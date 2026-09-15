@@ -129,8 +129,11 @@ public final class ChatHistory {
         return kept;
     }
 
-    /** Tells the save the history changed; nothing without one. */
-    private static void changed() {
+    /**
+     * Tells the save the history changed; nothing without one. The
+     * console stream is written with the history and says so here too.
+     */
+    static synchronized void changed() {
         if (store != null) {
             store.markDirty();
         }
@@ -616,6 +619,17 @@ public final class ChatHistory {
             return new Audience(null, null, null, false);
         }
 
+        /**
+         * Whoever may read the channel when they ask: a gated channel's
+         * line — the Operator channel's, the Console's, a configured
+         * read gate's — reaches every account the gate admits at replay,
+         * a role granted afterwards included, the way a Discord channel
+         * shows its past to whoever is let in.
+         */
+        public static Audience readers() {
+            return new Audience(null, null, null, true);
+        }
+
         /** Whether the audience is everyone: no accounts, party, faction or gate. */
         boolean isOpen() {
             return this.accounts == null && this.partyId == null
@@ -650,9 +664,8 @@ public final class ChatHistory {
          * any of its characters at will, so owning one is being reachable
          * by it. {@code gated} asks the channel's read gate again besides.
          */
-        public static Audience faction(String factionId, Collection<UUID> sentTo,
-                                       boolean gated) {
-            return new Audience(gated ? sentTo : null, null, factionId, gated);
+        public static Audience faction(String factionId, boolean gated) {
+            return new Audience(null, null, factionId, gated);
         }
 
         /** Nobody: what a line recorded without an audience gets. */

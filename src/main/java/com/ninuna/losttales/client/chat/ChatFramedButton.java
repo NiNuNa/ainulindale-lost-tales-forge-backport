@@ -20,9 +20,11 @@ import org.lwjgl.opengl.GL11;
  * tab's are.</p>
  *
  * <p>The tab row's search control, the input bar's channel indicator,
- * the jump-to-present button and a hovered message's toolbar are framed
- * buttons: their content centred inside, at least {@link #PADDING} clear
- * pixels from the ink.</p>
+ * the jump-to-present button, a hovered message's toolbar and the
+ * reaction chips are framed buttons: their content centred inside, at
+ * least {@link #PADDING} clear pixels from the ink — {@link #WIDE_PADDING}
+ * for the two standing in the window's strips, the search control and
+ * the indicator, which have the room for it.</p>
  */
 final class ChatFramedButton {
     /** A corner cell's size; a frame is at least two corners each way. */
@@ -37,6 +39,9 @@ final class ChatFramedButton {
     static final int PADDING = 2;
     /** From the footprint's outer edge to what the button holds. */
     static final int INSET = EDGE + PADDING;
+    /** The strips' buttons keep a wider clearing round what they hold. */
+    static final int WIDE_PADDING = 3;
+    static final int WIDE_INSET = EDGE + WIDE_PADDING;
 
     private ChatFramedButton() {}
 

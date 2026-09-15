@@ -110,8 +110,8 @@ final class ChatChannelIcons {
             ItemStack banner = LotrFactionBannerResolver.bannerFor(
                     ClientChatChannelState.wornFactionId(ChatChannel.FACTION));
             if (banner != null) {
-                // The banner fills the icon box exactly as a shared
-                // item's icon fills its inline content box.
+                // Crisp at whole display pixels per texel, never cut,
+                // as an item's icon in a line is drawn.
                 ChatInlineIcons.drawItem(minecraft, banner, x, y, SIZE, alpha);
                 return;
             }

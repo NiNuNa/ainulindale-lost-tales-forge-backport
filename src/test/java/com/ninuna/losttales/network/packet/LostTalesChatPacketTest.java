@@ -672,7 +672,9 @@ public final class LostTalesChatPacketTest {
         // for a line that quotes nothing. An empty string is one byte
         // of length; the tail is a head (17 and a flag), a skin, a
         // component and a count of named players.
-        int tail = 17 + 1 + 1 + 1 + 4 + 4;
+        // The tab a command's answer is filed under is one more byte
+        // of length, appended last.
+        int tail = 17 + 1 + 1 + 1 + 4 + 4 + 1;
         int quoteBlock = 1 + 1 + 4;
         ByteBuf older = Unpooled.buffer();
         older.writeBytes(buffer, buffer.readableBytes() - tail - quoteBlock);
@@ -1172,8 +1174,10 @@ public final class LostTalesChatPacketTest {
         LostTalesPacketCodec.writeUtf8String(probe, "", 128);
         LostTalesPacketCodec.writeUtf8String(probe, "", 8192);
         probe.writeInt(0);
-        // And the reactions, none.
+        // And the reactions, none, and the tab a command's answer is
+        // filed under, none.
         probe.writeInt(0);
+        LostTalesPacketCodec.writeUtf8String(probe, "", 384);
         return probe.readableBytes();
     }
 }

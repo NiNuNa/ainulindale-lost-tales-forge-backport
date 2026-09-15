@@ -438,7 +438,7 @@ public final class ChatHistoryTest {
     @Test
     public void aFactionLineReplaysToCharactersOfTheFactionThenAndNow() {
         record(ChatChannel.FACTION, ALICE, "for Gondor", Arrays.asList(ALICE, BOB),
-                ChatHistory.Audience.faction(GONDOR, Arrays.asList(ALICE, BOB), false));
+                ChatHistory.Audience.faction(GONDOR, false));
         // A Gondor character made before the line: shown it, online then or not.
         assertEquals(1, ChatHistory.replayFor(
                 new ChatHistory.Requester(CAROL, GONDOR, SENT_AT - 1L, null, EVERY_CHANNEL),
@@ -456,19 +456,24 @@ public final class ChatHistoryTest {
                 ChatMessageIds.NONE).isEmpty());
     }
 
-    /** A staff line reaches who was sent it and may still read the channel. */
+    /** A staff line reaches whoever may read the channel now, and nobody else. */
     @Test
-    public void aGatedLineNeedsThenAndNow() {
+    public void aGatedLineReachesWhoMayReadItNow() {
         record(ChatChannel.ADMIN, ALICE, "staff only", Arrays.asList(ALICE, BOB),
-                ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB), true));
+                ChatHistory.Audience.readers());
         assertEquals(1, ChatHistory.replayFor(requester(BOB), ChatMessageIds.NONE).size());
         // Bob was an operator then but is not any more.
         assertTrue(ChatHistory.replayFor(
                 new ChatHistory.Requester(BOB, "", 0L, null,
                         Collections.singletonList(ChatChannel.ALL)),
                 ChatMessageIds.NONE).isEmpty());
-        // Carol is an operator now but was not sent it.
-        assertTrue(ChatHistory.replayFor(requester(CAROL), ChatMessageIds.NONE).isEmpty());
+        // Carol was not sent it but is an operator now: the channel's past is hers.
+        assertEquals(1, ChatHistory.replayFor(requester(CAROL), ChatMessageIds.NONE).size());
+        // A gated line written with an account list keeps to that list.
+        record(ChatChannel.ADMIN, ALICE, "for these two", Arrays.asList(ALICE, BOB),
+                ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB), true));
+        assertEquals(1, ChatHistory.replayFor(requester(CAROL), ChatMessageIds.NONE).size());
+        assertEquals(2, ChatHistory.replayFor(requester(BOB), ChatMessageIds.NONE).size());
     }
 
     /** Where a player stood cannot be asked again: proximity reaches who was near. */
@@ -492,10 +497,10 @@ public final class ChatHistoryTest {
     public void anAccountIsReplayedEveryFactionItHasACharacterIn() {
         long gondorLine = record(ChatChannel.FACTION, ALICE, "for Gondor",
                 Arrays.asList(ALICE),
-                ChatHistory.Audience.faction(GONDOR, Arrays.asList(ALICE), false));
+                ChatHistory.Audience.faction(GONDOR, false));
         long mordorLine = record(ChatChannel.FACTION, BOB, "for Mordor",
                 Arrays.asList(BOB),
-                ChatHistory.Audience.faction("MORDOR", Arrays.asList(BOB), false));
+                ChatHistory.Audience.faction("MORDOR", false));
 
         java.util.Map<String, Long> both = new java.util.HashMap<String, Long>();
         both.put(GONDOR, Long.valueOf(SENT_AT - 1L));
@@ -539,14 +544,14 @@ public final class ChatHistoryTest {
     public void oneConversationIsReplayedOnItsOwnAndOnlyWhatIsNew() {
         long first = record(ChatChannel.FACTION, ALICE, "for Gondor",
                 Arrays.asList(ALICE),
-                ChatHistory.Audience.faction(GONDOR, Arrays.asList(ALICE), false),
+                ChatHistory.Audience.faction(GONDOR, false),
                 GONDOR);
         long second = record(ChatChannel.FACTION, ALICE, "and again",
                 Arrays.asList(ALICE),
-                ChatHistory.Audience.faction(GONDOR, Arrays.asList(ALICE), false),
+                ChatHistory.Audience.faction(GONDOR, false),
                 GONDOR);
         record(ChatChannel.FACTION, BOB, "for Mordor", Arrays.asList(BOB),
-                ChatHistory.Audience.faction("MORDOR", Arrays.asList(BOB), false),
+                ChatHistory.Audience.faction("MORDOR", false),
                 "MORDOR");
         record(ChatChannel.ALL, ALICE, "hello", Arrays.asList(ALICE),
                 ChatHistory.Audience.everyone());

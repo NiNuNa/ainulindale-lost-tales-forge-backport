@@ -231,16 +231,17 @@ final class ChatTabActions {
     }
 
     /**
-     * Lets a window fill the screen, or gives it back the place and size
-     * it had, which filling the screen leaves as they were. The window
-     * comes to the front either way, since it is the one being looked at.
+     * Lets a window fill a part of the screen, or gives it back the
+     * place and size it had, which filling the screen leaves as they
+     * were. The window comes to the front either way, since it is the
+     * one being looked at.
      */
-    void setWindowFullscreen(ChatWindow window, boolean fullscreen) {
+    void setWindowFill(ChatWindow window, ChatWindow.ScreenFill fill) {
         if (window == null) {
             return;
         }
         ChatWindowLayout.raise(window.getId());
-        ChatWindowLayout.setFullscreen(window.getId(), fullscreen, true);
+        ChatWindowLayout.setFill(window.getId(), fill, true);
     }
 
     /**
@@ -284,7 +285,8 @@ final class ChatTabActions {
             ChatWindow candidate = ChatWindowLayout.window(other.windowId);
             // A window filling the screen has no edge of its own to be
             // stuck to.
-            if (candidate != null && !candidate.isFullscreen()
+            if (candidate != null
+                    && candidate.getFill() == ChatWindow.ScreenFill.NONE
                     && touchingSide(frame, candidate) != null) {
                 return candidate;
             }

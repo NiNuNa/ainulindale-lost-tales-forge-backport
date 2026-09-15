@@ -1,6 +1,7 @@
 package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
@@ -88,15 +89,29 @@ public final class ChatHistoryNbtCodec {
     private static final String TAG_REACTOR_NAME = "Name";
     private static final String TAG_UUID_MOST = "Most";
     private static final String TAG_UUID_LEAST = "Least";
+    /** The operator console's events, written beside the lines. */
+    private static final String TAG_CONSOLE_EVENTS = "ConsoleEvents";
+    private static final String TAG_EVENT_ID = "Id";
+    private static final String TAG_EVENT_TIMESTAMP = "Timestamp";
+    private static final String TAG_EVENT_KIND = "Kind";
+    private static final String TAG_EVENT_SEVERITY = "Severity";
+    private static final String TAG_EVENT_ACTOR = "Actor";
+    private static final String TAG_EVENT_TEXT = "Text";
+    private static final String TAG_EVENT_CONTEXT = "Context";
+    static final int MAX_CONSOLE_EVENTS = ChatConsoleStream.MAX_EVENTS;
 
     /** The most accounts one entry may name before it is quarantined. */
     static final int MAX_ACCOUNTS_PER_ENTRY = 4096;
 
     private ChatHistoryNbtCodec() {}
 
-    /** Writes the entries oldest first, by message id, and the quarantine as it was read. */
+    /**
+     * Writes the entries oldest first, by message id, the console's
+     * events oldest first beside them, and the quarantine as it was read.
+     */
     public static void write(NBTTagCompound output,
                              Collection<ChatHistory.Entry> entries,
+                             Collection<ChatConsoleEvent> consoleEvents,
                              Collection<NBTTagCompound> quarantinedEntries) {
         output.setInteger(TAG_DATA_VERSION, CURRENT_ROOT_DATA_VERSION);
         List<ChatHistory.Entry> ordered = new ArrayList<ChatHistory.Entry>();
@@ -132,7 +147,92 @@ public final class ChatHistoryNbtCodec {
                     Integer.valueOf(unwritable));
         }
         output.setTag(TAG_ENTRIES, list);
+        output.setTag(TAG_CONSOLE_EVENTS, writeConsoleEvents(consoleEvents));
         output.setTag(TAG_QUARANTINE, writeQuarantine(quarantine));
+    }
+
+    /** The console's events oldest first, by id, each whole. */
+    private static NBTTagList writeConsoleEvents(
+            Collection<ChatConsoleEvent> events) {
+        List<ChatConsoleEvent> ordered = new ArrayList<ChatConsoleEvent>();
+        if (events != null) {
+            for (ChatConsoleEvent event : events) {
+                if (event != null) {
+                    ordered.add(event);
+                }
+            }
+        }
+        Collections.sort(ordered, EVENT_ORDER);
+        NBTTagList list = new NBTTagList();
+        for (ChatConsoleEvent event : ordered) {
+            NBTTagCompound tag = new NBTTagCompound();
+            tag.setLong(TAG_EVENT_ID, event.getId());
+            tag.setLong(TAG_EVENT_TIMESTAMP, event.getTimestampMillis());
+            tag.setString(TAG_EVENT_KIND, event.getKind().name());
+            tag.setString(TAG_EVENT_SEVERITY, event.getSeverity().name());
+            tag.setString(TAG_EVENT_ACTOR, event.getActor());
+            tag.setString(TAG_EVENT_TEXT, event.getText());
+            tag.setString(TAG_EVENT_CONTEXT, event.getContext());
+            list.appendTag(tag);
+        }
+        return list;
+    }
+
+    /**
+     * One console event as the save holds it, or null with the reason
+     * when the save cannot vouch for it: a kind or severity this build
+     * does not know, an id that is none, words past the event's own
+     * bounds or none at all.
+     */
+    private static ChatConsoleEvent readConsoleEvent(NBTTagCompound raw,
+                                                     String[] failureReason) {
+        if (!raw.hasKey(TAG_EVENT_ID, Constants.NBT.TAG_LONG)
+                || !raw.hasKey(TAG_EVENT_TIMESTAMP, Constants.NBT.TAG_LONG)
+                || !raw.hasKey(TAG_EVENT_KIND, Constants.NBT.TAG_STRING)
+                || !raw.hasKey(TAG_EVENT_SEVERITY, Constants.NBT.TAG_STRING)
+                || !raw.hasKey(TAG_EVENT_ACTOR, Constants.NBT.TAG_STRING)
+                || !raw.hasKey(TAG_EVENT_TEXT, Constants.NBT.TAG_STRING)
+                || !raw.hasKey(TAG_EVENT_CONTEXT, Constants.NBT.TAG_STRING)) {
+            failureReason[0] = "missing_event_field";
+            return null;
+        }
+        long id = raw.getLong(TAG_EVENT_ID);
+        ChatConsoleEvent.Kind kind = kindOf(raw.getString(TAG_EVENT_KIND));
+        ChatConsoleEvent.Severity severity =
+                severityOf(raw.getString(TAG_EVENT_SEVERITY));
+        String actor = raw.getString(TAG_EVENT_ACTOR);
+        String text = raw.getString(TAG_EVENT_TEXT);
+        String context = raw.getString(TAG_EVENT_CONTEXT);
+        if (id <= 0L || kind == null || severity == null
+                || actor.length() > ChatConsoleEvent.MAX_ACTOR_LENGTH
+                || text.trim().length() == 0
+                || text.length() > ChatConsoleEvent.MAX_TEXT_LENGTH
+                || context.length() > ChatConsoleEvent.MAX_CONTEXT_LENGTH
+                || !ChatConsoleEvent.isContext(context)) {
+            failureReason[0] = "invalid_event";
+            return null;
+        }
+        return new ChatConsoleEvent(id, raw.getLong(TAG_EVENT_TIMESTAMP),
+                kind, severity, actor, text, context);
+    }
+
+    private static ChatConsoleEvent.Kind kindOf(String name) {
+        for (ChatConsoleEvent.Kind kind : ChatConsoleEvent.Kind.values()) {
+            if (kind.name().equals(name)) {
+                return kind;
+            }
+        }
+        return null;
+    }
+
+    private static ChatConsoleEvent.Severity severityOf(String name) {
+        for (ChatConsoleEvent.Severity severity
+                : ChatConsoleEvent.Severity.values()) {
+            if (severity.name().equals(name)) {
+                return severity;
+            }
+        }
+        return null;
     }
 
     /** What is kept of a line that could not be written: its names, not its bytes. */
@@ -198,7 +298,39 @@ public final class ChatHistoryNbtCodec {
             }
         }
         Collections.sort(entries, ENTRY_ORDER);
-        return ReadResult.success(entries, repaired, quarantinedEntries);
+        if (safeSource.hasKey(TAG_CONSOLE_EVENTS)
+                && !safeSource.hasKey(TAG_CONSOLE_EVENTS, Constants.NBT.TAG_LIST)) {
+            return ReadResult.unsupported(safeSource, -1);
+        }
+        // A save without the console's events is one from before they
+        // were kept: read as an empty console, and written whole.
+        repaired |= !safeSource.hasKey(TAG_CONSOLE_EVENTS, Constants.NBT.TAG_LIST);
+        List<ChatConsoleEvent> events = new ArrayList<ChatConsoleEvent>();
+        Set<Long> seenEventIds = new HashSet<Long>();
+        NBTTagList eventList = safeSource.getTagList(TAG_CONSOLE_EVENTS,
+                Constants.NBT.TAG_COMPOUND);
+        for (int index = 0; index < eventList.tagCount(); index++) {
+            NBTTagCompound raw = eventList.getCompoundTagAt(index);
+            String[] failureReason = new String[1];
+            ChatConsoleEvent event = readConsoleEvent(raw, failureReason);
+            if (event == null) {
+                quarantinedEntries.add(createQuarantineEntry(
+                        failureReason[0], index, raw));
+                repaired = true;
+            } else if (!seenEventIds.add(Long.valueOf(event.getId()))) {
+                quarantinedEntries.add(createQuarantineEntry(
+                        "duplicate_event", index, raw));
+                repaired = true;
+            } else if (events.size() >= MAX_CONSOLE_EVENTS) {
+                quarantinedEntries.add(createQuarantineEntry(
+                        "over_capacity", index, raw));
+                repaired = true;
+            } else {
+                events.add(event);
+            }
+        }
+        Collections.sort(events, EVENT_ORDER);
+        return ReadResult.success(entries, events, repaired, quarantinedEntries);
     }
 
     static NBTTagCompound writeEntry(ChatHistory.Entry entry) {
@@ -564,6 +696,17 @@ public final class ChatHistoryNbtCodec {
                 }
             };
 
+    /** Oldest first: the console's ids come from the same allocator. */
+    private static final Comparator<ChatConsoleEvent> EVENT_ORDER =
+            new Comparator<ChatConsoleEvent>() {
+                @Override
+                public int compare(ChatConsoleEvent left, ChatConsoleEvent right) {
+                    long a = left.getId();
+                    long b = right.getId();
+                    return a < b ? -1 : a == b ? 0 : 1;
+                }
+            };
+
     private static final class EntryReadResult {
         final ChatHistory.Entry entry;
         final String failureReason;
@@ -610,18 +753,22 @@ public final class ChatHistoryNbtCodec {
 
     public static final class ReadResult {
         private final List<ChatHistory.Entry> entries;
+        private final List<ChatConsoleEvent> consoleEvents;
         private final boolean repaired;
         private final List<NBTTagCompound> quarantineEntries;
         private final boolean readOnly;
         private final int unsupportedVersion;
         private final NBTTagCompound originalData;
 
-        private ReadResult(List<ChatHistory.Entry> entries, boolean repaired,
+        private ReadResult(List<ChatHistory.Entry> entries,
+                           List<ChatConsoleEvent> consoleEvents, boolean repaired,
                            List<NBTTagCompound> quarantineEntries,
                            boolean readOnly, int unsupportedVersion,
                            NBTTagCompound originalData) {
             this.entries = Collections.unmodifiableList(
                     new ArrayList<ChatHistory.Entry>(entries));
+            this.consoleEvents = Collections.unmodifiableList(
+                    new ArrayList<ChatConsoleEvent>(consoleEvents));
             this.repaired = repaired;
             this.quarantineEntries = Collections.unmodifiableList(
                     new ArrayList<NBTTagCompound>(quarantineEntries));
@@ -631,13 +778,16 @@ public final class ChatHistoryNbtCodec {
         }
 
         private static ReadResult success(List<ChatHistory.Entry> entries,
+                                          List<ChatConsoleEvent> consoleEvents,
                                           boolean repaired,
                                           List<NBTTagCompound> quarantine) {
-            return new ReadResult(entries, repaired, quarantine, false, -1, null);
+            return new ReadResult(entries, consoleEvents, repaired, quarantine,
+                    false, -1, null);
         }
 
         private static ReadResult unsupported(NBTTagCompound original, int version) {
-            return new ReadResult(Collections.<ChatHistory.Entry>emptyList(), false,
+            return new ReadResult(Collections.<ChatHistory.Entry>emptyList(),
+                    Collections.<ChatConsoleEvent>emptyList(), false,
                     Collections.<NBTTagCompound>emptyList(), true, version,
                     (NBTTagCompound)original.copy());
         }
@@ -645,6 +795,11 @@ public final class ChatHistoryNbtCodec {
         /** The kept lines, oldest first. */
         public List<ChatHistory.Entry> getEntries() {
             return this.entries;
+        }
+
+        /** The console's kept events, oldest first. */
+        public List<ChatConsoleEvent> getConsoleEvents() {
+            return this.consoleEvents;
         }
 
         public boolean wasRepaired() {

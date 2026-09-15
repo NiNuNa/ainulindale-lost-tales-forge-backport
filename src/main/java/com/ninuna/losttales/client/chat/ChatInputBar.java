@@ -31,6 +31,22 @@ import org.lwjgl.opengl.GL11;
 final class ChatInputBar {
     /** Height vanilla gives the chat's field, kept for the one we draw. */
     static final int FIELD_HEIGHT = 12;
+    /** Clear rows between the bar's edges and what stands on it. */
+    static final int CLEARANCE = 2;
+    /**
+     * Height of what stands on the bar: the channel indicator's frame —
+     * the icon's box with the strips' wide inset above and below it —
+     * and the typing well, level with it, so the two read as one row of
+     * controls. The bar's buttons are shorter and centred on the same
+     * middle.
+     */
+    static final int CONTENT_HEIGHT =
+            ChatChannelIcons.SIZE + 2 * ChatFramedButton.WIDE_INSET;
+    /**
+     * Height of the bar strip: the window's bottom rule, then what
+     * stands on the bar with the clearance above and below it.
+     */
+    static final int HEIGHT = 1 + CLEARANCE + CONTENT_HEIGHT + CLEARANCE;
     /** The pickers and lists take the bar's top plus this as their floor. */
     private static final int INPUT_ANCHOR_BELOW_BAR = 14;
     /** The send button is the rightmost bar control. */
@@ -74,13 +90,6 @@ final class ChatInputBar {
     private static final int CHARACTER_HEAD_INSET = 2;
     private static final int CHARACTER_HEAD_SIZE =
             LostTalesChatOverlayRenderer.HEAD_SIZE;
-    /**
-     * The channel indicator's frame height: the icon's box with the
-     * frame's inset above and below it, centred on the bar's middle as
-     * the bar's other controls are.
-     */
-    private static final int INDICATOR_FRAME_HEIGHT =
-            ChatChannelIcons.SIZE + 2 * ChatFramedButton.INSET;
     /** The chevron's frames, pointing right through upright to left. */
     private static final ChatIconSheet[] TOGGLE_FRAMES = {
             ChatIconSheet.TOGGLE_1, ChatIconSheet.TOGGLE_2,
@@ -97,10 +106,7 @@ final class ChatInputBar {
     private ChatInputField field;
     private int screenHeight;
 
-    /**
-     * When the bar's entrance began: the screen opening, and again
-     * whenever the bar arrives in another window.
-     */
+    /** When the bars' entrance began: the screen opening. */
     private long entranceNanos = System.nanoTime();
     /**
      * The indicator's marquee, as a tab's: how long the pointer has
@@ -116,20 +122,17 @@ final class ChatInputBar {
     private float sendFade;
     private long sendFadeNanos;
     /**
-     * The active window's bar this frame — the window holding the
-     * selected channel — in whole pixels plus the fractional remainder
-     * the bar group is drawn with, so it lands exactly on the window.
+     * The bar being drawn this frame — the active window's, the window
+     * holding the selected channel, except while another window's
+     * resting bar borrows the geometry — in whole pixels plus the
+     * fractional remainder the bar group is drawn with, so it lands
+     * exactly on the window.
      */
     private int left = 2;
     private int top;
     private int right;
     private float fractionX;
     private float fractionY;
-    /**
-     * The window the bar is in, so its arrival in another one can be
-     * told from a redraw of the one it is already in.
-     */
-    private String windowId;
     private long noticeNanos;
     private String noticeText = "";
 
@@ -206,6 +209,11 @@ final class ChatInputBar {
             this.fractionY = 0.0F;
             return;
         }
+        placeOn(frame);
+    }
+
+    /** Places the bar on the window's bar strip, as just drawn. */
+    private void placeOn(ChatWindowFrame frame) {
         double boxLeft = frame.boxLeft;
         double barTop = frame.barTop();
         this.left = (int)Math.floor(boxLeft);
@@ -214,22 +222,6 @@ final class ChatInputBar {
         this.fractionY = (float)(barTop - this.top);
         this.right = this.left + (int)Math.round(
                 frame.boxRight - frame.boxLeft);
-    }
-
-    /**
-     * Notices the bar changing hands. It is not carried between windows:
-     * it goes with the window it is leaving and arrives in the new one on
-     * the same entrance from below it plays when the screen opens — the
-     * bar alone, since the window it lands on is already there.
-     */
-    void noteInputWindow() {
-        ChatWindowFrame frame = activeFrame();
-        String current = frame == null ? null : frame.windowId;
-        if (current != null && this.windowId != null
-                && !current.equals(this.windowId)) {
-            this.entranceNanos = System.nanoTime();
-        }
-        this.windowId = current;
     }
 
     int left() {
@@ -291,17 +283,22 @@ final class ChatInputBar {
 
     /**
      * Top of the typing well on a bar strip starting at {@code barTop}:
-     * one message row, centred in the rows below the rule like the
-     * controls, which are as tall.
+     * the clearance below the rule, as tall as the indicator's frame
+     * beside it and level with it.
      */
     static int wellTopFor(int barTop) {
-        return barTop + 1 + (ChatWindowPlacement.INPUT_HEIGHT - 1
-                - LostTalesChatOverlayRenderer.LINE_HEIGHT) / 2;
+        return barTop + 1 + CLEARANCE;
     }
 
-    /** {@link #barTextTop} for a bar strip starting at {@code barTop}. */
+    /**
+     * {@link #barTextTop} for a bar strip starting at {@code barTop}: a
+     * message row centred in the well, and the text where a message row
+     * puts it.
+     */
     static int textTopFor(int barTop) {
-        return wellTopFor(barTop) + LostTalesChatOverlayRenderer.ROW_TEXT_TOP;
+        return wellTopFor(barTop)
+                + (CONTENT_HEIGHT - LostTalesChatOverlayRenderer.LINE_HEIGHT) / 2
+                + LostTalesChatOverlayRenderer.ROW_TEXT_TOP;
     }
 
     /** The anchor the pickers hang their buttons and panels from. */
@@ -482,43 +479,125 @@ final class ChatInputBar {
 
     /**
      * The active window's input bar in the chat's surface — the
-     * palette's plum black at the same half opacity as the message
-     * backdrop — exactly as wide as the window, with holes cut in it
-     * for the channel indicator's frame and the typing well, and the
-     * empty field's hint in the well. The
-     * strip's first row is the window's bottom rule, drawn with the
-     * window, so the bar's own paint begins one row below it and never
-     * darkens the rule.
+     * history's own colour at the same half opacity as the message
+     * backdrop, one flat stretch of it — exactly as wide as the window,
+     * with holes cut in it for the channel indicator's frame and the
+     * typing well, and the empty field's hint in the well. The strip's
+     * first row is the window's bottom rule, drawn with the window, so
+     * the bar's own paint begins one row below it and never darkens the
+     * rule.
      */
     void drawBar(int barRight) {
         IndicatorFit fit = indicatorFit(barRight);
         ChatInputLine line = lineAfter(fit.inkRight, barRight);
+        drawBarSurface(activeFrame(), fit, line, barRight);
+        drawHint(line, this.field.getText(), fit.channel);
+        this.field.drawTextBox();
+    }
+
+    /**
+     * The bar's surface with its holes, the well in them, and the
+     * window's frame edges beside and under the bar, which are the bar's
+     * own: drawn over its fill, so nothing darkens them, and arriving
+     * with the bar's fly-in.
+     */
+    private void drawBarSurface(ChatWindowFrame frame, IndicatorFit fit,
+                                ChatInputLine line, int barRight) {
         int wellTop = wellTopFor(this.top);
-        int wellBottom = wellTop + LostTalesChatOverlayRenderer.LINE_HEIGHT;
+        int wellBottom = wellTop + CONTENT_HEIGHT;
         int barBottom = this.top + ChatWindowPlacement.INPUT_HEIGHT;
         int frameTop = indicatorFrameTop();
+        float opacity = LostTalesChatVisualStyle.chatOpacity(this.mc);
+        int surface = LostTalesChatVisualStyle.surfaceArgb(opacity);
         // Up to the divider after the indicator, around the indicator's
         // frame, whose corner pixels the frame's rounding leaves to the
         // bar; from the divider on, around the typing well.
         LostTalesChatVisualStyle.fillAround(this.left, this.top + 1,
                 line.leftDividerX, barBottom, fit.frameLeft, frameTop,
-                fit.frameRight, frameTop + INDICATOR_FRAME_HEIGHT,
-                LostTalesChatVisualStyle.SURFACE);
+                fit.frameRight, frameTop + CONTENT_HEIGHT, surface);
         ChatFramedButton.fillCorners(fit.frameLeft, frameTop,
-                fit.frameRight - fit.frameLeft, INDICATOR_FRAME_HEIGHT,
-                LostTalesChatVisualStyle.SURFACE);
+                fit.frameRight - fit.frameLeft, CONTENT_HEIGHT, surface);
         LostTalesChatVisualStyle.fillAround(line.leftDividerX, this.top + 1,
                 barRight, barBottom, line.wellLeft, wellTop, line.wellRight,
-                wellBottom, LostTalesChatVisualStyle.SURFACE);
-        drawWell(line, wellTop, wellBottom);
-        // The window's frame edges beside and under the bar are the
-        // bar's own: drawn over its fill, so nothing darkens them, and
-        // arriving with the bar's fly-in.
-        drawBarLeftEdge(activeFrame(), this.left, this.top);
+                wellBottom, surface);
+        drawWell(line, wellTop, wellBottom,
+                LostTalesChatVisualStyle.insetArgb(opacity));
+        drawBarLeftEdge(frame, this.left, this.top);
         LostTalesChatOverlayRenderer.drawBarBottomEdge(this.left, barRight,
                 this.top + ChatWindowPlacement.INPUT_HEIGHT - 1, 255);
-        drawHint(line);
-        this.field.drawTextBox();
+    }
+
+    /**
+     * Another drawn window's bar: the same bar the active window wears,
+     * at rest — its surface, its well holding the front tab's unsent
+     * draft or the hint, that tab's channel indicator and speaker, the
+     * buttons unlit — so every window reads as a place to type, while
+     * only the active window's bar is typed in. Nothing here answers
+     * the pointer beyond the strip itself; a press on it moves the
+     * input to this window. Drawn where the live bar's geometry would
+     * put it, which is borrowed for the draw and given back.
+     */
+    void drawRestingBar(ChatWindowFrame frame, ChatWindow window) {
+        ChatTab tab = ChatWindowFrame.activeTab(window,
+                ChatWindowFrame.visibleTabs(window));
+        if (tab == null || frame == null || !frame.drawn) {
+            return;
+        }
+        int liveLeft = this.left;
+        int liveTop = this.top;
+        int liveRight = this.right;
+        float liveFractionX = this.fractionX;
+        float liveFractionY = this.fractionY;
+        placeOn(frame);
+        int barRight = this.right;
+        GL11.glPushMatrix();
+        try {
+            GL11.glTranslatef(this.fractionX, this.fractionY + entranceOffset(),
+                    0.0F);
+            String draft = ClientChatChannelState.getDraft(tab);
+            IndicatorFit fit = indicatorFit(barRight, tab);
+            ChatInputLine line = lineAfter(fit.inkRight, barRight);
+            drawBarSurface(frame, fit, line, barRight);
+            drawHint(line, draft, tab);
+            drawDraft(line, draft);
+            drawCharacterHead(tab, characterButtonLeft(), barControlTop(), 0);
+            drawIndicatorFrame(fit, 0.0F, false);
+            int toggleLeft = toolbarToggleLeft(barRight);
+            this.toolbarToggle.drawSettled(ChatWindowLayout.isToolbarCollapsed(),
+                    toggleLeft, barControlTop() + 1, ChatPickerPanel.BUTTON_SIZE,
+                    ChatPickerPanel.BUTTON_SIZE, 255);
+            for (ChatPickerPanel picker : this.pickers) {
+                if (isPickerShown(picker)) {
+                    picker.drawRestingButton(barRight, pickerAnchor());
+                }
+            }
+            drawDividers(line, barRight);
+            drawSendGlyph(barRight, 0.0F, false);
+            drawCounter(line, draft);
+        } finally {
+            GL11.glPopMatrix();
+            this.regions.addWindow(this.left, this.top, barRight,
+                    this.top + ChatWindowPlacement.INPUT_HEIGHT);
+            this.left = liveLeft;
+            this.top = liveTop;
+            this.right = liveRight;
+            this.fractionX = liveFractionX;
+            this.fractionY = liveFractionY;
+        }
+    }
+
+    /**
+     * A resting bar's unsent draft, plain in the field's own ivory and
+     * cut to the field, where the live field would show it being typed.
+     */
+    private void drawDraft(ChatInputLine line, String draft) {
+        if (draft.length() == 0) {
+            return;
+        }
+        int x = line.fieldLeft + ChatInputField.CARET_WIDTH + 1;
+        LostTalesChatVisualStyle.drawColored(this.font,
+                this.font.trimStringToWidth(draft, line.fieldRight - x), x,
+                barTextTop(), LostTalesChatVisualStyle.IVORY, 255);
     }
 
     /**
@@ -527,14 +606,15 @@ final class ChatInputBar {
      * timestamp column is a step darker than the panel. It fills the
      * hole the bar leaves for it rather than lying over the bar, so the
      * line being typed reads as a place of its own in one flat colour.
-     * It is one message row, level with the bar's buttons, and lays out
-     * everything the field draws — the text, the caret, the selection
-     * wash and the previews — as a message row does.
+     * It is as tall as the indicator's frame beside it and holds one
+     * message row in its middle, laying out everything the field draws
+     * — the text, the caret, the selection wash and the previews — as a
+     * message row does.
      */
-    private static void drawWell(ChatInputLine line, int top, int bottom) {
+    private static void drawWell(ChatInputLine line, int top, int bottom,
+                                 int argb) {
         if (line.wellRight > line.wellLeft) {
-            Gui.drawRect(line.wellLeft, top, line.wellRight, bottom,
-                    LostTalesChatVisualStyle.SURFACE_INSET);
+            Gui.drawRect(line.wellLeft, top, line.wellRight, bottom, argb);
         }
     }
 
@@ -546,12 +626,11 @@ final class ChatInputBar {
      * of the caret waiting at the field's start and goes with the first
      * character typed.
      */
-    private void drawHint(ChatInputLine line) {
-        if (this.field.getText().length() > 0) {
+    private void drawHint(ChatInputLine line, String typed, ChatTab tab) {
+        if (typed.length() > 0) {
             return;
         }
-        String key = ClientChatChannelState.canSend(
-                ClientChatChannelState.getSelected())
+        String key = ClientChatChannelState.canSend(tab)
                 ? "gui.losttales.chat.input.hint"
                 : "gui.losttales.chat.input.hint.read_only";
         int x = line.fieldLeft + ChatInputField.CARET_WIDTH + 1;
@@ -641,28 +720,39 @@ final class ChatInputBar {
             this.indicatorMarquee = ChatChannelTabBar.eased(
                     this.indicatorMarquee, 0.0F, elapsed);
         }
+        drawIndicatorFrame(fit, this.indicatorFade, true);
+        this.regions.add(fit.frameLeft, this.top,
+                ChatInputLine.dividerAfter(fit.inkRight),
+                this.top + ChatWindowPlacement.INPUT_HEIGHT);
+    }
+
+    /**
+     * The indicator's framed button as laid out in {@code fit}, lit as
+     * far as {@code lit}: its surface in the hole the bar left for it,
+     * the channel's icon, its name — slid by the marquee only on the
+     * live bar — and the frame's ink.
+     */
+    private void drawIndicatorFrame(IndicatorFit fit, float lit,
+                                    boolean marquee) {
         int frameTop = indicatorFrameTop();
         int frameWidth = fit.frameRight - fit.frameLeft;
-        // The button's own surface, in the hole the bar left for it.
         ChatFramedButton.drawSurface(fit.frameLeft, frameTop, frameWidth,
-                INDICATOR_FRAME_HEIGHT, this.indicatorFade,
-                LostTalesChatVisualStyle.INSET_ALPHA);
+                CONTENT_HEIGHT, lit,
+                Math.round(LostTalesChatVisualStyle.INSET_ALPHA
+                        * LostTalesChatVisualStyle.chatOpacity(this.mc)));
         int textTop = barTextTop();
         if (fit.iconLeft >= 0) {
             // The icon's box stands in the frame's middle, the name's
             // capitals half a pixel above the box's.
             LostTalesChatVisualStyle.beginContent();
             ChatChannelIcons.draw(this.mc, fit.channel, fit.iconLeft,
-                    frameTop + ChatFramedButton.INSET, 255);
+                    frameTop + ChatFramedButton.WIDE_INSET, 255);
         }
         if (fit.labelRoom > 0) {
-            drawIndicatorLabel(fit, textTop, this.indicatorFade);
+            drawIndicatorLabel(fit, textTop, lit, marquee);
         }
         ChatFramedButton.drawInk(fit.frameLeft, frameTop, frameWidth,
-                INDICATOR_FRAME_HEIGHT, this.indicatorFade, 255);
-        this.regions.add(fit.frameLeft, this.top,
-                ChatInputLine.dividerAfter(fit.inkRight),
-                this.top + ChatWindowPlacement.INPUT_HEIGHT);
+                CONTENT_HEIGHT, lit, 255);
     }
 
     /**
@@ -673,7 +763,7 @@ final class ChatInputBar {
      * the frame's inside.
      */
     private void drawIndicatorLabel(IndicatorFit fit, int textTop,
-                                    float lit) {
+                                    float lit, boolean marquee) {
         // A read-only channel reads italic rather than faint: text is
         // always at full opacity.
         String text = ClientChatChannelState.canSend(fit.channel)
@@ -686,48 +776,28 @@ final class ChatInputBar {
                     fit.labelLeft, textTop, color, 255);
             return;
         }
-        // The scissor is in screen space, and the bar group is drawn
-        // shifted by its fraction.
-        boolean clipped = LostTalesChatOverlayRenderer.beginClip(this.mc,
-                fit.labelLeft + this.fractionX,
-                fit.labelLeft + fit.labelRoom + this.fractionX,
-                Double.NaN, Double.NaN, true);
-        if (!clipped) {
+        if (!marquee) {
+            // A resting bar's cut name simply ends where its room does.
             LostTalesChatVisualStyle.drawColored(this.font,
                     this.font.trimStringToWidth(text, fit.labelRoom),
                     fit.labelLeft, textTop, color, 255);
             return;
         }
+        // A cut name thins out into the edge it is cut at, as far as
+        // it has gone past it, the words themselves fading; the scissor
+        // is in screen space, and the bar group is drawn shifted by its
+        // fraction.
         double offset = ChatChannelTabBar.snapped(this.indicatorMarquee,
                 ChatChannelTabBar.displayStep());
-        try {
-            GL11.glPushMatrix();
-            try {
-                GL11.glTranslatef((float)-offset, 0.0F, 0.0F);
-                LostTalesChatVisualStyle.drawColored(this.font, text,
-                        fit.labelLeft, textTop, color, 255);
-            } finally {
-                GL11.glPopMatrix();
-            }
-            float left = fit.labelLeft;
-            float right = fit.labelLeft + fit.labelRoom;
-            float depth = LostTalesChatOverlayRenderer.sideFadeDepth(
-                    fit.labelRoom);
-            int top = indicatorFrameTop() + ChatFramedButton.EDGE;
-            int bottom = indicatorFrameTop() + INDICATOR_FRAME_HEIGHT
-                    - ChatFramedButton.EDGE;
-            int tone = ChatFramedButton.surfaceRgb(lit);
-            LostTalesChatOverlayRenderer.drawSideFade(left, right, top,
-                    bottom, depth, tone,
-                    ChatChannelTabBar.sideFadeAlpha(offset, depth, 255));
-            LostTalesChatOverlayRenderer.drawSideFade(right, left, top,
-                    bottom, depth, tone,
-                    ChatChannelTabBar.sideFadeAlpha(
-                            fit.labelWidth - offset - fit.labelRoom, depth,
-                            255));
-        } finally {
-            LostTalesChatOverlayRenderer.endVerticalClip(true);
-        }
+        float depth = LostTalesChatOverlayRenderer.sideFadeDepth(fit.labelRoom);
+        LostTalesChatOverlayRenderer.drawFadingText(this.mc, this.font, text,
+                fit.labelLeft, (float)-offset, textTop, color, 255,
+                fit.labelLeft + this.fractionX,
+                fit.labelLeft + fit.labelRoom + this.fractionX, Double.NaN,
+                depth,
+                LostTalesChatOverlayRenderer.sideFadeStrength(offset, depth),
+                LostTalesChatOverlayRenderer.sideFadeStrength(
+                        fit.labelWidth - offset - fit.labelRoom, depth));
     }
 
     /** Left edge of the character-selection button, the bar's first control. */
@@ -747,12 +817,11 @@ final class ChatInputBar {
     }
 
     /**
-     * Top of the indicator's frame: centred on the bar's middle, as the
-     * bar's other controls are, two clear rows above it and below.
+     * Top of the indicator's frame: the clearance below the rule, level
+     * with the typing well.
      */
     private int indicatorFrameTop() {
-        return this.top + 1 + (ChatWindowPlacement.INPUT_HEIGHT - 1
-                - INDICATOR_FRAME_HEIGHT) / 2;
+        return this.top + 1 + CLEARANCE;
     }
 
     /**
@@ -766,9 +835,13 @@ final class ChatInputBar {
      * narrowing with it. A channel without an icon keeps its name whole.
      */
     private IndicatorFit indicatorFit(int barRight) {
-        ChatTab channel = ClientChatChannelState.getSelected();
+        return indicatorFit(barRight, ClientChatChannelState.getSelected());
+    }
+
+    /** {@link #indicatorFit} for the bar of a window whose front tab is {@code channel}. */
+    private IndicatorFit indicatorFit(int barRight, ChatTab channel) {
         int frameLeft = indicatorLeft();
-        int iconLeft = frameLeft + ChatFramedButton.INSET;
+        int iconLeft = frameLeft + ChatFramedButton.WIDE_INSET;
         boolean icon = ChatChannelIcons.iconOf(channel) != null;
         int iconRight = icon ? iconLeft + ChatChannelIcons.SIZE : iconLeft;
         int gap = icon ? ChatChannelIcons.GAP : 0;
@@ -779,14 +852,14 @@ final class ChatInputBar {
         // which is not ink.
         int wholeContentRight = iconRight + whole - 1;
         ChatInputLine wholeLine = lineAfter(wholeContentRight
-                + ChatFramedButton.INSET, barRight);
+                + ChatFramedButton.WIDE_INSET, barRight);
         int shown = icon ? indicatorShown(whole,
                 wholeLine.fieldRight - wholeLine.fieldLeft) : whole;
         int contentRight = shown >= whole ? wholeContentRight
                 : iconRight + shown;
         return new IndicatorFit(channel, label, icon ? iconLeft : -1,
                 iconRight + gap, labelWidth, Math.max(0, shown - gap),
-                frameLeft, contentRight + ChatFramedButton.INSET);
+                frameLeft, contentRight + ChatFramedButton.WIDE_INSET);
     }
 
     /**
@@ -861,10 +934,23 @@ final class ChatInputBar {
         int buttonLeft = characterButtonLeft();
         int controlTop = barControlTop();
         boolean hovered = isInsideCharacterButton(mouseX, mouseY);
-        int lift = menuOpen || hovered ? 1 : 0;
+        drawCharacterHead(ClientChatChannelState.getSelected(), buttonLeft,
+                controlTop, menuOpen || hovered ? 1 : 0);
+        this.regions.add(buttonLeft, controlTop,
+                buttonLeft + ChatPickerPanel.BUTTON_SIZE,
+                controlTop + ChatPickerPanel.BUTTON_SIZE);
+        return hovered;
+    }
+
+    /**
+     * The head of whoever {@code tab} would currently speak as, in the
+     * character button's square, lifted {@code lift} pixels, with the
+     * padlock in the square's corner while the choice is locked.
+     */
+    private void drawCharacterHead(ChatTab tab, int buttonLeft,
+                                   int controlTop, int lift) {
         ClientChatAppearances.Appearance shown =
-                ClientChatAppearances.effectiveFor(
-                        ClientChatChannelState.getSelected());
+                ClientChatAppearances.effectiveFor(tab);
         UUID self = this.mc.thePlayer == null ? null
                 : this.mc.thePlayer.getUniqueID();
         if (self != null) {
@@ -885,18 +971,13 @@ final class ChatInputBar {
                         CHARACTER_HEAD_SIZE, 1.0F, 1.0F);
             }
         }
-        if (ClientChatAppearances.isLocked(
-                ClientChatChannelState.getSelected())) {
+        if (ClientChatAppearances.isLocked(tab)) {
             ChatLockAnimation.drawShut(
                     buttonLeft + ChatPickerPanel.BUTTON_SIZE
                             - ChatLockAnimation.SHUT_WIDTH,
                     controlTop + ChatPickerPanel.BUTTON_SIZE
                             - ChatLockAnimation.HEIGHT, 255);
         }
-        this.regions.add(buttonLeft, controlTop,
-                buttonLeft + ChatPickerPanel.BUTTON_SIZE,
-                controlTop + ChatPickerPanel.BUTTON_SIZE);
-        return hovered;
     }
 
     /**
@@ -938,7 +1019,7 @@ final class ChatInputBar {
         int frameTop = indicatorFrameTop();
         return mouseX >= fit.frameLeft && mouseX < fit.frameRight
                 && mouseY >= frameTop
-                && mouseY < frameTop + INDICATOR_FRAME_HEIGHT;
+                && mouseY < frameTop + CONTENT_HEIGHT;
     }
 
     /** The channel as the indicator names it: its shown name, as its tab does. */
@@ -971,7 +1052,10 @@ final class ChatInputBar {
      * insert.
      */
     void drawDividers(int barRight) {
-        ChatInputLine line = inputLine(barRight);
+        drawDividers(inputLine(barRight), barRight);
+    }
+
+    private void drawDividers(ChatInputLine line, int barRight) {
         int insertRight = barSlotLeft(barRight, SEND_BUTTON_INDEX + 1)
                 + ChatPickerPanel.BUTTON_SIZE;
         int sendLeft = barSlotLeft(barRight, SEND_BUTTON_INDEX);
@@ -991,41 +1075,41 @@ final class ChatInputBar {
     /**
      * The sheet's send button, centred in the button square at the bar's
      * right end, lifted a pixel and crossing to its lit artwork while
-     * hovered, as the picker buttons beside it do; a flat mauve while
-     * there is nothing to send and the pointer is away.
+     * hovered, as the picker buttons beside it do.
      */
     void drawSendButton(int barRight, double mouseX, double mouseY) {
         int buttonLeft = sendButtonLeft(barRight);
         int controlTop = barControlTop();
         boolean hovered = isInsideSendButton(mouseX, mouseY, barRight);
-        boolean ready = this.field.getText().trim().length() > 0;
         long now = System.nanoTime();
         double elapsed = this.sendFadeNanos == 0L ? 0.0D
                 : (now - this.sendFadeNanos) / 1.0E9D;
         this.sendFadeNanos = now;
         this.sendFade = LostTalesChatVisualStyle.hoverFade(this.sendFade,
                 hovered, elapsed);
-        int x = buttonLeft + (ChatPickerPanel.BUTTON_SIZE
-                - ChatIconSheet.SEND.getWidth()) / 2;
-        int y = controlTop + (ChatPickerPanel.BUTTON_SIZE
-                - ChatIconSheet.SEND.getHeight()) / 2 - (hovered ? 1 : 0);
-        // Text and glyphs are always fully opaque; the button says
-        // what it can do with its colour, not by fading out.
-        if (hovered || ready) {
-            ChatIconSheet.drawPairWithShadow(ChatIconSheet.SEND,
-                    ChatIconSheet.SEND_HOVER, this.sendFade, x, y, 255);
-        } else {
-            ChatIconSheet.SEND.drawSilhouetteWithShadow(
-                    LostTalesColors.rgb(LostTalesColors.MAUVE), x, y, 255);
-        }
+        drawSendGlyph(barRight, this.sendFade, hovered);
         this.regions.add(buttonLeft, controlTop,
                 buttonLeft + ChatPickerPanel.BUTTON_SIZE,
                 controlTop + ChatPickerPanel.BUTTON_SIZE);
     }
 
-    /** {@code 37/256} for a message; nothing for a command. */
-    private String counterText() {
-        String text = this.field.getText();
+    /**
+     * The send glyph in its square: the sheet's send artwork as drawn,
+     * crossed to its lit artwork as far as {@code lit} and lifted a
+     * pixel while {@code hovered}. Text and glyphs are always fully
+     * opaque.
+     */
+    private void drawSendGlyph(int barRight, float lit, boolean hovered) {
+        int x = sendButtonLeft(barRight) + (ChatPickerPanel.BUTTON_SIZE
+                - ChatIconSheet.SEND.getWidth()) / 2;
+        int y = barControlTop() + (ChatPickerPanel.BUTTON_SIZE
+                - ChatIconSheet.SEND.getHeight()) / 2 - (hovered ? 1 : 0);
+        ChatIconSheet.drawPairWithShadow(ChatIconSheet.SEND,
+                ChatIconSheet.SEND_HOVER, lit, x, y, 255);
+    }
+
+    /** {@code 37/256} for a message, {@code 0/256} for none yet; nothing for a command. */
+    private static String counterText(String text) {
         if (ChatInputRules.isCommand(text)) {
             return "";
         }
@@ -1069,18 +1153,22 @@ final class ChatInputBar {
      * leaves the slot empty, so typing one moves nothing.
      */
     void drawCounter(int barRight) {
-        String text = counterText();
+        drawCounter(inputLine(barRight), this.field.getText());
+    }
+
+    private void drawCounter(ChatInputLine line, String typed) {
+        String text = counterText(typed);
         if (text.length() == 0) {
             return;
         }
-        boolean full = ChatInputRules.atMessageLimit(this.field.getText());
+        boolean full = ChatInputRules.atMessageLimit(typed);
         // Its capitals centred on the full-size text's, and its shadow a
         // pixel of its own size away, as the timestamps' are.
         int factor = ChatWindowFrame.displayScaleFactor();
         float scale = counterScale(factor);
         GL11.glPushMatrix();
         try {
-            GL11.glTranslatef(inputLine(barRight).counterLeft, barTextTop()
+            GL11.glTranslatef(line.counterLeft, barTextTop()
                     + LostTalesChatVisualStyle.smallTextTopOffset(factor),
                     0.0F);
             GL11.glScalef(scale, scale, 1.0F);

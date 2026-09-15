@@ -883,7 +883,8 @@ public final class ChatWindowLayout {
         if (source.tabs().size() == moved.size()) {
             // Everything the window held: the window itself moves,
             // rather than an empty one being left behind.
-            source.setOffsets(clampPercent(offsetX), clampPercent(offsetY));
+            source.setOffsets(clampWindowPercent(offsetX),
+                    clampWindowPercent(offsetY));
             changed();
             return source;
         }
@@ -903,7 +904,8 @@ public final class ChatWindowLayout {
         window.setWidth(source.getWidth());
         window.tabs().addAll(moved);
         window.setActiveTab(moved.get(moved.size() - 1));
-        window.setOffsets(clampPercent(offsetX), clampPercent(offsetY));
+        window.setOffsets(clampWindowPercent(offsetX),
+                clampWindowPercent(offsetY));
         WINDOWS.add(window);
         changed();
         return window;
@@ -927,20 +929,23 @@ public final class ChatWindowLayout {
     }
 
     /**
-     * Lets a window fill the screen, or gives it back its own box: its
-     * position, width and height are kept as they were throughout, and
-     * are what it returns to. {@code persist} is false while a drag that
-     * took a window out of the screen is still moving, so the file is
-     * written once, on release.
+     * Lets a window fill a part of the screen — the whole of it, a half
+     * or a quarter — or gives it back its own box: its position, width
+     * and height are kept as they were throughout, and are what it
+     * returns to. {@code persist} is false while a drag that took a
+     * window out of the screen is still moving, so the file is written
+     * once, on release.
      */
-    public static synchronized boolean setFullscreen(String windowId,
-                                                     boolean fullscreen,
-                                                     boolean persist) {
+    public static synchronized boolean setFill(String windowId,
+                                               ChatWindow.ScreenFill fill,
+                                               boolean persist) {
         ChatWindow window = window(windowId);
-        if (window == null || window.isFullscreen() == fullscreen) {
+        ChatWindow.ScreenFill wanted = fill == null
+                ? ChatWindow.ScreenFill.NONE : fill;
+        if (window == null || window.getFill() == wanted) {
             return false;
         }
-        window.setFullscreen(fullscreen);
+        window.setFill(wanted);
         if (persist) {
             changed();
         }
@@ -974,7 +979,8 @@ public final class ChatWindowLayout {
         if (window == null) {
             return false;
         }
-        window.setOffsets(clampPercent(offsetX), clampPercent(offsetY));
+        window.setOffsets(clampWindowPercent(offsetX),
+                clampWindowPercent(offsetY));
         if (persist) {
             changed();
         }
@@ -1236,10 +1242,10 @@ public final class ChatWindowLayout {
                 if (window.tabs().isEmpty()) {
                     continue;
                 }
-                window.setOffsets(clampPercent(spec.offsetX),
-                        clampPercent(spec.offsetY));
+                window.setOffsets(clampWindowPercent(spec.offsetX),
+                        clampWindowPercent(spec.offsetY));
                 window.setLocked(spec.locked);
-                window.setFullscreen(spec.fullscreen);
+                window.setFill(spec.fill);
                 window.setMaxLines(clampWindowLines(spec.maxLines));
                 window.setWidth(clampChatWidth(spec.width));
                 window.setActiveTab(spec.activeTab);
@@ -1328,7 +1334,7 @@ public final class ChatWindowLayout {
                     window.isLocked(), window.getOffsetX(),
                     window.getOffsetY(), window.getLinkTarget(),
                     window.getLinkSide(), window.getMaxLines(),
-                    window.getWidth(), window.isFullscreen()));
+                    window.getWidth(), window.getFill()));
         }
         return result;
     }
@@ -1389,9 +1395,9 @@ public final class ChatWindowLayout {
         double baseline = ChatWindowPlacement.baselineForRowTop(
                 created, minecraft, corner.y);
         created.setOffsets(
-                clampPercent(ChatWindowPlacement.windowPercentX(
+                clampWindowPercent(ChatWindowPlacement.windowPercentX(
                         created, corner.x, minecraft, screenWidth)),
-                clampPercent(ChatWindowPlacement.windowPercentY(
+                clampWindowPercent(ChatWindowPlacement.windowPercentY(
                         baseline, minecraft, screenHeight)));
     }
 
@@ -1467,6 +1473,20 @@ public final class ChatWindowLayout {
     }
 
     /**
+     * A window's percent: between the margins as {@link #clampPercent},
+     * and past them by up to the window's own size either way, which is
+     * how far a window may hang off the screen
+     * ({@link ChatWindowPlacement#position}). A safety bound; where a
+     * window really stops is the screen's hold on it.
+     */
+    static double clampWindowPercent(double value) {
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
+            return 0.0D;
+        }
+        return Math.max(-100.0D, Math.min(200.0D, value));
+    }
+
+    /**
      * Plain description of one window, used by load and describe. Tabs
      * may be given as {@link ChatTab}s or as plain {@link ChatChannel}s.
      */
@@ -1488,8 +1508,8 @@ public final class ChatWindowLayout {
         final double maxLines;
         /** The window's own width; 0 follows the game setting. */
         final int width;
-        /** Whether the window fills the screen rather than its own box. */
-        final boolean fullscreen;
+        /** The part of the screen the window fills; none in its own box. */
+        final ChatWindow.ScreenFill fill;
 
         WindowSpec(String id, List<?> tabs, Object activeTab,
                    boolean locked, double offsetX, double offsetY) {
@@ -1524,13 +1544,13 @@ public final class ChatWindowLayout {
                    String linkTarget, ChatWindow.LinkSide linkSide,
                    double maxLines, int width) {
             this(id, tabs, activeTab, locked, offsetX, offsetY, linkTarget,
-                    linkSide, maxLines, width, false);
+                    linkSide, maxLines, width, ChatWindow.ScreenFill.NONE);
         }
 
         WindowSpec(String id, List<?> tabs, Object activeTab,
                    boolean locked, double offsetX, double offsetY,
                    String linkTarget, ChatWindow.LinkSide linkSide,
-                   double maxLines, int width, boolean fullscreen) {
+                   double maxLines, int width, ChatWindow.ScreenFill fill) {
             this.id = id;
             List<ChatTab> converted = new ArrayList<ChatTab>();
             if (tabs != null) {
@@ -1552,7 +1572,7 @@ public final class ChatWindowLayout {
             this.linkAbove = this.linkSide == ChatWindow.LinkSide.ABOVE;
             this.maxLines = clampWindowLines(maxLines);
             this.width = clampChatWidth(width);
-            this.fullscreen = fullscreen;
+            this.fill = fill == null ? ChatWindow.ScreenFill.NONE : fill;
         }
 
         private static ChatTab toTab(Object value) {

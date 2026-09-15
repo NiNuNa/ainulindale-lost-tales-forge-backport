@@ -50,12 +50,12 @@ enum ChatIconSheet {
      * rather than a five-row cell, so it centres on the same row of the
      * strip the {@code +}'s own crossbar stands on.
      */
-    MINUS(80, 13, 5, 1),
-    MINUS_HOVER(86, 13, 5, 1),
-    CLOSE(12, 11, 5, 5),
-    CLOSE_HOVER(18, 11, 5, 5),
-    COG(24, 11, 5, 5),
-    COG_HOVER(30, 11, 5, 5),
+    MINUS(12, 13, 5, 1),
+    MINUS_HOVER(18, 13, 5, 1),
+    CLOSE(24, 11, 5, 5),
+    CLOSE_HOVER(30, 11, 5, 5),
+    COG(36, 11, 5, 5),
+    COG_HOVER(42, 11, 5, 5),
     /** The bubble the typing line is announced with, its tail included. */
     SPEECH_BUBBLE(23, 18, 9, 6),
     GRIP(0, 17, 6, 8),
@@ -75,7 +75,7 @@ enum ChatIconSheet {
      * key icons it carries.
      */
     SEARCH(14, 17, 8, 8),
-    SEARCH_LARGE(32, 26, 10, 10),
+    SEARCH_LARGE(33, 26, 8, 9),
     /**
      * A framed button's four corners, resting and lit: six-texel cells
      * whose innermost column and row are the frame's edges, stretched
@@ -92,24 +92,24 @@ enum ChatIconSheet {
     FRAME_LIT_BOTTOM_LEFT(14, 86, 6, 6),
     FRAME_LIT_BOTTOM_RIGHT(21, 86, 6, 6),
     /** The favourite heart: plain, and filled in the palette's wine. */
-    HEART(36, 11, 5, 5),
-    HEART_FAVORITE(42, 11, 5, 5),
+    HEART(48, 11, 5, 5),
+    HEART_FAVORITE(54, 11, 5, 5),
     /**
      * The insert-toolbar chevron's animation, five frames from pointing
      * right (the inserts are out and fold back toward it) to pointing
      * left (they are away and open leftward), each cell exactly its own
      * artwork so a frame centres on the control however wide it is.
      */
-    TOGGLE_1(48, 11, 3, 5),
-    TOGGLE_2(52, 11, 2, 5),
-    TOGGLE_3(55, 11, 1, 5),
-    TOGGLE_4(57, 11, 2, 5),
-    TOGGLE_5(60, 11, 3, 5),
-    TOGGLE_1_HOVER(64, 11, 3, 5),
-    TOGGLE_2_HOVER(68, 11, 2, 5),
-    TOGGLE_3_HOVER(71, 11, 1, 5),
-    TOGGLE_4_HOVER(73, 11, 2, 5),
-    TOGGLE_5_HOVER(76, 11, 3, 5),
+    TOGGLE_1(60, 11, 3, 5),
+    TOGGLE_2(64, 11, 2, 5),
+    TOGGLE_3(67, 11, 1, 5),
+    TOGGLE_4(69, 11, 2, 5),
+    TOGGLE_5(72, 11, 3, 5),
+    TOGGLE_1_HOVER(76, 11, 3, 5),
+    TOGGLE_2_HOVER(80, 11, 2, 5),
+    TOGGLE_3_HOVER(83, 11, 1, 5),
+    TOGGLE_4_HOVER(85, 11, 2, 5),
+    TOGGLE_5_HOVER(88, 11, 3, 5),
     /**
      * A tab's two border pieces. Each carries the corner it turns at the
      * top, the line that runs down the tab's side, and the tab's own
@@ -122,8 +122,8 @@ enum ChatIconSheet {
     TAB_RIGHT(5, 59, 4, 19),
     TAB_HOVER_LEFT(10, 59, 4, 19),
     TAB_HOVER_RIGHT(15, 59, 4, 19),
-    TAB_SELECTED_LEFT(20, 56, 4, 22),
-    TAB_SELECTED_RIGHT(25, 56, 4, 22),
+    TAB_SELECTED_LEFT(20, 56, 6, 22),
+    TAB_SELECTED_RIGHT(27, 56, 6, 22),
     /**
      * The hatch laid over message rows the history does not reach: a
      * 45° line every eight texels. The pattern's period divides the
@@ -177,16 +177,6 @@ enum ChatIconSheet {
     /** The sprite at its own size, with the chat's shadow under it. */
     void drawWithShadow(float x, float y, int alpha) {
         drawWithShadow(this.u, this.v, this.width, this.height, x, y, alpha);
-    }
-
-    /**
-     * The sprite as a flat silhouette in one colour, shadow and all:
-     * how a control whose sheet holds a single colourway of its glyph
-     * says it is inert.
-     */
-    void drawSilhouetteWithShadow(int rgb, float x, float y, int alpha) {
-        drawShadow(this.u, this.v, this.width, this.height, x, y, alpha);
-        drawSilhouette(rgb, x, y, alpha);
     }
 
     /**

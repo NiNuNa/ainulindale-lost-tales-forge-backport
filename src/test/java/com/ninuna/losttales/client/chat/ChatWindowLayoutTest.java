@@ -434,8 +434,9 @@ public final class ChatWindowLayoutTest {
                 party.getChannels());
         assertEquals(ChatChannel.PARTY, party.getActiveChannel());
         assertEquals(60.0D, party.getOffsetX(), 0.0D);
-        // Percents are clamped on the way in.
-        assertEquals(100.0D, party.getOffsetY(), 0.0D);
+        // A percent past the margin stands: the window may hang off the
+        // screen by up to its own size.
+        assertEquals(120.0D, party.getOffsetY(), 0.0D);
         assertEquals(3, ChatWindowLayout.windows().size());
         assertSame(party, ChatWindowLayout.windowOf(ChatChannel.PARTY));
         assertFalse(ChatWindowLayout.window("w2").contains(ChatChannel.PARTY));
@@ -707,8 +708,10 @@ public final class ChatWindowLayoutTest {
                 w3.getChannels());
         assertEquals(ChatChannel.OOC, w3.getActiveChannel());
         assertTrue(w3.isLocked());
-        assertEquals(100.0D, w3.getOffsetX(), 0.0D);
-        assertEquals(0.0D, w3.getOffsetY(), 0.0D);
+        // A window's percent is bounded a whole window past the margins
+        // (250 to 200); a little past the top is kept as stored.
+        assertEquals(200.0D, w3.getOffsetX(), 0.0D);
+        assertEquals(-5.0D, w3.getOffsetY(), 0.0D);
         // The legacy main window becomes an ordinary one, numbered on.
         ChatWindow legacy = ChatWindowLayout.windows().get(1);
         assertEquals("w8", legacy.getId());

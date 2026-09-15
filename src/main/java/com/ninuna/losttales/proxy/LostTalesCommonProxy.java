@@ -378,16 +378,17 @@ public class LostTalesCommonProxy {
         LostTalesChatRoleRosterWatcher.clear();
         ChatMessageIdAllocator.reset();
         ChatHistory.clear();
+        ChatConsoleStream.clear();
         // After the channels and the config above, since every kept
-        // line names its channel by id: the save's recent lines come
-        // back as the live history, and the save follows it from here.
+        // line names its channel by id: the save's recent lines and the
+        // console's kept events come back as the live stores, and the
+        // save follows them from here.
         ChatHistoryStorage.restore(event.getServer());
         // Straight after the history, whose kept messages decide which of
         // the save's Discord links come back, and before the bridge
         // starts below. Every server gets a map of its own, a character
         // room included, so nothing reaches it from the world before.
         LostTalesDiscordBridge.getInstance().restoreLinks(event.getServer());
-        ChatConsoleStream.clear();
         ChatCommandContexts.clear();
         LostTalesChatService.clear();
         LostTalesServerBroadcastHook.clear();

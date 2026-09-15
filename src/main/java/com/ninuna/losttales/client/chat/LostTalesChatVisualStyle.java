@@ -43,12 +43,10 @@ final class LostTalesChatVisualStyle {
             LostTalesSkyrimUiStyle.HUD_SHADOW);
     /**
      * The one opacity of every surface the chat lays out — backdrop,
-     * strips, tabs, bars: half. Text and icons are always fully opaque.
+     * strips, tabs, bars: half, thinned by the game's chat opacity.
+     * Text and icons are always fully opaque.
      */
     static final int SURFACE_ALPHA = 0x80;
-    /** The chat's surface at that opacity: the input bar's. */
-    static final int SURFACE = LostTalesSkyrimUiStyle.withAlpha(
-            LostTalesSkyrimUiStyle.PLUM_BLACK, SURFACE_ALPHA);
     /** Alpha-free surface tones for what animates its own opacity. */
     static final int SURFACE_RGB = LostTalesSkyrimUiStyle.rgb(
             LostTalesSkyrimUiStyle.PLUM_BLACK);
@@ -102,6 +100,28 @@ final class LostTalesChatVisualStyle {
     static int backdropRgb() {
         return paletteRgb(LostTalesConfig.chatBackgroundColor,
                 LostTalesColors.PLUM_BLACK);
+    }
+
+    /**
+     * The game's chat opacity as the chat applies it, never below a
+     * tenth: what the panel and every surface beside it are thinned by.
+     */
+    static float chatOpacity(Minecraft minecraft) {
+        return minecraft.gameSettings.chatOpacity * 0.9F + 0.1F;
+    }
+
+    /**
+     * The chat's surface at {@code share} of its opacity: the panel's
+     * own colour at half, so a window's strips and its bar are one flat
+     * stretch of exactly what its history is drawn in.
+     */
+    static int surfaceArgb(float share) {
+        return argb(backdropRgb(), Math.round(SURFACE_ALPHA * share));
+    }
+
+    /** The inset surface at {@code share} of its opacity. */
+    static int insetArgb(float share) {
+        return argb(SURFACE_RGB, Math.round(INSET_ALPHA * share));
     }
 
     /** The line under the pointer, in the client's chosen palette colour; plum grey until it chooses. */

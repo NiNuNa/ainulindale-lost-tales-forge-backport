@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatTabIds;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -28,8 +29,8 @@ import java.util.UUID;
  * filed under, and the selection points at.</p>
  */
 public final class ChatTab {
-    private static final String WHISPER_ID_PREFIX = "whisper:";
-    private static final String NPC_ID_PREFIX = "npc:";
+    private static final String WHISPER_ID_PREFIX = ChatTabIds.WHISPER_PREFIX;
+    private static final String NPC_ID_PREFIX = ChatTabIds.NPC_PREFIX;
     /**
      * Between the account and the identity in a tab's id. A Minecraft
      * account name cannot hold one, so the account is always the part
@@ -37,7 +38,7 @@ public final class ChatTab {
      * likes. An id without one is the account's own conversation, which
      * is also what every id stored before identities existed reads as.
      */
-    private static final char IDENTITY_SEPARATOR = '|';
+    private static final char IDENTITY_SEPARATOR = ChatTabIds.SEPARATOR;
     /**
      * The last segment of a whisper id, after a separator, when the
      * conversation is held as one of this player's characters: the

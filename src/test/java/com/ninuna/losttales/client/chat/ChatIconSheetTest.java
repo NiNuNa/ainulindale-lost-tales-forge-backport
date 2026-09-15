@@ -151,22 +151,30 @@ public final class ChatIconSheetTest {
      * below the ink threshold; anything between would neither be cut
      * away nor drawn whole.
      */
+    /** The most a surface-preview texel may reach: safely below the ink threshold. */
+    private static final float PREVIEW_ALPHA_CEILING = 0.75F;
+
     private static void assertInkOrPreview(BufferedImage sheet,
                                            ChatIconSheet piece) {
         int ceiling = (int)Math.floor(
                 ChatChannelTabBar.TAB_INK_THRESHOLD * 255.0F);
+        // A preview texel keeps a margin below the threshold, so a
+        // re-export nudging it up is caught before it is drawn as ink.
+        int previewCeiling = (int)Math.floor(PREVIEW_ALPHA_CEILING * 255.0F);
         boolean sawInk = false;
         for (int y = 0; y < piece.getHeight(); y++) {
             for (int x = 0; x < piece.getWidth(); x++) {
                 int alpha = sheet.getRGB(piece.getTextureU() + x,
                         piece.getTextureV() + y) >>> 24;
-                if (alpha == 0xFF) {
+                if (alpha >= ceiling) {
+                    // Ink, or a joint texel authored a little translucent
+                    // where the rule attaches to a selected piece's foot.
                     sawInk = true;
                     continue;
                 }
                 assertTrue(piece + " texel " + x + "," + y + " at alpha "
                         + alpha + " sits between preview and ink",
-                        alpha < ceiling);
+                        alpha <= previewCeiling);
             }
         }
         assertTrue(piece + " carries no ink at all", sawInk);
@@ -245,9 +253,16 @@ public final class ChatIconSheetTest {
         assertSameSize(ChatIconSheet.TAB_SELECTED_LEFT,
                 ChatIconSheet.TAB_SELECTED_RIGHT);
         assertSameSize(ChatIconSheet.TAB_LEFT, ChatIconSheet.TAB_HOVER_LEFT);
-        assertEquals(ChatIconSheet.TAB_LEFT.getWidth(),
+        // The selected pieces are their feet wider than the resting
+        // ones: the feet reach past the tab on the rule's row.
+        assertEquals(ChatIconSheet.TAB_LEFT.getWidth()
+                        + ChatChannelTabBar.SELECTED_FOOT,
                 ChatIconSheet.TAB_SELECTED_LEFT.getWidth());
-        assertEquals(ChatChannelTabBar.LIFT,
+        assertTrue(ChatChannelTabBar.SELECTED_FOOT > 0);
+        // The selected pieces are taller by the lift and one row more:
+        // the selected tab rises the lift above a resting one and
+        // stands one row lower, on the rule.
+        assertEquals(ChatChannelTabBar.LIFT + 1,
                 ChatIconSheet.TAB_SELECTED_LEFT.getHeight()
                         - ChatIconSheet.TAB_LEFT.getHeight());
         // A tab draws its pieces whole and stands on the window's top

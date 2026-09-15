@@ -2,7 +2,9 @@ package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -11,11 +13,14 @@ import java.util.Locale;
 /**
  * The shared operator console's memory: the last {@link #MAX_EVENTS}
  * administrative events, in the order they happened, so a staff member
- * who joins is shown what went on before them. In memory only and
- * cleared with the rest of the server's chat state; the server's own log
- * outlives it. Who is shown an event is {@code LostTalesChatService}'s
- * decision, made from the {@code chat.console.read} capability at the
- * moment of sending and again at the moment of replay.
+ * who joins is shown what went on before them. Written to the world
+ * with the chat history ({@link ChatHistoryWorldData}) and read back
+ * from it as the server starts, so a restart hands the console its past
+ * as it hands every channel theirs; cleared with the rest of the
+ * server's chat state. Who is shown an event is
+ * {@code LostTalesChatService}'s decision, made from the
+ * {@code chat.console.read} capability at the moment of sending and
+ * again at the moment of replay.
  *
  * <p>Commands are described here too, and described carefully: what a
  * command was and who ran it is what the console is for, while what it
@@ -35,18 +40,73 @@ public final class ChatConsoleStream {
 
     private ChatConsoleStream() {}
 
-    /** Remembers an event; the oldest goes once the ring is full. */
+    /**
+     * Remembers an event; the oldest goes once the ring is full, and the
+     * save is told.
+     */
     public static synchronized void record(ChatConsoleEvent event) {
         if (event == null) {
             return;
         }
         EVENTS.put(Long.valueOf(event.getId()), event);
+        trim();
+        ChatHistory.changed();
+    }
+
+    /**
+     * Hands the save's kept events back to the stream as the server
+     * starts, oldest first, each under its own id: one already held
+     * stays as it is. The id allocator moves past the newest, so no
+     * event said from here on shares an id with a kept one. Answers how
+     * many were taken.
+     */
+    public static synchronized int restore(Collection<ChatConsoleEvent> events) {
+        int kept = 0;
+        long newest = 0L;
+        if (events != null) {
+            List<ChatConsoleEvent> ordered = new ArrayList<ChatConsoleEvent>();
+            for (ChatConsoleEvent event : events) {
+                if (event != null && event.getId() > 0L) {
+                    ordered.add(event);
+                }
+            }
+            Collections.sort(ordered, BY_ID);
+            for (ChatConsoleEvent event : ordered) {
+                Long id = Long.valueOf(event.getId());
+                if (EVENTS.containsKey(id)) {
+                    continue;
+                }
+                EVENTS.put(id, event);
+                kept++;
+                newest = Math.max(newest, id.longValue());
+            }
+            trim();
+        }
+        ChatMessageIdAllocator.seed(newest);
+        return kept;
+    }
+
+    /** Every kept event, oldest first: what the save writes. */
+    public static synchronized List<ChatConsoleEvent> snapshot() {
+        return new ArrayList<ChatConsoleEvent>(EVENTS.values());
+    }
+
+    private static void trim() {
         while (EVENTS.size() > MAX_EVENTS) {
             Iterator<Long> oldest = EVENTS.keySet().iterator();
             oldest.next();
             oldest.remove();
         }
     }
+
+    private static final Comparator<ChatConsoleEvent> BY_ID =
+            new Comparator<ChatConsoleEvent>() {
+                @Override
+                public int compare(ChatConsoleEvent left, ChatConsoleEvent right) {
+                    return left.getId() < right.getId() ? -1
+                            : left.getId() > right.getId() ? 1 : 0;
+                }
+            };
 
     /**
      * The kept events newer than {@code sinceId}, oldest first, the newest

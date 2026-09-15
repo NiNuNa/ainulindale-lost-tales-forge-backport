@@ -37,6 +37,39 @@ public final class ChatCommandContextsTest {
         assertEquals("", ChatCommandContexts.take(null, 1000L));
     }
 
+    /**
+     * A running command answers line by line under its tab, while fresh
+     * and for a bounded number of lines; a command with no note answers
+     * nothing, and neither does anyone after the command is stale.
+     */
+    @Test
+    public void aRunningCommandAnswersItsLinesUnderItsTab() {
+        ChatCommandContexts.note(STEVE, "ooc", 1000L);
+        assertEquals("ooc", ChatCommandContexts.beginCommand(STEVE, 1200L));
+        assertEquals("", ChatCommandContexts.take(STEVE, 1200L));
+        for (int line = 0; line < ChatCommandContexts.MAX_LINES_PER_COMMAND; line++) {
+            assertEquals("ooc", ChatCommandContexts.answerLine(STEVE, 1300L));
+        }
+        assertEquals("one command keeps a bounded number of lines",
+                "", ChatCommandContexts.answerLine(STEVE, 1300L));
+        assertEquals("", ChatCommandContexts.answerLine(STEVE, 1300L));
+        // A fresh note, then the window passes.
+        ChatCommandContexts.note(STEVE, "all", 2000L);
+        assertEquals("all", ChatCommandContexts.beginCommand(STEVE, 2000L));
+        assertEquals("all", ChatCommandContexts.answerLine(STEVE, 2500L));
+        assertEquals("", ChatCommandContexts.answerLine(STEVE,
+                2000L + ChatCommandContexts.VALID_MILLIS + 1L));
+        // No note: no context, and a stale context is dropped with it.
+        ChatCommandContexts.note(ALEX, "party", 3000L);
+        assertEquals("party", ChatCommandContexts.beginCommand(ALEX, 3000L));
+        assertEquals("", ChatCommandContexts.beginCommand(ALEX, 3100L));
+        assertEquals("", ChatCommandContexts.answerLine(ALEX, 3100L));
+        assertEquals("", ChatCommandContexts.beginCommand(null, 3100L));
+        assertEquals("", ChatCommandContexts.answerLine(null, 3100L));
+        ChatCommandContexts.clear();
+        assertEquals("", ChatCommandContexts.answerLine(STEVE, 2500L));
+    }
+
     @Test
     public void aStaleNoteAnswersNothing() {
         ChatCommandContexts.note(STEVE, "all", 1000L);

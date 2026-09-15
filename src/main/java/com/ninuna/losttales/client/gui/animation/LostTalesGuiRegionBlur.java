@@ -150,13 +150,33 @@ public final class LostTalesGuiRegionBlur {
                 || vertexBottom <= vertexTop || opacity <= 0.0F) {
             return;
         }
+        // Only what lies on the screen is drawn: a region reaching past
+        // an edge — a window hanging off the screen — is cut to the
+        // screen, the quad and the sample alike, so the frame's last
+        // column is never stretched across the part beyond. The fade
+        // profile still runs across the whole region.
+        double clipLeft = Math.max(0.0D, screenLeft);
+        double clipRight = Math.min(this.guiWidth, screenRight);
+        double clipTop = Math.max(0.0D, screenTop);
+        double clipBottom = Math.min(this.guiHeight, screenBottom);
+        if (clipRight <= clipLeft || clipBottom <= clipTop) {
+            return;
+        }
+        double shownFrom = (clipLeft - screenLeft) / (screenRight - screenLeft);
+        double shownTo = (clipRight - screenLeft) / (screenRight - screenLeft);
+        double topShare = (clipTop - screenTop) / (screenBottom - screenTop);
+        double bottomShare = (clipBottom - screenTop)
+                / (screenBottom - screenTop);
+        double drawnTop = vertexTop + (vertexBottom - vertexTop) * topShare;
+        double drawnBottom = vertexTop
+                + (vertexBottom - vertexTop) * bottomShare;
         // Sampled against the projection's exact size, so a region lands
         // on the very pixels the world drew; see {@link #guiWidth}.
-        double u0 = clamp01(screenLeft / this.guiWidth);
-        double u1 = clamp01(screenRight / this.guiWidth);
+        double u0 = clipLeft / this.guiWidth;
+        double u1 = clipRight / this.guiWidth;
         // The capture reads bottom-up; GUI space counts down from the top.
-        double v0 = clamp01(1.0D - screenBottom / this.guiHeight);
-        double v1 = clamp01(1.0D - screenTop / this.guiHeight);
+        double v0 = 1.0D - clipBottom / this.guiHeight;
+        double v1 = 1.0D - clipTop / this.guiHeight;
         int alpha = Math.max(0, Math.min(255,
                 (int)Math.round(255.0D * opacity)));
         int steps = fadeWeights == null ? 1 : fadeWeights.length - 1;
@@ -178,21 +198,36 @@ public final class LostTalesGuiRegionBlur {
         for (int step = 0; step < steps; step++) {
             double from = step / (double)steps;
             double to = (step + 1) / (double)steps;
+            double w0 = fadeWeights == null ? 1.0D : fadeWeights[step];
+            double w1 = fadeWeights == null ? 1.0D : fadeWeights[step + 1];
+            // A step cut by the screen's edge keeps the profile's value
+            // where it is cut.
+            if (to <= shownFrom || from >= shownTo) {
+                continue;
+            }
+            if (from < shownFrom) {
+                w0 += (w1 - w0) * (shownFrom - from) / (to - from);
+                from = shownFrom;
+            }
+            if (to > shownTo) {
+                w1 = w0 + (w1 - w0) * (shownTo - from) / (to - from);
+                to = shownTo;
+            }
             double x0 = vertexLeft + (vertexRight - vertexLeft) * from;
             double x1 = vertexLeft + (vertexRight - vertexLeft) * to;
-            double uFrom = u0 + (u1 - u0) * from;
-            double uTo = u0 + (u1 - u0) * to;
-            int a0 = fadeWeights == null ? alpha
-                    : Math.round(alpha * fadeWeights[step]);
-            int a1 = fadeWeights == null ? alpha
-                    : Math.round(alpha * fadeWeights[step + 1]);
+            double uFrom = u0 + (u1 - u0) * (from - shownFrom)
+                    / (shownTo - shownFrom);
+            double uTo = u0 + (u1 - u0) * (to - shownFrom)
+                    / (shownTo - shownFrom);
+            int a0 = (int)Math.round(alpha * w0);
+            int a1 = (int)Math.round(alpha * w1);
             tessellator.setColorRGBA(255, 255, 255, a0);
-            tessellator.addVertexWithUV(x0, vertexBottom, 0.0D, uFrom, v0);
+            tessellator.addVertexWithUV(x0, drawnBottom, 0.0D, uFrom, v0);
             tessellator.setColorRGBA(255, 255, 255, a1);
-            tessellator.addVertexWithUV(x1, vertexBottom, 0.0D, uTo, v0);
-            tessellator.addVertexWithUV(x1, vertexTop, 0.0D, uTo, v1);
+            tessellator.addVertexWithUV(x1, drawnBottom, 0.0D, uTo, v0);
+            tessellator.addVertexWithUV(x1, drawnTop, 0.0D, uTo, v1);
             tessellator.setColorRGBA(255, 255, 255, a0);
-            tessellator.addVertexWithUV(x0, vertexTop, 0.0D, uFrom, v1);
+            tessellator.addVertexWithUV(x0, drawnTop, 0.0D, uFrom, v1);
         }
         tessellator.draw();
         GL11.glShadeModel(GL11.GL_FLAT);

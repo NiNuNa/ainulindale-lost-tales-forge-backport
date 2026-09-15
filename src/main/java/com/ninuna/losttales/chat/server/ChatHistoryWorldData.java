@@ -1,5 +1,6 @@
 package com.ninuna.losttales.chat.server;
 
+import com.ninuna.losttales.chat.ChatConsoleEvent;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -10,11 +11,12 @@ import net.minecraft.world.WorldSavedData;
 
 /**
  * The kept chat history in the world save: what {@link ChatHistory}
- * holds, written with the world so a restart hands it back. The live
- * store stays {@code ChatHistory}; this is where it is read from as the
- * server starts and written to as the world saves — from the live store
- * while the server runs, and from the snapshot {@link #hold} took as it
- * stops, since the store is cleared before the last save is written. A
+ * holds and what {@link ChatConsoleStream} holds, written with the world
+ * so a restart hands both back. The live stores stay {@code ChatHistory}
+ * and {@code ChatConsoleStream}; this is where they are read from as the
+ * server starts and written to as the world saves — from the live stores
+ * while the server runs, and from the snapshots {@link #hold} took as it
+ * stops, since the stores are cleared before the last save is written. A
  * store made read-only by newer-version data is preserved verbatim and
  * never written; the history then lives in memory alone for the run.
  */
@@ -24,10 +26,13 @@ public final class ChatHistoryWorldData extends WorldSavedData {
 
     private final List<ChatHistory.Entry> restored =
             new ArrayList<ChatHistory.Entry>();
+    private final List<ChatConsoleEvent> restoredEvents =
+            new ArrayList<ChatConsoleEvent>();
     private final List<NBTTagCompound> quarantinedEntries =
             new ArrayList<NBTTagCompound>();
-    /** The snapshot the stopping server left to be written, or null. */
+    /** The snapshots the stopping server left to be written, or null. */
     private List<ChatHistory.Entry> held;
+    private List<ChatConsoleEvent> heldEvents;
 
     private boolean readOnlyForNewerVersion;
     private int unsupportedDataVersion = -1;
@@ -44,8 +49,10 @@ public final class ChatHistoryWorldData extends WorldSavedData {
     @Override
     public synchronized void readFromNBT(NBTTagCompound compound) {
         this.restored.clear();
+        this.restoredEvents.clear();
         this.quarantinedEntries.clear();
         this.held = null;
+        this.heldEvents = null;
         this.readOnlyForNewerVersion = false;
         this.unsupportedDataVersion = -1;
         this.preservedNewerData = null;
@@ -58,6 +65,7 @@ public final class ChatHistoryWorldData extends WorldSavedData {
             return;
         }
         this.restored.addAll(result.getEntries());
+        this.restoredEvents.addAll(result.getConsoleEvents());
         this.quarantinedEntries.addAll(result.getQuarantineEntriesCopy());
         if (result.wasRepaired()) {
             markDirty();
@@ -72,6 +80,8 @@ public final class ChatHistoryWorldData extends WorldSavedData {
         }
         ChatHistoryNbtCodec.write(compound,
                 this.held != null ? this.held : ChatHistory.snapshot(),
+                this.heldEvents != null ? this.heldEvents
+                        : ChatConsoleStream.snapshot(),
                 this.quarantinedEntries);
     }
 
@@ -83,14 +93,26 @@ public final class ChatHistoryWorldData extends WorldSavedData {
         return Collections.unmodifiableList(entries);
     }
 
+    /** The console's events read from the save, oldest first; empty once taken. */
+    public synchronized List<ChatConsoleEvent> takeRestoredEvents() {
+        List<ChatConsoleEvent> events =
+                new ArrayList<ChatConsoleEvent>(this.restoredEvents);
+        this.restoredEvents.clear();
+        return Collections.unmodifiableList(events);
+    }
+
     /**
-     * Keeps a snapshot for the saves still to come: what the stopping
-     * server calls before the live store is cleared, so the last save
-     * writes the history and not the emptiness after it.
+     * Keeps snapshots for the saves still to come: what the stopping
+     * server calls before the live stores are cleared, so the last save
+     * writes the history and the console and not the emptiness after
+     * them.
      */
-    public synchronized void hold(List<ChatHistory.Entry> snapshot) {
+    public synchronized void hold(List<ChatHistory.Entry> snapshot,
+                                  List<ChatConsoleEvent> events) {
         this.held = snapshot == null ? null
                 : new ArrayList<ChatHistory.Entry>(snapshot);
+        this.heldEvents = events == null ? null
+                : new ArrayList<ChatConsoleEvent>(events);
         markDirty();
     }
 

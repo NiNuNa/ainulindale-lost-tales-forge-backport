@@ -41,24 +41,38 @@ public final class ChatWindowLayoutStoreTest {
     }
 
     /**
-     * A window filling the screen says so in its line and keeps its own
-     * place and size beside it, which is what it goes back to; a window
-     * without the word is at its own size, as every older file's are.
+     * A window filling a part of the screen names it in its line and
+     * keeps its own place and size beside it, which is what it goes
+     * back to; a window without the word is at its own size, and a part
+     * the build does not know reads as none.
      */
     @Test
     public void aWindowFillingTheScreenRoundTrips() {
         ChatWindowLayoutStore.load(Arrays.asList(
                 "window w1 locked=false x=10.00 y=20.00 lines=6.00"
-                        + " fullscreen=true active=console tabs=console,admin",
-                "window w2 locked=false x=0.00 y=100.00 active=all tabs=all"));
+                        + " fill=full active=console tabs=console,admin",
+                "window w2 locked=false x=0.00 y=100.00 active=all tabs=all",
+                "window w3 locked=false x=0.00 y=50.00 fill=top_right"
+                        + " active=ooc tabs=ooc",
+                "window w4 locked=false x=0.00 y=60.00 fill=sideways"
+                        + " active=party tabs=party"));
         ChatWindow first = ChatWindowLayout.window("w1");
         assertTrue(first.isFullscreen());
+        assertEquals(ChatWindow.ScreenFill.FULL, first.getFill());
         assertEquals(10.0D, first.getOffsetX(), 0.0001D);
         assertEquals(6.0D, first.getMaxLines(), 0.0001D);
-        assertFalse(ChatWindowLayout.window("w2").isFullscreen());
+        assertEquals(ChatWindow.ScreenFill.NONE,
+                ChatWindowLayout.window("w2").getFill());
+        assertEquals(ChatWindow.ScreenFill.TOP_RIGHT,
+                ChatWindowLayout.window("w3").getFill());
+        assertFalse(ChatWindowLayout.window("w3").isFullscreen());
+        assertEquals(ChatWindow.ScreenFill.NONE,
+                ChatWindowLayout.window("w4").getFill());
         List<String> described = ChatWindowLayoutStore.describe();
-        assertTrue(described.get(1).contains(" fullscreen=true"));
-        assertFalse(described.get(2).contains("fullscreen"));
+        assertTrue(described.get(1).contains(" fill=full"));
+        assertFalse(described.get(2).contains("fill"));
+        assertTrue(described.get(3).contains(" fill=top_right"));
+        assertFalse(described.get(4).contains("fill"));
         ChatWindowLayoutStore.load(described);
         assertEquals(described, ChatWindowLayoutStore.describe());
     }

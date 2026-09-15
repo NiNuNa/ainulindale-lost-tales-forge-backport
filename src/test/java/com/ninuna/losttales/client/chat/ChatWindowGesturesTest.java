@@ -34,6 +34,41 @@ public final class ChatWindowGesturesTest {
         ClientChatChannelState.clear();
     }
 
+    /**
+     * Where a dragged window snaps to: the whole screen from the top
+     * edge, a half from a side, a quarter from the end of an edge
+     * nearest a corner, nothing from the bottom edge's middle or from
+     * anywhere clear of the edges.
+     */
+    @Test
+    public void theScreenEdgesSnapAWindowToTheirHalvesAndCorners() {
+        assertEquals(ChatWindow.ScreenFill.FULL,
+                ChatWindowGestures.snapZoneAt(500.0D, 0.5D, 1000, 600));
+        assertEquals(ChatWindow.ScreenFill.LEFT,
+                ChatWindowGestures.snapZoneAt(0.0D, 300.0D, 1000, 600));
+        assertEquals(ChatWindow.ScreenFill.RIGHT,
+                ChatWindowGestures.snapZoneAt(999.5D, 300.0D, 1000, 600));
+        assertEquals(ChatWindow.ScreenFill.TOP_LEFT,
+                ChatWindowGestures.snapZoneAt(1.0D, 50.0D, 1000, 600));
+        assertEquals(ChatWindow.ScreenFill.TOP_LEFT,
+                ChatWindowGestures.snapZoneAt(100.0D, 1.0D, 1000, 600));
+        assertEquals(ChatWindow.ScreenFill.TOP_RIGHT,
+                ChatWindowGestures.snapZoneAt(999.0D, 100.0D, 1000, 600));
+        assertEquals(ChatWindow.ScreenFill.BOTTOM_LEFT,
+                ChatWindowGestures.snapZoneAt(0.0D, 550.0D, 1000, 600));
+        assertEquals(ChatWindow.ScreenFill.BOTTOM_RIGHT,
+                ChatWindowGestures.snapZoneAt(900.0D, 599.5D, 1000, 600));
+        // The bottom edge's middle, and anywhere inside, snap nowhere.
+        assertEquals(ChatWindow.ScreenFill.NONE,
+                ChatWindowGestures.snapZoneAt(500.0D, 599.5D, 1000, 600));
+        assertEquals(ChatWindow.ScreenFill.LEFT,
+                ChatWindowGestures.snapZoneAt(14.0D, 300.0D, 1000, 600));
+        assertEquals(ChatWindow.ScreenFill.NONE,
+                ChatWindowGestures.snapZoneAt(18.0D, 300.0D, 1000, 600));
+        assertEquals(ChatWindow.ScreenFill.NONE,
+                ChatWindowGestures.snapZoneAt(500.0D, 300.0D, 1000, 600));
+    }
+
     @Test
     public void theBorderOutsideAWindowAnswersWithItsEdgeOrCorner() {
         int border = ChatWindowGestures.RESIZE_BORDER;

@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.chat.ChatDeliveryMark;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
+import com.ninuna.losttales.client.gui.animation.LostTalesUiEasing;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiRegionBlur;
 import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
@@ -179,8 +180,8 @@ final class LostTalesChatOverlayRenderer {
      * reaches through the trailing strip and over the newest message.
      */
     private static final float BOTTOM_EDGE_FADE_HEIGHT = LINE_HEIGHT * 2.0F;
-    /** Opacity of an edge fade on the edge it hangs from: half. */
-    static final int EDGE_FADE_ALPHA = 0x80;
+    /** Opacity of an edge fade on the edge it hangs from: a third. */
+    static final int EDGE_FADE_ALPHA = Math.round(255.0F / 3.0F);
     /**
      * How long a line stays on screen in the closed feed, in the update
      * counter's own ticks: vanilla's own ten seconds, held to full
@@ -192,11 +193,12 @@ final class LostTalesChatOverlayRenderer {
     static final int FEED_FADE_TICKS = 200;
     /**
      * The opacity of the hatch laid over message rows the history does
-     * not reach yet, at the middle of the hatched region: the chat
-     * sheet's own hatch cell, drawn in the colours it was authored in,
-     * falling off to nothing at the region's top and bottom edges.
+     * not reach yet, at the middle of the hatched region: a third, since
+     * it lies over the panel's own surface. The chat sheet's own hatch
+     * cell, drawn in the colours it was authored in, falling off to
+     * nothing at the region's top and bottom edges.
      */
-    private static final int EMPTY_HATCH_ALPHA = 0x80;
+    private static final int EMPTY_HATCH_ALPHA = Math.round(255.0F / 3.0F);
     /**
      * Mesh resolution of an edge fade. The horizontal ramp is linear, so
      * two columns carry it exactly; the vertical one is eased, and each
@@ -329,9 +331,9 @@ final class LostTalesChatOverlayRenderer {
         // reserves room for, which the open screen does not draw. Only
         // a window whose history cannot be read falls back to that
         // shared list.
-        // A window filling the screen, or gliding to or from it, is laid
-        // out at the width it is drawn at this instant.
-        frame.advanceFullscreen(window.isFullscreen());
+        // A window filling a part of the screen, or gliding to or from
+        // it, is laid out at the width it is drawn at this instant.
+        frame.advanceFill(window.getFill());
         int chatWidth = ChatWindowPlacement.drawnChatWidth(window, minecraft,
                 screenWidth);
         List<ChatLine> own = ChatWindowLines.forWindow(minecraft, chat,
@@ -805,6 +807,7 @@ final class LostTalesChatOverlayRenderer {
         }
     }
 
+
     private static void drawWindow(
             Minecraft minecraft, GuiNewChat chat, ChatWindowFrame frame,
             ChatLineFilter filter, List<ChatLine> lines,
@@ -849,7 +852,7 @@ final class LostTalesChatOverlayRenderer {
         float stackBase = rows.top(scrollRow);
         float slidePixels = scrollSlide * rows.height(scrollRow);
         float totalHeight = rows.total();
-        float opacity = minecraft.gameSettings.chatOpacity * 0.9F + 0.1F;
+        float opacity = LostTalesChatVisualStyle.chatOpacity(minecraft);
         float scale = chat.func_146244_h();
         ChatLineBands bands = frame.bands;
         bands.reset(lines, totalLineCount, scale);
@@ -985,8 +988,9 @@ final class LostTalesChatOverlayRenderer {
                 - TOOLBAR_GAP - toolbarWidth(toolbarKinds.length);
         boolean jumpShown = open && advanceJumpButton(frame, scrollLines);
         // Centred across the panel, on a whole pixel.
-        float jumpLeft = Math.round((panelLeft + panelRight
-                - JUMP_BUTTON_SIZE) / 2.0F);
+        int jumpWidth = jumpButtonWidth(minecraft.fontRenderer);
+        float jumpLeft = Math.round((panelLeft + panelRight - jumpWidth)
+                / 2.0F);
         float jumpTop = jumpButtonTop(frame, bottomEdge, originY, scale);
         Holes holes = new Holes();
         for (int index = 0; index < toolbarKinds.length; index++) {
@@ -995,7 +999,7 @@ final class LostTalesChatOverlayRenderer {
                     TOOLBAR_BUTTON_SIZE, CONTROL_DEPTH, 1.0F);
         }
         if (jumpShown) {
-            holes.add(jumpLeft, jumpTop, JUMP_BUTTON_SIZE, JUMP_BUTTON_SIZE,
+            holes.add(jumpLeft, jumpTop, jumpWidth, JUMP_BUTTON_HEIGHT,
                     CONTROL_DEPTH, 1.0F);
         }
         if (open) {
@@ -1540,8 +1544,8 @@ final class LostTalesChatOverlayRenderer {
                     }
                     if (jumpShown) {
                         drawJumpButton(minecraft, frame, jumpLeft, jumpTop,
-                                bottomEdge, controlAlpha, originX, originY,
-                                scale);
+                                jumpWidth, bottomEdge, controlAlpha, originX,
+                                originY, scale);
                     }
                 } finally {
                     endVerticalClip(controlsClipped);
@@ -1651,61 +1655,101 @@ final class LostTalesChatOverlayRenderer {
     }
 
     /**
-     * The shade along a clip's side where a line of text is cut: the
-     * history's edge fades turned on their side. {@code rgb} at
-     * {@code alpha} on the edge at {@code edgeX}, easing to nothing
-     * {@code depth} pixels in toward {@code limitX}, from {@code top} to
-     * {@code bottom}, on the same curve and in as many steps as the
-     * history's shades. A tab's name and the channel indicator's hang one
-     * from each side their marquee cuts, so a name slides into and out of
-     * sight the way the history scrolls under its rules.
+     * Words drawn between two clip edges, thinning out into either edge
+     * over {@code depth} pixels as far as {@code leftStrength} and
+     * {@code rightStrength} say (0..1, how far the words have gone past
+     * that edge): the stretch at a fading edge is drawn in one-pixel
+     * slices at falling opacity, so the words themselves fade rather
+     * than a wash being laid over them, and the fade is seamless over
+     * whatever surface they stand on, as a browser's cut tab name is.
+     * The clip edges are in screen space; {@code x} and {@code fraction}
+     * are in the caller's matrix, and {@code clipBottom} may be NaN.
      */
-    static void drawSideFade(float edgeX, float limitX, float top,
-                             float bottom, float depth, int rgb, int alpha) {
-        int safeAlpha = Math.max(0, Math.min(255, alpha));
-        if (safeAlpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA
-                || bottom <= top || depth <= 0.0F) {
+    static void drawFadingText(Minecraft minecraft, FontRenderer font,
+                               String text, int x, float fraction, int y,
+                               int rgb, int alpha, double clipLeft,
+                               double clipRight, double clipBottom,
+                               float depth, float leftStrength,
+                               float rightStrength) {
+        if (clipRight <= clipLeft
+                || alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
             return;
         }
-        boolean inward = limitX > edgeX;
-        float far = inward ? Math.min(limitX, edgeX + depth)
-                : Math.max(limitX, edgeX - depth);
-        if (far == edgeX) {
+        double leftZone = leftStrength > 0.0F ? Math.min(depth,
+                (clipRight - clipLeft) / 2.0D) : 0.0D;
+        double rightZone = rightStrength > 0.0F ? Math.min(depth,
+                (clipRight - clipLeft) / 2.0D) : 0.0D;
+        // Every slice is one display pixel wide, its edges laid on the
+        // display grid: the clip rounds inward, and two neighbours
+        // meeting on a fraction of a pixel would each give that pixel
+        // up and leave a gap in the words.
+        int factor = ChatWindowFrame.displayScaleFactor();
+        int leftSlices = (int)Math.round(leftZone * factor);
+        int rightSlices = (int)Math.round(rightZone * factor);
+        double leftEnd = ChatWindowFrame.snapToDisplayPixels(
+                clipLeft + leftSlices / (double)factor);
+        double rightStart = ChatWindowFrame.snapToDisplayPixels(
+                clipRight - rightSlices / (double)factor);
+        drawTextSlice(minecraft, font, text, x, fraction, y, rgb, alpha,
+                leftEnd, rightStart, clipBottom);
+        for (int slice = 0; slice < leftSlices; slice++) {
+            // A slice's opacity is read at its middle: none at the very
+            // edge for words fully gone past it, the whole at the zone's
+            // inner end.
+            float share = 1.0F - leftStrength
+                    * (1.0F - (slice + 0.5F) / leftSlices);
+            drawTextSlice(minecraft, font, text, x, fraction, y, rgb,
+                    Math.round(alpha * share),
+                    ChatWindowFrame.snapToDisplayPixels(
+                            leftEnd - (leftSlices - slice) / (double)factor),
+                    ChatWindowFrame.snapToDisplayPixels(
+                            leftEnd - (leftSlices - slice - 1) / (double)factor),
+                    clipBottom);
+        }
+        for (int slice = 0; slice < rightSlices; slice++) {
+            float share = 1.0F - rightStrength
+                    * (1.0F - (slice + 0.5F) / rightSlices);
+            drawTextSlice(minecraft, font, text, x, fraction, y, rgb,
+                    Math.round(alpha * share),
+                    ChatWindowFrame.snapToDisplayPixels(
+                            rightStart + (rightSlices - slice - 1) / (double)factor),
+                    ChatWindowFrame.snapToDisplayPixels(
+                            rightStart + (rightSlices - slice) / (double)factor),
+                    clipBottom);
+        }
+    }
+
+    /** The words once, cut to one stretch of screen. */
+    private static void drawTextSlice(Minecraft minecraft, FontRenderer font,
+                                      String text, int x, float fraction,
+                                      int y, int rgb, int alpha,
+                                      double clipLeft, double clipRight,
+                                      double clipBottom) {
+        if (clipRight <= clipLeft
+                || alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
             return;
         }
-        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
-        for (int step = 0; step < EDGE_FADE_ROWS; step++) {
-            float near = edgeX + (far - edgeX) * (step / (float)EDGE_FADE_ROWS);
-            float away = edgeX + (far - edgeX)
-                    * ((step + 1) / (float)EDGE_FADE_ROWS);
-            int nearAlpha = Math.round(safeAlpha * (1.0F
-                    - LostTalesChatMotion.smoothStep(
-                            step / (float)EDGE_FADE_ROWS)));
-            int awayAlpha = Math.round(safeAlpha * (1.0F
-                    - LostTalesChatMotion.smoothStep(
-                            (step + 1) / (float)EDGE_FADE_ROWS)));
-            // Each piece is taken left to right, so the winding is the
-            // backdrop's whichever side the shade hangs from.
-            float x0 = inward ? near : away;
-            float x1 = inward ? away : near;
-            int alpha0 = inward ? nearAlpha : awayAlpha;
-            int alpha1 = inward ? awayAlpha : nearAlpha;
-            // Same winding as the backdrop: the GUI pass culls back faces.
-            tessellator.setColorRGBA_I(rgb, alpha1);
-            tessellator.addVertex(x1, bottom, 0.0D);
-            tessellator.addVertex(x1, top, 0.0D);
-            tessellator.setColorRGBA_I(rgb, alpha0);
-            tessellator.addVertex(x0, top, 0.0D);
-            tessellator.addVertex(x0, bottom, 0.0D);
+        boolean clipped = beginClip(minecraft, clipLeft, clipRight,
+                Double.NaN, clipBottom, true);
+        try {
+            GL11.glPushMatrix();
+            try {
+                GL11.glTranslatef(fraction, 0.0F, 0.0F);
+                LostTalesChatVisualStyle.drawColored(font, text, x, y, rgb,
+                        alpha);
+            } finally {
+                GL11.glPopMatrix();
+            }
+        } finally {
+            endVerticalClip(clipped);
         }
-        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
     }
 
     /**
-     * How strongly a side fade hangs from an edge text is cut at: as far
-     * as the text has gone past the edge, up to the fade's depth. The
-     * shade comes and goes with the marquee instead of appearing, and an
-     * edge nothing is cut at wears none.
+     * How strongly words fade into an edge they are cut at: as far as
+     * they have gone past the edge, up to the fade's depth. The fade
+     * comes and goes with the marquee instead of appearing, and an edge
+     * nothing is cut at has none.
      */
     static float sideFadeStrength(double hiddenPixels, float depth) {
         if (depth <= 0.0F || hiddenPixels <= 0.0D) {
@@ -1757,26 +1801,84 @@ final class LostTalesChatOverlayRenderer {
      */
     static void drawEdgeFade(float left, float right, float edge,
                              float limit, float height, int alpha) {
+        drawEdgeFade(left, right, left, right, edge, limit, height, alpha,
+                LostTalesChatVisualStyle.backdropRgb(), true);
+    }
+
+    /**
+     * As above in {@code rgb}, drawing only the stretch from
+     * {@code from} to {@code to} of the band from {@code left} to
+     * {@code right}: what the tab strip draws in pieces, each tab's
+     * stretch in the tab's own colour and the selected tab's left out.
+     * {@code ramped} gives the band the history's left-to-right ramp,
+     * one ramp across every piece; without it the shade is even across
+     * the whole width, as the strip's is, so its far end shows the
+     * shade as its near end does.
+     */
+    static void drawEdgeFade(float left, float right, float from, float to,
+                             float edge, float limit, float height,
+                             int alpha, int rgb, boolean ramped) {
+        float drawLeft = Math.max(left, from);
+        float drawRight = Math.min(right, to);
+        if (right <= left || drawRight <= drawLeft) {
+            return;
+        }
+        // The ramp is linear across the whole span, so the drawn stretch
+        // takes its weight at either end from the span's own line.
+        float[] columnX = {drawLeft, drawRight};
+        float[] columnWeight = ramped
+                ? new float[] {
+                        1.0F - (drawLeft - left) / (right - left),
+                        1.0F - (drawRight - left) / (right - left)}
+                : new float[] {1.0F, 1.0F};
+        drawEdgeFade(columnX, columnWeight, edge, limit, height, alpha, rgb);
+    }
+
+    /** Columns the bell of a tab's own shade is drawn in. */
+    private static final int BELL_FADE_COLUMNS = 8;
+
+    /**
+     * A tab's own shade above the rule, in the tab's colour: the edge
+     * fade with a bell across the tab's width, full at its middle and
+     * nothing at either side, eased the way the vertical ramp is, so
+     * the colour gathers under the tab's middle and is gone where the
+     * tab meets its neighbours.
+     */
+    static void drawBellFade(float left, float right, float edge,
+                             float limit, float height, int alpha, int rgb) {
+        if (right <= left) {
+            return;
+        }
+        float[] columnX = new float[BELL_FADE_COLUMNS + 1];
+        float[] columnWeight = new float[columnX.length];
+        for (int column = 0; column <= BELL_FADE_COLUMNS; column++) {
+            float t = column / (float)BELL_FADE_COLUMNS;
+            columnX[column] = left + (right - left) * t;
+            columnWeight[column] = 1.0F - LostTalesChatMotion.smoothStep(
+                    Math.abs(t - 0.5F) * 2.0F);
+        }
+        drawEdgeFade(columnX, columnWeight, edge, limit, height, alpha, rgb);
+    }
+
+    /**
+     * The edge fade over the columns given — each with its own share of
+     * the opacity, the shade blending straight between neighbours —
+     * from {@code edge} toward {@code limit} for at most {@code height}.
+     */
+    private static void drawEdgeFade(float[] columnX, float[] columnWeight,
+                                     float edge, float limit, float height,
+                                     int alpha, int rgb) {
         int safeAlpha = Math.max(0, Math.min(255, alpha));
         if (safeAlpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
             return;
         }
         boolean downward = limit > edge;
-        int backdropRgb = LostTalesChatVisualStyle.backdropRgb();
+        int backdropRgb = rgb;
         float far = downward
                 ? Math.min(limit, edge + height)
                 : Math.max(limit, edge - height);
-        // The caller passes exactly the backdrop band's span, so the two
-        // ramps coincide.
-        if (far == edge || right <= left) {
+        if (far == edge) {
             return;
-        }
-        float[] columnX = new float[EDGE_FADE_COLUMNS + 1];
-        float[] columnWeight = new float[columnX.length];
-        for (int column = 0; column <= EDGE_FADE_COLUMNS; column++) {
-            float t = column / (float)EDGE_FADE_COLUMNS;
-            columnX[column] = left + (right - left) * t;
-            columnWeight[column] = 1.0F - t;
         }
         Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
         for (int rowIndex = 0; rowIndex < EDGE_FADE_ROWS; rowIndex++) {
@@ -2045,12 +2147,30 @@ final class LostTalesChatOverlayRenderer {
     }
 
     /**
-     * Edge of the jump-to-present button's square: the down chevron's
-     * width with the frame's inset either side. Square, so the chevron's
-     * three rows stand in its middle exactly too.
+     * Height of the jump-to-present button: the down chevron's width
+     * with the frame's inset either side, so the chevron's three rows
+     * and the label's capitals both stand in its middle exactly.
      */
-    private static final int JUMP_BUTTON_SIZE =
+    private static final int JUMP_BUTTON_HEIGHT =
             ChatIconSheet.CHEVRON_1.getWidth() + 2 * ChatFramedButton.INSET;
+
+    /** What the jump-to-present button says, before its chevron. */
+    private static String jumpButtonLabel() {
+        return StatCollector.translateToLocal("gui.losttales.chat.jump_to_present");
+    }
+
+    /**
+     * Width of the jump-to-present button: the label's ink, the gap an
+     * icon keeps from its label, the chevron, and the frame's inset at
+     * either end. The last glyph's width includes a column of spacing
+     * after it, which is not ink.
+     */
+    private static int jumpButtonWidth(FontRenderer font) {
+        int label = font == null ? 0
+                : Math.max(0, font.getStringWidth(jumpButtonLabel()) - 1);
+        return ChatFramedButton.INSET + label + ChatChannelIcons.GAP
+                + ChatIconSheet.CHEVRON_1.getWidth() + ChatFramedButton.INSET;
+    }
 
     /**
      * Advances the jump-to-present button's fly-in: out while the view is
@@ -2060,18 +2180,13 @@ final class LostTalesChatOverlayRenderer {
     private static boolean advanceJumpButton(ChatWindowFrame frame,
                                              double scrollLines) {
         boolean wanted = frame.view != null && scrollLines > 0.5D;
-        long now = System.nanoTime();
-        if (!LostTalesConfig.enableChatAnimations) {
-            frame.jumpButtonProgress = wanted ? 1.0F : 0.0F;
-        } else {
-            double elapsed = frame.jumpButtonNanos == 0L ? 0.0D
-                    : (now - frame.jumpButtonNanos) / 1.0E9D;
-            frame.jumpButtonProgress = (float)LostTalesChatMotion.approach(
-                    frame.jumpButtonProgress, wanted ? 1.0D : 0.0D, elapsed,
-                    0.1D);
-        }
-        frame.jumpButtonNanos = now;
-        return frame.jumpButtonProgress > 0.02F;
+        float progress = frame.jumpMotion.advance(System.nanoTime(), wanted,
+                LostTalesConfig.enableChatAnimations
+                        ? Math.max(1, LostTalesConfig
+                                .chatAnimationDurationMillis)
+                        : 0,
+                LostTalesUiEasing.SMOOTH);
+        return progress > 0.02F;
     }
 
     /**
@@ -2083,24 +2198,25 @@ final class LostTalesChatOverlayRenderer {
     private static float jumpButtonTop(ChatWindowFrame frame,
                                        float bottomEdge, float originY,
                                        float scale) {
-        float slide = (1.0F - Math.min(1.0F, frame.jumpButtonProgress))
-                * (JUMP_BUTTON_SIZE + 3.0F);
-        float top = bottomEdge - 1.0F - JUMP_BUTTON_SIZE + slide;
+        float slide = (1.0F - frame.jumpMotion.clamped())
+                * (JUMP_BUTTON_HEIGHT + 3.0F);
+        float top = bottomEdge - 1.0F - JUMP_BUTTON_HEIGHT + slide;
         return (float)((ChatWindowFrame.snapToDisplayPixels(
                 originY + top * scale) - originY) / scale);
     }
 
     /**
      * The jump-to-present button of a scrolled-back view: a framed button
-     * centred across the panel with the sheet's down chevron in it — the
-     * tab search's, at rest — lit under the pointer, standing in the hole
-     * the history left for it. Drawn in the window's local space; the
-     * screen rectangle it lands on is recorded on the frame, so the click
-     * resolves against exactly what is on screen.
+     * centred across the panel, its label in ivory and the sheet's down
+     * chevron — the tab search's, at rest — after it, lit under the
+     * pointer, standing in the hole the history left for it. Drawn in
+     * the window's local space; the screen rectangle it lands on is
+     * recorded on the frame, so the click resolves against exactly what
+     * is on screen.
      */
     private static void drawJumpButton(Minecraft minecraft,
                                        ChatWindowFrame frame, float left,
-                                       float top, float bottomEdge,
+                                       float top, int width, float bottomEdge,
                                        int alpha, float originX,
                                        float originY, float scale) {
         if (alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
@@ -2112,30 +2228,46 @@ final class LostTalesChatOverlayRenderer {
         frame.jumpFadeNanos = now;
         frame.jumpFade = LostTalesChatVisualStyle.hoverFade(frame.jumpFade,
                 frame.jumpHovered, elapsed);
-        ChatFramedButton.drawSurface(left, top, JUMP_BUTTON_SIZE,
-                JUMP_BUTTON_SIZE, frame.jumpFade, Math.round(alpha
+        ChatFramedButton.drawSurface(left, top, width, JUMP_BUTTON_HEIGHT,
+                frame.jumpFade, Math.round(alpha
                         * LostTalesChatVisualStyle.INSET_ALPHA / 255.0F));
+        // The label and the badge's count are text, which is drawn at
+        // whole coordinates: the matrix carries the button's own place
+        // — a whole display pixel, fractions of a GUI pixel included —
+        // so they fly with the frame instead of stepping a GUI pixel at
+        // a time beside it.
+        GL11.glPushMatrix();
+        try {
+            GL11.glTranslatef(left, top, 0.0F);
+            // The label's capitals in the button's middle.
+            LostTalesChatVisualStyle.drawColored(minecraft.fontRenderer,
+                    jumpButtonLabel(), ChatFramedButton.INSET,
+                    (JUMP_BUTTON_HEIGHT - GLYPH_CAP_HEIGHT) / 2,
+                    LostTalesChatVisualStyle.IVORY, alpha);
+            // What is waiting below, so a view scrolled back says how
+            // much it has not seen rather than only that there is more.
+            // In the divider's own crimson, which is the colour this
+            // chat says "unread" in, on the button's right shoulder.
+            drawWaitingCount(minecraft, frame, width, 0.0F, alpha);
+        } finally {
+            GL11.glPopMatrix();
+        }
+        // The chevron the icon gap past the label's ink.
         ChatIconSheet.drawPairWithShadow(ChatIconSheet.CHEVRON_1,
                 ChatIconSheet.CHEVRON_1_HOVER, frame.jumpFade,
-                left + (JUMP_BUTTON_SIZE
-                        - ChatIconSheet.CHEVRON_1.getWidth()) / 2,
-                top + (JUMP_BUTTON_SIZE
+                left + width - ChatFramedButton.INSET
+                        - ChatIconSheet.CHEVRON_1.getWidth(),
+                top + (JUMP_BUTTON_HEIGHT
                         - ChatIconSheet.CHEVRON_1.getHeight()) / 2, alpha);
-        ChatFramedButton.drawInk(left, top, JUMP_BUTTON_SIZE,
-                JUMP_BUTTON_SIZE, frame.jumpFade, alpha);
-        // What is waiting below, so a view scrolled back says how much
-        // it has not seen rather than only that there is more. In the
-        // divider's own crimson, which is the colour this chat says
-        // "unread" in, on the button's right shoulder.
-        drawWaitingCount(minecraft, frame, left + JUMP_BUTTON_SIZE, top,
-                alpha);
+        ChatFramedButton.drawInk(left, top, width, JUMP_BUTTON_HEIGHT,
+                frame.jumpFade, alpha);
         frame.jumpPillLeft = originX + left * scale;
         frame.jumpPillTop = originY + top * scale;
-        frame.jumpPillRight = originX + (left + JUMP_BUTTON_SIZE) * scale;
+        frame.jumpPillRight = originX + (left + width) * scale;
         // The clip cuts the flying-in button on the bottom rule; the
         // hitbox ends where the pixels do.
         frame.jumpPillBottom = Math.min(
-                originY + (top + JUMP_BUTTON_SIZE) * scale,
+                originY + (top + JUMP_BUTTON_HEIGHT) * scale,
                 originY + bottomEdge * scale);
     }
 
@@ -2365,7 +2497,8 @@ final class LostTalesChatOverlayRenderer {
      * back, as a small badge on the jump-to-present button. Anchored on
      * the button's top-right corner and drawn over its outline, so a
      * long count grows leftward across the button rather than off the
-     * panel; nothing is drawn while nothing is waiting.
+     * panel; nothing is drawn while nothing is waiting. Drawn in the
+     * button's own space, its origin at the button's top-left corner.
      */
     private static void drawWaitingCount(Minecraft minecraft,
                                          ChatWindowFrame frame,
@@ -2698,12 +2831,33 @@ final class LostTalesChatOverlayRenderer {
     }
 
     /**
+     * As above with the stretch from {@code holeLeft} to
+     * {@code holeRight} left out — where the selected tab stands on the
+     * row — the band's curve still running the whole width.
+     */
+    static void drawBackdropRowAround(float left, float top, float right,
+                                      float bottom, int alpha,
+                                      float holeLeft, float holeRight) {
+        int rgb = LostTalesChatVisualStyle.backdropRgb();
+        if (holeRight <= holeLeft || holeRight <= left || holeLeft >= right) {
+            drawChatBackdrop(left, top, right, bottom, alpha, rgb);
+            return;
+        }
+        drawChatBackdrop(left, left, Math.max(left, holeLeft), top, right,
+                bottom, alpha, rgb, GL11.GL_ONE_MINUS_SRC_ALPHA,
+                BACKDROP_FADE_WEIGHTS);
+        drawChatBackdrop(left, Math.min(right, holeRight), right, top, right,
+                bottom, alpha, rgb, GL11.GL_ONE_MINUS_SRC_ALPHA,
+                BACKDROP_FADE_WEIGHTS);
+    }
+
+    /**
      * The opacity a window's backdrop is drawn at, before the opening
      * fade is applied to it. Both rules ask here, so the row each of
      * them stands on is the same one the messages between them lie on.
      */
     static int backdropRowAlpha(Minecraft minecraft) {
-        float opacity = minecraft.gameSettings.chatOpacity * 0.9F + 0.1F;
+        float opacity = LostTalesChatVisualStyle.chatOpacity(minecraft);
         return Math.max(0, Math.min(255, Math.round(255.0F * opacity))) / 2;
     }
 
@@ -2717,29 +2871,97 @@ final class LostTalesChatOverlayRenderer {
      */
     static void drawRule(float left, float right, float top, float bottom,
                          int alpha) {
+        drawRuleAround(left, right, top, bottom, alpha, 0.0F, 0.0F);
+    }
+
+    /**
+     * The rule with the stretch from {@code holeLeft} to
+     * {@code holeRight} left out — where the selected tab stands on it —
+     * hung from the tab: each piece is full where it meets the tab's
+     * border and fades to nothing at the strip's end, so the rule and
+     * the tab read as one. Without a hole, the whole rule as
+     * {@link #drawRule} draws it.
+     */
+    static void drawRuleAround(float left, float right, float top,
+                               float bottom, int alpha, float holeLeft,
+                               float holeRight) {
         int safeAlpha = Math.max(0, Math.min(255, alpha));
         if (safeAlpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA
                 || right <= left || bottom <= top) {
             return;
         }
-        float centre = (left + right) / 2.0F;
         Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
-        // Same winding as the backdrop: the GUI pass culls back faces.
-        // Left half: transparent edge to opaque centre.
-        tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, safeAlpha);
-        tessellator.addVertex(centre, bottom, 0.0D);
-        tessellator.addVertex(centre, top, 0.0D);
-        tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, 0);
-        tessellator.addVertex(left, top, 0.0D);
-        tessellator.addVertex(left, bottom, 0.0D);
-        // Right half: opaque centre to transparent edge.
-        tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, 0);
-        tessellator.addVertex(right, bottom, 0.0D);
-        tessellator.addVertex(right, top, 0.0D);
-        tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, safeAlpha);
-        tessellator.addVertex(centre, top, 0.0D);
-        tessellator.addVertex(centre, bottom, 0.0D);
+        if (holeRight <= holeLeft || holeRight <= left || holeLeft >= right) {
+            drawRuleSpan(tessellator, left, right, left, right, top, bottom,
+                    safeAlpha);
+        } else {
+            drawRuleRamp(tessellator, left, Math.max(left, holeLeft), top,
+                    bottom, safeAlpha);
+            drawRuleRamp(tessellator, right, Math.min(right, holeRight), top,
+                    bottom, safeAlpha);
+        }
         LostTalesSkyrimUiStyle.endQuads(tessellator, true);
+    }
+
+    /**
+     * One piece of a rule from {@code faint}, where it is nothing, to
+     * {@code full}, where it is opaque; either may be the left end.
+     */
+    private static void drawRuleRamp(Tessellator tessellator, float faint,
+                                     float full, float top, float bottom,
+                                     int alpha) {
+        if (faint == full) {
+            return;
+        }
+        float leftX = Math.min(faint, full);
+        float rightX = Math.max(faint, full);
+        int leftAlpha = faint < full ? 0 : alpha;
+        int rightAlpha = faint < full ? alpha : 0;
+        // Same winding as the backdrop: the GUI pass culls back faces.
+        tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, rightAlpha);
+        tessellator.addVertex(rightX, bottom, 0.0D);
+        tessellator.addVertex(rightX, top, 0.0D);
+        tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, leftAlpha);
+        tessellator.addVertex(leftX, top, 0.0D);
+        tessellator.addVertex(leftX, bottom, 0.0D);
+    }
+
+    /**
+     * The stretch of a rule from {@code from} to {@code to}: opaque at
+     * the rule's centre and nothing at its ends, the stretch cut at the
+     * centre when it crosses it so each piece is one linear ramp.
+     */
+    private static void drawRuleSpan(Tessellator tessellator, float left,
+                                     float right, float from, float to,
+                                     float top, float bottom, int alpha) {
+        if (to <= from) {
+            return;
+        }
+        float centre = (left + right) / 2.0F;
+        if (from < centre && to > centre) {
+            drawRuleSpan(tessellator, left, right, from, centre, top, bottom,
+                    alpha);
+            drawRuleSpan(tessellator, left, right, centre, to, top, bottom,
+                    alpha);
+            return;
+        }
+        int fromAlpha = ruleAlpha(left, right, from, alpha);
+        int toAlpha = ruleAlpha(left, right, to, alpha);
+        // Same winding as the backdrop: the GUI pass culls back faces.
+        tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, toAlpha);
+        tessellator.addVertex(to, bottom, 0.0D);
+        tessellator.addVertex(to, top, 0.0D);
+        tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, fromAlpha);
+        tessellator.addVertex(from, top, 0.0D);
+        tessellator.addVertex(from, bottom, 0.0D);
+    }
+
+    /** The rule's opacity at {@code x}: full at its centre, none at its ends. */
+    private static int ruleAlpha(float left, float right, float x, int alpha) {
+        float half = (right - left) / 2.0F;
+        float centre = (left + right) / 2.0F;
+        return half <= 0.0F ? alpha : Math.round(alpha
+                * Math.max(0.0F, 1.0F - Math.abs(x - centre) / half));
     }
 
     /**
@@ -3342,8 +3564,8 @@ final class LostTalesChatOverlayRenderer {
     private static void drawChatBackdrop(
             float left, float top, float right, float bottom, int alpha,
             int backdropRgb, float[] weights) {
-        drawChatBackdrop(left, left, top, right, bottom, alpha, backdropRgb,
-                GL11.GL_ONE_MINUS_SRC_ALPHA, weights);
+        drawChatBackdrop(left, left, right, top, right, bottom, alpha,
+                backdropRgb, GL11.GL_ONE_MINUS_SRC_ALPHA, weights);
     }
 
     /**
@@ -3357,7 +3579,7 @@ final class LostTalesChatOverlayRenderer {
     private static void drawChatBackdrop(
             float curveLeft, float left, float top, float right,
             float bottom, int alpha, int backdropRgb) {
-        drawChatBackdrop(curveLeft, left, top, right, bottom, alpha,
+        drawChatBackdrop(curveLeft, left, right, top, right, bottom, alpha,
                 backdropRgb, GL11.GL_ONE_MINUS_SRC_ALPHA,
                 BACKDROP_FADE_WEIGHTS);
     }
@@ -3374,9 +3596,22 @@ final class LostTalesChatOverlayRenderer {
             float curveLeft, float left, float top, float right,
             float bottom, int alpha, int backdropRgb,
             int destinationFactor, float[] weights) {
+        drawChatBackdrop(curveLeft, left, right, top, right, bottom, alpha,
+                backdropRgb, destinationFactor, weights);
+    }
+
+    /**
+     * As above, drawing only up to {@code drawRight}: the band's curve
+     * still runs to {@code right}, and the band stops short of it.
+     */
+    private static void drawChatBackdrop(
+            float curveLeft, float left, float drawRight, float top,
+            float right, float bottom, int alpha, int backdropRgb,
+            int destinationFactor, float[] weights) {
         int safeAlpha = Math.max(0, Math.min(255, alpha));
         int steps = weights == null ? 0 : weights.length - 1;
-        if (right <= left || bottom <= top || safeAlpha <= 0 || steps < 1) {
+        if (drawRight <= left || bottom <= top || safeAlpha <= 0
+                || steps < 1) {
             return;
         }
         Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
@@ -3391,11 +3626,20 @@ final class LostTalesChatOverlayRenderer {
             if (x1 <= left) {
                 continue;
             }
+            if (x0 >= drawRight) {
+                break;
+            }
             float w0 = weights[step];
             float w1 = weights[step + 1];
             if (x0 < left) {
                 w0 += (w1 - w0) * (left - x0) / (x1 - x0);
                 x0 = left;
+            }
+            if (x1 > drawRight) {
+                // The band stops inside the step: the curve's value
+                // there, as at a start inside one.
+                w1 = w0 + (w1 - w0) * (drawRight - x0) / (x1 - x0);
+                x1 = drawRight;
             }
             int a0 = Math.round(safeAlpha * w0);
             int a1 = Math.round(safeAlpha * w1);

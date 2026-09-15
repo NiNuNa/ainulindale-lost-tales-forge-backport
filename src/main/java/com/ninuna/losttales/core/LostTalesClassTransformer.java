@@ -125,6 +125,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.lotrFastTravelArrivalTransformer.active";
     public static final String SERVER_BROADCAST_ACTIVE_PROPERTY =
             "losttales.serverBroadcastTransformer.active";
+    public static final String PLAYER_LINE_ACTIVE_PROPERTY =
+            "losttales.playerLineTransformer.active";
     public static final String DEATH_MESSAGE_ACTIVE_PROPERTY =
             "losttales.deathMessageTransformer.active";
     public static final String LOTR_HIRED_UNIT_ACTIVE_PROPERTY =
@@ -423,7 +425,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return transformPlayerController(basicClass);
         }
         if (ENTITY_PLAYER_MP.equals(transformedName)) {
-            return transformEntityPlayerMpDeathMessage(basicClass);
+            return transformEntityPlayerMpChatLine(
+                    transformEntityPlayerMpDeathMessage(basicClass));
         }
         if (ENTITY_PLAYER.equals(transformedName)) {
             return transformEntityPlayerContainer(basicClass);
@@ -3435,6 +3438,53 @@ public final class LostTalesClassTransformer implements IClassTransformer {
      * patch the Discord bridge cannot hear of deaths or achievements
      * and says so when it starts.</p>
      */
+    /**
+     * Patches the head of {@code EntityPlayerMP.addChatMessage}, where
+     * every line sent to one player passes, to call
+     * {@code LostTalesServerBroadcastHook.onPlayerLine}, which records
+     * a command's answer under the tab it was typed in and hands the
+     * component back. Idempotent, and never fails the game.
+     */
+    private static byte[] transformEntityPlayerMpChatLine(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!("addChatMessage".equals(method.name)
+                        || "func_145747_a".equals(method.name))
+                        || !"(Lnet/minecraft/util/IChatComponent;)V"
+                        .equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, SERVER_BROADCAST_HOOK_OWNER,
+                        "onPlayerLine")) {
+                    System.setProperty(PLAYER_LINE_ACTIVE_PROPERTY, "true");
+                    return basicClass;
+                }
+                InsnList hook = new InsnList();
+                hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                hook.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                        SERVER_BROADCAST_HOOK_OWNER, "onPlayerLine",
+                        "(Lnet/minecraft/entity/player/EntityPlayerMP;"
+                                + "Lnet/minecraft/util/IChatComponent;)"
+                                + "Lnet/minecraft/util/IChatComponent;"));
+                hook.add(new VarInsnNode(Opcodes.ASTORE, 1));
+                method.instructions.insert(hook);
+                System.setProperty(PLAYER_LINE_ACTIVE_PROPERTY, "true");
+                info("Patched player chat lines to keep a command's "
+                        + "answers with its tab");
+                return write(owner);
+            }
+            warn("Could not locate EntityPlayerMP#addChatMessage; "
+                    + "command answers will not be kept in the history");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch player chat lines: " + throwable);
+            return basicClass;
+        }
+    }
+
     private static byte[] transformServerBroadcast(byte[] basicClass) {
         try {
             ClassNode owner = read(basicClass);

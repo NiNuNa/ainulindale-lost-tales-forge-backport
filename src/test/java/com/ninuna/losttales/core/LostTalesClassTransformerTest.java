@@ -484,6 +484,37 @@ public final class LostTalesClassTransformerTest {
     }
 
     @Test
+    public void playerLinesReportEveryLineSentToOnePlayer() throws Exception {
+        ClassNode player = transform("net.minecraft.entity.player.EntityPlayerMP");
+        MethodNode method = findMethod(player, "addChatMessage");
+        assertEquals("(Lnet/minecraft/util/IChatComponent;)V", method.desc);
+        assertTrue(containsStaticHook(player, "addChatMessage",
+                SERVER_BROADCAST_HOOK_OWNER, "onPlayerLine"));
+        // The hook is the very first thing the method does, fed the
+        // player and the component, and what it hands back is sent.
+        AbstractInsnNode first = method.instructions.getFirst();
+        while (first != null && first.getOpcode() < 0) {
+            first = first.getNext();
+        }
+        assertTrue(first instanceof org.objectweb.asm.tree.VarInsnNode);
+        assertEquals(Opcodes.ALOAD, first.getOpcode());
+        assertEquals(0, ((org.objectweb.asm.tree.VarInsnNode)first).var);
+        AbstractInsnNode second = nextCode(first);
+        assertEquals(Opcodes.ALOAD, second.getOpcode());
+        assertEquals(1, ((org.objectweb.asm.tree.VarInsnNode)second).var);
+        AbstractInsnNode third = nextCode(second);
+        assertTrue(third instanceof MethodInsnNode);
+        assertEquals("onPlayerLine", ((MethodInsnNode)third).name);
+        assertEquals("(Lnet/minecraft/entity/player/EntityPlayerMP;"
+                + "Lnet/minecraft/util/IChatComponent;)"
+                + "Lnet/minecraft/util/IChatComponent;",
+                ((MethodInsnNode)third).desc);
+        AbstractInsnNode fourth = nextCode(third);
+        assertEquals(Opcodes.ASTORE, fourth.getOpcode());
+        assertEquals(1, ((org.objectweb.asm.tree.VarInsnNode)fourth).var);
+    }
+
+    @Test
     public void serverBroadcastsReportEveryServerWideLine() throws Exception {
         ClassNode manager = transform(
                 "net.minecraft.server.management.ServerConfigurationManager");

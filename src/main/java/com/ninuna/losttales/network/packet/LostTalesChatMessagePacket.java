@@ -3,6 +3,7 @@ package com.ninuna.losttales.network.packet;
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
@@ -155,6 +156,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
     private static final int MAX_FACTION_NAME_BYTES = 128;
     /** A scope value is a normalized faction id; well past any of them. */
     private static final int MAX_SCOPE_VALUE_BYTES = 128;
+    /** The most bytes a tab id may take: the console's own bound on a context. */
+    private static final int MAX_TAB_ID_BYTES = ChatConsoleEvent.MAX_CONTEXT_LENGTH;
 
     private String channelId = "";
     private UUID senderId;
@@ -223,6 +226,14 @@ public final class LostTalesChatMessagePacket implements IMessage {
      * characters in two factions keeps the two apart.
      */
     private String scopeValue = "";
+    /**
+     * For a line of the server's own that answers a command, the id of
+     * the tab the command was typed in, as the client reported it: the
+     * client files the answer under that tab, wherever the line's
+     * channel would have put it. Empty on every other line. Appended
+     * last; carried only by a system sender.
+     */
+    private String tabId = "";
     private UUID ownCharacterId;
     /**
      * For a whisper, the character of the other party the conversation
@@ -665,6 +676,13 @@ public final class LostTalesChatMessagePacket implements IMessage {
             if (buffer.readableBytes() >= 4) {
                 this.reactions = LostTalesChatReactionCodec.read(buffer);
             }
+            // Appended after those: the tab a command's answer belongs
+            // under. A payload written before it names none.
+            this.tabId = "";
+            if (buffer.readableBytes() >= 1) {
+                this.tabId = LostTalesPacketCodec.readUtf8String(buffer,
+                        MAX_TAB_ID_BYTES);
+            }
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
@@ -681,6 +699,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
             this.ownCharacterId = null;
             this.partnerCharacterId = null;
             this.scopeValue = "";
+            this.tabId = "";
             this.messageId = ChatMessageIds.NONE;
             this.reply = ChatReplyReference.NONE;
             this.partnerIdentity = "";
@@ -819,6 +838,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
             buffer.writeInt(player.getNameColor());
         }
         LostTalesChatReactionCodec.write(buffer, this.reactions);
+        LostTalesPacketCodec.writeUtf8String(buffer, this.tabId, MAX_TAB_ID_BYTES);
     }
 
     /** A presence flag and a UUID, always {@link #IDENTITY_ID_TAIL_BYTES} long. */
@@ -875,6 +895,10 @@ public final class LostTalesChatMessagePacket implements IMessage {
                         this.bodyJson, MAX_BODY_BYTES)
                 || (this.bodyJson.length() > 0
                         && !isSystemSender(this.senderId))
+                || !LostTalesPacketCodec.isUtf8WithinLimit(this.tabId,
+                        MAX_TAB_ID_BYTES)
+                || !ChatConsoleEvent.isContext(this.tabId)
+                || (this.tabId.length() > 0 && !isSystemSender(this.senderId))
                 || this.namedPlayers.size() > ChatNamedPlayer.MAX_PER_LINE
                 || (ChatChannel.fromId(this.channelId) == ChatChannel.WHISPER
                         && this.partner.length() == 0)
@@ -975,8 +999,28 @@ public final class LostTalesChatMessagePacket implements IMessage {
         copy.bodyJson = this.bodyJson;
         copy.namedPlayers = this.namedPlayers;
         copy.reactions = this.reactions;
+        copy.tabId = this.tabId;
         return copy;
     }
+
+    /**
+     * The same line filed under the tab {@code tabId} names on the
+     * client: what a line of the server's own that answers a command
+     * carries. Anything but a system sender keeps none, whatever it is
+     * handed, and so does an id that would not be a context.
+     */
+    public LostTalesChatMessagePacket withTabId(String tabId) {
+        LostTalesChatMessagePacket copy = withNameColor(this.nameColor);
+        String id = tabId == null ? "" : tabId.trim();
+        copy.tabId = isSystemSender(this.senderId)
+                && ChatConsoleEvent.isContext(id)
+                && LostTalesPacketCodec.isUtf8WithinLimit(id, MAX_TAB_ID_BYTES)
+                ? id : "";
+        return copy;
+    }
+
+    /** The tab a command's answer is filed under; empty for every other line. */
+    public String getTabId() { return this.tabId; }
 
     /** The same line wearing {@code reactions}, as one reader is shown them. */
     public LostTalesChatMessagePacket withReactions(ChatReactionSummary reactions) {

@@ -33,11 +33,81 @@ public final class ChatWindow {
     /** Which side of its target this window sits on. */
     private LinkSide linkSide = LinkSide.BELOW;
     /**
-     * Whether the window fills the screen between its margins. Its own
-     * position and size stay as they were throughout, and are what it
-     * goes back to when it lets the screen go.
+     * The part of the screen the window fills, or none while it stands
+     * in its own box. Its own position and size stay as they were
+     * throughout, and are what it goes back to when it lets the screen
+     * go.
      */
-    private boolean fullscreen;
+    private ScreenFill fill = ScreenFill.NONE;
+
+    /**
+     * The parts of the screen a window can fill, as a desktop window
+     * snaps to the edge it is dragged to: the whole screen from the
+     * top edge, a half from a side, a quarter from a corner. Each is a
+     * box of screen halves — its left and top in halves, and how many
+     * halves across and down it spans.
+     */
+    public enum ScreenFill {
+        NONE("none", 0, 0, 0, 0),
+        FULL("full", 0, 0, 2, 2),
+        LEFT("left", 0, 0, 1, 2),
+        RIGHT("right", 1, 0, 1, 2),
+        TOP_LEFT("top_left", 0, 0, 1, 1),
+        TOP_RIGHT("top_right", 1, 0, 1, 1),
+        BOTTOM_LEFT("bottom_left", 0, 1, 1, 1),
+        BOTTOM_RIGHT("bottom_right", 1, 1, 1, 1);
+
+        private final String id;
+        private final int halfLeft;
+        private final int halfTop;
+        private final int halvesAcross;
+        private final int halvesDown;
+
+        ScreenFill(String id, int halfLeft, int halfTop, int halvesAcross,
+                   int halvesDown) {
+            this.id = id;
+            this.halfLeft = halfLeft;
+            this.halfTop = halfTop;
+            this.halvesAcross = halvesAcross;
+            this.halvesDown = halvesDown;
+        }
+
+        public String id() { return this.id; }
+
+        /** The fill's left edge on a screen {@code screenWidth} wide. */
+        public int left(int screenWidth) {
+            return this.halfLeft == 0 ? 0 : screenWidth / 2;
+        }
+
+        /** The fill's width on a screen {@code screenWidth} wide. */
+        public int width(int screenWidth) {
+            return this.halvesAcross == 2 ? screenWidth
+                    : this.halfLeft == 0 ? screenWidth / 2
+                    : screenWidth - screenWidth / 2;
+        }
+
+        /** The fill's top edge on a screen {@code screenHeight} tall. */
+        public int top(int screenHeight) {
+            return this.halfTop == 0 ? 0 : screenHeight / 2;
+        }
+
+        /** The fill's height on a screen {@code screenHeight} tall. */
+        public int height(int screenHeight) {
+            return this.halvesDown == 2 ? screenHeight
+                    : this.halfTop == 0 ? screenHeight / 2
+                    : screenHeight - screenHeight / 2;
+        }
+
+        /** The fill of that name; none for anything else. */
+        public static ScreenFill fromId(String id) {
+            for (ScreenFill fill : values()) {
+                if (fill.id.equalsIgnoreCase(id)) {
+                    return fill;
+                }
+            }
+            return NONE;
+        }
+    }
 
     /**
      * Where a stuck window sits relative to the one it is stuck to. Two
@@ -102,8 +172,11 @@ public final class ChatWindow {
     public LinkSide getLinkSide() { return this.linkSide; }
     public boolean isLinked() { return this.linkTarget != null; }
 
-    /** Whether the window fills the screen rather than its own box. */
-    public boolean isFullscreen() { return this.fullscreen; }
+    /** The part of the screen the window fills; none in its own box. */
+    public ScreenFill getFill() { return this.fill; }
+
+    /** Whether the window fills the whole screen rather than its own box. */
+    public boolean isFullscreen() { return this.fill == ScreenFill.FULL; }
 
     /** Tabs in row order, including channels currently unavailable. */
     public List<ChatTab> getTabs() {
@@ -150,7 +223,9 @@ public final class ChatWindow {
 
     void setWidth(int width) { this.width = width; }
 
-    void setFullscreen(boolean fullscreen) { this.fullscreen = fullscreen; }
+    void setFill(ScreenFill fill) {
+        this.fill = fill == null ? ScreenFill.NONE : fill;
+    }
 
     void setOffsets(double offsetX, double offsetY) {
         this.offsetX = offsetX;

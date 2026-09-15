@@ -196,21 +196,28 @@ public final class ChatChannelPolicy {
             }
         }
         Routing routing = new Routing(recipients, null);
-        return new Routing(recipients,
-                audienceFor(channel, party, factionId, routing.recipientIds()));
+        // Staff talk in a private channel is the console readers' own
+        // and opens to whoever reads the console later, as the Operator
+        // channel does; a note to oneself stays with who was sent it.
+        return new Routing(recipients, staffTalk
+                ? ChatHistory.Audience.readers()
+                : audienceFor(channel, party, factionId, routing.recipientIds()));
     }
 
     /**
      * Who may be shown the line after the fact, from how it was routed.
      * An open world-wide channel reaches everyone, later joiners
-     * included. A channel whose read side asks for a role reaches only
-     * those who were sent the line and may still read it, so a role
-     * granted afterwards opens nothing said before. A party line reaches
-     * the accounts of the party's members then, while they are still in
-     * it; a faction line the characters of the faction then and now; a
-     * private channel's line stays with who was sent it and may still
-     * read the channel; everything else — proximity above all — exactly
-     * who was sent it.
+     * included. A channel whose read side asks for a role — the Operator
+     * channel, an open channel the config gates — reaches whoever may
+     * read it at the moment of asking, so a role granted afterwards
+     * opens everything said before, as a Discord channel shows its past
+     * to whoever is let in. A party line reaches the accounts of the
+     * party's members then, while they are still in it; a faction line
+     * the characters of the faction then and now; everything else —
+     * proximity, whispers, a private channel's line — exactly who was
+     * sent it, since where a player stood cannot be asked again and a
+     * note to oneself is nobody else's ({@link #route} opens staff talk
+     * in a private channel to the console's readers instead).
      */
     public static ChatHistory.Audience audienceFor(ChatChannel channel, Party party,
                                                    String factionId,
@@ -220,10 +227,10 @@ public final class ChatChannelPolicy {
         switch (channel.getRecipientRule()) {
             case GLOBAL:
                 return readGated
-                        ? ChatHistory.Audience.accounts(recipientIds, true)
+                        ? ChatHistory.Audience.readers()
                         : ChatHistory.Audience.everyone();
             case OPERATORS:
-                return ChatHistory.Audience.accounts(recipientIds, true);
+                return ChatHistory.Audience.readers();
             case PARTY:
                 List<UUID> owners = new ArrayList<UUID>();
                 if (party != null) {
@@ -236,9 +243,9 @@ public final class ChatChannelPolicy {
                 return ChatHistory.Audience.party(
                         party == null ? null : party.getPartyId(), owners);
             case FACTION:
-                return ChatHistory.Audience.faction(factionId, recipientIds, readGated);
+                return ChatHistory.Audience.faction(factionId, readGated);
             case SELF:
-                return ChatHistory.Audience.accounts(recipientIds, true);
+                return ChatHistory.Audience.accounts(recipientIds, false);
             default:
                 return ChatHistory.Audience.accounts(recipientIds, false);
         }

@@ -4,6 +4,9 @@ import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.item.ItemStack;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.BufferUtils;
+import java.nio.FloatBuffer;
 
 /**
  * The one set of rules every inline chat glyph — emoji, item icon, map
@@ -156,16 +159,59 @@ final class ChatInlineIcons {
         }
     }
 
+    /**
+     * An item's icon in its box, crisp and never cut: drawn at the most
+     * whole display pixels per texel that fit the box, from an origin on
+     * the display grid, so its pixel art keeps every texel whole the way
+     * the emoji do rather than being squeezed into the box. Only where
+     * not even one pixel per texel fits — GUI scale 1, sixteen texels in
+     * a ten-pixel box — is the icon squeezed to the box as it always
+     * was, uneven pixels and all, rather than cut. The faction banner
+     * is drawn the same way.
+     */
     static void drawItem(Minecraft minecraft, ItemStack stack,
                          float boxX, float boxY, float size, int alpha,
                          boolean silhouette) {
+        if (minecraft == null || stack == null || size <= 0.0F) {
+            return;
+        }
+        // The matrix the caller draws in only scales and translates:
+        // the chat scale over the lines, a fraction of a pixel under the
+        // strips and the bar. Its scale and offset give the box's place
+        // on the screen, and with the GUI scale, how many display pixels
+        // one of the caller's units is.
+        FloatBuffer matrix = BufferUtils.createFloatBuffer(16);
+        GL11.glGetFloat(GL11.GL_MODELVIEW_MATRIX, matrix);
+        float scaleX = matrix.get(0);
+        float scaleY = matrix.get(5);
+        float shiftX = matrix.get(12);
+        float shiftY = matrix.get(13);
+        if (scaleX <= 0.0F || scaleY <= 0.0F) {
+            return;
+        }
+        int factor = ChatWindowFrame.displayScaleFactor();
+        double unit = factor * scaleX;
+        int ratio = (int)Math.floor(size * unit / ICON_TEXELS + 0.001D);
+        // Not one whole pixel per texel fits: squeezed to the box, as
+        // the box is all the room there is.
+        float drawn = ratio <= 0 ? size : (float)(ratio * ICON_TEXELS / unit);
+        // Centred in the box, on the display grid.
+        double originX = ChatWindowFrame.snapToDisplayPixels(
+                scaleX * boxX + shiftX + (size - drawn) / 2.0D * scaleX);
+        double originY = ChatWindowFrame.snapToDisplayPixels(
+                scaleY * boxY + shiftY + (size - drawn) / 2.0D * scaleY);
+        float x = (float)((originX - shiftX) / scaleX);
+        float y = (float)((originY - shiftY) / scaleY);
         if (silhouette) {
-            ChatItemRenderer.drawShadow(minecraft, stack, boxX, boxY, size,
+            ChatItemRenderer.drawShadow(minecraft, stack, x, y, drawn,
                     LostTalesChatVisualStyle.SHADOW, alpha);
         } else {
-            ChatItemRenderer.draw(minecraft, stack, boxX, boxY, size, alpha);
+            ChatItemRenderer.draw(minecraft, stack, x, y, drawn, alpha);
         }
     }
+
+    /** An icon's sixteen texels; vanilla's item icon size. */
+    private static final int ICON_TEXELS = 16;
 
     /** Marker artwork fitted into the box, in {@code rgb}. */
     static void drawMarker(Minecraft minecraft, String iconName, int rgb,

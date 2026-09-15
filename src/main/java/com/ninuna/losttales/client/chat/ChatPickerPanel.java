@@ -294,6 +294,20 @@ abstract class ChatPickerPanel {
         drawTooltip(minecraft.fontRenderer, tipX, tipY, anchorRight);
     }
 
+    /**
+     * The button's glyph at rest, where the bar it stands on is not the
+     * one being typed in: no lift, no lit artwork, nothing registered
+     * for the pointer.
+     */
+    void drawRestingButton(int anchorRight, int anchorY) {
+        int left = buttonLeft(anchorRight);
+        int top = buttonTop(anchorY);
+        ChatIconSheet glyph = buttonGlyph();
+        ChatIconSheet.drawPairWithShadow(glyph, buttonGlyphLit(), 0.0F,
+                left + (BUTTON_SIZE - glyph.getWidth()) / 2,
+                top + (BUTTON_SIZE - glyph.getHeight()) / 2, 255);
+    }
+
     private void drawButton(ChatPointerRegions regions, int anchorRight,
                             int screenHeight, double mouseX, double mouseY) {
         int left = buttonLeft(anchorRight);

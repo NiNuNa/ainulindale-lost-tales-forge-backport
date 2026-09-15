@@ -11,11 +11,13 @@ import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.ChatSystemLineClassifier;
+import com.ninuna.losttales.chat.ChatTabIds;
 import com.ninuna.losttales.compat.discord.DiscordGameEventRelay;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import cpw.mods.fml.common.FMLLog;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,14 +34,20 @@ import net.minecraft.util.IChatComponent;
 /**
  * Where every server-wide line passes on its way out — an achievement,
  * a death, a join or a leave, {@code /say} — patched by the coremod
- * into the head of {@code ServerConfigurationManager.sendChatMsg}. Two
- * things happen to it here: the Discord relay is told, and a line
- * that will land in Global is given a message id of the server's own,
+ * into the head of {@code ServerConfigurationManager.sendChatMsg}, and
+ * where every line sent to one player passes, patched into the head of
+ * {@code EntityPlayerMP.addChatMessage}. Two things happen to a
+ * server-wide line here: the Discord relay is told, and a line that
+ * will land in Global is given a message id of the server's own,
  * carried as an empty run on the component and recorded in the chat
  * history under the Server's name, so a reply to it on any client
- * names the same message and a click on the quote finds it. The words
- * are never changed, and a line is never delayed or refused: whatever
- * fails, the component goes out as it came.
+ * names the same message and a click on the quote finds it. A line
+ * sent to one player that answers a command they typed is recorded the
+ * same way, for that account alone, under the tab the command was
+ * typed in ({@link #onPlayerLine}), so the answer comes back with the
+ * rest of the tab's history. The words are never changed, and a line
+ * is never delayed or refused: whatever fails, the component goes out
+ * as it came.
  *
  * <p>A join line's id is also kept for the login replay of the player
  * it announces ({@link #takeJoinLine}). The game announces a join just
@@ -91,15 +99,50 @@ public final class LostTalesServerBroadcastHook {
     }
 
     /**
-     * Gives the line an id and records it for everyone online: they are
-     * the ones who can be shown it, so they are the ones who may reply
-     * to it by that id. The history keeps the words, cleaned as a
-     * message is, under the Server's name in the Console's colour, and
-     * beside them the component itself as the game's own chat JSON —
-     * its hover, its colours, its links — with the players it names as
-     * they are playing right now, so a replay shows the line as the
-     * live one was shown, naming players who may be long gone by the
-     * identity they had.
+     * Sees a line about to be sent to one player and hands back the one
+     * to send: the same component, with an id run appended when the
+     * line answers a command the player typed from a chat tab — their
+     * running command's context names the tab — and is then recorded
+     * for that account alone under that tab. Any other line to one
+     * player — a countdown, a notice, another mod's word — passes
+     * unrecorded, as it did before.
+     */
+    public static IChatComponent onPlayerLine(EntityPlayerMP player,
+                                              IChatComponent message) {
+        if (player == null || message == null) {
+            return message;
+        }
+        try {
+            UUID account = player.getUniqueID();
+            if (account == null
+                    || (player.worldObj != null && player.worldObj.isRemote)
+                    || ChatSystemLineClassifier.classify(message)
+                            != ChatChannel.CONSOLE) {
+                return message;
+            }
+            String tabId = ChatCommandContexts.answerLine(account,
+                    System.currentTimeMillis());
+            if (tabId.length() == 0) {
+                return message;
+            }
+            ChatChannel channel = ChatTabIds.channelOf(tabId);
+            List<UUID> self = Collections.singletonList(account);
+            long messageId = record(message,
+                    channel == null ? ChatChannel.CONSOLE : channel, tabId,
+                    self, ChatHistory.Audience.accounts(self, false));
+            if (messageId != ChatMessageIds.NONE) {
+                mark(message, messageId);
+            }
+        } catch (Throwable throwable) {
+            logOnce("keep", throwable);
+        }
+        return message;
+    }
+
+    /**
+     * Gives a server-wide line an id and records it for everyone
+     * online: they are the ones who can be shown it, so they are the
+     * ones who may reply to it by that id.
      */
     private static void stamp(IChatComponent message) {
         MinecraftServer server = MinecraftServer.getServer();
@@ -107,11 +150,6 @@ public final class LostTalesServerBroadcastHook {
                 || server.getConfigurationManager().playerEntityList == null) {
             return;
         }
-        String text = ChatMessageValidator.cleaned(message.getUnformattedText());
-        if (text.length() == 0) {
-            return;
-        }
-        long messageId = ChatMessageIdAllocator.next();
         List<UUID> recipients = new ArrayList<UUID>();
         @SuppressWarnings("unchecked")
         List<EntityPlayerMP> online = server.getConfigurationManager().playerEntityList;
@@ -120,22 +158,62 @@ public final class LostTalesServerBroadcastHook {
                 recipients.add(player.getUniqueID());
             }
         }
+        long messageId = record(message, ChatChannel.ALL, "", recipients,
+                ChatHistory.Audience.everyone());
+        if (messageId == ChatMessageIds.NONE) {
+            return;
+        }
+        if (ChatSystemLineClassifier.kindOf(message)
+                == ChatSystemLineClassifier.Kind.JOIN) {
+            noteJoinLine(joinerAccount(message), messageId);
+        }
+        mark(message, messageId);
+    }
+
+    /**
+     * Records a line of the server's own in {@code channel} for the
+     * audience, under the tab it answers when it answers one, and
+     * answers its new id — or none for a line with no words or no
+     * server to record it on. The history keeps the words, cleaned as
+     * a message is, under the Server's name in the Console's colour,
+     * and beside them the component itself as the game's own chat JSON
+     * — its hover, its colours, its links — with the players it names
+     * as they are playing right now, so a replay shows the line as the
+     * live one was shown, naming players who may be long gone by the
+     * identity they had.
+     */
+    private static long record(IChatComponent message, ChatChannel channel,
+                               String tabId, List<UUID> recipients,
+                               ChatHistory.Audience audience) {
+        MinecraftServer server = MinecraftServer.getServer();
+        if (server == null || server.getConfigurationManager() == null
+                || server.getConfigurationManager().playerEntityList == null) {
+            return ChatMessageIds.NONE;
+        }
+        String text = ChatMessageValidator.cleaned(message.getUnformattedText());
+        if (text.length() == 0) {
+            return ChatMessageIds.NONE;
+        }
+        long messageId = ChatMessageIdAllocator.next();
+        @SuppressWarnings("unchecked")
+        List<EntityPlayerMP> online = server.getConfigurationManager().playerEntityList;
         LostTalesChatMessagePacket record = new LostTalesChatMessagePacket(
-                ChatChannel.ALL, LostTalesChatMessagePacket.SERVER_SENDER_ID,
+                channel, LostTalesChatMessagePacket.SERVER_SENDER_ID,
                 SERVER_NAME, SERVER_NAME, "",
                 LostTalesColors.rgb(LostTalesColors.HUD_LABEL),
                 ChatChannel.CONSOLE.getDisplayColor(), text,
                 System.currentTimeMillis(), "", null, "", "", 0, true,
                 messageId, ChatReplyReference.NONE, "")
                 .withServerBody(componentJson(message),
-                        namedPlayers(text, online));
+                        namedPlayers(text, online))
+                .withTabId(tabId);
         ChatHistory.record(messageId, LostTalesChatMessagePacket.SERVER_SENDER_ID,
-                SERVER_NAME, null, record, recipients,
-                ChatHistory.Audience.everyone());
-        if (ChatSystemLineClassifier.kindOf(message)
-                == ChatSystemLineClassifier.Kind.JOIN) {
-            noteJoinLine(joinerAccount(message), messageId);
-        }
+                SERVER_NAME, null, record, recipients, audience);
+        return messageId;
+    }
+
+    /** The id run appended to a recorded line: the server's word to every client. */
+    private static void mark(IChatComponent message, long messageId) {
         ChatComponentText mark = new ChatComponentText("");
         mark.setChatStyle(mark.getChatStyle().setChatClickEvent(new ClickEvent(
                 ClickEvent.Action.SUGGEST_COMMAND,

@@ -122,6 +122,32 @@ public final class ChatConsoleStreamTest {
         assertTrue(cut.endsWith("…"));
     }
 
+    /** The save's events come back in order under their own ids, once each. */
+    @Test
+    public void restoredEventsComeBackOnceEachAndMoveTheAllocatorOn() {
+        List<ChatConsoleEvent> kept = new java.util.ArrayList<ChatConsoleEvent>();
+        kept.add(new ChatConsoleEvent(30L, 30L, ChatConsoleEvent.Kind.SERVER,
+                ChatConsoleEvent.Severity.INFO, "Server", "third"));
+        kept.add(new ChatConsoleEvent(10L, 10L, ChatConsoleEvent.Kind.SERVER,
+                ChatConsoleEvent.Severity.INFO, "Server", "first"));
+        kept.add(new ChatConsoleEvent(20L, 20L, ChatConsoleEvent.Kind.SERVER,
+                ChatConsoleEvent.Severity.INFO, "Server", "second"));
+        kept.add(new ChatConsoleEvent(20L, 21L, ChatConsoleEvent.Kind.SERVER,
+                ChatConsoleEvent.Severity.INFO, "Server", "second again"));
+        kept.add(null);
+        assertEquals(3, ChatConsoleStream.restore(kept));
+        List<ChatConsoleEvent> replay = ChatConsoleStream.replay(0L);
+        assertEquals(3, replay.size());
+        assertEquals("first", replay.get(0).getText());
+        assertEquals("second", replay.get(1).getText());
+        assertEquals("third", replay.get(2).getText());
+        assertEquals(3, ChatConsoleStream.snapshot().size());
+        assertTrue(ChatMessageIdAllocator.next() > 30L);
+        // Restoring nothing changes nothing.
+        assertEquals(0, ChatConsoleStream.restore(null));
+        assertEquals(3, ChatConsoleStream.size());
+    }
+
     private static long record(String text) {
         long id = ChatMessageIdAllocator.next();
         ChatConsoleStream.record(new ChatConsoleEvent(id, id, ChatConsoleEvent.Kind.COMMAND,

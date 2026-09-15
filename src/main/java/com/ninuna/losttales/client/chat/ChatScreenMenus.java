@@ -1432,9 +1432,10 @@ final class ChatScreenMenus {
             // enough to show every one of the window's tabs whole. A
             // row that cannot be measured leaves the width alone, and
             // the window keeps following the game's chat-width setting.
-            // A window filling the screen takes the size it is given,
-            // as the entry says.
-            ChatWindowLayout.setFullscreen(window.getId(), false, false);
+            // A window filling a part of the screen takes the size it
+            // is given, as the entry says.
+            ChatWindowLayout.setFill(window.getId(),
+                    ChatWindow.ScreenFill.NONE, false);
             ChatWindowLayout.setWindowLines(window.getId(),
                     ChatWindowLayout.DEFAULT_WINDOW_LINES, false);
             ChatWindowLayout.setWindowWidth(window.getId(),

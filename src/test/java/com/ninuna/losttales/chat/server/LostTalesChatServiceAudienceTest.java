@@ -64,13 +64,14 @@ public final class LostTalesChatServiceAudienceTest {
     }
 
     @Test
-    public void theStaffChannelReachesWhoWasSentItAndMayStillRead() {
+    public void theStaffChannelReachesWhoeverMayReadItNow() {
         record(ChatChannel.ADMIN, null, "", Arrays.asList(ALICE, BOB));
         assertEquals(1, replay(BOB, "", 0L, null, EVERY_CHANNEL).size());
         // Bob lost the operator role since.
         assertTrue(replay(BOB, "", 0L, null, OPEN_CHANNELS).isEmpty());
-        // Carol gained it since, but was not sent the line.
-        assertTrue(replay(CAROL, "", 0L, null, EVERY_CHANNEL).isEmpty());
+        // Carol gained it since and was not sent the line: the channel's
+        // past comes with the role, as on Discord.
+        assertEquals(1, replay(CAROL, "", 0L, null, EVERY_CHANNEL).size());
     }
 
     /** A gate the config puts on an open channel's read side makes it staff-like. */
@@ -83,7 +84,8 @@ public final class LostTalesChatServiceAudienceTest {
         ChatChannelGates.install(ChatChannelGates.of(gates));
         record(ChatChannel.ALL, null, "", Arrays.asList(ALICE, BOB));
         assertEquals(1, replay(BOB, "", 0L, null, EVERY_CHANNEL).size());
-        assertTrue(replay(CAROL, "", 0L, null, EVERY_CHANNEL).isEmpty());
+        // Carol was not sent it, but may read the channel now.
+        assertEquals(1, replay(CAROL, "", 0L, null, EVERY_CHANNEL).size());
         // Bob may no longer read the gated channel.
         assertTrue(replay(BOB, "", 0L, null,
                 Collections.singletonList(ChatChannel.OOC)).isEmpty());
@@ -114,14 +116,16 @@ public final class LostTalesChatServiceAudienceTest {
     }
 
     @Test
-    public void proximityWhispersAndTheConsoleReachOnlyWhoWasSentThem() {
+    public void proximityWhispersAndConsoleNotesReachOnlyWhoWasSentThem() {
         record(ChatChannel.PROXIMITY, null, "", Arrays.asList(ALICE, BOB));
         record(ChatChannel.WHISPER, null, "", Arrays.asList(ALICE, BOB));
         record(ChatChannel.CONSOLE, null, "", Arrays.asList(ALICE, BOB));
         assertEquals(3, replay(BOB, "", 0L, null, EVERY_CHANNEL).size());
+        // Carol was near nobody, whispered with nobody and was sent no
+        // note: an operator's role opens none of them.
         assertTrue(replay(CAROL, "", 0L, null, EVERY_CHANNEL).isEmpty());
-        // The console line asks besides that the reader may still read the console.
-        assertEquals(2, replay(BOB, "", 0L, null, OPEN_CHANNELS).size());
+        // A note to oneself comes back whatever the console gate says.
+        assertEquals(3, replay(BOB, "", 0L, null, OPEN_CHANNELS).size());
     }
 
     private static void record(ChatChannel channel, Party party, String factionId,

@@ -5,10 +5,9 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
 /**
- * A name cut by a tab's or the indicator's edge sinks into it the way
- * the history sinks into its rules: a shade hangs from each side as far
- * as the name has run past it, one line deep, never past a third of the
- * room, and at the history's own edge opacity.
+ * A name cut by a tab's or the indicator's edge thins out into it: the
+ * words fade from each side as far as the name has run past it, one
+ * line deep, never past a third of the room.
  */
 public final class ChatSideFadeTest {
 
@@ -34,16 +33,5 @@ public final class ChatSideFadeTest {
                 LostTalesChatOverlayRenderer.sideFadeDepth(30.0D), 0.0001F);
         assertEquals(0.0F,
                 LostTalesChatOverlayRenderer.sideFadeDepth(-4.0D), 0.0F);
-    }
-
-    @Test
-    public void theShadeIsTheHistorysEdgeShade() {
-        assertEquals(LostTalesChatOverlayRenderer.EDGE_FADE_ALPHA,
-                ChatChannelTabBar.sideFadeAlpha(100.0D, 12.0F, 255));
-        assertEquals(0, ChatChannelTabBar.sideFadeAlpha(0.0D, 12.0F, 255));
-        // A tab fading in with its window takes the shade down with it.
-        assertEquals(Math.round(LostTalesChatOverlayRenderer.EDGE_FADE_ALPHA
-                        * 0.5F),
-                ChatChannelTabBar.sideFadeAlpha(100.0D, 12.0F, 128), 1);
     }
 }

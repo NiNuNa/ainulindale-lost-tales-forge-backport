@@ -31,7 +31,7 @@ public final class ChatConsoleCommandHandler {
         String context = "";
         if (sender instanceof EntityPlayerMP) {
             actor = sender.getCommandSenderName();
-            context = ChatCommandContexts.take(
+            context = ChatCommandContexts.beginCommand(
                     ((EntityPlayerMP)sender).getUniqueID(),
                     System.currentTimeMillis());
         } else if (sender instanceof MinecraftServer) {

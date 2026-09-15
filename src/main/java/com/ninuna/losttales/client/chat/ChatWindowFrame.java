@@ -128,14 +128,30 @@ final class ChatWindowFrame {
     float motionX;
     float motionY;
     /**
-     * How far the window stands toward filling the screen, eased from
-     * the moment it took the screen or let it go, so its box glides
-     * between its own and the screen's rather than jumping.
+     * How far the window has come along its glide to the part of the
+     * screen it fills, or back to its own box, eased from the moment it
+     * was sent, so its box glides rather than jumping. Every glide is
+     * one leg from the box drawn as it began ({@link #fillLegFrom},
+     * null for the window's own box) to what it is bound for
+     * ({@link #fillLegTo}, none for the window's own box).
      */
-    private final LostTalesUiTransition fullscreenMotion =
+    private final LostTalesUiTransition fillMotion =
             new LostTalesUiTransition();
-    /** Whether {@link #fullscreenMotion} has been advanced at all yet. */
-    private boolean fullscreenSeen;
+    /** Whether {@link #fillMotion} has been advanced at all yet. */
+    private boolean fillSeen;
+    private ChatWindowPlacement.Box fillLegFrom;
+    private ChatWindow.ScreenFill fillLegFromFill = ChatWindow.ScreenFill.NONE;
+    private ChatWindow.ScreenFill fillLegTo = ChatWindow.ScreenFill.NONE;
+    /** The box the window was last laid in ({@link #begin}). */
+    private ChatWindowPlacement.Box placed;
+    /**
+     * The part of the screen a drag in progress would snap the window
+     * to on release, shown by the window itself: it takes that part
+     * while the pointer is in the edge's zone and comes back under the
+     * pointer when it leaves, on the same glide, and is filled for good
+     * only when the button comes up.
+     */
+    ChatWindow.ScreenFill dragPreview = ChatWindow.ScreenFill.NONE;
     /**
      * How long the row still counts a finished glide as gliding. The
      * frame a glide settles on moves the edges its last step, and the
@@ -143,7 +159,7 @@ final class ChatWindowFrame {
      */
     private static final long GLIDE_TAIL_NANOS = 100L * 1000000L;
     /** When an advance last found the glide still moving; 0 before one has. */
-    private long fullscreenGlideNanos;
+    private long fillGlideNanos;
     /**
      * The timestamps drawn this frame, and the delivery marks, each with
      * the chat line id it belongs to, in screen GUI pixels. Recorded from
@@ -162,8 +178,12 @@ final class ChatWindowFrame {
     float jumpPillTop;
     float jumpPillRight;
     float jumpPillBottom;
-    /** How far the button has flown in from below the rule, 0..1. */
-    float jumpButtonProgress;
+    /**
+     * The button's fly-in from below the rule, eased over the chat's
+     * animation duration like every other glide, so it arrives rather
+     * than creeping to a stop.
+     */
+    final LostTalesUiTransition jumpMotion = new LostTalesUiTransition();
     /**
      * The hovered message's toolbar as drawn this frame, in screen GUI
      * pixels; width zero while none was drawn. Recorded from the draw
@@ -236,8 +256,6 @@ final class ChatWindowFrame {
         return this.toolbarFades[kind];
     }
 
-    /** When the fly-in was last advanced. */
-    long jumpButtonNanos;
     /** Whether the pointer is on the jump-to-present button this frame. */
     boolean jumpHovered;
     /** How far the jump-to-present button has lit, and when it last moved. */
@@ -455,6 +473,7 @@ final class ChatWindowFrame {
      */
     void begin(ChatWindowPlacement.Box box, float chatScale,
                float openingMotionX, float openingMotionY) {
+        this.placed = box;
         this.boxLeft = snapToDisplayPixels(box.x);
         this.boxTop = snapToDisplayPixels(box.y);
         this.boxRight = this.boxLeft + box.width;
@@ -521,42 +540,96 @@ final class ChatWindowFrame {
     }
 
     /**
-     * Moves the window's fullscreen motion on to this instant, toward
-     * the state the window is in. Called once a frame before the window
-     * is measured; the first call stands the window in its state rather
-     * than travelling into it.
+     * Moves the window's fill motion on to this instant, toward the part
+     * of the screen the window fills. Called once a frame before the
+     * window is measured; the first call stands the window in its state
+     * rather than travelling into it. A change of fill starts a new
+     * leg from the box drawn last — the window's own box, the part of
+     * the screen it filled, or wherever a glide had brought it — so a
+     * window sent from one fill to another sets out from where it
+     * stands; a leg back to the window's own box forgets its start once
+     * it arrives, so the box is the window's own again exactly.
      */
-    void advanceFullscreen(boolean fullscreen) {
-        if (this.fullscreenSeen && !this.fullscreenMotion.isSettled()) {
-            this.fullscreenGlideNanos = System.nanoTime();
+    void advanceFill(ChatWindow.ScreenFill fill) {
+        long now = System.nanoTime();
+        ChatWindow.ScreenFill wanted = fill == null
+                || fill == ChatWindow.ScreenFill.NONE ? this.dragPreview : fill;
+        if (this.fillSeen && !this.fillMotion.isSettled()) {
+            this.fillGlideNanos = now;
         }
-        this.fullscreenSeen = true;
-        this.fullscreenMotion.advance(System.nanoTime(), fullscreen,
+        if (this.fillSeen && wanted != this.fillLegTo) {
+            this.fillLegFromFill = this.fillLegTo;
+            this.fillLegFrom = this.placed;
+            this.fillLegTo = wanted;
+            this.fillMotion.settle(false);
+        } else if (!this.fillSeen) {
+            this.fillLegTo = wanted;
+        }
+        this.fillSeen = true;
+        this.fillMotion.advance(now, true,
                 LostTalesConfig.enableChatAnimations
                         ? Math.max(1, LostTalesConfig
                                 .chatAnimationDurationMillis)
                         : 0,
                 LostTalesUiEasing.SMOOTH);
-    }
-
-    /**
-     * How far the window stands toward filling the screen, 0..1, as the
-     * motion was last advanced; before it has been, the state itself.
-     */
-    float fullscreenShare(boolean fullscreen) {
-        if (!this.fullscreenSeen) {
-            return fullscreen ? 1.0F : 0.0F;
+        if (this.fillLegTo == ChatWindow.ScreenFill.NONE
+                && this.fillMotion.isSettled()) {
+            this.fillLegFrom = null;
+            this.fillLegFromFill = ChatWindow.ScreenFill.NONE;
         }
-        return this.fullscreenMotion.clamped();
+    }
+
+    /** Whether {@link #advanceFill} has placed the window at all yet. */
+    boolean hasSeenFill() {
+        return this.fillSeen;
+    }
+
+    /** The box the running leg set out from, or null for the window's own. */
+    ChatWindowPlacement.Box fillLegFrom() {
+        return this.fillLegFrom;
+    }
+
+    /** What the running leg is bound for; none for the window's own box. */
+    ChatWindow.ScreenFill fillLegTo() {
+        return this.fillLegTo;
+    }
+
+    /** How far along its leg the window has come, 0..1. */
+    float fillShare() {
+        return this.fillMotion.clamped();
     }
 
     /**
-     * Whether the window is gliding to or from filling the screen, the
+     * How far the window stands toward filling the whole screen, 0..1:
+     * what the fullscreen control's glyph crosses over by, so it points
+     * inward exactly as the window takes the whole screen and outward
+     * as it gives it back — or fills a half or a quarter instead.
+     */
+    float fullShare() {
+        if (this.fillLegTo == ChatWindow.ScreenFill.FULL) {
+            return this.fillMotion.clamped();
+        }
+        return this.fillLegFromFill == ChatWindow.ScreenFill.FULL
+                ? 1.0F - this.fillMotion.clamped() : 0.0F;
+    }
+
+    /**
+     * Whether the window stands in its own box, and not in a part of
+     * the screen or on the way to or from one. Its edges are its own to
+     * resize only then.
+     */
+    boolean isInOwnBox() {
+        return !this.fillSeen || (this.fillLegTo == ChatWindow.ScreenFill.NONE
+                && this.fillLegFrom == null);
+    }
+
+    /**
+     * Whether the window is gliding to or from a part of the screen, the
      * frame the glide settles on and a moment after it included.
      */
-    boolean isFullscreenGliding() {
-        return this.fullscreenSeen && (!this.fullscreenMotion.isSettled()
-                || System.nanoTime() - this.fullscreenGlideNanos
+    boolean isFillGliding() {
+        return this.fillSeen && (!this.fillMotion.isSettled()
+                || System.nanoTime() - this.fillGlideNanos
                         < GLIDE_TAIL_NANOS);
     }
 
@@ -859,15 +932,24 @@ final class ChatWindowFrame {
     }
 
     /**
-     * Bottom of the tab row (screen y, fractional): the top margin above
-     * the drawn message stack — the row's last pixel row is the window's
-     * top rule, and the first content pixel lies the margin below it, so
-     * the topmost line keeps clear of the rule. A full window's stack
-     * ends on its box's own edge, so the row and the box top never drift
+     * Bottom of the tab row (screen y, fractional): the tool strip and
+     * the top margin above the drawn message stack — the row's last
+     * pixel row is the window's top rule, the tool strip hangs under it,
+     * and the first content pixel lies the margin below that, so the
+     * topmost line keeps clear of the strip. A full window's stack ends
+     * on its box's own edge, so the row and the box top never drift
      * apart whatever the chat scale is; a window with fewer lines than
      * it has room for carries its row down onto them.
      */
     double tabRowBottom() {
+        return historyTop() - ChatWindowPlacement.TOOL_STRIP_HEIGHT;
+    }
+
+    /**
+     * Top of the history's panel (screen y, fractional): the margin
+     * above the drawn message stack, under the tool strip.
+     */
+    double historyTop() {
         return this.stackTop - ChatWindowPlacement.HISTORY_TOP_MARGIN;
     }
 

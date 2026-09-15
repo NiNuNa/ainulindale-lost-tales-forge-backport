@@ -80,22 +80,37 @@ public final class ChatInputBarTest {
     public void theWellLaysItsContentOutLikeAMessageRow() {
         int barTop = 100;
         int wellTop = ChatInputBar.wellTopFor(barTop);
-        int wellBottom = wellTop + LostTalesChatOverlayRenderer.LINE_HEIGHT;
+        int wellBottom = wellTop + ChatInputBar.CONTENT_HEIGHT;
         int textTop = ChatInputBar.textTopFor(barTop);
         int caretTop = ChatInputField.caretTop(textTop);
         int caretBottom = caretTop + (int)ChatInlineIcons.CONTENT_SIZE;
+        // The well stands the clearance below the rule and as far above
+        // the bar's end, and is as tall as the indicator's frame beside
+        // it: the icon's box with the wide inset above and below.
+        assertEquals(1 + ChatInputBar.CLEARANCE, wellTop - barTop);
+        assertEquals(ChatInputBar.CLEARANCE,
+                barTop + ChatInputBar.HEIGHT - wellBottom);
+        assertEquals(ChatChannelIcons.SIZE + 2 * ChatFramedButton.WIDE_INSET,
+                ChatInputBar.CONTENT_HEIGHT);
+        assertEquals(ChatInputBar.HEIGHT, ChatWindowPlacement.INPUT_HEIGHT);
+        // A message row stands in the well's middle, and its text where
+        // a message row puts it: the caret a row inside the message row.
+        int rowTop = wellTop + (ChatInputBar.CONTENT_HEIGHT
+                - LostTalesChatOverlayRenderer.LINE_HEIGHT) / 2;
         assertEquals(LostTalesChatOverlayRenderer.ROW_TEXT_TOP,
-                textTop - wellTop);
-        assertEquals(1, caretTop - wellTop);
-        assertEquals(1, wellBottom - caretBottom);
+                textTop - rowTop);
+        assertEquals(1, caretTop - rowTop);
+        assertEquals(1, rowTop + LostTalesChatOverlayRenderer.LINE_HEIGHT
+                - caretBottom);
         assertEquals(textTop + LostTalesChatOverlayRenderer.centredBoxTop(
                         (int)ChatInlineIcons.CONTENT_SIZE),
                 ChatInlineIcons.boxTop(textTop, ChatInlineIcons.SLOT_WIDTH),
                 0.0F);
-        assertEquals(wellTop, ChatInlineIcons.boxTop(textTop,
+        assertEquals(rowTop, ChatInlineIcons.boxTop(textTop,
                 ChatInlineIcons.SLOT_WIDTH), 0.0F);
-        // Level with the bar's buttons, which are as tall.
-        assertEquals(ChatInputBar.controlTopFor(barTop), wellTop);
+        // The bar's buttons are centred on the well's middle: the
+        // message row is exactly their height.
+        assertEquals(ChatInputBar.controlTopFor(barTop), rowTop);
     }
 
     @Test

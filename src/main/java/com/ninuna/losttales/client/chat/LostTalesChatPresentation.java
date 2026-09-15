@@ -105,12 +105,34 @@ public final class LostTalesChatPresentation {
      * stands in its tab, and the closed feed, which shows what is
      * happening, passes over it.
      */
+    /**
+     * How far the server's clock stands from this client's, as the
+     * last live line said: what a message's own echo is stamped with,
+     * so it sorts and groups with the server's lines around it as the
+     * server's copy will, whatever the two clocks disagree by.
+     */
+    private static long serverClockOffsetMillis;
+
+    /** The server's clock now, as near as the last live line tells it. */
+    static long serverNow() {
+        return System.currentTimeMillis() + serverClockOffsetMillis;
+    }
+
+    /** Forgets the server's clock: the next server sets it afresh. */
+    static void forgetServerClock() {
+        serverClockOffsetMillis = 0L;
+    }
+
     public static void receive(LostTalesChatMessagePacket packet,
                                boolean replayed, boolean beforeArrival) {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (packet == null || packet.isMalformed() || minecraft == null
                 || minecraft.ingameGUI == null) {
             return;
+        }
+        if (!replayed && packet.getTimestampMillis() > 0L) {
+            serverClockOffsetMillis = packet.getTimestampMillis()
+                    - System.currentTimeMillis();
         }
         // The Server looks the same wherever and whenever it speaks: a
         // line of its own the server replays from the history wears
@@ -769,9 +791,13 @@ public final class LostTalesChatPresentation {
                         minecraft.ingameGUI.getChatGUI()) == null) {
             return 0L;
         }
+        // Stamped with the server's clock as this client knows it, so
+        // the echo runs on from the server's lines before it as its own
+        // copy will, rather than sorting behind them or falling out of
+        // the grouping window by however far the clocks disagree.
         LostTalesChatMessagePacket packet = signedPacket(minecraft, tab,
                 message, showcases, reply, ClientChatMessageIds.nextLocal(),
-                System.currentTimeMillis());
+                serverNow());
         long nonce = ClientChatPendingEchoes.nextNonce();
         // Never pinged and never sounded: naming yourself in your own
         // message is answered for by the copy that comes back, and
@@ -827,6 +853,10 @@ public final class LostTalesChatPresentation {
                         !packet.getReply().exists()));
         ClientChatMessageIds.remember(chatLineId, packet.getMessageId());
         ClientChatMessages.remember(packet, tab, showcaseIds);
+        // The line's time is the server's from here on, for the day
+        // rules as for everything else.
+        ClientChatChannelViews.recordTime(chatLineId,
+                packet.getTimestampMillis());
         LostTalesChatHistoryHooks.refresh(chat);
         return chatLineId;
     }
@@ -1438,6 +1468,16 @@ public final class LostTalesChatPresentation {
     }
 
     private static ChatTab fileUnder(LostTalesChatMessagePacket packet) {
+        // A command's answer of the server's own names the tab the
+        // command was typed in, which is this client's own word, and
+        // is filed there wherever its channel would have put it.
+        if (LostTalesChatMessagePacket.isSystemSender(packet.getSenderId())
+                && packet.getTabId().length() > 0) {
+            ChatTab stated = ChatTab.fromId(packet.getTabId());
+            if (stated != null) {
+                return stated;
+            }
+        }
         if (packet.getChannel() == ChatChannel.WHISPER) {
             return ChatTab.whisper(packet.getPartner(),
                     packet.getPartnerIdentity(),

@@ -912,6 +912,7 @@ public final class ClientChatChannelViews {
         ClientChatDeliveryMarks.clear();
         ClientChatMessages.clear();
         ClientChatPendingEchoes.clear();
+        LostTalesChatPresentation.forgetServerClock();
         ChatWindowLines.clear();
         ChatWindowFrame.clear();
         ClientChatAccountRoles.clear();
@@ -955,6 +956,7 @@ public final class ClientChatChannelViews {
         ClientChatDeliveryMarks.clear();
         ClientChatMessages.clear();
         ClientChatPendingEchoes.clear();
+        LostTalesChatPresentation.forgetServerClock();
         ChatWindowLines.clear();
         ChatWindowFrame.clear();
         ClientChatConsoleEvents.clear();

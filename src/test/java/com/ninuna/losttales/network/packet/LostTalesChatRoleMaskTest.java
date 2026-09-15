@@ -165,8 +165,10 @@ public final class LostTalesChatRoleMaskTest {
         LostTalesPacketCodec.writeUtf8String(probe, "", 128);
         LostTalesPacketCodec.writeUtf8String(probe, "", 8192);
         probe.writeInt(0);
-        // And the reactions, none.
+        // And the reactions, none, and the tab a command's answer is
+        // filed under, none.
         probe.writeInt(0);
+        LostTalesPacketCodec.writeUtf8String(probe, "", 384);
         return probe.readableBytes();
     }
 }

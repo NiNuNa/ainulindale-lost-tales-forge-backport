@@ -83,9 +83,14 @@ final class ChatGroupRuns {
                 || groupedLine == null) {
             return;
         }
-        ENTRIES.put(Integer.valueOf(chatLineId), new Entry(tab, senderId,
-                identityName, accountLine, timestampMillis, groupable,
-                groupedLine));
+        // Remembered under the conversation the line is read in: a
+        // scoped channel's row tab and its conversation tab are one
+        // place to the reader, and a line filed under one — this
+        // player's own echo, a command's echo — must run on with lines
+        // filed under the other.
+        ENTRIES.put(Integer.valueOf(chatLineId), new Entry(ChatTab.viewed(tab),
+                senderId, identityName, accountLine, timestampMillis,
+                groupable, groupedLine));
         while (ENTRIES.size() > ClientChatChannelViews.maxTrackedLines()) {
             Iterator<Integer> oldest = ENTRIES.keySet().iterator();
             oldest.next();

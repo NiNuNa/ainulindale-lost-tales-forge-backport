@@ -849,6 +849,7 @@ gui.losttales.chat.card.role.members=Holding it right now:
 gui.losttales.chat.card.role.nobody=No one online
 gui.losttales.chat.card.role.more=and %s more
 gui.losttales.chat.jump_to_present=Jump to Present
+gui.losttales.chat.jump_to_present.tip=You're viewing older messages. Jump to the present?
 gui.losttales.chat.unread_divider=%s New Unread Messages
 gui.losttales.chat.unread_divider.one=1 New Unread Message
 gui.losttales.chat.unread_divider.dated=%s - %s

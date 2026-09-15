@@ -65,10 +65,25 @@ final class ChatIconFlipbook {
      */
     void draw(int boxLeft, int boxTop, int boxWidth, int boxHeight,
               int alpha) {
-        int index = frameIndex();
+        drawFrame(frameIndex(), this.hoverFade, boxLeft, boxTop, boxWidth,
+                boxHeight, alpha);
+    }
+
+    /**
+     * The run's end frame for {@code on}, at rest and unlit, centred in
+     * the box as {@link #draw} centres the running one: what a control
+     * shows where nothing is moving it and no pointer reaches it.
+     */
+    void drawSettled(boolean on, int boxLeft, int boxTop, int boxWidth,
+                     int boxHeight, int alpha) {
+        drawFrame(on ? this.frames.length - 1 : 0, 0.0F, boxLeft, boxTop,
+                boxWidth, boxHeight, alpha);
+    }
+
+    private void drawFrame(int index, float lit, int boxLeft, int boxTop,
+                           int boxWidth, int boxHeight, int alpha) {
         ChatIconSheet icon = this.frames[index];
-        ChatIconSheet.drawPairWithShadow(icon, this.hoverFrames[index],
-                this.hoverFade,
+        ChatIconSheet.drawPairWithShadow(icon, this.hoverFrames[index], lit,
                 boxLeft + (boxWidth - icon.getWidth()) / 2,
                 boxTop + (boxHeight - icon.getHeight()) / 2, alpha);
     }

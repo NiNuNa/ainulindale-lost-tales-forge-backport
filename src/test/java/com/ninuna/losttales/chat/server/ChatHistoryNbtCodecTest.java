@@ -1,6 +1,7 @@
 package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.Arrays;
@@ -34,13 +35,118 @@ public final class ChatHistoryNbtCodecTest {
     @Before
     public void setUp() {
         ChatHistory.clear();
+        ChatConsoleStream.clear();
         ChatMessageIdAllocator.reset();
     }
 
     @After
     public void tearDown() {
         ChatHistory.clear();
+        ChatConsoleStream.clear();
         ChatMessageIdAllocator.reset();
+    }
+
+    /** The console's events are written beside the lines and come back whole. */
+    @Test
+    public void theConsolesEventsRoundTripBesideTheLines() {
+        long line = ChatMessageIdAllocator.next();
+        ChatHistory.record(line, ALICE, "Aldric", null,
+                line(line, ChatChannel.ALL, ALICE, "hail", ""),
+                Arrays.asList(ALICE), ChatHistory.Audience.everyone());
+        long command = ChatMessageIdAllocator.next();
+        ChatConsoleStream.record(new ChatConsoleEvent(command, 5L,
+                ChatConsoleEvent.Kind.COMMAND, ChatConsoleEvent.Severity.INFO,
+                "Steve", "/tp Alex", "all"));
+        long warning = ChatMessageIdAllocator.next();
+        ChatConsoleStream.record(new ChatConsoleEvent(warning, 6L,
+                ChatConsoleEvent.Kind.WARNING, ChatConsoleEvent.Severity.WARNING,
+                "", "the bridge is down"));
+
+        NBTTagCompound written = new NBTTagCompound();
+        ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
+                ChatConsoleStream.snapshot(), Collections.<NBTTagCompound>emptyList());
+        ChatHistoryNbtCodec.ReadResult result = ChatHistoryNbtCodec.read(written);
+        assertFalse(result.isReadOnly());
+        assertFalse(result.wasRepaired());
+        assertEquals(2, result.getConsoleEvents().size());
+        ChatConsoleEvent first = result.getConsoleEvents().get(0);
+        assertEquals(command, first.getId());
+        assertEquals(5L, first.getTimestampMillis());
+        assertEquals(ChatConsoleEvent.Kind.COMMAND, first.getKind());
+        assertEquals(ChatConsoleEvent.Severity.INFO, first.getSeverity());
+        assertEquals("Steve", first.getActor());
+        assertEquals("/tp Alex", first.getText());
+        assertEquals("all", first.getContext());
+        assertEquals(warning, result.getConsoleEvents().get(1).getId());
+        assertEquals("", result.getConsoleEvents().get(1).getActor());
+
+        // Restored into a clean stream, the console replays them in order,
+        // and the allocator has moved past the newest.
+        ChatConsoleStream.clear();
+        ChatMessageIdAllocator.reset();
+        assertEquals(2, ChatConsoleStream.restore(result.getConsoleEvents()));
+        assertEquals(2, ChatConsoleStream.replay(0L).size());
+        assertEquals("/tp Alex", ChatConsoleStream.replay(0L).get(0).getText());
+        assertTrue(ChatMessageIdAllocator.next() > warning);
+    }
+
+    /** An event the save cannot vouch for is quarantined; an older save without the list reads as an empty console. */
+    @Test
+    public void anEventTheSaveCannotVouchForIsQuarantined() {
+        long id = ChatMessageIdAllocator.next();
+        ChatConsoleStream.record(new ChatConsoleEvent(id, 5L,
+                ChatConsoleEvent.Kind.SERVER, ChatConsoleEvent.Severity.INFO,
+                "Server", "Server started"));
+        NBTTagCompound written = new NBTTagCompound();
+        ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
+                ChatConsoleStream.snapshot(), Collections.<NBTTagCompound>emptyList());
+        NBTTagList events = written.getTagList("ConsoleEvents",
+                Constants.NBT.TAG_COMPOUND);
+        NBTTagCompound good = events.getCompoundTagAt(0);
+        // A kind this build does not know.
+        NBTTagCompound unknownKind = (NBTTagCompound)good.copy();
+        unknownKind.setLong("Id", id + 1);
+        unknownKind.setString("Kind", "TELEPATHY");
+        // Nothing said.
+        NBTTagCompound silent = (NBTTagCompound)good.copy();
+        silent.setLong("Id", id + 2);
+        silent.setString("Text", "   ");
+        // A field missing.
+        NBTTagCompound partial = (NBTTagCompound)good.copy();
+        partial.setLong("Id", id + 3);
+        partial.removeTag("Severity");
+        NBTTagList rewritten = new NBTTagList();
+        rewritten.appendTag(good.copy());
+        rewritten.appendTag(unknownKind);
+        rewritten.appendTag(silent);
+        rewritten.appendTag(partial);
+        rewritten.appendTag(good.copy());
+        written.setTag("ConsoleEvents", rewritten);
+
+        ChatHistoryNbtCodec.ReadResult result = ChatHistoryNbtCodec.read(written);
+        assertFalse(result.isReadOnly());
+        assertTrue(result.wasRepaired());
+        assertEquals(1, result.getConsoleEvents().size());
+        assertEquals(4, result.getQuarantineEntriesCopy().size());
+        assertEquals("invalid_event",
+                result.getQuarantineEntriesCopy().get(0).getString("Reason"));
+        assertEquals("invalid_event",
+                result.getQuarantineEntriesCopy().get(1).getString("Reason"));
+        assertEquals("missing_event_field",
+                result.getQuarantineEntriesCopy().get(2).getString("Reason"));
+        assertEquals("duplicate_event",
+                result.getQuarantineEntriesCopy().get(3).getString("Reason"));
+
+        // A save written before the console was kept: read whole, as an
+        // empty console, and marked for writing in the newer shape.
+        written.removeTag("ConsoleEvents");
+        ChatHistoryNbtCodec.ReadResult older = ChatHistoryNbtCodec.read(written);
+        assertFalse(older.isReadOnly());
+        assertTrue(older.wasRepaired());
+        assertTrue(older.getConsoleEvents().isEmpty());
+        // The list under another tag type is not this build's to read.
+        written.setString("ConsoleEvents", "?");
+        assertTrue(ChatHistoryNbtCodec.read(written).isReadOnly());
     }
 
     @Test
@@ -66,12 +172,12 @@ public final class ChatHistoryNbtCodecTest {
                 line(faction, ChatChannel.FACTION, ALICE, "the gate holds", "")
                         .withScope("gondor"),
                 Arrays.asList(ALICE),
-                ChatHistory.Audience.faction("gondor", Arrays.asList(ALICE), true));
+                ChatHistory.Audience.faction("gondor", true));
         List<ChatHistory.Entry> before = ChatHistory.snapshot();
 
         NBTTagCompound written = new NBTTagCompound();
         ChatHistoryNbtCodec.write(written, before,
-                Collections.<NBTTagCompound>emptyList());
+                ChatConsoleStream.snapshot(), Collections.<NBTTagCompound>emptyList());
         ChatHistoryNbtCodec.ReadResult result = ChatHistoryNbtCodec.read(written);
         assertFalse(result.isReadOnly());
         assertFalse(result.wasRepaired());
@@ -119,7 +225,7 @@ public final class ChatHistoryNbtCodecTest {
                 Arrays.asList(ALICE), ChatHistory.Audience.everyone());
         NBTTagCompound written = new NBTTagCompound();
         ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
-                Collections.<NBTTagCompound>emptyList());
+                ChatConsoleStream.snapshot(), Collections.<NBTTagCompound>emptyList());
         NBTTagList entries = written.getTagList("Entries", Constants.NBT.TAG_COMPOUND);
         NBTTagCompound good = entries.getCompoundTagAt(0);
 
@@ -159,7 +265,7 @@ public final class ChatHistoryNbtCodecTest {
         // The quarantine rides along verbatim on the next write.
         NBTTagCompound again = new NBTTagCompound();
         ChatHistoryNbtCodec.write(again, result.getEntries(),
-                result.getQuarantineEntriesCopy());
+                ChatConsoleStream.snapshot(), result.getQuarantineEntriesCopy());
         assertEquals(4, ChatHistoryNbtCodec.read(again)
                 .getQuarantineEntriesCopy().size());
     }
@@ -184,7 +290,7 @@ public final class ChatHistoryNbtCodecTest {
                 Arrays.asList(ALICE), ChatHistory.Audience.everyone());
         NBTTagCompound current = new NBTTagCompound();
         ChatHistoryNbtCodec.write(current, ChatHistory.snapshot(),
-                Collections.<NBTTagCompound>emptyList());
+                ChatConsoleStream.snapshot(), Collections.<NBTTagCompound>emptyList());
         current.getTagList("Entries", Constants.NBT.TAG_COMPOUND)
                 .getCompoundTagAt(0).setInteger("DataVersion",
                         ChatHistoryNbtCodec.CURRENT_ENTRY_DATA_VERSION + 1);
@@ -219,7 +325,7 @@ public final class ChatHistoryNbtCodecTest {
 
         NBTTagCompound written = new NBTTagCompound();
         ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
-                Collections.<NBTTagCompound>emptyList());
+                ChatConsoleStream.snapshot(), Collections.<NBTTagCompound>emptyList());
         NBTTagList entries = written.getTagList("Entries",
                 Constants.NBT.TAG_COMPOUND);
         assertEquals(1, entries.getCompoundTagAt(0).getInteger("DataVersion"));
@@ -248,7 +354,7 @@ public final class ChatHistoryNbtCodecTest {
                 null, EVERY_CHANNEL), BOB, "Beren", "smile", true);
         NBTTagCompound written = new NBTTagCompound();
         ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
-                Collections.<NBTTagCompound>emptyList());
+                ChatConsoleStream.snapshot(), Collections.<NBTTagCompound>emptyList());
         written.getTagList("Entries", Constants.NBT.TAG_COMPOUND)
                 .getCompoundTagAt(0).getTagList("Reactions",
                         Constants.NBT.TAG_COMPOUND)
@@ -276,7 +382,7 @@ public final class ChatHistoryNbtCodecTest {
 
         NBTTagCompound written = new NBTTagCompound();
         ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
-                Collections.<NBTTagCompound>emptyList());
+                ChatConsoleStream.snapshot(), Collections.<NBTTagCompound>emptyList());
         assertEquals(ChatHistoryNbtCodec.FOREIGN_ENTRY_DATA_VERSION,
                 written.getTagList("Entries", Constants.NBT.TAG_COMPOUND)
                         .getCompoundTagAt(0).getInteger("DataVersion"));
@@ -314,7 +420,7 @@ public final class ChatHistoryNbtCodecTest {
                 null, EVERY_CHANNEL), BOB, "Beren", "grinning", true);
         NBTTagCompound written = new NBTTagCompound();
         ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
-                Collections.<NBTTagCompound>emptyList());
+                ChatConsoleStream.snapshot(), Collections.<NBTTagCompound>emptyList());
         NBTTagCompound entry = written.getTagList("Entries",
                 Constants.NBT.TAG_COMPOUND).getCompoundTagAt(0);
         assertEquals(ChatHistoryNbtCodec.FOREIGN_ENTRY_DATA_VERSION,
@@ -340,7 +446,7 @@ public final class ChatHistoryNbtCodecTest {
 
         NBTTagCompound again = new NBTTagCompound();
         ChatHistoryNbtCodec.write(again, ChatHistory.snapshot(),
-                Collections.<NBTTagCompound>emptyList());
+                ChatConsoleStream.snapshot(), Collections.<NBTTagCompound>emptyList());
         assertEquals("the registry's emoji alone keep the second layout",
                 ChatHistoryNbtCodec.REACTED_ENTRY_DATA_VERSION,
                 again.getTagList("Entries", Constants.NBT.TAG_COMPOUND)
@@ -357,7 +463,7 @@ public final class ChatHistoryNbtCodecTest {
                 null, EVERY_CHANNEL), BOB, "Beren", "smile", true);
         NBTTagCompound written = new NBTTagCompound();
         ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
-                Collections.<NBTTagCompound>emptyList());
+                ChatConsoleStream.snapshot(), Collections.<NBTTagCompound>emptyList());
         NBTTagCompound entry = written.getTagList("Entries",
                 Constants.NBT.TAG_COMPOUND).getCompoundTagAt(0);
         assertEquals(ChatHistoryNbtCodec.REACTED_ENTRY_DATA_VERSION,

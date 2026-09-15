@@ -1,6 +1,7 @@
 package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.util.LostTalesDimensionHelper;
 import cpw.mods.fml.common.FMLLog;
@@ -42,12 +43,13 @@ public final class ChatHistoryStorage {
     }
 
     /**
-     * Hands the save's kept lines to the live history as the server
-     * starts, and attaches the save so every line said from here on is
-     * written with the world. Called after the channels and the config
-     * are in force, since every kept line names its channel by id, and
-     * after the live store was cleared. Off by the server's config, or
-     * with a save this build cannot read, the history stays in memory.
+     * Hands the save's kept lines to the live history and its kept
+     * console events to the console stream as the server starts, and
+     * attaches the save so everything said from here on is written with
+     * the world. Called after the channels and the config are in force,
+     * since every kept line names its channel by id, and after the live
+     * stores were cleared. Off by the server's config, or with a save
+     * this build cannot read, both stay in memory.
      */
     public static void restore(MinecraftServer server) {
         if (server == null || server.worldServerForDimension(0) == null) {
@@ -68,10 +70,13 @@ public final class ChatHistoryStorage {
             }
             List<ChatHistory.Entry> entries = data.takeRestored();
             int kept = ChatHistory.restore(entries);
+            List<ChatConsoleEvent> events = data.takeRestoredEvents();
+            int keptEvents = ChatConsoleStream.restore(events);
             ChatHistory.attach(data);
-            FMLLog.info("[%s] Restored %d of %d kept chat lines from the save (%d quarantined)",
+            FMLLog.info("[%s] Restored %d of %d kept chat lines and %d of %d console events from the save (%d quarantined)",
                     LostTalesMetaData.MOD_ID, Integer.valueOf(kept),
                     Integer.valueOf(entries.size()),
+                    Integer.valueOf(keptEvents), Integer.valueOf(events.size()),
                     Integer.valueOf(data.getQuarantinedEntryCount()));
         } catch (RuntimeException failure) {
             FMLLog.severe("[%s] Chat history could not be read from the save; it is kept in memory only for this run: %s",
@@ -81,14 +86,14 @@ public final class ChatHistoryStorage {
     }
 
     /**
-     * Leaves the live history's last state with the save as the server
-     * stops, before the live store is cleared: the world is saved after
-     * this, and what it writes is this snapshot.
+     * Leaves the live history's and the console's last state with the
+     * save as the server stops, before the live stores are cleared: the
+     * world is saved after this, and what it writes is these snapshots.
      */
     public static void release() {
         ChatHistoryWorldData data = ChatHistory.attached();
         if (data != null) {
-            data.hold(ChatHistory.snapshot());
+            data.hold(ChatHistory.snapshot(), ChatConsoleStream.snapshot());
         }
         ChatHistory.attach(null);
     }

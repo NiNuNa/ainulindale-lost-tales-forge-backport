@@ -771,7 +771,6 @@ public final class LostTalesChatGui extends GuiChat
     private void drawChat(int mouseX, int mouseY, float partialTicks) {
         ClientChatChannelState.ensureAvailable();
         this.tabActions.syncSelection();
-        this.bar.noteInputWindow();
         this.bar.refreshPickers();
         // A reaction the message menu asked for opens the emoji picker
         // on that message, whichever way the menu entry was chosen.
@@ -1213,7 +1212,7 @@ public final class LostTalesChatGui extends GuiChat
                         "gui.losttales.chat.tab.restore");
             case JUMP_PILL:
                 return StatCollector.translateToLocal(
-                        "gui.losttales.chat.jump_to_present");
+                        "gui.losttales.chat.jump_to_present.tip");
             case REPLY_CHIP:
                 return StatCollector.translateToLocal(
                         "gui.losttales.chat.message.cancel_reply");
@@ -1374,15 +1373,22 @@ public final class LostTalesChatGui extends GuiChat
      * (or on one empty line) and carrying the window's top rule as its
      * last pixel row, and the bottom rule over the shade. The row is the
      * window's title strip and is there while the window has a tab the
-     * player can see. No window draws an input section of its own: there
-     * is one, it belongs to the window being typed in, and it is drawn
-     * once with the bar group wherever it has travelled to.
+     * player can see. Every window but the active one — the window being
+     * typed in — wears a resting bar under its bottom rule, drawn here
+     * with the window; the active window's bar is the live one, drawn
+     * once with the bar group after every window, so its pickers and
+     * lists stand over them all.
      */
     private void drawWindows(int mouseX, int mouseY, double pointerX,
                              double pointerY, float partialTicks) {
         LostTalesGuiAnimationSample opening =
                 ClientChatChannelViews.openSample();
         List<ChatWindow> windows = ChatWindowLayout.stacked();
+        // The live bar's window: the one holding the selected channel,
+        // else the first drawn, as the bar itself places it.
+        ChatWindow typed = ChatWindowLayout.windowOf(
+                ClientChatChannelState.getSelected());
+        String activeBarId = typed == null ? null : typed.getId();
         boolean blurActive = LostTalesConfig.enableChatBackgroundBlur
                 && LostTalesConfig.enableGuiBackgroundBlur;
         List<ChatWindowPlacement.Box> drawnBoxes = blurActive
@@ -1401,8 +1407,7 @@ public final class LostTalesChatGui extends GuiChat
                 // behind the one in front.
                 // Measured where the window stands this frame, a window
                 // gliding to or from the screen included.
-                ChatWindowFrame.of(window).advanceFullscreen(
-                        window.isFullscreen());
+                ChatWindowFrame.of(window).advanceFill(window.getFill());
                 ChatWindowPlacement.Box box = ChatWindowPlacement
                         .windowBounds(window, this.mc, this.width,
                                 this.height);
@@ -1416,6 +1421,9 @@ public final class LostTalesChatGui extends GuiChat
             LostTalesChatOverlayRenderer.drawWindowForScreen(this.mc, window,
                     this.width, this.height, opening);
             ChatWindowFrame frame = frameFor(window);
+            if (activeBarId == null && frame.drawn) {
+                activeBarId = window.getId();
+            }
             ChatChannelTabBar.Row row = rowFor(window, frame, opening);
             if (row == null) {
                 continue;
@@ -1443,6 +1451,9 @@ public final class LostTalesChatGui extends GuiChat
                     opening);
             LostTalesChatOverlayRenderer.drawWindowLeftEdge(this.mc, frame,
                     opening);
+            if (!window.getId().equals(activeBarId)) {
+                this.bar.drawRestingBar(frame, window);
+            }
         }
     }
 
@@ -1482,13 +1493,13 @@ public final class LostTalesChatGui extends GuiChat
         row.locked = window.isLocked();
         row.moving = this.gestures.isMovingWindow(window.getId());
         row.resizing = this.gestures.isResizingWindow(window.getId());
-        row.gliding = frame.isFullscreenGliding();
+        row.gliding = frame.isFillGliding();
         // A locked window keeps the tabs and the size it has, so it
         // offers neither a tab cross nor the window's own controls: they
         // are all refused anyway, and would only mislead.
         row.closable = ClientChatChannelState.isClosable(row.selected);
         row.windowControls = !window.isLocked();
-        row.fullscreenShare = frame.fullscreenShare(window.isFullscreen());
+        row.fullscreenShare = frame.fullShare();
         row.showRestore = !window.isLocked()
                 && (!ChatScreenMenus.restorableChannels().isEmpty()
                         || ChatScreenMenus.hasWhisperCandidates(this.mc));
@@ -1583,11 +1594,10 @@ public final class LostTalesChatGui extends GuiChat
     }
 
     /**
-     * A click in the strip below another window's bottom rule moves the
-     * input to that window. Nothing is drawn there — the input section
-     * belongs to the window being typed in and to no other — but the
-     * room is still part of the window's box, and pressing it asks for
-     * the bar to come there, which is what the bar then does.
+     * A click on another window's resting bar moves the input to that
+     * window: the bar drawn there answers nothing itself, and pressing
+     * it asks for the live bar to come there, which is what it then
+     * does.
      */
     private ChatWindowFrame otherBarAt(double x, double barY) {
         ChatWindowFrame active = this.bar.activeFrame();
@@ -2024,11 +2034,11 @@ public final class LostTalesChatGui extends GuiChat
                 return ChatWindowLayout.window(frame.windowId) == null
                         ? null : frame;
             }
-            // Only the message area cycles. The strip and the grip move
+            // Only the message area cycles. The strips and the grip move
             // the window and the bar is the input; what is left is the
             // history, which is where the player is pointing when they
             // mean "the one behind this".
-            if (y < frame.tabRowBottom() || y >= frame.barTop()) {
+            if (y < frame.historyTop() || y >= frame.barTop()) {
                 return null;
             }
             front = frame;
@@ -2433,8 +2443,9 @@ public final class LostTalesChatGui extends GuiChat
                         ChatChannelTabBar.rowTop(row.rowBottom) - 2);
                 return true;
             case WINDOW_FULLSCREEN:
-                this.tabActions.setWindowFullscreen(window,
-                        !window.isFullscreen());
+                this.tabActions.setWindowFill(window, window.isFullscreen()
+                        ? ChatWindow.ScreenFill.NONE
+                        : ChatWindow.ScreenFill.FULL);
                 return true;
             case WINDOW_CLOSE:
                 this.tabActions.closeWindow(window);
@@ -2470,8 +2481,9 @@ public final class LostTalesChatGui extends GuiChat
             // A double click is spent by its second press; a third
             // press starts another.
             this.stripPressWindowId = null;
-            this.tabActions.setWindowFullscreen(window,
-                    !window.isFullscreen());
+            this.tabActions.setWindowFill(window, window.isFullscreen()
+                    ? ChatWindow.ScreenFill.NONE
+                    : ChatWindow.ScreenFill.FULL);
             return;
         }
         this.stripPressWindowId = window.getId();
