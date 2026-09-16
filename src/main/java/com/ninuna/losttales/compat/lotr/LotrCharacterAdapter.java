@@ -35,6 +35,12 @@ import java.util.Set;
 public final class LotrCharacterAdapter implements CharacterFactionResolver {
 
     public static final String ID_PREFIX = "lotr:";
+    /**
+     * LOTR's faction of the factionless. Every chat identity belongs to a
+     * faction: a character created without one and the account speak
+     * and read Faction chat here.
+     */
+    public static final String UNALIGNED_FACTION_ID = ID_PREFIX + "unaligned";
     private static final int MAX_STABLE_ID_LENGTH = 64;
 
     private static final LotrCharacterAdapter INSTANCE = new LotrCharacterAdapter();
@@ -410,6 +416,15 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
             return "";
         }
         return normalized;
+    }
+
+    /**
+     * The faction an identity speaks and reads Faction chat in: the
+     * normalized id, or {@link #UNALIGNED_FACTION_ID} when it names none.
+     */
+    public static String factionIdOrUnaligned(String factionId) {
+        String normalized = normalizeFactionId(factionId);
+        return normalized.length() == 0 ? UNALIGNED_FACTION_ID : normalized;
     }
 
     public static String normalizeWaypointId(String waypointId) {

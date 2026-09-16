@@ -3,6 +3,8 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.core.LostTalesClassTransformer;
+import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
+import java.util.Collections;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import java.util.ArrayList;
@@ -130,7 +132,7 @@ public final class LostTalesSpeechBubbleRenderer {
                 || minecraft == null || minecraft.fontRenderer == null
                 || minecraft.currentScreen instanceof GuiChat
                 || speaker.isInvisible()
-                || ChatSpeechBubbles.isEmpty()) {
+                || (ChatSpeechBubbles.isEmpty() && !typingShown())) {
             return;
         }
         // Speech carries as far as the server's Proximity radius, measured
@@ -154,10 +156,13 @@ public final class LostTalesSpeechBubbleRenderer {
         long now = System.nanoTime();
         ChatSpeechBubbles.Speech speech =
                 ChatSpeechBubbles.speechOf(speaker.getUniqueID(), now);
-        if (speech == null) {
-            return;
+        List<Row> rows = speech == null ? new ArrayList<Row>(1)
+                : layOut(minecraft.fontRenderer, speech, now);
+        if (typingShown() && isTyping(speaker, now)) {
+            // The dots stand nearest the head, under whatever was said:
+            // they are what comes next.
+            rows.add(Row.dots());
         }
-        List<Row> rows = layOut(minecraft.fontRenderer, speech, now);
         if (rows.isEmpty()) {
             return;
         }
@@ -178,7 +183,7 @@ public final class LostTalesSpeechBubbleRenderer {
             GL11.glRotatef(-renderManager.playerViewY, 0.0F, 1.0F, 0.0F);
             GL11.glRotatef(renderManager.playerViewX, 1.0F, 0.0F, 0.0F);
             GL11.glScalef(-BUBBLE_SCALE, -BUBBLE_SCALE, BUBBLE_SCALE);
-            draw(minecraft, minecraft.fontRenderer, rows);
+            draw(minecraft, minecraft.fontRenderer, rows, now);
         } finally {
             GL11.glPopMatrix();
             GL11.glDepthMask(true);
@@ -229,7 +234,7 @@ public final class LostTalesSpeechBubbleRenderer {
 
     /** The stack, growing upward so its last row stands on the anchor. */
     private static void draw(Minecraft minecraft, FontRenderer font,
-                             List<Row> rows) {
+                             List<Row> rows, long nowNanos) {
         int height = 0;
         for (int index = 0; index < rows.size(); index++) {
             height += ROW_STRIDE + rows.get(index).gapBelow;
@@ -246,7 +251,11 @@ public final class LostTalesSpeechBubbleRenderer {
                 drawBackdrop(-half - PADDING_X, y - PADDING_Y,
                         half + PADDING_X, y + ROW_STRIDE - 1 - PADDING_Y,
                         row.opacity);
-                drawRow(minecraft, font, row, -half, y, alpha);
+                if (row.dots) {
+                    drawDots(-half, y, alpha, nowNanos);
+                } else {
+                    drawRow(minecraft, font, row, -half, y, alpha);
+                }
             }
             y += ROW_STRIDE + row.gapBelow;
         }
@@ -279,18 +288,76 @@ public final class LostTalesSpeechBubbleRenderer {
         }
     }
 
+    /**
+     * Whether typing bubbles are drawn at all right now: the client
+     * shows typing, and somebody is typing into a roleplaying
+     * conversation. Both the speech and the typing switches gate them,
+     * since the dots stand where the speech will.
+     */
+    private static boolean typingShown() {
+        return LostTalesConfig.showChatTypingIndicators
+                && ClientChatTypingState.anyTypingInCharacter(System.nanoTime());
+    }
+
+    /**
+     * Whether this speaker is typing into a roleplaying conversation
+     * this client reads: a player, by the name their lines would show —
+     * the character they play, or their account.
+     */
+    private static boolean isTyping(EntityLivingBase speaker, long nowNanos) {
+        if (!(speaker instanceof EntityPlayer)) {
+            return false;
+        }
+        String account = speaker.getCommandSenderName();
+        String character = ClientCharacterAppearanceCache.characterNameFor(account);
+        return (character != null
+                && ClientChatTypingState.isTypingInCharacter(character, nowNanos))
+                || ClientChatTypingState.isTypingInCharacter(account, nowNanos);
+    }
+
+    /** Where the dots' two rows stand in a row of capitals: on its middle, half a pixel up. */
+    private static final int DOTS_TOP = 2;
+
+    /**
+     * The typing marks: three dots on the row's capitals, each
+     * breathing on the clock ({@link ChatTypingDots}), the chat's
+     * shadow under each, drawn as the backdrop is, without a texture.
+     */
+    private static void drawDots(int left, int y, int alpha, long nowNanos) {
+        int top = y + DOTS_TOP;
+        for (int index = 0; index < ChatTypingDots.COUNT; index++) {
+            int x = left + index * (ChatTypingDots.DOT_SIZE + ChatTypingDots.GAP);
+            int dotAlpha = Math.round(alpha * ChatTypingDots.opacity(index, nowNanos));
+            int shadowAlpha = LostTalesChatVisualStyle.shadowAlpha(dotAlpha);
+            if (shadowAlpha >= LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+                fillQuad(x + LostTalesChatVisualStyle.SHADOW_OFFSET,
+                        top + LostTalesChatVisualStyle.SHADOW_OFFSET,
+                        x + ChatTypingDots.DOT_SIZE + LostTalesChatVisualStyle.SHADOW_OFFSET,
+                        top + ChatTypingDots.DOT_SIZE + LostTalesChatVisualStyle.SHADOW_OFFSET,
+                        LostTalesChatVisualStyle.SHADOW, shadowAlpha);
+            }
+            fillQuad(x, top, x + ChatTypingDots.DOT_SIZE, top + ChatTypingDots.DOT_SIZE,
+                    LostTalesChatVisualStyle.IVORY, dotAlpha);
+        }
+    }
+
     /** The chat's own black, behind one row of speech. */
     private static void drawBackdrop(float left, float top, float right,
                                      float bottom, float opacity) {
-        int alpha = Math.round(BACKDROP_ALPHA * opacity);
+        fillQuad(left, top, right, bottom, LostTalesChatVisualStyle.SURFACE_RGB,
+                Math.round(BACKDROP_ALPHA * opacity));
+    }
+
+    /** One flat quad in the bubble's own units, without a texture. */
+    private static void fillQuad(float left, float top, float right, float bottom,
+                                 int rgb, int alpha) {
         if (alpha <= 0) {
             return;
         }
         GL11.glDisable(GL11.GL_TEXTURE_2D);
         Tessellator tessellator = Tessellator.instance;
         tessellator.startDrawingQuads();
-        tessellator.setColorRGBA_I(LostTalesChatVisualStyle.SURFACE_RGB,
-                alpha);
+        tessellator.setColorRGBA_I(rgb, alpha);
         tessellator.addVertex(left, bottom, 0.0D);
         tessellator.addVertex(right, bottom, 0.0D);
         tessellator.addVertex(right, top, 0.0D);
@@ -310,14 +377,24 @@ public final class LostTalesSpeechBubbleRenderer {
         private final float opacity;
         private final int rgb;
         private final int gapBelow;
+        /** Whether the row is the typing marks rather than words. */
+        private final boolean dots;
 
         private Row(List<ChatEmojiParser.Segment> parts, int width,
-                    float opacity, int rgb, int gapBelow) {
+                    float opacity, int rgb, int gapBelow, boolean dots) {
             this.parts = parts;
             this.width = width;
             this.opacity = opacity;
             this.rgb = rgb;
             this.gapBelow = gapBelow;
+            this.dots = dots;
+        }
+
+        /** The typing marks as a row of their own width. */
+        static Row dots() {
+            return new Row(Collections.<ChatEmojiParser.Segment>emptyList(),
+                    ChatTypingDots.WIDTH, 1.0F, LostTalesChatVisualStyle.IVORY, 0,
+                    true);
         }
 
         static Row of(FontRenderer font, String text, float opacity,
@@ -329,7 +406,7 @@ public final class LostTalesSpeechBubbleRenderer {
                 width += part.isEmoji() ? EMOJI_ADVANCE
                         : font.getStringWidth(part.getText());
             }
-            return new Row(parts, width, opacity, rgb, gapBelow);
+            return new Row(parts, width, opacity, rgb, gapBelow, false);
         }
     }
 }

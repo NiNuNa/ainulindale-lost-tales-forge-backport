@@ -1,0 +1,90 @@
+# The words the chat filter replaces, one per line as word=replacement.
+# A word is matched whole, with stretched letters and the common endings
+# (s, es, ies, ed, ing, er, ers, y, in, head, hole, face); the stand-in
+# takes the ending over in English spelling. Case is kept. A server adds
+# words in chat.profanityWords (server/server.cfg), a client in
+# config/losttales/client/chat/profanity.txt, in this same shape.
+
+# Swearing
+fuck=flip
+fuk=flip
+fuq=flip
+fck=flip
+fcuk=flip
+phuck=flip
+motherfucker=motherflipper
+shit=poop
+shite=poop
+shyt=poop
+bullshit=bullpoop
+horseshit=horsepoop
+dipshit=dippoop
+ass=bum
+arse=bum
+azz=bum
+dumbass=dumbbum
+jackass=jackbum
+bitch=witch
+biatch=witch
+bastard=rascal
+crap=crud
+piss=whizz
+dick=duck
+cock=rooster
+cocksucker=lollipop
+pussy=kitty
+cunt=carrot
+kunt=carrot
+twat=twit
+wank=plonk
+wanker=plonker
+bollocks=bobbins
+bollox=bobbins
+bellend=bellpepper
+minge=mango
+prick=pickle
+douche=dingus
+douchebag=dingusbag
+tits=teacups
+titties=teacups
+turd=nugget
+bugger=badger
+tosser=toaster
+slag=slug
+skank=skunk
+bimbo=bonbon
+slut=turnip
+whore=walnut
+hooker=hookah
+jizz=fizz
+porn=corn
+dildo=dodo
+blowjob=lollipop
+handjob=handshake
+
+# Slurs
+nigger=noodle
+nigga=noodle
+negro=nougat
+coon=raccoon
+faggot=fiddle
+fag=fiddle
+dyke=dinky
+homo=hummus
+tranny=trolley
+retard=rutabaga
+retarded=silly
+spastic=sparkle
+spaz=sparkle
+midget=minnow
+kike=kite
+chink=chipmunk
+gook=goose
+spic=spice
+spick=spice
+wetback=wetsock
+beaner=beanie
+paki=pastry
+raghead=ragdoll
+towelhead=towelrack
+jap=jam

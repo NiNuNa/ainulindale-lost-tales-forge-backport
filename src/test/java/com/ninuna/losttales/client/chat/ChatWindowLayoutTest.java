@@ -37,6 +37,37 @@ public final class ChatWindowLayoutTest {
         ChatWindowLayout.reset();
     }
 
+    /**
+     * A place's whisper tabs are remembered where they were and come back
+     * on the next visit there, not elsewhere; one closed by hand stays
+     * closed until somebody speaks in it again.
+     */
+    @Test
+    public void whisperTabsAreRememberedPerPlaceAndClosedOnesStayClosed() {
+        ChatWindowLayout.restoreConversations("server:a");
+        ChatTab steve = ChatTab.whisper("Steve", "Aldric");
+        ChatTab bob = ChatTab.whisper("Bob", "Bob");
+        assertNotNull(ChatWindowLayout.openTab(steve, "w2"));
+        assertNotNull(ChatWindowLayout.openTab(bob, "w2"));
+        assertTrue(ChatWindowLayout.close(bob));
+        assertTrue("closed by hand: a replay may not reopen it",
+                ChatWindowLayout.isHidden(bob));
+        ChatWindowLayout.closeConversations();
+        assertFalse(ChatWindowLayout.isOpen(steve));
+        assertFalse(ChatWindowLayout.isHidden(bob));
+        ChatWindowLayout.restoreConversations("server:b");
+        assertFalse("another place has no such tab", ChatWindowLayout.isOpen(steve));
+        ChatWindowLayout.closeConversations();
+        ChatWindowLayout.restoreConversations("server:a");
+        assertTrue(ChatWindowLayout.isOpen(steve));
+        assertEquals("w2", ChatWindowLayout.windowOf(steve).getId());
+        assertFalse(ChatWindowLayout.isOpen(bob));
+        assertTrue(ChatWindowLayout.isHidden(bob));
+        assertNotNull(ChatWindowLayout.reopenConversation(bob, "w2"));
+        assertTrue(ChatWindowLayout.isOpen(bob));
+        assertFalse(ChatWindowLayout.isHidden(bob));
+    }
+
     @Test
     public void defaultLayoutIsAConsoleWindowAndAConversationWindow() {
         assertEquals(2, ChatWindowLayout.windows().size());
@@ -677,12 +708,12 @@ public final class ChatWindowLayoutTest {
     public void loadRepairsStaleDuplicateAndMissingEntries() {
         List<ChatWindowLayout.WindowSpec> specs =
                 new ArrayList<ChatWindowLayout.WindowSpec>();
-        // Party listed twice, a legacy main window, an unknown window id,
-        // an empty window, percents out of range, Console placed nowhere.
+        // Party listed twice, an unknown window id, an empty window,
+        // percents out of range, Console placed nowhere.
         specs.add(new ChatWindowLayout.WindowSpec("w3",
                 Arrays.asList(ChatChannel.PARTY, ChatChannel.OOC),
                 ChatChannel.OOC, true, 250.0D, -5.0D));
-        specs.add(new ChatWindowLayout.WindowSpec("main",
+        specs.add(new ChatWindowLayout.WindowSpec("w8",
                 Arrays.asList(ChatChannel.ALL, ChatChannel.PARTY,
                         ChatChannel.PROXIMITY),
                 ChatChannel.PARTY, false, 0.0D, 100.0D));
@@ -712,13 +743,14 @@ public final class ChatWindowLayoutTest {
         // (250 to 200); a little past the top is kept as stored.
         assertEquals(200.0D, w3.getOffsetX(), 0.0D);
         assertEquals(-5.0D, w3.getOffsetY(), 0.0D);
-        // The legacy main window becomes an ordinary one, numbered on.
-        ChatWindow legacy = ChatWindowLayout.windows().get(1);
-        assertEquals("w8", legacy.getId());
+        // The second window keeps its id and its place; its front tab,
+        // Party, went to the first window, so the first tab left stands.
+        ChatWindow second = ChatWindowLayout.windows().get(1);
+        assertEquals("w8", second.getId());
         assertEquals(Arrays.asList(ChatChannel.ALL, ChatChannel.PROXIMITY),
-                legacy.getChannels());
-        assertEquals(ChatChannel.ALL, legacy.getActiveChannel());
-        assertEquals(100.0D, legacy.getOffsetY(), 0.0D);
+                second.getChannels());
+        assertEquals(ChatChannel.ALL, second.getActiveChannel());
+        assertEquals(100.0D, second.getOffsetY(), 0.0D);
         assertEquals(Collections.singletonList(ChatChannel.ADMIN),
                 ChatWindowLayout.closedChannels());
         assertTrue(ChatWindowLayout.isMuted(ChatChannel.OOC));

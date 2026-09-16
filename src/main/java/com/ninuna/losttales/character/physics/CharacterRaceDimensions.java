@@ -33,7 +33,7 @@ public final class CharacterRaceDimensions {
             float sneakingEyeHeight,
             float modelScale,
             boolean lotrDerived) {
-        this.raceId = CharacterRaceRegistry.canonicalizeIdentifier(raceId);
+        this.raceId = CharacterRaceRegistry.normalizeIdentifier(raceId);
         this.width = width;
         this.height = height;
         this.standingEyeHeight = standingEyeHeight;
@@ -53,7 +53,7 @@ public final class CharacterRaceDimensions {
             throw new IllegalArgumentException("profile must not be null");
         }
 
-        String canonicalRaceId = CharacterRaceRegistry.canonicalizeIdentifier(raceId);
+        String canonicalRaceId = CharacterRaceRegistry.normalizeIdentifier(raceId);
         CharacterRaceDefinition definition =
                 CharacterRaceRegistry.get(canonicalRaceId);
         float width = positiveOr(definition == null
@@ -102,7 +102,7 @@ public final class CharacterRaceDimensions {
             throw new IllegalArgumentException("fallback must not be null");
         }
 
-        String canonicalRaceId = CharacterRaceRegistry.canonicalizeIdentifier(raceId);
+        String canonicalRaceId = CharacterRaceRegistry.normalizeIdentifier(raceId);
         float safeWidth = positiveOr(width, fallback.getWidth());
         float safeHeight = positiveOr(height, fallback.getHeight());
         float safeStandingEyeHeight = clampEyeHeight(

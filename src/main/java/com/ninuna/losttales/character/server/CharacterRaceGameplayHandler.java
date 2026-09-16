@@ -237,7 +237,7 @@ public final class CharacterRaceGameplayHandler {
             EntityPlayerMP player, RoleplayCharacter character) {
         if (player == null || character == null
                 || !CharacterRaceRegistry.HALF_TROLL.equals(
-                        CharacterRaceRegistry.canonicalizeIdentifier(
+                        CharacterRaceRegistry.normalizeIdentifier(
                                 character.getRaceId()))) {
             return true;
         }
@@ -286,7 +286,7 @@ public final class CharacterRaceGameplayHandler {
             EntityPlayerMP player, RoleplayCharacter character) {
         if (player == null || character == null
                 || !CharacterRaceRegistry.HALF_TROLL.equals(
-                        CharacterRaceRegistry.canonicalizeIdentifier(
+                        CharacterRaceRegistry.normalizeIdentifier(
                                 character.getRaceId()))) {
             return;
         }

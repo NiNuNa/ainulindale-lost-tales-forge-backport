@@ -147,21 +147,29 @@ public final class CharacterNbtCodec {
         output.setTag(TAG_QUARANTINE, writeQuarantine(quarantinedEntries));
     }
 
-    public static ReadResult read(NBTTagCompound source) {
-        CharacterDataMigrator.MigrationResult rootMigration =
-                CharacterDataMigrator.migrateRoot(source, CURRENT_ROOT_DATA_VERSION);
+    /**
+     * The data version a record carries, zero for a record that names
+     * none. A record is read at exactly the version this build writes;
+     * any other stays as it is and the store goes read-only.
+     */
+    private static int versionOf(NBTTagCompound source) {
+        return source.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
+                ? source.getInteger(TAG_DATA_VERSION) : 0;
+    }
 
-        if (!rootMigration.isValid()) {
+    public static ReadResult read(NBTTagCompound source) {
+        if (source == null) {
             warn("Character data root is malformed; data will remain read-only to avoid overwriting it");
             return ReadResult.unsupported(source, -1);
         }
-        if (!rootMigration.isSupported()) {
+        int rootVersion = versionOf(source);
+        if (rootVersion != CURRENT_ROOT_DATA_VERSION) {
             warn("Character data root uses unsupported version %d; data will remain read-only",
-                    Integer.valueOf(rootMigration.getVersion()));
-            return ReadResult.unsupported(source, rootMigration.getVersion());
+                    Integer.valueOf(rootVersion));
+            return ReadResult.unsupported(source, rootVersion);
         }
 
-        NBTTagCompound root = rootMigration.getTag();
+        NBTTagCompound root = (NBTTagCompound) source.copy();
         QuarantineReadResult quarantineResult = readQuarantine(root);
         if (!quarantineResult.supported) {
             warn("Character quarantine data is malformed or uses unsupported version %d; "
@@ -170,7 +178,7 @@ public final class CharacterNbtCodec {
             return ReadResult.unsupported(source, quarantineResult.unsupportedVersion);
         }
 
-        boolean repaired = rootMigration.wasMigrated() || quarantineResult.repaired;
+        boolean repaired = quarantineResult.repaired;
         ArrayList<NBTTagCompound> quarantinedEntries =
                 new ArrayList<NBTTagCompound>(quarantineResult.entries);
         if (!root.hasKey(TAG_ROSTERS, Constants.NBT.TAG_LIST)) {
@@ -331,20 +339,19 @@ public final class CharacterNbtCodec {
     }
 
     private static RosterReadResult readRoster(NBTTagCompound source, int rosterIndex) {
-        CharacterDataMigrator.MigrationResult migration =
-                CharacterDataMigrator.migrateRoster(source, CharacterRoster.CURRENT_DATA_VERSION);
-        if (!migration.isValid()) {
+        if (source == null) {
             warn("Skipping malformed roster at index %d", Integer.valueOf(rosterIndex));
             return RosterReadResult.failed(true, "malformed_roster");
         }
-        if (!migration.isSupported()) {
+        int version = versionOf(source);
+        if (version != CharacterRoster.CURRENT_DATA_VERSION) {
             warn("Roster at index %d uses unsupported version %d",
-                    Integer.valueOf(rosterIndex), Integer.valueOf(migration.getVersion()));
-            return RosterReadResult.unsupported(migration.getVersion());
+                    Integer.valueOf(rosterIndex), Integer.valueOf(version));
+            return RosterReadResult.unsupported(version);
         }
 
-        NBTTagCompound tag = migration.getTag();
-        boolean repaired = migration.wasMigrated();
+        NBTTagCompound tag = (NBTTagCompound) source.copy();
+        boolean repaired = false;
         UUID ownerId = readUuid(tag, TAG_OWNER_UUID);
         if (ownerId == null) {
             warn("Skipping roster at index %d because its owner UUID is missing or invalid",
@@ -403,9 +410,8 @@ public final class CharacterNbtCodec {
             repaired = true;
         }
         roster.setAccountCapeSettings(showAccountCape, accountCapeId);
-        // Absent on every roster written before templates existed,
-        // which reads as not yet taken: such a world takes it on the
-        // player's next login instead of never.
+        // A roster without the key has not read one: such a world takes
+        // the template on the player's next login instead of never.
         if (tag.getBoolean(TAG_TEMPLATE_TAKEN)) {
             roster.markTemplateTaken();
         }
@@ -458,22 +464,21 @@ public final class CharacterNbtCodec {
 
     private static CharacterReadResult readCharacter(NBTTagCompound source, UUID rosterOwnerId,
                                                        int rosterIndex, int characterIndex) {
-        CharacterDataMigrator.MigrationResult migration =
-                CharacterDataMigrator.migrateCharacter(source, RoleplayCharacter.CURRENT_DATA_VERSION);
-        if (!migration.isValid()) {
+        if (source == null) {
             warn("Skipping malformed character at index %d for owner %s",
                     Integer.valueOf(characterIndex), rosterOwnerId);
             return CharacterReadResult.failed(true, "malformed_character");
         }
-        if (!migration.isSupported()) {
+        int version = versionOf(source);
+        if (version != RoleplayCharacter.CURRENT_DATA_VERSION) {
             warn("Character at index %d for owner %s uses unsupported version %d",
                     Integer.valueOf(characterIndex), rosterOwnerId,
-                    Integer.valueOf(migration.getVersion()));
-            return CharacterReadResult.unsupported(migration.getVersion());
+                    Integer.valueOf(version));
+            return CharacterReadResult.unsupported(version);
         }
 
-        NBTTagCompound tag = migration.getTag();
-        boolean repaired = migration.wasMigrated();
+        NBTTagCompound tag = (NBTTagCompound) source.copy();
+        boolean repaired = false;
         ArrayList<NBTTagCompound> quarantinedEntries = new ArrayList<NBTTagCompound>();
         UUID characterId = readUuid(tag, TAG_CHARACTER_UUID);
         if (characterId == null) {
@@ -508,7 +513,7 @@ public final class CharacterNbtCodec {
 
         String name = tag.getString(TAG_NAME);
         String storedRaceId = tag.getString(TAG_RACE_ID);
-        String raceId = CharacterRaceRegistry.canonicalizeIdentifier(storedRaceId);
+        String raceId = CharacterRaceRegistry.normalizeIdentifier(storedRaceId);
         if (CharacterRaceRegistry.get(raceId) == null) {
             raceId = CharacterRaceRegistry.HUMAN;
             repaired = true;
@@ -520,13 +525,9 @@ public final class CharacterNbtCodec {
         String genderId = CharacterRaceRegistry.normalizeGenderForRace(
                 raceId, storedGenderId);
         String startingFactionId = tag.getString(TAG_STARTING_FACTION_ID);
-        // A record written before kinds existed is a roleplay character:
-        // that is what every record that existed then was.
+        // A record naming no kind, or one this build does not know, is a
+        // roleplay character.
         CharacterKind kind = CharacterKind.fromId(tag.getString(TAG_KIND));
-        // The account's own identity belongs to no faction, exactly as the
-        // account did before it was a character, so a blank faction is a
-        // fact about it rather than a missing field.
-        boolean factionRequired = kind != CharacterKind.DEFAULT;
         if ((slotIndex == CharacterRoster.DEFAULT_SLOT_INDEX)
                 != (kind == CharacterKind.DEFAULT)) {
             // The slot and the kind are two spellings of the same fact,
@@ -540,14 +541,14 @@ public final class CharacterNbtCodec {
             return CharacterReadResult.failed(true, "slot_kind_mismatch");
         }
         if (isBlank(name) || isBlank(raceId) || isBlank(genderId)
-                || (factionRequired && isBlank(startingFactionId))) {
+                || isBlank(startingFactionId)) {
             warn("Skipping character %s for owner %s because a required text field is empty or unsupported",
                     characterId, rosterOwnerId);
             return CharacterReadResult.failed(true, "missing_required_text_field");
         }
         if (!raceId.equals(storedRaceId)) {
             repaired = true;
-            warn("Migrating legacy race %s to %s for character %s owned by %s",
+            warn("Repairing race id %s to %s for character %s owned by %s",
                     storedRaceId, raceId, characterId, rosterOwnerId);
         }
         if (!genderId.equals(storedGenderId)) {
@@ -593,8 +594,8 @@ public final class CharacterNbtCodec {
                     characterId, rosterOwnerId);
         }
 
-        // Records written before version 7 carry no body type; the sex picks
-        // it, which is what the creator would have pre-selected.
+        // A record without a body type takes the sex's, which is what the
+        // creator would have pre-selected.
         boolean hasBodyType = tag.hasKey(TAG_BODY_TYPE_ID, Constants.NBT.TAG_STRING);
         String storedBodyTypeId = hasBodyType
                 ? CharacterBodyTypeRegistry.normalizeIdentifier(tag.getString(TAG_BODY_TYPE_ID))
@@ -610,8 +611,8 @@ public final class CharacterNbtCodec {
             }
         }
 
-        // Records written before version 8 carry no chest type; the sex
-        // picks it, as the creator would have.
+        // A record without a chest type takes the sex's, as the creator
+        // would have.
         boolean hasChestType = tag.hasKey(TAG_CHEST_TYPE_ID, Constants.NBT.TAG_STRING);
         String storedChestTypeId = hasChestType
                 ? CharacterChestTypeRegistry.normalizeIdentifier(tag.getString(TAG_CHEST_TYPE_ID))
@@ -760,21 +761,15 @@ public final class CharacterNbtCodec {
             return ProgressionReadResult.success(new CharacterProgression(), true, false);
         }
 
-        CharacterDataMigrator.MigrationResult migration =
-                CharacterDataMigrator.migrateProgression(source, CharacterProgression.CURRENT_DATA_VERSION);
-        if (!migration.isValid()) {
-            warn("Replacing malformed progression data for character %s owned by %s",
-                    characterId, ownerId);
-            return ProgressionReadResult.success(new CharacterProgression(), true, true);
-        }
-        if (!migration.isSupported()) {
+        int version = versionOf(source);
+        if (version != CharacterProgression.CURRENT_DATA_VERSION) {
             warn("Progression data for character %s owned by %s uses unsupported version %d",
-                    characterId, ownerId, Integer.valueOf(migration.getVersion()));
-            return ProgressionReadResult.unsupported(migration.getVersion());
+                    characterId, ownerId, Integer.valueOf(version));
+            return ProgressionReadResult.unsupported(version);
         }
 
-        NBTTagCompound tag = migration.getTag();
-        boolean repaired = migration.wasMigrated();
+        NBTTagCompound tag = (NBTTagCompound) source.copy();
+        boolean repaired = false;
         long experiencePoints = tag.hasKey(TAG_EXPERIENCE_POINTS, Constants.NBT.TAG_LONG)
                 ? tag.getLong(TAG_EXPERIENCE_POINTS)
                 : 0L;

@@ -18,9 +18,6 @@ import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.chat.share.ChatShowcase;
-import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
-import com.ninuna.losttales.character.sync.CharacterSummary;
-import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
@@ -160,7 +157,7 @@ public final class LostTalesChatPresentation {
         // for, and is known by the sender id the bridge signs with, not
         // by the channel: a Discord line and a player's line share OOC
         // & Discord. Whether the line wears the account is the line's
-        // own word too: appearances let a character speak there and the
+        // own word too: the chat identity lets a character speak there and the
         // account in Global.
         if (packet.isAccountLine() && !LostTalesChatMessagePacket
                 .isDiscordSender(packet.getSenderId())
@@ -201,16 +198,20 @@ public final class LostTalesChatPresentation {
         // hidden, or that has no window left to open in, stays closed:
         // its lines are still filed and counted unread, they still show
         // in the closed-chat feed, and the tab shows them all once it is
-        // opened again.
+        // opened again. A whisper tab closed by hand is closed only until
+        // somebody speaks in it again, and a replay is not that.
         ChatTab tab = tabOf(packet);
         // The layout holds one entry per channel, so a conversation of a
         // scoped channel is asked about as the row entry it belongs to.
         // Asking with the conversation's own tab would find no window
         // holding it and open a second Faction tab beside the first.
         ChatTab row = ChatTab.row(tab);
-        if (row != null && !ChatWindowLayout.isOpen(row)
-                && !ChatWindowLayout.isHidden(row)) {
-            ChatWindowLayout.openTab(row, windowIdOfSelection());
+        if (row != null && !ChatWindowLayout.isOpen(row)) {
+            if (!ChatWindowLayout.isHidden(row)) {
+                ChatWindowLayout.openTab(row, windowIdOfSelection());
+            } else if (!replayed && row.isWhisper() && !row.isNpc()) {
+                ChatWindowLayout.reopenConversation(row, windowIdOfSelection());
+            }
         }
         if (tab == null) {
             return;
@@ -219,11 +220,11 @@ public final class LostTalesChatPresentation {
                 && !minecraft.thePlayer.getUniqueID().equals(
                         packet.getSenderId())) {
             // Their half of the conversation says what colour it is in,
-            // and which appearance the tab names them by.
+            // and which identity the tab names them by.
             ClientChatChannelState.rememberPartnerColor(tab,
                     packet.getNameColor());
             ClientChatChannelState.rememberPartnerName(tab,
-                    packet.getIdentityName(), packet.getAccountName());
+                    packet.getIdentityName());
         }
         if (tab.isWhisper()) {
             // Both copies say which character of the other party the
@@ -248,7 +249,8 @@ public final class LostTalesChatPresentation {
                 : confirmPendingEcho(minecraft, packet, tab);
         int chatLineId;
         receivingReplayed = replayed;
-        receivingBeforeArrival = replayed && beforeArrival;
+        receivingBeforeArrival = (replayed && beforeArrival)
+                || !ClientChatChannelState.isAvailable(tab);
         try {
             chatLineId = confirmed != 0 ? confirmed
                     : print(minecraft, packet, tab, mentioned,
@@ -703,7 +705,7 @@ public final class LostTalesChatPresentation {
             Minecraft minecraft, ChatTab tab, String message,
             List<ChatShowcase> showcases, ChatReplyReference reply,
             long messageId, long timestampMillis) {
-        ClientChatIdentity.Signature signature = ClientChatIdentity.of(tab);
+        ClientChatSignature.Signature signature = ClientChatSignature.of(tab);
         LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
                 tab.getChannel(), minecraft.thePlayer.getUniqueID(),
                 signature.identityName, signature.accountName, "",
@@ -725,7 +727,7 @@ public final class LostTalesChatPresentation {
     /**
      * The player's own line in an NPC conversation: nobody is on the
      * other end, so nothing is sent; the line is signed the way the
-     * server signs a whisper of theirs — the appearance the tab speaks
+     * server signs a whisper of theirs — the identity the tab speaks
      * as, its roles and its colour — and filed under the NPC's tab. The
      * things the player shared were resolved by the client from its
      * own inventory and marker cache, since no server ever sees them,
@@ -857,6 +859,8 @@ public final class LostTalesChatPresentation {
         // rules as for everything else.
         ClientChatChannelViews.recordTime(chatLineId,
                 packet.getTimestampMillis());
+        ClientChatChannelViews.noteOwnLine(tab, chatLineId,
+                packet.getMessageId());
         LostTalesChatHistoryHooks.refresh(chat);
         return chatLineId;
     }
@@ -925,6 +929,11 @@ public final class LostTalesChatPresentation {
      * dimension, or a respawn in progress cannot swallow or duplicate it.
      */
     private static void playPingSound(Minecraft minecraft) {
+        // Do Not Disturb holds the cue: the mention still counts and
+        // tints, and nothing sounds.
+        if (ClientChatPresence.isDoNotDisturb()) {
+            return;
+        }
         String sound = LostTalesConfig.chatPingSound == null
                 ? "" : LostTalesConfig.chatPingSound.trim();
         if (sound.length() == 0 || minecraft.getSoundHandler() == null) {
@@ -1467,7 +1476,7 @@ public final class LostTalesChatPresentation {
         return filed;
     }
 
-    private static ChatTab fileUnder(LostTalesChatMessagePacket packet) {
+    static ChatTab fileUnder(LostTalesChatMessagePacket packet) {
         // A command's answer of the server's own names the tab the
         // command was typed in, which is this client's own word, and
         // is filed there wherever its channel would have put it.
@@ -1653,16 +1662,6 @@ public final class LostTalesChatPresentation {
 
         root.appendSibling(reply(text(packet.getIdentityName(),
                 nearestFormatting(packet.getNameColor()), false), whisper));
-        if (channel == ChatChannel.WHISPER && !packet.getIdentityName()
-                .equalsIgnoreCase(packet.getAccountName())) {
-            // A whisper spoken as a character still says who is behind
-            // it: the account in brackets, part of the name — it answers
-            // to the pointer the way the name does.
-            root.appendSibling(reply(text(
-                    " (" + packet.getAccountName() + ")",
-                    nearestFormatting(packet.getNameColor()), false),
-                    whisper));
-        }
         if (packet.getTitle().length() > 0) {
             // LOTR's NPC naming, "Name, the Gondor Farmer": the epithet is
             // the sender's faction and title; an untitled sender gets no
@@ -1711,6 +1710,11 @@ public final class LostTalesChatPresentation {
                     channel);
             ChatSpoilerMarker.mark(root.getSiblings(), bodyStart,
                     packet.getMessageId());
+            if (packet.isNarrator()) {
+                // The Narrator's words are told, not said: in italics,
+                // as a storybook sets them.
+                italicise(root.getSiblings(), bodyStart);
+            }
         } else if (kind == ChatBodyKind.ANSWER) {
             // The server's own component, exactly as it came: its
             // colours, its links and its hover text all stand. Built
@@ -1733,6 +1737,14 @@ public final class LostTalesChatPresentation {
                 command = command.substring(1);
             }
             root.appendSibling(text(command, null, false));
+        }
+    }
+
+    /** Sets every run from {@code from} on in italics, the marks it carries kept. */
+    private static void italicise(List<IChatComponent> parts, int from) {
+        for (int index = from; index < parts.size(); index++) {
+            IChatComponent part = parts.get(index);
+            part.setChatStyle(part.getChatStyle().setItalic(Boolean.TRUE));
         }
     }
 
@@ -1828,7 +1840,8 @@ public final class LostTalesChatPresentation {
         root.appendSibling(ChatReplyMarker.apply(
                 text("> ", nearestFormatting(name), false), name, id));
         root.appendSibling(ChatReplyMarker.apply(
-                text(reply.getExcerpt(), nearestFormatting(ivory), false),
+                text(ClientChatProfanity.filterMessage(reply.getExcerpt()),
+                        nearestFormatting(ivory), false),
                 ivory, id));
     }
 
@@ -2562,27 +2575,15 @@ public final class LostTalesChatPresentation {
         return true;
     }
 
-    /**
-     * The names a line may address this client by, the same set in every
-     * channel: the account, and every character of the roster — whoever
-     * this player is currently speaking as, every other name they own is
-     * an alias of them, so a mention of any of their names reaches them
-     * wherever it is said.
-     */
+    /** Mentions notify the account and the currently selected chat character. */
     private static List<String> localMentionNames(Minecraft minecraft) {
         List<String> names = new ArrayList<String>(4);
         if (minecraft != null && minecraft.thePlayer != null) {
             names.add(minecraft.thePlayer.getCommandSenderName());
         }
-        CharacterRosterSnapshot snapshot =
-                ClientCharacterRosterCache.getSnapshot();
-        if (snapshot != null) {
-            for (CharacterSummary summary : snapshot.getCharacters()) {
-                if (summary != null && summary.getName() != null
-                        && summary.getName().trim().length() > 0) {
-                    names.add(summary.getName().trim());
-                }
-            }
+        ClientChatIdentities.Identity identity = ClientChatIdentities.viewing();
+        if (!identity.account && identity.name.length() > 0) {
+            names.add(identity.name);
         }
         return names;
     }
@@ -2708,9 +2709,10 @@ public final class LostTalesChatPresentation {
     /**
      * As above from a bare name, for a translation's string argument.
      * {@code named} is what the server recorded about the players a
-     * replayed line names: a name this client cannot place — its
-     * player gone since — is placed by that record, shown as the
-     * identity they were playing in the colour that identity wore.
+     * replayed line names: a name this client cannot place as a
+     * character — its player gone since, or their character not yet
+     * known — is placed by that record, shown as the identity they
+     * were playing in the colour that identity wore.
      */
     private static IChatComponent asMentionName(String rawText,
                                                 ChatChannel channel,
@@ -2723,7 +2725,9 @@ public final class LostTalesChatPresentation {
         }
         boolean local = matchesAny(text, localNames);
         String account = ChatMentionColors.accountFor(text);
-        ChatNamedPlayer recorded = account == null
+        String characterName = account == null ? null
+                : ChatMentionColors.characterNameFor(account);
+        ChatNamedPlayer recorded = characterName == null
                 ? ChatNamedPlayer.find(named, text) : null;
         if (recorded != null) {
             if (local) {
@@ -2743,14 +2747,7 @@ public final class LostTalesChatPresentation {
         // the character's name, in the colour the mention resolution
         // below gives every mention of that identity, so an achievement
         // names its player exactly as their lines do.
-        String shown = text;
-        if (account != null) {
-            String characterName =
-                    ChatMentionColors.characterNameFor(account);
-            if (characterName != null) {
-                shown = characterName;
-            }
-        }
+        String shown = characterName != null ? characterName : text;
         int color = ChatMentionColors.colorOf(text, channel);
         if (color < 0) {
             // One of this client's own names the public caches cannot
@@ -3363,8 +3360,8 @@ public final class LostTalesChatPresentation {
                     : -1;
             if (color >= 0) {
                 if (at > literalStart) {
-                    root.appendSibling(text(
-                            text.substring(literalStart, at),
+                    root.appendSibling(text(ClientChatProfanity.filter(
+                            text.substring(literalStart, at)),
                             EnumChatFormatting.WHITE, false));
                 }
                 // A mention carries whom it reaches, so it answers to
@@ -3391,7 +3388,11 @@ public final class LostTalesChatPresentation {
             cursor = Math.max(end, at + 1);
         }
         if (literalStart < text.length()) {
-            root.appendSibling(text(text.substring(literalStart),
+            // The plain words, once everything that is not a word — the
+            // tokens, emojis, links, channels and mentions — has been
+            // split out: what the profanity filter reads.
+            root.appendSibling(text(ClientChatProfanity.filter(
+                    text.substring(literalStart)),
                     EnumChatFormatting.WHITE, false));
         }
     }

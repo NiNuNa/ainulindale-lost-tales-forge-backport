@@ -176,7 +176,7 @@ public final class LoreCharacterDefinitionJsonParser {
         String genderId = requiredIdentifier(object.get("genderId"), path + ".genderId");
         String modelId = requiredIdentifier(object.get("modelId"), path + ".modelId");
         String skinId = requiredIdentifier(object.get("skinId"), path + ".skinId");
-        raceId = CharacterRaceRegistry.canonicalizeIdentifier(raceId);
+        raceId = CharacterRaceRegistry.normalizeIdentifier(raceId);
         genderId = CharacterGenderRegistry.normalizeIdentifier(genderId);
         CharacterRaceDefinition race = CharacterRaceRegistry.get(raceId);
         if (race == null) {

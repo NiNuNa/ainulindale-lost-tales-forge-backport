@@ -8,6 +8,9 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatDeletePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
+import com.ninuna.losttales.chat.ChatNarrator;
+import com.ninuna.losttales.chat.ChatPresence;
+import com.ninuna.losttales.permission.LostTalesCapability;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -205,10 +208,6 @@ final class ChatScreenMenus {
         this.popup.scrollBy(rows);
     }
 
-    ChatPopupMenu.Entry lockControlAt(double mouseX, double mouseY) {
-        return this.popup.lockControlAt(mouseX, mouseY);
-    }
-
     void registerRegion(ChatPointerRegions regions) {
         this.popup.registerRegion(regions);
     }
@@ -231,26 +230,12 @@ final class ChatScreenMenus {
         return true;
     }
 
-    /**
-     * A press while a menu is open. The lock in the character selection
-     * menu is a switch, not a pick: the menu stays open, its rows
-     * refreshed, so the padlock answers in place. An entry acts and the
-     * menu closes — unless the entry asked a question of its own and
-     * the menu is showing it. A press outside closes the menu and goes
-     * on to whatever is under it, told which menu it closed.
-     */
+    /** An entry acts and closes the menu; an outside press continues behind it. */
     Click click(double mouseX, double mouseY, int button) {
         if (!this.popup.isOpen()) {
             return new Click(false, "", null);
         }
         String closedKind = this.popup.kind();
-        if (button == 0 && this.popup.lockControlAt(mouseX, mouseY) != null) {
-            ClientChatAppearances.toggleLocked(
-                    ClientChatChannelState.getSelected());
-            this.popup.replaceEntries(characterSelectionEntries(), this.font,
-                    this.screenWidth, this.screenHeight);
-            return new Click(true, closedKind, null);
-        }
         ChatPopupMenu.Entry entry = this.popup.entryAt(mouseX, mouseY);
         boolean inside = this.popup.contains(mouseX, mouseY);
         this.pendingCommand = null;
@@ -502,13 +487,18 @@ final class ChatScreenMenus {
                 SEARCH_SHORTCUT_KEYS);
     }
 
-    /** Narrows the open panel to what has been typed into it. */
+    /** Narrows the open searchable list to what has been typed into it. */
     private void refreshSearchPanel() {
-        if (!POPUP_SEARCH.equals(this.popup.kind())) {
+        List<ChatPopupMenu.Entry> entries;
+        if (POPUP_SEARCH.equals(this.popup.kind())) {
+            entries = searchEntries(this.popup.filter());
+        } else if (POPUP_CHARACTERS.equals(this.popup.kind())) {
+            entries = characterSelectionEntries(this.popup.filter());
+        } else {
             return;
         }
-        this.popup.replaceEntries(searchEntries(this.popup.filter()),
-                this.font, this.screenWidth, this.screenHeight);
+        this.popup.replaceEntries(entries, this.font, this.screenWidth,
+                this.screenHeight);
     }
 
     /**
@@ -559,8 +549,7 @@ final class ChatScreenMenus {
         List<ChatPopupMenu.Entry> players =
                 new ArrayList<ChatPopupMenu.Entry>();
         for (String name : whisperCandidates(this.mc)) {
-            ChatTab conversation = ChatTab.whisper(name, "",
-                    ClientChatAppearances.viewIdentityKey());
+            ChatTab conversation = ChatTab.whisper(name, "");
             if (conversation != null && !ChatWindowLayout.isOpen(conversation)
                     && matchesFilter(name, filter)) {
                 players.add(new ChatPopupMenu.Entry(conversation.id(),
@@ -691,8 +680,7 @@ final class ChatScreenMenus {
                     StatCollector.translateToLocal(
                             "gui.losttales.chat.open.players")));
             for (String name : players) {
-                ChatTab conversation = ChatTab.whisper(name, "",
-                    ClientChatAppearances.viewIdentityKey());
+                ChatTab conversation = ChatTab.whisper(name, "");
                 entries.add(new ChatPopupMenu.Entry(conversation.id(),
                         withCounter(name,
                                 ClientChatChannelViews.unreadCount(
@@ -1020,83 +1008,115 @@ final class ChatScreenMenus {
         return true;
     }
 
-    /** The character selection menu, anchored above its button. */
+    /**
+     * The character selection menu, anchored above its button, with a
+     * search field over its rows that narrows them as it is typed into.
+     */
     void openCharacterSelectionMenu(int anchorX, int anchorBottom) {
-        this.popup.open(POPUP_CHARACTERS, null, characterSelectionEntries(),
+        this.popup.open(POPUP_CHARACTERS, null, characterSelectionEntries(""),
                 this.font, anchorX, anchorBottom, this.screenWidth,
-                this.screenHeight);
+                this.screenHeight, StatCollector.translateToLocal(
+                        "gui.losttales.chat.character_selection.search"),
+                null);
     }
 
     /**
-     * The menu's rows: the selected character on top — the identity the
-     * tab currently speaks as, with the lock control beside it, which
-     * locks this tab and this tab alone — then the account and every
-     * roster character to choose from.
+     * The selected chat identity, then the owned characters and the
+     * owned lore characters, each section under its header. A filter keeps the rows
+     * whose names hold it and drops a section with nothing left; one
+     * that matches nothing says so under the current identity rather
+     * than closing the menu under the hand that is typing.
      */
-    private List<ChatPopupMenu.Entry> characterSelectionEntries() {
-        ChatTab selected = ClientChatChannelState.getSelected();
+    private List<ChatPopupMenu.Entry> characterSelectionEntries(
+            String filter) {
         UUID self = this.mc.thePlayer == null ? null
                 : this.mc.thePlayer.getUniqueID();
-        boolean locked = ClientChatAppearances.isLocked(selected);
-        ClientChatAppearances.Appearance current =
-                ClientChatAppearances.effectiveFor(selected);
+        ClientChatIdentities.Identity current =
+                ClientChatIdentities.viewing();
         List<ChatPopupMenu.Entry> entries =
                 new ArrayList<ChatPopupMenu.Entry>();
-        entries.add(ChatPopupMenu.Entry.passive(current.name)
-                .withHead(self, current.account ? "" : current.skinId)
-                .withLockControl(locked));
-        entries.add(ChatPopupMenu.Entry.header(
-                StatCollector.translateToLocal(
-                        "gui.losttales.chat.character_selection.account")));
-        entries.add(characterEntry("characters:account",
-                ClientChatAppearances.accountAppearance(), selected, self));
-        List<ClientChatAppearances.Appearance> characters =
-                ClientChatAppearances.characterAppearances();
-        if (!characters.isEmpty()) {
-            entries.add(ChatPopupMenu.Entry.header(
+        entries.add(ChatPopupMenu.Entry.passive(ClientChatIdentities.isNarrating()
+                ? ChatNarrator.NAME : current.name)
+                .withHead(self, current.account ? "" : current.skinId));
+        if (ClientChatChannelState.holds(LostTalesCapability.CHAT_NARRATE)) {
+            // The Narrator is a voice over the identity, not one of
+            // them: it stands above the roster, marked while chosen.
+            entries.add(new ChatPopupMenu.Entry("characters:narrator",
                     StatCollector.translateToLocal(
-                            "gui.losttales.chat.character_selection"
-                                    + ".characters")));
-            for (ClientChatAppearances.Appearance appearance : characters) {
-                entries.add(characterEntry(
-                        "characters:char:" + appearance.characterId,
-                        appearance, selected, self));
-            }
+                            "gui.losttales.chat.character_selection.narrator"),
+                    false, ClientChatIdentities.isNarrating()
+                            ? LostTalesColors.rgb(LostTalesColors.HONEY) : -1, null)
+                    .withSprite(ChatIconSheet.SPEECH_BUBBLE));
         }
-        List<ClientChatAppearances.Appearance> lore =
-                ClientChatAppearances.loreAppearances();
-        if (!lore.isEmpty()) {
-            entries.add(ChatPopupMenu.Entry.header(
+        addSection(entries,
+                "gui.losttales.chat.character_selection.characters",
+                characterRows(ClientChatIdentities.characterIdentities(),
+                        filter, self));
+        addSection(entries, "gui.losttales.chat.character_selection.lore",
+                characterRows(ClientChatIdentities.loreIdentities(),
+                        filter, self));
+        if (entries.size() == 1) {
+            entries.add(ChatPopupMenu.Entry.passive(
                     StatCollector.translateToLocal(
-                            "gui.losttales.chat.character_selection.lore")));
-            for (ClientChatAppearances.Appearance appearance : lore) {
-                entries.add(characterEntry(
-                        "characters:char:" + appearance.characterId,
-                        appearance, selected, self));
-            }
+                            "gui.losttales.chat.character_selection.none")));
         }
+        addSection(entries, "gui.losttales.chat.character_selection.status",
+                statusRows());
         return entries;
     }
 
-    /** One choosable identity: its head, its name, and the mention honey
-     *  as the swatch of the one the tab currently speaks as. */
-    private static ChatPopupMenu.Entry characterEntry(
-            String id, ClientChatAppearances.Appearance appearance,
-            ChatTab selected, UUID self) {
-        boolean effective = ClientChatAppearances.isEffective(
-                appearance, selected);
-        return new ChatPopupMenu.Entry(id, appearance.name, false,
-                effective ? LostTalesColors.rgb(LostTalesColors.HONEY) : -1,
-                null).withHead(self, appearance.skinId);
+    /** The presences to choose from, the chosen one marked; the account's, not a character's. */
+    private static List<ChatPopupMenu.Entry> statusRows() {
+        List<ChatPopupMenu.Entry> rows = new ArrayList<ChatPopupMenu.Entry>();
+        for (ChatPresence presence : ChatPresence.values()) {
+            rows.add(new ChatPopupMenu.Entry("characters:status:" + presence.name(),
+                    StatCollector.translateToLocal(presence.labelKey()), false,
+                    ClientChatPresence.chosen() == presence
+                            ? LostTalesColors.rgb(LostTalesColors.HONEY) : -1, null));
+        }
+        return rows;
     }
 
-    /** A choice applies to the selected tab: as its lock if it has one, else until the next switch. */
+    /** One section's rows: the identities whose names hold the filter. */
+    private static List<ChatPopupMenu.Entry> characterRows(
+            List<ClientChatIdentities.Identity> identities,
+            String filter, UUID self) {
+        List<ChatPopupMenu.Entry> rows = new ArrayList<ChatPopupMenu.Entry>();
+        for (ClientChatIdentities.Identity identity : identities) {
+            if (matchesFilter(identity.name, filter)) {
+                rows.add(characterEntry(
+                        "characters:char:" + identity.characterId,
+                        identity, self));
+            }
+        }
+        return rows;
+    }
+
+    /** One choosable identity: its head, its name, and the mention honey
+     *  as the swatch of the shared chat identity. */
+    private static ChatPopupMenu.Entry characterEntry(
+            String id, ClientChatIdentities.Identity identity,
+            UUID self) {
+        boolean effective = ClientChatIdentities.isSelected(identity);
+        return new ChatPopupMenu.Entry(id, identity.name, false,
+                effective ? LostTalesColors.rgb(LostTalesColors.HONEY) : -1,
+                null).withHead(self, identity.skinId);
+    }
+
+    /** A choice applies to every roleplaying conversation. */
     private static void handleCharacterSelectionEntry(
             ChatPopupMenu.Entry entry) {
-        ChatTab selected = ClientChatChannelState.getSelected();
-        if ("characters:account".equals(entry.id)) {
-            ClientChatAppearances.select(
-                    ClientChatAppearances.accountAppearance(), selected);
+        if ("characters:narrator".equals(entry.id)) {
+            ClientChatIdentities.setNarrating(!ClientChatIdentities.isNarrating());
+            return;
+        }
+        if (entry.id.startsWith("characters:status:")) {
+            try {
+                ClientChatPresence.choose(ChatPresence.valueOf(
+                        entry.id.substring("characters:status:".length())));
+            } catch (IllegalArgumentException ignored) {
+                // A row this build never made names no status.
+            }
             return;
         }
         if (!entry.id.startsWith("characters:char:")) {
@@ -1109,17 +1129,17 @@ final class ChatScreenMenus {
         } catch (IllegalArgumentException ignored) {
             return;
         }
-        for (ClientChatAppearances.Appearance appearance
-                : ClientChatAppearances.characterAppearances()) {
-            if (characterId.equals(appearance.characterId)) {
-                ClientChatAppearances.select(appearance, selected);
+        for (ClientChatIdentities.Identity identity
+                : ClientChatIdentities.characterIdentities()) {
+            if (characterId.equals(identity.characterId)) {
+                ClientChatIdentities.select(identity);
                 return;
             }
         }
-        for (ClientChatAppearances.Appearance appearance
-                : ClientChatAppearances.loreAppearances()) {
-            if (characterId.equals(appearance.characterId)) {
-                ClientChatAppearances.select(appearance, selected);
+        for (ClientChatIdentities.Identity identity
+                : ClientChatIdentities.loreIdentities()) {
+            if (characterId.equals(identity.characterId)) {
+                ClientChatIdentities.select(identity);
                 return;
             }
         }

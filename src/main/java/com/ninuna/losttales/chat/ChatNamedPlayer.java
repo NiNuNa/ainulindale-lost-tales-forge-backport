@@ -51,20 +51,25 @@ public final class ChatNamedPlayer {
         return this.account.length() > 0;
     }
 
-    /** The entry naming {@code account}, or null; the name is matched whole, whatever its case. */
+    /**
+     * The entry naming {@code name} — an account, or the identity it was
+     * playing, since a line the server writes names the character — or
+     * null; the name is matched whole, whatever its case.
+     */
     public static ChatNamedPlayer find(List<ChatNamedPlayer> named,
-                                       String account) {
-        if (named == null || account == null) {
+                                       String name) {
+        if (named == null || name == null) {
             return null;
         }
-        String wanted = account.trim().toLowerCase(Locale.ROOT);
+        String wanted = name.trim().toLowerCase(Locale.ROOT);
         if (wanted.length() == 0) {
             return null;
         }
         for (int index = 0; index < named.size(); index++) {
             ChatNamedPlayer entry = named.get(index);
-            if (entry != null && entry.account.toLowerCase(Locale.ROOT)
-                    .equals(wanted)) {
+            if (entry != null && (entry.account.toLowerCase(Locale.ROOT)
+                    .equals(wanted) || entry.identityName
+                    .toLowerCase(Locale.ROOT).equals(wanted))) {
                 return entry;
             }
         }

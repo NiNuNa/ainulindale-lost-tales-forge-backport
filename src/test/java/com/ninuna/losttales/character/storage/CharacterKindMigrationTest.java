@@ -6,6 +6,7 @@ import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
+import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import net.minecraft.nbt.NBTTagCompound;
 import org.junit.Test;
 
@@ -18,10 +19,10 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
- * Character data version 9 records which kind of identity a character is.
- * Every record written before it is a roleplay character, which is what
- * they all were, and the account's own identity reads back as the default
- * one it was written as.
+ * A character record says which kind of identity it is: the account's
+ * own default character, stored as Unaligned, or a roleplay character.
+ * Both kinds round-trip through the codec and the whole store, and a
+ * record that names no kind is a roleplay character.
  */
 public final class CharacterKindMigrationTest {
 
@@ -30,19 +31,18 @@ public final class CharacterKindMigrationTest {
     private static final UUID CHARACTER = UUID.fromString(
             "a1000000-0000-0000-0000-00000000001a");
 
-    /** A record from before kinds existed is a roleplay character. */
+    /** A record naming no kind is a roleplay character. */
     @Test
-    public void versionEightRecordsAreRoleplayCharacters() {
-        NBTTagCompound legacy = CharacterNbtCodec.writeCharacterRecord(roleplay());
-        legacy.setInteger("DataVersion", 8);
-        legacy.removeTag("Kind");
+    public void aRecordWithoutAKindIsARoleplayCharacter() {
+        NBTTagCompound record = CharacterNbtCodec.writeCharacterRecord(roleplay());
+        record.removeTag("Kind");
 
-        RoleplayCharacter migrated = CharacterNbtCodec.readCharacterRecord(legacy, OWNER);
+        RoleplayCharacter loaded = CharacterNbtCodec.readCharacterRecord(record, OWNER);
 
-        assertNotNull(migrated);
-        assertEquals(RoleplayCharacter.CURRENT_DATA_VERSION, migrated.getDataVersion());
-        assertEquals(CharacterKind.ROLEPLAY, migrated.getKind());
-        assertFalse(migrated.isDefault());
+        assertNotNull(loaded);
+        assertEquals(RoleplayCharacter.CURRENT_DATA_VERSION, loaded.getDataVersion());
+        assertEquals(CharacterKind.ROLEPLAY, loaded.getKind());
+        assertFalse(loaded.isDefault());
     }
 
     /** A kind this build does not know reads as a roleplay character. */
@@ -57,6 +57,19 @@ public final class CharacterKindMigrationTest {
         assertEquals(CharacterKind.ROLEPLAY, loaded.getKind());
     }
 
+    /** A record of another data version is not read; the store stays read-only. */
+    @Test
+    public void aRecordOfAnotherVersionIsRefused() {
+        NBTTagCompound record = CharacterNbtCodec.writeCharacterRecord(roleplay());
+        record.setInteger("DataVersion", RoleplayCharacter.CURRENT_DATA_VERSION - 1);
+        try {
+            CharacterNbtCodec.readCharacterRecord(record, OWNER);
+            fail("a record of another version was read");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("unsupported"));
+        }
+    }
+
     /** The account's own identity round-trips as the default one. */
     @Test
     public void theDefaultCharacterRoundTripsAsItsOwnKind() {
@@ -68,28 +81,19 @@ public final class CharacterKindMigrationTest {
         assertTrue(loaded.isDefault());
         assertEquals(CharacterRoster.DEFAULT_SLOT_INDEX, loaded.getSlotIndex());
         assertEquals("its id is the account's own", OWNER, loaded.getCharacterId());
+        assertEquals(LotrCharacterAdapter.UNALIGNED_FACTION_ID,
+                loaded.getStartingFactionId());
     }
 
-    /**
-     * The account belongs to no faction, exactly as it did before it was
-     * a character, so its record carries none and is still read back. A
-     * roleplay character with no faction is a record missing a field it
-     * must have, and is skipped as it always was.
-     */
+    /** Every record needs a faction; the default character's is Unaligned. */
     @Test
-    public void onlyTheDefaultCharacterMayBelongToNoFaction() {
+    public void aRecordWithoutAFactionIsSkipped() {
         NBTTagCompound withoutFaction = CharacterNbtCodec.writeCharacterRecord(
                 defaultCharacter());
-        assertEquals("", withoutFaction.getString("StartingFactionId"));
-        assertNotNull("the account's own identity is kept",
-                CharacterNbtCodec.readCharacterRecord(withoutFaction, OWNER));
-
-        NBTTagCompound roleplayWithoutFaction =
-                CharacterNbtCodec.writeCharacterRecord(roleplay());
-        roleplayWithoutFaction.setString("StartingFactionId", "");
+        withoutFaction.setString("StartingFactionId", "");
         try {
-            CharacterNbtCodec.readCharacterRecord(roleplayWithoutFaction, OWNER);
-            fail("a roleplay character with no faction was read back");
+            CharacterNbtCodec.readCharacterRecord(withoutFaction, OWNER);
+            fail("a character with no faction was read back");
         } catch (IllegalArgumentException expected) {
             assertTrue("refused for the missing field, not something else",
                     expected.getMessage() != null && expected.getMessage()
@@ -143,7 +147,8 @@ public final class CharacterKindMigrationTest {
         assertEquals(CharacterKind.DEFAULT, account.getKind());
         assertEquals(OWNER, account.getCharacterId());
         assertEquals(CharacterRoster.DEFAULT_SLOT_INDEX, account.getSlotIndex());
-        assertEquals("", account.getStartingFactionId());
+        assertEquals("the default character is Unaligned",
+                LotrCharacterAdapter.UNALIGNED_FACTION_ID, account.getStartingFactionId());
 
         RoleplayCharacter made = loaded.getCharacter(CHARACTER);
         assertNotNull(made);
@@ -178,7 +183,7 @@ public final class CharacterKindMigrationTest {
                 .gender(CharacterGenderRegistry.MALE)
                 .skin(CharacterSkinRegistry.ACCOUNT_SKIN_ID)
                 .age(1)
-                .startingFaction("")
+                .startingFaction(LotrCharacterAdapter.UNALIGNED_FACTION_ID)
                 .createdAt(1000L)
                 .build();
     }

@@ -470,6 +470,30 @@ public final class ClientChatChannelViews {
     }
 
     /**
+     * Files a line this player said themselves once the server has named
+     * it. The line was shown as an echo the moment it was typed and the
+     * server's copy took its place, so it never arrived as a line to
+     * count: it is theirs, read wherever it went, and the view's read
+     * mark moves up to it so the next join's replay does not count it
+     * as new.
+     */
+    public static synchronized void noteOwnLine(ChatTab tab, int chatLineId,
+                                                long serverId) {
+        if (tab == null || !ChatMessageIds.isServerId(serverId)) {
+            return;
+        }
+        ChatTab view = key(tab);
+        TAB_BY_LINE_ID.put(Integer.valueOf(chatLineId), tab);
+        Long newest = NEWEST_MESSAGE_BY_VIEW.get(view);
+        if (newest == null || serverId > newest.longValue()) {
+            NEWEST_MESSAGE_BY_VIEW.put(view, Long.valueOf(serverId));
+        }
+        ClientChatReadMarks.markRead(ClientChatSession.currentKey(), view,
+                serverId);
+        invalidateCache();
+    }
+
+    /**
      * The line the tab's unread divider stands above, or null: the first
      * line of the latest unread run.
      */
@@ -916,7 +940,8 @@ public final class ClientChatChannelViews {
         ChatWindowLines.clear();
         ChatWindowFrame.clear();
         ClientChatAccountRoles.clear();
-        ClientChatAppearances.clear();
+        ClientChatIdentities.clear();
+        ClientChatIdentitySelection.clear();
         ClientChatConsoleEvents.clear();
         ChatTabSelection.clear();
         // The history is gone with the world, and so are its conversations

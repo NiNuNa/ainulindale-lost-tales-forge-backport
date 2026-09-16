@@ -20,6 +20,9 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.permission.LostTalesPermissionCatalog;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.compat.discord.DiscordChannelBindings;
+import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
+import com.ninuna.losttales.chat.profanity.ChatProfanityMode;
+import com.ninuna.losttales.chat.profanity.ChatProfanityWords;
 import net.minecraft.server.MinecraftServer;
 import net.minecraftforge.common.config.ConfigCategory;
 import net.minecraftforge.common.config.Configuration;
@@ -51,7 +54,6 @@ public final class LostTalesConfig {
     public static final String HUD_PRESET_LOTR_SAFE = "lotr-safe";
     public static final String HUD_PRESET_COMPACT = "compact";
     public static final String HUD_PRESET_MINIMAL = "minimal";
-    public static final int HUD_PLACEMENT_VERSION = 2;
     public static final String[] HUD_PRESET_VALUES = new String[] {
             HUD_PRESET_CUSTOM,
             HUD_PRESET_DEFAULT,
@@ -83,7 +85,6 @@ public final class LostTalesConfig {
 
     public static boolean showLostTalesHud = true;
     public static String hudPlacementPreset = HUD_PRESET_CUSTOM;
-    public static int hudPlacementVersion = HUD_PLACEMENT_VERSION;
 
     public static boolean showCompassHud = true;
     public static boolean linkShowCompassHud = false;
@@ -152,6 +153,11 @@ public final class LostTalesConfig {
     public static boolean showChatTimestamps = true;
     public static boolean enableChatEmojis = true;
     public static boolean convertChatEmoticons = true;
+    /**
+     * How the words on the chat's profanity list read on this client:
+     * one of {@link ChatProfanityMode}'s names.
+     */
+    public static String chatProfanityFilter = ChatProfanityMode.SILLY.name();
     public static boolean enableChatMessageGrouping = true;
     public static boolean enableChatBackgroundBlur = true;
     public static boolean enableNpcChatStyling = true;
@@ -159,13 +165,6 @@ public final class LostTalesConfig {
     public static boolean enableChatPings = true;
     /** The chat's own mention cue, bundled with the mod. */
     static final String DEFAULT_CHAT_PING_SOUND = "losttales:chat.ping";
-    /**
-     * Sounds earlier builds shipped as the ping — LOTR's horn, then
-     * vanilla's note pling; config files written then still carry them,
-     * and both are migrated to the bundled cue.
-     */
-    private static final String[] LEGACY_CHAT_PING_SOUNDS = {
-            "lotr:item.horn", "note.pling"};
     public static String chatPingSound = DEFAULT_CHAT_PING_SOUND;
     /**
      * The open chat's surfaces, each a palette entry by name: the
@@ -235,6 +234,8 @@ public final class LostTalesConfig {
     public static boolean showChatTypingIndicators = true;
     /** Server switch for relaying typing presence at all. */
     public static boolean chatTypingIndicators = true;
+    /** Words the server adds to the chat's profanity list, one per line as word=replacement. */
+    public static String[] chatProfanityWords = new String[0];
     /** The config-defined permissions a role may grant; see {@code ChatRoleConfig}. */
     public static String[] chatPermissions = new String[0];
     /** The config-defined chat roles; see {@code ChatRoleConfig}. */
@@ -262,11 +263,6 @@ public final class LostTalesConfig {
             "ooc=DISABLED;channel=;webhook=",
             "all=DISABLED;webhook=",
     };
-    /** The single-channel keys of older files, migrated into the bindings once and dropped. */
-    private static final String[] LEGACY_DISCORD_KEYS = {
-            "channelId", "webhookUrl", "relayGameChat", "relayDiscordChat",
-            "relayGlobalChat", "relayOocChat", "readOnlyWebhookUrl",
-    };
     /** One entry per bound game channel. See {@code DiscordChannelBindings}. */
     public static String[] discordChannelBindings = DEFAULT_DISCORD_BINDINGS.clone();
     /** The picture a post carries: {name}/{uuid} of the sender's account. */
@@ -285,6 +281,8 @@ public final class LostTalesConfig {
     /** Connect the bot to Discord's gateway for instant relay and slash commands. */
     public static boolean discordGateway = true;
     public static boolean discordSlashCommands = true;
+    /** How the profanity list's words read in what the bridge posts: a {@link ChatProfanityMode} name. */
+    public static String discordProfanityFilter = ChatProfanityMode.OFF.name();
     public static int chatAnimationDurationMillis = 180;
     public static int chatInputAnimationDurationMillis = 180;
     public static int chatSelectorAnimationDurationMillis = 140;
@@ -377,39 +375,6 @@ public final class LostTalesConfig {
 
     private LostTalesConfig() {}
 
-    /**
-     * Keys older builds wrote that nothing reads any more, by category:
-     * dropped from a file as it is loaded, so a long-lived file describes
-     * only what the mod does today.
-     */
-    private static final String[][] RETIRED_KEYS = {
-            {CATEGORY_CHARACTERS, "characterAuditMaxEntries", "characterDeletedRetentionDays",
-                    "characterSwitchBlockInPortal", "characterSwitchBlockWhileRiding",
-                    "characterSwitchBlockWithContainerOpen", "characterSwitchCombatLockSeconds",
-                    "characterSwitchCooldownSeconds", "characterSwitchDimensionGuardSeconds",
-                    "characterSwitchOperatorBypass"},
-            {CATEGORY_CLIENT, "chestSize", "guiAnimationSpeed", "questNotificationsRightAligned",
-                    "useSkyrimCompassStyle", "useSkyrimQuestUiStyle",
-                    "onlyShowAggroHostileCompassMarkers"},
-            // The roles and gates moved to files of their own; a file
-            // written before they did still holds them here, where they
-            // read as settings nothing consults.
-            {CATEGORY_CHAT, "roles", "roleMembers", "channelRoles"},
-            {CATEGORY_DISCORD, "joinLeaveStyle"},
-    };
-
-    /** Drops every retired key the file still holds; true when it held any. */
-    private static boolean dropRetiredKeys(Configuration config) {
-        boolean dropped = false;
-        for (int group = 0; group < RETIRED_KEYS.length; group++) {
-            ConfigCategory category = config.getCategory(RETIRED_KEYS[group][0]);
-            for (int index = 1; index < RETIRED_KEYS[group].length; index++) {
-                dropped |= category.remove(RETIRED_KEYS[group][index]) != null;
-            }
-        }
-        return dropped;
-    }
-
     /** Whether the category is the client's own; see {@link #CLIENT_CATEGORIES}. */
     public static boolean isClientCategory(String category) {
         if (category == null) {
@@ -465,17 +430,10 @@ public final class LostTalesConfig {
      * changed; a configuration of no file is only read.
      */
     private static void readOptions(Configuration config, boolean fromFiles) {
-        boolean retiredDropped;
         try {
             if (fromFiles) {
                 config.load();
             }
-            // After the load, not before it: Forge's Configuration reads
-            // the file in its constructor and reads it again here, into
-            // the same category objects, so a key dropped beforehand is
-            // simply put back — and the flag it sets would rewrite the
-            // file with the retired keys still in it, on every start.
-            retiredDropped = dropRetiredKeys(config);
             applyGuiMetadata(config);
 
             enableChargeTiers = config.getBoolean(
@@ -634,14 +592,6 @@ public final class LostTalesConfig {
                     CATEGORY_CLIENT,
                     showLostTalesHud,
                     "Master toggle for Lost Tales HUD elements."
-            );
-            int loadedHudPlacementVersion = config.getInt(
-                    "hudPlacementVersion",
-                    CATEGORY_CLIENT,
-                    1,
-                    1,
-                    HUD_PLACEMENT_VERSION,
-                    "Internal client HUD coordinate version. Older Quick Loot positions are migrated automatically."
             );
             Property hudPresetProperty = config.get(
                     CATEGORY_CLIENT,
@@ -897,8 +847,7 @@ public final class LostTalesConfig {
             );
             quickLootHudOffsetX = getHudPercent(
                     config, "quickLootHudOffsetX",
-                    loadedHudPlacementVersion < HUD_PLACEMENT_VERSION
-                            ? 24.0D : quickLootHudOffsetX,
+                    quickLootHudOffsetX,
                     0.0D, 100.0D,
                     "Horizontal quick-loot position as a percentage of the scaled screen width."
             );
@@ -907,11 +856,6 @@ public final class LostTalesConfig {
                     quickLootHudOffsetY, 0.0D, 100.0D,
                     "Vertical quick-loot position as a percentage of the scaled screen height."
             );
-            if (loadedHudPlacementVersion < HUD_PLACEMENT_VERSION) {
-                quickLootHudOffsetX = migrateLegacyQuickLootOffsetX(
-                        quickLootHudOffsetX);
-            }
-            hudPlacementVersion = HUD_PLACEMENT_VERSION;
             quickLootHudMaxRows = config.getInt(
                     "quickLootHudMaxRows",
                     CATEGORY_CLIENT,
@@ -1023,6 +967,12 @@ public final class LostTalesConfig {
                     chatTypingIndicators,
                     "Relay who is typing into a channel to the players who would read the message; off drops every typing notice on the server."
             );
+            chatProfanityWords = config.getStringList(
+                    "profanityWords",
+                    CATEGORY_CHAT,
+                    chatProfanityWords,
+                    "Words added to the chat's profanity list beside the ones the mod bundles, one per line as word=replacement, both a run of letters: the word, matched whole with stretched letters and the common endings, and the silly word that stands in for it. Sent to every client with its chat access, refused in a character's name, and applied to what the Discord bridge posts when discord.profanityFilter says so. An entry naming a bundled word replaces its stand-in."
+            );
             chatAuditLogEnabled = config.getBoolean(
                     "auditLog",
                     CATEGORY_CHAT,
@@ -1055,7 +1005,7 @@ public final class LostTalesConfig {
                     "permissions",
                     CATEGORY_ROLES,
                     chatPermissions,
-                    "What a role may grant, in the server's own words, one per line as <id>=capability:<id>;capability:<id>;desc:<text>. capability may repeat and names something the code can do: chat.moderate (mute, unmute, remove any message), chat.console.read (the shared operator console), roles.manage (/losttales role), server.config (the server settings, which includes these roles and permissions), character.admin, quest.admin, party.admin, mapmarker.manage, waystone.manage, hud.admin. A permission naming no capability the code has is kept and allows nothing. A role's grant naming no permission here is read as the capability of that id, so grant:chat.moderate needs nothing defined."
+                    "What a role may grant, in the server's own words, one per line as <id>=capability:<id>;capability:<id>;desc:<text>. capability may repeat and names something the code can do: chat.moderate (mute, unmute, remove any message), chat.console.read (the shared operator console), chat.narrate (speak as the Narrator in the roleplaying channels), roles.manage (/losttales role), server.config (the server settings, which includes these roles and permissions), character.admin, quest.admin, party.admin, mapmarker.manage, waystone.manage, hud.admin. A permission naming no capability the code has is kept and allows nothing. A role's grant naming no permission here is read as the capability of that id, so grant:chat.moderate needs nothing defined."
             );
             chatRoles = config.getStringList(
                     "definitions",
@@ -1108,48 +1058,12 @@ public final class LostTalesConfig {
                     60,
                     "Server only: how often each bound Discord channel is read for new messages while the bot's gateway connection is down, in seconds. Lines said in the game are posted to Discord as soon as they are said, whatever this is."
             );
-            // An older file bound one Discord channel through single keys.
-            // They become entries of the list below once, and are dropped,
-            // so the file describes the bridge in one place.
-            ConfigCategory discordCategory = config.getCategory(CATEGORY_DISCORD);
-            String[] migratedBindings = DiscordChannelBindings.legacyEntries(
-                    legacyString(discordCategory, "channelId"),
-                    legacyString(discordCategory, "webhookUrl"),
-                    legacyBoolean(discordCategory, "relayGameChat", true),
-                    legacyBoolean(discordCategory, "relayDiscordChat", true),
-                    legacyBoolean(discordCategory, "relayGlobalChat", true),
-                    legacyBoolean(discordCategory, "relayOocChat", true),
-                    legacyString(discordCategory, "readOnlyWebhookUrl"));
-            boolean legacyDropped = false;
-            for (int index = 0; index < LEGACY_DISCORD_KEYS.length; index++) {
-                legacyDropped |= discordCategory.remove(LEGACY_DISCORD_KEYS[index]) != null;
-            }
             Property bindingsProperty = config.get(
                     CATEGORY_DISCORD,
                     "channelBindings",
                     DEFAULT_DISCORD_BINDINGS,
-                    "Server only, secrets: one entry per game channel and Discord channel it goes to, as <channel>=<direction>;channel=<Discord channel id>;webhook=<webhook URL>. A game channel may have several entries, one per Discord channel, in any guild the bot is in; a Discord channel is read into one game channel only. The channel is a wire id (all, proximity, faction, ooc, admin; ooc is OOC & Discord, the channel the bridge carries by default, and an entry an older file names discord is read and rewritten as ooc) or faction:<faction id> for one faction's Faction chat, with the id as LOTR names it (faction:lotr:gondor); the direction is DISABLED, GAME_TO_DISCORD, DISCORD_TO_GAME or BIDIRECTIONAL. channel= is needed to read, webhook= to post. Party, Console and whispers are private and refused."
+                    "Server only, secrets: one entry per game channel and Discord channel it goes to, as <channel>=<direction>;channel=<Discord channel id>;webhook=<webhook URL>. A game channel may have several entries, one per Discord channel, in any guild the bot is in; a Discord channel is read into one game channel only. The channel is a wire id (all, proximity, faction, ooc, admin; ooc is OOC & Discord, the channel the bridge carries by default) or faction:<faction id> for one faction's Faction chat, with the id as LOTR names it (faction:lotr:gondor); the direction is DISABLED, GAME_TO_DISCORD, DISCORD_TO_GAME or BIDIRECTIONAL. channel= is needed to read, webhook= to post. Party, Console and whispers are private and refused."
             );
-            if (migratedBindings.length > 0) {
-                // An untouched list is replaced by what the old keys meant;
-                // a list already edited by hand keeps its entries and only
-                // gains the old channels it does not name yet.
-                String[] current = bindingsProperty.getStringList();
-                bindingsProperty.set(isUntouched(current, DEFAULT_DISCORD_BINDINGS)
-                        ? migratedBindings : mergeBindings(current, migratedBindings));
-                legacyDropped = true;
-            }
-            // An older file named the channel OOC & Discord took in by its
-            // old id; such an entry is rewritten once under today's id.
-            String[] named = bindingsProperty.getStringList();
-            String[] renamed = DiscordChannelBindings.renameLegacyKeys(named);
-            if (!java.util.Arrays.equals(named, renamed)) {
-                bindingsProperty.set(renamed);
-                legacyDropped = true;
-            }
-            if (legacyDropped || retiredDropped) {
-                config.save();
-            }
             discordChannelBindings = bindingsProperty.getStringList();
             discordAvatarUrlTemplate = config.getString(
                     "avatarUrlTemplate",
@@ -1201,6 +1115,12 @@ public final class LostTalesConfig {
                     discordSlashCommands,
                     "Server only: register the bot's slash commands (/online, /who, /server) in every guild the bot is in when the gateway connects, and answer them. Needs gateway."
             );
+            Property discordProfanityProperty = config.get(
+                    CATEGORY_DISCORD, "profanityFilter", discordProfanityFilter,
+                    "Server only: how the words on the chat's profanity list read in what the bridge posts to Discord: OFF as typed, SILLY as their silly stand-ins, STARS as their first letter and stars. Lines arriving from Discord are left as they are; each client shows them by its own setting.");
+            discordProfanityProperty.setValidValues(ChatProfanityMode.names());
+            discordProfanityFilter = ChatProfanityMode.of(
+                    discordProfanityProperty.getString(), ChatProfanityMode.OFF).name();
             showChatTimestamps = config.getBoolean(
                     "showTimestamps",
                     CATEGORY_CLIENT,
@@ -1219,6 +1139,12 @@ public final class LostTalesConfig {
                     convertChatEmoticons,
                     "Turn classic emoticons you type (:) :D <3 ...) into their emojis as the message is sent."
             );
+            Property profanityProperty = config.get(
+                    CATEGORY_CLIENT, "chatProfanityFilter", chatProfanityFilter,
+                    "How the words on the chat's profanity list read on this client: OFF as typed, SILLY as their silly stand-ins (fuck reads flip, shit reads poop), STARS as their first letter and stars (f***). Display only: what you type reaches everyone else as typed, and what they see is their own setting's. The list is the mod's, plus the server's words and any in client/chat/profanity.txt.");
+            profanityProperty.setValidValues(ChatProfanityMode.names());
+            chatProfanityFilter = ChatProfanityMode.of(
+                    profanityProperty.getString(), ChatProfanityMode.SILLY).name();
             enableChatMessageGrouping = config.getBoolean(
                     "enableChatMessageGrouping",
                     CATEGORY_CLIENT,
@@ -1341,11 +1267,6 @@ public final class LostTalesConfig {
                     showChatTypingIndicators,
                     "Show who is typing into a channel above that window's input bar."
             );
-            if (isLegacyChatPingSound(chatPingSound)) {
-                chatPingSound = DEFAULT_CHAT_PING_SOUND;
-                config.getCategory(CATEGORY_CLIENT).get("chatPingSound")
-                        .set(chatPingSound);
-            }
             enableNpcChatStyling = config.getBoolean(
                     "enableNpcChatStyling",
                     CATEGORY_CLIENT,
@@ -1739,6 +1660,14 @@ public final class LostTalesConfig {
         // force, so one the file defines above may be given one.
         ChatChannelIconCatalog.install(
                 ChatRoleConfig.parseChannelIcons(chatChannelIcons, warnings));
+        // The words the server adds to the profanity list, over the
+        // bundled ones, sent to every client with its chat access.
+        List<String> profanityWarnings = new ArrayList<String>();
+        ChatProfanityCatalog.installServerWords(ChatProfanityWords.parse(
+                chatProfanityWords, ChatProfanityWords.MAX_WORDS, profanityWarnings));
+        for (String warning : profanityWarnings) {
+            warnings.warn(warning);
+        }
         // The Operator channel's gate is put back when its line is
         // missing, before the gates are read, and the value written back
         // with the rest of the file at the end of this load.
@@ -2033,22 +1962,6 @@ public final class LostTalesConfig {
         notificationHudOffsetY = clampPercent(notificationHudOffsetY);
     }
 
-    static boolean isLegacyChatPingSound(String sound) {
-        if (sound == null) {
-            return false;
-        }
-        for (String legacy : LEGACY_CHAT_PING_SOUNDS) {
-            if (legacy.equalsIgnoreCase(sound.trim())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    static double migrateLegacyQuickLootOffsetX(double legacyOffsetX) {
-        return clampPercent(50.0D + clampPercent(legacyOffsetX) / 2.0D);
-    }
-
     /**
      * A colour option's value as the palette knows it, or the option's
      * default when the file names no palette entry: a colour is only
@@ -2144,48 +2057,6 @@ public final class LostTalesConfig {
         LostTalesConfigDefinitions.apply(shipped, config);
     }
 
-    /** A legacy key's string, or empty when the file no longer has it. */
-    private static String legacyString(ConfigCategory category, String key) {
-        return category != null && category.containsKey(key)
-                ? category.get(key).getString().trim() : "";
-    }
-
-    /** A legacy key's boolean, or the fallback when the file no longer has it. */
-    private static boolean legacyBoolean(ConfigCategory category, String key,
-                                         boolean fallback) {
-        return category != null && category.containsKey(key)
-                ? category.get(key).getBoolean(fallback) : fallback;
-    }
-
-    /** Whether a list is empty or exactly its default, never edited by hand. */
-    private static boolean isUntouched(String[] current, String[] defaults) {
-        return current == null || current.length == 0
-                || java.util.Arrays.equals(current, defaults);
-    }
-
-    /** The current entries, followed by the migrated ones for channels they do not name. */
-    private static String[] mergeBindings(String[] current, String[] migrated) {
-        java.util.ArrayList<String> merged = new java.util.ArrayList<String>();
-        java.util.HashSet<String> named = new java.util.HashSet<String>();
-        for (int index = 0; index < current.length; index++) {
-            merged.add(current[index]);
-            named.add(bindingKeyOf(current[index]));
-        }
-        for (int index = 0; index < migrated.length; index++) {
-            if (named.add(bindingKeyOf(migrated[index]))) {
-                merged.add(migrated[index]);
-            }
-        }
-        return merged.toArray(new String[merged.size()]);
-    }
-
-    /** The channel an entry names: everything before its first '='. */
-    private static String bindingKeyOf(String entry) {
-        int equals = entry == null ? -1 : entry.indexOf('=');
-        return equals < 0 ? "" : entry.substring(0, equals).trim()
-                .toLowerCase(java.util.Locale.ROOT);
-    }
-
     private static void writeCurrentValues(Configuration config) {
         if (config == null) {
             return;
@@ -2206,6 +2077,8 @@ public final class LostTalesConfig {
                 .set(chatChannelDefinitions);
         config.get(CATEGORY_CHANNELS, "gates", chatChannelRoles).set(chatChannelRoles);
         config.get(CATEGORY_CHANNELS, "icons", chatChannelIcons).set(chatChannelIcons);
+        config.get(CATEGORY_CHAT, "profanityWords", chatProfanityWords)
+                .set(chatProfanityWords);
         config.get(CATEGORY_CLIENT, "showTimestamps",
                 showChatTimestamps).set(showChatTimestamps);
         config.get(CATEGORY_CLIENT, "enableChatEmojis",
@@ -2230,6 +2103,10 @@ public final class LostTalesConfig {
                 CATEGORY_CLIENT, "chatFeedAlignment", chatFeedAlignment);
         feedAlignmentProperty.set(chatFeedAlignment);
         feedAlignmentProperty.setValidValues(CHAT_FEED_ALIGNMENTS);
+        Property profanityProperty = config.get(
+                CATEGORY_CLIENT, "chatProfanityFilter", chatProfanityFilter);
+        profanityProperty.set(chatProfanityFilter);
+        profanityProperty.setValidValues(ChatProfanityMode.names());
         config.get(CATEGORY_CLIENT, "hideHudWhileChatting",
                 hideHudWhileChatting).set(hideHudWhileChatting);
         config.get(CATEGORY_CLIENT, "enableChatAnimations",
@@ -2347,8 +2224,6 @@ public final class LostTalesConfig {
         config.get(CATEGORY_CHARACTERS, "characterDeletionRetentionDays",
                 characterDeletionRetentionDays).set(characterDeletionRetentionDays);
         config.get(CATEGORY_CLIENT, "showLostTalesHud", showLostTalesHud).set(showLostTalesHud);
-        config.get(CATEGORY_CLIENT, "hudPlacementVersion",
-                hudPlacementVersion).set(hudPlacementVersion);
         Property hudPresetProperty = config.get(CATEGORY_CLIENT, "hudPlacementPreset", hudPlacementPreset);
         hudPresetProperty.set(hudPlacementPreset);
         hudPresetProperty.setValidValues(HUD_PRESET_VALUES);

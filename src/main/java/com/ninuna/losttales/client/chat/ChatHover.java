@@ -31,8 +31,6 @@ final class ChatHover {
         CARD,
         /** A row of the open menu that does something. */
         MENU_ENTRY,
-        /** The lock at a row's end in the character menu. */
-        MENU_LOCK,
         /** The open menu's own panel: a header, a display row, padding. */
         MENU,
         /** The {@code +} the empty state offers. */
@@ -51,6 +49,8 @@ final class ChatHover {
         RESIZE,
         /** A tab, a tab's control, an end control or the grip. */
         TAB_ROW,
+        /** The search bar in a window's tool strip: its field, chevrons or cross. */
+        SEARCH_BAR,
         /** The bare stretch of a tab row. */
         STRIP,
         /** The bar strip of a window other than the one typed in. */
@@ -88,6 +88,8 @@ final class ChatHover {
     ChatWindowFrame frame;
     ChatChannelTabBar.Row row;
     ChatChannelTabBar.Hit tabHit;
+    /** On the search bar, which of its parts; null anywhere else. */
+    ChatSearchBar.Part searchPart;
     /** Whether the pointer is on the grip's own glyph. */
     boolean overGrip;
     ChatPickerPanel picker;
@@ -125,14 +127,14 @@ final class ChatHover {
     /** Whether the pointer is on this window's tab row, a tab or its bare stretch. */
     boolean isOnRowOf(ChatWindowFrame frame) {
         return frame != null && this.frame == frame
-                && (this.kind == Kind.TAB_ROW || this.kind == Kind.STRIP);
+                && (this.kind == Kind.TAB_ROW || this.kind == Kind.STRIP
+                        || this.kind == Kind.SEARCH_BAR);
     }
 
     /** Whether a press here does something: what earns the hand. */
     boolean acts() {
         switch (this.kind) {
             case MENU_ENTRY:
-            case MENU_LOCK:
             case EMPTY_PLUS:
             case SUGGESTION:
             case PICKER_CELL:
@@ -153,6 +155,11 @@ final class ChatHover {
                 // A strip moves its window only while the window is not
                 // locked; a locked one is inert.
                 return this.window != null && !this.window.isLocked();
+            case SEARCH_BAR:
+                // The chevrons and the cross act; the field takes the
+                // caret without a hand.
+                return this.searchPart != null
+                        && this.searchPart != ChatSearchBar.Part.FIELD;
             case LINE:
             case WINDOW:
                 return this.acts;

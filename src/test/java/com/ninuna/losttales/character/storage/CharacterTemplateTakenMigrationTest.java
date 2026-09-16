@@ -14,10 +14,9 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Whether a world has read the account's template is one roster key newer
- * than the roster layout. A roster written before it has not read one, so
- * a world that already made a default character still takes the template
- * on the next login rather than never.
+ * Whether a world has read the account's template is one roster key. A
+ * roster without it has not read one, so the template is taken on the
+ * next login rather than never.
  */
 public final class CharacterTemplateTakenMigrationTest {
 

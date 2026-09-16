@@ -111,9 +111,8 @@ public class RoleplayCharacter {
 
     /**
      * Every field a character record holds, with the default a record
-     * written before the field existed gets: the body and chest types
-     * follow the sex, the level is the first, the capes are the
-     * catalogue's defaults. A schema bump adds one setter here.
+     * without the field gets: the body and chest types follow the sex,
+     * the level is the first, the capes are the catalogue's defaults.
      */
     public static final class Builder {
         private final UUID characterId;

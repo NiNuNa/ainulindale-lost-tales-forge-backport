@@ -70,10 +70,16 @@ public final class CharacterAppearanceSyncManager {
                         false, Collections.singletonList(appearance)), recipient);
     }
 
+    /**
+     * Tells everyone what the player looks like now. The game caches the
+     * player's display name, which names their character, so it is
+     * refreshed here: a broadcast is exactly when that may have changed.
+     */
     public static void broadcastPlayer(EntityPlayerMP player, CharacterRoster roster) {
         if (player == null || player.getUniqueID() == null) {
             return;
         }
+        player.refreshDisplayName();
         CharacterAppearance appearance = CharacterAppearance.fromRoster(
                 player.getUniqueID(), accountName(player), roster,
                 accountBodyType(player));

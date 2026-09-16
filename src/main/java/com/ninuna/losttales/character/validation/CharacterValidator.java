@@ -12,6 +12,8 @@ import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 import com.ninuna.losttales.character.server.CharacterCreationRequest;
+import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
+import com.ninuna.losttales.chat.profanity.ChatProfanityFilter;
 import net.minecraft.entity.player.EntityPlayerMP;
 
 import java.text.Normalizer;
@@ -109,6 +111,13 @@ public final class CharacterValidator {
             return CharacterAppearanceValidationResult.failure(
                     CharacterErrorId.INVALID_NAME_CHARACTERS);
         }
+        // A word the chat would filter is no name: the list in force on
+        // this side, the bundled one with the server's words over it.
+        if (ChatProfanityFilter.hasListedWord(normalizedName,
+                ChatProfanityCatalog.effective())) {
+            return CharacterAppearanceValidationResult.failure(
+                    CharacterErrorId.INVALID_NAME_PROFANE);
+        }
         String normalizedNameKey = normalizeNameKey(normalizedName);
         for (RoleplayCharacter existing : roster.getCharacters()) {
             if (exceptCharacterId != null
@@ -121,7 +130,7 @@ public final class CharacterValidator {
             }
         }
 
-        String raceId = CharacterRaceRegistry.canonicalizeIdentifier(requestedRaceId);
+        String raceId = CharacterRaceRegistry.normalizeIdentifier(requestedRaceId);
         if (!isValidIdentifierLength(raceId)) {
             return CharacterAppearanceValidationResult.failure(
                     CharacterErrorId.INVALID_RACE);
@@ -134,7 +143,7 @@ public final class CharacterValidator {
         // A race nobody may newly choose may still be kept by a character
         // who already is one; what is refused is taking it.
         if (!race.isSelectable() && !raceId.equals(
-                CharacterRaceRegistry.canonicalizeIdentifier(keptRaceId))) {
+                CharacterRaceRegistry.normalizeIdentifier(keptRaceId))) {
             return CharacterAppearanceValidationResult.failure(
                     CharacterErrorId.INVALID_RACE);
         }

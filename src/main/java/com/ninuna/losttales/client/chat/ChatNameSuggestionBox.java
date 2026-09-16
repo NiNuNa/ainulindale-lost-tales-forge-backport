@@ -207,6 +207,8 @@ final class ChatNameSuggestionBox {
         }
         LostTalesCharacterHeadIconRenderer.drawAccountHead(minecraft,
                 account, x, y, ICON_SIZE, 1.0F, 1.0F);
+        ChatPresenceMark.draw(x, y, ICON_SIZE,
+                ClientChatPresence.presenceOf(account), 255);
     }
 
     private static UUID accountId(ChatMentionCandidate candidate) {

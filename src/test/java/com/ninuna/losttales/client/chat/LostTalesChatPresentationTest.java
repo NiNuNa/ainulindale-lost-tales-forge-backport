@@ -8,6 +8,7 @@ import com.ninuna.losttales.chat.ChatEpithet;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
+import com.ninuna.losttales.chat.ChatNarrator;
 import java.util.UUID;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.util.EnumChatFormatting;
@@ -18,6 +19,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -33,6 +35,42 @@ public final class LostTalesChatPresentationTest {
     @After
     public void tearDown() {
         ChatRoleCatalog.resetToBuiltIn();
+    }
+
+    /**
+     * A Narrator line wears the Narrator's mark for a head and tells its
+     * words in italics; the words are still read for everything a
+     * message carries.
+     */
+    @Test
+    public void aNarratorLineWearsItsMarkAndItalicWords() {
+        boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
+        LostTalesConfig.showChatTimestamps = false;
+        try {
+            LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
+                    ChatChannel.ALL, UUID.randomUUID(), ChatNarrator.NAME,
+                    "Steve", "", 0, ChatNarrator.color(), "the gate falls",
+                    123456789L, ChatNarrator.SKIN_ID);
+            assertTrue(packet.isNarrator());
+            IChatComponent message = LostTalesChatPresentation.build(packet);
+            boolean marked = false;
+            boolean italicWords = false;
+            for (Object value : message) {
+                IChatComponent part = (IChatComponent) value;
+                ChatHeadMarker.Data head = ChatHeadMarker.decode(part);
+                if (head != null) {
+                    marked = head.isNarrator()
+                            && head.mark() == ChatHeadMarker.NARRATOR_MARK;
+                }
+                if ("the gate falls".equals(part.getUnformattedTextForChat())) {
+                    italicWords = part.getChatStyle().getItalic();
+                }
+            }
+            assertTrue("the head slot holds the Narrator's mark", marked);
+            assertTrue("the words are told in italics", italicWords);
+        } finally {
+            LostTalesConfig.showChatTimestamps = originalTimestamps;
+        }
     }
 
     /**
@@ -302,11 +340,17 @@ public final class LostTalesChatPresentationTest {
         }
     }
 
+    /**
+     * The Faction prefix names the reader's faction, as the tab does — the
+     * account reads as Unaligned — and wears the line's own faction colour.
+     */
     @Test
     public void factionChannelUsesTheFactionSnapshotColor() {
         boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
         LostTalesConfig.showChatTimestamps = false;
         try {
+            String prefix = ClientChatChannelState.displayName(ChatChannel.FACTION);
+            assertNotEquals(ChatChannel.FACTION.getDisplayName(), prefix);
             IChatComponent message = LostTalesChatPresentation.build(
                     new LostTalesChatMessagePacket(
                             ChatChannel.FACTION, UUID.randomUUID(),
@@ -315,8 +359,7 @@ public final class LostTalesChatPresentationTest {
                             123456789L, "losttales:elf_high_male_0"));
             for (Object value : message) {
                 IChatComponent part = (IChatComponent)value;
-                if ("Faction".equals(
-                        part.getUnformattedTextForChat())) {
+                if (prefix.equals(part.getUnformattedTextForChat())) {
                     assertEquals(Integer.valueOf(0x245A32),
                             ChatPrefixMarker.decode(part));
                     return;
@@ -539,7 +582,8 @@ public final class LostTalesChatPresentationTest {
                             .nameColor);
 
             // Signed with a character instead: no tag, the character's
-            // own colour, and the account named in brackets behind it.
+            // own colour, and the character's name alone, no account
+            // behind it.
             LostTalesChatMessagePacket asCharacter =
                     new LostTalesChatMessagePacket(
                             ChatChannel.WHISPER, UUID.randomUUID(),
@@ -553,7 +597,8 @@ public final class LostTalesChatPresentationTest {
                         .getUnformattedTextForChat());
             }
             assertFalse(character.toString().contains(operatorTag));
-            assertTrue(character.toString().contains("Aldric (Steve)"));
+            assertTrue(character.toString().contains("Aldric"));
+            assertFalse(character.toString().contains("(Steve)"));
             assertEquals(0x55AA55,
                     markerOf(LostTalesChatPresentation.build(asCharacter))
                             .nameColor);

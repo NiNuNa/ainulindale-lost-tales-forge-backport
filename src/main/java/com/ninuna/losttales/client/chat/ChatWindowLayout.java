@@ -9,7 +9,10 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -85,8 +88,6 @@ public final class ChatWindowLayout {
      */
     private static final int HEADLESS_SCREEN_WIDTH = 427;
     private static final int HEADLESS_SCREEN_HEIGHT = 240;
-    /** Window id of layouts written before every window was equal. */
-    static final String LEGACY_MAIN_ID = "main";
     private static final String ID_PREFIX = "w";
     private static final List<ChatTab> CONSOLE_WINDOW_TABS =
             Collections.unmodifiableList(Arrays.asList(
@@ -109,8 +110,25 @@ public final class ChatWindowLayout {
     private static final Set<ChatTab> MUTED = new HashSet<ChatTab>();
     /** Tabs whose mention cue is silent; they still show in the feed. */
     private static final Set<ChatTab> PINGS_MUTED = new HashSet<ChatTab>();
-    /** Tabs a message may not reopen; they stay closed until restored. */
+    /**
+     * Tabs a message may not reopen; they stay closed until restored. A
+     * whisper tab here was closed by hand, and is closed only until
+     * somebody speaks in it again: a replay may not bring it back, a
+     * live line does.
+     */
     private static final Set<ChatTab> HIDDEN = new HashSet<ChatTab>();
+    /**
+     * Whisper tabs remembered per place, by the session's server key:
+     * where each was open, in order, and which were closed by hand. A
+     * conversation belongs to the server it was held on, so arriving
+     * elsewhere leaves it in the file for the next visit.
+     */
+    private static final Map<String, List<String[]>> CONVERSATIONS =
+            new LinkedHashMap<String, List<String[]>>();
+    private static final Map<String, Set<String>> CLOSED_CONVERSATIONS =
+            new LinkedHashMap<String, Set<String>>();
+    /** The place whose whisper tabs are on screen; empty before a join. */
+    private static String conversationsPlace = "";
     /**
      * Stacking order, back to front, by window id: the window last
      * brought to the front draws last and is hit first. Session state,
@@ -145,6 +163,9 @@ public final class ChatWindowLayout {
         PINGS_MUTED.clear();
         HIDDEN.clear();
         STACK.clear();
+        CONVERSATIONS.clear();
+        CLOSED_CONVERSATIONS.clear();
+        conversationsPlace = "";
         nextWindowNumber = 1;
         feedOffsetX = 0.0D;
         feedOffsetY = 100.0D;
@@ -512,6 +533,10 @@ public final class ChatWindowLayout {
             return false;
         }
         removeTab(windowOf(tab), tab);
+        if (isRemembered(tab)) {
+            // Closed by hand: a replay may not reopen it; a live line does.
+            HIDDEN.add(ChatTab.row(tab));
+        }
         changed();
         return true;
     }
@@ -679,14 +704,14 @@ public final class ChatWindowLayout {
         return openWhisper(partner, "", preferredWindowId);
     }
 
-    /** As above for one identity of that account; empty is its own. */
+    /**
+     * As above for one identity of that account; empty is its own. The
+     * tab is the person's row entry: which conversation it shows follows
+     * the identity the chat is read as, which is who speaks in it.
+     */
     public static synchronized ChatTab openWhisper(
             String partner, String identity, String preferredWindowId) {
-        return openTab(ChatTab.whisper(partner, identity,
-                // Held as the identity the chat is being read as:
-                // opening a conversation opens it as whoever the
-                // player is in the chat, which is who speaks in it.
-                ClientChatAppearances.viewIdentityKey()), preferredWindowId);
+        return openTab(ChatTab.whisper(partner, identity), preferredWindowId);
     }
 
     /** Opens a conversation tab (a player's or an NPC's) the same way. */
@@ -1126,6 +1151,108 @@ public final class ChatWindowLayout {
         return result;
     }
 
+    /** Whether a tab is a whisper the layout remembers per place; an NPC's is not. */
+    private static boolean isRemembered(ChatTab tab) {
+        return tab != null && tab.isWhisper() && !tab.isNpc();
+    }
+
+    /**
+     * Writes a place's whisper tabs into the remembered set: the open
+     * ones with their windows, in order, and the ones closed by hand.
+     */
+    static synchronized void rememberConversations(String serverKey) {
+        if (serverKey == null || serverKey.length() == 0) {
+            return;
+        }
+        List<String[]> open = new ArrayList<String[]>();
+        for (ChatWindow window : WINDOWS) {
+            for (ChatTab tab : window.getTabs()) {
+                if (isRemembered(tab)) {
+                    open.add(new String[] {window.getId(), tab.id()});
+                }
+            }
+        }
+        Set<String> closed = new LinkedHashSet<String>();
+        for (ChatTab tab : HIDDEN) {
+            if (isRemembered(tab)) {
+                closed.add(tab.id());
+            }
+        }
+        CONVERSATIONS.put(serverKey, open);
+        CLOSED_CONVERSATIONS.put(serverKey, closed);
+    }
+
+    /**
+     * Opens the place's remembered whisper tabs where they were, and
+     * marks the ones closed by hand so a replay does not bring them
+     * back. Called as the client connects, before anything is replayed;
+     * a tab already open is left as it is.
+     */
+    public static synchronized void restoreConversations(String serverKey) {
+        conversationsPlace = serverKey == null ? "" : serverKey;
+        if (conversationsPlace.length() == 0) {
+            return;
+        }
+        Set<String> closed = CLOSED_CONVERSATIONS.get(conversationsPlace);
+        if (closed != null) {
+            for (String id : closed) {
+                ChatTab tab = ChatTab.fromId(id);
+                if (isRemembered(tab)) {
+                    HIDDEN.add(tab);
+                }
+            }
+        }
+        List<String[]> open = CONVERSATIONS.get(conversationsPlace);
+        if (open != null) {
+            for (String[] entry : open) {
+                ChatTab tab = ChatTab.fromId(entry[1]);
+                if (isRemembered(tab) && !isOpen(tab)) {
+                    HIDDEN.remove(tab);
+                    openTab(tab, entry[0]);
+                }
+            }
+        }
+    }
+
+    /**
+     * A live line reopens a whisper tab closed by hand: it was closed
+     * only until somebody spoke in it again. Null for anything else.
+     */
+    public static synchronized ChatTab reopenConversation(ChatTab row,
+                                                          String preferredWindowId) {
+        if (!isRemembered(row)) {
+            return null;
+        }
+        HIDDEN.remove(ChatTab.row(row));
+        return openTab(ChatTab.row(row), preferredWindowId);
+    }
+
+    /** Every place's remembered whisper tabs, the current place's as they stand; for the store. */
+    static synchronized Map<String, List<String[]>> rememberedConversations() {
+        rememberConversations(conversationsPlace);
+        return new LinkedHashMap<String, List<String[]>>(CONVERSATIONS);
+    }
+
+    /** Every place's whisper tabs closed by hand, the current place's as they stand; for the store. */
+    static synchronized Map<String, Set<String>> rememberedClosedConversations() {
+        rememberConversations(conversationsPlace);
+        return new LinkedHashMap<String, Set<String>>(CLOSED_CONVERSATIONS);
+    }
+
+    /** Takes the file's remembered whisper tabs; nothing is on screen for any place yet. */
+    static synchronized void loadConversations(Map<String, List<String[]>> open,
+                                               Map<String, Set<String>> closed) {
+        CONVERSATIONS.clear();
+        CLOSED_CONVERSATIONS.clear();
+        conversationsPlace = "";
+        if (open != null) {
+            CONVERSATIONS.putAll(open);
+        }
+        if (closed != null) {
+            CLOSED_CONVERSATIONS.putAll(closed);
+        }
+    }
+
     /** Writes the current state through the listener, if any. */
     public static synchronized void persist() {
         changed();
@@ -1133,10 +1260,19 @@ public final class ChatWindowLayout {
 
     /**
      * Closes every whisper and NPC tab: a conversation ends with the
-     * session it was held in, and so does its tab. A window left empty
-     * goes, the last one included.
+     * session it was held in, and so does its tab — the place's whisper
+     * tabs are remembered first, open and closed by hand alike, and come
+     * back on the next visit. A window left empty goes, the last one
+     * included.
      */
     public static synchronized void closeConversations() {
+        rememberConversations(conversationsPlace);
+        Iterator<ChatTab> closedByHand = HIDDEN.iterator();
+        while (closedByHand.hasNext()) {
+            if (isRemembered(closedByHand.next())) {
+                closedByHand.remove();
+            }
+        }
         boolean changed = false;
         Iterator<ChatWindow> iterator = WINDOWS.iterator();
         while (iterator.hasNext()) {
@@ -1177,8 +1313,7 @@ public final class ChatWindowLayout {
      * past the cap are dropped, percents are clamped, and every plain
      * channel that is neither placed nor listed as closed is appended to
      * the first window so a channel added after the file was written is
-     * never silently lost. A file from before every window was equal
-     * names one {@code main}; it becomes an ordinary window. A file that
+     * never silently lost. A file that
      * names no window and closes every channel describes the empty
      * layout and is loaded as one. The listener is not notified;
      * the caller decides whether a repaired layout is written back.
@@ -1222,9 +1357,7 @@ public final class ChatWindowLayout {
                     continue;
                 }
                 String id = spec.id;
-                if (LEGACY_MAIN_ID.equals(id)) {
-                    id = ID_PREFIX + nextWindowNumber++;
-                } else if (!isWindowId(id) || window(id) != null) {
+                if (!isWindowId(id) || window(id) != null) {
                     continue;
                 }
                 ChatWindow window = new ChatWindow(id);
@@ -1251,8 +1384,7 @@ public final class ChatWindowLayout {
                 window.setActiveTab(spec.activeTab);
                 WINDOWS.add(window);
                 if (spec.linkTarget != null) {
-                    window.setLink(LEGACY_MAIN_ID.equals(spec.linkTarget)
-                            ? null : spec.linkTarget, spec.linkSide);
+                    window.setLink(spec.linkTarget, spec.linkSide);
                 }
             }
         }

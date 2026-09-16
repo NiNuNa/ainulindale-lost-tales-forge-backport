@@ -13,6 +13,7 @@ import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.chat.share.ChatShowcase;
+import com.ninuna.losttales.chat.ChatNarrator;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
@@ -196,8 +197,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
      */
     private int roles;
     /**
-     * Whether the line wears the account identity. With appearances the
-     * channel no longer decides this — a character may speak in OOC and
+     * Whether the line wears the account identity. The channel
+     * does not decide this — a character may speak in OOC and
      * the account in Global — so the line says it itself; heads and skin
      * caching follow it.
      */
@@ -1103,6 +1104,9 @@ public final class LostTalesChatMessagePacket implements IMessage {
 
     /** Which conversation on a scoped channel the line is in; empty for one. */
     public String getScopeValue() { return this.scopeValue; }
+
+    /** Whether the line is the Narrator's: told, not said. */
+    public boolean isNarrator() { return ChatNarrator.isNarratorSkin(this.skinId); }
 
     /** Whether the channel is as many conversations as it has scope values. */
     private static boolean scopedChannel(ChatChannel channel) {

@@ -38,28 +38,14 @@ public final class ClientChatRoleSplitTest {
         UUID first = UUID.randomUUID();
         UUID second = UUID.randomUUID();
         ClientChatChannelState.setRoleMask(this.operator | this.team);
-        ClientChatChannelState.setRoleSplit(true, this.operator,
+        ClientChatChannelState.setRoleSplit(this.operator,
                 Collections.singletonMap(first, Integer.valueOf(this.team)));
         assertEquals(this.operator,
                 ClientChatChannelState.getAccountRoleMask());
         assertEquals(this.operator | this.team,
-                ClientChatChannelState.ownCharacterRoles(first, true));
+                ClientChatChannelState.ownCharacterRoles(first));
         assertEquals(this.operator,
-                ClientChatChannelState.ownCharacterRoles(second, false));
-    }
-
-    /** Until the server states them apart, the played mask stands in. */
-    @Test
-    public void anUnstatedSplitFallsBackToThePlayedMask() {
-        ClientChatChannelState.setRoleMask(this.operator | this.team);
-        ClientChatChannelState.setRoleSplit(false, 0, null);
-        assertEquals(this.operator | this.team,
-                ClientChatChannelState.getAccountRoleMask());
-        assertEquals(this.operator | this.team,
-                ClientChatChannelState.ownCharacterRoles(UUID.randomUUID(),
-                        true));
-        assertEquals(0, ClientChatChannelState.ownCharacterRoles(
-                UUID.randomUUID(), false));
+                ClientChatChannelState.ownCharacterRoles(second));
     }
 
     /**

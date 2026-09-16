@@ -32,9 +32,9 @@ public enum CharacterKind {
     }
 
     /**
-     * The kind an id names. Anything unknown — a record from a build
-     * that knew a kind this one does not — reads as {@link #ROLEPLAY},
-     * which is what every record written before kinds existed is.
+     * The kind an id names. Anything unknown — no kind at all, or one
+     * from a build that knows a kind this one does not — reads as
+     * {@link #ROLEPLAY}.
      */
     public static CharacterKind fromId(String id) {
         String normalized = id == null ? "" : id.trim().toLowerCase(Locale.ROOT);

@@ -69,8 +69,5 @@ public final class CharacterBodyModelRegistryTest {
                 CharacterRaceRegistry.ELF, CharacterBodyModelRegistry.LOTR_HUMAN));
         assertFalse(CharacterBodyModelRegistry.isCompatible(
                 CharacterRaceRegistry.ELF, ""));
-        assertTrue(CharacterBodyModelRegistry.isCompatible(
-                CharacterRaceRegistry.LEGACY_TROLL,
-                CharacterBodyModelRegistry.LOTR_HALF_TROLL));
     }
 }

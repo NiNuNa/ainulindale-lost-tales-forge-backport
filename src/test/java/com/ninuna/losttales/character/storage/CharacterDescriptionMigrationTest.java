@@ -20,19 +20,18 @@ public final class CharacterDescriptionMigrationTest {
             "91000000-0000-0000-0000-000000000019");
 
     @Test
-    public void versionFiveCharacterMigratesToEmptyDescription() {
-        NBTTagCompound legacy = CharacterNbtCodec.writeCharacterRecord(
+    public void aRecordWithoutADescriptionReadsAsEmpty() {
+        NBTTagCompound record = CharacterNbtCodec.writeCharacterRecord(
                 character("Temporary description"));
-        legacy.setInteger("DataVersion", 5);
-        legacy.removeTag("Description");
+        record.removeTag("Description");
 
-        RoleplayCharacter migrated = CharacterNbtCodec.readCharacterRecord(
-                legacy, OWNER);
+        RoleplayCharacter loaded = CharacterNbtCodec.readCharacterRecord(
+                record, OWNER);
 
-        assertNotNull(migrated);
+        assertNotNull(loaded);
         assertEquals(RoleplayCharacter.CURRENT_DATA_VERSION,
-                migrated.getDataVersion());
-        assertEquals("", migrated.getDescription());
+                loaded.getDataVersion());
+        assertEquals("", loaded.getDescription());
     }
 
     @Test

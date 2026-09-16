@@ -96,7 +96,7 @@ public final class CharacterSkinDefinition {
     }
 
     public boolean isCompatibleWith(String raceId, String genderId) {
-        if (!this.raceId.equals(CharacterRaceRegistry.canonicalizeIdentifier(raceId))) {
+        if (!this.raceId.equals(CharacterRaceRegistry.normalizeIdentifier(raceId))) {
             return false;
         }
         return this.genderId.length() == 0

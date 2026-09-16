@@ -194,13 +194,7 @@ final class ChatMentionColors {
                 && account != null
                 && account.trim().equalsIgnoreCase(
                         minecraft.thePlayer.getCommandSenderName())) {
-            CharacterRosterSnapshot snapshot =
-                    ClientCharacterRosterCache.getSnapshot();
-            CharacterSummary active = snapshot == null
-                    ? null : snapshot.getActiveCharacter();
-            return ClientChatChannelState.ownCharacterRoles(characterId,
-                    active != null
-                            && characterId.equals(active.getCharacterId()));
+            return ClientChatChannelState.ownCharacterRoles(characterId);
         }
         int worn = ClientChatChannelState.rosterRolesOf(account, characterId);
         return worn != 0 ? worn : rolesFor(account);
@@ -264,35 +258,12 @@ final class ChatMentionColors {
 
     /**
      * The active role-playing character's name for an online account, or
-     * null when this client knows none. The local player's own roster is
-     * the authority for their own character; everyone else's comes from
-     * the appearance the server syncs for every online player. The
-     * character channels sign their lines with this identity, so a
-     * system line naming the account is shown the same way.
+     * null when this client knows none. The character channels sign
+     * their lines with this identity, so a system line naming the
+     * account is shown the same way.
      */
     static String characterNameFor(String account) {
-        Minecraft minecraft = Minecraft.getMinecraft();
-        if (account == null || account.length() == 0) {
-            return null;
-        }
-        if (minecraft != null && minecraft.thePlayer != null
-                && account.equalsIgnoreCase(
-                        minecraft.thePlayer.getCommandSenderName())) {
-            CharacterRosterSnapshot snapshot =
-                    ClientCharacterRosterCache.getSnapshot();
-            CharacterSummary active = snapshot == null
-                    ? null : snapshot.getActiveCharacter();
-            return active == null ? null : normalized(active.getName());
-        }
-        for (CharacterAppearance appearance
-                : ClientCharacterAppearanceCache.snapshot().values()) {
-            if (appearance != null && appearance.hasCharacter()
-                    && account.equalsIgnoreCase(
-                            appearance.getAccountName())) {
-                return normalized(appearance.getCharacterName());
-            }
-        }
-        return null;
+        return ClientCharacterAppearanceCache.characterNameFor(account);
     }
 
     private static String normalized(String name) {

@@ -87,7 +87,7 @@ public final class CharacterBodyModelRegistry {
     /** The model a race's catalogue skins draw with; empty for an unknown race. */
     public static String getDefaultModelId(String raceId) {
         String modelId = DEFAULT_MODEL_BY_RACE.get(
-                CharacterRaceRegistry.canonicalizeIdentifier(raceId));
+                CharacterRaceRegistry.normalizeIdentifier(raceId));
         return modelId == null ? "" : modelId;
     }
 
@@ -101,7 +101,7 @@ public final class CharacterBodyModelRegistry {
             return true;
         }
         Set<String> extras = EXTRA_MODELS_BY_RACE.get(
-                CharacterRaceRegistry.canonicalizeIdentifier(raceId));
+                CharacterRaceRegistry.normalizeIdentifier(raceId));
         return extras != null && extras.contains(normalized);
     }
 

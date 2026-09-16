@@ -72,6 +72,7 @@ final class ChatOutbox {
      * composer holds.
      */
     void sendMessage(ChatTab tab, String message) {
+        ClientChatIdentitySelection.update();
         // What goes out may have its emoticons converted; the history
         // the caller recorded keeps the raw text.
         String outgoing = ChatInputRules.outgoingMessage(message);
@@ -131,6 +132,7 @@ final class ChatOutbox {
      */
     private void sendToTab(ChatTab tab, String outgoing,
                            ChatReplyReference reply) {
+        ClientChatIdentitySelection.update();
         long echoNonce = LostTalesChatPresentation.echoPending(tab, outgoing,
                 resolveLocalShowcases(outgoing), reply);
         // Only a message the server named travels as its id; a line
@@ -139,8 +141,8 @@ final class ChatOutbox {
         LostTalesNetworkHandler.CHANNEL.sendToServer(
                 new LostTalesChatSendPacket(tab.getChannel(), outgoing,
                         resolveShareReferences(outgoing), tab.getPartner(),
-                        ClientChatAppearances.wireKind(tab),
-                        ClientChatAppearances.wireCharacterId(tab),
+                        ClientChatIdentities.wireKind(tab),
+                        ClientChatIdentities.wireCharacterId(tab),
                         named ? reply.getMessageId() : ChatMessageIds.NONE,
                         tab.isWhisper() ? tab.getPartnerIdentity() : "",
                         echoNonce,
@@ -329,7 +331,9 @@ final class ChatOutbox {
         LostTalesNetworkHandler.CHANNEL.sendToServer(
                 new LostTalesChatTypingPacket(tab.getChannel(),
                         tab.isWhisper() ? tab.getPartner() : "", typing,
-                        ClientChatAppearances.wireKind(tab),
-                        ClientChatAppearances.wireCharacterId(tab)));
+                        ClientChatIdentities.wireKind(tab),
+                        ClientChatIdentities.wireCharacterId(tab),
+                        tab.isWhisper() ? tab.getPartnerIdentity() : "",
+                        tab.isWhisper() ? ClientChatChannelState.partnerCharacterIdOf(tab) : null));
     }
 }

@@ -122,6 +122,7 @@ public class LostTalesConfigGui extends GuiConfig {
                 "worldQuestMarkerMaxDistance", "showQuestChatFeedback", "playQuestSounds")));
         elements.add(group("chat", "losttales.config.category.client.chat", pick(client,
                 "showTimestamps", "enableChatEmojis", "convertChatEmoticons",
+                "chatProfanityFilter",
                 "enableChatMessageGrouping", "enableChatBackgroundBlur",
                 "enableChatPings", "chatPingSound", "chatBackgroundColor",
                 "chatSelectedLineColor", "chatMentionLineColor",
@@ -193,7 +194,6 @@ public class LostTalesConfigGui extends GuiConfig {
             return result;
         }
         Set<String> used = new HashSet<String>();
-        used.add("hudPlacementVersion");
         if (groups != null) {
             for (IConfigElement group : groups) {
                 if (group == null || group.getChildElements() == null) {

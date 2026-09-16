@@ -14,9 +14,6 @@ public final class CharacterGenderRegistry {
     public static final String MALE = "losttales:male";
     public static final String NON_BINARY = "losttales:non_binary";
 
-    /** Legacy save identifier removed from character creation in data version 3. */
-    public static final String LEGACY_UNSPECIFIED = "losttales:unspecified";
-
     private static final Set<String> IDENTIFIERS = Collections.unmodifiableSet(
             new LinkedHashSet<String>(Arrays.asList(
                     FEMALE,

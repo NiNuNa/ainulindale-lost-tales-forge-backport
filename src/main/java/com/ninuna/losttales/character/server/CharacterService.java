@@ -190,7 +190,8 @@ public final class CharacterService {
                 // and a slim skin would be sampled a texel too far.
                 .bodyType(CharacterAppearanceSyncManager.accountBodyType(player))
                 .age(CharacterValidator.MIN_AGE)
-                .startingFaction("")
+                // The account's own identity chose no side: it is Unaligned.
+                .startingFaction(LotrCharacterAdapter.UNALIGNED_FACTION_ID)
                 .createdAt(System.currentTimeMillis())
                 .minecraftCapeVisible(roster.isAccountMinecraftCapeVisible())
                 .cosmeticCape(roster.getAccountCosmeticCapeId())

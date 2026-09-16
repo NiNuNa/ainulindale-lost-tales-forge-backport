@@ -38,6 +38,9 @@ public final class LostTalesCapability {
     /** Read the shared operator console: commands run, moderation, config changes. */
     public static final LostTalesCapability CHAT_CONSOLE_READ = register("chat.console.read",
             OPERATOR, "read the shared operator console and talk in it");
+    /** Speak as the Narrator in the roleplaying channels and whispers. */
+    public static final LostTalesCapability CHAT_NARRATE = register("chat.narrate",
+            OPERATOR, "speak as the Narrator in the roleplaying channels");
 
     /* ---- The server's own settings ---- */
 

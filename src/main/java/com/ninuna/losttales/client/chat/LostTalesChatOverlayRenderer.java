@@ -1190,6 +1190,12 @@ final class LostTalesChatOverlayRenderer {
                     // else it wears, and fades out of it.
                     float flash = LostTalesChatPresentation.flashStrength(
                             line.getChatLineID());
+                    if (open) {
+                        // A search lights its matches the same way, the
+                        // one stood on whole and the others a share.
+                        flash = Math.max(flash,
+                                ChatSearch.litShare(line.getChatLineID()));
+                    }
                     boolean hoveredLine = open
                             && LostTalesChatPresentation.isHoveredLine(
                                     line.getChatLineID());

@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
+import com.ninuna.losttales.chat.ChatRolePresentation;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -33,22 +34,16 @@ public final class ClientChatTypingState {
         if (packet == null || packet.isMalformed()) {
             return;
         }
+        if (ChatRolePresentation.isInCharacter(packet.getChannel())
+                && !packet.getRecipientIdentity().equals(ClientChatIdentities.viewIdentityKey())) {
+            return;
+        }
         ChatTab tab = packet.getChannel() == ChatChannel.WHISPER
-                ? ChatTab.whisper(packet.getPartner())
-                : ChatTab.of(packet.getChannel());
+                ? ChatTab.whisper(packet.getPartner(), packet.getIdentityName(), packet.getRecipientIdentity())
+                : ChatTab.of(packet.getChannel(), packet.getScopeValue());
+        if (!tab.isWhisper() && !ClientChatChannelState.isAvailable(tab)) { return; }
         apply(tab, packet.getIdentityName(), packet.isTyping(),
                 System.nanoTime());
-    }
-
-    /**
-     * The key a tab's typing is filed under. The server says who is
-     * typing a whisper to this account, not into which of its
-     * conversations, so every conversation with one account shares the
-     * account's key; a plain tab is its own.
-     */
-    private static ChatTab keyOf(ChatTab tab) {
-        return tab != null && tab.isWhisper() && !tab.isNpc()
-                ? ChatTab.whisper(tab.getPartner()) : tab;
     }
 
     static synchronized void apply(ChatTab tab, String name, boolean typing,
@@ -86,7 +81,7 @@ public final class ClientChatTypingState {
     }
 
     static synchronized List<String> namesTyping(ChatTab tab, long nowNanos) {
-        LinkedHashMap<String, Long> names = tab == null ? null : TYPING.get(keyOf(tab));
+        LinkedHashMap<String, Long> names = tab == null ? null : TYPING.get(ChatTab.viewed(tab));
         if (names == null) {
             return Collections.emptyList();
         }
@@ -97,11 +92,50 @@ public final class ClientChatTypingState {
             }
         }
         if (names.isEmpty()) {
-            TYPING.remove(keyOf(tab));
+            TYPING.remove(ChatTab.viewed(tab));
             return Collections.emptyList();
         }
         return Collections.unmodifiableList(
                 new ArrayList<String>(names.keySet()));
+    }
+
+    /**
+     * Whether a name is typing into a roleplaying conversation this
+     * client reads — Global, Proximity, Faction, Party or a whisper —
+     * which is what the typing bubble over a head answers for. An NPC
+     * conversation is local and never has a typist on the other end.
+     */
+    public static synchronized boolean isTypingInCharacter(String name, long nowNanos) {
+        if (name == null || name.length() == 0) {
+            return false;
+        }
+        for (Map.Entry<ChatTab, LinkedHashMap<String, Long>> entry : TYPING.entrySet()) {
+            ChatTab tab = entry.getKey();
+            if (tab.isNpc() || !ChatRolePresentation.isInCharacter(tab.getChannel())) {
+                continue;
+            }
+            Long until = entry.getValue().get(name);
+            if (until != null && until.longValue() > nowNanos) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Whether anyone at all is typing into a roleplaying conversation. */
+    public static synchronized boolean anyTypingInCharacter(long nowNanos) {
+        for (Map.Entry<ChatTab, LinkedHashMap<String, Long>> entry : TYPING.entrySet()) {
+            ChatTab tab = entry.getKey();
+            if (tab.isNpc() || !ChatRolePresentation.isInCharacter(tab.getChannel())) {
+                continue;
+            }
+            for (Long until : entry.getValue().values()) {
+                if (until.longValue() > nowNanos) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public static synchronized void clear() {

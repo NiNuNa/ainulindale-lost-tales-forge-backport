@@ -129,10 +129,10 @@ public final class ChatChannelRegistryTest {
         assertEquals(builtIn + 1, ChatChannel.values().length);
     }
 
-    /** An older build's id for a channel since merged still resolves. */
+    /** An id no channel carries names nothing, the bare word Discord included. */
     @Test
-    public void theRetiredDiscordIdStillNamesTheChannelThatTookItIn() {
-        assertSame(ChatChannel.OOC, ChatChannel.fromId("discord"));
+    public void anUnknownIdNamesNothing() {
+        assertEquals(null, ChatChannel.fromId("discord"));
         assertEquals(null, ChatChannel.fromId("nothing_named_this"));
     }
 

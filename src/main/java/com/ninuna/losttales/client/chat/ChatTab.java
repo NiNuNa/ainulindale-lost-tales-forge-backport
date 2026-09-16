@@ -39,12 +39,7 @@ public final class ChatTab {
      * is also what every id stored before identities existed reads as.
      */
     private static final char IDENTITY_SEPARATOR = ChatTabIds.SEPARATOR;
-    /**
-     * The last segment of a whisper id, after a separator, when the
-     * conversation is held as one of this player's characters: the
-     * character's id, which no name can be mistaken for.
-     */
-    private static final String OWNER_MARK = "own:";
+    private static final String OWNER_MARK = ChatTabIds.OWNER_MARK;
     /**
      * The last segment of a scoped plain channel's id, after a
      * separator: the conversation the tab is, which for the Faction
@@ -114,14 +109,21 @@ public final class ChatTab {
      * The tab whose lines are shown while this one is on screen. A
      * channel that is one conversation is its own; a scoped channel's
      * row entry stands for whichever of its conversations the chat is
-     * being read as, so the lines shown under it are that identity's.
-     * The row holds one Faction tab; which faction it is showing
-     * follows the identity, and nothing else in the layout has to know.
+     * being read as, so the lines shown under it are that identity's;
+     * and a person's row entry stands for the conversation that person
+     * has with the identity being read. The row holds one Faction tab
+     * and one tab per person; which conversation each shows follows
+     * the identity, and nothing else in the layout has to know.
      */
     public static ChatTab viewed(ChatTab tab) {
-        if (tab == null || tab.isWhisper() || tab.channel == null
-                || !tab.channel.isScoped()
-                || tab.ownerKey.length() > 0) {
+        if (tab == null || tab.npc || tab.ownerKey.length() > 0) {
+            return tab;
+        }
+        if (tab.isWhisper()) {
+            return whisper(tab.partner, tab.identity,
+                    ClientChatIdentities.viewIdentityKey());
+        }
+        if (tab.channel == null || !tab.channel.isScoped()) {
             return tab;
         }
         return of(tab.channel,
@@ -130,16 +132,18 @@ public final class ChatTab {
 
     /**
      * The row entry a tab belongs to: the plain channel tab for a
-     * conversation of a scoped channel, and the tab itself for
-     * everything else. The row holds one entry per channel, so a line's
-     * own tab is not a tab a window can hold; anything asking the layout
-     * about a line asks about this.
+     * conversation of a scoped channel, the person's tab for a whisper
+     * conversation held as one identity, and the tab itself for
+     * everything else. The row holds one entry per channel and per
+     * person, so a line's own tab is not a tab a window can hold;
+     * anything asking the layout about a line asks about this.
      */
     public static ChatTab row(ChatTab tab) {
-        if (tab == null || tab.isWhisper() || tab.ownerKey.length() == 0) {
+        if (tab == null || tab.npc || tab.ownerKey.length() == 0) {
             return tab;
         }
-        return of(tab.channel);
+        return tab.isWhisper() ? whisper(tab.partner, tab.identity)
+                : of(tab.channel);
     }
 
     /**
@@ -158,16 +162,19 @@ public final class ChatTab {
         return new ChatTab(channel, "", "", scopeKey, false);
     }
 
-    /** The whisper tab with an account's own identity, held as this account; null for no name. */
+    /** The row entry for whispers with an account's own identity; null for no name. */
     public static ChatTab whisper(String partner) {
         return whisper(partner, "");
     }
 
     /**
-     * The whisper tab with one identity of an account, held as this
-     * account: the person as they were speaking, kept apart from their
-     * other characters and from their account. An empty identity is the
-     * account's own.
+     * The row entry for whispers with one identity of an account: the
+     * person as they were speaking, kept apart from their other
+     * characters and from their account. An empty identity is the
+     * account's own. Which conversation the entry shows — held as which
+     * of this player's identities — follows the identity being read
+     * ({@link #viewed}); the entry is also the conversation held as the
+     * account itself, which has no identity of its own to name.
      */
     public static ChatTab whisper(String partner, String identity) {
         return whisper(partner, identity, "");
@@ -210,8 +217,9 @@ public final class ChatTab {
     /**
      * This player's identity the tab is read and spoken as: a
      * character's id, lower-cased, or empty for the account. A whisper
-     * carries the identity the conversation is held as; a plain tab
-     * carries one only on a channel that is more than one conversation.
+     * conversation carries the identity it is held as, and a person's
+     * row entry none; a plain tab carries one only on a channel that is
+     * more than one conversation.
      */
     public String getOwnerKey() { return this.ownerKey; }
     /** Whether the conversation is with the account rather than a character. */
@@ -236,14 +244,8 @@ public final class ChatTab {
                     : this.channel.getId() + IDENTITY_SEPARATOR
                             + SCOPE_MARK + this.ownerKey;
         }
-        StringBuilder id = new StringBuilder(WHISPER_ID_PREFIX).append(this.partner);
-        if (!isAccountConversation() || this.ownerKey.length() > 0) {
-            id.append(IDENTITY_SEPARATOR).append(this.identity);
-        }
-        if (this.ownerKey.length() > 0) {
-            id.append(IDENTITY_SEPARATOR).append(OWNER_MARK).append(this.ownerKey);
-        }
-        return id.toString();
+        return ChatTabIds.whisperConversationId(this.partner, this.identity,
+                this.ownerKey);
     }
 
     /** The inverse of {@link #id()}; null for anything unknown. */

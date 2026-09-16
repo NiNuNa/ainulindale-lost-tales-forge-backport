@@ -11,9 +11,12 @@ import lotr.common.fac.LOTRFaction;
  * read through {@link LotrCharacterAdapter} by faction id or straight
  * off the faction when the entity is at hand, with two things decided
  * here and nowhere else: a faction that paints itself pure black — LOTR's
- * UNALIGNED, the factionless wanderers — reads in the palette's light
- * grey instead, since black is unreadable on the chat; and a faction
- * that cannot be resolved at all keeps the caller's fallback.
+ * UNALIGNED, the factionless wanderers — reads in the palette's rose
+ * beige instead, since black is unreadable on the chat and the muted
+ * grey below it is the Server's own; and a faction
+ * that cannot be resolved at all keeps the caller's fallback. Unaligned
+ * by id is answered without asking LOTR, since the answer is decided
+ * here.
  */
 public final class LotrFactionColors {
 
@@ -21,6 +24,10 @@ public final class LotrFactionColors {
 
     /** The colour of the faction with that id, or {@code fallback}. */
     public static int forFactionId(String factionId, int fallback) {
+        if (LotrCharacterAdapter.UNALIGNED_FACTION_ID.equals(
+                LotrCharacterAdapter.normalizeFactionId(factionId))) {
+            return readable(0, fallback);
+        }
         int color = LotrCharacterAdapter.getInstance().getFactionColor(factionId, fallback);
         return readable(color, fallback);
     }
@@ -42,10 +49,10 @@ public final class LotrFactionColors {
         }
     }
 
-    /** Pure black is the one faction colour the chat cannot show; it reads grey. */
+    /** Pure black is the one faction colour the chat cannot show; it reads rose beige. */
     private static int readable(int color, int fallback) {
         if ((color & 0xFFFFFF) == 0 && (fallback & 0xFFFFFF) != 0) {
-            return LostTalesColors.rgb(LostTalesColors.ROSE_GRAY);
+            return LostTalesColors.rgb(LostTalesColors.ROSE_BEIGE);
         }
         return color & 0xFFFFFF;
     }

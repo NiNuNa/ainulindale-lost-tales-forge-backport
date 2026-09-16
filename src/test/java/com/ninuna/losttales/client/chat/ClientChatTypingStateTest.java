@@ -8,6 +8,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public final class ClientChatTypingStateTest {
@@ -20,6 +21,26 @@ public final class ClientChatTypingStateTest {
     @After
     public void cleanUp() {
         ClientChatTypingState.clear();
+    }
+
+    /** A typist in a roleplaying tab shows over their head; one in OOC or an NPC tab does not. */
+    @Test
+    public void typingInARoleplayingTabShowsOverTheHead() {
+        ClientChatTypingState.apply(ChatTab.of(ChatChannel.PARTY), "Aragorn", true, 0L);
+        ClientChatTypingState.apply(ChatTab.of(ChatChannel.OOC), "Steve", true, 0L);
+        ClientChatTypingState.apply(ChatTab.npc("Bard"), "Bard", true, 0L);
+        long soon = ClientChatTypingState.TTL_NANOS - 1L;
+        assertTrue(ClientChatTypingState.isTypingInCharacter("Aragorn", soon));
+        assertTrue(ClientChatTypingState.anyTypingInCharacter(soon));
+        assertFalse("OOC is not in character",
+                ClientChatTypingState.isTypingInCharacter("Steve", soon));
+        assertFalse("nobody types on an NPC's side",
+                ClientChatTypingState.isTypingInCharacter("Bard", soon));
+        assertFalse(ClientChatTypingState.isTypingInCharacter("Aragorn",
+                ClientChatTypingState.TTL_NANOS));
+        assertFalse(ClientChatTypingState.isTypingInCharacter("", soon));
+        ClientChatTypingState.apply(ChatTab.of(ChatChannel.PARTY), "Aragorn", false, 1L);
+        assertFalse(ClientChatTypingState.anyTypingInCharacter(soon));
     }
 
     @Test

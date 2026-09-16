@@ -46,6 +46,31 @@ public final class ChatWindowLayoutStoreTest {
      * back to; a window without the word is at its own size, and a part
      * the build does not know reads as none.
      */
+    /**
+     * A place's whisper tabs, open or closed by hand, are lines of their
+     * own that survive the round trip and come back for that place only.
+     */
+    @Test
+    public void rememberedConversationsRoundTripPerPlace() {
+        ChatWindowLayoutStore.load(Arrays.asList(
+                "window w1 locked=false x=0.00 y=0.00 active=console tabs=console",
+                "window w2 locked=false x=0.00 y=100.00 active=all tabs=all,ooc",
+                "conversation\tserver:a\tw2\twhisper:Steve|Aldric",
+                "closedconversation\tserver:a\twhisper:Bob",
+                "conversation\tworld:My World\tw2\twhisper:Sam|Sam Gamgee"));
+        List<String> described = ChatWindowLayoutStore.describe();
+        assertTrue(described.contains("conversation\tserver:a\tw2\twhisper:Steve|Aldric"));
+        assertTrue(described.contains("closedconversation\tserver:a\twhisper:Bob"));
+        assertTrue(described.contains(
+                "conversation\tworld:My World\tw2\twhisper:Sam|Sam Gamgee"));
+        ChatWindowLayout.restoreConversations("server:a");
+        assertTrue(ChatWindowLayout.isOpen(ChatTab.whisper("Steve", "Aldric")));
+        assertFalse(ChatWindowLayout.isOpen(ChatTab.whisper("Sam", "Sam Gamgee")));
+        assertTrue(ChatWindowLayout.isHidden(ChatTab.whisper("Bob", "Bob")));
+        ChatWindowLayoutStore.load(described);
+        assertEquals(described, ChatWindowLayoutStore.describe());
+    }
+
     @Test
     public void aWindowFillingTheScreenRoundTrips() {
         ChatWindowLayoutStore.load(Arrays.asList(
@@ -112,16 +137,9 @@ public final class ChatWindowLayoutStoreTest {
     }
 
     /** Whether some window holds the trade channel and nothing else. */
-    /**
-     * The layout is the account's: its file is named after the account,
-     * nothing is named without one, and an account with no file yet
-     * starts from the file every account once shared — which is read
-     * and left alone, the account's own file being written from the
-     * first change.
-     */
+    /** The layout is one file per account, and nothing is written before a change. */
     @Test
-    public void theLayoutIsTheAccountsOwnAndStartsFromTheSharedFile()
-            throws IOException {
+    public void theLayoutIsTheAccountsOwn() throws IOException {
         UUID steve = UUID.fromString("c6000000-0000-0000-0000-00000000006c");
         assertNull(ChatWindowLayoutStore.fileFor(null, steve));
         assertNull(ChatWindowLayoutStore.fileFor(new File("client"), null));
@@ -131,28 +149,17 @@ public final class ChatWindowLayoutStoreTest {
         File folder = File.createTempFile("losttales-layout", "");
         assertTrue(folder.delete());
         assertTrue(folder.mkdirs());
-        File shared = new File(folder, ChatWindowLayoutStore.SHARED_FILE_PATH);
         try {
-            write(shared, "window w2 locked=false x=50.00 y=25.00 active=ooc tabs=ooc\n");
+            File own = ChatWindowLayoutStore.fileFor(folder, steve);
+            write(own, "window w2 locked=false x=50.00 y=25.00 active=ooc tabs=ooc\n");
             ChatWindowLayoutStore.initialize(folder, steve);
             ChatWindow window = ChatWindowLayout.window("w2");
-            assertNotNull("the shared file is the account's starting point", window);
+            assertNotNull("the account's own file is read", window);
             assertEquals(50.0D, window.getOffsetX(), 0.0D);
-            File own = ChatWindowLayoutStore.fileFor(folder, steve);
-            assertFalse("nothing is written before the account changes anything",
-                    own.isFile());
-            ChatWindowLayoutStore.save();
-            assertTrue(own.isFile());
-            assertTrue("the shared file is left as it was", shared.isFile());
-            // The account's own file is what is read from then on, and
-            // another account still starts from the shared one.
-            ChatWindowLayout.reset();
-            ChatWindowLayoutStore.initialize(folder, steve);
-            assertNotNull(ChatWindowLayout.window("w2"));
             UUID alex = UUID.fromString("d6000000-0000-0000-0000-00000000006d");
             ChatWindowLayoutStore.initialize(folder, alex);
-            assertNotNull(ChatWindowLayout.window("w2"));
-            assertFalse(ChatWindowLayoutStore.fileFor(folder, alex).isFile());
+            assertFalse("nothing is written before the account changes anything",
+                    ChatWindowLayoutStore.fileFor(folder, alex).isFile());
         } finally {
             ChatWindowLayoutStore.initialize(null);
             deleteTree(folder);
@@ -351,43 +358,12 @@ public final class ChatWindowLayoutStoreTest {
         assertEquals(lines, ChatWindowLayoutStore.describe());
     }
 
-    /** The identity locks and the hint flag ride in the file with the layout. */
-    @Test
-    public void identityLocksAndTheHintFlagRoundTrip() {
-        ClientChatAppearances.clear();
-        try {
-            List<String> lines = new java.util.ArrayList<String>(ChatWindowLayoutStore.describe());
-            assertFalse(lines.toString().contains("identity "));
-            lines.add("identity all b0000000-0000-0000-0000-00000000000b");
-            lines.add("identity ooc account");
-            lines.add("identity whisper:Steve account");
-            lines.add("identity all");
-            lines.add("flag identityHintShown=true");
-            ChatWindowLayoutStore.load(lines);
-            assertTrue(ClientChatAppearances.isLocked(ChatTab.of(ChatChannel.ALL)));
-            assertTrue(ClientChatAppearances.isLocked(ChatTab.of(ChatChannel.OOC)));
-            assertFalse(ClientChatAppearances.isLocked(ChatTab.whisper("Steve")));
-            assertTrue(ClientChatAppearances.wasIdentityHintShown());
-            List<String> described = ChatWindowLayoutStore.describe();
-            assertTrue(described.contains(
-                    "identity all b0000000-0000-0000-0000-00000000000b"));
-            assertTrue(described.contains("identity ooc account"));
-            assertTrue(described.contains("flag identityHintShown=true"));
-            assertFalse(described.toString().contains("whisper:Steve"));
-            ChatWindowLayoutStore.load(described);
-            assertEquals(described, ChatWindowLayoutStore.describe());
-        } finally {
-            ChatWindowLayoutStore.load(Collections.<String>emptyList());
-            ClientChatAppearances.forgetStored();
-        }
-    }
-
     @Test
     public void malformedLinesAreSkippedAndTheLayoutRepaired() {
         ChatWindowLayoutStore.load(Arrays.asList(
                 "# comment",
                 "",
-                "window main locked=maybe active=nope tabs=all,,unknown,ooc",
+                "window w1 locked=maybe active=nope tabs=all,,unknown,ooc",
                 "window w2 x=abc y=12 tabs=party,party",
                 "window  badid tabs=faction",
                 "window w9",
@@ -396,20 +372,18 @@ public final class ChatWindowLayoutStoreTest {
                 "closed admin",
                 "muted nothing",
                 "muted console",
-                "nofeed faction",
+                "muted faction",
                 "input y=40 x=oops",
                 "feed y=40 x=oops",
                 "garbage line here"));
         assertEquals(0.0D, ChatWindowLayout.feedOffsetX(), 0.0D);
         assertEquals(40.0D, ChatWindowLayout.feedOffsetY(), 0.0D);
-        // The legacy main window becomes an ordinary window, at vanilla's
-        // chat spot when the line carries no position. A line from a
-        // layout version with a separate input bar is simply skipped.
+        // A window line with no position stands at the origin; an input
+        // line names nothing the layout has and is skipped.
         ChatWindow main = ChatWindowLayout.firstWindow();
-        // Numbered past the highest id the file names, the empty "w9".
-        assertEquals("w10", main.getId());
+        assertEquals("w1", main.getId());
         assertEquals(0.0D, main.getOffsetX(), 0.0D);
-        assertEquals(100.0D, main.getOffsetY(), 0.0D);
+        assertEquals(0.0D, main.getOffsetY(), 0.0D);
         // Unknown ids dropped, unplaced channels appended, Admin closed.
         assertEquals(Arrays.asList(ChatChannel.ALL, ChatChannel.OOC,
                 ChatChannel.PROXIMITY, ChatChannel.FACTION,
@@ -459,35 +433,4 @@ public final class ChatWindowLayoutStoreTest {
         }
     }
 
-    /**
-     * An older build wrote a Discord tab of its own; OOC &amp; Discord took
-     * it in, so every line naming it — a tab, the front tab, a mute, a
-     * hidden mark — reads as that channel, and a layout naming both
-     * keeps one tab in the place the first of them had.
-     */
-    @Test
-    public void anOlderFilesDiscordTabReadsAsOocAndDiscord() {
-        ChatWindowLayoutStore.load(Arrays.asList(
-                "window w1 x=0.00 y=100.00 active=discord "
-                        + "tabs=all,discord,ooc,console",
-                "muted discord",
-                "hidden DISCORD"));
-        ChatWindow only = ChatWindowLayout.firstWindow();
-        assertEquals(Arrays.asList(ChatChannel.ALL, ChatChannel.OOC,
-                ChatChannel.CONSOLE), only.getChannels().subList(0, 3));
-        assertEquals(1, Collections.frequency(only.getChannels(),
-                ChatChannel.OOC));
-        assertEquals(ChatChannel.OOC, only.getActiveChannel());
-        assertTrue(ChatWindowLayout.isMuted(ChatChannel.OOC));
-        assertTrue(ChatWindowLayout.isHidden(ChatChannel.OOC));
-        // Written back, the file names the channel by today's id only.
-        for (String line : ChatWindowLayoutStore.describe()) {
-            assertFalse(line, line.contains("discord"));
-        }
-
-        ChatWindowLayout.reset();
-        ChatWindowLayoutStore.load(Arrays.asList("closed discord"));
-        assertEquals(Collections.singletonList(ChatChannel.OOC),
-                ChatWindowLayout.closedChannels());
-    }
 }

@@ -90,7 +90,7 @@ public final class PlayerAppearanceResolverTest {
                 resolved.getRendererScale(), 0.0F);
 
         ResolvedPlayerAppearance troll = PlayerAppearanceResolver.resolve(
-                PLAYER, new CharacterAppearance(PLAYER, CharacterRaceRegistry.LEGACY_TROLL,
+                PLAYER, new CharacterAppearance(PLAYER, CharacterRaceRegistry.HALF_TROLL,
                         CharacterGenderRegistry.FEMALE, ""));
         assertNotNull(troll);
         assertEquals(CharacterRaceRegistry.HALF_TROLL, troll.getRaceId());

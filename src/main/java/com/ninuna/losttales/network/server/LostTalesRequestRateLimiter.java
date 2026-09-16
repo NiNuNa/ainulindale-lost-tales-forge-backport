@@ -51,6 +51,11 @@ public final class LostTalesRequestRateLimiter {
         // for a channel that has more than one; a handful covers a
         // player moving between their characters.
         CHAT_HISTORY(6, 5000L),
+        // Selecting a character can replay two conversations; bound rapid cycling.
+        CHAT_IDENTITY(6, 5000L),
+        // A presence is chosen by hand now and then, and Away comes and
+        // goes with idle time; a handful in five seconds covers both.
+        CHAT_PRESENCE(6, 5000L),
         // An operator opens the settings screen and saves it; a few of each
         // in five seconds is already impatient.
         SERVER_CONFIG(6, 5000L),

@@ -315,6 +315,11 @@ public final class LostTalesServerBroadcastHook {
      * are playing — the name and colour their own Global line would be
      * signed with — so a replay names them as the live line did.
      */
+    /**
+     * The listed players a line names. The player a join line announces
+     * is not listed yet when it goes out; their login replay names them
+     * on it ({@link ChatHistory#namePlayer}).
+     */
     private static List<ChatNamedPlayer> namedPlayers(String text,
                                                       List<EntityPlayerMP> online) {
         List<ChatNamedPlayer> named = new ArrayList<ChatNamedPlayer>();
@@ -322,30 +327,42 @@ public final class LostTalesServerBroadcastHook {
             if (named.size() >= ChatNamedPlayer.MAX_PER_LINE) {
                 break;
             }
-            if (player == null) {
-                continue;
+            // The game writes a player in by their display name, which
+            // is their character's; an account name still names them.
+            if (player != null && (ChatNamedPlayer.names(text, accountOf(player))
+                    || ChatNamedPlayer.names(text, player.getDisplayName()))) {
+                named.add(namedPlayer(player));
             }
-            String account = player.getGameProfile() == null
-                    ? player.getCommandSenderName()
-                    : player.getGameProfile().getName();
-            if (!ChatNamedPlayer.names(text, account)) {
-                continue;
-            }
-            PlayableIdentityResolver.Resolution identity =
-                    PlayableIdentityResolver.resolve(player);
-            RoleplayCharacter character = identity.isAvailable()
-                    ? identity.getCharacter() : null;
-            String identityName = character == null ? account
-                    : PlayableIdentity.displayName(character, account);
-            LostTalesChatPresentationResolver.Presentation presentation =
-                    LostTalesChatPresentationResolver.resolve(player, character);
-            int roles = ChatAccountRoleResolver.resolve(player,
-                    character == null ? null : character.getCharacterId());
-            named.add(new ChatNamedPlayer(account, identityName,
-                    ChatRolePresentation.nameColor(ChatChannel.ALL, roles,
-                            character == null, presentation.nameColor)));
         }
         return named;
+    }
+
+    /**
+     * The player as a line names them: their account, the identity they
+     * are playing right now, and the colour that identity wears in
+     * Global — what a replay shows in place of the account's name.
+     */
+    public static ChatNamedPlayer namedPlayer(EntityPlayerMP player) {
+        String account = accountOf(player);
+        PlayableIdentityResolver.Resolution identity =
+                PlayableIdentityResolver.resolve(player);
+        RoleplayCharacter character = identity.isAvailable()
+                ? identity.getCharacter() : null;
+        String identityName = character == null ? account
+                : PlayableIdentity.displayName(character, account);
+        LostTalesChatPresentationResolver.Presentation presentation =
+                LostTalesChatPresentationResolver.resolve(player, character);
+        int roles = ChatAccountRoleResolver.resolve(player,
+                character == null ? null : character.getCharacterId());
+        return new ChatNamedPlayer(account, identityName,
+                ChatRolePresentation.nameColor(ChatChannel.ALL, roles,
+                        character == null, presentation.nameColor));
+    }
+
+    private static String accountOf(EntityPlayerMP player) {
+        return player.getGameProfile() == null
+                ? player.getCommandSenderName()
+                : player.getGameProfile().getName();
     }
 
     private static void logOnce(String what, Throwable throwable) {

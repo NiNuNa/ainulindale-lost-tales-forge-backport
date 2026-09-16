@@ -51,7 +51,7 @@ public final class LotrRaceProfileAdapter {
 
     public synchronized CharacterRaceGameplayProfile resolve(
             World world, String raceId) {
-        String canonicalRaceId = CharacterRaceRegistry.canonicalizeIdentifier(raceId);
+        String canonicalRaceId = CharacterRaceRegistry.normalizeIdentifier(raceId);
         if (canonicalRaceId.length() == 0) {
             return CharacterRaceGameplayRegistry.DEFAULT;
         }

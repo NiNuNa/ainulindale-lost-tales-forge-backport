@@ -13,7 +13,9 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.List;
 import java.util.Locale;
@@ -24,12 +26,11 @@ import java.util.UUID;
  * preference of the signed-in account, kept under {@code config/} in a
  * file named after the account and never synchronized or cleared
  * between worlds. Two people sharing a machine keep their own windows,
- * and one person with two accounts keeps an arrangement for each; the
- * file every account once shared is read as an account's starting
- * point while it has no file of its own. The file is a few plain lines
+ * and one person with two accounts keeps an arrangement for each. The
+ * file is a few plain lines
  * — one per window, one per closed channel, one per preference (muted,
- * mentions muted, hidden) — so a hand edit or a stale entry from an
- * older version cannot corrupt anything: whatever does not parse is
+ * mentions muted, hidden) — so a hand edit or a stale entry cannot
+ * corrupt anything: whatever does not parse is
  * skipped and the layout repairs itself on load.
  *
  * <pre>
@@ -42,12 +43,16 @@ import java.util.UUID;
  * noping party
  * hidden admin
  * </pre>
+ *
+ * <p>A whisper tab is remembered per place on a line of its own, its
+ * fields tab-separated since a name or a place may hold spaces:
+ * {@code conversation}, the place, the window and the tab id for one
+ * that was open; {@code closedconversation}, the place and the tab id
+ * for one closed by hand.</p>
  */
 public final class ChatWindowLayoutStore {
     /** The folder under the client's, one file per account. */
     static final String FOLDER = LostTalesConfigFiles.CHAT_LAYOUTS;
-    /** The file every account once shared: a starting point, never written. */
-    static final String SHARED_FILE_PATH = LostTalesConfigFiles.CHAT_LAYOUT;
     private static final Charset UTF_8 = Charset.forName("UTF-8");
 
     private static File storeFile;
@@ -83,19 +88,12 @@ public final class ChatWindowLayoutStore {
     static synchronized void initialize(File configDirectory, UUID accountId) {
         storeFile = fileFor(configDirectory, accountId);
         List<String> lines = readLines(storeFile);
-        if (lines == null && storeFile != null) {
-            // An account with no file of its own starts from the file
-            // every account once shared, which stays as it is: the
-            // account's own file is written from the first change.
-            lines = readLines(new File(configDirectory, SHARED_FILE_PATH));
-        }
         if (lines != null) {
             load(lines);
         } else {
             loadedLines = null;
             layoutTouched = false;
             ChatWindowLayout.reset();
-            ClientChatAppearances.forgetStored();
         }
         ChatWindowLayout.setChangeListener(new Runnable() {
             @Override
@@ -147,14 +145,37 @@ public final class ChatWindowLayoutStore {
         List<ChatTab> muted = new ArrayList<ChatTab>();
         List<ChatTab> pingsMuted = new ArrayList<ChatTab>();
         List<ChatTab> hidden = new ArrayList<ChatTab>();
-        List<String[]> locks = new ArrayList<String[]>();
-        boolean identityHintShown = false;
         double feedX = 0.0D;
         double feedY = 100.0D;
         boolean collapsed = false;
+        Map<String, List<String[]>> conversations =
+                new LinkedHashMap<String, List<String[]>>();
+        Map<String, Set<String>> closedConversations =
+                new LinkedHashMap<String, Set<String>>();
         for (String raw : lines) {
             String line = raw == null ? "" : raw.trim();
             if (line.length() == 0 || line.startsWith("#")) {
+                continue;
+            }
+            if (line.startsWith("conversation\t")
+                    || line.startsWith("closedconversation\t")) {
+                String[] fields = line.split("\t");
+                if ("conversation".equals(fields[0]) && fields.length == 4) {
+                    List<String[]> open = conversations.get(fields[1]);
+                    if (open == null) {
+                        open = new ArrayList<String[]>();
+                        conversations.put(fields[1], open);
+                    }
+                    open.add(new String[] {fields[2], fields[3]});
+                } else if ("closedconversation".equals(fields[0])
+                        && fields.length == 3) {
+                    Set<String> closedHere = closedConversations.get(fields[1]);
+                    if (closedHere == null) {
+                        closedHere = new LinkedHashSet<String>();
+                        closedConversations.put(fields[1], closedHere);
+                    }
+                    closedHere.add(fields[2]);
+                }
                 continue;
             }
             String[] parts = line.split("\\s+");
@@ -163,26 +184,12 @@ public final class ChatWindowLayoutStore {
                 if (channel != null) {
                     closed.add(channel);
                 }
-            } else if (parts.length == 2 && ("muted".equals(parts[0])
-                    // An older file's feed-only mute is today's mute.
-                    || "nofeed".equals(parts[0]))) {
+            } else if (parts.length == 2 && "muted".equals(parts[0])) {
                 addTab(muted, parts[1]);
             } else if (parts.length == 2 && "noping".equals(parts[0])) {
                 addTab(pingsMuted, parts[1]);
             } else if (parts.length == 2 && "hidden".equals(parts[0])) {
                 addTab(hidden, parts[1]);
-            } else if (parts.length == 3 && "identity".equals(parts[0])) {
-                // A tab's identity lock: the tab, and the account or a
-                // character id; one the roster cannot name is resolved
-                // later by ClientChatAppearances, or dropped there.
-                locks.add(new String[] {parts[1], parts[2]});
-            } else if ("flag".equals(parts[0])) {
-                for (int index = 1; index < parts.length; index++) {
-                    if (parts[index].startsWith("identityHintShown=")) {
-                        identityHintShown = "true".equalsIgnoreCase(
-                                parts[index].substring(18));
-                    }
-                }
             } else if (parts.length >= 2 && "window".equals(parts[0])) {
                 ChatWindowLayout.WindowSpec spec = parseWindow(parts);
                 if (spec != null) {
@@ -207,8 +214,7 @@ public final class ChatWindowLayoutStore {
         }
         ChatWindowLayout.load(specs, closed, muted, pingsMuted, hidden,
                 feedX, feedY, collapsed);
-        ClientChatAppearances.restoreLocks(locks);
-        ClientChatAppearances.restoreIdentityHintShown(identityHintShown);
+        ChatWindowLayout.loadConversations(conversations, closedConversations);
     }
 
     private static void addTab(List<ChatTab> tabs, String id) {
@@ -220,21 +226,17 @@ public final class ChatWindowLayoutStore {
 
     private static ChatWindowLayout.WindowSpec parseWindow(String[] parts) {
         String id = parts[1].toLowerCase(Locale.ROOT);
-        boolean legacyMain = ChatWindowLayout.LEGACY_MAIN_ID.equals(id);
-        if (!legacyMain && !ChatWindowLayout.isWindowId(id)) {
+        if (!ChatWindowLayout.isWindowId(id)) {
             return null;
         }
         List<ChatTab> tabs = new ArrayList<ChatTab>();
         ChatTab active = null;
         boolean locked = false;
-        // A file from before windows had positions leaves its main
-        // window where vanilla draws the chat.
         double offsetX = 0.0D;
-        double offsetY = legacyMain ? 100.0D : 0.0D;
+        double offsetY = 0.0D;
         String linkTarget = null;
         ChatWindow.LinkSide linkSide = ChatWindow.LinkSide.BELOW;
-        // No size of its own: the window follows the game's settings,
-        // which is what every file written before resizing carries.
+        // No size of its own: the window follows the game's settings.
         double maxLines = 0.0D;
         int width = 0;
         ChatWindow.ScreenFill fill = ChatWindow.ScreenFill.NONE;
@@ -368,11 +370,18 @@ public final class ChatWindowLayoutStore {
         for (ChatTab tab : ChatWindowLayout.hiddenTabs()) {
             lines.add("hidden " + tab.id());
         }
-        for (String[] lock : ClientChatAppearances.describeLocks()) {
-            lines.add("identity " + lock[0] + " " + lock[1]);
+        for (Map.Entry<String, List<String[]>> place
+                : ChatWindowLayout.rememberedConversations().entrySet()) {
+            for (String[] entry : place.getValue()) {
+                lines.add("conversation\t" + place.getKey() + "\t" + entry[0]
+                        + "\t" + entry[1]);
+            }
         }
-        if (ClientChatAppearances.wasIdentityHintShown()) {
-            lines.add("flag identityHintShown=true");
+        for (Map.Entry<String, Set<String>> place
+                : ChatWindowLayout.rememberedClosedConversations().entrySet()) {
+            for (String id : place.getValue()) {
+                lines.add("closedconversation\t" + place.getKey() + "\t" + id);
+            }
         }
         return lines;
     }

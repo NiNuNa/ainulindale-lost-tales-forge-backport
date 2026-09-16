@@ -25,16 +25,6 @@ public final class LostTalesHudPlacementConfigTest {
     }
 
     @Test
-    public void legacyQuickLootOffsetsKeepTheirPreviousScreenPosition() {
-        assertEquals(50.0D,
-                LostTalesConfig.migrateLegacyQuickLootOffsetX(0), 0.0001D);
-        assertEquals(62.0D,
-                LostTalesConfig.migrateLegacyQuickLootOffsetX(24), 0.0001D);
-        assertEquals(100.0D,
-                LostTalesConfig.migrateLegacyQuickLootOffsetX(100), 0.0001D);
-    }
-
-    @Test
     public void everyPlacementScreenElementHasAStableConfigKey() {
         assertEquals("compass",
                 LostTalesConfig.normalizeHudElement("compass"));

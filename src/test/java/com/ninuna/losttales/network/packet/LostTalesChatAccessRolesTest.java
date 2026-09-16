@@ -38,7 +38,7 @@ public final class LostTalesChatAccessRolesTest {
     private static LostTalesChatAccessPacket statement(int played,
             int account, Map<UUID, Integer> own,
             LostTalesChatAccessPacket.RoleHolder holder, int radius) {
-        return new LostTalesChatAccessPacket(false, true, played,
+        return new LostTalesChatAccessPacket(false, played,
                 holder == null
                         ? Collections.<LostTalesChatAccessPacket.RoleHolder>emptyList()
                         : Collections.singletonList(holder),
@@ -69,7 +69,6 @@ public final class LostTalesChatAccessRolesTest {
                 new LostTalesChatAccessPacket.RoleHolder("Steve",
                         operator | team, operator, played), 64));
         assertFalse(decoded.isMalformed());
-        assertTrue(decoded.hasRoleSplit());
         assertEquals(operator | team, decoded.getRoleMask());
         assertEquals(operator, decoded.getAccountRoleMask());
         assertEquals(Integer.valueOf(team),
@@ -94,26 +93,6 @@ public final class LostTalesChatAccessRolesTest {
         assertEquals(operator, decoded.getAccountRoleMask());
     }
 
-    /**
-     * A payload this short carries no catalogue either, so its mask is
-     * read against the built-in roles: the team mark is the one it can
-     * name.
-     */
-    @Test
-    public void aPayloadWithoutTheSplitLetsThePlayedMaskStandForTheAccount() {
-        int team = ChatAccountRole.TEAM.bit();
-        ByteBuf buffer = Unpooled.buffer();
-        buffer.writeBoolean(false);
-        buffer.writeBoolean(true);
-        buffer.writeInt(team);
-        LostTalesChatAccessPacket decoded = new LostTalesChatAccessPacket();
-        decoded.fromBytes(buffer);
-        assertFalse(decoded.isMalformed());
-        assertFalse(decoded.hasRoleSplit());
-        assertEquals(team, decoded.getAccountRoleMask());
-        assertTrue(decoded.getCharacterRoleMasks().isEmpty());
-        assertEquals(0, decoded.getProximityRadius());
-    }
 
     @Test
     public void aRadiusPastTheConfigsBoundIsRefused() {

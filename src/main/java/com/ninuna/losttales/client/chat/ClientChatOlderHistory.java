@@ -49,7 +49,7 @@ final class ClientChatOlderHistory {
     static synchronized boolean requestIfAtTop(Minecraft minecraft, ChatTab view,
                                                List<ChatLine> lines, boolean atTop) {
         if (!atTop || minecraft == null || minecraft.ingameGUI == null
-                || view == null || view.isWhisper() || lines == null
+                || view == null || view.isNpc() || lines == null
                 || lines.isEmpty()) {
             return false;
         }
@@ -64,8 +64,12 @@ final class ClientChatOlderHistory {
         if (decision != Decision.ASK) {
             return false;
         }
-        String scope = ClientChatContextHistory.scopeOf(ChatTab.viewed(view));
-        if (view.getChannel().isScoped() == (scope.length() == 0)) {
+        // A whisper names its conversation by the tab's id — the one held
+        // as the identity being read; a scoped channel by the conversation.
+        String scope = view.isWhisper() ? ChatTab.viewed(view).id()
+                : ClientChatContextHistory.scopeOf(ChatTab.viewed(view));
+        if (!view.isWhisper()
+                && view.getChannel().isScoped() == (scope.length() == 0)) {
             return false;
         }
         try {
@@ -168,6 +172,12 @@ final class ClientChatOlderHistory {
             }
         }
         return ChatMessageIds.NONE;
+    }
+
+    /** Whether the view's kept history has been paged to its end this session. */
+    static synchronized boolean isExhausted(ChatTab view) {
+        ChatTab key = key(view);
+        return key == null || EXHAUSTED.contains(key);
     }
 
     /** Forgets every ask; what a cleared history calls. */

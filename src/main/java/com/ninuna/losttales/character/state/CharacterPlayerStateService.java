@@ -591,14 +591,15 @@ public final class CharacterPlayerStateService {
             NBTTagCompound state;
             if (character != null && component == this.lotrProgressionComponent) {
                 // A character made in the roster names the faction it starts
-                // with, and starts with alignment for it. The account's own
-                // default character names none: it is the identity that was
-                // already being played, so its progression is whatever that
-                // player had, and clean progression is the right blank for it.
-                String startingFactionId = character.getStartingFactionId();
-                state = startingFactionId == null || startingFactionId.length() == 0
+                // with, and starts with alignment for it. Unaligned is
+                // nobody's chosen side: it is the default character's, the
+                // identity that was already being played, so its progression
+                // is whatever that player had, and clean progression is the
+                // right blank for it.
+                state = isUnaligned(character)
                         ? this.lotrProgressionComponent.createDefault()
-                        : this.lotrProgressionComponent.createDefault(startingFactionId);
+                        : this.lotrProgressionComponent.createDefault(
+                                character.getStartingFactionId());
             } else if (component == this.locationComponent) {
                 state = createInitialLocation(character);
             } else {
@@ -618,12 +619,21 @@ public final class CharacterPlayerStateService {
                 player, snapshot.getComponent(VanillaLocationStateComponent.ID));
     }
 
+    /** Whether the character's faction is Unaligned, or none, which is the same. */
+    private static boolean isUnaligned(RoleplayCharacter character) {
+        return LotrCharacterAdapter.UNALIGNED_FACTION_ID.equals(
+                LotrCharacterAdapter.factionIdOrUnaligned(
+                        character.getStartingFactionId()));
+    }
+
     private NBTTagCompound createInitialLocation(RoleplayCharacter character) {
         if (character == null) {
             return this.locationComponent.createDefault();
         }
         String waypointId = character.getStartingWaypointId();
-        if (waypointId.length() == 0) {
+        // Unaligned has no starting place of its own; such a character
+        // starts where the world's default puts it.
+        if (waypointId.length() == 0 && !isUnaligned(character)) {
             waypointId = LotrCharacterAdapter.getInstance()
                     .resolveStartingWaypointId(
                             character.getStartingFactionId(), "",

@@ -250,6 +250,8 @@ final class ChatChannelTabBar {
      * stands on begins here, which is the window's own left edge.
      */
     private static final int STRIP_INSET = 2;
+    /** The search bar's well, cut out of the tool strip; null for none. */
+    private ChatHitBox toolStripHole;
     /**
      * The window's left frame edge: the strip's first column, drawn on
      * the border, one pixel wide. The gaps are measured from it rather
@@ -579,6 +581,26 @@ final class ChatChannelTabBar {
      * row's band and the tool strip under its rule, down to the window's
      * top rule, which is the tool strip's last row.
      */
+    /** The tool strip's left edge in row space, where the search bar starts. */
+    static int toolStripLeft(Row row) {
+        return row.offsetX + row.left - STRIP_INSET;
+    }
+
+    /** The tool strip's right edge, fractions included, the row laid out first. */
+    double toolStripRight(FontRenderer font, Row row) {
+        layout(font, row);
+        return row.offsetX + this.endEdge + this.endFraction + STRIP_INSET;
+    }
+
+    /**
+     * Where the search bar's well is cut out of the tool strip's
+     * surface, in row space; null for a whole strip. The well wears a
+     * surface of its own, and no two surfaces are laid over each other.
+     */
+    void setToolStripHole(ChatHitBox hole) {
+        this.toolStripHole = hole;
+    }
+
     static boolean inStripBand(Row row, double mouseY) {
         double y = mouseY - row.fractionY;
         return y >= rowTop(row.rowBottom)
@@ -971,11 +993,29 @@ final class ChatChannelTabBar {
         // row of the history's backdrop, as the strip's rule stands.
         float stripLeft = row.offsetX + row.left - STRIP_INSET;
         int toolBottom = bottom + ChatWindowPlacement.TOOL_STRIP_HEIGHT;
-        LostTalesChatOverlayRenderer.fillRect(stripLeft, bottom, stripRight,
-                toolBottom - 1,
-                LostTalesChatVisualStyle.argb(
-                        LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB,
-                        scaled(TAB_SURFACE_ALPHA)));
+        int toolArgb = LostTalesChatVisualStyle.argb(
+                LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB,
+                scaled(TAB_SURFACE_ALPHA));
+        ChatHitBox hole = this.toolStripHole;
+        if (hole == null) {
+            LostTalesChatOverlayRenderer.fillRect(stripLeft, bottom, stripRight,
+                    toolBottom - 1, toolArgb);
+        } else {
+            // The search bar's well is a hole in the strip: the surface
+            // round it in four pieces, nothing under the well itself.
+            float holeLeft = (float) hole.left;
+            float holeTop = (float) hole.top;
+            float holeRight = (float) (hole.left + hole.width);
+            float holeBottom = (float) (hole.top + hole.height);
+            LostTalesChatOverlayRenderer.fillRect(stripLeft, bottom, stripRight,
+                    holeTop, toolArgb);
+            LostTalesChatOverlayRenderer.fillRect(stripLeft, holeTop, holeLeft,
+                    holeBottom, toolArgb);
+            LostTalesChatOverlayRenderer.fillRect(holeRight, holeTop, stripRight,
+                    holeBottom, toolArgb);
+            LostTalesChatOverlayRenderer.fillRect(stripLeft, holeBottom, stripRight,
+                    toolBottom - 1, toolArgb);
+        }
         LostTalesChatOverlayRenderer.drawBackdropRow(stripLeft,
                 toolBottom - 1, stripRight, toolBottom,
                 scaled(LostTalesChatOverlayRenderer.backdropRowAlpha(

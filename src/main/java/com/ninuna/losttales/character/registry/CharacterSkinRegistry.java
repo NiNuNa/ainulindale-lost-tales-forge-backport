@@ -146,7 +146,7 @@ public final class CharacterSkinRegistry {
 
     public static List<CharacterSkinDefinition> getCompatibleSkins(
             String raceId, String genderId) {
-        String canonicalRaceId = CharacterRaceRegistry.canonicalizeIdentifier(raceId);
+        String canonicalRaceId = CharacterRaceRegistry.normalizeIdentifier(raceId);
         List<CharacterSkinDefinition> raceSkins = BY_RACE.get(canonicalRaceId);
         if (raceSkins == null || raceSkins.isEmpty()) {
             return Collections.emptyList();

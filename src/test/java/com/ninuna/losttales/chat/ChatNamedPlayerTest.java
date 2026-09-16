@@ -27,6 +27,8 @@ public final class ChatNamedPlayerTest {
         ChatNamedPlayer sam = new ChatNamedPlayer("Sam", "Samwise", 0x123456);
         ChatNamedPlayer frodo = new ChatNamedPlayer("Frodo", "", 0);
         assertEquals(sam, ChatNamedPlayer.find(Arrays.asList(frodo, sam), "sam"));
+        assertEquals("a line the server writes names the character",
+                sam, ChatNamedPlayer.find(Arrays.asList(frodo, sam), "samwise"));
         assertEquals("Frodo", ChatNamedPlayer.find(
                 Arrays.asList(frodo, sam), "Frodo").getIdentityName());
         assertNull(ChatNamedPlayer.find(Arrays.asList(frodo, sam), "Merry"));

@@ -53,9 +53,7 @@ public final class ChatChannel {
     /**
      * Out-of-character conversation, and the channel the Discord bridge
      * carries by default: out of character, everyone online reads it,
-     * and it is there whether or not the server bridges anything. An
-     * older build kept a Discord channel of its own beside it; its id
-     * still resolves here, see {@link #fromId}.
+     * and it is there whether or not the server bridges anything.
      */
     public static final ChatChannel OOC = register("ooc", "OOC & Discord", ChatPresentationMode.OUT_OF_CHARACTER,
             ChatRecipientRule.GLOBAL, ChatChannelAccess.NONE,
@@ -89,15 +87,6 @@ public final class ChatChannel {
     private static final List<ChatChannel> BUILT_IN_ORDER =
             Collections.unmodifiableList(Arrays.asList(
                     ALL, PROXIMITY, FACTION, OOC, PARTY, ADMIN, CONSOLE));
-
-    /**
-     * The id an older build wrote for a channel that since became part
-     * of another: {@code discord}, the Discord channel OOC &amp; Discord
-     * took in. A layout file, a packet from an older client and a
-     * configuration entry naming it all resolve to the channel that
-     * took it in.
-     */
-    private static final String LEGACY_DISCORD_ID = "discord";
 
     /** The ids that are the code's own and are never taken out of force. */
     private static final java.util.Set<String> BUILT_IN_IDS =
@@ -281,10 +270,7 @@ public final class ChatChannel {
         return Collections.unmodifiableList(order);
     }
 
-    /**
-     * The channel an id names, an older build's id for a channel since
-     * merged included; null for anything unknown.
-     */
+    /** The channel an id names; null for anything unknown. */
     public static ChatChannel fromId(String id) {
         String normalized = id == null ? ""
                 : id.trim().toLowerCase(Locale.ROOT);
@@ -293,6 +279,6 @@ public final class ChatChannel {
                 return channel;
             }
         }
-        return LEGACY_DISCORD_ID.equals(normalized) ? OOC : null;
+        return null;
     }
 }

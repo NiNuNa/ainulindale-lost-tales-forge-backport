@@ -44,15 +44,11 @@ public final class ChatChannelTest {
         assertEquals(null, ChatChannel.fromId(null));
     }
 
-    /**
-     * An older build kept a Discord channel of its own; OOC &amp; Discord
-     * took it in, and its id still names that channel wherever a file
-     * or a packet from that build carries it.
-     */
+    /** OOC &amp; Discord is one channel under the id {@code ooc}; the bare word Discord names nothing. */
     @Test
-    public void theOldDiscordIdNamesOocAndDiscord() {
-        assertEquals(ChatChannel.OOC, ChatChannel.fromId("discord"));
-        assertEquals(ChatChannel.OOC, ChatChannel.fromId(" Discord "));
+    public void oocAndDiscordIsOneChannel() {
+        assertEquals(null, ChatChannel.fromId("discord"));
+        assertEquals(ChatChannel.OOC, ChatChannel.fromId(" OOC "));
         assertEquals("ooc", ChatChannel.OOC.getId());
         assertEquals("OOC & Discord", ChatChannel.OOC.getDisplayName());
         assertEquals(ChatRecipientRule.SELF,

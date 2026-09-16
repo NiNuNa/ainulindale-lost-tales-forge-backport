@@ -22,6 +22,24 @@ public final class PlayableIdentityDisplayNameTest {
     private static final UUID OWNER =
             UUID.fromString("f0000000-0000-0000-0000-00000000000f");
 
+    /**
+     * Forge's name format is answered with the character in the account's
+     * place, whatever another mod put around the account's name; a name
+     * that no longer holds the account is the character's alone, and no
+     * character leaves it be.
+     */
+    @Test
+    public void theDisplayNameCarriesTheCharacterInTheAccountsPlace() {
+        assertEquals("[Mod] Aldric",
+                PlayableIdentity.formatDisplayName("[Mod] Steve", "Steve", "Aldric"));
+        assertEquals("Aldric",
+                PlayableIdentity.formatDisplayName("Somebody", "Steve", "Aldric"));
+        assertEquals("Aldric",
+                PlayableIdentity.formatDisplayName(null, "Steve", "Aldric"));
+        assertEquals("[Mod] Steve",
+                PlayableIdentity.formatDisplayName("[Mod] Steve", "Steve", ""));
+    }
+
     @Test
     public void aCharacterGoesByItsOwnName() {
         assertEquals("Aldric",

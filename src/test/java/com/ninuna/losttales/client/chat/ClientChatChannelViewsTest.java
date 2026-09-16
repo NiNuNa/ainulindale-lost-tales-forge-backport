@@ -25,6 +25,25 @@ public final class ClientChatChannelViewsTest {
     @After
     public void cleanUp() {
         ClientChatChannelViews.clear();
+        ClientChatReadMarks.clear();
+        ClientChatSession.resumeAt("");
+    }
+
+    /**
+     * A line this player said is read wherever it went: once the server
+     * names it, the view's read mark stands at it, so the next join's
+     * replay of it is filed and not counted, while a later line is.
+     */
+    @Test
+    public void aPlayersOwnLineIsReadOnceTheServerNamesIt() {
+        ClientChatSession.resumeAt("server:play.example");
+        ChatTab party = ChatTab.of(ChatChannel.PARTY);
+        ChatTab global = ChatTab.of(ChatChannel.ALL);
+        ClientChatChannelViews.noteOwnLine(party, -7, 4200L);
+        ClientChatChannelViews.record(-8, party, global, false, 4200L, 1000L, true);
+        assertFalse(ClientChatChannelViews.hasUnread(ChatChannel.PARTY));
+        ClientChatChannelViews.record(-9, party, global, false, 4201L, 1000L, true);
+        assertEquals(1, ClientChatChannelViews.unreadCount(ChatChannel.PARTY));
     }
 
     private static ChatLine line(int chatLineId) {

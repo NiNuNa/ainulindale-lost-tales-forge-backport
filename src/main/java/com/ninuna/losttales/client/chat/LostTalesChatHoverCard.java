@@ -75,6 +75,25 @@ final class LostTalesChatHoverCard {
     }
 
     /**
+     * The brief card of the identity a tab speaks as: what the head
+     * button shows on hover, so who the roleplaying channels speak as
+     * is read the way anyone else in the chat is. Nothing while a
+     * clicked card stands open.
+     */
+    static void drawForIdentity(Minecraft minecraft, ChatTab tab, int mouseX,
+                                int mouseY, int screenWidth, int screenHeight) {
+        if (pinned != null || minecraft == null || minecraft.thePlayer == null) {
+            return;
+        }
+        ClientChatSignature.Signature signature = ClientChatSignature.of(tab);
+        drawCard(minecraft, new Target(minecraft.thePlayer.getUniqueID(),
+                        signature.accountLine, signature.skinId,
+                        signature.identityName, "", signature.accountName,
+                        signature.nameColor),
+                mouseX, mouseY, screenWidth, screenHeight, false);
+    }
+
+    /**
      * Whether the pointer stands on somebody — a sender's identity span
      * or a mention — rather than on message text: exactly where a card
      * is showing. A right-click there belongs to the person, so the
@@ -249,15 +268,18 @@ final class LostTalesChatHoverCard {
                         details.getCharacterId());
         addDetail(lines, "gui.losttales.chat.card.roles", target.npcIdentity
                 ? "" : roleNames(worn));
+        // Away or Do Not Disturb, when the person said so; Online is no news.
+        addDetail(lines, "gui.losttales.chat.card.status", target.npcIdentity
+                ? "" : ChatPresenceMark.label(
+                        ClientChatPresence.presenceOf(target.playerId)));
         // An NPC's faction is what its speech was captured with, and the
         // brief card says it too: without it the card is a name alone.
         if (full || target.npcIdentity) {
             addDetail(lines, "gui.losttales.chat.card.faction",
                     target.npcIdentity
                             ? ChatChannelIcons.npcFaction(target.playerId)
-                            : details == null
-                                    || details.getStartingFactionId().length() == 0
-                            ? "" : ClientCharacterDisplayNames.faction(
+                            : details == null ? ""
+                            : ClientCharacterDisplayNames.faction(
                                     details.getStartingFactionId()));
         }
         String description = "";

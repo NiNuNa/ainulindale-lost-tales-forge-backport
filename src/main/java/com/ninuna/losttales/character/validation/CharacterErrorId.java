@@ -18,6 +18,7 @@ public enum CharacterErrorId {
     INVALID_NAME_EMPTY("invalid_name_empty"),
     INVALID_NAME_LENGTH("invalid_name_length"),
     INVALID_NAME_CHARACTERS("invalid_name_characters"),
+    INVALID_NAME_PROFANE("invalid_name_profane"),
     DUPLICATE_NAME("duplicate_name"),
     INVALID_RACE("invalid_race"),
     INVALID_GENDER("invalid_gender"),
@@ -41,7 +42,6 @@ public enum CharacterErrorId {
     SWITCH_PLAYER_STATE_STORAGE_READ_ONLY("switch_player_state_storage_read_only"),
     SWITCH_PLAYER_STATE_INVALID("switch_player_state_invalid"),
     /** No longer produced: the account is a playable identity and needs no import target. Kept so the id and its text still resolve. */
-    SWITCH_STATE_IMPORT_REQUIRED("switch_state_import_required"),
     SWITCH_PLAYER_NOT_READY("switch_player_not_ready"),
     SWITCH_SESSION_CHANGED("switch_session_changed"),
     SWITCH_ALREADY_IN_PROGRESS("switch_already_in_progress"),

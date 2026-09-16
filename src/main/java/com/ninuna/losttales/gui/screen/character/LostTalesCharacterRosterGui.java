@@ -352,12 +352,8 @@ public final class LostTalesCharacterRosterGui extends GuiScreen
                 + ClientCharacterDisplayNames.gender(character.getGenderId()) + "  •  "
                 + I18n.format("gui.losttales.character.age_value",
                 Integer.valueOf(character.getAge()));
-        // The account's own identity starts in no faction, which is a
-        // fact about it rather than a field nobody filled in.
-        String faction = character.getStartingFactionId().length() == 0
-                ? I18n.format("gui.losttales.character.account_faction_none")
-                : ClientCharacterDisplayNames.faction(character.getStartingFactionId());
-        String lineTwo = faction + "  •  "
+        String lineTwo = ClientCharacterDisplayNames.faction(
+                character.getStartingFactionId()) + "  •  "
                 + I18n.format("gui.losttales.character.level_short",
                 Integer.valueOf(character.getRoleplayLevel()));
         this.fontRendererObj.drawStringWithShadow(

@@ -2,8 +2,8 @@ package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import java.util.LinkedHashMap;
-import com.ninuna.losttales.character.identity.RoleplayCharacterIdentityHook;
 import com.ninuna.losttales.character.model.CharacterRoster;
+import com.ninuna.losttales.character.model.CharacterKind;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.server.CharacterActiveResolver;
 import com.ninuna.losttales.character.storage.CharacterStorage;
@@ -12,6 +12,7 @@ import com.ninuna.losttales.chat.ChatChannelAccess;
 import com.ninuna.losttales.chat.ChatChannelGates;
 import com.ninuna.losttales.chat.ChatChannelScope;
 import com.ninuna.losttales.chat.ChatRecipientRule;
+import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.party.model.Party;
@@ -66,7 +67,7 @@ public final class ChatChannelPolicy {
      * needs a party, a faction line a faction — then the role gate,
      * which a channel may ask besides.
      *
-     * @param roles    the sender's roles as the identity being played
+     * @param roles    the sender's roles as the selected chat identity
      * @param operator whether the sender holds the server's operator level,
      *                 which is what reaches a staff channel the config
      *                 names no gate for; see {@link #staffOnly}
@@ -115,7 +116,8 @@ public final class ChatChannelPolicy {
         if (staffOnly(channel, gates)) {
             return LostTalesPermissions.isOperator(player);
         }
-        return gates.canRead(roles, channel);
+        return gates.canRead(ChatRolePresentation.isInCharacter(channel)
+                ? roles : ChatAccountRoleResolver.resolve(player, null), channel);
     }
 
     /** Whether the player may send into the channel, the staff floor included. */
@@ -125,7 +127,8 @@ public final class ChatChannelPolicy {
         if (staffOnly(channel, gates)) {
             return LostTalesPermissions.isOperator(player);
         }
-        return gates.canSend(roles, channel);
+        return gates.canSend(ChatRolePresentation.isInCharacter(channel)
+                ? roles : ChatAccountRoleResolver.resolve(player, null), channel);
     }
 
     /** Whether the refusal is the role gate's, so the client's tabs should be told again. */
@@ -165,7 +168,7 @@ public final class ChatChannelPolicy {
                 if (!LostTalesPermissions.isOperator(candidate)) {
                     continue;
                 }
-            } else if (gated && !gates.canRead(playedRoles(candidate), channel)) {
+            } else if (gated && !canRead(candidate, channel, ChatIdentitySelection.roles(candidate))) {
                 continue;
             }
             boolean reached;
@@ -185,7 +188,8 @@ public final class ChatChannelPolicy {
                     reached = isCurrentOnlinePartyMember(candidate, party);
                     break;
                 case FACTION:
-                    reached = ownsCharacterInFaction(candidate, factionId);
+                    reached = factionId != null && factionId.length() > 0
+                            && factionId.equals(factionOf(ChatIdentitySelection.character(candidate)));
                     break;
                 default:
                     reached = false;
@@ -291,10 +295,14 @@ public final class ChatChannelPolicy {
         return "";
     }
 
-    /** The played character's normalized faction id, or empty for none. */
-    public static String playedFactionId(RoleplayCharacter character) {
-        return character == null ? ""
-                : LotrCharacterAdapter.normalizeFactionId(character.getStartingFactionId());
+    /**
+     * The faction the selected identity speaks and reads Faction chat in:
+     * the character's own, or Unaligned for the account and for a
+     * character created without one. Never empty.
+     */
+    public static String factionOf(RoleplayCharacter character) {
+        return LotrCharacterAdapter.factionIdOrUnaligned(
+                character == null ? "" : character.getStartingFactionId());
     }
 
     private static boolean isCurrentOnlinePartyMember(EntityPlayerMP player, Party party) {
@@ -302,62 +310,35 @@ public final class ChatChannelPolicy {
             return false;
         }
         PartyMember member = party.getMember(
-                RoleplayCharacterIdentityHook.resolveGameplayId(player));
+                ChatIdentitySelection.identityId(player));
         return member != null && player.getUniqueID().equals(member.getOwnerId());
     }
 
     /**
-     * Whether a faction line reaches the player: they have a character
-     * in that faction, whichever one they happen to be playing. An
-     * account may play any of its characters at will, so what it could
-     * read by switching is what it may read; the client shows the line
-     * under that character's own tab and nowhere else. A character made
-     * after the line was said is not counted, so joining a faction
-     * opens nothing that was said before.
+     * The selected identity's faction, with the time its Faction history
+     * starts: the character's creation, or for the account the creation
+     * of its default character, which is when the account first joined.
      */
-    private static boolean ownsCharacterInFaction(EntityPlayerMP player, String factionId) {
-        return earliestCharacterIn(player, factionId) != null;
-    }
-
-    /**
-     * When the account's earliest character in the faction was made, or
-     * null when it has none. The one place the ownership rule is stated;
-     * routing asks it for now, the history for then.
-     */
-    public static Long earliestCharacterIn(EntityPlayerMP player, String factionId) {
-        if (player == null || factionId == null || factionId.length() == 0) {
-            return null;
-        }
-        Long earliest = null;
-        for (RoleplayCharacter character : charactersOf(player)) {
-            if (factionId.equals(playedFactionId(character))
-                    && (earliest == null
-                            || character.getCreationTimestamp() < earliest.longValue())) {
-                earliest = Long.valueOf(character.getCreationTimestamp());
-            }
-        }
-        return earliest;
-    }
-
-    /**
-     * Every faction the account has a character in, and when its
-     * earliest such character was made. What a history replay is
-     * decided against, read once for the player rather than per line.
-     */
-    public static Map<String, Long> ownedFactions(EntityPlayerMP player) {
+    public static Map<String, Long> selectedFactions(EntityPlayerMP player) {
         Map<String, Long> owned = new HashMap<String, Long>();
+        RoleplayCharacter character = ChatIdentitySelection.character(player);
+        owned.put(factionOf(character), Long.valueOf(character != null
+                ? character.getCreationTimestamp() : accountSince(player)));
+        return owned;
+    }
+
+    /**
+     * When the account's default character was made, or 0 when the roster
+     * cannot be read: the account has been able to read Unaligned talk
+     * since then.
+     */
+    private static long accountSince(EntityPlayerMP player) {
         for (RoleplayCharacter character : charactersOf(player)) {
-            String factionId = playedFactionId(character);
-            if (factionId.length() == 0) {
-                continue;
-            }
-            Long earliest = owned.get(factionId);
-            if (earliest == null
-                    || character.getCreationTimestamp() < earliest.longValue()) {
-                owned.put(factionId, Long.valueOf(character.getCreationTimestamp()));
+            if (character != null && character.getKind() == CharacterKind.DEFAULT) {
+                return character.getCreationTimestamp();
             }
         }
-        return owned;
+        return 0L;
     }
 
     /**

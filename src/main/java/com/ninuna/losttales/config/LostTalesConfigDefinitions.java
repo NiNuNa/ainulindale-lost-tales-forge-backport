@@ -25,8 +25,7 @@ public final class LostTalesConfigDefinitions {
      * holds — the same category, key, type and shape — the default,
      * comment, bounds and words it is defined with. What each is set to
      * is untouched, and so is an option the definitions do not hold or
-     * hold in another shape: a file from before the option changed type,
-     * which its own load converts.
+     * hold in another shape, which its own load converts.
      */
     public static void apply(Configuration definitions, Configuration target) {
         if (definitions == null || target == null) {

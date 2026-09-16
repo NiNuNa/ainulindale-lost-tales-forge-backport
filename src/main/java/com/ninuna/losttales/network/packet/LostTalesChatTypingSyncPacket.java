@@ -16,7 +16,7 @@ import io.netty.buffer.ByteBuf;
  * refreshed expires on its own, so a lost stop never leaves a ghost.
  */
 public final class LostTalesChatTypingSyncPacket implements IMessage {
-    private static final int MAX_PACKET_BYTES = 256;
+    private static final int MAX_PACKET_BYTES = 448;
     private static final int MAX_CHANNEL_BYTES = 16;
     private static final int MAX_NAME_BYTES = 96;
 
@@ -24,6 +24,8 @@ public final class LostTalesChatTypingSyncPacket implements IMessage {
     /** The whisper tab this belongs in; empty for every other channel. */
     private String partner = "";
     private String identityName = "";
+    private String scopeValue = "";
+    private String recipientIdentity = "";
     private boolean typing;
     private boolean malformed;
 
@@ -32,6 +34,14 @@ public final class LostTalesChatTypingSyncPacket implements IMessage {
     public LostTalesChatTypingSyncPacket(ChatChannel channel, String partner,
                                          String identityName,
                                          boolean typing) {
+        this(channel, partner, identityName, typing, "", "");
+    }
+
+    public LostTalesChatTypingSyncPacket(ChatChannel channel, String partner,
+                                         String identityName, boolean typing,
+                                         String scopeValue, String recipientIdentity) {
+        this.scopeValue = scopeValue == null ? "" : scopeValue;
+        this.recipientIdentity = recipientIdentity == null ? "" : recipientIdentity;
         this.channelId = channel == null ? "" : channel.getId();
         this.partner = partner == null ? "" : partner.trim();
         this.identityName = identityName == null ? "" : identityName.trim();
@@ -54,6 +64,8 @@ public final class LostTalesChatTypingSyncPacket implements IMessage {
             this.identityName = LostTalesPacketCodec.readUtf8String(
                     buffer, MAX_NAME_BYTES).trim();
             this.typing = buffer.readBoolean();
+            this.scopeValue = LostTalesPacketCodec.readUtf8String(buffer, 128);
+            this.recipientIdentity = LostTalesPacketCodec.readUtf8String(buffer, 36);
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
@@ -62,6 +74,8 @@ public final class LostTalesChatTypingSyncPacket implements IMessage {
             this.partner = "";
             this.identityName = "";
             this.typing = false;
+            this.scopeValue = "";
+            this.recipientIdentity = "";
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -76,11 +90,15 @@ public final class LostTalesChatTypingSyncPacket implements IMessage {
         LostTalesPacketCodec.writeUtf8String(buffer, this.identityName,
                 MAX_NAME_BYTES);
         buffer.writeBoolean(this.typing);
+        LostTalesPacketCodec.writeUtf8String(buffer, this.scopeValue, 128);
+        LostTalesPacketCodec.writeUtf8String(buffer, this.recipientIdentity, 36);
     }
 
     private void validate() {
         ChatChannel channel = ChatChannel.fromId(this.channelId);
         if (channel == null || this.identityName.length() == 0
+                || !LostTalesPacketCodec.isUtf8WithinLimit(this.scopeValue, 128)
+                || !LostTalesPacketCodec.isUtf8WithinLimit(this.recipientIdentity, 36)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.channelId, MAX_CHANNEL_BYTES)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
@@ -102,6 +120,8 @@ public final class LostTalesChatTypingSyncPacket implements IMessage {
     public String getPartner() { return this.partner; }
     /** The name the typist's messages show in this channel. */
     public String getIdentityName() { return this.identityName; }
+    public String getScopeValue() { return this.scopeValue; }
+    public String getRecipientIdentity() { return this.recipientIdentity; }
     public boolean isTyping() { return this.typing; }
     public boolean isMalformed() { return this.malformed; }
 

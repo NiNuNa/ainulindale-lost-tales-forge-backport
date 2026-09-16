@@ -27,17 +27,19 @@ import java.util.UUID;
  * promise a message somewhere the message will not go.</p>
  */
 public final class LostTalesChatTypingPacket implements IMessage {
-    private static final int MAX_PACKET_BYTES = 128;
+    private static final int MAX_PACKET_BYTES = 256;
     private static final int MAX_CHANNEL_BYTES = 16;
     private static final int MAX_TARGET_BYTES = 64;
 
     private String channelId = "";
     /** Account name a whisper is for; empty for every other channel. */
     private String target = "";
+    private String targetIdentity = "";
+    private UUID targetCharacterId;
     private boolean typing;
     /** Which identity the message would wear; see the send packet. */
-    private int appearanceKind = LostTalesChatSendPacket.APPEARANCE_DEFAULT;
-    private UUID appearanceCharacterId;
+    private int identityKind = LostTalesChatSendPacket.IDENTITY_DEFAULT;
+    private UUID identityCharacterId;
     private boolean malformed;
 
     public LostTalesChatTypingPacket() {}
@@ -45,17 +47,26 @@ public final class LostTalesChatTypingPacket implements IMessage {
     public LostTalesChatTypingPacket(ChatChannel channel, String target,
                                      boolean typing) {
         this(channel, target, typing,
-                LostTalesChatSendPacket.APPEARANCE_DEFAULT, null);
+                LostTalesChatSendPacket.IDENTITY_DEFAULT, null);
     }
 
     public LostTalesChatTypingPacket(ChatChannel channel, String target,
-                                     boolean typing, int appearanceKind,
-                                     UUID appearanceCharacterId) {
+                                     boolean typing, int identityKind,
+                                     UUID identityCharacterId) {
+        this(channel, target, typing, identityKind, identityCharacterId, "", null);
+    }
+
+    public LostTalesChatTypingPacket(ChatChannel channel, String target,
+                                     boolean typing, int identityKind,
+                                     UUID identityCharacterId, String targetIdentity,
+                                     UUID targetCharacterId) {
+        this.targetIdentity = targetIdentity == null ? "" : targetIdentity.trim();
+        this.targetCharacterId = targetCharacterId;
         this.channelId = channel == null ? "" : channel.getId();
         this.target = target == null ? "" : target.trim();
         this.typing = typing;
-        this.appearanceKind = appearanceKind;
-        this.appearanceCharacterId = appearanceCharacterId;
+        this.identityKind = identityKind;
+        this.identityCharacterId = identityCharacterId;
         validate();
     }
 
@@ -72,26 +83,28 @@ public final class LostTalesChatTypingPacket implements IMessage {
             this.target = LostTalesPacketCodec.readUtf8String(
                     buffer, MAX_TARGET_BYTES).trim();
             this.typing = buffer.readBoolean();
-            // Appended after the original layout: which identity the
-            // message would wear. A shorter payload states none, and the
-            // server signs and routes presence with the character being
-            // played, which is what it did before this was carried.
-            if (buffer.isReadable()) {
-                this.appearanceKind = buffer.readUnsignedByte();
-                this.appearanceCharacterId = this.appearanceKind
-                        == LostTalesChatSendPacket.APPEARANCE_CHARACTER
-                        ? new UUID(buffer.readLong(), buffer.readLong())
-                        : null;
+            this.identityKind = buffer.readUnsignedByte();
+            this.identityCharacterId = this.identityKind
+                    == LostTalesChatSendPacket.IDENTITY_CHARACTER
+                    ? new UUID(buffer.readLong(), buffer.readLong()) : null;
+            this.targetIdentity = LostTalesPacketCodec.readUtf8String(buffer, 96).trim();
+            int namedCharacter = buffer.readUnsignedByte();
+            if (namedCharacter > 1) {
+                throw new IllegalArgumentException("invalid whisper identity flag");
             }
+            this.targetCharacterId = namedCharacter == 0 ? null
+                    : new UUID(buffer.readLong(), buffer.readLong());
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
             this.malformed = true;
             this.channelId = "";
             this.target = "";
+            this.targetIdentity = "";
+            this.targetCharacterId = null;
             this.typing = false;
-            this.appearanceKind = LostTalesChatSendPacket.APPEARANCE_DEFAULT;
-            this.appearanceCharacterId = null;
+            this.identityKind = LostTalesChatSendPacket.IDENTITY_DEFAULT;
+            this.identityCharacterId = null;
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -104,19 +117,28 @@ public final class LostTalesChatTypingPacket implements IMessage {
         LostTalesPacketCodec.writeUtf8String(buffer, this.target,
                 MAX_TARGET_BYTES);
         buffer.writeBoolean(this.typing);
-        buffer.writeByte(this.appearanceKind);
-        if (this.appearanceKind
-                == LostTalesChatSendPacket.APPEARANCE_CHARACTER) {
+        buffer.writeByte(this.identityKind);
+        if (this.identityKind
+                == LostTalesChatSendPacket.IDENTITY_CHARACTER) {
             buffer.writeLong(
-                    this.appearanceCharacterId.getMostSignificantBits());
+                    this.identityCharacterId.getMostSignificantBits());
             buffer.writeLong(
-                    this.appearanceCharacterId.getLeastSignificantBits());
+                    this.identityCharacterId.getLeastSignificantBits());
+        }
+        LostTalesPacketCodec.writeUtf8String(buffer, this.targetIdentity, 96);
+        buffer.writeBoolean(this.targetCharacterId != null);
+        if (this.targetCharacterId != null) {
+            buffer.writeLong(this.targetCharacterId.getMostSignificantBits());
+            buffer.writeLong(this.targetCharacterId.getLeastSignificantBits());
         }
     }
 
     private void validate() {
         ChatChannel channel = ChatChannel.fromId(this.channelId);
         if (channel == null
+                || !LostTalesPacketCodec.isUtf8WithinLimit(this.targetIdentity, 96)
+                || (channel != ChatChannel.WHISPER
+                        && (this.targetIdentity.length() > 0 || this.targetCharacterId != null))
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.channelId, MAX_CHANNEL_BYTES)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
@@ -125,13 +147,13 @@ public final class LostTalesChatTypingPacket implements IMessage {
                         && this.target.length() == 0)
                 || (channel != ChatChannel.WHISPER
                         && this.target.length() > 0)
-                || this.appearanceKind
-                        < LostTalesChatSendPacket.APPEARANCE_DEFAULT
-                || this.appearanceKind
-                        > LostTalesChatSendPacket.APPEARANCE_CHARACTER
-                || (this.appearanceKind
-                        == LostTalesChatSendPacket.APPEARANCE_CHARACTER
-                        && this.appearanceCharacterId == null)) {
+                || this.identityKind
+                        < LostTalesChatSendPacket.IDENTITY_DEFAULT
+                || this.identityKind
+                        > LostTalesChatSendPacket.IDENTITY_CHARACTER
+                || (this.identityKind
+                        == LostTalesChatSendPacket.IDENTITY_CHARACTER
+                        && this.identityCharacterId == null)) {
             throw new IllegalArgumentException("invalid chat typing request");
         }
     }
@@ -141,10 +163,12 @@ public final class LostTalesChatTypingPacket implements IMessage {
     }
     /** The whisper's account name; empty otherwise. */
     public String getTarget() { return this.target; }
+    public String getTargetIdentity() { return this.targetIdentity; }
+    public UUID getTargetCharacterId() { return this.targetCharacterId; }
     public boolean isTyping() { return this.typing; }
-    public int getAppearanceKind() { return this.appearanceKind; }
-    public UUID getAppearanceCharacterId() {
-        return this.appearanceCharacterId;
+    public int getIdentityKind() { return this.identityKind; }
+    public UUID getIdentityCharacterId() {
+        return this.identityCharacterId;
     }
     public boolean isMalformed() { return this.malformed; }
 
@@ -170,8 +194,10 @@ public final class LostTalesChatTypingPacket implements IMessage {
                                     message.getChannel(),
                                     message.getTarget(),
                                     message.isTyping(),
-                                    message.getAppearanceKind(),
-                                    message.getAppearanceCharacterId());
+                                    message.getIdentityKind(),
+                                    message.getIdentityCharacterId(),
+                                    message.getTargetIdentity(),
+                                    message.getTargetCharacterId());
                         }
                     });
             return null;

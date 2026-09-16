@@ -134,10 +134,9 @@ public class CharacterRoster {
      * then on the character is this world's, and what the player does to
      * the template elsewhere is about the next world, not this one.</p>
      *
-     * <p>False for every roster written before the template existed, so
-     * a world that made a default character before then still takes it
-     * the next time the player joins. That is the same one reading, one
-     * login later.</p>
+     * <p>False for a roster that carries no answer, so such a world takes
+     * the template the next time the player joins: the same one reading,
+     * one login later.</p>
      */
     public boolean isTemplateTaken() {
         return this.templateTaken;

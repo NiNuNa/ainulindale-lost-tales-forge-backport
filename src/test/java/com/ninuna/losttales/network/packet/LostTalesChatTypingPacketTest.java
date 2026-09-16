@@ -46,28 +46,26 @@ public final class LostTalesChatTypingPacketTest {
     }
 
     @Test
-    public void theStatedIdentityRoundTripsAndAnOlderPayloadStatesNone() {
+    public void theStatedIdentityRoundTripsAndAnIncompletePayloadIsRejected() {
         java.util.UUID character =
                 java.util.UUID.fromString("00000000-0000-0000-0000-0000000000c1");
         LostTalesChatTypingPacket original = new LostTalesChatTypingPacket(
                 ChatChannel.ALL, "", true,
-                LostTalesChatSendPacket.APPEARANCE_CHARACTER, character);
+                LostTalesChatSendPacket.IDENTITY_CHARACTER, character);
         ByteBuf buffer = Unpooled.buffer();
         try {
             original.toBytes(buffer);
             LostTalesChatTypingPacket decoded = new LostTalesChatTypingPacket();
             decoded.fromBytes(buffer);
             assertFalse(decoded.isMalformed());
-            assertEquals(LostTalesChatSendPacket.APPEARANCE_CHARACTER,
-                    decoded.getAppearanceKind());
-            assertEquals(character, decoded.getAppearanceCharacterId());
+            assertEquals(LostTalesChatSendPacket.IDENTITY_CHARACTER,
+                    decoded.getIdentityKind());
+            assertEquals(character, decoded.getIdentityCharacterId());
         } finally {
             buffer.release();
         }
 
-        // The layout this was appended to: a payload that stops after the
-        // typing flag states no identity, and the server signs presence
-        // with the character being played, as it did before.
+        // Every field is mandatory; no older wire layout is supported.
         ByteBuf older = Unpooled.buffer();
         try {
             LostTalesPacketCodec.writeUtf8String(older, "all", 16);
@@ -75,10 +73,10 @@ public final class LostTalesChatTypingPacketTest {
             older.writeBoolean(true);
             LostTalesChatTypingPacket decoded = new LostTalesChatTypingPacket();
             decoded.fromBytes(older);
-            assertFalse(decoded.isMalformed());
-            assertEquals(LostTalesChatSendPacket.APPEARANCE_DEFAULT,
-                    decoded.getAppearanceKind());
-            assertNull(decoded.getAppearanceCharacterId());
+            assertTrue(decoded.isMalformed());
+            assertEquals(LostTalesChatSendPacket.IDENTITY_DEFAULT,
+                    decoded.getIdentityKind());
+            assertNull(decoded.getIdentityCharacterId());
         } finally {
             older.release();
         }
@@ -140,5 +138,47 @@ public final class LostTalesChatTypingPacketTest {
         decoded.fromBytes(buffer);
         assertTrue(decoded.isMalformed());
         assertEquals("", decoded.getIdentityName());
+    }
+
+    @Test
+    public void typingCarriesItsConversationAndRejectsEveryIncompletePayload() {
+        String identity = new java.util.UUID(1L, 2L).toString();
+        ByteBuf wire = Unpooled.buffer();
+        new LostTalesChatTypingSyncPacket(ChatChannel.FACTION, "", "Aldric",
+                true, "lotr:gondor", identity).toBytes(wire);
+        LostTalesChatTypingSyncPacket decoded = new LostTalesChatTypingSyncPacket();
+        decoded.fromBytes(wire.copy());
+        assertFalse(decoded.isMalformed());
+        assertEquals("lotr:gondor", decoded.getScopeValue());
+        assertEquals(identity, decoded.getRecipientIdentity());
+        for (int length = 0; length < wire.readableBytes(); length++) {
+            decoded = new LostTalesChatTypingSyncPacket();
+            decoded.fromBytes(wire.copy(0, length));
+            assertTrue(decoded.isMalformed());
+        }
+        decoded = new LostTalesChatTypingSyncPacket();
+        decoded.fromBytes(wire.copy().writeByte(0));
+        assertTrue(decoded.isMalformed());
+    }
+
+    @Test
+    public void whisperTypingAddressesACharacterAndRejectsPartialRequests() {
+        java.util.UUID character = new java.util.UUID(1L, 2L);
+        ByteBuf wire = Unpooled.buffer();
+        new LostTalesChatTypingPacket(ChatChannel.WHISPER, "Steve", true,
+                LostTalesChatSendPacket.IDENTITY_ACCOUNT, null, "Aldric", character).toBytes(wire);
+        LostTalesChatTypingPacket decoded = new LostTalesChatTypingPacket();
+        decoded.fromBytes(wire.copy());
+        assertFalse(decoded.isMalformed());
+        assertEquals("Aldric", decoded.getTargetIdentity());
+        assertEquals(character, decoded.getTargetCharacterId());
+        for (int length = 0; length < wire.readableBytes(); length++) {
+            decoded = new LostTalesChatTypingPacket();
+            decoded.fromBytes(wire.copy(0, length));
+            assertTrue(decoded.isMalformed());
+        }
+        decoded = new LostTalesChatTypingPacket();
+        decoded.fromBytes(wire.copy().setByte(wire.readableBytes() - 17, 2));
+        assertTrue(decoded.isMalformed());
     }
 }

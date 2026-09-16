@@ -15,9 +15,9 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Character data version 7 stores the arm width. Older records derive it
- * from the sex, unknown values are repaired the same way, and a stored
- * choice that differs from the sex's default survives a round trip.
+ * A record without an arm width derives it from the sex, an unknown
+ * value is repaired the same way, and a stored choice that differs from
+ * the sex's default survives a round trip.
  */
 public final class CharacterBodyTypeMigrationTest {
 
@@ -27,17 +27,16 @@ public final class CharacterBodyTypeMigrationTest {
             "91000000-0000-0000-0000-000000000019");
 
     @Test
-    public void versionSixRecordsTakeTheSexDefault() {
-        NBTTagCompound legacy = CharacterNbtCodec.writeCharacterRecord(
+    public void aRecordWithoutABodyTypeTakesTheSexDefault() {
+        NBTTagCompound record = CharacterNbtCodec.writeCharacterRecord(
                 character(CharacterGenderRegistry.FEMALE, CharacterBodyTypeRegistry.WIDE));
-        legacy.setInteger("DataVersion", 6);
-        legacy.removeTag("BodyTypeId");
+        record.removeTag("BodyTypeId");
 
-        RoleplayCharacter migrated = CharacterNbtCodec.readCharacterRecord(legacy, OWNER);
+        RoleplayCharacter loaded = CharacterNbtCodec.readCharacterRecord(record, OWNER);
 
-        assertNotNull(migrated);
-        assertEquals(RoleplayCharacter.CURRENT_DATA_VERSION, migrated.getDataVersion());
-        assertEquals(CharacterBodyTypeRegistry.SLIM, migrated.getBodyTypeId());
+        assertNotNull(loaded);
+        assertEquals(RoleplayCharacter.CURRENT_DATA_VERSION, loaded.getDataVersion());
+        assertEquals(CharacterBodyTypeRegistry.SLIM, loaded.getBodyTypeId());
     }
 
     @Test

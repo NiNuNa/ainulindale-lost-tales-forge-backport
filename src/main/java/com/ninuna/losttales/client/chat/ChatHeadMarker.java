@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
+import com.ninuna.losttales.chat.ChatNarrator;
 import java.nio.charset.Charset;
 import java.util.Base64;
 import java.util.UUID;
@@ -11,6 +12,12 @@ import net.minecraft.util.IChatComponent;
 
 /** Invisible style marker carried only by the two spaces reserved for a head. */
 final class ChatHeadMarker {
+    /**
+     * The mark a Narrator line wears for a head. The pointing hand stands
+     * in until a scroll is drawn into the emoji sheet.
+     */
+    static final ChatEmoji NARRATOR_MARK = ChatEmoji.INDEX_POINTING_AT_THE_VIEWER;
+
     private static final String PREFIX = "losttales-chat-head:";
     private static final Charset UTF_8 = Charset.forName("UTF-8");
 
@@ -186,12 +193,21 @@ final class ChatHeadMarker {
                             this.senderId);
         }
 
+        /** Whether the line is the Narrator's: its head slot holds the Narrator's mark. */
+        boolean isNarrator() {
+            return !this.accountIdentity && ChatNarrator.isNarratorSkin(this.skinId);
+        }
+
         /**
          * The emoji standing where the head would, or null for a
-         * sender with a head of their own: the Discord mark for the
-         * bridge, the console mark for the server and the client.
+         * sender with a head of their own: the Narrator's mark, the
+         * Discord mark for the bridge, the console mark for the server
+         * and the client.
          */
         ChatEmoji mark() {
+            if (isNarrator()) {
+                return NARRATOR_MARK;
+            }
             if (isDiscordSender()) {
                 return ChatEmoji.DISCORD;
             }

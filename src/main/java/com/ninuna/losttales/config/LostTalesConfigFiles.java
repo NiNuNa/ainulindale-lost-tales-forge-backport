@@ -48,16 +48,12 @@ public final class LostTalesConfigFiles {
      * people sharing a machine keep their own arrangement.
      */
     public static final String CHAT_LAYOUTS = "chat/layouts";
-    /**
-     * The one chat layout every account on an installation shared before
-     * layouts were per account. Read as an account's starting point while
-     * it has no file of its own; never written.
-     */
-    public static final String CHAT_LAYOUT = "chat/layout.txt";
     /** Emoji favourites and use counts, under the client folder. */
     public static final String CHAT_EMOJIS = "chat/emojis.txt";
     /** The ignore list, under the client folder. */
     public static final String CHAT_IGNORES = "chat/ignores.txt";
+    /** This installation's own profanity words, under the client folder; never written. */
+    public static final String CHAT_PROFANITY = "chat/profanity.txt";
     /**
      * How far each account has read each conversation on each server, a
      * folder under the client folder holding one file per account.

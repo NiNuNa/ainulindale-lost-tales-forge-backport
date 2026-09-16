@@ -302,8 +302,8 @@ public final class ChatHistoryNbtCodec {
                 && !safeSource.hasKey(TAG_CONSOLE_EVENTS, Constants.NBT.TAG_LIST)) {
             return ReadResult.unsupported(safeSource, -1);
         }
-        // A save without the console's events is one from before they
-        // were kept: read as an empty console, and written whole.
+        // A save without the console's events reads as an empty console
+        // and is written whole.
         repaired |= !safeSource.hasKey(TAG_CONSOLE_EVENTS, Constants.NBT.TAG_LIST);
         List<ChatConsoleEvent> events = new ArrayList<ChatConsoleEvent>();
         Set<Long> seenEventIds = new HashSet<Long>();
@@ -394,8 +394,8 @@ public final class ChatHistoryNbtCodec {
     /**
      * The reactions an entry was written with, or null when they cannot
      * be read back whole: a list of the wrong kind, an emoji that is no
-     * reaction key, a foreign emoji in an entry written before foreign
-     * emoji had a layout, a reactor without an id, one named twice under
+     * reaction key, a foreign emoji without its layout, a reactor
+     * without an id, one named twice under
      * one emoji, or more than the bounds allow. Such an entry is
      * quarantined whole rather than kept with part of its reactions.
      */

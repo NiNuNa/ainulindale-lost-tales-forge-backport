@@ -13,6 +13,7 @@ import com.ninuna.losttales.chat.ChatChannelAccess;
 import com.ninuna.losttales.chat.ChatChannelIconCatalog;
 import com.ninuna.losttales.chat.ChatChannelIconSpec;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
+import com.ninuna.losttales.chat.profanity.ChatProfanityWords;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
@@ -23,55 +24,32 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Server-to-client: which restricted chat channels the player may use,
- * and which roles the player holds. The client cannot know its own
- * operator status on a dedicated server, so the server states it on
- * login and whenever a refused message makes it worth saying again; the
- * server still checks on every send regardless. The role mask is
- * presentation only — it is what lets this client notice that
- * {@code @Operator} was addressed to it — and, like every other role
- * fact, it is the server's word alone. The second flag on the wire once
- * gated a Discord channel of its own; that channel is OOC & Discord now
- * and exists for everyone, so the server always sends it set and this
- * client reads nothing from it.
+ * Server-to-client: what this player may do in the chat, and everything
+ * a client draws from the server's word alone. Sent on login and again
+ * whenever something in it changes or a refused message makes it worth
+ * saying again; the server still checks on every request regardless.
+ * Every fact here is presentation: the Operator channel's send gate, the
+ * role mask this player holds (what lets a client notice {@code @Operator}
+ * was addressed to it), the <em>role roster</em> of every online account
+ * holding a role with its mask (account names and role marks are public
+ * on the tab list, so nothing here widens what a client can learn), the
+ * senders under a mute (sent to moderators only), the <em>role
+ * catalogue</em> in force (so a client draws config-defined roles it has
+ * never seen in code), the <em>channel gates</em> (the ids this client may
+ * read and send into), the two capability flags the moderation menus and
+ * the Server Settings button are offered on, every capability held by id,
+ * the channels this server defines for itself, the roles told apart by
+ * identity (the account's own mask, each own character's mask, and each
+ * roster holder's account mask beside the character they play, since a
+ * role given to an account is worn by every character of it and one given
+ * to a character by that character alone), the server's Proximity radius,
+ * the icons the server puts on its channels, and the words the server
+ * adds to the chat's profanity list.
  *
- * <p>Appended after the personal fields travels the <em>role roster</em>:
- * every online account that holds a role, with its mask. Account names
- * and role marks are public on the tab list and on every line those
- * players send, so nothing here widens what a client can learn; it only
- * lets the role hover card name a role's members, and a mention of a
- * role holder wear their colour before they have spoken.</p>
- *
- * <p>Appended after the muted senders travel the <em>role catalogue</em>
- * — every role in force, with its bit, look and rank, so a client draws
- * config-defined roles it has never seen in code — and the
- * <em>channel gates</em>: one bit per channel saying whether this
- * client may read it and one whether it may send into it, the server's
- * answer for this player alone. A payload written before either
- * existed reads as the built-in roles with every channel open.</p>
- *
- * <p>Then come two capability flags: whether this player may
- * <em>moderate</em> the chat — mute, unmute, take anyone's message back
- * — which is what the client's moderation menus are offered on, and
- * whether they may edit the server's settings, which is what the Server
- * Settings button is shown on. Presentation only, like every flag here:
- * the server decides again on each request. A payload written before
- * they travelled reads both as no.</p>
- *
- * <p>Last travels the list of every capability the player holds, by id,
- * which is what the client offers its menus on: a capability the code
- * gains later needs no flag of its own here. The two flags above stay
- * for a payload written before the list did, and say the same thing.</p>
- *
- * <p>After the channels a server defines travel the roles told apart by
- * identity — the account's own mask, the mask assigned to each of the
- * player's own characters, and for every roster holder the account's own
- * mask and the character it is playing — and the server's Proximity
- * radius. A role given to an account is worn by the account and every
- * character of it, one given to a character by that character alone,
- * and these fields are how a client tells the two apart. A payload
- * written before they travelled states neither: the played mask stands
- * for the account, and the radius is unknown.</p>
+ * <p>The layout is complete or the payload is malformed: a client reads
+ * exactly what this build's server writes, and a payload that stops
+ * short, names an unknown role bit, repeats a channel or holds an entry
+ * that reads as nothing is refused whole.</p>
  */
 public final class LostTalesChatAccessPacket implements IMessage {
     private static final int MAX_HOLDERS = 256;
@@ -116,7 +94,9 @@ public final class LostTalesChatAccessPacket implements IMessage {
             + 4 + 2 + MAX_OWN_CHARACTERS * 20
             + 2 + MAX_HOLDERS * 21 + 2
             + 1 + ChatChannelIconCatalog.MAX_ICONS
-                    * (MAX_CHANNEL_ID_BYTES + MAX_CHANNEL_ICON_BYTES + 4);
+                    * (MAX_CHANNEL_ID_BYTES + MAX_CHANNEL_ICON_BYTES + 4)
+            + 2 + ChatProfanityWords.MAX_WORDS
+                    * (ChatProfanityWords.MAX_ENTRY_BYTES + 2);
     /**
      * Every channel this build knows, by id: what a payload written
      * without a channel answer reads as, and what a client falls back to.
@@ -130,7 +110,6 @@ public final class LostTalesChatAccessPacket implements IMessage {
     }
 
     private boolean adminAccess;
-    private boolean discordAccess;
     private int roleMask;
     private List<RoleHolder> roleHolders = Collections.emptyList();
     /**
@@ -170,79 +149,65 @@ public final class LostTalesChatAccessPacket implements IMessage {
     /**
      * The account's own roles, apart from the character being played:
      * what an account line wears, and what every character of the
-     * account wears too. The played mask stands for it in a payload that
-     * does not state the two apart.
+     * account wears too.
      */
     private int accountRoleMask;
-    /** Whether the payload stated the roles apart by identity. */
-    private boolean rolesSplit;
     /** The roles assigned to each of the player's own characters, by id. */
     private Map<UUID, Integer> characterRoleMasks = Collections.emptyMap();
     /** The server's Proximity radius in blocks; zero when unstated. */
     private int proximityRadius;
-    /**
-     * The icons the server puts on its channels, by channel id: the
-     * channels file's choice, appended after the radius so a payload
-     * written before it names none.
-     */
+    /** The icons the server puts on its channels, by channel id: the channels file's choice. */
     private Map<String, ChatChannelIconSpec> channelIcons =
             Collections.emptyMap();
+    /** The words the server adds to the chat's profanity list. */
+    private ChatProfanityWords profanityWords = ChatProfanityWords.NONE;
     private boolean malformed;
 
     public LostTalesChatAccessPacket() {}
 
-    public LostTalesChatAccessPacket(boolean adminAccess,
-                                     boolean discordAccess) {
-        this(adminAccess, discordAccess, 0);
+    public LostTalesChatAccessPacket(boolean adminAccess) {
+        this(adminAccess, 0);
     }
 
-    public LostTalesChatAccessPacket(boolean adminAccess,
-                                     boolean discordAccess, int roleMask) {
-        this(adminAccess, discordAccess, roleMask,
-                Collections.<RoleHolder>emptyList());
+    public LostTalesChatAccessPacket(boolean adminAccess, int roleMask) {
+        this(adminAccess, roleMask, Collections.<RoleHolder>emptyList());
     }
 
-    public LostTalesChatAccessPacket(boolean adminAccess,
-                                     boolean discordAccess, int roleMask,
+    public LostTalesChatAccessPacket(boolean adminAccess, int roleMask,
                                      List<RoleHolder> roleHolders) {
-        this(adminAccess, discordAccess, roleMask, roleHolders,
-                Collections.<UUID>emptyList());
+        this(adminAccess, roleMask, roleHolders, Collections.<UUID>emptyList());
     }
 
-    public LostTalesChatAccessPacket(boolean adminAccess,
-                                     boolean discordAccess, int roleMask,
+    public LostTalesChatAccessPacket(boolean adminAccess, int roleMask,
                                      List<RoleHolder> roleHolders,
                                      List<UUID> mutedSenders) {
-        this(adminAccess, discordAccess, roleMask, roleHolders, mutedSenders,
+        this(adminAccess, roleMask, roleHolders, mutedSenders,
                 ChatRoleCatalog.current().roles(), allChannelIds(), allChannelIds());
     }
 
-    public LostTalesChatAccessPacket(boolean adminAccess,
-                                     boolean discordAccess, int roleMask,
+    public LostTalesChatAccessPacket(boolean adminAccess, int roleMask,
                                      List<RoleHolder> roleHolders,
                                      List<UUID> mutedSenders,
                                      List<ChatAccountRole> catalog,
                                      List<String> readableChannels,
                                      List<String> sendableChannels) {
-        this(adminAccess, discordAccess, roleMask, roleHolders, mutedSenders, catalog,
+        this(adminAccess, roleMask, roleHolders, mutedSenders, catalog,
                 readableChannels, sendableChannels, false, false);
     }
 
-    public LostTalesChatAccessPacket(boolean adminAccess,
-                                     boolean discordAccess, int roleMask,
+    public LostTalesChatAccessPacket(boolean adminAccess, int roleMask,
                                      List<RoleHolder> roleHolders,
                                      List<UUID> mutedSenders,
                                      List<ChatAccountRole> catalog,
                                      List<String> readableChannels,
                                      List<String> sendableChannels,
                                      boolean canModerate, boolean canEditServerConfig) {
-        this(adminAccess, discordAccess, roleMask, roleHolders, mutedSenders, catalog,
+        this(adminAccess, roleMask, roleHolders, mutedSenders, catalog,
                 readableChannels, sendableChannels, canModerate, canEditServerConfig,
                 Collections.<String>emptyList());
     }
 
-    public LostTalesChatAccessPacket(boolean adminAccess,
-                                     boolean discordAccess, int roleMask,
+    public LostTalesChatAccessPacket(boolean adminAccess, int roleMask,
                                      List<RoleHolder> roleHolders,
                                      List<UUID> mutedSenders,
                                      List<ChatAccountRole> catalog,
@@ -250,19 +215,13 @@ public final class LostTalesChatAccessPacket implements IMessage {
                                      List<String> sendableChannels,
                                      boolean canModerate, boolean canEditServerConfig,
                                      List<String> capabilities) {
-        this(adminAccess, discordAccess, roleMask, roleHolders, mutedSenders,
-                catalog, readableChannels, sendableChannels, canModerate,
+        this(adminAccess, roleMask, roleHolders, mutedSenders, catalog,
+                readableChannels, sendableChannels, canModerate,
                 canEditServerConfig, capabilities, roleMask,
                 Collections.<UUID, Integer>emptyMap(), 0);
     }
 
-    /**
-     * The whole statement: everything above, the account's own roles
-     * apart from the played character's, the roles assigned to each of
-     * the player's own characters, and the server's Proximity radius.
-     */
-    public LostTalesChatAccessPacket(boolean adminAccess,
-                                     boolean discordAccess, int roleMask,
+    public LostTalesChatAccessPacket(boolean adminAccess, int roleMask,
                                      List<RoleHolder> roleHolders,
                                      List<UUID> mutedSenders,
                                      List<ChatAccountRole> catalog,
@@ -273,15 +232,16 @@ public final class LostTalesChatAccessPacket implements IMessage {
                                      int accountRoleMask,
                                      Map<UUID, Integer> characterRoleMasks,
                                      int proximityRadius) {
-        this(adminAccess, discordAccess, roleMask, roleHolders, mutedSenders,
-                catalog, readableChannels, sendableChannels, canModerate,
+        this(adminAccess, roleMask, roleHolders, mutedSenders, catalog,
+                readableChannels, sendableChannels, canModerate,
                 canEditServerConfig, capabilities, accountRoleMask,
                 characterRoleMasks, proximityRadius,
-                Collections.<String, ChatChannelIconSpec>emptyMap());
+                Collections.<String, ChatChannelIconSpec>emptyMap(),
+                ChatProfanityWords.NONE);
     }
 
-    public LostTalesChatAccessPacket(boolean adminAccess,
-                                     boolean discordAccess, int roleMask,
+    /** The whole statement, see the class comment. */
+    public LostTalesChatAccessPacket(boolean adminAccess, int roleMask,
                                      List<RoleHolder> roleHolders,
                                      List<UUID> mutedSenders,
                                      List<ChatAccountRole> catalog,
@@ -292,9 +252,9 @@ public final class LostTalesChatAccessPacket implements IMessage {
                                      int accountRoleMask,
                                      Map<UUID, Integer> characterRoleMasks,
                                      int proximityRadius,
-                                     Map<String, ChatChannelIconSpec> channelIcons) {
+                                     Map<String, ChatChannelIconSpec> channelIcons,
+                                     ChatProfanityWords profanityWords) {
         this.accountRoleMask = accountRoleMask & roleMask;
-        this.rolesSplit = true;
         Map<UUID, Integer> characters = new LinkedHashMap<UUID, Integer>();
         if (characterRoleMasks != null) {
             for (Map.Entry<UUID, Integer> entry : characterRoleMasks.entrySet()) {
@@ -321,7 +281,6 @@ public final class LostTalesChatAccessPacket implements IMessage {
         this.adminAccess = adminAccess;
         this.canModerate = canModerate;
         this.canEditServerConfig = canEditServerConfig;
-        this.discordAccess = discordAccess;
         this.roleMask = roleMask;
         this.roleHolders = roleHolders == null || roleHolders.isEmpty()
                 ? Collections.<RoleHolder>emptyList()
@@ -354,6 +313,8 @@ public final class LostTalesChatAccessPacket implements IMessage {
         this.sendableChannels = channelIds(sendableChannels);
         this.definedChannels = definedChannels();
         this.channelIcons = channelIcons(channelIcons);
+        this.profanityWords = profanityWords == null
+                ? ChatProfanityWords.NONE : profanityWords;
     }
 
     /** The given icons, keyed by trimmed id, deduplicated and bounded. */
@@ -412,185 +373,158 @@ public final class LostTalesChatAccessPacket implements IMessage {
                         "invalid chat access packet size");
             }
             this.adminAccess = buffer.readBoolean();
-            this.discordAccess = buffer.readBoolean();
-            // Appended after the two flags; a packet written before the
-            // roles existed simply ends here and names none.
-            int roleMask = buffer.readableBytes() >= 4
-                    ? buffer.readInt() : 0;
-            // Appended again: the online role holders. A packet written
-            // before the roster existed ends here and names none.
-            List<RoleHolder> holders = new ArrayList<RoleHolder>();
-            if (buffer.readableBytes() >= 2) {
-                int count = buffer.readUnsignedShort();
-                if (count > MAX_HOLDERS) {
-                    throw new LostTalesPacketCodec.DecodeException(
-                            "too many role holders");
-                }
-                for (int index = 0; index < count; index++) {
-                    String name = LostTalesPacketCodec.readUtf8String(
-                            buffer, MAX_HOLDER_NAME_BYTES);
-                    int mask = buffer.readInt();
-                    if (name.trim().length() == 0 || mask == 0) {
-                        throw new LostTalesPacketCodec.DecodeException(
-                                "invalid role holder");
-                    }
-                    holders.add(new RoleHolder(name.trim(), mask));
-                }
+            int roleMask = buffer.readInt();
+            int holderCount = buffer.readUnsignedShort();
+            if (holderCount > MAX_HOLDERS) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "too many role holders");
             }
-            // Appended once more: the muted senders. A packet written
-            // before they travelled ends here and names none.
-            List<UUID> muted = new ArrayList<UUID>();
-            if (buffer.readableBytes() >= 2) {
-                int count = buffer.readUnsignedShort();
-                if (count > MAX_MUTED_SENDERS) {
+            String[] holderNames = new String[holderCount];
+            int[] holderMasks = new int[holderCount];
+            for (int index = 0; index < holderCount; index++) {
+                String name = LostTalesPacketCodec.readUtf8String(
+                        buffer, MAX_HOLDER_NAME_BYTES);
+                int mask = buffer.readInt();
+                if (name.trim().length() == 0 || mask == 0) {
                     throw new LostTalesPacketCodec.DecodeException(
-                            "too many muted senders");
+                            "invalid role holder");
                 }
-                for (int index = 0; index < count; index++) {
-                    muted.add(new UUID(buffer.readLong(), buffer.readLong()));
-                }
+                holderNames[index] = name.trim();
+                holderMasks[index] = mask;
             }
-            // Appended again: the role catalogue in force, which is what
-            // the masks above are read against. Without it, the built-ins.
-            List<ChatAccountRole> roles = new ArrayList<ChatAccountRole>();
-            if (buffer.readableBytes() >= 1) {
-                int count = buffer.readUnsignedByte();
-                if (count > ChatRoleCatalog.MAX_ROLES) {
-                    throw new LostTalesPacketCodec.DecodeException("too many roles");
-                }
-                for (int index = 0; index < count; index++) {
-                    roles.add(readRole(buffer));
-                }
+            int mutedCount = buffer.readUnsignedShort();
+            if (mutedCount > MAX_MUTED_SENDERS) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "too many muted senders");
+            }
+            List<UUID> muted = new ArrayList<UUID>(mutedCount);
+            for (int index = 0; index < mutedCount; index++) {
+                muted.add(new UUID(buffer.readLong(), buffer.readLong()));
+            }
+            // The catalogue in force is what every mask is read against;
+            // an empty one means the built-ins.
+            int roleCount = buffer.readUnsignedByte();
+            if (roleCount > ChatRoleCatalog.MAX_ROLES) {
+                throw new LostTalesPacketCodec.DecodeException("too many roles");
+            }
+            List<ChatAccountRole> roles = new ArrayList<ChatAccountRole>(roleCount);
+            for (int index = 0; index < roleCount; index++) {
+                roles.add(readRole(buffer));
             }
             ChatRoleCatalog known = roles.isEmpty() ? ChatRoleCatalog.builtIn()
                     : ChatRoleCatalog.fromWire(roles);
-            // The channel gates for this player, each side a list of ids.
-            List<String> readable = allChannelIds();
-            List<String> sendable = allChannelIds();
-            if (buffer.readableBytes() >= 1) {
-                readable = readChannelIds(buffer);
-                sendable = readChannelIds(buffer);
+            List<String> readable = readChannelIds(buffer);
+            List<String> sendable = readChannelIds(buffer);
+            boolean moderate = buffer.readBoolean();
+            boolean editConfig = buffer.readBoolean();
+            int capabilityCount = buffer.readUnsignedShort();
+            if (capabilityCount > MAX_CAPABILITIES) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "too many capabilities");
             }
-            // Appended last of all: the two capability flags.
-            boolean moderate = buffer.readableBytes() >= 1 && buffer.readBoolean();
-            boolean editConfig = buffer.readableBytes() >= 1 && buffer.readBoolean();
-            // Appended after the two flags: every capability held, by id.
-            // A payload written before they travelled names none, and the
-            // two flags stand for themselves.
-            List<String> held = new ArrayList<String>();
-            if (buffer.readableBytes() >= 2) {
-                int count = buffer.readUnsignedShort();
-                if (count > MAX_CAPABILITIES) {
+            List<String> held = new ArrayList<String>(capabilityCount);
+            for (int index = 0; index < capabilityCount; index++) {
+                String id = LostTalesPacketCodec.readUtf8String(
+                        buffer, MAX_CAPABILITY_ID_BYTES);
+                if (id.trim().length() == 0) {
                     throw new LostTalesPacketCodec.DecodeException(
-                            "too many capabilities");
+                            "invalid capability id");
                 }
-                for (int index = 0; index < count; index++) {
-                    String id = LostTalesPacketCodec.readUtf8String(
-                            buffer, MAX_CAPABILITY_ID_BYTES);
-                    if (id.trim().length() == 0) {
-                        throw new LostTalesPacketCodec.DecodeException(
-                                "invalid capability id");
-                    }
-                    held.add(id.trim());
-                }
+                held.add(id.trim());
+            }
+            int channelCount = buffer.readUnsignedByte();
+            if (channelCount > MAX_CHANNEL_IDS) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "too many defined channels");
             }
             List<ChatChannelDescriptor> defined =
-                    new ArrayList<ChatChannelDescriptor>();
-            if (buffer.readableBytes() >= 1) {
-                int channelCount = buffer.readUnsignedByte();
-                if (channelCount > MAX_CHANNEL_IDS) {
-                    throw new LostTalesPacketCodec.DecodeException(
-                            "too many defined channels");
-                }
-                for (int index = 0; index < channelCount; index++) {
-                    defined.add(readChannel(buffer));
-                }
+                    new ArrayList<ChatChannelDescriptor>(channelCount);
+            for (int index = 0; index < channelCount; index++) {
+                defined.add(readChannel(buffer));
             }
-            // Appended after the defined channels: the roles told apart by
-            // identity, then the Proximity radius. A payload written before
-            // they travelled states neither, and the played mask stands for
-            // the account.
-            boolean split = buffer.readableBytes() >= 4;
-            int accountRoles = split ? buffer.readInt() : roleMask;
+            int accountRoles = buffer.readInt();
+            int characterCount = buffer.readUnsignedShort();
+            if (characterCount > MAX_OWN_CHARACTERS) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "too many characters");
+            }
             Map<UUID, Integer> characters = new LinkedHashMap<UUID, Integer>();
-            int[] holderAccountRoles = new int[holders.size()];
-            UUID[] holderCharacters = new UUID[holders.size()];
-            boolean holdersSplit = false;
-            int radius = 0;
-            if (split) {
-                int characterCount = buffer.readUnsignedShort();
-                if (characterCount > MAX_OWN_CHARACTERS) {
+            for (int index = 0; index < characterCount; index++) {
+                UUID id = new UUID(buffer.readLong(), buffer.readLong());
+                int mask = buffer.readInt();
+                if (mask == 0 || characters.containsKey(id)) {
                     throw new LostTalesPacketCodec.DecodeException(
-                            "too many characters");
+                            "invalid character roles");
                 }
-                for (int index = 0; index < characterCount; index++) {
-                    UUID id = new UUID(buffer.readLong(), buffer.readLong());
-                    int mask = buffer.readInt();
-                    if (mask == 0 || characters.containsKey(id)) {
-                        throw new LostTalesPacketCodec.DecodeException(
-                                "invalid character roles");
-                    }
-                    characters.put(id, Integer.valueOf(mask));
-                }
-                int holderCount = buffer.readUnsignedShort();
-                if (holderCount != 0 && holderCount != holders.size()) {
-                    throw new LostTalesPacketCodec.DecodeException(
-                            "invalid role holder split");
-                }
-                holdersSplit = holderCount > 0;
-                for (int index = 0; index < holderCount; index++) {
-                    holderAccountRoles[index] = buffer.readInt();
-                    holderCharacters[index] = buffer.readBoolean()
-                            ? new UUID(buffer.readLong(), buffer.readLong())
-                            : null;
-                }
-                radius = buffer.readUnsignedShort();
-                if (radius > MAX_PROXIMITY_RADIUS) {
-                    throw new LostTalesPacketCodec.DecodeException(
-                            "invalid proximity radius");
-                }
+                characters.put(id, Integer.valueOf(mask));
             }
-            // Appended after the radius: the icons the channels wear, by
-            // id. A payload written before them names none.
+            if (buffer.readUnsignedShort() != holderCount) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "invalid role holder split");
+            }
+            int[] holderAccountRoles = new int[holderCount];
+            UUID[] holderCharacters = new UUID[holderCount];
+            for (int index = 0; index < holderCount; index++) {
+                holderAccountRoles[index] = buffer.readInt();
+                holderCharacters[index] = buffer.readBoolean()
+                        ? new UUID(buffer.readLong(), buffer.readLong())
+                        : null;
+            }
+            int radius = buffer.readUnsignedShort();
+            if (radius > MAX_PROXIMITY_RADIUS) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "invalid proximity radius");
+            }
+            int iconCount = buffer.readUnsignedByte();
+            if (iconCount > ChatChannelIconCatalog.MAX_ICONS) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "too many channel icons");
+            }
             Map<String, ChatChannelIconSpec> icons =
                     new LinkedHashMap<String, ChatChannelIconSpec>();
-            if (buffer.readableBytes() >= 1) {
-                int iconCount = buffer.readUnsignedByte();
-                if (iconCount > ChatChannelIconCatalog.MAX_ICONS) {
+            for (int index = 0; index < iconCount; index++) {
+                String id = LostTalesPacketCodec.readUtf8String(
+                        buffer, MAX_CHANNEL_ID_BYTES).trim();
+                ChatChannelIconSpec icon = ChatChannelIconSpec.parse(
+                        LostTalesPacketCodec.readUtf8String(
+                                buffer, MAX_CHANNEL_ICON_BYTES));
+                if (id.length() == 0 || icon == null
+                        || icons.containsKey(id)) {
                     throw new LostTalesPacketCodec.DecodeException(
-                            "too many channel icons");
+                            "invalid channel icon");
                 }
-                for (int index = 0; index < iconCount; index++) {
-                    String id = LostTalesPacketCodec.readUtf8String(
-                            buffer, MAX_CHANNEL_ID_BYTES).trim();
-                    ChatChannelIconSpec icon = ChatChannelIconSpec.parse(
-                            LostTalesPacketCodec.readUtf8String(
-                                    buffer, MAX_CHANNEL_ICON_BYTES));
-                    if (id.length() == 0 || icon == null
-                            || icons.containsKey(id)) {
-                        throw new LostTalesPacketCodec.DecodeException(
-                                "invalid channel icon");
-                    }
-                    icons.put(id, icon);
-                }
+                icons.put(id, icon);
+            }
+            // The server's profanity words, each an entry the list reads
+            // as it reads a config line; one it would skip is refused.
+            int wordCount = buffer.readUnsignedShort();
+            if (wordCount > ChatProfanityWords.MAX_WORDS) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "too many profanity words");
+            }
+            String[] entries = new String[wordCount];
+            for (int index = 0; index < wordCount; index++) {
+                entries[index] = LostTalesPacketCodec.readUtf8String(
+                        buffer, ChatProfanityWords.MAX_ENTRY_BYTES);
+            }
+            ChatProfanityWords words = ChatProfanityWords.parse(
+                    entries, ChatProfanityWords.MAX_WORDS, null);
+            if (words.size() != wordCount) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "invalid profanity word");
             }
             LostTalesPacketCodec.requireFinished(buffer);
             int knownMask = known.knownMask();
-            List<RoleHolder> stated = new ArrayList<RoleHolder>(holders.size());
-            for (int index = 0; index < holders.size(); index++) {
-                RoleHolder holder = holders.get(index);
-                if ((holder.getMask() & ~knownMask) != 0) {
+            List<RoleHolder> stated = new ArrayList<RoleHolder>(holderCount);
+            for (int index = 0; index < holderCount; index++) {
+                if ((holderMasks[index] & ~knownMask) != 0) {
                     throw new LostTalesPacketCodec.DecodeException("invalid role holder");
                 }
-                if (!holdersSplit) {
-                    stated.add(holder);
-                    continue;
-                }
-                if ((holderAccountRoles[index] & ~holder.getMask()) != 0) {
+                if ((holderAccountRoles[index] & ~holderMasks[index]) != 0) {
                     throw new LostTalesPacketCodec.DecodeException(
                             "invalid role holder split");
                 }
-                stated.add(new RoleHolder(holder.getName(), holder.getMask(),
+                stated.add(new RoleHolder(holderNames[index], holderMasks[index],
                         holderAccountRoles[index], holderCharacters[index]));
             }
             for (Integer mask : characters.values()) {
@@ -602,7 +536,6 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.roleMask = (roleMask & ~knownMask) != 0 ? 0 : roleMask;
             this.accountRoleMask = (accountRoles & ~knownMask) != 0 ? 0
                     : accountRoles & this.roleMask;
-            this.rolesSplit = split;
             this.characterRoleMasks = Collections.unmodifiableMap(characters);
             this.proximityRadius = radius;
             this.roleHolders = Collections.unmodifiableList(stated);
@@ -615,10 +548,10 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.capabilities = Collections.unmodifiableList(held);
             this.definedChannels = Collections.unmodifiableList(defined);
             this.channelIcons = Collections.unmodifiableMap(icons);
+            this.profanityWords = words;
         } catch (RuntimeException exception) {
             this.malformed = true;
             this.adminAccess = false;
-            this.discordAccess = false;
             this.roleMask = 0;
             this.roleHolders = Collections.emptyList();
             this.mutedSenders = Collections.emptyList();
@@ -630,10 +563,10 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.capabilities = Collections.emptyList();
             this.definedChannels = Collections.emptyList();
             this.accountRoleMask = 0;
-            this.rolesSplit = false;
             this.characterRoleMasks = Collections.emptyMap();
             this.proximityRadius = 0;
             this.channelIcons = Collections.emptyMap();
+            this.profanityWords = ChatProfanityWords.NONE;
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -721,7 +654,6 @@ public final class LostTalesChatAccessPacket implements IMessage {
     @Override
     public void toBytes(ByteBuf buffer) {
         buffer.writeBoolean(this.adminAccess);
-        buffer.writeBoolean(this.discordAccess);
         buffer.writeInt(this.roleMask);
         buffer.writeShort(this.roleHolders.size());
         for (RoleHolder holder : this.roleHolders) {
@@ -758,7 +690,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
             LostTalesPacketCodec.writeUtf8String(buffer, capability,
                     MAX_CAPABILITY_ID_BYTES);
         }
-        // Appended last of all: the channels this server has of its own.
+        // The channels this server has of its own.
         buffer.writeByte(this.definedChannels.size());
         for (ChatChannelDescriptor channel : this.definedChannels) {
             LostTalesPacketCodec.writeUtf8String(buffer, channel.getId(),
@@ -806,13 +738,18 @@ public final class LostTalesChatAccessPacket implements IMessage {
             LostTalesPacketCodec.writeUtf8String(buffer,
                     entry.getValue().toText(), MAX_CHANNEL_ICON_BYTES);
         }
+        // Then the words the server adds to the profanity list.
+        List<String> words = this.profanityWords.entries();
+        buffer.writeShort(words.size());
+        for (String entry : words) {
+            LostTalesPacketCodec.writeUtf8String(buffer, entry,
+                    ChatProfanityWords.MAX_ENTRY_BYTES);
+        }
     }
 
     public boolean hasAdminAccess() { return this.adminAccess; }
     /** The roles the server says this player holds, as a bit set. */
     public int getRoleMask() { return this.roleMask; }
-    /** The flag an older client gated its Discord tab on; always sent set. */
-    public boolean hasDiscordAccess() { return this.discordAccess; }
     /** Every online account holding a role, as the server states it. */
     public List<RoleHolder> getRoleHolders() { return this.roleHolders; }
 
@@ -835,12 +772,9 @@ public final class LostTalesChatAccessPacket implements IMessage {
     /** Every capability the server says this player holds, by id. */
     public List<String> getCapabilities() { return this.capabilities; }
     /**
-     * The account's own roles, apart from the character being played;
-     * the played mask when the payload did not state the two apart.
+     * The account's own roles, apart from the character being played.
      */
     public int getAccountRoleMask() { return this.accountRoleMask; }
-    /** Whether the payload stated the roles apart by identity. */
-    public boolean hasRoleSplit() { return this.rolesSplit; }
     /** The roles assigned to each of the player's own characters, by id. */
     public Map<UUID, Integer> getCharacterRoleMasks() {
         return this.characterRoleMasks;
@@ -848,6 +782,8 @@ public final class LostTalesChatAccessPacket implements IMessage {
     /** The server's Proximity radius in blocks; zero when unstated. */
     public int getProximityRadius() { return this.proximityRadius; }
     /** The icons the server puts on its channels, by id; empty when unstated. */
+    /** The words the server adds to the chat's profanity list; none when it adds none. */
+    public ChatProfanityWords getProfanityWords() { return this.profanityWords; }
     public Map<String, ChatChannelIconSpec> getChannelIcons() {
         return this.channelIcons;
     }

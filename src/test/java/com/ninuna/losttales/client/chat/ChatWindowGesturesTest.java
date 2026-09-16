@@ -155,8 +155,12 @@ public final class ChatWindowGesturesTest {
     public void aVisibleSlotIsTranslatedPastHiddenTabsAndTheMovingOnes() {
         ChatWindow window = ChatWindowLayout.windows().get(1);
         List<ChatTab> tabs = window.getTabs();
-        // The conversation window holds open tabs the player cannot
-        // see — Party outside a party — sitting between the others.
+        // A server gate hides Party while its layout slot stays intact.
+        java.util.List<String> allowed = new java.util.ArrayList<String>();
+        for (ChatChannel channel : ChatChannel.values()) {
+            if (channel != ChatChannel.PARTY) { allowed.add(channel.getId()); }
+        }
+        ClientChatChannelState.setChannelGates(allowed, allowed);
         assertTrue(tabs.contains(ChatTab.of(ChatChannel.PARTY)));
         assertFalse(ClientChatChannelState.isAvailable(
                 ChatTab.of(ChatChannel.PARTY)));

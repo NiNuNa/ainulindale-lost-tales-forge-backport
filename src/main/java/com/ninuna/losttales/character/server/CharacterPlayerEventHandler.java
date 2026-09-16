@@ -8,9 +8,12 @@ import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.character.switching.CharacterLifecycleStateTracker;
 import com.ninuna.losttales.character.switching.CharacterSwitchCoordinator;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
+import com.ninuna.losttales.character.identity.PlayableIdentityResolver;
+import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.compat.lotr.hired.LotrHiredUnitCustody;
 import com.ninuna.losttales.character.lore.transfer.LoreCharacterTransferCoordinator;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
+import com.ninuna.losttales.chat.server.ChatPresenceService;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
@@ -42,8 +45,34 @@ public final class CharacterPlayerEventHandler {
         AccessoryInventorySyncManager.clearPlayer(player.getUniqueID());
         CharacterAppearanceSyncManager.broadcastRemoval(player.getUniqueID());
         // The remaining players' role rosters follow the leave.
+        com.ninuna.losttales.chat.server.ChatIdentitySelection.forget(player.getUniqueID());
+        ChatPresenceService.forget(player.getUniqueID());
         LostTalesChatService.sendAccessToAll(player);
         CharacterSwitchCoordinator.getInstance().clearRuntimeState(player.getUniqueID());
+    }
+
+    /**
+     * The character's name as the player's display name on the server:
+     * what the game writes into a join, a leave, an achievement and any
+     * other line it builds from the display name, for everyone at once
+     * and as it happens. The client answers the same for the names it
+     * draws. The game caches the answer, so a change of character
+     * refreshes it where the appearance is broadcast.
+     */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public void useCharacterName(PlayerEvent.NameFormat event) {
+        if (event == null || !(event.entityPlayer instanceof EntityPlayerMP)) {
+            return;
+        }
+        PlayableIdentityResolver.Resolution identity =
+                PlayableIdentityResolver.resolve((EntityPlayerMP) event.entityPlayer);
+        RoleplayCharacter character = identity.isAvailable()
+                ? identity.getCharacter() : null;
+        if (character != null) {
+            event.displayname = PlayableIdentity.formatDisplayName(
+                    event.displayname, event.username,
+                    PlayableIdentity.displayName(character, event.username));
+        }
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
@@ -171,6 +200,7 @@ public final class CharacterPlayerEventHandler {
             // were away, in the order it happened.
             LostTalesChatService.sendAccessToAll(null);
             LostTalesChatService.sendLoginReplay(serverPlayer);
+            ChatPresenceService.sendAll(serverPlayer);
         } else {
             LostTalesChatService.sendAccess(serverPlayer);
         }

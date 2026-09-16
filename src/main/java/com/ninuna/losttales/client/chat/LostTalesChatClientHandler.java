@@ -133,6 +133,7 @@ public final class LostTalesChatClientHandler {
             this.watchedHead = null;
             return;
         }
+        ClientChatIdentitySelection.update();
         try {
             List<ChatLine> messages = ChatWindowLines.messageHistory(
                     minecraft.ingameGUI.getChatGUI());

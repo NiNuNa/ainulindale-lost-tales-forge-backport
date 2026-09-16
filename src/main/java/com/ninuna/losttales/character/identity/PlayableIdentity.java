@@ -82,6 +82,26 @@ public final class PlayableIdentity {
         return accountName == null ? "" : accountName.trim();
     }
 
+    /**
+     * A player's display name with the character's name in the account's
+     * place: what Forge's name format is answered with on both sides, so
+     * a join, a leave, an achievement and a nameplate all name the
+     * character. A display name that does not hold the account name —
+     * another mod rewrote it wholesale — gives way to the character's
+     * name alone; no character name leaves the display name as it is.
+     */
+    public static String formatDisplayName(String displayName, String accountName,
+                                           String characterName) {
+        if (characterName == null || characterName.length() == 0) {
+            return displayName;
+        }
+        int at = displayName == null || accountName == null
+                || accountName.length() == 0 ? -1 : displayName.indexOf(accountName);
+        return at < 0 ? characterName
+                : displayName.substring(0, at) + characterName
+                        + displayName.substring(at + accountName.length());
+    }
+
     public UUID getOwnerId() {
         return this.ownerId;
     }

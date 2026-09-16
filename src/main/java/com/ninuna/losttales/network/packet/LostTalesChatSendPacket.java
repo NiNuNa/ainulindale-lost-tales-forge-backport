@@ -30,11 +30,11 @@ import net.minecraft.entity.player.EntityPlayerMP;
  */
 public final class LostTalesChatSendPacket implements IMessage {
     /** Speak as the channel's default identity. */
-    public static final int APPEARANCE_DEFAULT = 0;
+    public static final int IDENTITY_DEFAULT = 0;
     /** Speak as the Minecraft account, wherever the message goes. */
-    public static final int APPEARANCE_ACCOUNT = 1;
+    public static final int IDENTITY_ACCOUNT = 1;
     /** Speak as one of the sender's own roster characters. */
-    public static final int APPEARANCE_CHARACTER = 2;
+    public static final int IDENTITY_CHARACTER = 2;
 
     private static final int MAX_PACKET_BYTES = 1300
             + ChatMessageValidator.MAX_UTF8_BYTES
@@ -98,8 +98,8 @@ public final class LostTalesChatSendPacket implements IMessage {
      * fact: the server resolves a character id against the sender's own
      * roster and refuses one it does not hold.
      */
-    private int appearanceKind = APPEARANCE_DEFAULT;
-    private UUID appearanceCharacterId;
+    private int identityKind = IDENTITY_DEFAULT;
+    private UUID identityCharacterId;
     /**
      * The message this one replies to, or {@link ChatMessageIds#NONE}.
      * A request like any other: the server checks the message is still
@@ -140,77 +140,77 @@ public final class LostTalesChatSendPacket implements IMessage {
     public LostTalesChatSendPacket(ChatChannel channel, String message,
                                    List<ChatShareReference> references,
                                    String target) {
-        this(channel, message, references, target, APPEARANCE_DEFAULT, null);
+        this(channel, message, references, target, IDENTITY_DEFAULT, null);
     }
 
     public LostTalesChatSendPacket(ChatChannel channel, String message,
                                    List<ChatShareReference> references,
-                                   String target, int appearanceKind,
-                                   UUID appearanceCharacterId) {
-        this(channel, message, references, target, appearanceKind,
-                appearanceCharacterId, ChatMessageIds.NONE);
+                                   String target, int identityKind,
+                                   UUID identityCharacterId) {
+        this(channel, message, references, target, identityKind,
+                identityCharacterId, ChatMessageIds.NONE);
     }
 
     public LostTalesChatSendPacket(ChatChannel channel, String message,
                                    List<ChatShareReference> references,
-                                   String target, int appearanceKind,
-                                   UUID appearanceCharacterId,
+                                   String target, int identityKind,
+                                   UUID identityCharacterId,
                                    long replyToMessageId) {
-        this(channel, message, references, target, appearanceKind,
-                appearanceCharacterId, replyToMessageId, "");
+        this(channel, message, references, target, identityKind,
+                identityCharacterId, replyToMessageId, "");
     }
 
     public LostTalesChatSendPacket(ChatChannel channel, String message,
                                    List<ChatShareReference> references,
-                                   String target, int appearanceKind,
-                                   UUID appearanceCharacterId,
+                                   String target, int identityKind,
+                                   UUID identityCharacterId,
                                    long replyToMessageId,
                                    String targetIdentity) {
-        this(channel, message, references, target, appearanceKind,
-                appearanceCharacterId, replyToMessageId, targetIdentity, 0L);
+        this(channel, message, references, target, identityKind,
+                identityCharacterId, replyToMessageId, targetIdentity, 0L);
     }
 
     public LostTalesChatSendPacket(ChatChannel channel, String message,
                                    List<ChatShareReference> references,
-                                   String target, int appearanceKind,
-                                   UUID appearanceCharacterId,
+                                   String target, int identityKind,
+                                   UUID identityCharacterId,
                                    long replyToMessageId,
                                    String targetIdentity, long echoNonce) {
-        this(channel, message, references, target, appearanceKind,
-                appearanceCharacterId, replyToMessageId, targetIdentity, echoNonce,
+        this(channel, message, references, target, identityKind,
+                identityCharacterId, replyToMessageId, targetIdentity, echoNonce,
                 null);
     }
 
     public LostTalesChatSendPacket(ChatChannel channel, String message,
                                    List<ChatShareReference> references,
-                                   String target, int appearanceKind,
-                                   UUID appearanceCharacterId,
+                                   String target, int identityKind,
+                                   UUID identityCharacterId,
                                    long replyToMessageId,
                                    String targetIdentity, long echoNonce,
                                    UUID targetCharacterId) {
-        this(channel, message, references, target, appearanceKind,
-                appearanceCharacterId, replyToMessageId, targetIdentity,
+        this(channel, message, references, target, identityKind,
+                identityCharacterId, replyToMessageId, targetIdentity,
                 echoNonce, targetCharacterId, "", "");
     }
 
     public LostTalesChatSendPacket(ChatChannel channel, String message,
                                    List<ChatShareReference> references,
-                                   String target, int appearanceKind,
-                                   UUID appearanceCharacterId,
+                                   String target, int identityKind,
+                                   UUID identityCharacterId,
                                    long replyToMessageId,
                                    String targetIdentity, long echoNonce,
                                    UUID targetCharacterId,
                                    String quoteAuthor, String quoteExcerpt) {
-        this(channel, message, references, target, appearanceKind,
-                appearanceCharacterId, replyToMessageId, targetIdentity,
+        this(channel, message, references, target, identityKind,
+                identityCharacterId, replyToMessageId, targetIdentity,
                 echoNonce, targetCharacterId, quoteAuthor, quoteExcerpt,
                 QUOTE_OTHER);
     }
 
     public LostTalesChatSendPacket(ChatChannel channel, String message,
                                    List<ChatShareReference> references,
-                                   String target, int appearanceKind,
-                                   UUID appearanceCharacterId,
+                                   String target, int identityKind,
+                                   UUID identityCharacterId,
                                    long replyToMessageId,
                                    String targetIdentity, long echoNonce,
                                    UUID targetCharacterId,
@@ -232,8 +232,8 @@ public final class LostTalesChatSendPacket implements IMessage {
                 ? Collections.<ChatShareReference>emptyList()
                 : Collections.unmodifiableList(
                         new ArrayList<ChatShareReference>(references));
-        this.appearanceKind = appearanceKind;
-        this.appearanceCharacterId = appearanceCharacterId;
+        this.identityKind = identityKind;
+        this.identityCharacterId = identityCharacterId;
         validate();
     }
 
@@ -274,9 +274,9 @@ public final class LostTalesChatSendPacket implements IMessage {
             this.references = Collections.unmodifiableList(decoded);
             this.target = LostTalesPacketCodec.readUtf8String(
                     buffer, MAX_TARGET_BYTES).trim();
-            this.appearanceKind = buffer.readUnsignedByte();
-            this.appearanceCharacterId =
-                    this.appearanceKind == APPEARANCE_CHARACTER
+            this.identityKind = buffer.readUnsignedByte();
+            this.identityCharacterId =
+                    this.identityKind == IDENTITY_CHARACTER
                             ? new UUID(buffer.readLong(), buffer.readLong())
                             : null;
             this.replyToMessageId = buffer.readLong();
@@ -324,8 +324,8 @@ public final class LostTalesChatSendPacket implements IMessage {
             this.targetCharacterId = null;
             this.target = "";
             this.references = Collections.emptyList();
-            this.appearanceKind = APPEARANCE_DEFAULT;
-            this.appearanceCharacterId = null;
+            this.identityKind = IDENTITY_DEFAULT;
+            this.identityCharacterId = null;
             this.replyToMessageId = ChatMessageIds.NONE;
             this.targetIdentity = "";
             this.echoNonce = 0L;
@@ -353,12 +353,12 @@ public final class LostTalesChatSendPacket implements IMessage {
         }
         LostTalesPacketCodec.writeUtf8String(buffer, this.target,
                 MAX_TARGET_BYTES);
-        buffer.writeByte(this.appearanceKind);
-        if (this.appearanceKind == APPEARANCE_CHARACTER) {
+        buffer.writeByte(this.identityKind);
+        if (this.identityKind == IDENTITY_CHARACTER) {
             buffer.writeLong(
-                    this.appearanceCharacterId.getMostSignificantBits());
+                    this.identityCharacterId.getMostSignificantBits());
             buffer.writeLong(
-                    this.appearanceCharacterId.getLeastSignificantBits());
+                    this.identityCharacterId.getLeastSignificantBits());
         }
         buffer.writeLong(this.replyToMessageId);
         LostTalesPacketCodec.writeUtf8String(buffer, this.targetIdentity,
@@ -412,10 +412,10 @@ public final class LostTalesChatSendPacket implements IMessage {
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.quoteExcerpt,
                         ChatReplyReference.MAX_EXCERPT_BYTES)
-                || this.appearanceKind < APPEARANCE_DEFAULT
-                || this.appearanceKind > APPEARANCE_CHARACTER
-                || (this.appearanceKind == APPEARANCE_CHARACTER
-                        && this.appearanceCharacterId == null)
+                || this.identityKind < IDENTITY_DEFAULT
+                || this.identityKind > IDENTITY_CHARACTER
+                || (this.identityKind == IDENTITY_CHARACTER
+                        && this.identityCharacterId == null)
                 || ChatChannel.fromId(this.channelId) == null
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.target, MAX_TARGET_BYTES)
@@ -456,10 +456,10 @@ public final class LostTalesChatSendPacket implements IMessage {
     /** The sender's own name for this message; zero for none. */
     public long getEchoNonce() { return this.echoNonce; }
     /** One of the {@code APPEARANCE_*} constants. */
-    public int getAppearanceKind() { return this.appearanceKind; }
+    public int getIdentityKind() { return this.identityKind; }
     /** The asked-for roster character; null unless the kind names one. */
-    public UUID getAppearanceCharacterId() {
-        return this.appearanceCharacterId;
+    public UUID getIdentityCharacterId() {
+        return this.identityCharacterId;
     }
     /** The message this one asks to reply to; {@code NONE} for none. */
     public long getReplyToMessageId() {

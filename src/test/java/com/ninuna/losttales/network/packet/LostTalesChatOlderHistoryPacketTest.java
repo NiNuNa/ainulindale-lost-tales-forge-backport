@@ -50,8 +50,13 @@ public final class LostTalesChatOlderHistoryPacketTest {
     }
 
     @Test
-    public void aWhisperAndAnUnnamedLineAreRefused() {
+    public void aWhisperNamesItsConversationAndAnUnnamedLineIsRefused() {
         assertRefused(ChatChannel.WHISPER, "", 42L);
+        LostTalesChatOlderHistoryPacket whisper = roundTrip(
+                new LostTalesChatOlderHistoryPacket(ChatChannel.WHISPER,
+                        "whisper:Steve|Aldric|own:abc", 42L));
+        assertFalse(whisper.isMalformed());
+        assertEquals("whisper:Steve|Aldric|own:abc", whisper.getScopeValue());
         assertRefused(ChatChannel.ALL, "", ChatMessageIds.NONE);
         assertRefused(ChatChannel.ALL, "", -3L);
         assertRefused(null, "", 42L);

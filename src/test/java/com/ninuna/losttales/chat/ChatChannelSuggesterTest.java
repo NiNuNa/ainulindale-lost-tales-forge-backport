@@ -87,7 +87,7 @@ public final class ChatChannelSuggesterTest {
         assertSame(ChatChannel.ALL, ChatChannelSuggester.resolve("all"));
         assertSame(ChatChannel.ALL, ChatChannelSuggester.resolve("Global"));
         assertSame(ChatChannel.OOC, ChatChannelSuggester.resolve("ooc&discord"));
-        assertSame(ChatChannel.OOC, ChatChannelSuggester.resolve("discord"));
+        assertNull(ChatChannelSuggester.resolve("discord"));
         assertSame(ChatChannel.CONSOLE, ChatChannelSuggester.resolve("CONSOLE"));
         assertNull(ChatChannelSuggester.resolve("whisper"));
         assertNull(ChatChannelSuggester.resolve("nowhere"));

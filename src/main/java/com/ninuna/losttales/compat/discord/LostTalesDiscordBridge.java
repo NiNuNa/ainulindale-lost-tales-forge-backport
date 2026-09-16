@@ -16,6 +16,9 @@ import com.ninuna.losttales.core.LostTalesClassTransformer;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatDeliveryMarkPacket;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
+import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
+import com.ninuna.losttales.chat.profanity.ChatProfanityFilter;
+import com.ninuna.losttales.chat.profanity.ChatProfanityMode;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
@@ -2604,7 +2607,7 @@ public final class LostTalesDiscordBridge {
                         DiscordJson.webhookLineBody(next.username,
                                 next.avatarUrl, header
                                         + DiscordMessageLinkRewriter.outbound(
-                                                next.message,
+                                                filtered(next.message),
                                                 outboundResolver(webhook))));
             } else {
                 DiscordMessageLinks.Copy copy = copyThrough(next, webhook);
@@ -2616,7 +2619,7 @@ public final class LostTalesDiscordBridge {
                         ? DiscordHttp.editWebhookMessage(webhook, copy.discordId,
                                 DiscordJson.webhookLineEditBody(copy.header
                                         + DiscordMessageLinkRewriter.outbound(
-                                                next.message,
+                                                filtered(next.message),
                                                 outboundResolver(webhook))))
                         : DiscordHttp.deleteWebhookMessage(webhook, copy.discordId);
             }
@@ -2755,7 +2758,22 @@ public final class LostTalesDiscordBridge {
                 }
             }
             return DiscordMessageSanitizer.replyHeader(
-                    next.reply.getAuthor(), next.reply.getExcerpt(), jumpUrl);
+                    next.reply.getAuthor(), filtered(next.reply.getExcerpt()),
+                    jumpUrl);
+        }
+
+        /**
+         * A player's words as the server posts them to Discord: the
+         * profanity list's words read as {@code discord.profanityFilter}
+         * says, the tokens, emojis and links left alone. What arrives
+         * from Discord is not touched here; each client shows it by its
+         * own setting.
+         */
+        private String filtered(String text) {
+            return ChatProfanityFilter.filterMessage(text,
+                    ChatProfanityMode.of(LostTalesConfig.discordProfanityFilter,
+                            ChatProfanityMode.OFF),
+                    ChatProfanityCatalog.effective());
         }
 
         /**

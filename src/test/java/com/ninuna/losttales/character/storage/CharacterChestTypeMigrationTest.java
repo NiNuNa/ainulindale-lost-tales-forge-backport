@@ -15,9 +15,9 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
 /**
- * Character data version 8 stores the chest type. Older records derive it
- * from the sex, unknown values are repaired the same way, and a stored
- * choice that differs from the sex's default survives a round trip.
+ * A record without a chest type derives it from the sex, an unknown
+ * value is repaired the same way, and a stored choice that differs from
+ * the sex's default survives a round trip.
  */
 public final class CharacterChestTypeMigrationTest {
 
@@ -27,18 +27,17 @@ public final class CharacterChestTypeMigrationTest {
             "91000000-0000-0000-0000-000000000019");
 
     @Test
-    public void versionSevenRecordsTakeTheSexDefault() {
-        NBTTagCompound legacy = CharacterNbtCodec.writeCharacterRecord(
+    public void aRecordWithoutAChestTypeTakesTheSexDefault() {
+        NBTTagCompound record = CharacterNbtCodec.writeCharacterRecord(
                 character(CharacterGenderRegistry.FEMALE, CharacterChestTypeRegistry.NONE));
-        legacy.setInteger("DataVersion", 7);
-        legacy.removeTag("ChestTypeId");
+        record.removeTag("ChestTypeId");
 
-        RoleplayCharacter migrated = CharacterNbtCodec.readCharacterRecord(legacy, OWNER);
+        RoleplayCharacter loaded = CharacterNbtCodec.readCharacterRecord(record, OWNER);
 
-        assertNotNull(migrated);
-        assertEquals(RoleplayCharacter.CURRENT_DATA_VERSION, migrated.getDataVersion());
-        assertEquals(CharacterChestTypeRegistry.ROUNDED_MEDIUM, migrated.getChestTypeId());
-        assertEquals(CharacterBodyTypeRegistry.SLIM, migrated.getBodyTypeId());
+        assertNotNull(loaded);
+        assertEquals(RoleplayCharacter.CURRENT_DATA_VERSION, loaded.getDataVersion());
+        assertEquals(CharacterChestTypeRegistry.ROUNDED_MEDIUM, loaded.getChestTypeId());
+        assertEquals(CharacterBodyTypeRegistry.SLIM, loaded.getBodyTypeId());
     }
 
     @Test

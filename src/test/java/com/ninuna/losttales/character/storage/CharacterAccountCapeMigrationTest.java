@@ -16,9 +16,9 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * The account's cape settings are two roster keys newer than the roster
- * layout: a roster written without them wears the defaults, a chosen cape
- * survives a round trip, and an unknown cape id is repaired to none.
+ * The account's cape settings are two roster keys: a roster without them
+ * wears the defaults, a chosen cape survives a round trip, and an unknown
+ * cape id is repaired to none.
  */
 public final class CharacterAccountCapeMigrationTest {
 

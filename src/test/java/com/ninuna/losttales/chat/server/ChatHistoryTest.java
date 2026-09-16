@@ -1,9 +1,11 @@
 package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatReactionSummary;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
+import com.ninuna.losttales.chat.ChatTabIds;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.Arrays;
@@ -756,6 +758,141 @@ public final class ChatHistoryTest {
         assertTrue(ChatHistory.reactionsFor(id, BOB).find("pepe:556").mine);
         assertNull("nothing of Discord's left to clear",
                 ChatHistory.clearDiscordReactions(id, null, "556"));
+    }
+
+    /**
+     * Whisper history is kept per conversation: a busy pair cannot push
+     * another pair's lines out of reach.
+     */
+    @Test
+    public void whisperRetentionIsPerConversation() {
+        int kept = LostTalesConfig.chatHistoryPerChannel;
+        LostTalesConfig.chatHistoryPerChannel = 2;
+        try {
+            ChatHistory.Audience withBob = ChatHistory.Audience.accounts(
+                    Arrays.asList(ALICE, BOB), false);
+            long first = record(ChatChannel.WHISPER, ALICE, "one", Arrays.asList(ALICE, BOB), withBob);
+            long aside = ChatMessageIdAllocator.next();
+            ChatHistory.record(aside, ALICE, "Aldric", null,
+                    line(aside, ChatChannel.WHISPER, ALICE, "aside").withPartner("carol", "carol"),
+                    Arrays.asList(ALICE, CAROL),
+                    ChatHistory.Audience.accounts(Arrays.asList(ALICE, CAROL), false));
+            long second = record(ChatChannel.WHISPER, ALICE, "two", Arrays.asList(ALICE, BOB), withBob);
+            long third = record(ChatChannel.WHISPER, ALICE, "three", Arrays.asList(ALICE, BOB), withBob);
+            assertFalse("the pair's oldest line went",
+                    ChatHistory.quoteFor(first, BOB, ChatChannel.WHISPER, "").exists());
+            assertTrue(ChatHistory.quoteFor(second, BOB, ChatChannel.WHISPER, "").exists());
+            assertTrue(ChatHistory.quoteFor(third, BOB, ChatChannel.WHISPER, "").exists());
+            assertTrue("the other pair's line stays",
+                    ChatHistory.quoteFor(aside, CAROL, ChatChannel.WHISPER, "").exists());
+        } finally {
+            LostTalesConfig.chatHistoryPerChannel = kept;
+        }
+    }
+
+    /**
+     * The Faction and Party channels hold several conversations, and each
+     * faction and each party is charged its own budget: a busy faction
+     * only ever pushes out its own lines.
+     */
+    @Test
+    public void factionAndPartyRetentionIsPerFactionAndPerParty() {
+        int kept = LostTalesConfig.chatHistoryPerChannel;
+        LostTalesConfig.chatHistoryPerChannel = 2;
+        try {
+            ChatHistory.Audience gondor = ChatHistory.Audience.faction("gondor", false);
+            long first = record(ChatChannel.FACTION, ALICE, "one",
+                    Arrays.asList(ALICE), gondor, "gondor");
+            long rohan = record(ChatChannel.FACTION, BOB, "horses",
+                    Arrays.asList(BOB), ChatHistory.Audience.faction("rohan", false), "rohan");
+            long second = record(ChatChannel.FACTION, ALICE, "two",
+                    Arrays.asList(ALICE), gondor, "gondor");
+            long third = record(ChatChannel.FACTION, ALICE, "three",
+                    Arrays.asList(ALICE), gondor, "gondor");
+            assertFalse("the faction's oldest line went",
+                    ChatHistory.quoteFor(first, ALICE, ChatChannel.FACTION, "gondor").exists());
+            assertTrue(ChatHistory.quoteFor(second, ALICE, ChatChannel.FACTION, "gondor").exists());
+            assertTrue(ChatHistory.quoteFor(third, ALICE, ChatChannel.FACTION, "gondor").exists());
+            assertTrue("the other faction's line stays",
+                    ChatHistory.quoteFor(rohan, BOB, ChatChannel.FACTION, "rohan").exists());
+
+            UUID otherParty = UUID.randomUUID();
+            ChatHistory.Audience ours = ChatHistory.Audience.party(PARTY, Arrays.asList(ALICE, BOB));
+            String ourScope = PARTY.toString();
+            long formUp = record(ChatChannel.PARTY, ALICE, "form up",
+                    Arrays.asList(ALICE, BOB), ours, ourScope);
+            long theirs = record(ChatChannel.PARTY, CAROL, "we march",
+                    Arrays.asList(CAROL), ChatHistory.Audience.party(otherParty, Arrays.asList(CAROL)),
+                    otherParty.toString());
+            record(ChatChannel.PARTY, ALICE, "hold", Arrays.asList(ALICE, BOB), ours, ourScope);
+            record(ChatChannel.PARTY, ALICE, "charge", Arrays.asList(ALICE, BOB), ours, ourScope);
+            assertFalse("the party's oldest line went",
+                    ChatHistory.quoteFor(formUp, BOB, ChatChannel.PARTY, ourScope).exists());
+            assertTrue("the other party's line stays",
+                    ChatHistory.quoteFor(theirs, CAROL, ChatChannel.PARTY, otherParty.toString()).exists());
+        } finally {
+            LostTalesConfig.chatHistoryPerChannel = kept;
+        }
+    }
+
+    /**
+     * A whisper tab reaches back into the kept history like any other: the
+     * page before a line, of the conversation the tab names, for one of
+     * its two parties and nobody else.
+     */
+    @Test
+    public void aWhisperConversationPagesItsOlderLinesForItsParties() {
+        long older = record(ChatChannel.WHISPER, ALICE, "first", Arrays.asList(ALICE, BOB),
+                ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB), false));
+        long newer = record(ChatChannel.WHISPER, ALICE, "second", Arrays.asList(ALICE, BOB),
+                ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB), false));
+        String conversation = ChatTabIds.whisperConversationId("bob", "", "");
+        List<LostTalesChatMessagePacket> page = ChatHistory.replayBefore(
+                requester(ALICE), ChatChannel.WHISPER, conversation, newer);
+        assertEquals(1, page.size());
+        assertEquals(older, page.get(0).getMessageId());
+        assertTrue("another conversation answers with nothing",
+                ChatHistory.replayBefore(requester(ALICE), ChatChannel.WHISPER,
+                        ChatTabIds.whisperConversationId("carol", "", ""), newer).isEmpty());
+        assertTrue("someone who was not sent it is answered with nothing",
+                ChatHistory.replayBefore(requester(CAROL), ChatChannel.WHISPER,
+                        conversation, newer).isEmpty());
+    }
+
+    /**
+     * A join line is recorded before the server lists the player it
+     * announces, so it names nobody; at their login they are named on
+     * it, afresh if need be, and a reader shown it later sees the
+     * identity they were playing. A player's own line names nobody
+     * this way.
+     */
+    @Test
+    public void namingAPlayerOnAServerLineReachesLaterReaders() {
+        long id = ChatMessageIdAllocator.next();
+        LostTalesChatMessagePacket line = new LostTalesChatMessagePacket(
+                ChatChannel.ALL, LostTalesChatMessagePacket.SERVER_SENDER_ID,
+                "Server", "Server", "", 0, 0, "alice joined the game", SENT_AT,
+                "", null, "", "", 0, true, id, ChatReplyReference.NONE, "")
+                .withServerBody("{}", Collections.<ChatNamedPlayer>emptyList());
+        ChatHistory.record(id, LostTalesChatMessagePacket.SERVER_SENDER_ID,
+                "Server", null, line, Collections.singletonList(BOB),
+                ChatHistory.Audience.everyone());
+        ChatNamedPlayer asAccount = new ChatNamedPlayer("alice", "alice", 0x123456);
+        ChatHistory.namePlayer(id, asAccount);
+        ChatHistory.namePlayer(id, new ChatNamedPlayer("alice", "Aldric", 0xABCDEF));
+        List<LostTalesChatMessagePacket> replay = ChatHistory.replayFor(
+                requester(CAROL), ChatMessageIds.NONE);
+        assertEquals(1, replay.size());
+        List<ChatNamedPlayer> named = replay.get(0).getNamedPlayers();
+        assertEquals(1, named.size());
+        assertEquals("Aldric", named.get(0).getIdentityName());
+        assertEquals(0xABCDEF, named.get(0).getNameColor());
+        long own = record(ChatChannel.ALL, ALICE, "hello", Arrays.asList(BOB),
+                ChatHistory.Audience.everyone());
+        ChatHistory.namePlayer(own, asAccount);
+        replay = ChatHistory.replayFor(requester(CAROL), ChatMessageIds.NONE);
+        assertEquals(2, replay.size());
+        assertTrue(replay.get(1).getNamedPlayers().isEmpty());
     }
 
     private static long record(ChatChannel channel, UUID author, String text,

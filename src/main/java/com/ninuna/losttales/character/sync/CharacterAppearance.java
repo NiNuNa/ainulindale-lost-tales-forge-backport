@@ -191,7 +191,7 @@ public final class CharacterAppearance {
                 ? characterId : null;
         this.accountName = normalizeName(accountName);
         this.characterName = normalizeName(characterName);
-        this.raceId = CharacterRaceRegistry.canonicalizeIdentifier(raceId);
+        this.raceId = CharacterRaceRegistry.normalizeIdentifier(raceId);
         this.genderId = CharacterGenderRegistry.normalizeIdentifier(genderId);
         this.skinId = CharacterSkinRegistry.normalizeIdentifier(skinId);
         this.bodyTypeId = CharacterBodyTypeRegistry.contains(bodyTypeId)

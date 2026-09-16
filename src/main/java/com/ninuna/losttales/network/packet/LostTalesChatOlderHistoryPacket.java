@@ -20,7 +20,8 @@ import net.minecraft.entity.player.EntityPlayerMP;
  * of each channel, and the server's kept history reaches further back.
  *
  * <p>It names the channel, the conversation for a channel that has more
- * than one (a normalized faction id, a party id; empty otherwise), and
+ * than one (a normalized faction id, a party id; for a whisper the id
+ * its tab carries; empty otherwise), and
  * the oldest message the client already holds, so the answer carries
  * only what comes before it. The server answers with the lines newest
  * first, so the client can lay each one above the last.</p>
@@ -31,7 +32,8 @@ import net.minecraft.entity.player.EntityPlayerMP;
  */
 public final class LostTalesChatOlderHistoryPacket implements IMessage {
     private static final int MAX_CHANNEL_ID_BYTES = 64;
-    private static final int MAX_SCOPE_VALUE_BYTES = 128;
+    /** Room for a whisper conversation's id: two names and a character id. */
+    private static final int MAX_SCOPE_VALUE_BYTES = 192;
     private static final int MAX_PACKET_BYTES =
             MAX_CHANNEL_ID_BYTES + MAX_SCOPE_VALUE_BYTES + 32;
 
@@ -86,14 +88,16 @@ public final class LostTalesChatOlderHistoryPacket implements IMessage {
 
     /**
      * A request names a channel the server has, a conversation exactly
-     * when the channel has more than one, and a line the server named to
-     * reach back from; a whisper is asked about by nobody, since its
-     * lines are two accounts' own.
+     * when the channel has more than one — for a whisper always, by the
+     * id its tab carries — and a line the server named to reach back
+     * from.
      */
     private void validate() {
         ChatChannel channel = ChatChannel.fromId(this.channelId);
-        if (channel == null || channel == ChatChannel.WHISPER
-                || channel.isScoped() != (this.scopeValue.length() > 0)
+        boolean conversation = this.scopeValue.length() > 0;
+        if (channel == null
+                || (channel == ChatChannel.WHISPER ? !conversation
+                        : channel.isScoped() != conversation)
                 || !ChatMessageIds.isServerId(this.beforeMessageId)) {
             throw new IllegalArgumentException("invalid chat older history request");
         }

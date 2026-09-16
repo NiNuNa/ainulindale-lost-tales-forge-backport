@@ -22,7 +22,7 @@ public final class LostTalesChatSendPacketQuoteSourceTest {
 
     private static LostTalesChatSendPacket quoting(int source) {
         return new LostTalesChatSendPacket(ChatChannel.ALL, "which one?",
-                null, "", LostTalesChatSendPacket.APPEARANCE_DEFAULT, null,
+                null, "", LostTalesChatSendPacket.IDENTITY_DEFAULT, null,
                 ChatMessageIds.NONE, "", 7L, null, "Server",
                 "Unknown command", source);
     }
@@ -68,7 +68,7 @@ public final class LostTalesChatSendPacketQuoteSourceTest {
     public void aSourceWithoutAQuoteIsDropped() {
         LostTalesChatSendPacket plain = new LostTalesChatSendPacket(
                 ChatChannel.ALL, "hello", null, "",
-                LostTalesChatSendPacket.APPEARANCE_DEFAULT, null,
+                LostTalesChatSendPacket.IDENTITY_DEFAULT, null,
                 ChatMessageIds.NONE, "", 7L, null, "", "",
                 LostTalesChatSendPacket.QUOTE_SYSTEM);
         assertEquals(LostTalesChatSendPacket.QUOTE_OTHER,

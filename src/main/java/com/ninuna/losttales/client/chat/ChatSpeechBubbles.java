@@ -58,7 +58,10 @@ public final class ChatSpeechBubbles {
         }
         ChatChannel channel = packet.getChannel();
         UUID speaker = packet.getSenderId();
-        if (speaker == null || !ChatRolePresentation.isInCharacter(channel)) {
+        // The Narrator tells; nothing is said over a head.
+        if (speaker == null || !ChatRolePresentation.isInCharacter(channel)
+                || packet.isNarrator()
+                || !ClientChatChannelState.isAvailable(LostTalesChatPresentation.fileUnder(packet))) {
             return;
         }
         // The name and its colour are the chat's own, so a hobbit is the
@@ -84,7 +87,9 @@ public final class ChatSpeechBubbles {
         if (speaker == null || body == null) {
             return;
         }
-        String spoken = LostTalesChatVisualStyle.removeColorCodes(body).trim();
+        // The words over a head read as the words in the log do.
+        String spoken = ClientChatProfanity.filterMessage(
+                LostTalesChatVisualStyle.removeColorCodes(body).trim());
         if (spoken.length() == 0) {
             return;
         }

@@ -47,8 +47,6 @@ public final class LostTalesConfigFilesTest {
         assertTrue(server.getParentFile().isDirectory());
         assertFalse(client.exists());
         assertFalse(server.exists());
-        assertEquals(new File(configDirectory, "losttales/client/chat/layout.txt"),
-                LostTalesConfigFiles.clientFile(configDirectory, LostTalesConfigFiles.CHAT_LAYOUT));
         assertEquals("third-person.cfg", LostTalesConfigFiles.CAMERA_OPTIONS);
     }
 

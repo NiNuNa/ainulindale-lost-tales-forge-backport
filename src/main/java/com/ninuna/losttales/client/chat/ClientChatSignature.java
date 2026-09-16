@@ -6,6 +6,7 @@ import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.compat.lotr.LotrFactionColors;
+import com.ninuna.losttales.chat.ChatNarrator;
 import net.minecraft.client.Minecraft;
 
 /**
@@ -17,36 +18,43 @@ import net.minecraft.client.Minecraft;
  * conversation, the echo of a command.
  *
  * <p>It follows the same rules the server signs by, so a locally built
- * line reads exactly like a served one: the appearance the tab
+ * line reads exactly like a served one: the identity the tab
  * currently speaks as decides the name and the head, and the tab's
  * channel decides whether the roles are tagged and what colours the
  * name ({@link ChatRolePresentation}). The LOTR title is the server's
  * to resolve, so a locally signed line carries none.</p>
  */
-final class ClientChatIdentity {
+final class ClientChatSignature {
 
-    private ClientChatIdentity() {}
+    private ClientChatSignature() {}
 
-    /** How the tab's current appearance signs a line built here. */
+    /** How the tab's current identity signs a line built here. */
     static Signature of(ChatTab tab) {
         Minecraft minecraft = Minecraft.getMinecraft();
         String account = minecraft == null || minecraft.thePlayer == null
                 ? "" : minecraft.thePlayer.getCommandSenderName();
-        ClientChatAppearances.Appearance appearance =
-                ClientChatAppearances.effectiveFor(tab);
+        ClientChatIdentities.Identity identity =
+                ClientChatIdentities.effectiveFor(tab);
         ChatChannel channel = tab == null ? null : tab.getChannel();
         int roles = ChatRolePresentation.rolesShown(channel,
-                statedRoleMask(appearance));
-        if (appearance == null || appearance.account
-                || appearance.name.length() == 0) {
+                statedRoleMask(identity));
+        if (ClientChatIdentities.isNarrating()
+                && ClientChatIdentities.speaksInCharacter(tab)) {
+            // The Narrator's voice over the identity: its name, colour
+            // and mark, on the line the identity would sign.
+            return new Signature(ChatNarrator.NAME, account,
+                    ChatNarrator.color(), ChatNarrator.SKIN_ID, roles, false);
+        }
+        if (identity == null || identity.account
+                || identity.name.length() == 0) {
             return new Signature(account, account,
                     ChatRolePresentation.nameColor(channel, roles, true, 0),
                     "", roles, true);
         }
-        return new Signature(appearance.name, account,
+        return new Signature(identity.name, account,
                 ChatRolePresentation.nameColor(channel, roles, false,
-                        factionColor(appearance)),
-                appearance.skinId, roles, false);
+                        factionColor(identity)),
+                identity.skinId, roles, false);
     }
 
     /**
@@ -60,19 +68,12 @@ final class ClientChatIdentity {
      * worn character's own roles, takes the line's place a moment later.
      */
     private static int statedRoleMask(
-            ClientChatAppearances.Appearance appearance) {
-        if (appearance == null || appearance.account
-                || appearance.characterId == null) {
+            ClientChatIdentities.Identity identity) {
+        if (identity == null || identity.account
+                || identity.characterId == null) {
             return ClientChatChannelState.getAccountRoleMask();
         }
-        CharacterRosterSnapshot roster =
-                ClientCharacterRosterCache.getSnapshot();
-        CharacterSummary active = roster == null ? null
-                : roster.getActiveCharacter();
-        return ClientChatChannelState.ownCharacterRoles(
-                appearance.characterId, active != null
-                        && appearance.characterId.equals(
-                                active.getCharacterId()));
+        return ClientChatChannelState.ownCharacterRoles(identity.characterId);
     }
 
     /**
@@ -81,12 +82,12 @@ final class ClientChatIdentity {
      * the roster no longer holds the character.
      */
     private static int factionColor(
-            ClientChatAppearances.Appearance appearance) {
+            ClientChatIdentities.Identity identity) {
         int ivory = ChatRolePresentation.unassignedColor();
         CharacterRosterSnapshot roster =
                 ClientCharacterRosterCache.getSnapshot();
         CharacterSummary summary = roster == null ? null
-                : roster.getCharacter(appearance.characterId);
+                : roster.getCharacter(identity.characterId);
         return summary == null ? ivory
                 : LotrFactionColors.forFactionId(
                         summary.getStartingFactionId(), ivory);

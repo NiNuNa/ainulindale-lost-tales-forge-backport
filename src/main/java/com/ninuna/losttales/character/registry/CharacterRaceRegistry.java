@@ -31,8 +31,6 @@ public final class CharacterRaceRegistry {
     public static final String URUK = "losttales:uruk";
     public static final String HALF_TROLL = "losttales:half_troll";
 
-    /** Legacy save identifier. Full trolls are no longer playable. */
-    public static final String LEGACY_TROLL = "losttales:troll";
 
     private static final Set<String> MALE_AND_FEMALE = identifiers(
             CharacterGenderRegistry.MALE,
@@ -113,7 +111,7 @@ public final class CharacterRaceRegistry {
     private CharacterRaceRegistry() {}
 
     public static CharacterRaceDefinition get(String id) {
-        return DEFINITIONS.get(canonicalizeIdentifier(id));
+        return DEFINITIONS.get(normalizeIdentifier(id));
     }
 
     public static Collection<CharacterRaceDefinition> getAll() {
@@ -126,7 +124,7 @@ public final class CharacterRaceRegistry {
     }
 
     /**
-     * Repairs legacy or incompatible gender values deterministically. Gendered
+     * Repairs an incompatible gender value deterministically. Gendered
      * races fall back to male; unisex races always use non-binary.
      */
     public static String normalizeGenderForRace(String raceId, String genderId) {
@@ -141,11 +139,6 @@ public final class CharacterRaceRegistry {
         return definition.hasGenderedModels()
                 ? CharacterGenderRegistry.MALE
                 : CharacterGenderRegistry.NON_BINARY;
-    }
-
-    public static String canonicalizeIdentifier(String id) {
-        String normalized = normalizeIdentifier(id);
-        return LEGACY_TROLL.equals(normalized) ? HALF_TROLL : normalized;
     }
 
     public static String normalizeIdentifier(String id) {
@@ -240,7 +233,7 @@ public final class CharacterRaceRegistry {
 
     private static void register(Map<String, CharacterRaceDefinition> definitions,
                                  CharacterRaceDefinition definition) {
-        String id = canonicalizeIdentifier(definition.getId());
+        String id = normalizeIdentifier(definition.getId());
         if (!id.equals(definition.getId())) {
             throw new IllegalArgumentException("Race ID is not canonical: " + definition.getId());
         }

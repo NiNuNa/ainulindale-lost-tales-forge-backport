@@ -1,11 +1,12 @@
 package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.chat.ChatChannel;
-import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatChannelScope;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReactionSummary;
 import com.ninuna.losttales.chat.ChatReplyReference;
+import com.ninuna.losttales.chat.ChatTabIds;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.ArrayList;
@@ -16,6 +17,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -44,8 +46,12 @@ import java.util.UUID;
  * said before. Proximity lines reach only those who were near, since
  * where a player stood then cannot be asked again.</p>
  *
- * <p>Bounded per channel ({@link #MAX_PER_CHANNEL} unless the server's
- * config says otherwise) and in all ({@link #MAX_TOTAL}), the oldest
+ * <p>Bounded per channel — per faction and per party on the channels
+ * that hold several, and per conversation for whispers, so one busy
+ * faction, party or pair cannot push another's lines out —
+ * ({@link #MAX_PER_CHANNEL}
+ * unless the server's config says otherwise) and in all
+ * ({@link #MAX_TOTAL}), the oldest
  * going first; a replay hands a player at most
  * {@link #MAX_REPLAY_PER_CHANNEL} of a channel and
  * {@link #MAX_REPLAY_TOTAL} in all. The live store is this class; the
@@ -119,8 +125,8 @@ public final class ChatHistory {
                     continue;
                 }
                 ENTRIES.put(id, entry);
-                count(entry.channelId, 1);
-                trim(entry.channelId);
+                count(budgetKeyOf(entry), 1);
+                trim(budgetKeyOf(entry));
                 kept++;
                 newest = Math.max(newest, id.longValue());
             }
@@ -173,10 +179,11 @@ public final class ChatHistory {
                 forOthers, audience == null ? Audience.nobody() : audience,
                 forOthers.getTimestampMillis()));
         if (replaced != null) {
-            count(replaced.channelId, -1);
+            count(budgetKeyOf(replaced), -1);
         }
-        count(channelId, 1);
-        trim(channelId);
+        Entry kept = ENTRIES.get(Long.valueOf(messageId));
+        count(budgetKeyOf(kept), 1);
+        trim(budgetKeyOf(kept));
         changed();
     }
 
@@ -280,6 +287,47 @@ public final class ChatHistory {
                 entry.audience, entry.timestampMillis, entry.reactions));
         changed();
         return Collections.unmodifiableSet(new HashSet<UUID>(entry.seenBy));
+    }
+
+    /**
+     * Names a player on a kept line of the server's own, as the players
+     * it names were named when it was recorded: the join line announces
+     * a player the server does not list yet, so they are named on it at
+     * their login, by the identity they are playing. A player already
+     * named is named afresh. Nothing for a line that is not kept or is
+     * not the server's.
+     */
+    public static synchronized void namePlayer(long messageId,
+                                               ChatNamedPlayer named) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        if (entry == null || named == null || !named.isValid()
+                || !LostTalesChatMessagePacket.isSystemSender(entry.authorId)) {
+            return;
+        }
+        List<ChatNamedPlayer> players = new ArrayList<ChatNamedPlayer>();
+        players.add(named);
+        for (ChatNamedPlayer player : entry.forOthers.getNamedPlayers()) {
+            if (!player.getAccount().equalsIgnoreCase(named.getAccount())) {
+                players.add(player);
+            }
+        }
+        LostTalesChatMessagePacket forOthers;
+        LostTalesChatMessagePacket forSender;
+        try {
+            forOthers = entry.forOthers.withServerBody(
+                    entry.forOthers.getBodyJson(), players);
+            forSender = entry.forSender == entry.forOthers ? forOthers
+                    : entry.forSender.withServerBody(
+                            entry.forSender.getBodyJson(), players);
+        } catch (RuntimeException refused) {
+            // A line that cannot be rebuilt is left as it was.
+            return;
+        }
+        ENTRIES.put(Long.valueOf(messageId), new Entry(entry.authorId,
+                entry.author, entry.excerpt, entry.seenBy, entry.channelId,
+                forSender, forOthers, entry.audience, entry.timestampMillis,
+                entry.reactions));
+        changed();
     }
 
     /* ---- Reactions ---- */
@@ -415,9 +463,7 @@ public final class ChatHistory {
      */
     private static LostTalesChatMessagePacket shownTo(Requester requester,
                                                       Entry entry) {
-        LostTalesChatMessagePacket line = requester.accountId != null
-                && requester.accountId.equals(entry.authorId)
-                ? entry.forSender : entry.forOthers;
+        LostTalesChatMessagePacket line = copyFor(requester, entry);
         if (requester.accountId != null
                 && entry.seenBy.add(requester.accountId)) {
             changed();
@@ -425,6 +471,18 @@ public final class ChatHistory {
         return entry.reactions.isEmpty() ? line
                 : line.withReactions(entry.reactions.summaryFor(
                         requester.accountId));
+    }
+
+    /** The copy of a kept line meant for the requester: its author's own, else everyone else's. */
+    private static LostTalesChatMessagePacket copyFor(Requester requester, Entry entry) {
+        return requester.accountId != null && requester.accountId.equals(entry.authorId)
+                ? entry.forSender : entry.forOthers;
+    }
+
+    /** The conversation a whisper copy is held in, as the reader's tab names it. */
+    private static String conversationIdOf(LostTalesChatMessagePacket copy) {
+        return ChatTabIds.whisperConversationId(copy.getPartner(),
+                copy.getPartnerIdentity(), copy.getOwnCharacterId());
     }
 
     /**
@@ -543,7 +601,9 @@ public final class ChatHistory {
     /**
      * The page of a channel before {@code beforeMessageId}, newest first:
      * the newest kept messages of the channel — and of the conversation
-     * {@code scopeValue} names, for a channel that has more than one —
+     * {@code scopeValue} names, for a channel that has more than one, or
+     * for a whisper the conversation whose tab id it is, read off the
+     * requester's own copy of each line —
      * older than that line whose audience admits the requester, at most
      * {@link #MAX_OLDER_PER_REQUEST}. What a client scrolled to the top
      * of a tab asks for; newest first so it can lay each line above the
@@ -569,7 +629,10 @@ public final class ChatHistory {
                     || !channelId.equals(entry.channelId)
                     || (channel.isScoped()
                             && !scope.equals(entry.forOthers.getScopeValue()))
-                    || !entry.audience.admits(requester, entry)) {
+                    || !entry.audience.admits(requester, entry)
+                    || (channel == ChatChannel.WHISPER
+                            && !conversationIdOf(copyFor(requester, entry))
+                                    .equalsIgnoreCase(scope))) {
                 continue;
             }
             lines.add(shownTo(requester, entry));
@@ -792,7 +855,7 @@ public final class ChatHistory {
     private static void forget(long messageId) {
         Entry gone = ENTRIES.remove(Long.valueOf(messageId));
         if (gone != null) {
-            count(gone.channelId, -1);
+            count(budgetKeyOf(gone), -1);
             changed();
         }
     }
@@ -808,15 +871,41 @@ public final class ChatHistory {
     }
 
     /** Drops the oldest of a channel past its cap, then the oldest of all past the total. */
-    private static void trim(String channelId) {
-        Integer count = COUNT_BY_CHANNEL.get(channelId);
+    /**
+     * What a kept line's share of the budget is charged to: its channel,
+     * or for a whisper the pair of identities in it, whichever side
+     * spoke, so every pair keeps its own recent lines.
+     */
+    /**
+     * The budget a line is charged to: its channel; on a channel that
+     * holds several conversations, the one faction or party it was said
+     * in; for a whisper the pair of identities. So a busy faction, party
+     * or pair only ever pushes out its own lines.
+     */
+    private static String budgetKeyOf(Entry entry) {
+        LostTalesChatMessagePacket copy = entry.forSender;
+        if (!ChatChannel.WHISPER.getId().equals(entry.channelId)) {
+            String scope = copy.getScopeValue();
+            return scope.length() == 0 ? entry.channelId
+                    : entry.channelId + ":" + scope.toLowerCase(Locale.ROOT);
+        }
+        String one = (copy.getAccountName() + "/" + copy.getIdentityName())
+                .toLowerCase(Locale.ROOT);
+        String other = (copy.getPartner() + "/" + copy.getPartnerIdentity())
+                .toLowerCase(Locale.ROOT);
+        return entry.channelId + ":" + (one.compareTo(other) <= 0
+                ? one + "|" + other : other + "|" + one);
+    }
+
+    private static void trim(String budgetKey) {
+        Integer count = COUNT_BY_CHANNEL.get(budgetKey);
         if (count != null && count.intValue() > perChannelCapacity()) {
             Iterator<Map.Entry<Long, Entry>> oldest = ENTRIES.entrySet().iterator();
             while (oldest.hasNext()) {
                 Map.Entry<Long, Entry> candidate = oldest.next();
-                if (channelId.equals(candidate.getValue().channelId)) {
+                if (budgetKey.equals(budgetKeyOf(candidate.getValue()))) {
                     oldest.remove();
-                    count(channelId, -1);
+                    count(budgetKey, -1);
                     break;
                 }
             }
@@ -825,7 +914,7 @@ public final class ChatHistory {
             Iterator<Map.Entry<Long, Entry>> oldest = ENTRIES.entrySet().iterator();
             Map.Entry<Long, Entry> gone = oldest.next();
             oldest.remove();
-            count(gone.getValue().channelId, -1);
+            count(budgetKeyOf(gone.getValue()), -1);
         }
     }
 

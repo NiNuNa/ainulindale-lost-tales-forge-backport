@@ -1,5 +1,7 @@
 package com.ninuna.losttales.proxy;
 
+import com.ninuna.losttales.chat.server.ChatIdentitySelection;
+import com.ninuna.losttales.network.packet.LostTalesChatIdentitySyncPacket;
 import java.io.File;
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.LostTalesMetaData;
@@ -124,6 +126,9 @@ import com.ninuna.losttales.compat.lotr.LotrRaceProfileAdapter;
 import com.ninuna.losttales.world.room.CharacterRoomWorldHandler;
 import com.ninuna.losttales.world.room.CharacterRoomWorldType;
 import com.ninuna.losttales.world.waystone.LostTalesWaystoneGenerationHandler;
+import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
+import com.ninuna.losttales.network.packet.LostTalesChatPresenceSyncPacket;
+import com.ninuna.losttales.chat.server.ChatPresenceService;
 import software.bernie.geckolib3.GeckoLib;
 
 public class LostTalesCommonProxy {
@@ -173,6 +178,7 @@ public class LostTalesCommonProxy {
                 new LostTalesChargeService();
         LostTalesWaystoneGenerationHandler waystoneGenerationHandler =
                 new LostTalesWaystoneGenerationHandler();
+        cpw.mods.fml.common.FMLCommonHandler.instance().bus().register(new ChatIdentitySelection());
         LostTalesChatRoleRosterWatcher chatRoleRosterWatcher =
                 new LostTalesChatRoleRosterWatcher();
         MinecraftForge.EVENT_BUS.register(questPlayerEventHandler);
@@ -324,6 +330,10 @@ public class LostTalesCommonProxy {
 
     public void handlePartyTrackingSync(PartyTrackingSyncPacket packet) {}
 
+    public void handleChatIdentity(LostTalesChatIdentitySyncPacket packet) {}
+
+    public void handleChatPresence(LostTalesChatPresenceSyncPacket packet) {}
+
     public void handleChatMessage(LostTalesChatMessagePacket packet) {}
 
     public void handleChatAccess(LostTalesChatAccessPacket packet) {}
@@ -392,6 +402,8 @@ public class LostTalesCommonProxy {
         LostTalesDiscordBridge.getInstance().restoreLinks(event.getServer());
         ChatCommandContexts.clear();
         LostTalesChatService.clear();
+        ChatIdentitySelection.clear();
+        ChatPresenceService.clear();
         LostTalesServerBroadcastHook.clear();
         LostTalesChatService.console(ChatConsoleEvent.Kind.SERVER,
                 ChatConsoleEvent.Severity.INFO, "Server", "Server started");
@@ -473,6 +485,7 @@ public class LostTalesCommonProxy {
         LostTalesChatRoleRosterWatcher.clear();
         ChatChannel.resetToBuiltIn();
         ChatChannelIconCatalog.resetToDefaults();
+        ChatProfanityCatalog.resetToBundled();
         ChatMessageIdAllocator.reset();
         // The save takes the history's last state before the store is
         // cleared: the worlds are saved after this event, and what
@@ -482,6 +495,8 @@ public class LostTalesCommonProxy {
         ChatConsoleStream.clear();
         ChatCommandContexts.clear();
         LostTalesChatService.clear();
+        ChatIdentitySelection.clear();
+        ChatPresenceService.clear();
         LostTalesServerBroadcastHook.clear();
         ChatAuditLog.onServerStopping();
         LostTalesMobAggroEventHandler.clearAll();

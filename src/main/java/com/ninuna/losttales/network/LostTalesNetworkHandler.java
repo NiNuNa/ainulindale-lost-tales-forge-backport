@@ -1,5 +1,7 @@
 package com.ninuna.losttales.network;
 
+import com.ninuna.losttales.network.packet.LostTalesChatIdentityPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatIdentitySyncPacket;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.network.packet.LostTalesMapMarkerDiscoveryPacket;
 import com.ninuna.losttales.network.packet.LostTalesMapMarkerSnapshotPacket;
@@ -58,6 +60,8 @@ import com.ninuna.losttales.network.packet.party.PartyMemberStatusSyncPacket;
 import com.ninuna.losttales.network.packet.party.PartyOperationResultPacket;
 import com.ninuna.losttales.network.packet.party.PartyStateSyncPacket;
 import com.ninuna.losttales.network.packet.party.PartyTrackingSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatPresencePacket;
+import com.ninuna.losttales.network.packet.LostTalesChatPresenceSyncPacket;
 import cpw.mods.fml.common.network.NetworkRegistry;
 import cpw.mods.fml.common.network.simpleimpl.SimpleNetworkWrapper;
 import cpw.mods.fml.relauncher.Side;
@@ -136,5 +140,9 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(LostTalesChatReactPacket.Handler.class, LostTalesChatReactPacket.class, 54, Side.SERVER);
         CHANNEL.registerMessage(LostTalesChatReactionSyncPacket.Handler.class, LostTalesChatReactionSyncPacket.class, 55, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesChatDeliveryMarkPacket.Handler.class, LostTalesChatDeliveryMarkPacket.class, 56, Side.CLIENT);
+        CHANNEL.registerMessage(LostTalesChatIdentityPacket.Handler.class, LostTalesChatIdentityPacket.class, 57, Side.SERVER);
+        CHANNEL.registerMessage(LostTalesChatIdentitySyncPacket.Handler.class, LostTalesChatIdentitySyncPacket.class, 58, Side.CLIENT);
+        CHANNEL.registerMessage(LostTalesChatPresencePacket.Handler.class, LostTalesChatPresencePacket.class, 59, Side.SERVER);
+        CHANNEL.registerMessage(LostTalesChatPresenceSyncPacket.Handler.class, LostTalesChatPresenceSyncPacket.class, 60, Side.CLIENT);
     }
 }

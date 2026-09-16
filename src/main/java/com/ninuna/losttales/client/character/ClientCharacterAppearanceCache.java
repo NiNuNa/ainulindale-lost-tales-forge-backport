@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import net.minecraft.client.Minecraft;
 
 /** Client-only cache of public active-character rendering information. */
 public final class ClientCharacterAppearanceCache {
@@ -99,6 +100,46 @@ public final class ClientCharacterAppearanceCache {
         if (playerId != null) {
             PREVIEW_APPEARANCES.remove(playerId);
         }
+    }
+
+    /**
+     * The appearance an online account plays, or null when this client
+     * knows none: the local player's own by their id, which falls back
+     * to their roster, and everyone else's from the appearance the
+     * server syncs for every online player.
+     */
+    public static CharacterAppearance appearanceFor(String accountName) {
+        if (accountName == null || accountName.length() == 0) {
+            return null;
+        }
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft != null && minecraft.thePlayer != null
+                && accountName.equalsIgnoreCase(
+                        minecraft.thePlayer.getCommandSenderName())) {
+            return getAuthoritative(minecraft.thePlayer.getUniqueID());
+        }
+        for (CharacterAppearance appearance : snapshot().values()) {
+            if (appearance != null
+                    && accountName.equalsIgnoreCase(appearance.getAccountName())) {
+                return appearance;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The name of the character an online account is playing, or null
+     * when this client knows none.
+     */
+    public static String characterNameFor(String accountName) {
+        CharacterAppearance appearance = appearanceFor(accountName);
+        return appearance == null || !appearance.hasCharacter() ? null
+                : trimmedOrNull(appearance.getCharacterName());
+    }
+
+    private static String trimmedOrNull(String name) {
+        String trimmed = name == null ? "" : name.trim();
+        return trimmed.length() == 0 ? null : trimmed;
     }
 
     public static synchronized Map<UUID, CharacterAppearance> snapshot() {

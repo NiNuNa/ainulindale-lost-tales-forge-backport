@@ -41,6 +41,11 @@ public final class ClientChatSession {
         return serverKey;
     }
 
+    /** Names where the chat came from directly; for tests. */
+    static synchronized void resumeAt(String key) {
+        serverKey = key == null ? "" : key;
+    }
+
     /**
      * A stable name for where the client is: the server address for
      * multiplayer, the save folder for single player. Empty when neither

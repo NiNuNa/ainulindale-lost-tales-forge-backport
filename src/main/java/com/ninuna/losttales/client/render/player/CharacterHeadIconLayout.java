@@ -56,7 +56,7 @@ final class CharacterHeadIconLayout {
 
     static CharacterHeadIconLayout forConfiguredRace(String raceId) {
         String canonicalRace =
-                CharacterRaceRegistry.canonicalizeIdentifier(raceId);
+                CharacterRaceRegistry.normalizeIdentifier(raceId);
         if (CharacterRaceRegistry.HUMAN.equals(canonicalRace)
                 || CharacterRaceRegistry.ELF.equals(canonicalRace)
                 || CharacterRaceRegistry.DWARF.equals(canonicalRace)

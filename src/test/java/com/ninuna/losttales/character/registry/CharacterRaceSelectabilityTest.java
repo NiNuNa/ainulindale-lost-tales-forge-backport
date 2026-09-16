@@ -37,10 +37,6 @@ public final class CharacterRaceSelectabilityTest {
         // repairing such a character into a human.
         assertNotNull(CharacterRaceRegistry.get(
                 CharacterRaceRegistry.HALF_TROLL));
-        assertEquals("a legacy troll is still the same race",
-                CharacterRaceRegistry.HALF_TROLL,
-                CharacterRaceRegistry.canonicalizeIdentifier(
-                        CharacterRaceRegistry.LEGACY_TROLL));
     }
 
     @Test

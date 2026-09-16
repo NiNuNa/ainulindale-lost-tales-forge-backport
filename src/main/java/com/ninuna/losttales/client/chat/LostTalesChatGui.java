@@ -97,12 +97,13 @@ public final class LostTalesChatGui extends GuiChat
     private final ChatPointerRegions regions = new ChatPointerRegions();
     /** The input section: its place, its controls, its notice. */
     private final ChatInputBar bar = new ChatInputBar();
+    private final ChatSearchBar searchBar = new ChatSearchBar();
     /** The suggestion lists, command completion and token insertion. */
     private final ChatInputCompletion completion =
             new ChatInputCompletion(this.notices);
     /** The selection, and the verbs that open, close, lock and move tabs. */
     private final ChatTabActions tabActions = new ChatTabActions(this.bar,
-            this.completion, this.composer, this.notices);
+            this.completion, this.composer);
     /** The drags: tabs, windows, resizes and scrollbars. */
     private final ChatWindowGestures gestures = new ChatWindowGestures(
             new ChatWindowGestures.RowSource() {
@@ -150,6 +151,7 @@ public final class LostTalesChatGui extends GuiChat
     private int emptyPlusTop;
     private int emptyPlusRight;
     private int emptyPlusBottom;
+    private String composingIdentityKey;
 
     public LostTalesChatGui(String defaultText) {
         super(defaultText == null ? "" : defaultText);
@@ -181,6 +183,7 @@ public final class LostTalesChatGui extends GuiChat
         this.outbox.bind(this.mc);
         this.bar.bind(this.mc, this.fontRendererObj, this.regions, styled,
                 this.height);
+        this.searchBar.bind(this.fontRendererObj);
         this.inputField.setTextColor(LostTalesChatVisualStyle.IVORY);
         this.inputField.setDisabledTextColour(
                 LostTalesChatVisualStyle.SHADOW);
@@ -198,6 +201,7 @@ public final class LostTalesChatGui extends GuiChat
             this.inputField.setText(draft);
             this.inputField.setCursorPositionEnd();
         }
+        this.composingIdentityKey = ClientChatIdentities.viewIdentityKey();
         this.tabActions.bind(this.mc, styled);
         this.gestures.bind(this.mc, this.fontRendererObj, this.width,
                 this.height);
@@ -215,7 +219,9 @@ public final class LostTalesChatGui extends GuiChat
     @Override
     public void updateScreen() {
         super.updateScreen();
+        syncChatIdentity();
         this.bar.tickPickers();
+        this.searchBar.tick();
         ClientChatChannelState.ensureAvailable();
         this.tabActions.syncSelection();
         if (isEmptyState()) {
@@ -231,6 +237,17 @@ public final class LostTalesChatGui extends GuiChat
                 ClientChatChannelState.getSelected());
     }
 
+    /** A reply or edit belongs to the identity that started composing it. */
+    private void syncChatIdentity() {
+        String identity = ClientChatIdentities.viewIdentityKey();
+        if (identity.equals(this.composingIdentityKey)) { return; }
+        this.composingIdentityKey = identity;
+        this.outbox.stopTyping();
+        this.composer.cancelComposing(this.inputField);
+        ClientChatIdentitySelection.update();
+        this.tabActions.syncSelection();
+    }
+
     /**
      * Closing without sending keeps the text for the next opening; once
      * something has been sent the draft is spent.
@@ -243,6 +260,8 @@ public final class LostTalesChatGui extends GuiChat
         // card a click opened goes with the screen.
         this.gestures.cancelDrags();
         LostTalesChatHoverCard.unpin();
+        // A search belongs to the open screen and goes with it.
+        ChatSearch.close();
         if (!isEmptyState()) {
             ClientChatChannelState.setDraft(
                     this.sent ? "" : this.inputField.getText());
@@ -363,6 +382,18 @@ public final class LostTalesChatGui extends GuiChat
                 && this.menus.handleKeyTyped(typedChar, keyCode)) {
             return;
         }
+        // Ctrl+F opens the search over the window being typed in, and
+        // while its field holds the keys they are its own: Enter walks
+        // the matches down and Shift+Enter up, Escape closes it, and
+        // everything else is typed into it.
+        if (isCtrlKeyDown() && keyCode == Keyboard.KEY_F) {
+            openSearch();
+            return;
+        }
+        if (this.searchBar.isFocused()) {
+            handleSearchKey(typedChar, keyCode);
+            return;
+        }
         // Escape with nothing else open drops the reply before it closes
         // the chat: backing out of an answer should not cost the screen.
         if (keyCode == Keyboard.KEY_ESCAPE
@@ -481,6 +512,93 @@ public final class LostTalesChatGui extends GuiChat
         maybeSpaceTypedShortcode(typedChar);
         enforceLimit();
         this.completion.refreshAfterTyping();
+    }
+
+    /** Opens the search over the window being typed in and gives it the keys. */
+    private void openSearch() {
+        ChatWindow typed = ChatWindowLayout.windowOf(
+                ClientChatChannelState.getSelected());
+        if (typed == null) {
+            return;
+        }
+        ChatSearch.open(typed.getId());
+        this.searchBar.setText(ChatSearch.query());
+        focusSearch(true);
+    }
+
+    /** Closes the search: its lit matches go, and the input has the keys again. */
+    private void closeSearch() {
+        ChatSearch.close();
+        this.searchBar.setText("");
+        focusSearch(false);
+    }
+
+    /** The keys go to the search field or to the input, never to both. */
+    private void focusSearch(boolean on) {
+        this.searchBar.focus(on);
+        this.inputField.setFocused(!on);
+    }
+
+    private void handleSearchKey(char typedChar, int keyCode) {
+        if (keyCode == Keyboard.KEY_ESCAPE) {
+            closeSearch();
+            return;
+        }
+        if (keyCode == Keyboard.KEY_RETURN
+                || keyCode == Keyboard.KEY_NUMPADENTER) {
+            walkSearch(!isShiftKeyDown());
+            return;
+        }
+        if (this.searchBar.keyTyped(typedChar, keyCode)) {
+            ChatSearch.setQuery(this.searchBar.text());
+        }
+    }
+
+    /** Walks to the next match down, or the previous one up, and lands on it. */
+    private void walkSearch(boolean forward) {
+        ChatWindow typed = ChatWindowLayout.windowOf(
+                ClientChatChannelState.getSelected());
+        ChatWindowFrame frame = typed == null ? null : frameFor(typed);
+        if (frame == null) {
+            return;
+        }
+        landSearch(frame, ChatSearch.walk(forward, this.mc, frame));
+    }
+
+    /** Lands on a match the search named, when it named one. */
+    private static void landSearch(ChatWindowFrame frame, int chatLineId) {
+        if (chatLineId == 0) {
+            return;
+        }
+        int index = firstRowOf(frame.lines, chatLineId);
+        if (index >= 0) {
+            landOn(frame, index, chatLineId);
+        }
+    }
+
+    /** A press on the search bar: the field takes the caret, the controls act. */
+    private void clickSearchBar(ChatHover press, double x, double y, int button) {
+        if (button != 0 || press.frame == null || press.searchPart == null) {
+            return;
+        }
+        this.tabActions.selectWindow(press.window);
+        switch (press.searchPart) {
+            case FIELD:
+                focusSearch(true);
+                this.searchBar.clickField(press.row, x, y);
+                return;
+            case PREVIOUS:
+                walkSearch(false);
+                return;
+            case NEXT:
+                walkSearch(true);
+                return;
+            case CLOSE:
+                closeSearch();
+                return;
+            default:
+                return;
+        }
     }
 
     /**
@@ -704,8 +822,7 @@ public final class LostTalesChatGui extends GuiChat
         // finds it: the open menu's rows, the open picker's list, else
         // the history of the window under the pointer.
         ChatHover under = resolveHover(mouseX, mouseY);
-        if (under.is(ChatHover.Kind.MENU) || under.is(ChatHover.Kind.MENU_ENTRY)
-                || under.is(ChatHover.Kind.MENU_LOCK)) {
+        if (under.is(ChatHover.Kind.MENU) || under.is(ChatHover.Kind.MENU_ENTRY)) {
             this.menus.scrollBy(-ChatWheelStep.menuRows(lines));
             return;
         }
@@ -832,8 +949,7 @@ public final class LostTalesChatGui extends GuiChat
         this.menus.refreshRestorePopup();
         this.menus.registerRegion(this.regions);
         boolean onMenu = this.hover.is(ChatHover.Kind.MENU)
-                || this.hover.is(ChatHover.Kind.MENU_ENTRY)
-                || this.hover.is(ChatHover.Kind.MENU_LOCK);
+                || this.hover.is(ChatHover.Kind.MENU_ENTRY);
         double menuX = onMenu ? pointerX : ChatHover.AWAY;
         double menuY = onMenu ? pointerY : ChatHover.AWAY;
         if (isEmptyState()) {
@@ -848,7 +964,7 @@ public final class LostTalesChatGui extends GuiChat
                     onPlus ? pointerY : ChatHover.AWAY);
             this.bar.drawNotice();
             this.menus.draw(this.regions, menuX, menuY);
-            drawHoverTipFor(this.hover);
+            drawHoverTipFor();
             return;
         }
         int barRight = this.bar.inputBarRight();
@@ -896,6 +1012,13 @@ public final class LostTalesChatGui extends GuiChat
         if (candidate != null) {
             LostTalesChatHoverCard.drawForCandidate(this.mc, candidate,
                     mouseX, mouseY, this.width, this.height);
+        } else if (this.hover.is(ChatHover.Kind.CHARACTER_BUTTON)
+                && !this.menus.isOpen()) {
+            // The head button's hover is the chosen identity's own brief
+            // card: who the roleplaying channels speak as right now.
+            LostTalesChatHoverCard.drawForIdentity(this.mc,
+                    ClientChatChannelState.getSelected(), mouseX, mouseY,
+                    this.width, this.height);
         } else {
             LostTalesChatHoverCard.draw(this.mc, person, mouseX, mouseY,
                     this.width, this.height);
@@ -905,17 +1028,12 @@ public final class LostTalesChatGui extends GuiChat
         LostTalesChatHoverCard.drawPinned(this.mc, this.width, this.height);
         this.gestures.drawLinkHighlight();
         this.menus.draw(this.regions, menuX, menuY);
-        drawHoverTipFor(this.hover);
+        drawHoverTipFor();
     }
 
-    /**
-     * The tip beside the pointer, when what it rests on has one. Behind
-     * an open menu the rest of the screen keeps quiet; the lock inside
-     * the character menu speaks for itself there.
-     */
-    private void drawHoverTipFor(ChatHover hover) {
-        if (this.hoverTip.length() > 0 && (hover.is(ChatHover.Kind.MENU_LOCK)
-                || !this.menus.isOpen())) {
+    /** The open menu owns its tooltips; controls behind it stay quiet. */
+    private void drawHoverTipFor() {
+        if (this.hoverTip.length() > 0 && !this.menus.isOpen()) {
             drawHoverTip();
         }
     }
@@ -985,12 +1103,9 @@ public final class LostTalesChatGui extends GuiChat
             return new ChatHover(ChatHover.Kind.CARD);
         }
         if (this.menus.isOpen() && this.menus.contains(x, y)) {
-            ChatPopupMenu.Entry lock = this.menus.lockControlAt(x, y);
-            ChatPopupMenu.Entry entry = lock != null ? lock
-                    : this.menus.entryAt(x, y);
-            ChatHover hover = new ChatHover(lock != null
-                    ? ChatHover.Kind.MENU_LOCK : entry != null
-                            ? ChatHover.Kind.MENU_ENTRY : ChatHover.Kind.MENU);
+            ChatPopupMenu.Entry entry = this.menus.entryAt(x, y);
+            ChatHover hover = new ChatHover(entry != null
+                    ? ChatHover.Kind.MENU_ENTRY : ChatHover.Kind.MENU);
             hover.menuEntry = entry;
             return hover;
         }
@@ -1153,6 +1268,17 @@ public final class LostTalesChatGui extends GuiChat
             ChatChannelTabBar.Hit hit = row.dragging != null || row.resizing
                     ? null : frame.tabBar.hitAt(this.fontRendererObj, row,
                             x, y);
+            ChatSearchBar.Part part = hit != null || row.dragging != null
+                    || row.resizing ? null
+                    : this.searchBar.partAt(frame, row, x, y);
+            if (part != null) {
+                ChatHover hover = new ChatHover(ChatHover.Kind.SEARCH_BAR);
+                hover.window = window;
+                hover.frame = frame;
+                hover.row = row;
+                hover.searchPart = part;
+                return hover;
+            }
             if (hit == null && !frame.tabBar.stripContains(
                     this.fontRendererObj, row, x, y)) {
                 continue;
@@ -1207,6 +1333,8 @@ public final class LostTalesChatGui extends GuiChat
             case TAB_ROW:
                 return hover.tabHit == null || hover.window == null ? ""
                         : tipFor(hover.tabHit, hover.window, hover.overGrip);
+            case SEARCH_BAR:
+                return ChatSearchBar.tipFor(hover.searchPart);
             case EMPTY_PLUS:
                 return StatCollector.translateToLocal(
                         "gui.losttales.chat.tab.restore");
@@ -1226,21 +1354,13 @@ public final class LostTalesChatGui extends GuiChat
                 return hover.markLineId != 0 ? markTip(hover.markLineId)
                         : stampTip(hover.stampLineId);
             case CHARACTER_BUTTON:
-                return StatCollector.translateToLocal(
-                        "gui.losttales.chat.character_selection.tip");
+                // The hover shows the chosen identity's card instead of words.
+                return "";
             case TOOLBAR_TOGGLE:
                 return StatCollector.translateToLocal(
                         ChatWindowLayout.isToolbarCollapsed()
                                 ? "gui.losttales.chat.toolbar.expand"
                                 : "gui.losttales.chat.toolbar.collapse");
-            case MENU_LOCK:
-                // The lock in the character selection menu answers with
-                // the same tip its states answer with everywhere else.
-                return StatCollector.translateToLocal(
-                        ClientChatAppearances.isLocked(
-                                ClientChatChannelState.getSelected())
-                                ? "gui.losttales.chat.character_selection.unlock"
-                                : "gui.losttales.chat.character_selection.lock");
             default:
                 return "";
         }
@@ -1386,6 +1506,11 @@ public final class LostTalesChatGui extends GuiChat
         ChatWindow typed = ChatWindowLayout.windowOf(
                 ClientChatChannelState.getSelected());
         String activeBarId = typed == null ? null : typed.getId();
+        // The search follows the input: moved to another window, it closes.
+        ChatSearch.closeUnless(activeBarId);
+        if (!ChatSearch.isOpen() && this.searchBar.isFocused()) {
+            focusSearch(false);
+        }
         boolean blurActive = LostTalesConfig.enableChatBackgroundBlur
                 && LostTalesConfig.enableGuiBackgroundBlur;
         List<ChatWindowPlacement.Box> drawnBoxes = blurActive
@@ -1429,6 +1554,9 @@ public final class LostTalesChatGui extends GuiChat
             // window's fractional remainder, so it sits exactly where the
             // lines do while the window glides. The row is told the same
             // remainder, since its scissors are cut outside this matrix.
+            // The search bar lays itself out first, so the strip can
+            // leave its well out of the surface it paints.
+            this.searchBar.prepare(this.fontRendererObj, frame, row);
             GL11.glPushMatrix();
             try {
                 GL11.glTranslatef(row.fractionX, row.fractionY, 0.0F);
@@ -1440,6 +1568,16 @@ public final class LostTalesChatGui extends GuiChat
                         onRow ? pointerX : ChatHover.AWAY,
                         onRow ? pointerY : ChatHover.AWAY,
                         opening.getOpacity());
+                if (ChatSearch.isOpenOn(window.getId())) {
+                    landSearch(frame, ChatSearch.scan(this.mc, frame));
+                    this.searchBar.draw(this.fontRendererObj, frame,
+                            onRow ? pointerX : ChatHover.AWAY,
+                            onRow ? pointerY : ChatHover.AWAY,
+                            opening.getOpacity(),
+                            this.hover.is(ChatHover.Kind.SEARCH_BAR)
+                                    && this.hover.frame == frame
+                                    ? this.hover.searchPart : null);
+                }
             } finally {
                 GL11.glPopMatrix();
             }
@@ -1802,6 +1940,7 @@ public final class LostTalesChatGui extends GuiChat
         // it and goes on to whatever is under it, which is told which
         // menu it closed so a switch does not reopen what it put away.
         ChatScreenMenus.Click menuClick = this.menus.click(x, y, button);
+        syncChatIdentity();
         String closedPopupKind = menuClick.closedKind;
         if (menuClick.command != null) {
             sendCommand(menuClick.command);
@@ -1819,7 +1958,15 @@ public final class LostTalesChatGui extends GuiChat
             return;
         }
         ChatHover press = resolveHover(x, y);
+        // A press anywhere but the search bar hands the keys back to
+        // the input; the search stays open with its matches lit.
+        if (this.searchBar.isFocused() && !press.is(ChatHover.Kind.SEARCH_BAR)) {
+            focusSearch(false);
+        }
         switch (press.kind) {
+            case SEARCH_BAR:
+                clickSearchBar(press, x, y, button);
+                return;
             case SUGGESTION:
                 if (button == 0) {
                     this.completion.accept(press.suggestion);

@@ -9,6 +9,7 @@ import com.ninuna.losttales.client.LostTalesClientThread;
 import com.ninuna.losttales.config.client.ClientServerConfigCache;
 import com.ninuna.losttales.client.accessory.ClientAccessoryEffectCache;
 import com.ninuna.losttales.client.accessory.WraithWorldVisualEffect;
+import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.client.camera.ThirdPersonCameraRuntime;
 import com.ninuna.losttales.client.camera.ThirdPersonCrosshairRenderer;
@@ -30,6 +31,7 @@ import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
 import com.ninuna.losttales.client.chat.ChatSpeechBubbles;
+import com.ninuna.losttales.client.chat.ChatWindowLayout;
 import com.ninuna.losttales.client.chat.LostTalesSpeechBubbleRenderer;
 import com.ninuna.losttales.client.chat.ClientChatChannelState;
 import com.ninuna.losttales.client.chat.ClientChatIgnores;
@@ -47,6 +49,7 @@ import com.ninuna.losttales.client.gui.LostTalesGuiPointerTargets;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimations;
 import com.ninuna.losttales.client.gui.LostTalesHudFade;
 import com.ninuna.losttales.client.gui.LostTalesHudHidingScreen;
+import com.ninuna.losttales.client.gui.LostTalesPlayerListOverlay;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientWaystoneStateStore;
@@ -85,6 +88,8 @@ import com.ninuna.losttales.item.weapon.LostTalesItemSword;
 import com.ninuna.losttales.proxy.LostTalesClientProxy;
 import com.ninuna.losttales.world.map.LostTalesMapOverlay;
 import com.ninuna.losttales.compat.lotr.LotrRaceProfileAdapter;
+import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
+import com.ninuna.losttales.client.chat.ClientChatPresence;
 import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.network.FMLNetworkEvent.ClientConnectedToServerEvent;
@@ -232,21 +237,25 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
 
     private static void beginSession() {
         Minecraft minecraft = Minecraft.getMinecraft();
-        if (ClientChatSession.resume(minecraft)) {
-            return;
+        if (!ClientChatSession.resume(minecraft)) {
+            if (minecraft != null && minecraft.ingameGUI != null) {
+                minecraft.ingameGUI.getChatGUI().clearChatMessages();
+            }
+            ClientChatChannelState.clear();
+            ClientChatChannelViews.clear();
+            ChatRoleCatalog.resetToBuiltIn();
+            // A channel a server defined is that server's; arriving
+            // somewhere else leaves the code's own channels alone.
+            ChatChannel.resetToBuiltIn();
+            ChatProfanityCatalog.resetToBundled();
+            ClientChatPresence.clear();
+            ClientChatShowcaseStore.clear();
+            LostTalesChatPresentation.clear();
+            LostTalesCharacterHeadIconRenderer.clearAccountSkinCache();
         }
-        if (minecraft != null && minecraft.ingameGUI != null) {
-            minecraft.ingameGUI.getChatGUI().clearChatMessages();
-        }
-        ClientChatChannelState.clear();
-        ClientChatChannelViews.clear();
-        ChatRoleCatalog.resetToBuiltIn();
-        // A channel a server defined is that server's; arriving
-        // somewhere else leaves the code's own channels alone.
-        ChatChannel.resetToBuiltIn();
-        ClientChatShowcaseStore.clear();
-        LostTalesChatPresentation.clear();
-        LostTalesCharacterHeadIconRenderer.clearAccountSkinCache();
+        // The place's remembered whisper tabs come back where they were,
+        // before anything is replayed into them.
+        ChatWindowLayout.restoreConversations(ClientChatSession.currentKey());
     }
 
     @SubscribeEvent
@@ -270,6 +279,14 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     public void expirePendingChatEchoes(TickEvent.ClientTickEvent event) {
         if (event != null && event.phase == TickEvent.Phase.END) {
             LostTalesChatPresentation.expirePendingEchoes();
+        }
+    }
+
+    /** Away sets in and lifts on this client's own activity. */
+    @SubscribeEvent
+    public void updateChatPresence(TickEvent.ClientTickEvent event) {
+        if (event != null && event.phase == TickEvent.Phase.END) {
+            ClientChatPresence.onClientTick(Minecraft.getMinecraft());
         }
     }
 
@@ -309,6 +326,24 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
                 Minecraft.getMinecraft(), event);
     }
 
+    /**
+     * The Tab player list, drawn as the mod's own so it names characters
+     * rather than accounts. Runs last, so a screen that hides the HUD or
+     * another mod that claims the list has had its say first.
+     */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public void renderPlayerList(RenderGameOverlayEvent.Pre event) {
+        if (event == null || event.isCanceled()
+                || event.type != RenderGameOverlayEvent.ElementType.PLAYER_LIST
+                || event.resolution == null) {
+            return;
+        }
+        if (LostTalesPlayerListOverlay.draw(Minecraft.getMinecraft(),
+                event.resolution.getScaledWidth())) {
+            event.setCanceled(true);
+        }
+    }
+
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void useCharacterName(PlayerEvent.NameFormat event) {
         if (event == null || event.entityPlayer == null
@@ -318,20 +353,10 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         CharacterAppearance appearance =
                 ClientCharacterAppearanceCache.getAuthoritative(
                         event.entityPlayer.getUniqueID());
-        if (appearance != null && appearance.hasCharacter()
-                && appearance.getCharacterName().length() > 0) {
-            String characterName = appearance.getCharacterName();
-            String displayName = event.displayname;
-            String accountName = event.username;
-            int accountNameIndex = displayName == null || accountName == null
-                    || accountName.length() == 0
-                    ? -1 : displayName.indexOf(accountName);
-            event.displayname = accountNameIndex < 0
-                    ? characterName
-                    : displayName.substring(0, accountNameIndex)
-                    + characterName
-                    + displayName.substring(
-                    accountNameIndex + accountName.length());
+        if (appearance != null && appearance.hasCharacter()) {
+            event.displayname = PlayableIdentity.formatDisplayName(
+                    event.displayname, event.username,
+                    appearance.getCharacterName());
         }
     }
 

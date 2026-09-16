@@ -1,5 +1,7 @@
 package com.ninuna.losttales.proxy;
 
+import com.ninuna.losttales.client.chat.ClientChatIdentitySelection;
+import com.ninuna.losttales.network.packet.LostTalesChatIdentitySyncPacket;
 import com.ninuna.losttales.config.LostTalesConfigFiles;
 import java.io.File;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityLamp;
@@ -106,6 +108,10 @@ import com.ninuna.losttales.network.packet.party.PartyMemberStatusSyncPacket;
 import com.ninuna.losttales.network.packet.party.PartyOperationResultPacket;
 import com.ninuna.losttales.network.packet.party.PartyStateSyncPacket;
 import com.ninuna.losttales.network.packet.party.PartyTrackingSyncPacket;
+import com.ninuna.losttales.client.chat.ClientChatProfanity;
+import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
+import com.ninuna.losttales.network.packet.LostTalesChatPresenceSyncPacket;
+import com.ninuna.losttales.client.chat.ClientChatPresence;
 import cpw.mods.fml.client.registry.ClientRegistry;
 import cpw.mods.fml.client.registry.RenderingRegistry;
 import cpw.mods.fml.common.FMLCommonHandler;
@@ -132,13 +138,13 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
 
     @Override
     public void preInit(FMLPreInitializationEvent event) {
-        // The client's own stores live in the client folder; the common
-        // proxy has already moved an older build's files into it.
+        // The client's own stores live in the client folder.
         File clientFolder = LostTalesConfigFiles.clientDirectory(
                 event.getModConfigurationDirectory());
         CameraPresetFileStore.initialize(clientFolder);
         ChatEmojiUsageStore.initialize(clientFolder);
         ClientChatIgnores.initialize(clientFolder);
+        ClientChatProfanity.initialize(clientFolder);
         ChatWindowLayoutStore.initialize(clientFolder);
         ClientChatReadMarks.initialize(clientFolder);
         LostTalesClientMapMarkerUsageStore.initialize(clientFolder);
@@ -475,6 +481,16 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     }
 
     @Override
+    public void handleChatIdentity(LostTalesChatIdentitySyncPacket packet) {
+        ClientChatIdentitySelection.accept(packet);
+    }
+
+    @Override
+    public void handleChatPresence(LostTalesChatPresenceSyncPacket packet) {
+        ClientChatPresence.accept(packet);
+    }
+
+    @Override
     public void handleChatMessage(LostTalesChatMessagePacket packet) {
         // A line from an ignored account is dropped before it exists
         // anywhere on this client: no history entry, no tab, no unread,
@@ -550,12 +566,14 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
             ClientChatChannelState.setCanEditServerConfig(
                     packet.canEditServerConfig());
             ClientChatChannelState.setRoleMask(packet.getRoleMask());
-            ClientChatChannelState.setRoleSplit(packet.hasRoleSplit(),
-                    packet.getAccountRoleMask(),
+            ClientChatChannelState.setRoleSplit(packet.getAccountRoleMask(),
                     packet.getCharacterRoleMasks());
             ClientChatChannelState.setProximityRadius(
                     packet.getProximityRadius());
             ClientChatChannelState.setChannelIcons(packet.getChannelIcons());
+            // The words the server adds to the profanity list, over the
+            // bundled ones, for as long as this server is the place.
+            ChatProfanityCatalog.installServerWords(packet.getProfanityWords());
             java.util.LinkedHashMap<String, Integer> holders =
                     new java.util.LinkedHashMap<String, Integer>();
             java.util.HashMap<String, Integer> accountRoles =
