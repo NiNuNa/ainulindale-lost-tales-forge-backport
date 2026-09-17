@@ -80,6 +80,7 @@ import com.ninuna.losttales.gui.hud.mapmarker.LostTalesMapMarkerHudRenderer;
 import com.ninuna.losttales.gui.hud.party.LostTalesPartyHudRenderer;
 import com.ninuna.losttales.gui.hud.quest.LostTalesQuestHudRenderer;
 import com.ninuna.losttales.gui.hud.quest.LostTalesWorldQuestMarkerRenderer;
+import com.ninuna.losttales.gui.screen.LostTalesQuestJournalGui;
 import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.item.weapon.LostTalesItemBattleaxe;
 import com.ninuna.losttales.item.weapon.LostTalesItemDagger;
@@ -105,6 +106,7 @@ import net.minecraft.client.resources.IResourceManager;
 import net.minecraft.client.resources.IResourceManagerReloadListener;
 import net.minecraftforge.client.MinecraftForgeClient;
 import lotr.client.gui.LOTRGuiMap;
+import lotr.client.gui.LOTRGuiRedBook;
 import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.client.event.EntityViewRenderEvent;
@@ -502,7 +504,11 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void replaceLotrMapGui(GuiOpenEvent event) {
-        if (event.gui != null && event.gui.getClass() == LOTRGuiMap.class) {
+        if (event.gui != null
+                && event.gui.getClass() == LOTRGuiRedBook.class) {
+            event.gui = new LostTalesQuestJournalGui(null);
+        } else if (event.gui != null
+                && event.gui.getClass() == LOTRGuiMap.class) {
             event.gui = LostTalesLotrMapGui.replace(
                     (LOTRGuiMap)event.gui);
         } else if (event.gui != null

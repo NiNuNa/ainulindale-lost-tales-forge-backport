@@ -1584,8 +1584,12 @@ public final class LostTalesChatGui extends GuiChat
             drawTypingLine(window, frame, opening, mouseX, mouseY);
             LostTalesChatOverlayRenderer.drawBottomRule(this.mc, frame,
                     opening);
+            LostTalesChatOverlayRenderer.drawWindowFrameSurface(this.mc,
+                    frame, opening);
             LostTalesChatOverlayRenderer.drawWindowLeftEdge(this.mc, frame,
                     opening);
+            LostTalesChatOverlayRenderer.drawWindowTopRightEdges(this.mc,
+                    frame, opening);
             if (!window.getId().equals(activeBarId)) {
                 this.bar.drawRestingBar(frame, window);
             }
@@ -1804,6 +1808,27 @@ public final class LostTalesChatGui extends GuiChat
                 this.renderToolTip(stack, mouseX, mouseY);
                 GL11.glDisable(GL11.GL_LIGHTING);
             }
+            return;
+        }
+        if (share.kind == ChatShareKind.QUEST) {
+            ClientChatShowcaseStore.Quest quest =
+                    ClientChatShowcaseStore.getQuest(share.showcaseId);
+            if (quest == null) return;
+            List<String> lines = new ArrayList<String>(6);
+            lines.add(EnumChatFormatting.GOLD + quest.title);
+            if (quest.category.length() > 0) {
+                lines.add(EnumChatFormatting.ITALIC + quest.category);
+            }
+            if (quest.objective.length() > 0) lines.add(quest.objective);
+            if (quest.reward.length() > 0) {
+                lines.add(EnumChatFormatting.GRAY + "Rewards: " + quest.reward);
+            }
+            lines.add(EnumChatFormatting.GRAY + StatCollector.translateToLocal(
+                    quest.joinable ? "gui.losttales.chat.quest.join"
+                            : "gui.losttales.chat.quest.view_only"));
+            LostTalesChatHoverCard.drawTextCard(this.mc, lines, mouseX, mouseY,
+                    this.width, this.height);
+            GL11.glDisable(GL11.GL_LIGHTING);
             return;
         }
         ClientChatShowcaseStore.Marker marker =
@@ -2719,6 +2744,22 @@ public final class LostTalesChatGui extends GuiChat
                 if (marker != null) {
                     LostTalesLotrMapGui.openFocusedOn(marker.id,
                             marker.dimensionId, marker.x, marker.z);
+                }
+                return true;
+            }
+            case QUEST_SHARE: {
+                ChatShowcaseMarker.Data share = ChatShowcaseMarker.decode(part);
+                ClientChatShowcaseStore.Quest quest = share == null ? null
+                        : ClientChatShowcaseStore.getQuest(share.showcaseId);
+                if (quest != null) {
+                    if (quest.joinable) {
+                        com.ninuna.losttales.network.LostTalesNetworkHandler.CHANNEL
+                                .sendToServer(new com.ninuna.losttales.network.packet.LostTalesQuestShareJoinPacket(
+                                        quest.messageId, quest.tokenIndex));
+                    } else {
+                        this.mc.displayGuiScreen(
+                                new com.ninuna.losttales.gui.screen.LostTalesQuestJournalGui(this));
+                    }
                 }
                 return true;
             }

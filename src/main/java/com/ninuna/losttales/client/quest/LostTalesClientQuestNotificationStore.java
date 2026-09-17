@@ -2,7 +2,9 @@ package com.ninuna.losttales.client.quest;
 
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
-import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
+import com.ninuna.losttales.quest.LostTalesQuestObjectiveSelection;
+import com.ninuna.losttales.quest.LostTalesQuestObjectiveTextHelper;
+import com.ninuna.losttales.quest.progress.LostTalesQuestHistoryEntry;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -15,8 +17,8 @@ import java.util.Set;
 /**
  * Small client-side notification queue for quest HUD messages.
  *
- * The modern branch only has a placeholder quest HUD. This class keeps the 1.7.10
- * version simple by deriving short toast messages from normal quest sync snapshots.
+ * Short quest banners are derived from authoritative sync snapshots, keeping
+ * state-change feedback out of chat while avoiding a second event protocol.
  */
 public final class LostTalesClientQuestNotificationStore {
     private static final long DEFAULT_DURATION_MS = 4200L;
@@ -50,12 +52,16 @@ public final class LostTalesClientQuestNotificationStore {
         add(message, Type.COMPLETE);
     }
 
+    public static synchronized void addFailed(String message) {
+        add(message, Type.FAILED);
+    }
+
     /**
      * Compare the next packet with the currently cached quest state and enqueue
      * user-facing messages. The first sync after joining a world is silent to avoid
      * replaying old quest state as new notifications.
      */
-    public static synchronized void notifyForIncomingSync(Collection<LostTalesQuestProgress> newActiveQuests, Collection<String> newCompletedQuestIds) {
+    public static synchronized void notifyForIncomingSync(Collection<LostTalesQuestProgress> newActiveQuests, Collection<LostTalesQuestHistoryEntry> newQuestHistory) {
         if (!LostTalesClientQuestProgressStore.hasReceivedSync()) {
             return;
         }
@@ -63,11 +69,38 @@ public final class LostTalesClientQuestNotificationStore {
         Map<String, LostTalesQuestProgress> oldActive = toProgressMap(LostTalesClientQuestProgressStore.getActiveQuests());
         Map<String, LostTalesQuestProgress> newActive = toProgressMap(newActiveQuests);
         Set<String> oldCompleted = new LinkedHashSet<String>(LostTalesClientQuestProgressStore.getCompletedQuestIds());
-        Set<String> newCompleted = toIdSet(newCompletedQuestIds);
+        Map<String, LostTalesQuestHistoryEntry> oldHistory = toHistoryMap(
+                LostTalesClientQuestProgressStore.getQuestHistory());
+        Map<String, LostTalesQuestHistoryEntry> nextHistory = toHistoryMap(
+                newQuestHistory);
 
-        for (String questId : newCompleted) {
-            if (!oldCompleted.contains(questId)) {
-                addComplete("Quest completed: " + questTitle(questId));
+        for (LostTalesQuestHistoryEntry entry : nextHistory.values()) {
+            if (entry.isCompleted()
+                    && !oldCompleted.contains(entry.getQuestId())) {
+                addComplete("Quest completed: "
+                        + questTitle(entry.getQuestId()));
+            }
+        }
+
+        for (LostTalesQuestHistoryEntry entry : nextHistory.values()) {
+            LostTalesQuestHistoryEntry previous = oldHistory.get(
+                    entry.getQuestId());
+            if (previous != null
+                    && previous.getOutcome() == entry.getOutcome()
+                    && previous.getWorldTime() == entry.getWorldTime()) {
+                continue;
+            }
+            if (entry.isCompleted()) {
+                continue;
+            }
+            String reason = entry.getDetail().length() == 0 ? ""
+                    : " - " + entry.getDetail();
+            if (entry.isFailed()) {
+                addFailed("Quest failed: " + questTitle(entry.getQuestId())
+                        + reason);
+            } else {
+                add("Quest abandoned: " + questTitle(entry.getQuestId())
+                        + reason, Type.ABANDONED);
             }
         }
 
@@ -78,6 +111,9 @@ public final class LostTalesClientQuestNotificationStore {
 
             if (previous == null && !oldCompleted.contains(questId)) {
                 addInfo("Quest started: " + questTitle(questId));
+                if (next.getDeadlineWorldTime() > next.getAcceptedWorldTime()) {
+                    addFailed("Time limit: " + formatTicks(next.getDeadlineWorldTime() - next.getAcceptedWorldTime()));
+                }
                 continue;
             }
 
@@ -108,12 +144,25 @@ public final class LostTalesClientQuestNotificationStore {
 
     private static void notifyObjectiveChanges(String questId, LostTalesQuestProgress previous, LostTalesQuestProgress next) {
         LostTalesQuestDefinition quest = LostTalesClientQuestDefinitionStore.getQuest(questId);
-        LostTalesQuestStageDefinition stage = findStage(quest, next);
-        if (stage == null) {
+        if (quest == null) {
             return;
         }
 
-        for (LostTalesQuestObjectiveDefinition objective : stage.getObjectives()) {
+        Map<String, LostTalesQuestObjectiveDefinition> objectives =
+                new LinkedHashMap<String, LostTalesQuestObjectiveDefinition>();
+        for (LostTalesQuestObjectiveDefinition objective
+                : LostTalesQuestObjectiveSelection
+                .getProgressibleObjectives(quest, previous)) {
+            objectives.put(objective.getId(), objective);
+        }
+        for (LostTalesQuestObjectiveDefinition objective
+                : LostTalesQuestObjectiveSelection
+                .getProgressibleObjectives(quest, next)) {
+            objectives.put(objective.getId(), objective);
+        }
+
+        for (LostTalesQuestObjectiveDefinition objective
+                : objectives.values()) {
             int before = previous.getObjectiveProgress(objective.getId());
             int after = next.getObjectiveProgress(objective.getId());
             if (after <= before) {
@@ -142,16 +191,18 @@ public final class LostTalesClientQuestNotificationStore {
         return map;
     }
 
-    private static Set<String> toIdSet(Collection<String> values) {
-        Set<String> set = new LinkedHashSet<String>();
-        if (values != null) {
-            for (String value : values) {
-                if (value != null && value.length() > 0) {
-                    set.add(value);
+    private static Map<String, LostTalesQuestHistoryEntry> toHistoryMap(
+            Collection<LostTalesQuestHistoryEntry> entries) {
+        Map<String, LostTalesQuestHistoryEntry> map =
+                new LinkedHashMap<String, LostTalesQuestHistoryEntry>();
+        if (entries != null) {
+            for (LostTalesQuestHistoryEntry entry : entries) {
+                if (entry != null && entry.getQuestId().length() > 0) {
+                    map.put(entry.getQuestId(), entry);
                 }
             }
         }
-        return set;
+        return map;
     }
 
     private static boolean stageChanged(LostTalesQuestProgress previous, LostTalesQuestProgress next) {
@@ -163,33 +214,24 @@ public final class LostTalesClientQuestNotificationStore {
         return !previousId.equals(nextId);
     }
 
-    private static LostTalesQuestStageDefinition findStage(LostTalesQuestDefinition quest, LostTalesQuestProgress progress) {
-        if (quest == null || progress == null || quest.getStages().isEmpty()) {
-            return null;
-        }
-        for (LostTalesQuestStageDefinition stage : quest.getStages()) {
-            if (stage.getId() != null && stage.getId().equals(progress.getStageId())) {
-                return stage;
-            }
-        }
-        int index = progress.getStageIndex();
-        return index >= 0 && index < quest.getStages().size() ? quest.getStages().get(index) : quest.getFirstStage();
-    }
-
     private static String questTitle(String questId) {
         LostTalesQuestDefinition quest = LostTalesClientQuestDefinitionStore.getQuest(questId);
         return quest == null ? questId : quest.getTitle();
     }
 
     private static int getObjectiveTargetCount(LostTalesQuestObjectiveDefinition objective) {
-        if (objective == null || "goto".equalsIgnoreCase(objective.getType())) {
-            return 1;
+        return LostTalesQuestObjectiveTextHelper
+                .getObjectiveTargetCount(objective);
+    }
+
+    private static String formatTicks(long ticks) {
+        long seconds = Math.max(0L, ticks / 20L);
+        long minutes = seconds / 60L;
+        long remainingSeconds = seconds % 60L;
+        if (minutes <= 0L) {
+            return remainingSeconds + "s";
         }
-        try {
-            return Math.max(1, Integer.parseInt(objective.getParam("count", "1")));
-        } catch (Exception ignored) {
-            return 1;
-        }
+        return minutes + "m " + remainingSeconds + "s";
     }
 
     private static void trimOldest() {
@@ -207,7 +249,9 @@ public final class LostTalesClientQuestNotificationStore {
     public enum Type {
         INFO(0xDDBB77, "Quest Updated"),
         PROGRESS(0xAADDFF, "Objective Progress"),
-        COMPLETE(0x77DD77, "Quest Complete");
+        COMPLETE(0x77DD77, "Quest Complete"),
+        FAILED(0xDD7777, "Quest Failed"),
+        ABANDONED(0xCCAA77, "Quest Abandoned");
 
         private final int color;
         private final String displayTitle;

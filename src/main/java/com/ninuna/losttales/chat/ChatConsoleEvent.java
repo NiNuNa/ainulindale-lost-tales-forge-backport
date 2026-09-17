@@ -22,7 +22,7 @@ public final class ChatConsoleEvent {
         ROLES,
         /** A server setting changed live. */
         CONFIG,
-        /** The server itself: started, a bridge came up. */
+        /** The server itself: started or stopped, a bridge came up. */
         SERVER,
         /** Something the mod could not do and staff should know about. */
         WARNING;

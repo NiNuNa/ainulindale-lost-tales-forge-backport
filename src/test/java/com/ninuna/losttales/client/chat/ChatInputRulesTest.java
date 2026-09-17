@@ -32,6 +32,18 @@ public final class ChatInputRulesTest {
     }
 
     @Test
+    public void aWhispersWordsBeginAfterTheVerbAndTheName() {
+        String command = " /msg  Bilbo hello  there ";
+        assertEquals(command.indexOf("hello"),
+                ChatInputRules.whisperMessageStart(command));
+        assertEquals("/w Bilbo".length(),
+                ChatInputRules.whisperMessageStart("/w Bilbo"));
+        assertEquals("/w ".length(),
+                ChatInputRules.whisperMessageStart("/w "));
+        assertEquals(0, ChatInputRules.whisperMessageStart(null));
+    }
+
+    @Test
     public void whisperPartsSplitTheVerbTheNameAndTheRest() {
         assertArrayEquals(new String[] {"/msg", "Bilbo", "hello  there"},
                 ChatInputRules.whisperParts(" /msg  Bilbo hello  there "));

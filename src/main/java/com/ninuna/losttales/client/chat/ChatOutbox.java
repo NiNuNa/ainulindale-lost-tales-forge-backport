@@ -15,6 +15,7 @@ import com.ninuna.losttales.network.packet.LostTalesChatEditPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatTypingPacket;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.StatCollector;
@@ -177,7 +178,7 @@ final class ChatOutbox {
         }
         return resolveLocalShowcases(tokens,
                 ChatShareCandidates.items(this.mc.thePlayer),
-                ChatShareCandidates.markers());
+                ChatShareCandidates.markers(), ChatShareCandidates.quests());
     }
 
     /** As above over given candidates, so the matching is testable. */
@@ -185,6 +186,15 @@ final class ChatOutbox {
             List<ChatShareTokenParser.Token> tokens,
             List<ChatShareCandidates.ItemEntry> items,
             List<ChatShareCandidates.MarkerEntry> markers) {
+        return resolveLocalShowcases(tokens, items, markers,
+                Collections.<ChatShareCandidates.QuestEntry>emptyList());
+    }
+
+    static List<ChatShowcase> resolveLocalShowcases(
+            List<ChatShareTokenParser.Token> tokens,
+            List<ChatShareCandidates.ItemEntry> items,
+            List<ChatShareCandidates.MarkerEntry> markers,
+            List<ChatShareCandidates.QuestEntry> quests) {
         List<ChatShowcase> showcases = new ArrayList<ChatShowcase>();
         int index = 0;
         for (ChatShareTokenParser.Token token : tokens) {
@@ -203,7 +213,7 @@ final class ChatOutbox {
                     }
                     break;
                 }
-            } else {
+            } else if (token.kind == ChatShareKind.MARKER) {
                 for (ChatShareCandidates.MarkerEntry entry : markers) {
                     if (!entry.matchesToken(token)) {
                         continue;
@@ -219,10 +229,36 @@ final class ChatOutbox {
                     }
                     break;
                 }
+            } else {
+                for (ChatShareCandidates.QuestEntry entry : quests) {
+                    if (!entry.matchesToken(token)) continue;
+                    com.ninuna.losttales.client.quest.ClientQuestEntry quest =
+                            entry.quest;
+                    String objective = quest.getObjectives().isEmpty() ? ""
+                            : quest.getObjectives().get(0).getText();
+                    String reward = join(quest.getRewards());
+                    showcases.add(ChatShowcase.quest(index,
+                            quest.getReference(), quest.getTitle(),
+                            quest.getCategory(), objective, reward,
+                            quest.getSource() == com.ninuna.losttales.client.quest.ClientQuestEntry.Source.LOST_TALES));
+                    break;
+                }
             }
             index++;
         }
         return showcases.isEmpty() ? null : showcases;
+    }
+
+    private static String join(List<String> values) {
+        StringBuilder text = new StringBuilder();
+        if (values != null) {
+            for (String value : values) {
+                if (value == null || value.length() == 0) continue;
+                if (text.length() > 0) text.append("; ");
+                text.append(value);
+            }
+        }
+        return text.toString();
     }
 
     /**
@@ -240,7 +276,7 @@ final class ChatOutbox {
         }
         return resolveShareReferences(tokens,
                 ChatShareCandidates.items(this.mc.thePlayer),
-                ChatShareCandidates.markers());
+                ChatShareCandidates.markers(), ChatShareCandidates.quests());
     }
 
     /** As above over given candidates, so the matching is testable. */
@@ -248,6 +284,15 @@ final class ChatOutbox {
             List<ChatShareTokenParser.Token> tokens,
             List<ChatShareCandidates.ItemEntry> items,
             List<ChatShareCandidates.MarkerEntry> markers) {
+        return resolveShareReferences(tokens, items, markers,
+                Collections.<ChatShareCandidates.QuestEntry>emptyList());
+    }
+
+    static List<ChatShareReference> resolveShareReferences(
+            List<ChatShareTokenParser.Token> tokens,
+            List<ChatShareCandidates.ItemEntry> items,
+            List<ChatShareCandidates.MarkerEntry> markers,
+            List<ChatShareCandidates.QuestEntry> quests) {
         List<ChatShareReference> references =
                 new ArrayList<ChatShareReference>(tokens.size());
         for (ChatShareTokenParser.Token token : tokens) {
@@ -260,11 +305,19 @@ final class ChatOutbox {
                         break;
                     }
                 }
-            } else {
+            } else if (token.kind == ChatShareKind.MARKER) {
                 for (ChatShareCandidates.MarkerEntry entry : markers) {
                     if (entry.matchesToken(token)) {
                         reference = ChatShareReference.marker(
                                 entry.marker.getId());
+                        break;
+                    }
+                }
+            } else {
+                for (ChatShareCandidates.QuestEntry entry : quests) {
+                    if (entry.matchesToken(token)) {
+                        reference = ChatShareReference.quest(
+                                entry.quest.getReference());
                         break;
                     }
                 }

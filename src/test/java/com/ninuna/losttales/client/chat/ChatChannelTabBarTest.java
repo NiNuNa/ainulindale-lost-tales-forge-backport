@@ -36,10 +36,11 @@ public final class ChatChannelTabBarTest {
         ChatHitBox search = ChatChannelTabBar.searchBox(40, rowBottom);
         assertEquals(search.width, search.height, EPSILON);
         // The strip begins two pixels left of the row, on the window's
-        // one-pixel frame edge; the button stands three clear pixels
-        // inside that edge, and the first tab three past the button.
+        // own edge, its one-pixel frame standing just outside it; the
+        // button stands three clear pixels inside the frame, and the
+        // first tab three past the button.
         int stripInset = 2;
-        assertEquals(40 - stripInset + 1 + 3, search.left, EPSILON);
+        assertEquals(40 - stripInset + 3, search.left, EPSILON);
         assertEquals(search.right() + 3,
                 40 + ChatChannelTabBar.tabRunLeftInset() - stripInset, EPSILON);
         assertEquals(ChatChannelTabBar.centredInStrip(rowBottom,

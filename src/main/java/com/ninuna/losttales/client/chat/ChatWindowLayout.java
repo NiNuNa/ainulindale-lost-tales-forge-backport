@@ -1215,12 +1215,13 @@ public final class ChatWindowLayout {
     }
 
     /**
-     * A live line reopens a whisper tab closed by hand: it was closed
-     * only until somebody spoke in it again. Null for anything else.
+     * A live line reopens a whisper tab closed by hand, a player's or an
+     * NPC's: it was closed only until somebody spoke in it again. Null
+     * for anything else.
      */
     public static synchronized ChatTab reopenConversation(ChatTab row,
                                                           String preferredWindowId) {
-        if (!isRemembered(row)) {
+        if (row == null || !row.isWhisper()) {
             return null;
         }
         HIDDEN.remove(ChatTab.row(row));
@@ -1512,17 +1513,16 @@ public final class ChatWindowLayout {
         }
         // The new window is placed by its tab row: the corner is where
         // the row lands at the size the window opens at, the way a tab
-        // torn off a row is placed, so a window that opens with one line
-        // stands a step below the reference's row rather than a whole
-        // full-height window below it. A reference filling the screen is
-        // measured by the box it goes back to.
+        // torn off a row is placed, so the new window's row stands a step
+        // below the reference's whatever height it opens at. A reference
+        // filling the screen is measured by the box it goes back to.
         ChatWindowPlacement.Box from = ChatWindowPlacement.restingBounds(
                 reference, minecraft, screenWidth, screenHeight);
         int width = ChatWindowPlacement.windowWidth(created, minecraft);
         double height = ChatWindowPlacement.currentHeight(created, minecraft);
         ChatWindowCascade.Corner corner = ChatWindowCascade.place(
                 from.x, from.y, width, height, screenWidth,
-                screenHeight, HudPlacementLayout.SCREEN_MARGIN,
+                screenHeight, ChatWindowPlacement.EDGE_MARGIN,
                 ChatWindowCascade.STEP);
         double baseline = ChatWindowPlacement.baselineForRowTop(
                 created, minecraft, corner.y);

@@ -61,6 +61,79 @@ public final class ChatMarkdownTest {
         assertTrue(ChatMarkdown.hasMarkup("__u__"));
     }
 
+    /**
+     * A single underscore makes an italic at a word's edges, as Discord
+     * reads one, and never inside a word: a name, an identifier and an
+     * underline keep their underscores.
+     */
+    @Test
+    public void singleUnderscoresItaliciseOnlyAtAWordsEdges() {
+        List<ChatMarkdown.Span> spans = ChatMarkdown.parse("a _b c_ d");
+        assertEquals(3, spans.size());
+        assertEquals("b c", spans.get(1).getText());
+        assertTrue(spans.get(1).isItalic());
+        assertTrue(spans.get(0).isPlain() && spans.get(2).isPlain());
+        assertTrue(ChatMarkdown.parse("_x_").get(0).isItalic());
+        assertTrue(ChatMarkdown.parse("_x_!").get(0).isItalic());
+        assertEquals("snake_case_name", plainOf(
+                ChatMarkdown.parse("snake_case_name")));
+        assertTrue(ChatMarkdown.parse("snake_case_name").get(0).isPlain());
+        assertTrue(ChatMarkdown.parse("@Cool_Player_1 hi").get(0).isPlain());
+        assertTrue(ChatMarkdown.parse("_a_b").get(0).isPlain());
+        assertTrue(ChatMarkdown.parse("a _ b _ c").get(0).isPlain());
+        // Inside an underline, and around one.
+        List<ChatMarkdown.Span> underline = ChatMarkdown.parse("___x___");
+        assertEquals(1, underline.size());
+        assertTrue(underline.get(0).isUnderlined()
+                && underline.get(0).isItalic());
+        List<ChatMarkdown.Span> around = ChatMarkdown.parse("_a __b__ c_");
+        assertEquals("a b c", plainOf(around));
+        assertTrue(around.get(0).isItalic());
+        assertTrue(around.get(1).isItalic() && around.get(1).isUnderlined());
+    }
+
+    /**
+     * Discord's formatting table, row by row: every form it lists reads
+     * here the way it reads there.
+     */
+    @Test
+    public void everyFormDiscordListsReadsTheSame() {
+        assertStyled("*italics*", "italics", ChatMarkdown.Span.ITALIC);
+        assertStyled("_italics_", "italics", ChatMarkdown.Span.ITALIC);
+        assertStyled("__*underline italics*__", "underline italics",
+                ChatMarkdown.Span.UNDERLINE | ChatMarkdown.Span.ITALIC);
+        assertStyled("**bold**", "bold", ChatMarkdown.Span.BOLD);
+        assertStyled("__**underline bold**__", "underline bold",
+                ChatMarkdown.Span.UNDERLINE | ChatMarkdown.Span.BOLD);
+        assertStyled("***bold italics***", "bold italics",
+                ChatMarkdown.Span.BOLD | ChatMarkdown.Span.ITALIC);
+        assertStyled("__***underline bold italics***__",
+                "underline bold italics", ChatMarkdown.Span.UNDERLINE
+                        | ChatMarkdown.Span.BOLD | ChatMarkdown.Span.ITALIC);
+        assertStyled("__underline__", "underline",
+                ChatMarkdown.Span.UNDERLINE);
+        assertStyled("~~Strikethrough~~", "Strikethrough",
+                ChatMarkdown.Span.STRIKETHROUGH);
+    }
+
+    /** One run, with exactly these marks. */
+    private static void assertStyled(String message, String text, int style) {
+        List<ChatMarkdown.Span> spans = ChatMarkdown.parse(message);
+        assertEquals(message, 1, spans.size());
+        ChatMarkdown.Span span = spans.get(0);
+        assertEquals(message, text, span.getText());
+        assertEquals(message + " bold", (style & ChatMarkdown.Span.BOLD) != 0,
+                span.isBold());
+        assertEquals(message + " italic",
+                (style & ChatMarkdown.Span.ITALIC) != 0, span.isItalic());
+        assertEquals(message + " underline",
+                (style & ChatMarkdown.Span.UNDERLINE) != 0,
+                span.isUnderlined());
+        assertEquals(message + " strikethrough",
+                (style & ChatMarkdown.Span.STRIKETHROUGH) != 0,
+                span.isStrikethrough());
+    }
+
     /** Marks nest, so a run can carry more than one. */
     @Test
     public void marksNest() {

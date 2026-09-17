@@ -33,6 +33,8 @@ final class ChatShareSuggestionBox {
             Collections.emptyList();
     private List<ChatShareCandidates.MarkerEntry> markers =
             Collections.emptyList();
+    private List<ChatShareCandidates.QuestEntry> quests =
+            Collections.emptyList();
     private List<ChatShareCandidates.Entry> matches = Collections.emptyList();
     private ChatShareSuggester.Query query;
     private int selectedIndex;
@@ -67,7 +69,8 @@ final class ChatShareSuggestionBox {
             this.lastKind = found.kind;
             List<? extends ChatShareCandidates.Entry> pool =
                     found.kind == ChatShareKind.MARKER ? this.markers
-                            : this.items;
+                    : found.kind == ChatShareKind.QUEST ? this.quests
+                    : this.items;
             List<String> labels = new ArrayList<String>(pool.size());
             for (int index = 0; index < pool.size(); index++) {
                 labels.add(pool.get(index).name);
@@ -97,11 +100,15 @@ final class ChatShareSuggestionBox {
                 ChatShareCandidates.items(player);
         List<ChatShareCandidates.MarkerEntry> builtMarkers =
                 ChatShareCandidates.markers();
+        List<ChatShareCandidates.QuestEntry> builtQuests =
+                ChatShareCandidates.quests();
         boolean changed = !ChatShareCandidates.sameItems(
                 builtItems, this.items)
-                || builtMarkers.size() != this.markers.size();
+                || builtMarkers.size() != this.markers.size()
+                || builtQuests.size() != this.quests.size();
         this.items = builtItems;
         this.markers = builtMarkers;
+        this.quests = builtQuests;
         return changed;
     }
 
@@ -212,6 +219,8 @@ final class ChatShareSuggestionBox {
             ChatInlineIcons.drawMarker(minecraft, marker.marker.getIconName(),
                     ChatInlineIcons.markerRgb(marker.marker.getColorName()),
                     boxX, boxY, ChatInlineIcons.CONTENT_SIZE, 255);
+        } else if (entry instanceof ChatShareCandidates.QuestEntry) {
+            ChatIconSheet.QUEST.drawWithShadow(boxX, boxY, 255);
         }
     }
 

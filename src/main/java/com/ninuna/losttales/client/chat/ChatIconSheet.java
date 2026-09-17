@@ -56,8 +56,13 @@ enum ChatIconSheet {
     CLOSE_HOVER(30, 11, 5, 5),
     COG(36, 11, 5, 5),
     COG_HOVER(42, 11, 5, 5),
-    /** The bubble the typing line is announced with, its tail included. */
-    SPEECH_BUBBLE(23, 18, 9, 6),
+    /**
+     * The speech bubble, its tail included: the typing line, a reply's
+     * quote and a message link wear it, and the character menu's
+     * Narrator row crosses to its lit artwork.
+     */
+    SPEECH_BUBBLE(32, 18, 9, 6),
+    SPEECH_BUBBLE_HOVER(42, 18, 9, 6),
     GRIP(0, 17, 6, 8),
     GRIP_HOVER(7, 17, 6, 8),
     /**
@@ -65,16 +70,19 @@ enum ChatIconSheet {
      * the window keeps its own size, pointing in while it fills the
      * screen, each with its lit artwork.
      */
-    FULLSCREEN(39, 18, 5, 5),
-    FULLSCREEN_HOVER(51, 18, 5, 5),
-    FULLSCREEN_EXIT(33, 18, 5, 5),
-    FULLSCREEN_EXIT_HOVER(45, 18, 5, 5),
+    FULLSCREEN(58, 18, 5, 5),
+    FULLSCREEN_HOVER(70, 18, 5, 5),
+    FULLSCREEN_EXIT(52, 18, 5, 5),
+    FULLSCREEN_EXIT_HOVER(64, 18, 5, 5),
     /**
      * The magnifier a search field opens with, in two sizes: eight
      * pixels for a field one chat row tall, ten for one as tall as the
-     * key icons it carries.
+     * key icons it carries. Only the small one has lit artwork, which
+     * the search bar and the pickers cross to while their field takes
+     * the keys or the pointer is on it.
      */
     SEARCH(14, 17, 8, 8),
+    SEARCH_HOVER(23, 17, 8, 8),
     SEARCH_LARGE(33, 26, 8, 9),
     /**
      * A framed button's four corners, resting and lit: six-texel cells
@@ -140,6 +148,11 @@ enum ChatIconSheet {
      * insert-toolbar chevron above, laid out the same way — each cell
      * exactly its own artwork, so a frame centres on the control
      * however tall it is.
+     *
+     * <p>Three colourways of the same run: ivory, lit, and the muted
+     * tones the grip rests in. The search bar's chevrons and the jump
+     * button rest in ivory and light to the lit run; the tab search
+     * button rests in the muted run and lights to ivory.</p>
      */
     CHEVRON_1(0, 43, 5, 3),
     CHEVRON_2(0, 47, 5, 2),
@@ -150,7 +163,12 @@ enum ChatIconSheet {
     CHEVRON_2_HOVER(6, 47, 5, 2),
     CHEVRON_3_HOVER(6, 50, 5, 1),
     CHEVRON_4_HOVER(6, 52, 5, 2),
-    CHEVRON_5_HOVER(6, 55, 5, 3);
+    CHEVRON_5_HOVER(6, 55, 5, 3),
+    CHEVRON_1_MUTED(12, 43, 5, 3),
+    CHEVRON_2_MUTED(12, 47, 5, 2),
+    CHEVRON_3_MUTED(12, 50, 5, 1),
+    CHEVRON_4_MUTED(12, 52, 5, 2),
+    CHEVRON_5_MUTED(12, 55, 5, 3);
 
     static final String TEXTURE_PATH = "textures/gui/chat.png";
     static final int SHEET_WIDTH = 108;

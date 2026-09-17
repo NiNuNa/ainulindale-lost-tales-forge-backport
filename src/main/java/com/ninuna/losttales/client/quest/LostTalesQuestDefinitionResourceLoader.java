@@ -20,10 +20,9 @@ import net.minecraft.util.ResourceLocation;
 final class LostTalesQuestDefinitionResourceLoader {
     private static final String INDEX_FILE = "quests/index.json";
     private static final String[] FALLBACK_QUEST_FILES = new String[] {
-            "quests/test_quest.json",
-            "quests/missive/gather_gold_ore.json",
-            "quests/missive/kill_orc.json",
-            "quests/path/blacksmith/test_crafting_quest.json"
+            "quests/tutorial/meet_nia.json",
+            "quests/tutorial/cheese_cache.json",
+            "quests/tutorial/starter_note.json"
     };
 
     private LostTalesQuestDefinitionResourceLoader() {}

@@ -3,12 +3,13 @@ package com.ninuna.losttales.quest;
 /**
  * Coarse-grained start source used by the 1.7.10 quest manager.
  *
- * This replaces modern interaction/context objects with a tiny enum so the server can
- * reject client journal starts for quests intended to begin from an item, NPC, or script.
+ * The server uses this to enforce item, NPC/script, command, and validated
+ * party-share start policies without trusting a client-supplied quest ID.
  */
 public enum LostTalesQuestStartSource {
     COMMAND,
-    JOURNAL,
     ITEM,
-    INTERACTION
+    INTERACTION,
+    /** Accepted from a server-validated chat card shared by a party member. */
+    SHARED
 }

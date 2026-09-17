@@ -279,7 +279,7 @@ final class ChatTabActions {
     /** As above between two drawn frames. */
     static ChatWindow.LinkSide touchingSide(ChatWindowFrame frame,
                                             ChatWindowFrame other) {
-        int margin = HudPlacementLayout.SCREEN_MARGIN;
+        int margin = ChatWindowPlacement.WINDOW_GAP;
         boolean overlapsColumn = frame.boxLeft < other.boxRight + margin
                 && frame.boxRight + margin > other.boxLeft;
         boolean overlapsRow = frame.boxTop < other.boxBottom + margin

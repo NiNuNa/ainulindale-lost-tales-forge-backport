@@ -16,9 +16,9 @@ import net.minecraft.entity.player.EntityPlayerMP;
 /**
  * Server-authoritative, conservative party quest event distributor.
  *
- * Only kill events are shared in this stage. Every participant is revalidated
- * against live server state, and each backing quest adapter independently
- * checks whether that player possesses a matching active objective.
+ * Kill and destination-arrival events are shared. Every participant is
+ * revalidated against live server state, and each backing quest adapter
+ * independently checks whether that player possesses a matching objective.
  */
 public final class PartyQuestProgressCoordinator {
 
@@ -33,7 +33,6 @@ public final class PartyQuestProgressCoordinator {
 
     private PartyQuestProgressCoordinator() {
         this.adapters.add(new LostTalesPartyQuestCompatibilityAdapter());
-        this.adapters.add(new LotrLegacyPartyQuestCompatibilityAdapter());
     }
 
     public static PartyQuestProgressCoordinator getInstance() {
@@ -58,8 +57,8 @@ public final class PartyQuestProgressCoordinator {
         }
         this.recentKillEvents.put(eventKey, Long.valueOf(worldTime));
 
-        applyAdapters(creditedPlayer, victim);
-        if (!LostTalesConfig.enablePartySharedQuestKillProgress) {
+        applyKillAdapters(creditedPlayer, victim, false);
+        if (!LostTalesConfig.enableSharedQuestProgress) {
             return;
         }
 
@@ -93,16 +92,71 @@ public final class PartyQuestProgressCoordinator {
                     creditedPlayer, participant, member, radiusSq)) {
                 continue;
             }
-            applyAdapters(participant, victim);
+            applyKillAdapters(participant, victim, true);
         }
     }
 
-    private void applyAdapters(EntityPlayerMP participant, Entity victim) {
-        for (PartyQuestCompatibilityAdapter adapter : this.adapters) {
-            if (adapter != null && adapter.isAvailable()) {
-                adapter.applySharedKillProgress(participant, victim);
+    public synchronized void handleAuthoritativeTravel(
+            EntityPlayerMP source) {
+        if (source == null || source.worldObj == null
+                || source.worldObj.isRemote || !source.isEntityAlive()) {
+            return;
+        }
+        boolean sourceChanged = applyTravelAdapters(source, source, false);
+        if (!sourceChanged
+                || !LostTalesConfig.enableSharedQuestProgress) {
+            return;
+        }
+        UUID sourceId = RoleplayCharacterIdentityHook.resolveGameplayId(
+                source);
+        Party party = PartyService.getInstance()
+                .getPartyForActiveCharacter(source);
+        if (sourceId == null || party == null
+                || !party.containsMember(sourceId)) {
+            return;
+        }
+        double radius = Math.max(1, LostTalesConfig.partySharedQuestRadius);
+        double radiusSq = radius * radius;
+        List<?> onlinePlayers = source.mcServer == null
+                || source.mcServer.getConfigurationManager() == null
+                ? null
+                : source.mcServer.getConfigurationManager().playerEntityList;
+        if (onlinePlayers == null) {
+            return;
+        }
+        for (PartyMember member : party.getMembers()) {
+            if (member == null
+                    || sourceId.equals(member.getCharacterId())) {
+                continue;
+            }
+            EntityPlayerMP participant = findOnlinePlayer(
+                    onlinePlayers, member.getOwnerId());
+            if (isEligibleParticipant(source, participant, member,
+                    radiusSq)) {
+                applyTravelAdapters(participant, source, true);
             }
         }
+    }
+
+    private void applyKillAdapters(EntityPlayerMP participant, Entity victim,
+            boolean shared) {
+        for (PartyQuestCompatibilityAdapter adapter : this.adapters) {
+            if (adapter != null && adapter.isAvailable()) {
+                adapter.applyKillProgress(participant, victim, shared);
+            }
+        }
+    }
+
+    private boolean applyTravelAdapters(EntityPlayerMP participant,
+            Entity source, boolean shared) {
+        boolean changed = false;
+        for (PartyQuestCompatibilityAdapter adapter : this.adapters) {
+            if (adapter != null && adapter.isAvailable()) {
+                changed |= adapter.applyTravelProgress(
+                        participant, source, shared);
+            }
+        }
+        return changed;
     }
 
     private boolean isEligibleParticipant(EntityPlayerMP source,

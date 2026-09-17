@@ -26,7 +26,7 @@ import static org.junit.Assert.assertTrue;
  */
 public final class ChatEmojiShortcodesTest {
     private static final Charset UTF_8 = Charset.forName("UTF-8");
-    private static final String LICENCE = "assets/losttales/emoji/shortcodes.LICENSE.txt";
+    private static final String LICENCE = "assets/losttales/chat/emoji/shortcodes.LICENSE.txt";
     /**
      * The package and version the header names. The version itself is
      * recorded in docs/wiki/Development.md, not here.
@@ -176,7 +176,7 @@ public final class ChatEmojiShortcodesTest {
     @Test
     public void aMissingListNamesNothing() {
         assertTrue(ChatEmojiShortcodes.load(
-                "assets/losttales/emoji/no_such_list.txt").isEmpty());
+                "assets/losttales/chat/emoji/no_such_list.txt").isEmpty());
     }
 
     @Test

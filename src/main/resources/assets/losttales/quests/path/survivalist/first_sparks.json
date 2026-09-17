@@ -3,6 +3,7 @@
   "title": "Path of the Survivalist: First Sparks",
   "description": "The first lesson of the trail is simple: gather what the land gives freely and keep a flame ready before dusk.",
   "repeatable": false,
+  "restartable": true,
   "startMode": "item",
   "journalLog": {
     "10": "I have taken my first steps on the survivalist path. Before I can call myself prepared, I need simple fuel, a few branches, and a reliable flame.",

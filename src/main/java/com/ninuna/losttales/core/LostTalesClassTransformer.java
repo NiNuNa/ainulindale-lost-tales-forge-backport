@@ -101,6 +101,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.lotrMapControlBarTransformer.active";
     public static final String LOTR_MAP_MINIQUEST_FILTER_ACTIVE_PROPERTY =
             "losttales.lotrMapMiniquestFilterTransformer.active";
+    public static final String LOTR_QUEST_TRACKER_ACTIVE_PROPERTY =
+            "losttales.lotrQuestTrackerTransformer.active";
     public static final String LOTR_MAP_ROTATION_ACTIVE_PROPERTY =
             "losttales.lotrMapRotationTransformer.active";
     public static final String GUI_ANIMATION_ACTIVE_PROPERTY =
@@ -189,6 +191,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "lotr/client/render/entity/LOTRNPCRendering";
     private static final String LOTR_GUI_MAP =
             "lotr.client.gui.LOTRGuiMap";
+    private static final String LOTR_GUI_MINIQUEST_TRACKER =
+            "lotr.client.gui.LOTRGuiMiniquestTracker";
     private static final String LOTR_LEVEL_DATA =
             "lotr.common.LOTRLevelData";
 
@@ -374,6 +378,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
     private static final String FAST_TRAVEL_ARRIVAL_HOOK_OWNER =
             "com/ninuna/losttales/compat/lotr/"
                     + "LostTalesLotrFastTravelArrivalHook";
+    private static final String LOTR_QUEST_PRESENTATION_HOOK_OWNER =
+            "com/ninuna/losttales/compat/lotr/"
+                    + "LotrQuestPresentationHooks";
     private static final String SERVER_CONFIGURATION_MANAGER =
             "net.minecraft.server.management.ServerConfigurationManager";
     private static final String SERVER_BROADCAST_HOOK_OWNER =
@@ -479,6 +486,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         if (LOTR_GUI_MAP.equals(transformedName)) {
             return transformLotrMapScene(transformLotrGuiMap(basicClass), false);
         }
+        if (LOTR_GUI_MINIQUEST_TRACKER.equals(transformedName)) {
+            return transformLotrQuestTracker(basicClass);
+        }
         if ("lotr.client.gui.LOTRGuiRendererMap".equals(transformedName)) {
             return transformLotrMapScene(basicClass, true);
         }
@@ -486,6 +496,46 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return transformLotrPlayerLocations(basicClass);
         }
         return basicClass;
+    }
+
+    private static byte[] transformLotrQuestTracker(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!"drawTracker".equals(method.name)
+                        || !"(Lnet/minecraft/client/Minecraft;"
+                                .concat("Lnet/minecraft/entity/player/EntityPlayer;)V")
+                                .equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method,
+                        LOTR_QUEST_PRESENTATION_HOOK_OWNER,
+                        "shouldRenderNativeTracker")) {
+                    System.setProperty(LOTR_QUEST_TRACKER_ACTIVE_PROPERTY,
+                            "true");
+                    return basicClass;
+                }
+                LabelNode render = new LabelNode();
+                InsnList guard = new InsnList();
+                guard.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                        LOTR_QUEST_PRESENTATION_HOOK_OWNER,
+                        "shouldRenderNativeTracker", "()Z", false));
+                guard.add(new JumpInsnNode(Opcodes.IFNE, render));
+                guard.add(new InsnNode(Opcodes.RETURN));
+                guard.add(render);
+                method.instructions.insert(guard);
+                System.setProperty(LOTR_QUEST_TRACKER_ACTIVE_PROPERTY,
+                        "true");
+                info("Patched the native LOTR quest tracker behind the Lost Tales fallback option");
+                return write(owner);
+            }
+            warn("Could not locate LOTRGuiMiniquestTracker#drawTracker; keeping LOTR's tracker");
+            return basicClass;
+        } catch (Throwable failure) {
+            warn("Failed to guard the LOTR quest tracker: " + failure);
+            return basicClass;
+        }
     }
 
     /** Shares ground layers across gameplay, embedded and animated LOTR maps. */

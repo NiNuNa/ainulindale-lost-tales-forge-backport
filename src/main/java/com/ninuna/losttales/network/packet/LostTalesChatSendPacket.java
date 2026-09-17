@@ -266,6 +266,10 @@ public final class LostTalesChatSendPacket implements IMessage {
                     decoded.add(ChatShareReference.marker(
                             LostTalesPacketCodec.readUtf8String(buffer,
                                     ChatShareReference.MAX_MARKER_ID_BYTES)));
+                } else if (kind == ChatShareKind.QUEST) {
+                    decoded.add(ChatShareReference.quest(
+                            LostTalesPacketCodec.readUtf8String(buffer,
+                                    ChatShareReference.MAX_QUEST_REFERENCE_BYTES)));
                 } else {
                     throw new LostTalesPacketCodec.DecodeException(
                             "unknown share kind");
@@ -345,10 +349,14 @@ public final class LostTalesChatSendPacket implements IMessage {
             buffer.writeByte(reference.getKind().getCode());
             if (reference.getKind() == ChatShareKind.ITEM) {
                 buffer.writeByte(reference.getSlot());
-            } else {
+            } else if (reference.getKind() == ChatShareKind.MARKER) {
                 LostTalesPacketCodec.writeUtf8String(buffer,
                         reference.getMarkerId(),
                         ChatShareReference.MAX_MARKER_ID_BYTES);
+            } else {
+                LostTalesPacketCodec.writeUtf8String(buffer,
+                        reference.getQuestReference(),
+                        ChatShareReference.MAX_QUEST_REFERENCE_BYTES);
             }
         }
         LostTalesPacketCodec.writeUtf8String(buffer, this.target,

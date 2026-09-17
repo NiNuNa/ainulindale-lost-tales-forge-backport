@@ -26,7 +26,6 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInve
     public static final int INVENTORY_SIZE = 9;
     public static final int DEFAULT_MIN_AVAILABLE_MISSIVES = 5;
     public static final int DEFAULT_MAX_AVAILABLE_MISSIVES = 9;
-    private static final int LEGACY_DEFAULT_MAX_AVAILABLE_MISSIVES = 8;
     public static final long DEFAULT_GENERATION_INTERVAL_TICKS = 36000L;
     private static final long EXPIRATION_CHECK_INTERVAL_TICKS = 1200L;
 
@@ -355,9 +354,6 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInve
         }
         this.minAvailableMissives = nbt.hasKey("MinAvailableMissives") ? nbt.getInteger("MinAvailableMissives") : this.minAvailableMissives;
         this.maxAvailableMissives = nbt.hasKey("MaxAvailableMissives") ? nbt.getInteger("MaxAvailableMissives") : this.maxAvailableMissives;
-        if (this.maxAvailableMissives == LEGACY_DEFAULT_MAX_AVAILABLE_MISSIVES && INVENTORY_SIZE > LEGACY_DEFAULT_MAX_AVAILABLE_MISSIVES) {
-            this.maxAvailableMissives = Math.max(this.maxAvailableMissives, LostTalesConfig.missiveBoardMaxAvailable);
-        }
         this.generationSequence = Math.max(0, nbt.getInteger("GenerationSequence"));
         this.nextExpirationCheckWorldTime = nbt.getLong("NextExpirationCheckWorldTime");
         this.applyMissiveRange(this.minAvailableMissives, this.maxAvailableMissives);

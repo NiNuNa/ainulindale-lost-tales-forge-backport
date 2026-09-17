@@ -3,6 +3,7 @@
   "title": "Path of the Survivalist: Food for the Road",
   "description": "No trail is safe on an empty stomach. A careful wanderer learns to hunt, harvest, and keep enough food for the next day.",
   "repeatable": false,
+  "restartable": true,
   "startMode": "item",
   "prerequisites": {
     "completed": "losttales:path/survivalist/stone_and_shelter"

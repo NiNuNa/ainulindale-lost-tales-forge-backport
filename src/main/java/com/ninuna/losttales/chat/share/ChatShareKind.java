@@ -8,7 +8,8 @@ package com.ninuna.losttales.chat.share;
  */
 public enum ChatShareKind {
     ITEM('i'),
-    MARKER('m');
+    MARKER('m'),
+    QUEST('q');
 
     public static final char TOKEN_CLOSE = ']';
 

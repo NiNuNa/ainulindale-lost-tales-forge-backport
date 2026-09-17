@@ -41,6 +41,8 @@ final class ChatInteractions {
         ACHIEVEMENT,
         /** A shared map marker flies the map to it. */
         MARKER_SHARE,
+        /** A shared quest opens its preview and may request a party join. */
+        QUEST_SHARE,
         /** A web address opens. */
         LINK,
         /** A suggestion is put into the input field. */
@@ -97,6 +99,7 @@ final class ChatInteractions {
         if (share != null) {
             // An item's card is its answer; a marker flies the map.
             return share.kind == ChatShareKind.MARKER ? Action.MARKER_SHARE
+                    : share.kind == ChatShareKind.QUEST ? Action.QUEST_SHARE
                     : Action.CONSUMED;
         }
         // The chat's own metadata rides on click events too — a colour,
@@ -164,6 +167,56 @@ final class ChatInteractions {
         return hover.getAction() == HoverEvent.Action.SHOW_ACHIEVEMENT
                 || LOTR_ACHIEVEMENT_ACTION.equals(
                         hover.getAction().getCanonicalName());
+    }
+
+    /**
+     * Whether two runs are pieces of one element the pointer uses as
+     * one: the same reply quote, channel link, spoiler, share or
+     * achievement, or the same click. A bracketed achievement or share
+     * is several runs — its brackets, its name, a share's icon — and
+     * every one of them lights, underlines and answers with the others,
+     * so the element reads as one thing wherever the pointer rests on it.
+     */
+    static boolean sameElement(IChatComponent one, IChatComponent other) {
+        if (one == null || other == null) {
+            return false;
+        }
+        if (ChatReplyMarker.isMarker(one)) {
+            return ChatReplyMarker.isMarker(other);
+        }
+        if (ChatChannelLinkMarker.isMarker(one)) {
+            return ChatChannelLinkMarker.sameLink(one, other);
+        }
+        if (ChatSpoilerMarker.isMarker(one)) {
+            return ChatSpoilerMarker.sameSpoiler(one, other);
+        }
+        ChatShowcaseMarker.Data share = ChatShowcaseMarker.decode(one);
+        if (share != null) {
+            ChatShowcaseMarker.Data theirs = ChatShowcaseMarker.decode(other);
+            return theirs != null && theirs.kind == share.kind
+                    && theirs.showcaseId == share.showcaseId;
+        }
+        if (isAchievement(one)) {
+            return isAchievement(other) && sameHover(one, other);
+        }
+        ClickEvent own = genuineClick(one);
+        ClickEvent theirs = genuineClick(other);
+        return own != null && theirs != null
+                && own.getAction() == theirs.getAction()
+                && own.getValue() != null
+                && own.getValue().equals(theirs.getValue());
+    }
+
+    /** Whether both runs carry the same card: one action, one value. */
+    private static boolean sameHover(IChatComponent one,
+                                     IChatComponent other) {
+        HoverEvent own = one.getChatStyle().getChatHoverEvent();
+        HoverEvent theirs = other.getChatStyle().getChatHoverEvent();
+        return own != null && theirs != null
+                && own.getAction() == theirs.getAction()
+                && own.getValue() != null && theirs.getValue() != null
+                && own.getValue().getUnformattedText().equals(
+                        theirs.getValue().getUnformattedText());
     }
 
     /**

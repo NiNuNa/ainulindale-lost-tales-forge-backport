@@ -202,12 +202,13 @@ public final class ChatRowCentringTest {
 
     @Test
     public void aHoverRuleStandsOnTheDescendersShadowRow() {
-        // The row under the descenders, where their shadow falls, with
-        // the row's last pixel clear below it. The rule takes no shadow
-        // of its own.
+        // The row under the descenders, where their shadow falls, and
+        // the rule's own shadow on the row's last pixel, still inside the
+        // row: under every glyph and glyph shadow of the line.
         int rule = TEXT_TOP + LostTalesChatVisualStyle.UNDERLINE_ROW;
         assertEquals(TEXT_TOP + CAPS + 1, rule);
         assertEquals(LINE - 2, rule);
+        assertEquals(LINE - 1, rule + LostTalesChatVisualStyle.SHADOW_OFFSET);
     }
 
     @Test

@@ -23,9 +23,9 @@ import net.minecraft.util.IChatComponent;
  * break</em> marker after the sender ends the header row and opens the
  * message body on the next one, behind the separator the wrapper draws
  * in the sender's colour ({@link ChatBodyMarker}) — the chat's chevron,
- * or a label the line names itself, such as the words a command echo
- * opens with; it carries that colour, since a grouped continuation has
- * no head marker to read it from. An <em>indent</em>
+ * or a label the line names itself; it carries that colour, since a
+ * grouped continuation has no head marker to read it from. An
+ * <em>indent</em>
  * marker opens every continuation line of a wrapped message and records
  * the anchor's offset twice — for the closed HUD (channel prefix shown)
  * and the open screen (prefix hidden) — so continuation lines land under
@@ -88,16 +88,6 @@ final class ChatLayoutMarker {
         }
         return marker(PREFIX + BODY + (senderColor & 0xFFFFFF) + ':'
                 + label);
-    }
-
-    /**
-     * A body break that opens the body behind nothing at all — no
-     * chevron and no words — for a body whose own first run is its
-     * opener: a command echo's slash, which is part of the command and
-     * copied with it. {@link #bodyLabel} answers with an empty label.
-     */
-    static ChatComponentText bodyBreakBare(int senderColor) {
-        return marker(PREFIX + BODY + (senderColor & 0xFFFFFF) + ':');
     }
 
     static ChatComponentText indent(int closedWidth, int openWidth) {
@@ -224,8 +214,7 @@ final class ChatLayoutMarker {
 
     /**
      * The label a body break opens the body with: null for the chat's
-     * chevron — and when the component is not a body break at all —
-     * and empty for a bare break that opens the body behind nothing.
+     * chevron, and when the component is not a body break at all.
      */
     static String bodyLabel(IChatComponent component) {
         String payload = payloadOf(component);

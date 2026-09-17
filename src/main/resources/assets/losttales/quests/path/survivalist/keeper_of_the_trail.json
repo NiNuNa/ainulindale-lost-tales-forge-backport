@@ -3,6 +3,7 @@
   "title": "Path of the Survivalist: Keeper of the Trail",
   "description": "The final lesson is not about surviving one night, but being ready for many. A true survivalist carries food, light, tools, and direction.",
   "repeatable": false,
+  "restartable": true,
   "startMode": "item",
   "prerequisites": {
     "completed": "losttales:path/survivalist/night_watch"

@@ -13,7 +13,6 @@ import java.util.Map;
  * Gson from bundled assets instead of from server datapacks.
  */
 public final class LostTalesQuestDefinition {
-    public static final String START_MODE_JOURNAL = "journal";
     public static final String START_MODE_ITEM = "item";
     public static final String START_MODE_INTERACTION = "interaction";
     public static final String START_MODE_ANY = "any";
@@ -23,6 +22,7 @@ public final class LostTalesQuestDefinition {
     private final String title;
     private final String description;
     private final boolean repeatable;
+    private final boolean restartable;
     private final String startMode;
     private final Map<String, String> prerequisites;
     private final Map<String, String> rewards;
@@ -31,15 +31,23 @@ public final class LostTalesQuestDefinition {
     private final Map<String, String> journalLog;
     private final List<LostTalesQuestStageDefinition> stages;
 
-    public LostTalesQuestDefinition(String id, String title, String description, boolean repeatable, Map<String, String> journalLog, List<LostTalesQuestStageDefinition> stages) {
-        this(id, title, description, repeatable, START_MODE_JOURNAL, Collections.<String, String>emptyMap(), Collections.<String, String>emptyMap(), Collections.<String, String>emptyMap(), Collections.<String, String>emptyMap(), journalLog, stages);
+    public LostTalesQuestDefinition(String id, String title, String description, boolean repeatable, String startMode, Map<String, String> prerequisites, Map<String, String> rewards, Map<String, String> interaction, Map<String, String> markers, Map<String, String> journalLog, List<LostTalesQuestStageDefinition> stages) {
+        this(id, title, description, repeatable, repeatable, startMode,
+                prerequisites, rewards, interaction, markers, journalLog,
+                stages);
     }
 
-    public LostTalesQuestDefinition(String id, String title, String description, boolean repeatable, String startMode, Map<String, String> prerequisites, Map<String, String> rewards, Map<String, String> interaction, Map<String, String> markers, Map<String, String> journalLog, List<LostTalesQuestStageDefinition> stages) {
+    public LostTalesQuestDefinition(String id, String title,
+            String description, boolean repeatable, boolean restartable,
+            String startMode, Map<String, String> prerequisites,
+            Map<String, String> rewards, Map<String, String> interaction,
+            Map<String, String> markers, Map<String, String> journalLog,
+            List<LostTalesQuestStageDefinition> stages) {
         this.id = id;
         this.title = title;
         this.description = description;
         this.repeatable = repeatable;
+        this.restartable = restartable;
         this.startMode = normalizeStartMode(startMode);
         this.prerequisites = Collections.unmodifiableMap(new LinkedHashMap<String, String>(prerequisites == null ? Collections.<String, String>emptyMap() : prerequisites));
         this.rewards = Collections.unmodifiableMap(new LinkedHashMap<String, String>(rewards == null ? Collections.<String, String>emptyMap() : rewards));
@@ -65,12 +73,12 @@ public final class LostTalesQuestDefinition {
         return this.repeatable;
     }
 
-    public String getStartMode() {
-        return this.startMode;
+    public boolean isRestartable() {
+        return this.restartable;
     }
 
-    public boolean canStartFromJournal() {
-        return START_MODE_JOURNAL.equals(this.startMode) || START_MODE_ANY.equals(this.startMode);
+    public String getStartMode() {
+        return this.startMode;
     }
 
     public boolean canStartFromItem() {
@@ -116,7 +124,7 @@ public final class LostTalesQuestDefinition {
     private static String normalizeStartMode(String value) {
         String normalized = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
         if (normalized.length() == 0) {
-            return START_MODE_JOURNAL;
+            return START_MODE_LOCKED;
         }
         if ("npc".equals(normalized) || "entity".equals(normalized)) {
             return START_MODE_INTERACTION;
@@ -124,9 +132,9 @@ public final class LostTalesQuestDefinition {
         if ("manual".equals(normalized) || "command".equals(normalized)) {
             return START_MODE_LOCKED;
         }
-        if (START_MODE_JOURNAL.equals(normalized) || START_MODE_ITEM.equals(normalized) || START_MODE_INTERACTION.equals(normalized) || START_MODE_ANY.equals(normalized) || START_MODE_LOCKED.equals(normalized)) {
+        if (START_MODE_ITEM.equals(normalized) || START_MODE_INTERACTION.equals(normalized) || START_MODE_ANY.equals(normalized) || START_MODE_LOCKED.equals(normalized)) {
             return normalized;
         }
-        return START_MODE_JOURNAL;
+        return START_MODE_LOCKED;
     }
 }

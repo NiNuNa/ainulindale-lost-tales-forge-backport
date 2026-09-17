@@ -4,8 +4,6 @@ import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
 import com.ninuna.losttales.network.server.LostTalesServerPacketDispatcher;
 import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
 import com.ninuna.losttales.quest.LostTalesQuestManager;
-import com.ninuna.losttales.quest.LostTalesQuestStartSource;
-import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
@@ -14,16 +12,10 @@ import net.minecraft.entity.player.EntityPlayerMP;
 
 import java.util.Locale;
 
-/** Client-to-server quest action request from the legacy 1.7.10 quest journal. */
+/** Client-to-server tracking request from the unified quest journal. */
 public class LostTalesQuestActionPacket implements IMessage {
-    public static final String ACTION_START = "start";
-    public static final String ACTION_ABANDON = "abandon";
-    public static final String ACTION_SCAN = "scan";
     public static final String ACTION_PIN = "pin";
     public static final String ACTION_UNPIN = "unpin";
-    public static final String ACTION_REVEAL_MARKERS = "reveal_markers";
-    public static final String ACTION_PIN_MARKER = "pin_marker";
-    public static final String ACTION_UNPIN_MARKER = "unpin_marker";
 
     private String action = "";
     private String questId = "";
@@ -71,35 +63,18 @@ public class LostTalesQuestActionPacket implements IMessage {
     }
 
     private static boolean isKnownAction(String action) {
-        return ACTION_START.equals(action)
-                || ACTION_ABANDON.equals(action)
-                || ACTION_SCAN.equals(action)
-                || ACTION_PIN.equals(action)
-                || ACTION_UNPIN.equals(action)
-                || ACTION_REVEAL_MARKERS.equals(action)
-                || ACTION_PIN_MARKER.equals(action)
-                || ACTION_UNPIN_MARKER.equals(action);
+        return ACTION_PIN.equals(action) || ACTION_UNPIN.equals(action);
     }
 
     private static boolean hasValidIdentifierUsage(String action, String identifier) {
-        if (ACTION_START.equals(action)
-                || ACTION_ABANDON.equals(action)
-                || ACTION_PIN.equals(action)
-                || ACTION_REVEAL_MARKERS.equals(action)
-                || ACTION_PIN_MARKER.equals(action)) {
+        if (ACTION_PIN.equals(action)) {
             return identifier.length() > 0;
         }
         return true;
     }
 
     private static void execute(EntityPlayerMP player, String action, String questId) {
-        if (ACTION_START.equals(action)) {
-            LostTalesQuestManager.startQuest(player, questId, LostTalesQuestStartSource.JOURNAL);
-        } else if (ACTION_ABANDON.equals(action)) {
-            LostTalesQuestManager.abandonQuest(player, questId);
-        } else if (ACTION_SCAN.equals(action)) {
-            LostTalesQuestManager.refreshGatherProgressFromInventory(player);
-        } else if (ACTION_PIN.equals(action)) {
+        if (ACTION_PIN.equals(action)) {
             LostTalesQuestManager.pinQuest(player, questId);
         } else if (ACTION_UNPIN.equals(action)) {
             if (questId.length() > 0) {
@@ -107,15 +82,6 @@ public class LostTalesQuestActionPacket implements IMessage {
             } else {
                 LostTalesQuestManager.unpinQuest(player);
             }
-        } else if (ACTION_REVEAL_MARKERS.equals(action)) {
-            LostTalesQuestPlayerData data = LostTalesQuestManager.getPlayerData(player);
-            if (data != null && data.isQuestActive(questId)) {
-                LostTalesQuestManager.revealQuestMarkers(player, questId);
-            }
-        } else if (ACTION_PIN_MARKER.equals(action)) {
-            LostTalesQuestManager.pinMapMarker(player, questId);
-        } else if (ACTION_UNPIN_MARKER.equals(action)) {
-            LostTalesQuestManager.unpinMapMarker(player);
         }
     }
 

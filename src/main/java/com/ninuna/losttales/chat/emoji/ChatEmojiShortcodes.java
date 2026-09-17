@@ -12,7 +12,7 @@ import java.util.Map;
 
 /**
  * Discord's names for Unicode emoji, from the bundled list
- * {@code assets/losttales/emoji/shortcodes.txt}. Discord sends a Unicode
+ * {@code assets/losttales/chat/emoji/shortcodes.txt}. Discord sends a Unicode
  * emoji as its characters only, never by name; this list gives a chip
  * the name Discord shows, {@code :star:} for U+2B50.
  *
@@ -31,7 +31,7 @@ import java.util.Map;
  */
 public final class ChatEmojiShortcodes {
     /** Where the list lies on the class path. */
-    static final String RESOURCE = "assets/losttales/emoji/shortcodes.txt";
+    static final String RESOURCE = "assets/losttales/chat/emoji/shortcodes.txt";
     /** Bytes read at most; the bundled list is about half as long. */
     static final int MAX_BYTES = 256 * 1024;
     /** Characters in one line, its line break not counted. */

@@ -120,7 +120,7 @@ public final class LostTalesConfig {
     public static int partyStatusHeartbeatTicks = 100;
     public static int partyTrackingUpdateIntervalTicks = 10;
     public static int partyTrackingHeartbeatTicks = 100;
-    public static boolean enablePartySharedQuestKillProgress = true;
+    public static boolean enableSharedQuestProgress = true;
     public static int partySharedQuestRadius = 32;
 
     public static boolean showQuickLootHud = true;
@@ -137,6 +137,7 @@ public final class LostTalesConfig {
     public static int questHudMaxTrackedQuests = 4;
     public static int questHudObjectiveLineCount = 2;
     public static boolean showQuestHudNotifications = true;
+    public static boolean showNativeLotrQuestTracker = false;
     /** The one slot every passing notice shares: quest banners, discoveries, area names. */
     public static double notificationHudOffsetX = 50.0D;
     public static double notificationHudOffsetY = 35.0D;
@@ -309,7 +310,6 @@ public final class LostTalesConfig {
 
     public static boolean enableQuestPrerequisites = true;
     public static boolean enableQuestRewards = true;
-    public static boolean allowQuestJournalStarts = true;
     public static boolean allowQuestItemStarts = true;
     public static boolean allowQuestInteractionStarts = true;
     public static boolean autoRevealQuestMarkersOnStart = true;
@@ -818,11 +818,11 @@ public final class LostTalesConfig {
                     400,
                     "Maximum server ticks between unchanged party tracking snapshots for online party members."
             );
-            enablePartySharedQuestKillProgress = config.getBoolean(
-                    "enableSharedQuestKillProgress",
+            enableSharedQuestProgress = config.getBoolean(
+                    "enableSharedQuestProgress",
                     CATEGORY_PARTY,
-                    enablePartySharedQuestKillProgress,
-                    "Allow one authoritative kill event to advance matching Lost Tales kill objectives for eligible nearby party members. Completion and rewards remain individual."
+                    enableSharedQuestProgress,
+                    "Allow authoritative kill and destination-arrival events to advance matching Lost Tales objectives for eligible nearby party members. Gathering, crafting, hand-ins, completion, and rewards remain individual."
             );
             partySharedQuestRadius = config.getInt(
                     "sharedQuestRadius",
@@ -830,7 +830,7 @@ public final class LostTalesConfig {
                     partySharedQuestRadius,
                     1,
                     128,
-                    "Maximum block distance for conservative party-shared kill objective progress. Members must be online, alive, in the same dimension, using the party character, and independently possess the matching quest."
+                    "Maximum block distance for conservative party-shared kill and travel objective progress. Members must be online, alive, in the same dimension, using the party character, and independently possess the matching quest."
             );
 
             showQuickLootHud = config.getBoolean(
@@ -916,6 +916,12 @@ public final class LostTalesConfig {
                     CATEGORY_CLIENT,
                     showQuestHudNotifications,
                     "Render centered quest notification banners for quest starts, objective progress, and completions."
+            );
+            showNativeLotrQuestTracker = config.getBoolean(
+                    "showNativeLotrQuestTracker",
+                    CATEGORY_CLIENT,
+                    showNativeLotrQuestTracker,
+                    "Also render LOTR's original single-quest tracker as a compatibility fallback."
             );
             notificationHudOffsetX = getHudPercent(
                     config, "notificationHudOffsetX",
@@ -1402,12 +1408,6 @@ public final class LostTalesConfig {
                     CATEGORY_QUESTS,
                     enableQuestRewards,
                     "Grant optional quest JSON rewards when quests complete naturally or by command."
-            );
-            allowQuestJournalStarts = config.getBoolean(
-                    "allowQuestJournalStarts",
-                    CATEGORY_QUESTS,
-                    allowQuestJournalStarts,
-                    "Allow the development quest journal to request quest starts for quests whose startMode allows journal starts."
             );
             allowQuestItemStarts = config.getBoolean(
                     "allowQuestItemStarts",
@@ -2264,7 +2264,7 @@ public final class LostTalesConfig {
         config.get(CATEGORY_PARTY, "statusHeartbeatTicks", partyStatusHeartbeatTicks).set(partyStatusHeartbeatTicks);
         config.get(CATEGORY_PARTY, "trackingUpdateIntervalTicks", partyTrackingUpdateIntervalTicks).set(partyTrackingUpdateIntervalTicks);
         config.get(CATEGORY_PARTY, "trackingHeartbeatTicks", partyTrackingHeartbeatTicks).set(partyTrackingHeartbeatTicks);
-        config.get(CATEGORY_PARTY, "enableSharedQuestKillProgress", enablePartySharedQuestKillProgress).set(enablePartySharedQuestKillProgress);
+        config.get(CATEGORY_PARTY, "enableSharedQuestProgress", enableSharedQuestProgress).set(enableSharedQuestProgress);
         config.get(CATEGORY_PARTY, "sharedQuestRadius", partySharedQuestRadius).set(partySharedQuestRadius);
         config.get(CATEGORY_CLIENT, "showQuickLootHud", showQuickLootHud).set(showQuickLootHud);
         config.get(CATEGORY_CLIENT, "linkShowQuickLootHud", linkShowQuickLootHud).set(linkShowQuickLootHud);
@@ -2279,6 +2279,7 @@ public final class LostTalesConfig {
         config.get(CATEGORY_CLIENT, "questHudMaxTrackedQuests", questHudMaxTrackedQuests).set(questHudMaxTrackedQuests);
         config.get(CATEGORY_CLIENT, "questHudObjectiveLineCount", questHudObjectiveLineCount).set(questHudObjectiveLineCount);
         config.get(CATEGORY_CLIENT, "showQuestHudNotifications", showQuestHudNotifications).set(showQuestHudNotifications);
+        config.get(CATEGORY_CLIENT, "showNativeLotrQuestTracker", showNativeLotrQuestTracker).set(showNativeLotrQuestTracker);
         config.get(CATEGORY_CLIENT, "notificationHudOffsetX",
                 notificationHudOffsetX).set(notificationHudOffsetX);
         config.get(CATEGORY_CLIENT, "notificationHudOffsetY",
@@ -2290,7 +2291,6 @@ public final class LostTalesConfig {
         config.get(CATEGORY_CLIENT, "playQuestSounds", playQuestSounds).set(playQuestSounds);
         config.get(CATEGORY_QUESTS, "enableQuestPrerequisites", enableQuestPrerequisites).set(enableQuestPrerequisites);
         config.get(CATEGORY_QUESTS, "enableQuestRewards", enableQuestRewards).set(enableQuestRewards);
-        config.get(CATEGORY_QUESTS, "allowQuestJournalStarts", allowQuestJournalStarts).set(allowQuestJournalStarts);
         config.get(CATEGORY_QUESTS, "allowQuestItemStarts", allowQuestItemStarts).set(allowQuestItemStarts);
         config.get(CATEGORY_QUESTS, "allowQuestInteractionStarts", allowQuestInteractionStarts).set(allowQuestInteractionStarts);
         config.get(CATEGORY_QUESTS, "autoRevealQuestMarkersOnStart", autoRevealQuestMarkersOnStart).set(autoRevealQuestMarkersOnStart);

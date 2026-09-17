@@ -15,9 +15,10 @@ public final class ChatWindowPlacementTest {
     }
 
     /**
-     * A window filling the screen stands between the margins — without a
-     * Minecraft instance the margin is zero, so the whole 1000 by 600
-     * screen — with its lines laid out to that width. The window beside
+     * A window filling the screen stands between the margins with room
+     * for its frame — without a Minecraft instance the margin is zero,
+     * so the 1000 by 600 screen less the frame's two pixels on every side —
+     * with its lines laid out to that width. The window beside
      * it stays where it was, and letting go gives it back the very box
      * it had, since filling the screen changed nothing the window keeps.
      */
@@ -34,12 +35,16 @@ public final class ChatWindowPlacementTest {
                 ChatWindow.ScreenFill.FULL, false));
         ChatWindowPlacement.Box full = ChatWindowPlacement.windowBounds(
                 conversation, null, 1000, 600);
-        assertEquals(0.0D, full.x, 0.0001D);
-        assertEquals(0.0D, full.y, 0.0001D);
-        assertEquals(1000, full.width);
-        assertEquals(600.0D, full.bottom(), 0.0001D);
-        assertEquals(ChatWindowPlacement.chatWidthForBox(1000.0D, null),
-                ChatWindowPlacement.drawnChatWidth(conversation, null, 1000));
+        int frame = ChatWindowPlacement.FRAME_WIDTH;
+        assertEquals(frame, full.x, 0.0001D);
+        assertEquals(frame, full.y, 0.0001D);
+        assertEquals(ChatWindowPlacement.boxWidthForChatWidth(
+                ChatWindowPlacement.chatWidthForBox(1000.0D - 2 * frame,
+                        null), null), full.width, 0.0001D);
+        assertEquals(600.0D - frame, full.bottom(), 0.0001D);
+        assertEquals(ChatWindowPlacement.chatWidthForBox(1000.0D - 2 * frame,
+                null), ChatWindowPlacement.drawnChatWidth(conversation, null,
+                1000));
         ChatWindowPlacement.Box consoleDuring =
                 ChatWindowPlacement.windowBounds(console, null, 1000, 600);
         assertEquals(consoleBefore.x, consoleDuring.x, 0.0001D);
@@ -56,9 +61,11 @@ public final class ChatWindowPlacementTest {
 
     /**
      * A window filling a half or a quarter of the screen takes exactly
-     * that part: a side's half from the screen's edge to its middle, a
-     * corner's quarter between the middle and two edges, on an odd
-     * screen the far half taking the odd pixel.
+     * that part less its frame's two pixels on every side: a side's half
+     * from the screen's edge to its middle, a corner's quarter between
+     * the middle and two edges, on an odd screen the far half taking the
+     * odd pixel, so two windows filling neighbouring parts stand four
+     * pixels apart with their frames side by side.
      */
     @Test
     public void aWindowFillsTheHalfOrQuarterItIsSentTo() {
@@ -68,35 +75,36 @@ public final class ChatWindowPlacementTest {
                 ChatWindow.ScreenFill.LEFT, false));
         ChatWindowPlacement.Box left = ChatWindowPlacement.windowBounds(
                 window, null, 1001, 601);
-        assertEquals(0.0D, left.x, 0.0001D);
-        assertEquals(0.0D, left.y, 0.0001D);
+        int frame = ChatWindowPlacement.FRAME_WIDTH;
+        assertEquals(frame, left.x, 0.0001D);
+        assertEquals(frame, left.y, 0.0001D);
         assertEquals(ChatWindowPlacement.boxWidthForChatWidth(
-                ChatWindowPlacement.chatWidthForBox(500.0D, null), null),
-                left.width, 0.0001D);
-        assertEquals(601.0D, left.bottom(), 0.0001D);
+                ChatWindowPlacement.chatWidthForBox(500.0D - 2 * frame, null),
+                null), left.width, 0.0001D);
+        assertEquals(601.0D - frame, left.bottom(), 0.0001D);
         assertTrue(ChatWindowLayout.setFill(window.getId(),
                 ChatWindow.ScreenFill.RIGHT, false));
         ChatWindowPlacement.Box right = ChatWindowPlacement.windowBounds(
                 window, null, 1001, 601);
-        assertEquals(500.0D, right.x, 0.0001D);
+        assertEquals(500.0D + frame, right.x, 0.0001D);
         assertEquals(ChatWindowPlacement.boxWidthForChatWidth(
-                ChatWindowPlacement.chatWidthForBox(501.0D, null), null),
-                right.width, 0.0001D);
+                ChatWindowPlacement.chatWidthForBox(501.0D - 2 * frame, null),
+                null), right.width, 0.0001D);
         assertTrue(ChatWindowLayout.setFill(window.getId(),
                 ChatWindow.ScreenFill.BOTTOM_RIGHT, false));
         ChatWindowPlacement.Box quarter = ChatWindowPlacement.windowBounds(
                 window, null, 1001, 601);
-        assertEquals(500.0D, quarter.x, 0.0001D);
-        assertEquals(300.0D, quarter.y, 0.0001D);
-        assertEquals(601.0D, quarter.bottom(), 0.0001D);
+        assertEquals(500.0D + frame, quarter.x, 0.0001D);
+        assertEquals(300.0D + frame, quarter.y, 0.0001D);
+        assertEquals(601.0D - frame, quarter.bottom(), 0.0001D);
         assertTrue(ChatWindowLayout.setFill(window.getId(),
                 ChatWindow.ScreenFill.TOP_LEFT, false));
         quarter = ChatWindowPlacement.windowBounds(window, null, 1001, 601);
-        assertEquals(0.0D, quarter.x, 0.0001D);
-        assertEquals(0.0D, quarter.y, 0.0001D);
-        assertEquals(300.0D, quarter.bottom(), 0.0001D);
-        assertEquals(ChatWindowPlacement.chatWidthForBox(500.0D, null),
-                ChatWindowPlacement.drawnChatWidth(window, null, 1001));
+        assertEquals(frame, quarter.x, 0.0001D);
+        assertEquals(frame, quarter.y, 0.0001D);
+        assertEquals(300.0D - frame, quarter.bottom(), 0.0001D);
+        assertEquals(ChatWindowPlacement.chatWidthForBox(500.0D - 2 * frame,
+                null), ChatWindowPlacement.drawnChatWidth(window, null, 1001));
     }
 
     /** Half way through the glide, every edge has come half its way. */
@@ -117,11 +125,14 @@ public final class ChatWindowPlacementTest {
 
     /**
      * Without a Minecraft instance a window is 160 wide, a line 12 tall,
-     * the tab row 22 with its 17-row tool strip under it and the bar 26,
+     * the tab row 22 with its 17-row tool strip under it and the bar 25,
      * the rules on their inner rows, 2px of head-room under the tool
-     * strip, and one trailing line below the baseline — so a one-line
-     * window is 39 + 2 + 12 + (12 + 26) = 91 tall with 12 + 26 = 38 of
-     * it below the baseline. The screen margin is zero. A window may hang
+     * strip, and one trailing line below the baseline — so a window
+     * given one line of its own is 39 + 2 + 12 + (12 + 25) = 90 tall
+     * with 12 + 25 = 37 of it below the baseline. The screen margin is
+     * zero, and a window keeps two pixels inside the screen for its
+     * frame.
+     * A window may hang
      * off either side as long as forty pixels of it stay on screen, and
      * below as long as its strip does; it never rises above the top.
      * Other windows never hold it.
@@ -130,38 +141,40 @@ public final class ChatWindowPlacementTest {
     public void theScreenHoldsOnlyAStripsWorthOfAWindow() {
         ChatWindowLayout.reset();
         ChatWindow dragged = ChatWindowLayout.firstWindow();
-        // Above the top edge: the strip stops on it (baseline 91 - 38 =
-        // 53); fifty pixels past the left edge is allowed, since 110 of
-        // the 160 stay on screen.
+        ChatWindowLayout.setWindowLines(dragged.getId(), 1.0D, false);
+        // Above the top edge: the strip stops the frame's two pixels
+        // below it (baseline 2 + 90 - 37 = 55); fifty pixels past the left
+        // edge is allowed, since 110 of the 160 stay on screen.
         ChatWindowPlacement.Anchor anchor = ChatWindowPlacement.constrainWindow(
                 dragged, null, -50.0D, -50.0D, 1000, 600);
         assertEquals(-50.0D, anchor.x, 0.0001D);
-        assertEquals(53.0D, anchor.baseline, 0.0001D);
-        // Far past the left edge: held where forty pixels remain (40 -
-        // 160 = -120).
+        assertEquals(55.0D, anchor.baseline, 0.0001D);
+        // Far past the left edge: held where forty pixels remain past the
+        // frame's two pixels (2 + 40 - 160 = -118).
         anchor = ChatWindowPlacement.constrainWindow(dragged, null, -500.0D,
                 300.0D, 1000, 600);
-        assertEquals(-120.0D, anchor.x, 0.0001D);
+        assertEquals(-118.0D, anchor.x, 0.0001D);
         // Far past the bottom-right: forty pixels remain on the right
-        // (x 1000 - 40 = 960), and the strip stays on screen below (the
-        // box top at 600 - 22 = 578, so the baseline at 578 + 91 - 38 =
-        // 631).
+        // (x 1000 - 2 - 40 = 958), and the strip stays on screen below
+        // (the box top at 600 - 2 - 22 = 576, so the baseline at
+        // 576 + 90 - 37 = 629).
         anchor = ChatWindowPlacement.constrainWindow(dragged, null, 2000.0D,
                 2000.0D, 1000, 600);
-        assertEquals(960.0D, anchor.x, 0.0001D);
-        assertEquals(631.0D, anchor.baseline, 0.0001D);
+        assertEquals(958.0D, anchor.x, 0.0001D);
+        assertEquals(629.0D, anchor.baseline, 0.0001D);
         // A stored overhang is a share of the window: -25 percent stands
-        // a quarter of the window off the left edge on any screen.
+        // a quarter of the window past the frame's two pixels on any
+        // screen.
         ChatWindowLayout.setPosition(dragged.getId(), -25.0D, 0.0D, false);
-        assertEquals(-40.0D, ChatWindowPlacement.windowBounds(dragged, null,
+        assertEquals(-38.0D, ChatWindowPlacement.windowBounds(dragged, null,
                 1000, 600).x, 0.0001D);
-        assertEquals(-40.0D, ChatWindowPlacement.windowBounds(dragged, null,
+        assertEquals(-38.0D, ChatWindowPlacement.windowBounds(dragged, null,
                 500, 600).x, 0.0001D);
         // Past what the screen holds, the stored value is kept and the
-        // box held: -90 percent asks for 144 off, and gets 120.
+        // box held: -90 percent asks for 2 - 144 = -142, and gets -118.
         ChatWindowLayout.setPosition(dragged.getId(), -90.0D, 0.0D, false);
         assertEquals(-90.0D, dragged.getOffsetX(), 0.0D);
-        assertEquals(-120.0D, ChatWindowPlacement.windowBounds(dragged, null,
+        assertEquals(-118.0D, ChatWindowPlacement.windowBounds(dragged, null,
                 1000, 600).x, 0.0001D);
         // Anywhere inside is fine, another window there or not: the
         // console window may be dropped right onto the conversation one.
@@ -181,70 +194,97 @@ public final class ChatWindowPlacementTest {
 
     /**
      * Without a Minecraft instance lines are 12 tall, the row and its
-     * tool strip 39 with 2px of head-room under them, and 12 + 26 = 38
+     * tool strip 39 with 2px of head-room under them, and 12 + 25 = 37
      * hang below the baseline (the trailing line and the bar); a
-     * one-line window is 91 tall, so its travel on a 591px screen is
-     * 591 - 91 = 500. The console window sits at 10% (baseline 0.10 *
-     * 500 + 91 - 38 = 103, bottom 103 + 38 = 141), the conversation
-     * window at 22% (baseline 0.22 * 500 + 53 = 163) with eight lines
-     * (room 8 * 12 = 96, box 39 + 2 + 96 + 38 = 175 tall), so its top
-     * (163 - (175 - 38) = 26) runs over the console window.
+     * one-line window is 90 tall, and a window keeps two pixels inside
+     * the screen for its frame, so its travel on a 594px screen is
+     * 594 - 90 - 4 = 500. The console window, one line tall, sits at 10%
+     * (baseline 2 + 0.10 * 500 + 90 - 37 = 105, bottom 105 + 37 = 142),
+     * the conversation window at 22% (baseline 2 + 0.22 * 500 + 53 = 165)
+     * eight lines tall (room 8 * 12 = 96, box 39 + 2 + 96 + 37 = 174
+     * tall), so its top (165 - (174 - 37) = 28) runs over the console
+     * window.
      */
     @Test
-    public void aGrowingWindowOverlapsItsNeighbourAndMovesALinkedOne() {
+    public void aTallWindowOverlapsItsNeighbourAndMovesALinkedOne() {
         ChatWindowLayout.reset();
         ChatWindow console = ChatWindowLayout.firstWindow();
         ChatWindow below = ChatWindowLayout.windows().get(1);
         ChatWindowLayout.setPosition(console.getId(), 0.0D, 10.0D, false);
         ChatWindowLayout.setPosition(below.getId(), 0.0D, 22.0D, false);
-        ChatWindowFrame frame = ChatWindowFrame.of(below);
-        List<net.minecraft.client.gui.ChatLine> lines =
-                new java.util.ArrayList<net.minecraft.client.gui.ChatLine>();
-        for (int index = 0; index < 8; index++) {
-            lines.add(new net.minecraft.client.gui.ChatLine(0,
-                    new net.minecraft.util.ChatComponentText("x"), index));
-        }
-        frame.lines = lines;
+        ChatWindowLayout.setWindowLines(console.getId(), 1.0D, false);
+        ChatWindowLayout.setWindowLines(below.getId(), 8.0D, false);
+        // Unlinked, the console window is no border: it stays put and the
+        // tall window shows every line, over it.
+        ChatWindowPlacement.Box consoleBox =
+                ChatWindowPlacement.windowBounds(console, null, 1000, 594);
+        ChatWindowPlacement.Box belowBox =
+                ChatWindowPlacement.windowBounds(below, null, 1000, 594);
+        assertEquals(105.0D, consoleBox.baseline(), 0.0001D);
+        assertEquals(142.0D, consoleBox.bottom(), 0.0001D);
+        assertEquals(96.0D, belowBox.room, 0.0001D);
+        assertEquals(165.0D, belowBox.baseline(), 0.0001D);
+        assertEquals(28.0D, belowBox.y, 0.0001D);
+        assertTrue(belowBox.y < consoleBox.bottom());
+        // Linked above the tall window, it moves up with it until it meets
+        // the top margin; the tall window keeps its height. The console
+        // window would stand at 165 - 96 - 2 - 39 - 4 - 37 = -13, the
+        // window gap between them, and is held where its top is the
+        // frame's two pixels below the edge: baseline 2 + 12 + 2 + 39 = 55.
+        ChatWindowLayout.link(console.getId(), below.getId(), true);
+        consoleBox = ChatWindowPlacement.windowBounds(console, null, 1000,
+                594);
+        belowBox = ChatWindowPlacement.windowBounds(below, null, 1000, 594);
+        assertEquals(55.0D, consoleBox.baseline(), 0.0001D);
+        assertEquals(2.0D, consoleBox.y, 0.0001D);
+        assertEquals(96.0D, belowBox.room, 0.0001D);
+        assertEquals(165.0D, belowBox.baseline(), 0.0001D);
+        // Stored anchors are untouched.
+        assertEquals(10.0D, console.getOffsetY(), 0.0D);
+        assertEquals(22.0D, below.getOffsetY(), 0.0D);
+        // One line tall, the window has the linked one simply sit a
+        // window gap above it (its top at 165 - 53 = 112, the linked
+        // one's baseline at 112 - 4 - 37 = 71).
+        ChatWindowLayout.setWindowLines(below.getId(), 1.0D, false);
+        consoleBox = ChatWindowPlacement.windowBounds(console, null, 1000,
+                594);
+        belowBox = ChatWindowPlacement.windowBounds(below, null, 1000, 594);
+        assertEquals(12.0D, belowBox.room, 0.0001D);
+        assertEquals(71.0D, consoleBox.baseline(), 0.0001D);
+        assertEquals(belowBox.y - ChatWindowPlacement.WINDOW_GAP,
+                consoleBox.bottom(), 0.0001D);
+    }
+
+    /**
+     * A window's height is its own, never what its tabs hold: one that
+     * follows the game's chat height is as tall as that setting — twenty
+     * lines without a Minecraft instance — whether it holds no line or
+     * many, so bringing another tab forward never resizes it.
+     */
+    @Test
+    public void aWindowIsAsTallAsItsOwnHeightWhateverItHolds() {
+        ChatWindowLayout.reset();
+        ChatWindow window = ChatWindowLayout.firstWindow();
+        assertEquals(0.0D, window.getMaxLines(), 0.0D);
+        ChatWindowFrame frame = ChatWindowFrame.of(window);
         try {
-            // Unlinked, the console window is no border: it stays put
-            // and the growing window shows every line, over it.
-            ChatWindowPlacement.Box consoleBox =
-                    ChatWindowPlacement.windowBounds(console, null, 1000, 591);
-            ChatWindowPlacement.Box belowBox =
-                    ChatWindowPlacement.windowBounds(below, null, 1000, 591);
-            assertEquals(103.0D, consoleBox.baseline(), 0.0001D);
-            assertEquals(141.0D, consoleBox.bottom(), 0.0001D);
-            assertEquals(96.0D, belowBox.room, 0.0001D);
-            assertEquals(163.0D, belowBox.baseline(), 0.0001D);
-            assertEquals(26.0D, belowBox.y, 0.0001D);
-            assertTrue(belowBox.y < consoleBox.bottom());
-            // Linked above the growing window, it moves up with it until
-            // it meets the top margin; the growing window keeps growing.
-            // The console window would stand at 163 - 96 - 2 - 39 - 38
-            // = -12 and is held where its top meets the edge: baseline
-            // 12 + 2 + 39 = 53.
-            ChatWindowLayout.link(console.getId(), below.getId(), true);
-            consoleBox = ChatWindowPlacement.windowBounds(console, null,
-                    1000, 591);
-            belowBox = ChatWindowPlacement.windowBounds(below, null, 1000,
-                    591);
-            assertEquals(53.0D, consoleBox.baseline(), 0.0001D);
-            assertEquals(0.0D, consoleBox.y, 0.0001D);
-            assertEquals(96.0D, belowBox.room, 0.0001D);
-            assertEquals(163.0D, belowBox.baseline(), 0.0001D);
-            // Stored anchors are untouched.
-            assertEquals(10.0D, console.getOffsetY(), 0.0D);
-            assertEquals(22.0D, below.getOffsetY(), 0.0D);
-            // With one line the linked window simply sits directly above
-            // (the growing window's top at 163 - 53 = 110, the linked
-            // one's baseline at 110 - 38 = 72).
+            double empty = ChatWindowPlacement.currentLines(window, null);
+            List<net.minecraft.client.gui.ChatLine> lines =
+                    new java.util.ArrayList<net.minecraft.client.gui.ChatLine>();
+            for (int index = 0; index < 8; index++) {
+                lines.add(new net.minecraft.client.gui.ChatLine(0,
+                        new net.minecraft.util.ChatComponentText("x"), index));
+            }
+            frame.lines = lines;
+            assertEquals(20.0D, empty, 0.0D);
+            assertEquals(empty, ChatWindowPlacement.currentLines(window, null),
+                    0.0D);
+            ChatWindowLayout.setWindowLines(window.getId(), 3.0D, false);
+            assertEquals(3.0D, ChatWindowPlacement.currentLines(window, null),
+                    0.0D);
             frame.lines = lines.subList(0, 1);
-            consoleBox = ChatWindowPlacement.windowBounds(console, null,
-                    1000, 591);
-            belowBox = ChatWindowPlacement.windowBounds(below, null, 1000,
-                    591);
-            assertEquals(12.0D, belowBox.room, 0.0001D);
-            assertEquals(belowBox.y, consoleBox.bottom(), 0.0001D);
+            assertEquals(3.0D, ChatWindowPlacement.currentLines(window, null),
+                    0.0D);
         } finally {
             ChatWindowFrame.clear();
         }
@@ -255,26 +295,31 @@ public final class ChatWindowPlacementTest {
         ChatWindowLayout.reset();
         ChatWindow console = ChatWindowLayout.firstWindow();
         ChatWindow below = ChatWindowLayout.windows().get(1);
+        ChatWindowLayout.setWindowLines(console.getId(), 3.0D, false);
+        ChatWindowLayout.setWindowLines(below.getId(), 3.0D, false);
         // The console window sits above the conversation window and is
         // linked to it; wherever the conversation window is, the console
-        // window ends directly on its top.
+        // window ends a window gap above its top, their frames side by
+        // side.
         ChatWindowLayout.setPosition(below.getId(), 0.0D, 50.0D, false);
         ChatWindowLayout.link(console.getId(), below.getId(), true);
         ChatWindowPlacement.Box belowBox = ChatWindowPlacement.windowBounds(
                 below, null, 1000, 600);
         ChatWindowPlacement.Box consoleBox = ChatWindowPlacement.windowBounds(
                 console, null, 1000, 600);
-        assertEquals(belowBox.y, consoleBox.bottom(), 0.0001D);
+        int gap = ChatWindowPlacement.WINDOW_GAP;
+        assertEquals(belowBox.y - gap, consoleBox.bottom(), 0.0001D);
         ChatWindowLayout.setPosition(below.getId(), 0.0D, 80.0D, false);
         belowBox = ChatWindowPlacement.windowBounds(below, null, 1000, 600);
         consoleBox = ChatWindowPlacement.windowBounds(console, null, 1000,
                 600);
-        assertEquals(belowBox.y, consoleBox.bottom(), 0.0001D);
-        // Linked below instead: its top follows the target's bottom.
+        assertEquals(belowBox.y - gap, consoleBox.bottom(), 0.0001D);
+        // Linked below instead: its top follows the target's bottom, the
+        // same gap apart.
         ChatWindowLayout.link(console.getId(), below.getId(), false);
         consoleBox = ChatWindowPlacement.windowBounds(console, null, 1000,
                 600);
-        assertEquals(belowBox.bottom(), consoleBox.y, 0.0001D);
+        assertEquals(belowBox.bottom() + gap, consoleBox.y, 0.0001D);
     }
 
     @Test
@@ -318,22 +363,22 @@ public final class ChatWindowPlacementTest {
      * a pixel count, not a whole number of lines: nothing rounds it, so
      * the box is exactly as tall as asked. Without a Minecraft instance
      * a line is 12 tall, the row and its tool strip 39 with 2px of
-     * head-room under them and 12 + 26 = 38 hang below the baseline, so
-     * a box of n lines is 39 + 2 + 12n + 38 = 79 + 12n tall.
+     * head-room under them and 12 + 25 = 37 hang below the baseline, so
+     * a box of n lines is 39 + 2 + 12n + 37 = 78 + 12n tall.
      */
     @Test
     public void heightIsContinuousBetweenWholeLines() {
         ChatWindowLayout.reset();
         // Twelve lines: 12 * 12 = 144 of room.
-        assertEquals(39 + 2 + 144 + 38,
+        assertEquals(39 + 2 + 144 + 37,
                 ChatWindowPlacement.heightForLines(12.0D, null), 0.0001D);
         // 12.37 lines: 12.37 * 12 = 148.44 of room.
-        assertEquals(39 + 2 + 148.44D + 38,
+        assertEquals(39 + 2 + 148.44D + 37,
                 ChatWindowPlacement.heightForLines(12.37D, null), 0.0001D);
         // Every height between two whole lines is reachable, and asking
         // for one gives it back unchanged, exactly: twelve lines are
-        // 79 + 144 = 223 tall, thirteen 79 + 156 = 235.
-        for (int height = 223; height <= 235; height++) {
+        // 78 + 144 = 222 tall, thirteen 78 + 156 = 234.
+        for (int height = 222; height <= 234; height++) {
             double lines = ChatWindowPlacement.linesForHeight(height, null);
             assertEquals(height,
                     ChatWindowPlacement.heightForLines(lines, null),
@@ -355,7 +400,7 @@ public final class ChatWindowPlacementTest {
             ChatWindowPlacement.Box box = ChatWindowPlacement.windowBounds(
                     window, null, 1000, 600);
             assertEquals(148.44D, box.room, 0.0001D);
-            assertEquals(39 + 2 + 148.44D + 38, box.height, 0.0001D);
+            assertEquals(39 + 2 + 148.44D + 37, box.height, 0.0001D);
         } finally {
             ChatWindowFrame.clear();
         }

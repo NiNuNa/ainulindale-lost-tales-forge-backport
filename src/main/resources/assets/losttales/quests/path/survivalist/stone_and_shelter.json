@@ -3,6 +3,7 @@
   "title": "Path of the Survivalist: Stone and Shelter",
   "description": "A traveler who relies only on wood will not last long. Stone tools, storage, and a fire-safe hearth make a camp worth keeping.",
   "repeatable": false,
+  "restartable": true,
   "startMode": "item",
   "prerequisites": {
     "completed": "losttales:path/survivalist/first_sparks"

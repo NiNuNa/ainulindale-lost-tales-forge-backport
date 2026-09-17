@@ -180,7 +180,13 @@ final class ChatWindowGestures {
         }
     }
 
-    /** The edge a drag is about to link to, lit along its whole width. */
+    /**
+     * The edge a drag is about to link to, lit along its whole length:
+     * the target's frame on that side, both of its pixels, from corner
+     * to corner, where the frame is drawn — so the light lies in the gap
+     * the two windows will keep, over the frame it stands for, and never
+     * on either window's own pixels.
+     */
     void drawLinkHighlight() {
         if (this.windowDrag == null || !this.windowDrag.active
                 || this.windowDrag.snapTargetId == null) {
@@ -191,24 +197,28 @@ final class ChatWindowGestures {
         if (target == null || !target.drawn) {
             return;
         }
-        int left = (int)Math.floor(target.boxLeft);
-        int right = (int)Math.round(target.boxRight);
-        int top = (int)Math.floor(target.boxTop);
-        int bottom = (int)Math.round(target.boxBottom);
+        float ring = ChatWindowPlacement.FRAME_WIDTH;
+        float left = (float)target.drawnLeft();
+        float right = left + (float)(target.boxRight - target.boxLeft);
+        float top = (float)(target.boxTop + target.motionY);
+        float bottom = (float)(target.boxBottom + target.motionY);
         int colour = LostTalesChatVisualStyle.argb(LINK_HIGHLIGHT_RGB, 0xFF);
-        // The edge the window would stick to, lit along its whole length.
         switch (this.windowDrag.snapSide) {
             case ABOVE:
-                Gui.drawRect(left, top - 1, right, top + 1, colour);
+                LostTalesChatOverlayRenderer.fillRect(left - ring, top - ring,
+                        right + ring, top, colour);
                 return;
             case BELOW:
-                Gui.drawRect(left, bottom - 1, right, bottom + 1, colour);
+                LostTalesChatOverlayRenderer.fillRect(left - ring, bottom,
+                        right + ring, bottom + ring, colour);
                 return;
             case LEFT:
-                Gui.drawRect(left - 1, top, left + 1, bottom, colour);
+                LostTalesChatOverlayRenderer.fillRect(left - ring, top - ring,
+                        left, bottom + ring, colour);
                 return;
             default:
-                Gui.drawRect(right - 1, top, right + 1, bottom, colour);
+                LostTalesChatOverlayRenderer.fillRect(right, top - ring,
+                        right + ring, bottom + ring, colour);
         }
     }
 
@@ -710,7 +720,7 @@ final class ChatWindowGestures {
             this.windowResize = null;
             return;
         }
-        int margin = HudPlacementLayout.SCREEN_MARGIN;
+        int margin = ChatWindowPlacement.EDGE_MARGIN;
         // The floor follows the window's own tabs, so an edge stops
         // where the row would otherwise start hiding one.
         double minWidth = ChatWindowPlacement.minBoxWidth(this.mc, window);
@@ -1091,13 +1101,13 @@ final class ChatWindowGestures {
 
     /**
      * Snaps the dragged window to another window's top or bottom edge
-     * when it comes within a few pixels of it, a margin apart, and
+     * when it comes within a few pixels of it, a window gap apart, and
      * remembers that edge so the release links the two; the snapped
      * baseline is returned.
      */
     private ChatWindowPlacement.Anchor snapToNeighbour(ChatWindow window,
                                    ChatWindowPlacement.Anchor anchor) {
-        int margin = HudPlacementLayout.SCREEN_MARGIN;
+        int margin = ChatWindowPlacement.WINDOW_GAP;
         int width = ChatWindowPlacement.windowWidth(window, this.mc);
         double height = ChatWindowPlacement.currentHeight(window, this.mc);
         int barHeight = ChatWindowPlacement.barHeight(this.mc);
@@ -1626,7 +1636,6 @@ final class ChatWindowGestures {
     /**
      * Where a window carrying the dragged tabs sits: its row under the
      * pointer, held where the tab was taken hold of, and kept on screen.
-     * An empty window's row stands one line above its baseline.
      */
     private ChatWindowPlacement.Anchor carriedAnchor(ChatWindow window,
                                                      TabDrag drag,

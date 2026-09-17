@@ -88,6 +88,29 @@ public final class LostTalesClassTransformerTest {
                 LostTalesClassTransformer.LOTR_MAIN_MENU_TEXT_ACTIVE_PROPERTY);
     }
 
+    @Test
+    public void nativeLotrQuestTrackerUsesTheCompatibilityFallbackGuard()
+            throws Exception {
+        String name = "lotr.client.gui.LOTRGuiMiniquestTracker";
+        String hookOwner = "com/ninuna/losttales/compat/lotr/"
+                + "LotrQuestPresentationHooks";
+        byte[] original = readResource(name.replace('.', '/') + ".class");
+        LostTalesClassTransformer transformer =
+                new LostTalesClassTransformer();
+        System.clearProperty(
+                LostTalesClassTransformer.LOTR_QUEST_TRACKER_ACTIVE_PROPERTY);
+        byte[] transformed = transformer.transform(name, name, original);
+        ClassNode result = new ClassNode();
+        new ClassReader(transformed).accept(result, 0);
+        MethodNode drawTracker = findMethod(result, "drawTracker");
+        assertEquals(1, countCalls(drawTracker, hookOwner,
+                "shouldRenderNativeTracker"));
+        assertTrue(Boolean.getBoolean(
+                LostTalesClassTransformer.LOTR_QUEST_TRACKER_ACTIVE_PROPERTY));
+        assertArrayEquals(transformed,
+                transformer.transform(name, name, transformed));
+    }
+
     private static void assertMainMenuTextHooks(String binaryName, String property)
             throws Exception {
         String hookOwner = "com/ninuna/losttales/client/gui/LostTalesMainMenuTextStyle";

@@ -14,5 +14,9 @@ public interface PartyQuestCompatibilityAdapter {
 
     boolean isAvailable();
 
-    void applySharedKillProgress(EntityPlayerMP participant, Entity victim);
+    void applyKillProgress(EntityPlayerMP participant, Entity victim,
+            boolean shared);
+
+    boolean applyTravelProgress(EntityPlayerMP participant, Entity source,
+            boolean shared);
 }

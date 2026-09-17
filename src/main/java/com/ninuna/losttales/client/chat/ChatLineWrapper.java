@@ -28,8 +28,8 @@ import net.minecraft.util.IChatComponent;
  * message. A grouped continuation carries no sender at all and so has
  * no header row; its body starts on the row it is already on, behind
  * the same chevron, and the run stays aligned. A line may name its own
- * separator instead of the chevron — the words a command echo opens its
- * body with — and is laid out the same way behind it. The separator is
+ * separator instead of the chevron, and is laid out the same way behind
+ * it. The separator is
  * the chat's own punctuation rather than the sender's words: it is added
  * here, so the stored message never holds it and copying a line copies
  * what was said.</p>

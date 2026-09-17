@@ -133,6 +133,29 @@ final class ChatFramedButton {
         }
     }
 
+    /**
+     * One corner cell of a frame alone, cut to its ink, the sheet one
+     * texel to one pixel from an origin the caller lays on a whole display
+     * pixel: what a chat window's frame closes its brightest corners with,
+     * so they round and shade as a framed button's do.
+     */
+    static void drawCornerInk(ChatIconSheet corner, float left, float top,
+                              int alpha) {
+        if (corner == null
+                || alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+            return;
+        }
+        GL11.glEnable(GL11.GL_ALPHA_TEST);
+        try {
+            GL11.glAlphaFunc(GL11.GL_GREATER,
+                    ChatChannelTabBar.TAB_INK_THRESHOLD * alpha / 255.0F);
+            corner.draw(left, top, alpha);
+        } finally {
+            // The threshold vanilla's GUI runs under.
+            GL11.glAlphaFunc(GL11.GL_GREATER, 0.1F);
+        }
+    }
+
     /** One colourway of the frame: its corners, and its edges between them. */
     private static void drawFrame(boolean lit, float left, float top,
                                   int width, int height, int alpha) {

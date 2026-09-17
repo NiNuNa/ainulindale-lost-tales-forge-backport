@@ -11,19 +11,20 @@ import org.lwjgl.input.Mouse;
 /**
  * Where chat windows sit on screen. A window is one unit — tab row,
  * messages and its own input bar, all the same width — anchored by its
- * <em>baseline</em>, the edge the newest message sits on: messages grow
+ * <em>baseline</em>, the edge the newest message sits on: messages stack
  * upward from it and
  * the input bar hangs below it, so a window never moves when a message
  * arrives. The stored position is the baseline's percent of its travel
  * (with the box at its smallest, one empty line), and the visible box is
- * only as tall as what the window currently shows, so a short window can
- * be placed anywhere on the screen, its top edge included. A window that
- * grows past the top margin is pushed down just far enough to stay on
- * screen — it grows downward from there — and returns to its anchor as
- * its lines go; the stored position never changes. Windows keep off the
- * screen edges only: they may overlap one another — the one in use is
- * drawn in front — and only a window linked to a growing one moves with
- * it.
+ * as tall as the window's own height, or the game's chat height while it
+ * has none — never what its tabs hold, so neither a message nor another
+ * tab brought forward resizes it — and a short window can be placed
+ * anywhere on the screen, its top edge included. A window taller than
+ * the room above its baseline is pushed down just far enough to stay on
+ * screen and returns to its anchor once it fits; the stored position
+ * never changes. Windows keep off the screen edges only: they may
+ * overlap one another — the one in use is drawn in front — and only a
+ * window linked to another moves with it.
  *
  * <p>The closed-chat feed — one stack of every unmuted channel's
  * messages, shown only while the chat is closed — is placed the same way
@@ -32,19 +33,40 @@ import org.lwjgl.input.Mouse;
  *
  * <p>Boxes are computed in fractional pixels with the same margin as
  * {@link HudPlacementLayout}, so a dragged window moves as smoothly as
- * the mouse instead of stepping by whole GUI pixels.</p>
+ * the mouse instead of stepping by whole GUI pixels. A window keeps the
+ * room its frame needs besides ({@link #FRAME_WIDTH}); the closed feed
+ * has no frame and keeps the margin alone.</p>
  */
 public final class ChatWindowPlacement {
     /** Height of a window's bar strip ({@link ChatInputBar#HEIGHT}):
      *  its first row is the window's bottom rule, as the tab strip's
-     *  last row is the top one, and its last row is the window's bottom
-     *  frame edge.
+     *  last row is the top one; the window's bottom frame edge runs just
+     *  below it.
      *  <p>The strips are deliberately UI chrome and do not follow the
      *  vanilla chat-scale setting, exactly as vanilla's own input line
      *  does not: the setting scales what is read (the message stride,
      *  and with it the trailing strip), never what is operated. That
      *  asymmetry is a decision, not an oversight.</p> */
     public static final int INPUT_HEIGHT = ChatInputBar.HEIGHT;
+    /** The white edge of a window's frame: one pixel just outside its box. */
+    static final int FRAME_EDGE_WIDTH = 1;
+    /**
+     * The window frame's whole width: its white edge, and a pixel of the
+     * window's own surface just outside that, lying under the edge as a
+     * framed button's surface lies under its frame — all of it over
+     * nothing of the window's own. Placement keeps that room for it, so
+     * every frame shows whole and none lies over another window.
+     */
+    static final int FRAME_WIDTH = FRAME_EDGE_WIDTH + 1;
+    /** How far a window's box stays inside the screen: the margin and its frame. */
+    static final int EDGE_MARGIN = HudPlacementLayout.SCREEN_MARGIN
+            + FRAME_WIDTH;
+    /**
+     * How far apart two windows stuck together stand: the margin and a
+     * frame for each, so their frames stand side by side.
+     */
+    static final int WINDOW_GAP = HudPlacementLayout.SCREEN_MARGIN
+            + 2 * FRAME_WIDTH;
     /**
      * The least of a window that stays on screen when it is pushed past
      * a side of the screen: a stretch of its strip wide enough to take
@@ -176,7 +198,7 @@ public final class ChatWindowPlacement {
             return Integer.MAX_VALUE;
         }
         return Math.max(1, chatWidthForBox(
-                screenWidth - 2 * HudPlacementLayout.SCREEN_MARGIN,
+                screenWidth - 2 * EDGE_MARGIN,
                 minecraft));
     }
 
@@ -285,29 +307,16 @@ public final class ChatWindowPlacement {
     }
 
     /**
-     * The lines the window currently shows. A window given a height of
-     * its own keeps exactly that height: fewer messages than it has room
-     * for show as empty rows above them, so resizing never moves the
-     * window. One following the game setting is as tall as the tallest
-     * stack any of its tabs has held, in lines and fractions of one — a
-     * blank row between runs is a fraction of a line — at least one, at most its
-     * {@link #lineCap}: one height for every tab of the window, so
-     * bringing another tab forward never resizes it; a window not drawn
-     * yet shows one.
+     * The lines the window currently shows: its {@link #lineCap}, at
+     * least one — the height the player gave it, or the game's chat
+     * height while it has none. Never what its tabs hold: fewer messages
+     * than it has room for show as empty rows above them, so neither
+     * bringing another tab forward nor a message arriving ever resizes
+     * the window, and resizing never moves it.
      */
     public static double currentLines(ChatWindow window,
                                       Minecraft minecraft) {
-        double cap = lineCap(window, minecraft);
-        if (window != null && window.getMaxLines() > 0.0D) {
-            return Math.max(1.0D, cap);
-        }
-        ChatWindowFrame frame = window == null ? null
-                : ChatWindowFrame.find(window.getId());
-        if (frame == null || frame.lines == null) {
-            return 1.0D;
-        }
-        return Math.max(1.0D, Math.min(cap,
-                Math.max(frame.contentLines(), frame.peakContentLines)));
+        return Math.max(1.0D, lineCap(window, minecraft));
     }
 
     /** Pixels of message room {@code lines} lines take at this scale,
@@ -359,11 +368,11 @@ public final class ChatWindowPlacement {
 
     /**
      * The window's box from its own place and size. A window linked to
-     * another takes its place from its target — a margin above or below
-     * it, following chains — and is kept on screen like any other. No
-     * window is a border for another: windows may overlap, and a growing
+     * another takes its place from its target — a window gap above or
+     * below it, following chains — and is kept on screen like any other. No
+     * window is a border for another: windows may overlap, and a tall
      * one never loses lines to a neighbour. Stored anchors never change;
-     * it is all recomputed every frame and undoes itself as lines go.
+     * it is all recomputed every frame.
      * Links are followed between resting boxes, so a window filling the
      * screen never moves the windows stuck to it; this is also the box
      * it goes back to, and what a drag measures a window from.
@@ -377,7 +386,7 @@ public final class ChatWindowPlacement {
             return anchoredBounds(window, minecraft, screenWidth,
                     screenHeight);
         }
-        int margin = HudPlacementLayout.SCREEN_MARGIN;
+        int gap = WINDOW_GAP;
         int row = rowHeight(minecraft);
         int barHeight = barHeight(minecraft);
         double[] x = new double[count];
@@ -393,8 +402,9 @@ public final class ChatWindowPlacement {
             widths[i] = box.width;
         }
         // A linked window takes its place from its target — above it or
-        // below it, a margin apart — following chains in passes, and
-        // stops at the screen margins like any window.
+        // below it, a window gap apart, room for both frames — following
+        // chains in passes, and stops at the screen margins like any
+        // window.
         for (int pass = 0; pass < count; pass++) {
             boolean moved = false;
             for (int i = 0; i < count; i++) {
@@ -412,8 +422,8 @@ public final class ChatWindowPlacement {
                     // takes its left edge from the window it holds.
                     double wantedX = linked.getLinkSide()
                             == ChatWindow.LinkSide.LEFT
-                            ? x[t] - margin - widths[i]
-                            : x[t] + widths[t] + margin;
+                            ? x[t] - gap - widths[i]
+                            : x[t] + widths[t] + gap;
                     wantedX = holdOnScreen(wantedX, widths[i], screenWidth);
                     if (wantedX != x[i]) {
                         x[i] = wantedX;
@@ -423,13 +433,14 @@ public final class ChatWindowPlacement {
                 }
                 double wanted = linked.isLinkedAbove()
                         ? baseline[t] - room[t] - HISTORY_TOP_MARGIN - row
-                                - margin - barHeight
-                        : baseline[t] + barHeight + margin + room[i]
+                                - gap - barHeight
+                        : baseline[t] + barHeight + gap + room[i]
                                 + HISTORY_TOP_MARGIN + row;
-                double ceiling = margin + room[i] + HISTORY_TOP_MARGIN + row;
+                double ceiling = EDGE_MARGIN + room[i] + HISTORY_TOP_MARGIN
+                        + row;
                 wanted = Math.max(ceiling, Math.min(maxBaseline(
                         row + HISTORY_TOP_MARGIN + room[i] + barHeight,
-                        barHeight, screenHeight), wanted));
+                        barHeight, screenHeight, EDGE_MARGIN), wanted));
                 if (wanted != baseline[i]) {
                     baseline[i] = wanted;
                     moved = true;
@@ -465,16 +476,17 @@ public final class ChatWindowPlacement {
         // fits between the screen margins by giving up message room; the
         // stored height itself is untouched, so scaling back restores it.
         double maxHeight = Math.max(minHeight(minecraft),
-                screenHeight - 2.0D * HudPlacementLayout.SCREEN_MARGIN);
+                screenHeight - 2.0D * EDGE_MARGIN);
         if (height > maxHeight) {
             room = Math.max(1.0D, room - (height - maxHeight));
             height = heightForRoom(room, minecraft);
         }
         int barHeight = barHeight(minecraft);
         double baseline = keepOnScreen(baselineFor(window.getOffsetY(),
-                minecraft, screenHeight), height, barHeight, screenHeight);
+                minecraft, screenHeight), height, barHeight, screenHeight,
+                EDGE_MARGIN);
         return new Box(holdOnScreen(position(window.getOffsetX(),
-                screenWidth, width), width, screenWidth),
+                screenWidth, width, EDGE_MARGIN), width, screenWidth),
                 baseline - (height - barHeight), width, height, barHeight,
                 room);
     }
@@ -533,13 +545,14 @@ public final class ChatWindowPlacement {
 
     /**
      * The box a window fills a part of the screen with: that part of the
-     * screen between the screen margins, its lines laid out to its
+     * screen with room for the frame round it, so two windows filling
+     * neighbouring parts stand a window gap apart, its lines laid out to its
      * width — the whole screen, a half from one side, a quarter from
      * one corner.
      */
     static Box fillBounds(ChatWindow.ScreenFill fill, Minecraft minecraft,
                           int screenWidth, int screenHeight) {
-        int margin = HudPlacementLayout.SCREEN_MARGIN;
+        int margin = EDGE_MARGIN;
         int barHeight = barHeight(minecraft);
         int width = (int)Math.round(boxWidthForChatWidth(
                 fillChatWidth(fill, minecraft, screenWidth), minecraft));
@@ -555,7 +568,7 @@ public final class ChatWindowPlacement {
     static int fillChatWidth(ChatWindow.ScreenFill fill, Minecraft minecraft,
                              int screenWidth) {
         return Math.max(ChatWindowLayout.MIN_CHAT_WIDTH, chatWidthForBox(
-                fill.width(screenWidth) - 2 * HudPlacementLayout.SCREEN_MARGIN,
+                fill.width(screenWidth) - 2 * EDGE_MARGIN,
                 minecraft));
     }
 
@@ -591,10 +604,16 @@ public final class ChatWindowPlacement {
      */
     static double keepOnScreen(double baseline, double height, int barHeight,
                                int screenHeight) {
-        double minBaseline = HudPlacementLayout.SCREEN_MARGIN + height
-                - barHeight;
+        return keepOnScreen(baseline, height, barHeight, screenHeight,
+                HudPlacementLayout.SCREEN_MARGIN);
+    }
+
+    /** As above, the box kept {@code margin} inside the screen. */
+    static double keepOnScreen(double baseline, double height, int barHeight,
+                               int screenHeight, int margin) {
+        double minBaseline = margin + height - barHeight;
         double maxBaseline = Math.max(minBaseline,
-                maxBaseline(height, barHeight, screenHeight));
+                maxBaseline(height, barHeight, screenHeight, margin));
         return Math.max(minBaseline, Math.min(maxBaseline, baseline));
     }
 
@@ -603,8 +622,15 @@ public final class ChatWindowPlacement {
      * whole on the screen above the bottom margin.
      */
     static double maxBaseline(double height, int barHeight, int screenHeight) {
-        return screenHeight - HudPlacementLayout.SCREEN_MARGIN
-                - ChatChannelTabBar.ROW_HEIGHT + height - barHeight;
+        return maxBaseline(height, barHeight, screenHeight,
+                HudPlacementLayout.SCREEN_MARGIN);
+    }
+
+    /** As above, {@code margin} above the screen's bottom. */
+    static double maxBaseline(double height, int barHeight, int screenHeight,
+                              int margin) {
+        return screenHeight - margin - ChatChannelTabBar.ROW_HEIGHT + height
+                - barHeight;
     }
 
     /**
@@ -614,7 +640,7 @@ public final class ChatWindowPlacement {
      * the hold.
      */
     static double holdOnScreen(double x, int width, int screenWidth) {
-        int margin = HudPlacementLayout.SCREEN_MARGIN;
+        int margin = EDGE_MARGIN;
         double minX = Math.min(margin, margin + EDGE_HOLD - width);
         double maxX = Math.max(margin, screenWidth - margin - EDGE_HOLD);
         return Math.max(minX, Math.min(maxX, x));
@@ -622,14 +648,15 @@ public final class ChatWindowPlacement {
 
     public static double windowPercentX(double x, Minecraft minecraft,
                                         int screenWidth) {
-        return percent(x, screenWidth, windowWidth(minecraft));
+        return percent(x, screenWidth, windowWidth(minecraft), EDGE_MARGIN);
     }
 
     /** As above for a window that has a width of its own. */
     public static double windowPercentX(ChatWindow window, double x,
                                         Minecraft minecraft,
                                         int screenWidth) {
-        return percent(x, screenWidth, windowWidth(window, minecraft));
+        return percent(x, screenWidth, windowWidth(window, minecraft),
+                EDGE_MARGIN);
     }
 
     /**
@@ -639,7 +666,7 @@ public final class ChatWindowPlacement {
     public static double baselineFor(double percent, Minecraft minecraft,
                                      int screenHeight) {
         int minHeight = minHeight(minecraft);
-        return position(percent, screenHeight, minHeight)
+        return position(percent, screenHeight, minHeight, EDGE_MARGIN)
                 + minHeight - barHeight(minecraft);
     }
 
@@ -647,7 +674,7 @@ public final class ChatWindowPlacement {
                                         int screenHeight) {
         int minHeight = minHeight(minecraft);
         return percent(baseline - (minHeight - barHeight(minecraft)),
-                screenHeight, minHeight);
+                screenHeight, minHeight, EDGE_MARGIN);
     }
 
     /**
@@ -683,7 +710,7 @@ public final class ChatWindowPlacement {
                 : currentHeight(window, minecraft);
         return new Anchor(holdOnScreen(x, width, screenWidth),
                 keepOnScreen(baseline, height, barHeight(minecraft),
-                        screenHeight));
+                        screenHeight, EDGE_MARGIN));
     }
 
     /** The share of the screen the closed feed may fill at most. */
@@ -743,6 +770,12 @@ public final class ChatWindowPlacement {
                                          int screenHeight) {
         int minHeight = lineHeight(minecraft);
         return position(percent, screenHeight, minHeight) + minHeight;
+    }
+
+    /** The feed's percent for a left edge: the margin alone, no frame. */
+    public static double feedPercentX(double x, Minecraft minecraft,
+                                      int screenWidth) {
+        return percent(x, screenWidth, windowWidth(minecraft));
     }
 
     public static double feedPercentY(double baseline, Minecraft minecraft,
@@ -834,7 +867,13 @@ public final class ChatWindowPlacement {
      * {@link ChatWindowLayout#clampWindowPercent}.
      */
     static double position(double percent, int screenSize, int elementSize) {
-        int margin = HudPlacementLayout.SCREEN_MARGIN;
+        return position(percent, screenSize, elementSize,
+                HudPlacementLayout.SCREEN_MARGIN);
+    }
+
+    /** As above, the element kept {@code margin} from the screen's edges. */
+    static double position(double percent, int screenSize, int elementSize,
+                           int margin) {
         double travel = Math.max(0, screenSize - elementSize - margin * 2);
         double bounded = ChatWindowLayout.clampWindowPercent(percent);
         if (bounded < 0.0D) {
@@ -848,7 +887,13 @@ public final class ChatWindowPlacement {
 
     /** The inverse of {@link #position}. */
     static double percent(double position, int screenSize, int elementSize) {
-        int margin = HudPlacementLayout.SCREEN_MARGIN;
+        return percent(position, screenSize, elementSize,
+                HudPlacementLayout.SCREEN_MARGIN);
+    }
+
+    /** As above, the element kept {@code margin} from the screen's edges. */
+    static double percent(double position, int screenSize, int elementSize,
+                          int margin) {
         double travel = Math.max(0, screenSize - elementSize - margin * 2);
         double offset = position - margin;
         if (elementSize <= 0) {

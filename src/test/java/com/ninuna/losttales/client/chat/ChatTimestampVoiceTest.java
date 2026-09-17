@@ -99,6 +99,28 @@ public final class ChatTimestampVoiceTest {
         assertTrue(LostTalesChatOverlayRenderer.opensItsMinute(lines, 4));
     }
 
+    /**
+     * The unread divider opens the turn again while it stands, as a
+     * day's rule does: the message under it opens a run of its own, and
+     * a run is stamped once.
+     */
+    @Test
+    public void theUnreadDividerOpensTheTurnAgain() {
+        remember(1, ALICE, "Alice");
+        remember(2, ALICE, "Alice");
+        List<ChatLine> lines = new ArrayList<ChatLine>();
+        lines.add(stamped(2, "[15:13] "));
+        lines.add(new ChatLine(0, new ChatComponentText("wrapped"), 1));
+        lines.add(stamped(1, "[15:13] "));
+        assertFalse(LostTalesChatOverlayRenderer.opensItsMinute(lines, 0,
+                -1));
+        // The divider over message 2's oldest row.
+        assertTrue(LostTalesChatOverlayRenderer.opensItsMinute(lines, 0, 0));
+        // Over a message above the stamped one, it is no business of it.
+        assertFalse(LostTalesChatOverlayRenderer.opensItsMinute(lines, 1,
+                0));
+    }
+
     /** System lines have no voice; beside a player's line they are a change of voice. */
     @Test
     public void systemLinesAreOneVoiceAmongThemselvesAndAnotherBesideAPlayer() {

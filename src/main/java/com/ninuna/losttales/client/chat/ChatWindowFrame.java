@@ -57,15 +57,6 @@ final class ChatWindowFrame {
     /** The view's line list drawn last; the bands index into it. */
     List<ChatLine> lines = Collections.emptyList();
     /**
-     * The tallest stack any tab of this window has been drawn with this
-     * session, in lines and fractions of one. A window that follows the
-     * game's chat height is as tall as this rather than as tall as the
-     * tab in front, so every tab of the window shares one height and
-     * switching tabs never resizes it; a tab with a shorter stack shows
-     * empty rows above it.
-     */
-    double peakContentLines;
-    /**
      * Index in {@link #lines} of the oldest wrapped row of the message
      * the unread divider stands above, or -1 while this view shows no
      * divider. The divider takes a row of the stack, its line and the
@@ -101,10 +92,11 @@ final class ChatWindowFrame {
     double baseline;
     /**
      * Top of the drawn message stack (screen y, motion included): the
-     * edge the tab row stands a padding above. A full window cuts its
-     * topmost line where its box runs out of room, so this is the box's
-     * own edge rather than the top of the last whole line; a window
-     * still filling up sits on the lines it has.
+     * edge the tab row stands a padding above. An open window's is its
+     * box's own edge whatever its tab in front holds — a full window
+     * cuts its topmost line there, and a shorter history leaves empty
+     * rows under it — so switching tabs never moves the row; the closed
+     * feed's sits on the lines it has.
      */
     double stackTop;
     /** Message-line room of the box drawn this frame, in pixels,
@@ -487,8 +479,8 @@ final class ChatWindowFrame {
         this.room = this.baseline
                 - snapToDisplayPixels(box.baseline() - box.room);
         this.renderedScrollLines = 0.0D;
-        // Until the draw says otherwise the stack fills the box; an
-        // empty window is corrected to its one placeholder line.
+        // The stack fills the box until the draw lays it on the drawn
+        // baseline.
         this.stackTop = this.baseline + this.motionY - this.room;
     }
 
@@ -936,10 +928,9 @@ final class ChatWindowFrame {
      * the top margin above the drawn message stack — the row's last
      * pixel row is the window's top rule, the tool strip hangs under it,
      * and the first content pixel lies the margin below that, so the
-     * topmost line keeps clear of the strip. A full window's stack ends
-     * on its box's own edge, so the row and the box top never drift
-     * apart whatever the chat scale is; a window with fewer lines than
-     * it has room for carries its row down onto them.
+     * topmost line keeps clear of the strip. The stack of an open window
+     * ends on its box's own edge, so the row and the box top never drift
+     * apart whatever the chat scale is or the tab in front holds.
      */
     double tabRowBottom() {
         return historyTop() - ChatWindowPlacement.TOOL_STRIP_HEIGHT;

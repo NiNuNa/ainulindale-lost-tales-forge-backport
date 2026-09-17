@@ -18,10 +18,9 @@ public final class ChatTimestampColumnTest {
     public void everyGapIsThreePixelsOfClearSpace() {
         ChatTimestampColumn column =
                 ChatTimestampColumn.forWidth(TIMESTAMP_INK);
-        // The frame edge is drawn on the border, so the gap after it is
-        // what is left once its own pixel is spent.
-        assertEquals(ChatTimestampColumn.EDGE_GAP,
-                column.timestampX() - ChatTimestampColumn.BORDER_WIDTH);
+        // The frame edge stands outside the window, so the gap starts at
+        // the window's own edge.
+        assertEquals(ChatTimestampColumn.EDGE_GAP, column.timestampX());
         // From the last pixel of ink to the separator.
         assertEquals(ChatTimestampColumn.EDGE_GAP,
                 column.separatorX()

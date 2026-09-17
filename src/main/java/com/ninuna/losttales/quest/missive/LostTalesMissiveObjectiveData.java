@@ -13,7 +13,6 @@ public final class LostTalesMissiveObjectiveData {
     public static final String TYPE_GATHER = "gather";
     public static final String TYPE_CRAFT = "craft";
     public static final String TYPE_GOTO = "goto";
-    public static final String TYPE_DELIVER = "deliver";
 
     private final String id;
     private final String type;

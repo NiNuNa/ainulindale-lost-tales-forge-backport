@@ -458,6 +458,12 @@ public class LostTalesCommonProxy {
     }
 
     public void onServerStopping(FMLServerStoppingEvent event) {
+        // The Console's entry for the stop, the pair of the one the start
+        // records: shown to its readers still online, and kept by the
+        // history's snapshot below, so the Console shows it when the
+        // server is next up. First, before the ids are reset below.
+        LostTalesChatService.console(ChatConsoleEvent.Kind.SERVER,
+                ChatConsoleEvent.Severity.INFO, "Server", "Server stopped");
         // The farewell and the offline topic are queued before the stop,
         // which gives the worker a bounded moment to send them.
         LostTalesDiscordBridge.getInstance().onServerStopping();

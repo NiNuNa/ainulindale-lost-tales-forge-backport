@@ -3,6 +3,8 @@ package com.ninuna.losttales.gui.hud.quest;
 import com.ninuna.losttales.client.camera.ThirdPersonCameraController;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapMarkerData;
+import com.ninuna.losttales.client.quest.ClientQuestCatalog;
+import com.ninuna.losttales.client.quest.ClientQuestEntry;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestNotificationStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
@@ -13,11 +15,12 @@ import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderHelper;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
+import com.ninuna.losttales.quest.LostTalesQuestObjectiveSelection;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveTextHelper;
-import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -28,7 +31,7 @@ import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.MathHelper;
 import org.lwjgl.opengl.GL11;
-/** Lightweight 1.7.10 quest HUD: tracked quest/objective list plus short sync-derived toasts. */
+/** Shared Lost Tales and LOTR quest tracker plus sync-derived notifications. */
 public final class LostTalesQuestHudRenderer {
     private static final int PANEL_WIDTH = 238;
     private static final int PANEL_PADDING = 6;
@@ -165,46 +168,105 @@ public final class LostTalesQuestHudRenderer {
 
     private static List<TrackedQuestHudEntry> collectVisibleTrackedQuestEntries(Minecraft minecraft, float partialTicks) {
         List<TrackedQuestHudEntry> entries = new ArrayList<TrackedQuestHudEntry>();
-        Collection<LostTalesQuestProgress> tracked = LostTalesClientQuestProgressStore.getPinnedQuests();
-        if (tracked.isEmpty()) {
-            return entries;
-        }
-
-        for (LostTalesQuestProgress progress : tracked) {
-            LostTalesQuestDefinition quest = LostTalesClientQuestDefinitionStore.getQuest(progress.getQuestId());
-            if (quest == null) {
+        for (ClientQuestEntry entry : ClientQuestCatalog.getEntries(minecraft)) {
+            if (!entry.isActive() || !entry.isTracked()) {
                 continue;
             }
-            LostTalesQuestStageDefinition stage = findStage(quest, progress);
-            if (!shouldShowQuestForCurrentView(minecraft, quest, stage, partialTicks)) {
+            LostTalesQuestDefinition quest = entry.getLostTalesDefinition();
+            LostTalesQuestProgress progress = entry.getLostTalesProgress();
+            if (quest != null
+                    ? !shouldShowQuestForCurrentView(minecraft, quest,
+                            progress, partialTicks)
+                    : requiresReturnFacing(entry)
+                            && !shouldShowQuestForCurrentView(minecraft,
+                                    entry.getTargets(), partialTicks)) {
                 continue;
             }
-            List<LostTalesQuestObjectiveDefinition> objectives = collectPrimaryObjectives(progress, stage);
-            if (objectives.isEmpty()) {
-                String objectiveText = stage == null ? "No active stage" : "No objectives";
-                entries.add(new TrackedQuestHudEntry(quest.getTitle(), objectiveText, 0, 1, false, minecraft.fontRenderer));
-                continue;
+            ArrayList<String> objectiveLines = new ArrayList<String>();
+            int current = 0;
+            int target = 0;
+            boolean complete = !entry.getObjectives().isEmpty();
+            for (ClientQuestEntry.Objective objective : entry.getObjectives()) {
+                String line = (objective.isComplete() ? "✓ " : "◇ ")
+                        + objective.getText();
+                objectiveLines.add(line);
+                current += Math.min(objective.getCurrent(), objective.getTarget());
+                target += objective.getTarget();
+                complete &= objective.isComplete();
             }
-
-            for (LostTalesQuestObjectiveDefinition objective : objectives) {
-                int target = LostTalesQuestObjectiveTextHelper.getObjectiveTargetCount(objective);
-                int current = progress == null ? 0 : progress.getObjectiveProgress(objective.getId());
-                String objectiveText = LostTalesQuestObjectiveTextHelper.buildObjectiveLine(progress, objective, true, false, false, false);
-                if (progress != null && progress.hasTimeLimit() && minecraft.theWorld != null) {
-                    String remaining = formatRemainingTime(progress.getRemainingTicks(minecraft.theWorld.getTotalWorldTime()));
-                    if (remaining.length() > 0) {
-                        objectiveText = objectiveText + " | " + remaining + " left";
-                    }
-                }
-                boolean complete = current >= target;
-                entries.add(new TrackedQuestHudEntry(quest.getTitle(), objectiveText, current, target, complete, minecraft.fontRenderer));
+            if (objectiveLines.isEmpty()) {
+                objectiveLines.add("◇ No current objective");
+                target = 1;
+                complete = false;
             }
+            if (entry.hasDeadline()) {
+                objectiveLines.set(0, objectiveLines.get(0) + " | "
+                        + formatRemainingTime(entry.getRemainingTicks())
+                        + " left");
+            }
+            entries.add(new TrackedQuestHudEntry(entry.getTitle(),
+                    objectiveLines, current, Math.max(1, target), complete,
+                    minecraft.fontRenderer));
         }
         return entries;
     }
 
-    private static boolean shouldShowQuestForCurrentView(Minecraft minecraft, LostTalesQuestDefinition quest, LostTalesQuestStageDefinition stage, float partialTicks) {
-        List<HudQuestTarget> targets = collectCurrentStageTargets(minecraft, quest, stage);
+    /** LOTR's stored target is its giver; it gates the HUD only at turn-in. */
+    private static boolean requiresReturnFacing(ClientQuestEntry entry) {
+        if (entry == null || entry.getObjectives().isEmpty()) {
+            return false;
+        }
+        boolean required = false;
+        for (ClientQuestEntry.Objective objective : entry.getObjectives()) {
+            if (objective.isOptional()) continue;
+            required = true;
+            if (!objective.isComplete()) return false;
+        }
+        return required;
+    }
+
+    private static boolean shouldShowQuestForCurrentView(Minecraft minecraft,
+            List<ClientQuestEntry.Target> targets, float partialTicks) {
+        if (targets == null || targets.isEmpty() || minecraft == null
+                || minecraft.theWorld == null) {
+            return true;
+        }
+        int dimension = minecraft.theWorld.provider.dimensionId;
+        EntityPlayer player = minecraft.thePlayer;
+        LostTalesCompassHudRenderHelper.PlayerPos playerPos =
+                LostTalesCompassHudRenderHelper.lerpPlayerPos(player,
+                        partialTicks);
+        float viewYaw = ThirdPersonCameraController.resolveViewYaw(
+                player.prevRotationYaw, player.rotationYaw, partialTicks);
+        float normalizedYaw = LostTalesCompassHudRenderHelper
+                .normalizeViewYaw(viewYaw);
+        boolean hasCurrentDimensionTarget = false;
+        for (ClientQuestEntry.Target target : targets) {
+            if (target.getDimensionId() != dimension) {
+                continue;
+            }
+            hasCurrentDimensionTarget = true;
+            double dx = target.getX() - playerPos.x;
+            double dz = target.getZ() - playerPos.z;
+            if (dx * dx + dz * dz <= QUEST_MARKER_NEAR_DISTANCE_SQ) {
+                return true;
+            }
+            float targetDeg = LostTalesCompassHudRenderHelper
+                    .angleDegToTarget(dx, dz);
+            float delta = Math.abs(LostTalesCompassHudRenderHelper
+                    .shortestDeltaDegrees(targetDeg, normalizedYaw));
+            if (delta <= QUEST_MARKER_VISIBLE_HALF_ANGLE_DEGREES) {
+                return true;
+            }
+        }
+        return !hasCurrentDimensionTarget;
+    }
+
+    private static boolean shouldShowQuestForCurrentView(Minecraft minecraft,
+            LostTalesQuestDefinition quest, LostTalesQuestProgress progress,
+            float partialTicks) {
+        List<HudQuestTarget> targets = collectProgressibleTargets(minecraft,
+                quest, progress);
         if (targets.isEmpty()) {
             return true;
         }
@@ -231,14 +293,20 @@ public final class LostTalesQuestHudRenderer {
         return false;
     }
 
-    private static List<HudQuestTarget> collectCurrentStageTargets(Minecraft minecraft, LostTalesQuestDefinition quest, LostTalesQuestStageDefinition stage) {
+    private static List<HudQuestTarget> collectProgressibleTargets(
+            Minecraft minecraft, LostTalesQuestDefinition quest,
+            LostTalesQuestProgress progress) {
         List<HudQuestTarget> targets = new ArrayList<HudQuestTarget>();
-        if (minecraft == null || minecraft.theWorld == null || stage == null) {
+        if (minecraft == null || minecraft.theWorld == null || quest == null
+                || progress == null) {
             return targets;
         }
         int dimension = minecraft.theWorld.provider.dimensionId;
-        for (LostTalesQuestObjectiveDefinition objective : stage.getObjectives()) {
-            if (objective == null) {
+        for (LostTalesQuestObjectiveDefinition objective
+                : LostTalesQuestObjectiveSelection
+                .getProgressibleObjectives(quest, progress)) {
+            if (objective == null || LostTalesQuestObjectiveSelection
+                    .isComplete(progress, objective)) {
                 continue;
             }
             addMarkerTargets(targets, objective, dimension);
@@ -299,33 +367,6 @@ public final class LostTalesQuestHudRenderer {
             return null;
         }
         return new HudQuestTarget(x.doubleValue(), y.doubleValue(), z.doubleValue());
-    }
-
-    private static List<LostTalesQuestObjectiveDefinition> collectPrimaryObjectives(LostTalesQuestProgress progress, LostTalesQuestStageDefinition stage) {
-        List<LostTalesQuestObjectiveDefinition> result = new ArrayList<LostTalesQuestObjectiveDefinition>();
-        if (stage == null || stage.getObjectives().isEmpty()) {
-            return result;
-        }
-
-        int limit = Math.max(1, Math.min(6, LostTalesConfig.questHudMaxObjectives));
-        for (LostTalesQuestObjectiveDefinition objective : stage.getObjectives()) {
-            if (objective == null) {
-                continue;
-            }
-            int target = LostTalesQuestObjectiveTextHelper.getObjectiveTargetCount(objective);
-            int current = progress == null ? 0 : progress.getObjectiveProgress(objective.getId());
-            if (current < target) {
-                result.add(objective);
-            }
-            if (result.size() >= limit) {
-                return result;
-            }
-        }
-
-        if (result.isEmpty()) {
-            result.add(stage.getObjectives().get(0));
-        }
-        return result;
     }
 
     private static String formatRemainingTime(long ticks) {
@@ -444,19 +485,6 @@ public final class LostTalesQuestHudRenderer {
         }
     }
 
-    private static LostTalesQuestStageDefinition findStage(LostTalesQuestDefinition quest, LostTalesQuestProgress progress) {
-        if (quest == null || progress == null || quest.getStages().isEmpty()) {
-            return null;
-        }
-        for (LostTalesQuestStageDefinition stage : quest.getStages()) {
-            if (stage.getId() != null && stage.getId().equals(progress.getStageId())) {
-                return stage;
-            }
-        }
-        int index = progress.getStageIndex();
-        return index >= 0 && index < quest.getStages().size() ? quest.getStages().get(index) : quest.getFirstStage();
-    }
-
     private static String trimToWidth(FontRenderer font, String text, int width) {
         if (text == null || width <= 0) {
             return "";
@@ -480,17 +508,27 @@ public final class LostTalesQuestHudRenderer {
         private final int target;
         private final boolean complete;
 
-        private TrackedQuestHudEntry(String title, String objectiveText, int current, int target, boolean complete, FontRenderer font) {
+        private TrackedQuestHudEntry(String title, List<String> objectiveText,
+                int current, int target, boolean complete, FontRenderer font) {
             this.title = title == null || title.length() == 0 ? "Tracked Quest" : title;
             this.current = Math.max(0, current);
             this.target = Math.max(1, target);
             this.complete = complete;
-            String safeObjective = objectiveText == null || objectiveText.length() == 0 ? "No objective" : "\u25C7 " + objectiveText;
-            List<String> wrapped = font == null
-                    ? new ArrayList<String>()
-                    : font.listFormattedStringToWidth(safeObjective, PANEL_WIDTH - PANEL_PADDING * 2 - 10);
+            List<String> wrapped = new ArrayList<String>();
+            if (objectiveText != null) {
+                for (String objective : objectiveText) {
+                    String safeObjective = objective == null
+                            || objective.length() == 0
+                            ? "\u25C7 No objective" : objective;
+                    List<String> objectiveWrapped = font == null
+                            ? Collections.singletonList(safeObjective)
+                            : font.listFormattedStringToWidth(safeObjective,
+                                    PANEL_WIDTH - PANEL_PADDING * 2 - 10);
+                    wrapped.addAll(objectiveWrapped);
+                }
+            }
             if (wrapped.isEmpty()) {
-                wrapped.add(safeObjective);
+                wrapped.add("\u25C7 No objective");
             }
             this.objectiveLines = wrapped;
         }

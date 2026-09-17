@@ -641,8 +641,12 @@ public final class LostTalesChatPresentationTest {
                             part.getChatStyle().getBold());
                 }
                 if ("code".equals(text)) {
-                    sawCode = part.getChatStyle().getColor()
-                            == EnumChatFormatting.GRAY;
+                    // Inline code: in italics and the chat's aside tone.
+                    sawCode = Boolean.TRUE.equals(
+                            part.getChatStyle().getItalic())
+                            && Integer.valueOf(
+                                    LostTalesChatVisualStyle.asideRgb())
+                                    .equals(ChatColorMarker.decode(part));
                 }
             }
             assertEquals("a bold and code word", body.toString());
@@ -655,9 +659,9 @@ public final class LostTalesChatPresentationTest {
 
     /**
      * A command echo is a line of the sender's like any other: the same
-     * header, part for part, and a body row that opens with the
-     * command's own slash instead of the chevron. The body is the rest
-     * of the command exactly as typed, in grey since it was not said —
+     * header, part for part, and a body row that opens behind the
+     * chevron, as a message's does. The body is the command exactly as
+     * typed, slash and all, shown as inline code since it was not said —
      * nothing in it is markup, an emoji or a mention — and its grouped
      * form opens the same way.
      */
@@ -684,25 +688,18 @@ public final class LostTalesChatPresentationTest {
 
             assertEquals(headerOf(said), headerOf(used));
             assertEquals("Global: <  Arathorn> ", headerOf(used));
+            // Both bodies open behind the chevron.
             assertNull(labelOf(said));
-            // A bare break: the body opens behind nothing.
-            assertEquals("", labelOf(used));
+            assertNull(labelOf(used));
 
             java.util.List<IChatComponent> body = bodyOf(used);
-            assertEquals(3, body.size());
-            // The slash in the sender's colour, where the chevron stands,
-            // then the chevron's own gap as a spacer that copies as
-            // nothing, then the command in the chat's white.
-            assertEquals("/", body.get(0).getUnformattedTextForChat());
-            assertEquals(Integer.valueOf(packet.getNameColor()),
+            // One run, slash and all, behind the chevron: the command as
+            // inline code, in italics and exactly the aside tone.
+            assertEquals(1, body.size());
+            assertEquals(command, body.get(0).getUnformattedTextForChat());
+            assertTrue(body.get(0).getChatStyle().getItalic());
+            assertEquals(Integer.valueOf(LostTalesChatVisualStyle.asideRgb()),
                     ChatColorMarker.decode(body.get(0)));
-            assertEquals(LostTalesChatPresentation.COMMAND_GAP,
-                    ChatSpacerMarker.decode(body.get(1)));
-            assertEquals("", body.get(1).getUnformattedTextForChat());
-            assertEquals(command.substring(1),
-                    body.get(2).getUnformattedTextForChat());
-            assertNull(body.get(2).getChatStyle().getColor());
-            assertNull(body.get(2).getChatStyle().getChatClickEvent());
             // The message form of the same words is read for markup.
             assertTrue(bodyOf(said).size() > 1);
 
@@ -710,13 +707,182 @@ public final class LostTalesChatPresentationTest {
                     packet, ChatTab.of(ChatChannel.ALL), new int[0], true,
                     ChatBodyKind.COMMAND);
             assertEquals("", headerOf(grouped));
-            assertEquals("", labelOf(grouped));
-            assertEquals("/", bodyOf(grouped).get(0).getUnformattedTextForChat());
-            assertEquals(command.substring(1),
-                    bodyOf(grouped).get(2).getUnformattedTextForChat());
+            assertNull(labelOf(grouped));
+            assertEquals(1, bodyOf(grouped).size());
+            assertEquals(command,
+                    bodyOf(grouped).get(0).getUnformattedTextForChat());
         } finally {
             LostTalesConfig.showChatTimestamps = originalTimestamps;
             LostTalesConfig.enableChatEmojis = originalEmojis;
+        }
+    }
+
+    /**
+     * A quoted command is still a command: the quote a reply opens with
+     * shows it as inline code, as the line it quotes does, while quoted
+     * words keep the chat's ivory.
+     */
+    @Test
+    public void aQuotedCommandIsInlineCode() {
+        LostTalesChatMessagePacket answer = new LostTalesChatMessagePacket(
+                ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
+                "RangerOfTheNorth", "", 0x55AA55, 0x336633, "Done.",
+                123456789L, "losttales:human_ranger_male_2");
+        IChatComponent command = quoteWordsOf(answer.withReply(
+                com.ninuna.losttales.chat.ChatReplyReference.unanchored(
+                        "Player125", "/clear", 0xAA5555)));
+        assertEquals("/clear", command.getUnformattedTextForChat());
+        assertTrue(command.getChatStyle().getItalic());
+        assertEquals(Integer.valueOf(LostTalesChatVisualStyle.asideRgb()),
+                ChatReplyMarker.colorOf(command));
+
+        IChatComponent words = quoteWordsOf(answer.withReply(
+                com.ninuna.losttales.chat.ChatReplyReference.unanchored(
+                        "Player125", "hello /there", 0xAA5555)));
+        assertEquals("hello /there", words.getUnformattedTextForChat());
+        assertFalse(words.getChatStyle().getItalic());
+        assertEquals(Integer.valueOf(
+                LostTalesColors.rgb(LostTalesColors.HUD_LABEL)),
+                ChatReplyMarker.colorOf(words));
+    }
+
+    /** The words of the quote the line built from {@code packet} opens with. */
+    private static IChatComponent quoteWordsOf(
+            LostTalesChatMessagePacket packet) {
+        IChatComponent line = LostTalesChatPresentation.build(packet,
+                ChatTab.of(ChatChannel.ALL), new int[0], false,
+                ChatBodyKind.MESSAGE);
+        IChatComponent words = null;
+        for (Object value : line) {
+            IChatComponent part = (IChatComponent)value;
+            if (ChatLayoutMarker.isLineBreak(part)) {
+                return words;
+            }
+            if (ChatReplyMarker.isMarker(part)) {
+                words = part;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * A console entry reads as a sentence: its words end with a full
+     * stop, and words that already end one keep their own mark.
+     */
+    @Test
+    public void consoleEntriesEndWithAFullStop() {
+        assertEquals("Server started.",
+                LostTalesChatPresentation.asSentence("Server started"));
+        assertEquals("changed server settings: [a, b].",
+                LostTalesChatPresentation.asSentence(
+                        "changed server settings: [a, b]"));
+        assertEquals("Server stopped.",
+                LostTalesChatPresentation.asSentence("Server stopped. "));
+        assertEquals("Really?",
+                LostTalesChatPresentation.asSentence("Really?"));
+        assertEquals("", LostTalesChatPresentation.asSentence(""));
+        assertEquals("", LostTalesChatPresentation.asSentence(null));
+    }
+
+    /**
+     * A reply to one of this player's lines pings them without naming
+     * them, whoever replies — another player, a Discord member, the
+     * Server answering their command, or they themselves — and neither
+     * a reply to somebody else nor a line replying to nothing does.
+     */
+    @Test
+    public void aReplyToThisPlayersLinePingsThem() {
+        UUID player = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+        com.ninuna.losttales.chat.ChatReplyReference toPlayer =
+                com.ninuna.losttales.chat.ChatReplyReference.of(1234L,
+                        "Arathorn", "hello").withHead(player, true, "");
+        assertTrue(LostTalesChatPresentation.repliesTo(toPlayer, player));
+        com.ninuna.losttales.chat.ChatReplyReference toOther =
+                com.ninuna.losttales.chat.ChatReplyReference.of(1234L,
+                        "Legolas", "hello").withHead(other, true, "");
+        assertFalse(LostTalesChatPresentation.repliesTo(toOther, player));
+        assertTrue(LostTalesChatPresentation.repliesTo(toOther, other));
+        assertFalse(LostTalesChatPresentation.repliesTo(
+                com.ninuna.losttales.chat.ChatReplyReference.NONE, player));
+        // A quote told no head, of a line this client does not hold,
+        // names nobody.
+        assertFalse(LostTalesChatPresentation.repliesTo(
+                com.ninuna.losttales.chat.ChatReplyReference.of(99L,
+                        "Arathorn", "hello"), player));
+    }
+
+    /**
+     * A console entry's actor is always a mention, of an account this
+     * client cannot place too — one long offline — so an older entry
+     * names its player as it did when it was new; this player's own name
+     * pings them, and the Server names nobody.
+     */
+    @Test
+    public void aConsoleEntrysActorIsAlwaysAMention() {
+        boolean[] mentioned = new boolean[1];
+        IChatComponent actor = LostTalesChatPresentation.actorMention(
+                java.util.Collections.<String>emptyList(), "Player531",
+                mentioned);
+        assertEquals("@Player531", actor.getUnformattedTextForChat());
+        ChatMentionMarker.Data marker = ChatMentionMarker.decode(actor);
+        assertNotNull(marker);
+        assertEquals("Player531", marker.account);
+        assertFalse(mentioned[0]);
+        IChatComponent own = LostTalesChatPresentation.actorMention(
+                java.util.Arrays.asList("Player531"), "Player531",
+                mentioned);
+        assertEquals("@Player531", own.getUnformattedTextForChat());
+        assertTrue(mentioned[0]);
+        IChatComponent server = LostTalesChatPresentation.actorMention(
+                java.util.Collections.<String>emptyList(), "Server",
+                new boolean[1]);
+        assertEquals("Server", server.getUnformattedTextForChat());
+        assertNull(ChatMentionMarker.decode(server));
+    }
+
+    /**
+     * A mention keeps reading as one after its player has gone: a name
+     * this client cannot place is placed by the players the server
+     * recorded the message as naming, in the colour a live mention of
+     * them takes — in character, the identity they were playing — and a
+     * name nobody recorded stays text.
+     */
+    @Test
+    public void aRecordedMentionOutlivesItsPlayer() {
+        boolean originalPings = LostTalesConfig.enableChatPings;
+        LostTalesConfig.enableChatPings = true;
+        try {
+            LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
+                    ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
+                    "RangerOfTheNorth", "", 0x55AA55, 0x336633,
+                    "hi @Aragorn and @Nobody", 123456789L,
+                    "losttales:human_ranger_male_2").withNamedPlayers(
+                            java.util.Collections.singletonList(
+                                    new com.ninuna.losttales.chat
+                                            .ChatNamedPlayer("Player531",
+                                                    "Aragorn", 0x2F6FB0)));
+            IChatComponent aragorn = null;
+            IChatComponent nobody = null;
+            for (IChatComponent part : bodyOf(LostTalesChatPresentation.build(
+                    packet, ChatTab.of(ChatChannel.ALL), new int[0], false,
+                    ChatBodyKind.MESSAGE))) {
+                String text = part.getUnformattedTextForChat();
+                if ("@Aragorn".equals(text)) {
+                    aragorn = part;
+                } else if (text.contains("@Nobody")) {
+                    nobody = part;
+                }
+            }
+            assertNotNull(aragorn);
+            ChatMentionMarker.Data marker = ChatMentionMarker.decode(aragorn);
+            assertNotNull(marker);
+            assertEquals("Player531", marker.account);
+            assertEquals(0x2F6FB0, marker.color);
+            assertNotNull(nobody);
+            assertNull(ChatMentionMarker.decode(nobody));
+        } finally {
+            LostTalesConfig.enableChatPings = originalPings;
         }
     }
 

@@ -8,8 +8,7 @@ import com.ninuna.losttales.config.LostTalesConfig;
  * A control whose sheet holds its motion as a run of frames: the
  * insert-toolbar chevron and the tab search chevron are the same thing
  * turned through a right angle, and both play their run between an open
- * and a closed state while a pointer crossfades them to their lit
- * artwork.
+ * and a closed state while they crossfade to their lit artwork and back.
  *
  * <p>The frame is picked from a {@link LostTalesUiTransition}, so a
  * control flipped back before its run has finished travels on from the
@@ -31,11 +30,13 @@ final class ChatIconFlipbook {
     }
 
     /**
-     * Advances both the flip and the pointer crossfade to this instant.
-     * {@code on} is the state the control is in — the run's last frame —
-     * and the run plays backward toward its first when it is dropped.
+     * Advances both the flip and the crossfade to the lit artwork to this
+     * instant. {@code on} is the state the control is in — the run's last
+     * frame — and the run plays backward toward its first when it is
+     * dropped; {@code lit} is whether the control is lit, which is the
+     * pointer resting on it or, for a control that says so, its state.
      */
-    void advance(boolean on, boolean hovered) {
+    void advance(boolean on, boolean lit) {
         long now = System.nanoTime();
         this.flip.advance(now, on,
                 LostTalesConfig.enableChatAnimations
@@ -47,7 +48,7 @@ final class ChatIconFlipbook {
                 : (now - this.hoverNanos) / 1.0E9D;
         this.hoverNanos = now;
         this.hoverFade = LostTalesChatVisualStyle.hoverFade(this.hoverFade,
-                hovered, elapsed);
+                lit, elapsed);
     }
 
     /** The frame the run stands on this instant. */
@@ -57,7 +58,7 @@ final class ChatIconFlipbook {
 
     /**
      * The frame centred in the control's box, with the lit artwork laid
-     * over it as far as the pointer has brought it. The box is the
+     * over it as far as the crossfade has come. The box is the
      * control's whole hit square: the frames differ in size along the
      * axis the chevron folds on, and centring each one in the box is
      * what keeps the run on one spot instead of walking it across the

@@ -12,8 +12,8 @@ import net.minecraft.client.gui.FontRenderer;
  * </pre>
  *
  * <p>The gaps are what the eye sees, so both ends of them are measured
- * in ink. The window's left frame edge is a drawn pixel of its own, so
- * the column starts past it rather than on it; and a glyph's width in
+ * in ink. The window's left frame edge stands just outside the window,
+ * so the first gap starts at the window's own edge; and a glyph's width in
  * this font carries one column of spacing after it, so the width
  * reserved for the timestamp is one less than the widths summed —
  * otherwise the gap after the {@code ]} is four pixels while the gap
@@ -35,8 +35,6 @@ final class ChatTimestampColumn {
     /** Gap at the window edge, around the separator, and before text. */
     static final int EDGE_GAP = 3;
     static final int SEPARATOR_WIDTH = 1;
-    /** The window's left frame edge: drawn on the border, one pixel wide. */
-    static final int BORDER_WIDTH = 1;
 
     private static final ChatTimestampColumn DISABLED =
             new ChatTimestampColumn(false, 0);
@@ -76,9 +74,12 @@ final class ChatTimestampColumn {
         return new ChatTimestampColumn(true, timestampWidth);
     }
 
-    /** Where the timestamp text begins: clear of the frame edge. */
+    /**
+     * Where the timestamp text begins: the edge gap in from the window's
+     * edge, the frame standing outside it.
+     */
     int timestampX() {
-        return BORDER_WIDTH + EDGE_GAP;
+        return EDGE_GAP;
     }
 
     /** Left edge of the vertical separator. */

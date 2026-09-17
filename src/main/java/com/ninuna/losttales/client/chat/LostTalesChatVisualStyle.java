@@ -82,10 +82,11 @@ final class LostTalesChatVisualStyle {
      * The chat's one tone for what is said about a line rather than in
      * it: the Console's own colour. Timestamps, the Server's and the
      * Client's names, a day's rule, the reply chip, the typing line, the
-     * edited mark and the words in an empty place — a window's
-     * invitation, the empty screen's line, the empty field's hint — all
-     * wear it. Asked for rather than kept, so a server that recolours
-     * the Console recolours every one of them with it.
+     * edited mark, inline code and a logged command's words, and the
+     * words in an empty place — a window's invitation, the empty
+     * screen's line, the empty field's hint — all wear it. Asked for
+     * rather than kept, so a server that recolours the Console recolours
+     * every one of them with it.
      */
     static int asideRgb() {
         return ClientChatChannelState.displayColor(ChatChannel.CONSOLE);
@@ -855,7 +856,7 @@ final class LostTalesChatVisualStyle {
         // its extent is known — so a name reads as one thing with its
         // head, brackets and title, and a link as one line. The rule
         // stands on the row the descenders' shadow takes and is drawn in
-        // the content pass alone, with no shadow of its own.
+        // the content pass alone, with its own shadow under it.
         int ruleStart = -1;
         int ruleEnd = 0;
         int ruleColor = 0;
@@ -949,6 +950,14 @@ final class LostTalesChatVisualStyle {
                     drawShareIcon(share, cursor, y, width, alpha,
                             shadowPass);
                 }
+                // The icon is a piece of its share, between the bracket
+                // and the name: while the share is lit the rule runs on
+                // under it, so the share keeps one underline.
+                underlined = hovered != null
+                        && ChatInteractions.answersClick(part,
+                                chatLinksEnabled())
+                        && sharesInteraction(part, line, index, hovered);
+                underlineColor = share.textColor;
             } else if (ChatReplyMarker.isIconSlot(part)) {
                 // The bubble a reply's quote opens with, in the quote's
                 // own tone, centred in the row as a box of its own, on
@@ -1114,7 +1123,11 @@ final class LostTalesChatVisualStyle {
                 // after it, not to what is lit.
                 ruleTrailing = ChatInlineIcons.declaredWidth(part) >= 0 ? 0
                         : trailingSpaceWidth(font, text);
-            } else if (ruleStart >= 0) {
+            } else if (ruleStart >= 0
+                    && ChatSpacerMarker.decode(part) < 0) {
+                // A spacer holds no ink: a rule runs on over one to the
+                // next lit run of its element, and ends where the last
+                // lit run did when none follows.
                 drawRule(ruleStart, ruleEnd - ruleTrailing, y, ruleColor,
                         alpha);
                 ruleStart = -1;
@@ -1253,21 +1266,34 @@ final class LostTalesChatVisualStyle {
     /**
      * The row under a run's glyphs the font draws its own underline on,
      * counted from the text's top: the row the descenders' shadow falls
-     * on, which in a message row leaves the row's last pixel clear below
-     * it.
+     * on, which in a message row leaves the row's last pixel for the
+     * rule's own shadow.
      */
     static final int UNDERLINE_ROW = 8;
 
     /**
      * One rule from {@code start} to {@code end}, the last pixel left
-     * to the glyph's own trailing gap so the rule ends with the glyphs.
+     * to the glyph's own trailing gap so the rule ends with the glyphs,
+     * over the chat's one shadow. The rule is drawn once its extent is
+     * known, after the glyphs beside it, and its shadow with it: the row
+     * the shadow takes is under every glyph and every glyph's shadow, so
+     * nothing of the line lies there for it to be laid over.
      */
     private static void drawRule(int start, int end, int y, int color,
                                  int alpha) {
-        if (end - 1 > start) {
-            LostTalesChatOverlayRenderer.fillRect(start, y + UNDERLINE_ROW,
-                    end - 1, y + UNDERLINE_ROW + 1, argb(color, alpha));
+        if (end - 1 <= start) {
+            return;
         }
+        int shadow = shadowAlpha(alpha);
+        if (shadow > 0) {
+            LostTalesChatOverlayRenderer.fillRect(start + SHADOW_OFFSET,
+                    y + UNDERLINE_ROW + SHADOW_OFFSET,
+                    end - 1 + SHADOW_OFFSET,
+                    y + UNDERLINE_ROW + 1 + SHADOW_OFFSET,
+                    argb(SHADOW, shadow));
+        }
+        LostTalesChatOverlayRenderer.fillRect(start, y + UNDERLINE_ROW,
+                end - 1, y + UNDERLINE_ROW + 1, argb(color, alpha));
     }
 
     /** Whether the run opens a web address on a click. */
@@ -1313,11 +1339,11 @@ final class LostTalesChatVisualStyle {
 
     /**
      * Whether the run at {@code index} of {@code line} acts with the
-     * hovered one, which is on the same row: it is the hovered run, or
-     * it answers exactly as that run does — the runs of one reply quote
-     * share the message they lead to, the pieces of one link share its
-     * address — so all of it is underlined together. Nothing on
-     * another row ever acts with it.
+     * hovered one, which is on the same row: it is the hovered run, or a
+     * piece of the same element ({@link ChatInteractions#sameElement}) —
+     * a reply quote, a link, a spoiler, the brackets, icon and name of a
+     * share or an achievement — so the whole of it is underlined as
+     * one. Nothing on another row ever acts with it.
      */
     private static boolean sharesInteraction(IChatComponent part,
                                              IChatComponent line, int index,
@@ -1325,21 +1351,8 @@ final class LostTalesChatVisualStyle {
         if (part == null || hovered == null) {
             return false;
         }
-        if (LostTalesChatPresentation.isHoveredRun(line, index)) {
-            return true;
-        }
-        if (ChatReplyMarker.isMarker(part)) {
-            return ChatReplyMarker.isMarker(hovered);
-        }
-        if (ChatChannelLinkMarker.isMarker(part)) {
-            return ChatChannelLinkMarker.sameLink(part, hovered);
-        }
-        ClickEvent own = ChatInteractions.genuineClick(part);
-        ClickEvent theirs = ChatInteractions.genuineClick(hovered);
-        return own != null && theirs != null
-                && own.getAction() == theirs.getAction()
-                && own.getValue() != null
-                && own.getValue().equals(theirs.getValue());
+        return LostTalesChatPresentation.isHoveredRun(line, index)
+                || ChatInteractions.sameElement(part, hovered);
     }
 
     private static void drawShareIcon(ChatShowcaseMarker.Data share,
@@ -1354,6 +1367,12 @@ final class LostTalesChatVisualStyle {
             if (stack != null) {
                 ChatInlineIcons.drawItem(minecraft, stack, boxX, boxY, size,
                         alpha, shadowPass);
+            }
+            return;
+        }
+        if (share.kind == ChatShareKind.QUEST) {
+            if (ClientChatShowcaseStore.getQuest(share.showcaseId) != null) {
+                ChatIconSheet.QUEST.drawWithShadow(boxX, boxY, alpha);
             }
             return;
         }

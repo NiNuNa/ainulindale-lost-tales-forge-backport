@@ -18,7 +18,16 @@ public final class LostTalesPartyQuestCompatibilityAdapter implements PartyQuest
     }
 
     @Override
-    public void applySharedKillProgress(EntityPlayerMP participant, Entity victim) {
-        LostTalesQuestManager.handleEntityKilled(participant, victim);
+    public void applyKillProgress(EntityPlayerMP participant, Entity victim,
+            boolean shared) {
+        LostTalesQuestManager.handleEntityKilled(
+                participant, victim, shared);
+    }
+
+    @Override
+    public boolean applyTravelProgress(EntityPlayerMP participant,
+            Entity source, boolean shared) {
+        return LostTalesQuestManager.handleTravelProgress(
+                participant, source, shared);
     }
 }

@@ -424,14 +424,13 @@ public final class ChatLineWrapperTest {
     }
 
     /**
-     * A command echo opens its body behind nothing: no chevron, no
-     * words, so the command's own slash stands where the chevron stands
-     * and its continuations start at the body's edge. The slash and
-     * the command are the body's own text: a copy reads the command
-     * whole, and the separator adds nothing to it.
+     * A command echo opens its body behind the chevron in the sender's
+     * colour, as a message does, and every continuation of it is inset
+     * by the chevron. The command is the body's own text: a copy reads
+     * it as typed, and the chevron adds nothing to it.
      */
     @Test
-    public void labelledBodyBreaksOpenTheBodyBehindTheLabel() {
+    public void commandEchoesOpenTheBodyBehindTheChevron() {
         boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
         LostTalesConfig.showChatTimestamps = false;
         try {
@@ -444,7 +443,6 @@ public final class ChatLineWrapperTest {
                             "losttales:human_ranger_male_2"),
                     ChatTab.of(ChatChannel.ALL), new int[0], false,
                     ChatBodyKind.COMMAND);
-            String label = "";
             for (int state = 0; state < 2; state++) {
                 boolean chatOpen = state == 1;
                 List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
@@ -452,23 +450,26 @@ public final class ChatLineWrapperTest {
                 assertNotNull(lines);
                 assertTrue(lines.size() > 2);
                 assertEquals("Global: <  Arathorn> ", plain(lines.get(0)));
-                assertTrue(plain(lines.get(1)).startsWith("/losttales"));
+                assertTrue(plain(lines.get(1)).startsWith(
+                        ChatLineWrapper.BODY_SEPARATOR + "/losttales"));
                 assertEquals(-1, indentOf(lines.get(1), chatOpen));
+                int separator = METRICS.width(
+                        ChatLineWrapper.BODY_SEPARATOR);
                 for (int index = 2; index < lines.size(); index++) {
-                    assertEquals(0, indentOf(lines.get(index), chatOpen));
+                    assertEquals(separator,
+                            indentOf(lines.get(index), chatOpen));
                 }
-                // The slash and the command after it read back as the
-                // command typed; the bare separator adds nothing.
+                // The command reads back as typed; the chevron adds
+                // nothing.
                 assertEquals("Global: <  Arathorn> " + command,
                         joinedText(lines));
-                // The separator carries the sender's colour, as the
-                // chevron does.
+                // The chevron carries the sender's colour.
                 Integer color = null;
                 for (Object value : lines.get(1)) {
                     IChatComponent part = (IChatComponent)value;
                     if (ChatBodyMarker.isMarker(part)) {
                         color = ChatBodyMarker.decode(part);
-                        assertEquals(label,
+                        assertEquals(ChatLineWrapper.BODY_SEPARATOR,
                                 part.getUnformattedTextForChat());
                     }
                 }

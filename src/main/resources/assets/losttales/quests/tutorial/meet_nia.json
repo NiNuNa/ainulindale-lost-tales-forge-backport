@@ -1,8 +1,9 @@
 {
   "id": "losttales:tutorial/meet_nia",
   "title": "A Conversation with Nia",
-  "description": "Nia has a small task for travelers who stop to speak with her. This quest demonstrates the 1.7.10 interaction-start hook and a simple reward.",
+  "description": "Nia needs a few sturdy sticks for repairs and has provisions to spare for a traveler willing to help.",
   "repeatable": false,
+  "restartable": true,
   "startMode": "interaction",
   "interaction": {
     "entity": "Nia,losttalesnia,losttalesentitynia"

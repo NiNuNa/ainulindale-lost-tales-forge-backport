@@ -19,7 +19,7 @@ public final class LostTalesClientQuestProgressStoreTest {
     public void syncedDiscoveryAndPinUseLogicalLotrIdentity() {
         LostTalesClientQuestProgressStore.update(
                 Collections.emptyList(), Collections.emptySet(),
-                Collections.emptySet(), Collections.emptySet(),
+                Collections.emptySet(),
                 Arrays.asList(
                         "lotr:waypoint:HOBBITON",
                         "LOTR:WAYPOINT:hobbiton"),
@@ -42,7 +42,7 @@ public final class LostTalesClientQuestProgressStoreTest {
     public void customMarkerIdsRemainCaseSensitive() {
         LostTalesClientQuestProgressStore.update(
                 Collections.emptyList(), Collections.emptySet(),
-                Collections.emptySet(), Collections.emptySet(),
+                Collections.emptySet(),
                 Arrays.asList("losttales:Town", "losttales:town"),
                 "losttales:Town");
 

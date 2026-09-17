@@ -4,7 +4,7 @@ import com.ninuna.losttales.mapmarker.LostTalesMapMarkerIdentity;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
-import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
+import com.ninuna.losttales.quest.LostTalesQuestObjectiveSelection;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
@@ -13,6 +13,7 @@ import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import net.minecraft.client.Minecraft;
 /**
  * Client-side helper for deciding which quest/map markers should be emphasized.
  *
@@ -35,7 +36,7 @@ public final class LostTalesClientQuestMarkerHelper {
 
             String label = createQuestLabel(quest);
             addQuestDefinitionMarkers(labels, quest, label);
-            addCurrentStageObjectiveMarkers(labels, quest, progress, label);
+            addProgressibleObjectiveMarkers(labels, quest, progress, label);
         }
         return labels;
     }
@@ -45,20 +46,38 @@ public final class LostTalesClientQuestMarkerHelper {
         Set<ActiveCoordinateMarker> markers = new LinkedHashSet<ActiveCoordinateMarker>();
         for (LostTalesQuestProgress progress : LostTalesClientQuestProgressStore.getPinnedQuests()) {
             LostTalesQuestDefinition quest = LostTalesClientQuestDefinitionStore.getQuest(progress.getQuestId());
-            LostTalesQuestStageDefinition stage = getCurrentStage(quest, progress);
-            if (quest == null || stage == null) {
+            if (quest == null) {
                 continue;
             }
 
             String label = createQuestLabel(quest);
-            for (LostTalesQuestObjectiveDefinition objective : stage.getObjectives()) {
-                if (objective == null || !isGotoObjective(objective)) {
+            for (LostTalesQuestObjectiveDefinition objective
+                    : LostTalesQuestObjectiveSelection
+                    .getProgressibleObjectives(quest, progress)) {
+                if (objective == null || !isGotoObjective(objective)
+                        || LostTalesQuestObjectiveSelection
+                        .isComplete(progress, objective)) {
                     continue;
                 }
                 ActiveCoordinateMarker marker = coordinateMarkerFromObjective(quest, objective, label);
                 if (marker != null) {
                     markers.add(marker);
                 }
+            }
+        }
+        for (ClientQuestEntry quest
+                : ClientQuestCatalog.getEntries(Minecraft.getMinecraft())) {
+            if (quest.getSource() != ClientQuestEntry.Source.LOTR
+                    || !quest.isActive() || !quest.isTracked()) {
+                continue;
+            }
+            int index = 0;
+            for (ClientQuestEntry.Target target : quest.getTargets()) {
+                markers.add(new ActiveCoordinateMarker(
+                        quest.getReference() + ":" + index,
+                        quest.getTitle(), target.getDimensionId(),
+                        target.getX(), target.getY(), target.getZ()));
+                index++;
             }
         }
         return markers;
@@ -88,13 +107,14 @@ public final class LostTalesClientQuestMarkerHelper {
         }
     }
 
-    private static void addCurrentStageObjectiveMarkers(Map<String, String> labels, LostTalesQuestDefinition quest, LostTalesQuestProgress progress, String label) {
-        LostTalesQuestStageDefinition stage = getCurrentStage(quest, progress);
-        if (stage == null) {
-            return;
-        }
-        for (LostTalesQuestObjectiveDefinition objective : stage.getObjectives()) {
-            if (objective == null) {
+    private static void addProgressibleObjectiveMarkers(
+            Map<String, String> labels, LostTalesQuestDefinition quest,
+            LostTalesQuestProgress progress, String label) {
+        for (LostTalesQuestObjectiveDefinition objective
+                : LostTalesQuestObjectiveSelection
+                .getProgressibleObjectives(quest, progress)) {
+            if (objective == null || LostTalesQuestObjectiveSelection
+                    .isComplete(progress, objective)) {
                 continue;
             }
             String markerId = firstParam(objective, "marker", "mapMarker", "map_marker", "targetMarker", "target_marker");
@@ -124,25 +144,6 @@ public final class LostTalesClientQuestMarkerHelper {
                 normalized,
                 LostTalesMapMarkerIdentity.Authority.QUEST_PLAYER)
                 .getCanonicalKey();
-    }
-
-    private static LostTalesQuestStageDefinition getCurrentStage(LostTalesQuestDefinition quest, LostTalesQuestProgress progress) {
-        if (quest == null || progress == null || quest.getStages().isEmpty()) {
-            return null;
-        }
-        String stageId = progress.getStageId();
-        if (stageId != null && stageId.length() > 0) {
-            for (LostTalesQuestStageDefinition stage : quest.getStages()) {
-                if (stageId.equals(stage.getId())) {
-                    return stage;
-                }
-            }
-        }
-        int index = progress.getStageIndex();
-        if (index >= 0 && index < quest.getStages().size()) {
-            return quest.getStages().get(index);
-        }
-        return quest.getFirstStage();
     }
 
     private static ActiveCoordinateMarker coordinateMarkerFromObjective(LostTalesQuestDefinition quest, LostTalesQuestObjectiveDefinition objective, String label) {

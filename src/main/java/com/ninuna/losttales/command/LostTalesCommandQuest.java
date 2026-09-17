@@ -196,6 +196,8 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
             send(sender, EnumChatFormatting.YELLOW + player.getCommandSenderName() + " already has this quest active.");
         } else if (result == LostTalesQuestManager.StartResult.ALREADY_COMPLETED) {
             send(sender, EnumChatFormatting.YELLOW + player.getCommandSenderName() + " has already completed this one-time quest.");
+        } else if (result == LostTalesQuestManager.StartResult.RESTART_NOT_ALLOWED) {
+            send(sender, EnumChatFormatting.YELLOW + "This quest definition does not allow restarting after failure or abandonment.");
         } else if (result == LostTalesQuestManager.StartResult.START_NOT_ALLOWED) {
             send(sender, EnumChatFormatting.RED + "This quest cannot be started from that source.");
         } else if (result == LostTalesQuestManager.StartResult.REQUIREMENTS_NOT_MET) {
@@ -354,12 +356,12 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
         send(sender, EnumChatFormatting.GRAY + getCommandUsage(sender));
         send(sender, EnumChatFormatting.GRAY + "Examples:");
         send(sender, EnumChatFormatting.GRAY + commandPrefix() + " defs");
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " start losttales:test_quest");
+        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " start losttales:tutorial/starter_note");
         send(sender, EnumChatFormatting.GRAY + commandPrefix() + " list <player>");
         send(sender, EnumChatFormatting.GRAY + commandPrefix() + " scan <player>");
         send(sender, EnumChatFormatting.GRAY + commandPrefix() + " starter losttales:tutorial/starter_note");
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " abandon losttales:test_quest");
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " pin losttales:test_quest");
+        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " abandon losttales:tutorial/starter_note");
+        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " pin losttales:tutorial/starter_note");
         send(sender, EnumChatFormatting.GRAY + commandPrefix() + " revealmarkers losttales:tutorial/meet_nia");
         send(sender, EnumChatFormatting.GRAY + commandPrefix() + " trackmarker losttales:quest_giver_nia");
     }

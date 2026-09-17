@@ -29,6 +29,7 @@ public final class LostTalesQuestDefinitionNbt {
     private static final String KEY_TITLE = "Title";
     private static final String KEY_DESCRIPTION = "Description";
     private static final String KEY_REPEATABLE = "Repeatable";
+    private static final String KEY_RESTARTABLE = "Restartable";
     private static final String KEY_START_MODE = "StartMode";
     private static final String KEY_PREREQUISITES = "Prerequisites";
     private static final String KEY_REWARDS = "Rewards";
@@ -58,6 +59,7 @@ public final class LostTalesQuestDefinitionNbt {
         tag.setString(KEY_TITLE, safe(quest.getTitle()));
         tag.setString(KEY_DESCRIPTION, safe(quest.getDescription()));
         tag.setBoolean(KEY_REPEATABLE, quest.isRepeatable());
+        tag.setBoolean(KEY_RESTARTABLE, quest.isRestartable());
         tag.setString(KEY_START_MODE, safe(quest.getStartMode()));
         tag.setTag(KEY_PREREQUISITES, writeStringMap(quest.getPrerequisites()));
         tag.setTag(KEY_REWARDS, writeStringMap(quest.getRewards()));
@@ -134,6 +136,7 @@ public final class LostTalesQuestDefinitionNbt {
                 tag.getString(KEY_TITLE),
                 tag.getString(KEY_DESCRIPTION),
                 tag.getBoolean(KEY_REPEATABLE),
+                tag.getBoolean(KEY_RESTARTABLE),
                 tag.getString(KEY_START_MODE),
                 readStringMap(tag.getTagList(KEY_PREREQUISITES, Constants.NBT.TAG_COMPOUND)),
                 readStringMap(tag.getTagList(KEY_REWARDS, Constants.NBT.TAG_COMPOUND)),

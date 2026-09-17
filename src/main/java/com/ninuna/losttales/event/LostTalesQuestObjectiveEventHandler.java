@@ -110,6 +110,8 @@ public final class LostTalesQuestObjectiveEventHandler {
             return;
         }
 
+        PartyQuestProgressCoordinator.getInstance()
+                .handleAuthoritativeTravel((EntityPlayerMP) event.player);
         LostTalesQuestManager.handlePlayerTick((EntityPlayerMP) event.player);
     }
 

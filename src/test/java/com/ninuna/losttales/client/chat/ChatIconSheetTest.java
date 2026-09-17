@@ -198,6 +198,28 @@ public final class ChatIconSheetTest {
         // centred on the control from either side.
         assertSameSize(ChatIconSheet.TOGGLE_1, ChatIconSheet.TOGGLE_5);
         assertSameSize(ChatIconSheet.TOGGLE_2, ChatIconSheet.TOGGLE_4);
+        // The vertical chevron's three colourways are one run, frame by
+        // frame, and its end frames mirror each other too.
+        ChatIconSheet[][] chevrons = {
+                {ChatIconSheet.CHEVRON_1, ChatIconSheet.CHEVRON_1_HOVER,
+                        ChatIconSheet.CHEVRON_1_MUTED},
+                {ChatIconSheet.CHEVRON_2, ChatIconSheet.CHEVRON_2_HOVER,
+                        ChatIconSheet.CHEVRON_2_MUTED},
+                {ChatIconSheet.CHEVRON_3, ChatIconSheet.CHEVRON_3_HOVER,
+                        ChatIconSheet.CHEVRON_3_MUTED},
+                {ChatIconSheet.CHEVRON_4, ChatIconSheet.CHEVRON_4_HOVER,
+                        ChatIconSheet.CHEVRON_4_MUTED},
+                {ChatIconSheet.CHEVRON_5, ChatIconSheet.CHEVRON_5_HOVER,
+                        ChatIconSheet.CHEVRON_5_MUTED}};
+        for (ChatIconSheet[] frame : chevrons) {
+            assertSameSize(frame[0], frame[1]);
+            assertSameSize(frame[0], frame[2]);
+        }
+        assertSameSize(ChatIconSheet.CHEVRON_1, ChatIconSheet.CHEVRON_5);
+        assertSameSize(ChatIconSheet.CHEVRON_2, ChatIconSheet.CHEVRON_4);
+        assertSameSize(ChatIconSheet.SEARCH, ChatIconSheet.SEARCH_HOVER);
+        assertSameSize(ChatIconSheet.SPEECH_BUBBLE,
+                ChatIconSheet.SPEECH_BUBBLE_HOVER);
         assertSameSize(ChatIconSheet.SEND, ChatIconSheet.SEND_HOVER);
         assertSameSize(ChatIconSheet.FULLSCREEN,
                 ChatIconSheet.FULLSCREEN_HOVER);

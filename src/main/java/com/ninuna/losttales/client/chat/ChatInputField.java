@@ -42,14 +42,18 @@ import net.minecraft.util.EnumChatFormatting;
  *
  * <p>The chat's markup is previewed as it is typed: the text between a
  * pair of marks wears the marks' style — bold, italic, underlined,
- * struck — code and spoiler text a subdued colour, and the marker
- * characters themselves stay on the bar, dimmed, at their own width, so
- * nothing the caret can stand on is hidden from it. The same scan that
- * lays out the sent line ({@link ChatMarkdown#layout}) decides which
- * characters are marks, so the preview and the line agree. A bold
- * glyph is a pixel wider than its plain self, and the display model
- * below measures it so, which keeps the caret, the selection and the
- * scroll on the glyphs actually drawn.</p>
+ * struck — code is the chat's inline code, spoiler text a subdued
+ * colour, and the marker characters themselves stay on the bar, dimmed,
+ * at their own width, so nothing the caret can stand on is hidden from
+ * it. The same scan that lays out the sent line
+ * ({@link ChatMarkdown#layout}) decides which characters are marks, so
+ * the preview and the line agree. A command is inline code as it is
+ * typed, whole, as the chat shows a command everywhere; only the words
+ * a whisper verb sends are previewed, as the whisper they become
+ * ({@link ChatInputStyles#layout}). A bold glyph is a pixel wider than
+ * its plain self, and the display model below measures it so, which
+ * keeps the caret, the selection and the scroll on the glyphs actually
+ * drawn.</p>
  *
  * <p>A share token whose item or marker the client can already resolve
  * — {@code [i:Stone Sword]}, {@code [m:Northgate]} — is shown as the
@@ -90,7 +94,7 @@ final class ChatInputField extends GuiTextField {
     private List<TokenPreview> previews = Collections.emptyList();
     /** The raw text the styles below were laid out for. */
     private String styledText;
-    /** Every character's markup style, or null for text without markup. */
+    /** Every character's style, or null for text with nothing to style. */
     private int[] styles;
     /** Whether what is typed is shown as it is, as a search field's is. */
     private boolean plainText;
@@ -176,14 +180,12 @@ final class ChatInputField extends GuiTextField {
                 && caretInside;
         int left = this.xPosition;
         int top = this.yPosition;
-        int cursorX = left;
         // The whole visible run is coloured at once, so a mention split
         // by the caret keeps one colour across the break.
         int[] colors = colorsOf(visible);
-        if (visible.length() > 0) {
-            int headEnd = caretInside ? caret : visible.length();
-            cursorX = drawRuns(visible, colors, 0, headEnd, left, top);
-        }
+        int headEnd = caretInside ? caret : visible.length();
+        int cursorX = left + this.font.getStringWidth(
+                visible.substring(0, headEnd));
         // The caret stands on the boundary between the two runs; the
         // runs themselves are never shifted for it, so the text stays
         // still as the caret walks through it.
@@ -191,11 +193,17 @@ final class ChatInputField extends GuiTextField {
         if (!caretInside) {
             caretX = caret > 0 ? left + getWidth() : left;
         }
+        if (caretVisible) {
+            drawCaretShadow(caretX, top);
+        }
+        if (visible.length() > 0) {
+            drawRuns(visible, colors, 0, headEnd, left, top);
+        }
         if (visible.length() > 0 && caretInside && caret < visible.length()) {
             drawRuns(visible, colors, caret, visible.length(), cursorX, top);
         }
         if (caretVisible) {
-            drawCaret(caretX, top);
+            drawCaretBar(caretX, top);
         }
         if (selection != caret && caretInside) {
             int selectionX = left + this.font.getStringWidth(
@@ -241,16 +249,42 @@ final class ChatInputField extends GuiTextField {
     static final int CARET_WIDTH = 1;
 
     /**
+     * The caret over the chat's one shadow, where no glyph stands after
+     * it: at the end of what is typed, or in an empty field. A caret
+     * inside the text lays its shadow before the text and its bar after
+     * it instead ({@link #drawCaretShadow}, {@link #drawCaretBar}).
+     */
+    static void drawCaret(int x, int textTop) {
+        drawCaretShadow(x, textTop);
+        drawCaretBar(x, textTop);
+    }
+
+    /**
      * The caret: a one-pixel ivory bar as tall as the field's content
      * box, a clear row short of the well at both ends, wherever it
      * stands. After the last character vanilla draws an underscore
      * instead, which hangs past the field's end and out of the well;
      * the bar keeps to the field.
      */
-    static void drawCaret(int x, int textTop) {
+    private static void drawCaretBar(int x, int textTop) {
         int top = caretTop(textTop);
         Gui.drawRect(x, top, x + CARET_WIDTH, top + CONTENT_HEIGHT,
                 LostTalesChatVisualStyle.argb(CARET_RGB, 0xFF));
+    }
+
+    /**
+     * The caret's shadow, as every word beside it casts one: the bar a
+     * pixel down and right in the shadow tone at the shadow's share of
+     * the bar's opacity. It lands on the column of the glyph the caret
+     * stands before, so it goes down before the text, which draws over
+     * it, and its last row is the message row's last, inside the well.
+     */
+    private static void drawCaretShadow(int x, int textTop) {
+        int top = caretTop(textTop) + LostTalesChatVisualStyle.SHADOW_OFFSET;
+        int left = x + LostTalesChatVisualStyle.SHADOW_OFFSET;
+        Gui.drawRect(left, top, left + CARET_WIDTH, top + CONTENT_HEIGHT,
+                LostTalesChatVisualStyle.argb(LostTalesChatVisualStyle.SHADOW,
+                        LostTalesChatVisualStyle.shadowAlpha(0xFF)));
     }
 
     /**
@@ -413,8 +447,9 @@ final class ChatInputField extends GuiTextField {
     }
 
     /**
-     * The previews not inside a code span: quoted text is shown as
-     * typed in the sent line, so a token inside it is literal here too.
+     * The previews not inside code: quoted text and a command are shown
+     * as typed in the sent line, so a token inside either is literal
+     * here too.
      */
     private static List<TokenPreview> outsideCode(List<TokenPreview> previews,
                                                   int[] styles) {
@@ -588,6 +623,15 @@ final class ChatInputField extends GuiTextField {
                 scrollOffset, getWidth());
         int left = this.xPosition;
         int top = this.yPosition;
+        int caret = getCursorPosition();
+        boolean caretInside = caret >= scrollOffset && caret <= visibleEnd;
+        boolean caretVisible = isFocused() && blink / 6 % 2 == 0
+                && caretInside;
+        int caretX = left + displayedX(text, resolved, scrollOffset,
+                Math.max(scrollOffset, Math.min(caret, visibleEnd)));
+        if (caretVisible) {
+            drawCaretShadow(caretX, top);
+        }
         int[] colors = colorsOf(text.substring(scrollOffset, visibleEnd));
         int x = left;
         int cursor = scrollOffset;
@@ -606,14 +650,8 @@ final class ChatInputField extends GuiTextField {
         drawPlainRuns(text, colors, scrollOffset, cursor, visibleEnd,
                 x, top);
 
-        int caret = getCursorPosition();
-        boolean caretInside = caret >= scrollOffset && caret <= visibleEnd;
-        boolean caretVisible = isFocused() && blink / 6 % 2 == 0
-                && caretInside;
-        int caretX = left + displayedX(text, resolved, scrollOffset,
-                Math.max(scrollOffset, Math.min(caret, visibleEnd)));
         if (caretVisible) {
-            drawCaret(caretX, top);
+            drawCaretBar(caretX, top);
         }
         int selection = getSelectionEnd();
         if (selection != caret && caretInside) {
@@ -658,8 +696,9 @@ final class ChatInputField extends GuiTextField {
     }
 
     /**
-     * The markup styles of the raw text, laid out only when it changes;
-     * null for text carrying no markup at all, the common case.
+     * The styles of the raw text as the field shows them
+     * ({@link ChatInputStyles#layout}), laid out only when it changes;
+     * null for text with nothing to style, the common case.
      */
     private int[] stylesFor(String text) {
         if (this.plainText) {
@@ -669,8 +708,7 @@ final class ChatInputField extends GuiTextField {
             return this.styles;
         }
         this.styledText = text;
-        this.styles = ChatMarkdown.hasMarkup(text)
-                ? ChatMarkdown.layout(text) : null;
+        this.styles = ChatInputStyles.layout(text);
         return this.styles;
     }
 

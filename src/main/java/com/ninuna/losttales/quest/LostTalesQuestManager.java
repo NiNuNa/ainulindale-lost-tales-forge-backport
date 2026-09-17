@@ -1,5 +1,7 @@
 package com.ninuna.losttales.quest;
 
+import com.ninuna.losttales.compat.lotr.LotrQuestReference;
+import com.ninuna.losttales.compat.lotr.LotrQuestTrackingAdapter;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerCatalog;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
@@ -16,6 +18,7 @@ import com.ninuna.losttales.util.LostTalesDimensionHelper;
 import com.ninuna.losttales.world.map.waypoint.LostTalesMapMarkerWaypointUnlockHelper;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -90,6 +93,14 @@ public final class LostTalesQuestManager {
             sendQuestChat(player, EnumChatFormatting.YELLOW + "Quest already completed: " + EnumChatFormatting.WHITE + quest.getTitle());
             return StartResult.ALREADY_COMPLETED;
         }
+        if (data.getQuestHistoryEntry(questId) != null
+                && !data.getQuestHistoryEntry(questId).isCompleted()
+                && !quest.isRestartable()) {
+            sendQuestChat(player, EnumChatFormatting.YELLOW
+                    + "This quest cannot be restarted: "
+                    + EnumChatFormatting.WHITE + quest.getTitle());
+            return StartResult.RESTART_NOT_ALLOWED;
+        }
         if (!canStartFromSource(quest, source)) {
             sendQuestChat(player, EnumChatFormatting.RED + "This quest cannot be started from here.");
             return StartResult.START_NOT_ALLOWED;
@@ -112,15 +123,11 @@ public final class LostTalesQuestManager {
         if (LostTalesConfig.autoRevealQuestMarkersOnStart) {
             revealQuestMarkers(player, quest, false);
         }
-        sendQuestChat(player, EnumChatFormatting.GOLD + "Quest started: " + EnumChatFormatting.YELLOW + quest.getTitle());
-        if (timeLimitTicks > 0L) {
-            sendQuestChat(player, EnumChatFormatting.RED + "Time limit: " + formatTicks(timeLimitTicks) + ".");
-        }
         playQuestSound(player, "random.orb", 0.35F, 1.0F);
 
         if (player instanceof EntityPlayerMP) {
             EntityPlayerMP serverPlayer = (EntityPlayerMP) player;
-            if (scanCurrentStageGatherObjectives(serverPlayer, quest)) {
+            if (scanProgressibleGatherObjectives(serverPlayer, quest)) {
                 evaluateStageProgress(serverPlayer, questId);
             } else if (quest.getStages().isEmpty() || firstStage == null || firstStage.getObjectives().isEmpty()) {
                 evaluateStageProgress(serverPlayer, questId);
@@ -159,11 +166,16 @@ public final class LostTalesQuestManager {
             return false;
         }
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
-        boolean changed = data != null && data.completeQuest(questId);
+        LostTalesQuestProgress progress = data == null ? null
+                : data.getActiveQuest(questId);
+        long worldTime = player == null || player.worldObj == null ? 0L
+                : player.worldObj.getTotalWorldTime();
+        boolean changed = data != null && data.completeQuest(questId,
+                buildCompletionOutcome(quest, progress), worldTime,
+                getCompletedOptionalObjectiveIds(quest, progress));
         if (changed) {
             revealQuestMarkers(player, quest, false);
-            grantQuestRewards(player, quest);
-            sendQuestChat(player, EnumChatFormatting.GREEN + "Quest completed: " + EnumChatFormatting.YELLOW + quest.getTitle());
+            grantQuestRewards(player, quest, progress);
             playQuestSound(player, "random.levelup", 0.45F, 1.0F);
             syncToClient(player);
         }
@@ -182,9 +194,11 @@ public final class LostTalesQuestManager {
 
     public static boolean abandonQuest(EntityPlayer player, String questId) {
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
-        boolean changed = data != null && data.abandonQuest(questId);
+        long worldTime = player == null || player.worldObj == null ? 0L
+                : player.worldObj.getTotalWorldTime();
+        boolean changed = data != null && data.abandonQuest(questId,
+                "Abandoned by the player.", worldTime);
         if (changed) {
-            sendQuestChat(player, EnumChatFormatting.YELLOW + "Quest abandoned: " + questTitle(questId));
             syncToClient(player);
         }
         return changed;
@@ -196,7 +210,9 @@ public final class LostTalesQuestManager {
         if (data == null) {
             return false;
         }
-        boolean changed = data.setPinnedQuestId(questId);
+        boolean changed = LotrQuestReference.isLotrQuest(questId)
+                ? LotrQuestTrackingAdapter.pin(player, questId, data)
+                : data.setPinnedQuestId(questId);
         if (changed) {
             sendQuestChat(player, EnumChatFormatting.AQUA + "Tracking quest: " + questTitle(questId));
             syncToClient(player);
@@ -211,6 +227,7 @@ public final class LostTalesQuestManager {
         }
         boolean changed = data.clearPinnedQuestId();
         if (changed) {
+            LotrQuestTrackingAdapter.clearNativeTracking(player);
             sendQuestChat(player, EnumChatFormatting.AQUA + "Stopped tracking all quests.");
             syncToClient(player);
         }
@@ -222,7 +239,9 @@ public final class LostTalesQuestManager {
         if (data == null || questId == null || questId.length() == 0) {
             return false;
         }
-        boolean changed = data.unpinQuestId(questId);
+        boolean changed = LotrQuestReference.isLotrQuest(questId)
+                ? LotrQuestTrackingAdapter.unpin(player, questId, data)
+                : data.unpinQuestId(questId);
         if (changed) {
             sendQuestChat(player, EnumChatFormatting.AQUA + "Stopped tracking quest: " + questTitle(questId));
             syncToClient(player);
@@ -432,7 +451,7 @@ public final class LostTalesQuestManager {
         for (LostTalesQuestProgress progress : getActiveQuests(player)) {
             LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(progress.getQuestId());
             if (quest != null) {
-                boolean questChanged = scanCurrentStageGatherObjectives(player, quest);
+                boolean questChanged = scanProgressibleGatherObjectives(player, quest);
                 if (questChanged) {
                     evaluateStageProgress(player, quest.getId());
                     changed = true;
@@ -457,6 +476,11 @@ public final class LostTalesQuestManager {
     }
 
     public static void handleEntityKilled(EntityPlayerMP player, Entity victim) {
+        handleEntityKilled(player, victim, false);
+    }
+
+    public static void handleEntityKilled(EntityPlayerMP player, Entity victim,
+            boolean shared) {
         if (player == null || victim == null || player.worldObj == null || player.worldObj.isRemote) {
             return;
         }
@@ -464,13 +488,17 @@ public final class LostTalesQuestManager {
         boolean changed = false;
         for (LostTalesQuestProgress progress : getActiveQuests(player)) {
             LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(progress.getQuestId());
-            LostTalesQuestStageDefinition stage = getCurrentStage(quest, progress);
-            if (quest == null || stage == null) {
+            if (quest == null) {
                 continue;
             }
 
-            for (LostTalesQuestObjectiveDefinition objective : stage.getObjectives()) {
+            for (LostTalesQuestObjectiveDefinition objective
+                    : LostTalesQuestObjectiveSelection
+                    .getProgressibleObjectives(quest, progress)) {
                 if (!"kill".equalsIgnoreCase(objective.getType())) {
+                    continue;
+                }
+                if (shared && !allowsPartySharing(objective)) {
                     continue;
                 }
                 if (!LostTalesQuestObjectiveMatcher.matchesEntity(victim, objective)) {
@@ -496,12 +524,13 @@ public final class LostTalesQuestManager {
         int amount = Math.max(1, pickedUp.stackSize);
         for (LostTalesQuestProgress progress : getActiveQuests(player)) {
             LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(progress.getQuestId());
-            LostTalesQuestStageDefinition stage = getCurrentStage(quest, progress);
-            if (quest == null || stage == null) {
+            if (quest == null) {
                 continue;
             }
 
-            for (LostTalesQuestObjectiveDefinition objective : stage.getObjectives()) {
+            for (LostTalesQuestObjectiveDefinition objective
+                    : LostTalesQuestObjectiveSelection
+                    .getProgressibleObjectives(quest, progress)) {
                 if (!isGatherObjective(objective)) {
                     continue;
                 }
@@ -525,12 +554,13 @@ public final class LostTalesQuestManager {
         int amount = Math.max(1, crafted.stackSize);
         for (LostTalesQuestProgress progress : getActiveQuests(player)) {
             LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(progress.getQuestId());
-            LostTalesQuestStageDefinition stage = getCurrentStage(quest, progress);
-            if (quest == null || stage == null) {
+            if (quest == null) {
                 continue;
             }
 
-            for (LostTalesQuestObjectiveDefinition objective : stage.getObjectives()) {
+            for (LostTalesQuestObjectiveDefinition objective
+                    : LostTalesQuestObjectiveSelection
+                    .getProgressibleObjectives(quest, progress)) {
                 if (!"craft".equalsIgnoreCase(objective.getType())) {
                     continue;
                 }
@@ -555,25 +585,43 @@ public final class LostTalesQuestManager {
             changed |= discoverNearbyMapMarkers(player, false);
         }
         changed |= ensureLotrWaypointsForDiscoveredMapMarkers(player);
+        if (changed) {
+            syncToClient(player);
+        }
+    }
+
+    public static boolean handleTravelProgress(EntityPlayerMP player,
+            Entity source, boolean shared) {
+        if (player == null || source == null || player.worldObj == null
+                || player.worldObj.isRemote || source.worldObj == null
+                || source.worldObj.provider.dimensionId
+                != player.worldObj.provider.dimensionId) {
+            return false;
+        }
+        boolean changed = false;
         for (LostTalesQuestProgress progress : getActiveQuests(player)) {
-            LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(progress.getQuestId());
-            LostTalesQuestStageDefinition stage = getCurrentStage(quest, progress);
-            if (quest == null || stage == null) {
+            LostTalesQuestDefinition quest =
+                    LostTalesQuestRegistry.getQuest(progress.getQuestId());
+            if (quest == null) {
                 continue;
             }
-
-            for (LostTalesQuestObjectiveDefinition objective : stage.getObjectives()) {
-                if (!isGotoObjective(objective)) {
+            for (LostTalesQuestObjectiveDefinition objective
+                    : LostTalesQuestObjectiveSelection
+                    .getProgressibleObjectives(quest, progress)) {
+                if (!isGotoObjective(objective)
+                        || shared && !allowsPartySharing(objective)) {
                     continue;
                 }
-                if (isAtObjectiveLocation(player, objective)) {
-                    changed |= setObjectiveProgressAndEvaluate(player, quest, objective, 1);
+                if (isAtObjectiveLocation(player, source, objective)) {
+                    changed |= setObjectiveProgressAndEvaluate(
+                            player, quest, objective, 1);
                 }
             }
         }
         if (changed) {
             syncToClient(player);
         }
+        return changed;
     }
 
     public static boolean failExpiredQuests(EntityPlayerMP player) {
@@ -592,9 +640,8 @@ public final class LostTalesQuestManager {
                 continue;
             }
             String questId = progress.getQuestId();
-            if (data.failQuest(questId)) {
+            if (data.failQuest(questId, "Time limit expired.", worldTime)) {
                 changed = true;
-                sendQuestChat(player, EnumChatFormatting.RED + "Quest failed: " + questTitle(questId));
                 playQuestSound(player, "random.break", 0.3F, 0.8F);
             }
         }
@@ -616,7 +663,7 @@ public final class LostTalesQuestManager {
         for (LostTalesQuestProgress progress : getActiveQuests(player)) {
             LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(progress.getQuestId());
             if (quest != null) {
-                changed |= scanCurrentStageGatherObjectives(player, quest);
+                changed |= scanProgressibleGatherObjectives(player, quest);
             }
         }
         changed |= discoverNearbyMapMarkers(player, false);
@@ -731,7 +778,6 @@ public final class LostTalesQuestManager {
         boolean changed = now != before;
         if (changed) {
             if (before < target && now >= target) {
-                sendQuestChat(player, EnumChatFormatting.GREEN + "Objective complete: " + EnumChatFormatting.WHITE + objectiveDescription(objective));
                 playQuestSound(player, "random.orb", 0.35F, 1.25F);
             }
             evaluateStageProgress(player, quest.getId());
@@ -754,7 +800,6 @@ public final class LostTalesQuestManager {
 
         data.setObjectiveProgress(quest.getId(), objective.getId(), clamped);
         if (before < target && clamped >= target) {
-            sendQuestChat(player, EnumChatFormatting.GREEN + "Objective complete: " + EnumChatFormatting.WHITE + objectiveDescription(objective));
             playQuestSound(player, "random.orb", 0.35F, 1.25F);
         }
         evaluateStageProgress(player, quest.getId());
@@ -765,7 +810,8 @@ public final class LostTalesQuestManager {
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
         LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(questId);
         LostTalesQuestProgress progress = data == null ? null : data.getActiveQuest(questId);
-        LostTalesQuestStageDefinition stage = getCurrentStage(quest, progress);
+        LostTalesQuestStageDefinition stage = LostTalesQuestObjectiveSelection
+                .getCurrentStage(quest, progress);
         if (data == null || quest == null || progress == null || stage == null) {
             return false;
         }
@@ -782,26 +828,31 @@ public final class LostTalesQuestManager {
         }
 
         List<LostTalesQuestStageDefinition> stages = quest.getStages();
-        int stageIndex = getStageIndex(quest, progress);
+        int stageIndex = LostTalesQuestObjectiveSelection
+                .getCurrentStageIndex(quest, progress);
         int nextStageIndex = stageIndex + 1;
         if (nextStageIndex >= 0 && nextStageIndex < stages.size()) {
             LostTalesQuestStageDefinition nextStage = stages.get(nextStageIndex);
             boolean changed = data.setQuestStage(questId, nextStageIndex, nextStage.getId());
             if (changed) {
-                sendQuestChat(player, EnumChatFormatting.AQUA + "Quest advanced: " + EnumChatFormatting.YELLOW + quest.getTitle());
                 playQuestSound(player, "random.orb", 0.35F, 1.05F);
-                if (scanCurrentStageGatherObjectives(player, quest)) {
+                if (scanProgressibleGatherObjectives(player, quest)) {
                     evaluateStageProgress(player, questId);
                 }
             }
             return changed;
         }
 
-        boolean completed = data.completeQuest(questId);
+        LostTalesQuestProgress completedProgress = progress.copy();
+        long worldTime = player.worldObj == null ? 0L
+                : player.worldObj.getTotalWorldTime();
+        boolean completed = data.completeQuest(questId,
+                buildCompletionOutcome(quest, completedProgress), worldTime,
+                getCompletedOptionalObjectiveIds(quest,
+                        completedProgress));
         if (completed) {
             revealQuestMarkers(player, quest, false);
-            grantQuestRewards(player, quest);
-            sendQuestChat(player, EnumChatFormatting.GREEN + "Quest completed: " + EnumChatFormatting.YELLOW + quest.getTitle());
+            grantQuestRewards(player, quest, completedProgress);
             playQuestSound(player, "random.levelup", 0.45F, 1.0F);
         }
         return completed;
@@ -890,23 +941,82 @@ public final class LostTalesQuestManager {
         if (source == LostTalesQuestStartSource.COMMAND) {
             return true;
         }
-        if (source == LostTalesQuestStartSource.JOURNAL) {
-            return LostTalesConfig.allowQuestJournalStarts && quest.canStartFromJournal();
-        }
         if (source == LostTalesQuestStartSource.ITEM) {
             return LostTalesConfig.allowQuestItemStarts && quest.canStartFromItem();
         }
         if (source == LostTalesQuestStartSource.INTERACTION) {
             return LostTalesConfig.allowQuestInteractionStarts && quest.canStartFromInteraction();
         }
+        if (source == LostTalesQuestStartSource.SHARED) {
+            return true;
+        }
         return false;
     }
 
-    private static void grantQuestRewards(EntityPlayer player, LostTalesQuestDefinition quest) {
-        if (!LostTalesConfig.enableQuestRewards || !(player instanceof EntityPlayerMP) || quest == null || quest.getRewards().isEmpty()) {
+    private static void grantQuestRewards(EntityPlayer player,
+            LostTalesQuestDefinition quest,
+            LostTalesQuestProgress progress) {
+        if (!LostTalesConfig.enableQuestRewards
+                || !(player instanceof EntityPlayerMP) || quest == null) {
             return;
         }
-        LostTalesQuestRewardHelper.grantRewards((EntityPlayerMP) player, quest);
+        LostTalesQuestRewardHelper.grantRewards(
+                (EntityPlayerMP) player, quest, progress);
+    }
+
+    private static String buildCompletionOutcome(
+            LostTalesQuestDefinition quest,
+            LostTalesQuestProgress progress) {
+        if (quest == null || progress == null) {
+            return "";
+        }
+        StringBuilder outcome = new StringBuilder();
+        for (LostTalesQuestStageDefinition stage : quest.getStages()) {
+            for (LostTalesQuestObjectiveDefinition objective
+                    : stage.getObjectives()) {
+                if (!objective.isOptional()
+                        || progress.getObjectiveProgress(objective.getId())
+                        < getObjectiveTargetCount(objective)) {
+                    continue;
+                }
+                String detail = firstNonEmpty(
+                        objective.getParam("outcome", ""),
+                        objective.getParam("outcomeText", ""),
+                        objective.getParam("outcome_text", ""));
+                if (detail.length() == 0) {
+                    String description = objective.getDescription();
+                    detail = "Optional objective completed: "
+                            + (description == null
+                            || description.length() == 0
+                            ? objective.getId() : description);
+                }
+                if (outcome.length() > 0) {
+                    outcome.append(" ");
+                }
+                outcome.append(detail);
+            }
+        }
+        return outcome.toString();
+    }
+
+    private static Set<String> getCompletedOptionalObjectiveIds(
+            LostTalesQuestDefinition quest,
+            LostTalesQuestProgress progress) {
+        LinkedHashSet<String> completed = new LinkedHashSet<String>();
+        if (quest == null || progress == null) {
+            return completed;
+        }
+        for (LostTalesQuestStageDefinition stage : quest.getStages()) {
+            for (LostTalesQuestObjectiveDefinition objective
+                    : stage.getObjectives()) {
+                if (objective.isOptional()
+                        && progress.getObjectiveProgress(objective.getId())
+                        >= getObjectiveTargetCount(objective)) {
+                    completed.add(objective.getId());
+                }
+            }
+        }
+        return completed;
     }
 
     public static void syncToClient(EntityPlayer player) {
@@ -920,19 +1030,21 @@ public final class LostTalesQuestManager {
             return;
         }
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        LotrQuestTrackingAdapter.prune(player, data);
         LostTalesNetworkHandler.CHANNEL.sendTo(LostTalesQuestSyncPacket.fromPlayerData(data), player);
     }
 
-    private static boolean scanCurrentStageGatherObjectives(EntityPlayerMP player, LostTalesQuestDefinition quest) {
+    private static boolean scanProgressibleGatherObjectives(EntityPlayerMP player, LostTalesQuestDefinition quest) {
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
         LostTalesQuestProgress progress = data == null || quest == null ? null : data.getActiveQuest(quest.getId());
-        LostTalesQuestStageDefinition stage = getCurrentStage(quest, progress);
-        if (data == null || progress == null || stage == null) {
+        if (data == null || progress == null) {
             return false;
         }
 
         boolean changed = false;
-        for (LostTalesQuestObjectiveDefinition objective : stage.getObjectives()) {
+        for (LostTalesQuestObjectiveDefinition objective
+                : LostTalesQuestObjectiveSelection
+                .getProgressibleObjectives(quest, progress)) {
             if (!isGatherObjective(objective)) {
                 continue;
             }
@@ -944,7 +1056,6 @@ public final class LostTalesQuestManager {
                 data.setObjectiveProgress(quest.getId(), objective.getId(), inventoryCount);
                 changed = true;
                 if (before < target && inventoryCount >= target) {
-                    sendQuestChat(player, EnumChatFormatting.GREEN + "Objective complete: " + EnumChatFormatting.WHITE + objectiveDescription(objective));
                     playQuestSound(player, "random.orb", 0.35F, 1.25F);
                 }
             }
@@ -965,39 +1076,6 @@ public final class LostTalesQuestManager {
             }
         }
         return count;
-    }
-
-    private static LostTalesQuestStageDefinition getCurrentStage(LostTalesQuestDefinition quest, LostTalesQuestProgress progress) {
-        if (quest == null || progress == null || quest.getStages().isEmpty()) {
-            return null;
-        }
-
-        for (LostTalesQuestStageDefinition stage : quest.getStages()) {
-            if (stage.getId() != null && stage.getId().equals(progress.getStageId())) {
-                return stage;
-            }
-        }
-
-        int index = progress.getStageIndex();
-        if (index >= 0 && index < quest.getStages().size()) {
-            return quest.getStages().get(index);
-        }
-        return quest.getFirstStage();
-    }
-
-    private static int getStageIndex(LostTalesQuestDefinition quest, LostTalesQuestProgress progress) {
-        if (quest == null || progress == null) {
-            return -1;
-        }
-
-        List<LostTalesQuestStageDefinition> stages = quest.getStages();
-        for (int i = 0; i < stages.size(); i++) {
-            LostTalesQuestStageDefinition stage = stages.get(i);
-            if (stage.getId() != null && stage.getId().equals(progress.getStageId())) {
-                return i;
-            }
-        }
-        return progress.getStageIndex();
     }
 
     private static boolean isGatherObjective(LostTalesQuestObjectiveDefinition objective) {
@@ -1023,7 +1101,11 @@ public final class LostTalesQuestManager {
         return "goto".equalsIgnoreCase(type) || "go_to".equalsIgnoreCase(type) || "travel".equalsIgnoreCase(type) || "location".equalsIgnoreCase(type);
     }
 
-    private static boolean isAtObjectiveLocation(EntityPlayerMP player, LostTalesQuestObjectiveDefinition objective) {
+    private static boolean isAtObjectiveLocation(EntityPlayerMP player,
+            Entity source, LostTalesQuestObjectiveDefinition objective) {
+        if (player == null || source == null || source.worldObj == null) {
+            return false;
+        }
         Map<String, String> params = objective.getParams();
         LostTalesMapMarkerDefinition marker = getObjectiveLocationMarker(player, objective);
         boolean hasExplicitCoordinates = params.containsKey("x") || params.containsKey("y") || params.containsKey("z");
@@ -1036,15 +1118,27 @@ public final class LostTalesQuestManager {
         double y = marker != null ? marker.getY() : parseDouble(params.get("y"), 0.0D);
         double z = marker != null ? marker.getZ() : parseDouble(params.get("z"), 0.0D);
         double radius = Math.max(0.5D, parseDouble(params.get("radius"), 3.0D));
-        int targetDimension = marker != null ? marker.getDimensionId() : LostTalesDimensionHelper.parseDimensionId(params.get("dimension"), player.worldObj.provider.dimensionId);
-        if (player.worldObj.provider.dimensionId != targetDimension) {
+        int targetDimension = marker != null ? marker.getDimensionId() : LostTalesDimensionHelper.parseDimensionId(params.get("dimension"), source.worldObj.provider.dimensionId);
+        if (source.worldObj.provider.dimensionId != targetDimension) {
             return false;
         }
 
-        double dx = player.posX - x;
-        double dy = player.posY - y;
-        double dz = player.posZ - z;
+        double dx = source.posX - x;
+        double dy = source.posY - y;
+        double dz = source.posZ - z;
         return dx * dx + dy * dy + dz * dz <= radius * radius;
+    }
+
+    private static boolean allowsPartySharing(
+            LostTalesQuestObjectiveDefinition objective) {
+        if (objective == null) {
+            return false;
+        }
+        String value = firstNonEmpty(
+                objective.getParam("partyShared", ""),
+                objective.getParam("party_shared", ""),
+                objective.getParam("shareWithParty", ""));
+        return value.length() == 0 || Boolean.parseBoolean(value);
     }
 
     private static LostTalesMapMarkerDefinition getObjectiveLocationMarker(EntityPlayerMP player, LostTalesQuestObjectiveDefinition objective) {
@@ -1085,28 +1179,10 @@ public final class LostTalesQuestManager {
         return dx * dx + dy * dy + dz * dz <= radius * radius;
     }
 
-    private static String objectiveDescription(LostTalesQuestObjectiveDefinition objective) {
-        if (objective == null) {
-            return "objective";
-        }
-        String description = objective.getDescription();
-        return description == null || description.length() == 0 ? objective.getId() : description;
-    }
-
-    private static String formatTicks(long ticks) {
-        if (ticks >= 24000L && ticks % 24000L == 0L) {
-            long days = ticks / 24000L;
-            return days + " in-game day" + (days == 1L ? "" : "s");
-        }
-        if (ticks >= 1200L) {
-            long minutes = ticks / 1200L;
-            return minutes + " in-game minute" + (minutes == 1L ? "" : "s");
-        }
-        long seconds = Math.max(1L, ticks / 20L);
-        return seconds + " second" + (seconds == 1L ? "" : "s");
-    }
-
     private static String questTitle(String questId) {
+        if (LotrQuestReference.isLotrQuest(questId)) {
+            return "LOTR quest";
+        }
         LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(questId);
         return quest == null ? questId : quest.getTitle();
     }
@@ -1169,6 +1245,7 @@ public final class LostTalesQuestManager {
         NO_PLAYER_DATA,
         ALREADY_ACTIVE,
         ALREADY_COMPLETED,
+        RESTART_NOT_ALLOWED,
         START_NOT_ALLOWED,
         REQUIREMENTS_NOT_MET
     }

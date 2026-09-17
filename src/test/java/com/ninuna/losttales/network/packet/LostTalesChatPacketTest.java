@@ -127,10 +127,10 @@ public final class LostTalesChatPacketTest {
     @Test
     public void sendRequestCarriesBoundedShareReferences() {
         LostTalesChatSendPacket original = new LostTalesChatSendPacket(
-                ChatChannel.ALL, "see [i:Sword] [m:Bree] [i:Bow]",
+                ChatChannel.ALL, "see [i:Sword] [m:Bree] [q:Road Work]",
                 Arrays.asList(ChatShareReference.item(4),
                         ChatShareReference.marker("losttales:bree"),
-                        ChatShareReference.unresolved(ChatShareKind.ITEM)));
+                        ChatShareReference.quest("losttales:road_work")));
         ByteBuf buffer = Unpooled.buffer();
         original.toBytes(buffer);
         LostTalesChatSendPacket decoded = new LostTalesChatSendPacket();
@@ -142,7 +142,10 @@ public final class LostTalesChatPacketTest {
                 decoded.getReferences().get(1).getMarkerId());
         assertEquals(ChatShareKind.MARKER,
                 decoded.getReferences().get(1).getKind());
-        assertFalse(decoded.getReferences().get(2).isResolved());
+        assertEquals(ChatShareKind.QUEST,
+                decoded.getReferences().get(2).getKind());
+        assertEquals("losttales:road_work",
+                decoded.getReferences().get(2).getQuestReference());
 
         boolean rejectedSlot = false;
         try {
@@ -173,18 +176,22 @@ public final class LostTalesChatPacketTest {
                 new LostTalesChatMessagePacket(
                         ChatChannel.OOC, UUID.randomUUID(), "Steve",
                         "Steve", "", 0xFFFFFF, 0xFFFFFF,
-                        "look [i:Sword] near [m:Bree]", 5L, "",
+                        "look [i:Sword] near [m:Bree] [q:Road Work]", 5L, "",
                         Arrays.asList(ChatShowcase.item(0, data),
                                 ChatShowcase.marker(1, "losttales:bree",
                                         "Bree", "town", "orange", 100,
-                                        512.5D, -384.0D)));
+                                        512.5D, -384.0D),
+                                ChatShowcase.quest(2, "losttales:road_work",
+                                        "Road Work", "Regional",
+                                        "Defeat 4 orcs", "Experience: 20",
+                                        true)));
         ByteBuf buffer = Unpooled.buffer();
         original.toBytes(buffer);
         LostTalesChatMessagePacket decoded =
                 new LostTalesChatMessagePacket();
         decoded.fromBytes(buffer);
         assertFalse(decoded.isMalformed());
-        assertEquals(2, decoded.getShowcases().size());
+        assertEquals(3, decoded.getShowcases().size());
         assertEquals(ChatShareKind.ITEM,
                 decoded.getShowcases().get(0).getKind());
         assertTrue(Arrays.equals(data,
@@ -197,6 +204,23 @@ public final class LostTalesChatPacketTest {
         assertEquals(100, marker.getMarkerDimension());
         assertEquals(512.5D, marker.getMarkerX(), 0.0D);
         assertEquals(-384.0D, marker.getMarkerZ(), 0.0D);
+        ChatShowcase quest = decoded.getShowcases().get(2);
+        assertEquals(ChatShareKind.QUEST, quest.getKind());
+        assertEquals("losttales:road_work", quest.getQuestReference());
+        assertEquals("Road Work", quest.getQuestTitle());
+        assertEquals("Defeat 4 orcs", quest.getQuestObjective());
+        assertTrue(quest.isQuestJoinable());
+
+        LostTalesQuestShareJoinPacket join =
+                new LostTalesQuestShareJoinPacket(7L, 2);
+        ByteBuf joinBytes = Unpooled.buffer();
+        join.toBytes(joinBytes);
+        LostTalesQuestShareJoinPacket decodedJoin =
+                new LostTalesQuestShareJoinPacket();
+        decodedJoin.fromBytes(joinBytes);
+        ByteBuf encodedAgain = Unpooled.buffer();
+        decodedJoin.toBytes(encodedAgain);
+        assertEquals(9, encodedAgain.readableBytes());
 
         // A showcase whose kind does not match its token is refused.
         boolean rejectedKind = false;

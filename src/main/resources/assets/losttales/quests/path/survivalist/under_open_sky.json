@@ -3,6 +3,7 @@
   "title": "Path of the Survivalist: Under Open Sky",
   "description": "Even the hardiest traveler must rest. A bedroll, spare wool, and a few comforts can turn a dangerous night into a quiet one.",
   "repeatable": false,
+  "restartable": true,
   "startMode": "item",
   "prerequisites": {
     "completed": "losttales:path/survivalist/tools_of_the_trail"

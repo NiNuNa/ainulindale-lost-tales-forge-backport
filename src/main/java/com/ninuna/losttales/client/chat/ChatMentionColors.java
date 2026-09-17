@@ -51,6 +51,16 @@ final class ChatMentionColors {
     }
 
     /**
+     * The colour a mention of an account this client cannot place is
+     * drawn in: its primary role's colour where its roles are known, the
+     * shared accent until they are.
+     */
+    static int accountColorOf(String account) {
+        int roleColor = roleColorFor(account);
+        return roleColor >= 0 ? roleColor : PLAYER_RGB;
+    }
+
+    /**
      * The colour the named mention is drawn in, or -1 when the name
      * reaches nobody and the text stays as it was typed. Roles answer
      * in every channel: an operator is worth calling wherever the call

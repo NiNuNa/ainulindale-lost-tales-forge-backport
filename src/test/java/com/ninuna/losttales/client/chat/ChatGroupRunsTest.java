@@ -96,6 +96,32 @@ public final class ChatGroupRunsTest {
                         new boolean[] { false, false, true, false }));
     }
 
+    /**
+     * The unread divider ends the run it lands in while it stands, as a
+     * day's rule does: the first unread message opens a run with its
+     * header, and once the divider goes the run is whole again.
+     */
+    @Test
+    public void theUnreadDividerOpensARunWhileItStands() {
+        remember(1, ChatChannel.ALL, ALICE, "Alice", START);
+        remember(2, ChatChannel.ALL, ALICE, "Alice", START + 10000L);
+        remember(3, ChatChannel.ALL, ALICE, "Alice", START + 20000L);
+        int[] ids = newestFirst(1, 2, 3);
+        String[] noDays = new String[ids.length];
+        assertArrayEquals(new boolean[] { true, false, false },
+                ChatGroupRuns.continuationsOf(ids,
+                        ChatWindowLines.runsOpened(noDays, ids, 2)));
+        assertArrayEquals(new boolean[] { true, true, false },
+                ChatGroupRuns.continuationsOf(ids,
+                        ChatWindowLines.runsOpened(noDays, ids, 0)));
+        // A day's rule and the divider together each open their own.
+        assertArrayEquals(new boolean[] { false, false, false },
+                ChatGroupRuns.continuationsOf(ids,
+                        ChatWindowLines.runsOpened(
+                                new String[] { "today", null, null }, ids,
+                                2)));
+    }
+
     /** Ordinary consecutive messages still group, in either view. */
     @Test
     public void consecutiveMessagesFromOneIdentityGroup() {

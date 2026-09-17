@@ -114,10 +114,6 @@ public class LostTalesItemMissiveLetter extends Item {
         if (LostTalesMissiveObjectiveData.TYPE_GOTO.equalsIgnoreCase(type)) {
             return "Scout the marked location.";
         }
-        if (LostTalesMissiveObjectiveData.TYPE_DELIVER.equalsIgnoreCase(type)) {
-            String item = firstNonEmpty(objective.getParam("item", ""), objective.getParam("itemId", ""), objective.getParam("target", ""));
-            return "Deliver " + count + " " + (item.length() > 0 ? prettify(item) : count == 1 ? "item" : "items") + ".";
-        }
         return prettify(type) + ".";
     }
 

@@ -39,8 +39,9 @@ public final class ChatTabActionsTest {
 
     @Test
     public void aWindowRestingOnEachEdgeIsToldWhichOne() {
-        int margin = HudPlacementLayout.SCREEN_MARGIN;
-        // Above: its bottom sits one margin over the neighbour's top.
+        int margin = ChatWindowPlacement.WINDOW_GAP;
+        // Above: its bottom sits one window gap over the neighbour's top,
+        // the two frames side by side.
         box(this.frame, 120, 20, 280, 100 - margin);
         assertEquals(ChatWindow.LinkSide.ABOVE,
                 ChatTabActions.touchingSide(this.frame, this.other));
@@ -61,7 +62,7 @@ public final class ChatTabActionsTest {
 
     @Test
     public void aWindowClearOfTheNeighbourTouchesNothing() {
-        int margin = HudPlacementLayout.SCREEN_MARGIN;
+        int margin = ChatWindowPlacement.WINDOW_GAP;
         // Too far above.
         box(this.frame, 120, 20, 280, 100 - margin - ChatTabActions.LINK_SNAP
                 - 1);

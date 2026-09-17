@@ -13,23 +13,27 @@ public final class ChatShareReference {
     public static final int NO_SLOT = 255;
     /** Marker ids are bounded like {@code LostTalesMapMarkerRecord} ids. */
     public static final int MAX_MARKER_ID_BYTES = 256;
+    /** Lost Tales ids and namespaced LOTR miniquest references. */
+    public static final int MAX_QUEST_REFERENCE_BYTES = 256;
 
     private final ChatShareKind kind;
     private final int slot;
     private final String markerId;
+    private final String questReference;
 
     private ChatShareReference(ChatShareKind kind, int slot,
-                               String markerId) {
+                               String markerId, String questReference) {
         this.kind = kind;
         this.slot = slot;
         this.markerId = markerId == null ? "" : markerId;
+        this.questReference = questReference == null ? "" : questReference;
     }
 
     public static ChatShareReference item(int slot) {
         if (!isValidItemSlot(slot) && slot != NO_SLOT) {
             throw new IllegalArgumentException("invalid item slot");
         }
-        return new ChatShareReference(ChatShareKind.ITEM, slot, "");
+        return new ChatShareReference(ChatShareKind.ITEM, slot, "", "");
     }
 
     public static ChatShareReference marker(String markerId) {
@@ -37,12 +41,24 @@ public final class ChatShareReference {
         if (id.length() > MAX_MARKER_ID_BYTES) {
             throw new IllegalArgumentException("invalid marker id");
         }
-        return new ChatShareReference(ChatShareKind.MARKER, NO_SLOT, id);
+        return new ChatShareReference(ChatShareKind.MARKER, NO_SLOT, id, "");
+    }
+
+    public static ChatShareReference quest(String questReference) {
+        String reference = questReference == null ? "" : questReference.trim();
+        if (reference.length() > MAX_QUEST_REFERENCE_BYTES) {
+            throw new IllegalArgumentException("invalid quest reference");
+        }
+        return new ChatShareReference(ChatShareKind.QUEST, NO_SLOT, "",
+                reference);
     }
 
     /** The unresolved placeholder for a token of the given kind. */
     public static ChatShareReference unresolved(ChatShareKind kind) {
-        return kind == ChatShareKind.MARKER ? marker("") : item(NO_SLOT);
+        if (kind == ChatShareKind.MARKER) {
+            return marker("");
+        }
+        return kind == ChatShareKind.QUEST ? quest("") : item(NO_SLOT);
     }
 
     public static boolean isValidItemSlot(int slot) {
@@ -63,9 +79,16 @@ public final class ChatShareReference {
         return this.markerId;
     }
 
+    public String getQuestReference() {
+        return this.questReference;
+    }
+
     public boolean isResolved() {
-        return this.kind == ChatShareKind.ITEM
-                ? isValidItemSlot(this.slot)
-                : this.markerId.length() > 0;
+        if (this.kind == ChatShareKind.ITEM) {
+            return isValidItemSlot(this.slot);
+        }
+        return this.kind == ChatShareKind.MARKER
+                ? this.markerId.length() > 0
+                : this.questReference.length() > 0;
     }
 }

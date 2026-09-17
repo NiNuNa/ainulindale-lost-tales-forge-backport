@@ -35,6 +35,12 @@ public final class ChatShowcase {
             ChatShareReference.MAX_MARKER_ID_BYTES;
     public static final int MAX_MARKER_NAME_BYTES = 256;
     public static final int MAX_MARKER_STYLE_BYTES = 64;
+    public static final int MAX_QUEST_REFERENCE_BYTES =
+            ChatShareReference.MAX_QUEST_REFERENCE_BYTES;
+    public static final int MAX_QUEST_TITLE_BYTES = 256;
+    public static final int MAX_QUEST_CATEGORY_BYTES = 128;
+    public static final int MAX_QUEST_OBJECTIVE_BYTES = 512;
+    public static final int MAX_QUEST_REWARD_BYTES = 512;
     /** Matches {@code LostTalesMapMarkerRecord.MAX_ABSOLUTE_COORDINATE}. */
     public static final double MAX_MARKER_COORDINATE = 30000000.0D;
 
@@ -48,12 +54,21 @@ public final class ChatShowcase {
     private final int markerDimension;
     private final double markerX;
     private final double markerZ;
+    private final String questReference;
+    private final String questTitle;
+    private final String questCategory;
+    private final String questObjective;
+    private final String questReward;
+    private final boolean questJoinable;
 
     private ChatShowcase(ChatShareKind kind, int tokenIndex,
                          byte[] stackData, String markerId,
                          String markerName, String markerIcon,
                          String markerColor, int markerDimension,
-                         double markerX, double markerZ) {
+                         double markerX, double markerZ,
+                         String questReference, String questTitle,
+                         String questCategory, String questObjective,
+                         String questReward, boolean questJoinable) {
         if (kind == null || tokenIndex < 0
                 || tokenIndex >= ChatShareTokenParser.MAX_TOKENS) {
             throw new IllegalArgumentException("invalid chat showcase");
@@ -68,6 +83,12 @@ public final class ChatShowcase {
         this.markerDimension = markerDimension;
         this.markerX = markerX;
         this.markerZ = markerZ;
+        this.questReference = questReference == null ? "" : questReference;
+        this.questTitle = questTitle == null ? "" : questTitle;
+        this.questCategory = questCategory == null ? "" : questCategory;
+        this.questObjective = questObjective == null ? "" : questObjective;
+        this.questReward = questReward == null ? "" : questReward;
+        this.questJoinable = questJoinable;
     }
 
     public static ChatShowcase item(int tokenIndex, byte[] stackData) {
@@ -76,7 +97,8 @@ public final class ChatShowcase {
             throw new IllegalArgumentException("invalid chat item showcase");
         }
         return new ChatShowcase(ChatShareKind.ITEM, tokenIndex, stackData,
-                "", "", "", "", 0, 0.0D, 0.0D);
+                "", "", "", "", 0, 0.0D, 0.0D,
+                "", "", "", "", "", false);
     }
 
     public static ChatShowcase marker(int tokenIndex, String markerId,
@@ -97,7 +119,26 @@ public final class ChatShowcase {
         }
         return new ChatShowcase(ChatShareKind.MARKER, tokenIndex, null,
                 markerId, markerName, markerIcon, markerColor,
-                markerDimension, markerX, markerZ);
+                markerDimension, markerX, markerZ,
+                "", "", "", "", "", false);
+    }
+
+    public static ChatShowcase quest(int tokenIndex, String reference,
+                                     String title, String category,
+                                     String objective, String reward,
+                                     boolean joinable) {
+        if (reference == null || reference.length() == 0
+                || utf8Length(reference) > MAX_QUEST_REFERENCE_BYTES
+                || title == null || title.length() == 0
+                || utf8Length(title) > MAX_QUEST_TITLE_BYTES
+                || utf8Length(category) > MAX_QUEST_CATEGORY_BYTES
+                || utf8Length(objective) > MAX_QUEST_OBJECTIVE_BYTES
+                || utf8Length(reward) > MAX_QUEST_REWARD_BYTES) {
+            throw new IllegalArgumentException("invalid chat quest showcase");
+        }
+        return new ChatShowcase(ChatShareKind.QUEST, tokenIndex, null,
+                "", "", "", "", 0, 0.0D, 0.0D,
+                reference, title, category, objective, reward, joinable);
     }
 
     public static boolean isFiniteCoordinate(double value) {
@@ -124,9 +165,15 @@ public final class ChatShowcase {
         if (this.kind == ChatShareKind.ITEM) {
             return SHOWCASE_OVERHEAD_BYTES + this.stackData.length;
         }
-        return SHOWCASE_OVERHEAD_BYTES + utf8Length(this.markerId)
+        if (this.kind == ChatShareKind.MARKER) {
+            return SHOWCASE_OVERHEAD_BYTES + utf8Length(this.markerId)
                 + utf8Length(this.markerName) + utf8Length(this.markerIcon)
                 + utf8Length(this.markerColor) + 4 + 8 + 8;
+        }
+        return SHOWCASE_OVERHEAD_BYTES + utf8Length(this.questReference)
+                + utf8Length(this.questTitle) + utf8Length(this.questCategory)
+                + utf8Length(this.questObjective) + utf8Length(this.questReward)
+                + 1;
     }
 
     /** The wire cost of a whole set of showcases. */
@@ -153,6 +200,12 @@ public final class ChatShowcase {
     public int getMarkerDimension() { return this.markerDimension; }
     public double getMarkerX() { return this.markerX; }
     public double getMarkerZ() { return this.markerZ; }
+    public String getQuestReference() { return this.questReference; }
+    public String getQuestTitle() { return this.questTitle; }
+    public String getQuestCategory() { return this.questCategory; }
+    public String getQuestObjective() { return this.questObjective; }
+    public String getQuestReward() { return this.questReward; }
+    public boolean isQuestJoinable() { return this.questJoinable; }
 
     /**
      * Serializes a stack for the wire, or returns null when the stack is

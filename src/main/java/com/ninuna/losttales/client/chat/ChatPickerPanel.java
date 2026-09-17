@@ -36,6 +36,9 @@ abstract class ChatPickerPanel {
     /** How far the button has crossed to its hovered artwork, and when. */
     private float buttonFade;
     private long buttonFadeNanos;
+    /** How far the search row's magnifier has crossed to its lit artwork, and when. */
+    private float magnifierFade;
+    private long magnifierFadeNanos;
     static final int BUTTON_SIZE = 12;
     static final int BUTTON_MARGIN = 2;
     /** The buttons stand this far below the anchor the caller passes. */
@@ -365,7 +368,10 @@ abstract class ChatPickerPanel {
 
         int textAlpha = Math.max(LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA,
                 Math.min(255, Math.round(255.0F * progress)));
-        drawSearchRow(font, layout, textAlpha);
+        drawSearchRow(font, layout, textAlpha, this.targetOpen
+                && this.searchField != null
+                && (this.searchField.isFocused()
+                        || searchFieldBox().contains(mouseX, mouseY)));
         // Rows are clipped to the body so a scrolled list never paints
         // over the search row or past the panel's bottom edge.
         boolean clipped = beginBodyClip(minecraft, layout);
@@ -422,20 +428,30 @@ abstract class ChatPickerPanel {
 
     /**
      * The search row as the chat's menus draw theirs: the magnifier it
-     * opens with; what has been typed, in the chat's own text field;
-     * while it is empty, the prompt in the chat's aside tone and
-     * italics, as the input bar's hint is, a pixel clear of the caret;
-     * and a hairline under it that parts it from the list.
+     * opens with, crossing to its lit artwork while {@code lit}; what has
+     * been typed, in the chat's own text field; while it is empty, the
+     * prompt in the chat's aside tone and italics, as the input bar's
+     * hint is, a pixel clear of the caret; and a hairline under it that
+     * parts it from the list.
      */
-    private void drawSearchRow(FontRenderer font, Layout layout, int alpha) {
+    private void drawSearchRow(FontRenderer font, Layout layout, int alpha,
+                               boolean lit) {
         Gui.drawRect(layout.left + PADDING, layout.bodyTop - 1,
                 layout.left + panelWidth() - PADDING, layout.bodyTop,
                 LostTalesChatVisualStyle.argb(
                         LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB,
                         Math.min(alpha, 0xA0)));
+        long now = System.nanoTime();
+        double elapsed = this.magnifierFadeNanos == 0L ? 0.0D
+                : (now - this.magnifierFadeNanos) / 1.0E9D;
+        this.magnifierFadeNanos = now;
+        this.magnifierFade = LostTalesChatVisualStyle.hoverFade(
+                this.magnifierFade, lit, elapsed);
         // The magnifier stands on the capitals of what is typed beside
         // it, as every icon in a chat row does.
-        ChatIconSheet.SEARCH.drawWithShadow(layout.left + PADDING + 1,
+        ChatIconSheet.drawPairWithShadow(ChatIconSheet.SEARCH,
+                ChatIconSheet.SEARCH_HOVER, this.magnifierFade,
+                layout.left + PADDING + 1,
                 layout.searchY + LostTalesChatOverlayRenderer.centredBoxTop(
                         ChatIconSheet.SEARCH.getHeight()), alpha);
         if (this.searchField == null) {
@@ -513,6 +529,18 @@ abstract class ChatPickerPanel {
             this.searchField.setEnableBackgroundDrawing(false);
             this.searchField.setTextColor(LostTalesChatVisualStyle.IVORY);
         }
+    }
+
+    /**
+     * The box a press lands on the search field in, read from the numbers
+     * {@link #positionSearchField} gives the field: what the field's own
+     * press test asks, so the magnifier lights on the pixels a press
+     * would put the caret from.
+     */
+    private ChatHitBox searchFieldBox() {
+        return new ChatHitBox(this.searchField.xPosition,
+                this.searchField.yPosition, this.searchField.width,
+                this.searchField.height);
     }
 
     /**

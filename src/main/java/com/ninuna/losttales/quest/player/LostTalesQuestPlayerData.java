@@ -1,6 +1,7 @@
 package com.ninuna.losttales.quest.player;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.compat.lotr.LotrQuestReference;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerCatalog;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerIdentity;
@@ -9,6 +10,7 @@ import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestDefinitionNbt;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import com.ninuna.losttales.quest.LostTalesQuestRegistry;
+import com.ninuna.losttales.quest.progress.LostTalesQuestHistoryEntry;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -34,19 +36,19 @@ import net.minecraftforge.common.util.Constants;
  */
 public final class LostTalesQuestPlayerData implements IExtendedEntityProperties {
     public static final String PROPERTY_ID = "LostTalesQuestData";
-    public static final int CURRENT_DATA_VERSION = 1;
+    public static final int CURRENT_DATA_VERSION = 2;
     static final int MAX_ACTIVE_QUESTS = 1024;
     static final int MAX_QUEST_ID_HISTORY = 8192;
     static final int MAX_DYNAMIC_QUESTS = 512;
     static final int MAX_DYNAMIC_MARKERS = 2048;
     static final int MAX_IDENTIFIER_CHARACTERS = 256;
     static final int MAX_NAME_CHARACTERS = 1024;
+    static final int MAX_HISTORY_DETAIL_CHARACTERS = 2048;
 
     private static final String TAG_DATA_VERSION = "DataVersion";
 
     private final Map<String, LostTalesQuestProgress> activeQuests = new LinkedHashMap<String, LostTalesQuestProgress>();
-    private final Set<String> completedQuests = new LinkedHashSet<String>();
-    private final Set<String> failedQuests = new LinkedHashSet<String>();
+    private final Map<String, LostTalesQuestHistoryEntry> questHistory = new LinkedHashMap<String, LostTalesQuestHistoryEntry>();
     private final Set<String> discoveredMarkerIds = new LinkedHashSet<String>();
     private final Map<String, String> discoveredMarkerIdByCanonicalKey =
             new LinkedHashMap<String, String>();
@@ -96,29 +98,31 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         }
         data.setTag("ActiveQuests", activeList);
 
-        NBTTagList completedList = new NBTTagList();
-        for (String questId : this.completedQuests) {
+        NBTTagList historyList = new NBTTagList();
+        for (LostTalesQuestHistoryEntry entry : this.questHistory.values()) {
             NBTTagCompound questTag = new NBTTagCompound();
-            questTag.setString("QuestId", questId);
-            completedList.appendTag(questTag);
+            questTag.setString("QuestId", entry.getQuestId());
+            questTag.setString("Outcome", entry.getOutcome().name());
+            questTag.setString("Detail", entry.getDetail());
+            questTag.setLong("WorldTime", entry.getWorldTime());
+            NBTTagList optionalObjectives = new NBTTagList();
+            for (String objectiveId
+                    : entry.getCompletedOptionalObjectiveIds()) {
+                NBTTagCompound objectiveTag = new NBTTagCompound();
+                objectiveTag.setString("ObjectiveId", objectiveId);
+                optionalObjectives.appendTag(objectiveTag);
+            }
+            questTag.setTag("CompletedOptionalObjectives",
+                    optionalObjectives);
+            historyList.appendTag(questTag);
         }
-        data.setTag("CompletedQuests", completedList);
+        data.setTag("QuestHistory", historyList);
 
-        NBTTagList failedList = new NBTTagList();
-        for (String questId : this.failedQuests) {
-            NBTTagCompound questTag = new NBTTagCompound();
-            questTag.setString("QuestId", questId);
-            failedList.appendTag(questTag);
-        }
-        data.setTag("FailedQuests", failedList);
-
-        // Keep the old single-string tag as a migration/compatibility hint, but
-        // store the real tracked quest state as a list so multiple quests can be
-        // tracked at the same time.
-        data.setString("PinnedQuestId", getPinnedQuestId());
         NBTTagList pinnedQuestList = new NBTTagList();
         for (String questId : this.pinnedQuestIds) {
-            if (questId == null || questId.length() == 0 || !this.activeQuests.containsKey(questId)) {
+            if (questId == null || questId.length() == 0
+                    || (!this.activeQuests.containsKey(questId)
+                        && !LotrQuestReference.isLotrQuest(questId))) {
                 continue;
             }
             NBTTagCompound questTag = new NBTTagCompound();
@@ -186,8 +190,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                              boolean registerRuntimeDefinitions,
                              boolean logWarnings) {
         this.activeQuests.clear();
-        this.completedQuests.clear();
-        this.failedQuests.clear();
+        this.questHistory.clear();
         this.discoveredMarkerIds.clear();
         this.discoveredMarkerIdByCanonicalKey.clear();
         this.dynamicMapMarkers.clear();
@@ -210,23 +213,18 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         }
 
         NBTTagCompound originalData = compound.getCompoundTag(PROPERTY_ID);
-        LostTalesQuestDataMigrator.MigrationResult migration =
-                LostTalesQuestDataMigrator.migrate(originalData, CURRENT_DATA_VERSION);
-        if (!migration.isValid()) {
-            enterReadOnlyMode(originalData, -1,
-                    "Quest data is malformed and will be preserved without modification",
-                    logWarnings);
-            return;
-        }
-        if (!migration.isSupported()) {
-            enterReadOnlyMode(originalData, migration.getVersion(),
-                    "Quest data uses unsupported version " + migration.getVersion()
+        int storedVersion = originalData.hasKey(TAG_DATA_VERSION,
+                Constants.NBT.TAG_INT)
+                ? originalData.getInteger(TAG_DATA_VERSION) : -1;
+        if (storedVersion != CURRENT_DATA_VERSION) {
+            enterReadOnlyMode(originalData, storedVersion,
+                    "Quest data uses unsupported version " + storedVersion
                             + " and will be preserved without modification",
                     logWarnings);
             return;
         }
 
-        NBTTagCompound data = migration.getTag();
+        NBTTagCompound data = (NBTTagCompound)originalData.copy();
         if (!isStructurallyReasonable(data)) {
             enterReadOnlyMode(originalData, -1,
                     "Quest data exceeds structural safety limits and will "
@@ -245,34 +243,32 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         NBTTagList pinnedQuestList = data.getTagList("PinnedQuestIds", Constants.NBT.TAG_COMPOUND);
         for (int i = 0; i < pinnedQuestList.tagCount(); i++) {
             String questId = pinnedQuestList.getCompoundTagAt(i).getString("QuestId");
-            if (questId != null && questId.length() > 0 && this.activeQuests.containsKey(questId)) {
+            if (questId != null && questId.length() > 0
+                    && (this.activeQuests.containsKey(questId)
+                        || LotrQuestReference.isLotrQuest(questId))) {
                 this.pinnedQuestIds.add(questId);
             }
         }
 
-        // Migration path for worlds saved before multi-tracking existed.
-        if (this.pinnedQuestIds.isEmpty()) {
-            String legacyPinnedQuestId = data.getString("PinnedQuestId");
-            if (legacyPinnedQuestId != null && this.activeQuests.containsKey(legacyPinnedQuestId)) {
-                this.pinnedQuestIds.add(legacyPinnedQuestId);
-            }
-        }
-
-        NBTTagList completedList = data.getTagList("CompletedQuests", Constants.NBT.TAG_COMPOUND);
-        for (int i = 0; i < completedList.tagCount(); i++) {
-            NBTTagCompound questTag = completedList.getCompoundTagAt(i);
+        NBTTagList historyList = data.getTagList("QuestHistory", Constants.NBT.TAG_COMPOUND);
+        for (int i = 0; i < historyList.tagCount(); i++) {
+            NBTTagCompound questTag = historyList.getCompoundTagAt(i);
             String questId = questTag.getString("QuestId");
-            if (questId != null && questId.length() > 0) {
-                this.completedQuests.add(questId);
-            }
-        }
-
-        NBTTagList failedList = data.getTagList("FailedQuests", Constants.NBT.TAG_COMPOUND);
-        for (int i = 0; i < failedList.tagCount(); i++) {
-            NBTTagCompound questTag = failedList.getCompoundTagAt(i);
-            String questId = questTag.getString("QuestId");
-            if (questId != null && questId.length() > 0) {
-                this.failedQuests.add(questId);
+            LostTalesQuestHistoryEntry.Outcome outcome = LostTalesQuestHistoryEntry.Outcome.fromName(questTag.getString("Outcome"));
+            if (questId != null && questId.length() > 0 && outcome != null) {
+                LinkedHashSet<String> completedOptionalObjectives =
+                        new LinkedHashSet<String>();
+                NBTTagList optionalObjectives = questTag.getTagList(
+                        "CompletedOptionalObjectives",
+                        Constants.NBT.TAG_COMPOUND);
+                for (int j = 0; j < optionalObjectives.tagCount(); j++) {
+                    completedOptionalObjectives.add(optionalObjectives
+                            .getCompoundTagAt(j).getString("ObjectiveId"));
+                }
+                this.questHistory.put(questId, new LostTalesQuestHistoryEntry(
+                        questId, outcome, questTag.getString("Detail"),
+                        questTag.getLong("WorldTime"),
+                        completedOptionalObjectives));
             }
         }
 
@@ -411,11 +407,23 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     public Set<String> getCompletedQuestIds() {
-        return Collections.unmodifiableSet(new LinkedHashSet<String>(this.completedQuests));
+        LinkedHashSet<String> completed = new LinkedHashSet<String>();
+        for (LostTalesQuestHistoryEntry entry : this.questHistory.values()) {
+            if (entry.isCompleted()) {
+                completed.add(entry.getQuestId());
+            }
+        }
+        return Collections.unmodifiableSet(completed);
     }
 
-    public Set<String> getFailedQuestIds() {
-        return Collections.unmodifiableSet(new LinkedHashSet<String>(this.failedQuests));
+    public Collection<LostTalesQuestHistoryEntry> getQuestHistory() {
+        return Collections.unmodifiableCollection(
+                new ArrayList<LostTalesQuestHistoryEntry>(
+                        this.questHistory.values()));
+    }
+
+    public LostTalesQuestHistoryEntry getQuestHistoryEntry(String questId) {
+        return questId == null ? null : this.questHistory.get(questId);
     }
 
     public Set<String> getDiscoveredMarkerIds() {
@@ -461,11 +469,18 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     public boolean isQuestCompleted(String questId) {
-        return this.completedQuests.contains(questId);
+        LostTalesQuestHistoryEntry entry = getQuestHistoryEntry(questId);
+        return entry != null && entry.isCompleted();
     }
 
     public boolean isQuestFailed(String questId) {
-        return questId != null && this.failedQuests.contains(questId);
+        LostTalesQuestHistoryEntry entry = getQuestHistoryEntry(questId);
+        return entry != null && entry.isFailed();
+    }
+
+    public boolean isQuestAbandoned(String questId) {
+        LostTalesQuestHistoryEntry entry = getQuestHistoryEntry(questId);
+        return entry != null && entry.isAbandoned();
     }
 
     public void startQuest(String questId, String firstStageId) {
@@ -479,7 +494,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         if (questId == null || questId.length() == 0 || this.activeQuests.containsKey(questId)) {
             return;
         }
-        this.failedQuests.remove(questId);
+        this.questHistory.remove(questId);
         this.activeQuests.put(questId, new LostTalesQuestProgress(questId, 0, firstStageId, null, acceptedWorldTime, deadlineWorldTime));
     }
 
@@ -493,13 +508,8 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     public Set<String> getPinnedQuestIds() {
-        LinkedHashSet<String> copy = new LinkedHashSet<String>();
-        for (String questId : this.pinnedQuestIds) {
-            if (questId != null && questId.length() > 0 && this.activeQuests.containsKey(questId)) {
-                copy.add(questId);
-            }
-        }
-        return Collections.unmodifiableSet(copy);
+        return Collections.unmodifiableSet(
+                new LinkedHashSet<String>(this.pinnedQuestIds));
     }
 
     public boolean isQuestPinned(String questId) {
@@ -620,6 +630,23 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         return this.pinnedQuestIds.add(questId);
     }
 
+    public boolean pinQuestReference(String questReference) {
+        if (!isWritable() || questReference == null
+                || questReference.length() == 0) {
+            return false;
+        }
+        if (!this.activeQuests.containsKey(questReference)
+                && !LotrQuestReference.isLotrQuest(questReference)) {
+            return false;
+        }
+        return this.pinnedQuestIds.add(questReference);
+    }
+
+    public boolean isQuestReferencePinned(String questReference) {
+        return questReference != null
+                && this.pinnedQuestIds.contains(questReference);
+    }
+
     public boolean hasPinnedQuest() {
         return !getPinnedQuestIds().isEmpty();
     }
@@ -643,7 +670,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         return changed;
     }
 
-    public boolean completeQuest(String questId) {
+    public boolean completeQuest(String questId, String outcome,
+            long worldTime,
+            Collection<String> completedOptionalObjectiveIds) {
         if (!isWritable()) {
             return false;
         }
@@ -652,12 +681,15 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         }
         boolean wasActive = this.activeQuests.remove(questId) != null;
         this.pinnedQuestIds.remove(questId);
-        this.failedQuests.remove(questId);
-        boolean wasNewlyCompleted = this.completedQuests.add(questId);
-        return wasActive || wasNewlyCompleted;
+        LostTalesQuestHistoryEntry old = this.questHistory.put(questId,
+                new LostTalesQuestHistoryEntry(questId,
+                        LostTalesQuestHistoryEntry.Outcome.COMPLETED,
+                        boundedDetail(outcome), worldTime,
+                        completedOptionalObjectiveIds));
+        return wasActive || old == null || !old.isCompleted();
     }
 
-    public boolean failQuest(String questId) {
+    public boolean failQuest(String questId, String reason, long worldTime) {
         if (!isWritable()) {
             return false;
         }
@@ -666,9 +698,11 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         }
         boolean wasActive = this.activeQuests.remove(questId) != null;
         this.pinnedQuestIds.remove(questId);
-        this.completedQuests.remove(questId);
-        boolean wasNewlyFailed = this.failedQuests.add(questId);
-        return wasActive || wasNewlyFailed;
+        LostTalesQuestHistoryEntry old = this.questHistory.put(questId,
+                new LostTalesQuestHistoryEntry(questId,
+                        LostTalesQuestHistoryEntry.Outcome.FAILED,
+                        boundedDetail(reason), worldTime));
+        return wasActive || old == null || !old.isFailed();
     }
 
     public boolean setQuestStage(String questId, int stageIndex, String stageId) {
@@ -680,7 +714,6 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             return false;
         }
         progress.setStage(stageIndex, stageId);
-        progress.clearObjectiveProgress();
         return true;
     }
 
@@ -716,12 +749,12 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         }
         boolean removedActive = this.activeQuests.remove(questId) != null;
         this.pinnedQuestIds.remove(questId);
-        boolean removedCompleted = this.completedQuests.remove(questId);
-        boolean removedFailed = this.failedQuests.remove(questId);
-        return removedActive || removedCompleted || removedFailed;
+        boolean removedHistory = this.questHistory.remove(questId) != null;
+        return removedActive || removedHistory;
     }
 
-    public boolean abandonQuest(String questId) {
+    public boolean abandonQuest(String questId, String reason,
+            long worldTime) {
         if (!isWritable()) {
             return false;
         }
@@ -730,13 +763,17 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         }
         boolean changed = this.activeQuests.remove(questId) != null;
         this.pinnedQuestIds.remove(questId);
+        if (changed) {
+            this.questHistory.put(questId, new LostTalesQuestHistoryEntry(
+                    questId, LostTalesQuestHistoryEntry.Outcome.ABANDONED,
+                    boundedDetail(reason), worldTime));
+        }
         return changed;
     }
 
     public void copyFrom(LostTalesQuestPlayerData oldData) {
         this.activeQuests.clear();
-        this.completedQuests.clear();
-        this.failedQuests.clear();
+        this.questHistory.clear();
         this.discoveredMarkerIds.clear();
         this.discoveredMarkerIdByCanonicalKey.clear();
         this.dynamicMapMarkers.clear();
@@ -762,8 +799,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         for (LostTalesQuestProgress progress : oldData.activeQuests.values()) {
             this.activeQuests.put(progress.getQuestId(), progress.copy());
         }
-        this.completedQuests.addAll(oldData.completedQuests);
-        this.failedQuests.addAll(oldData.failedQuests);
+        this.questHistory.putAll(oldData.questHistory);
         for (String markerId : oldData.discoveredMarkerIds) {
             addDiscoveredMarkerId(markerId);
         }
@@ -774,7 +810,8 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         this.dynamicQuestDefinitions.putAll(oldData.dynamicQuestDefinitions);
         LostTalesQuestRegistry.registerRuntimeQuests(this.dynamicQuestDefinitions.values());
         for (String questId : oldData.pinnedQuestIds) {
-            if (questId != null && this.activeQuests.containsKey(questId)) {
+            if (questId != null && (this.activeQuests.containsKey(questId)
+                    || LotrQuestReference.isLotrQuest(questId))) {
                 this.pinnedQuestIds.add(questId);
             }
         }
@@ -796,7 +833,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         boolean changed = false;
         ArrayList<String> invalidPinnedQuests = new ArrayList<String>();
         for (String questId : this.pinnedQuestIds) {
-            if (questId == null || questId.length() == 0 || !this.activeQuests.containsKey(questId)) {
+            if (questId == null || questId.length() == 0
+                    || (!this.activeQuests.containsKey(questId)
+                        && !LotrQuestReference.isLotrQuest(questId))) {
                 invalidPinnedQuests.add(questId);
             }
         }
@@ -993,23 +1032,25 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         return value == null || value.length() == 0 ? fallback : value;
     }
 
+    private static String boundedDetail(String value) {
+        String detail = value == null ? "" : value.trim();
+        return detail.length() <= MAX_HISTORY_DETAIL_CHARACTERS ? detail
+                : detail.substring(0, MAX_HISTORY_DETAIL_CHARACTERS);
+    }
+
     private static boolean isStructurallyReasonable(NBTTagCompound data) {
         if (!hasCompoundListWithinLimit(
                 data, "ActiveQuests", MAX_ACTIVE_QUESTS)
                 || !hasCompoundListWithinLimit(
                 data, "PinnedQuestIds", MAX_ACTIVE_QUESTS)
                 || !hasCompoundListWithinLimit(
-                data, "CompletedQuests", MAX_QUEST_ID_HISTORY)
-                || !hasCompoundListWithinLimit(
-                data, "FailedQuests", MAX_QUEST_ID_HISTORY)
+                data, "QuestHistory", MAX_QUEST_ID_HISTORY)
                 || !hasCompoundListWithinLimit(
                 data, "DiscoveredMarkers", MAX_QUEST_ID_HISTORY)
                 || !hasCompoundListWithinLimit(
                 data, "DynamicQuestDefinitions", MAX_DYNAMIC_QUESTS)
                 || !hasCompoundListWithinLimit(
                 data, "DynamicMapMarkers", MAX_DYNAMIC_MARKERS)
-                || !hasReasonableOptionalString(
-                data, "PinnedQuestId", MAX_IDENTIFIER_CHARACTERS)
                 || !hasReasonableOptionalString(
                 data, "PinnedMapMarkerId", MAX_IDENTIFIER_CHARACTERS)) {
             return false;
@@ -1025,11 +1066,28 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         }
         if (!hasReasonableIdList(data, "PinnedQuestIds", "QuestId")
                 || !hasReasonableIdList(
-                data, "CompletedQuests", "QuestId")
-                || !hasReasonableIdList(data, "FailedQuests", "QuestId")
-                || !hasReasonableIdList(
                 data, "DiscoveredMarkers", "MarkerId")) {
             return false;
+        }
+
+        NBTTagList history = data.getTagList(
+                "QuestHistory", Constants.NBT.TAG_COMPOUND);
+        for (int i = 0; i < history.tagCount(); i++) {
+            NBTTagCompound entry = history.getCompoundTagAt(i);
+            if (!hasReasonableRequiredString(entry, "QuestId",
+                    MAX_IDENTIFIER_CHARACTERS)
+                    || LostTalesQuestHistoryEntry.Outcome.fromName(
+                    entry.getString("Outcome")) == null
+                    || !hasReasonableOptionalString(entry, "Detail",
+                    MAX_HISTORY_DETAIL_CHARACTERS)
+                    || !hasCompoundListWithinLimit(entry,
+                    "CompletedOptionalObjectives",
+                    LostTalesQuestProgress.MAX_OBJECTIVE_ENTRIES)
+                    || !hasReasonableIdList(entry,
+                    "CompletedOptionalObjectives", "ObjectiveId")
+                    || entry.getLong("WorldTime") < 0L) {
+                return false;
+            }
         }
 
         NBTTagList dynamicQuests = data.getTagList(

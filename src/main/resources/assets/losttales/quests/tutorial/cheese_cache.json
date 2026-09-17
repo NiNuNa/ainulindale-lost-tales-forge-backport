@@ -1,8 +1,9 @@
 {
   "id": "losttales:tutorial/cheese_cache",
   "title": "The Cheese Cache",
-  "description": "A tiny block-interaction quest used to test right-click quest starts on the Lost Tales cheese wheel block.",
+  "description": "A roadside cheese cache is running short of grain. Leave a little wheat and take provisions for the road.",
   "repeatable": true,
+  "restartable": true,
   "startMode": "interaction",
   "interaction": {
     "block": "losttales:cheese_wheel",

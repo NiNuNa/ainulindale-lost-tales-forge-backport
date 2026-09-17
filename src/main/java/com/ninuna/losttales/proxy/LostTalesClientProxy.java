@@ -284,8 +284,8 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         if (packet != null) {
             LostTalesClientMapMarkerStore.setDynamicMarkers(packet.getDynamicMapMarkers());
             LostTalesClientQuestDefinitionStore.setDynamicQuestDefinitions(packet.getDynamicQuestDefinitions());
-            LostTalesClientQuestNotificationStore.notifyForIncomingSync(packet.getActiveQuests(), packet.getCompletedQuestIds());
-            LostTalesClientQuestProgressStore.update(packet.getActiveQuests(), packet.getCompletedQuestIds(), packet.getFailedQuestIds(), packet.getPinnedQuestIds(), packet.getDiscoveredMarkerIds(), packet.getPinnedMapMarkerId());
+            LostTalesClientQuestNotificationStore.notifyForIncomingSync(packet.getActiveQuests(), packet.getQuestHistory());
+            LostTalesClientQuestProgressStore.update(packet.getActiveQuests(), packet.getQuestHistory(), packet.getPinnedQuestIds(), packet.getDiscoveredMarkerIds(), packet.getPinnedMapMarkerId());
         }
     }
 

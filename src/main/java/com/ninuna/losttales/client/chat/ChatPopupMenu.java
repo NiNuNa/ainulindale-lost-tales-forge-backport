@@ -7,7 +7,9 @@ import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
@@ -86,6 +88,14 @@ final class ChatPopupMenu {
         /** A sheet sprite before the name, or null. */
         ChatIconSheet sprite;
         /**
+         * The sprite's lit artwork, or null for none: the sprite crosses
+         * to it while the pointer is on the row, and rests on it while
+         * the row is {@link #chosen}.
+         */
+        ChatIconSheet litSprite;
+        /** Whether the row is the one chosen, which keeps its sprite lit. */
+        boolean chosen;
+        /**
          * The colour the label is drawn in; -1 for the menu's ivory. An
          * operator's action wears the Operator channel's crimson, so a
          * row that reaches beyond this player's own words is told apart
@@ -144,6 +154,18 @@ final class ChatPopupMenu {
             return this;
         }
 
+        /**
+         * The same entry with a sprite that lights: under the pointer,
+         * and for as long as the row is {@code chosen}.
+         */
+        Entry withSprite(ChatIconSheet sprite, ChatIconSheet litSprite,
+                         boolean chosen) {
+            this.sprite = sprite;
+            this.litSprite = litSprite;
+            this.chosen = chosen;
+            return this;
+        }
+
     }
 
     /** The head a row wears: an account's, or a character skin's. */
@@ -191,6 +213,13 @@ final class ChatPopupMenu {
     /** The keys of the shortcut shown beside it, or empty for none. */
     private int[] filterHint = NO_KEYS;
     private long filterNanos;
+    /**
+     * How far each lighting sprite has crossed to its lit artwork, by its
+     * row's id, so a list handed over again as it is typed into carries
+     * on from what is on screen; and when the crossfades last stepped.
+     */
+    private final Map<String, Float> spriteFades = new HashMap<String, Float>();
+    private long spriteNanos;
 
     boolean isOpen() {
         return !this.entries.isEmpty();
@@ -333,6 +362,7 @@ final class ChatPopupMenu {
             // A fresh opening starts where it is asked; only wheel turns
             // on the open list glide.
             this.renderedScrollRows = this.scrollRows;
+            this.spriteFades.clear();
         }
     }
 
@@ -386,6 +416,8 @@ final class ChatPopupMenu {
         this.filter = null;
         this.filterPrompt = "";
         this.filterHint = NO_KEYS;
+        this.spriteFades.clear();
+        this.spriteNanos = 0L;
         this.fieldHeight = 0;
     }
 
@@ -493,6 +525,22 @@ final class ChatPopupMenu {
                 LostTalesChatMotion.SCROLL_EASE_SECONDS);
     }
 
+    /**
+     * One step of a lighting sprite's crossfade, toward its lit artwork
+     * while its row is hovered or chosen. A row drawn for the first time
+     * starts where it is headed, so a menu opening on the chosen row
+     * shows its sprite lit instead of lighting it up.
+     */
+    private float spriteFade(Entry entry, boolean hovered, double elapsed) {
+        boolean lit = hovered || entry.chosen;
+        Float kept = this.spriteFades.get(entry.id);
+        float fade = kept == null ? (lit ? 1.0F : 0.0F)
+                : LostTalesChatVisualStyle.hoverFade(kept.floatValue(), lit,
+                        elapsed);
+        this.spriteFades.put(entry.id, Float.valueOf(fade));
+        return fade;
+    }
+
     /** The clickable entry under the point, resolved against the drawn
      *  offset so a gliding list answers for what is on screen; headers,
      *  display rows and the padding bands are nobody's. */
@@ -543,6 +591,10 @@ final class ChatPopupMenu {
             return;
         }
         advanceScrollEasing();
+        long now = System.nanoTime();
+        double elapsed = this.spriteNanos == 0L ? 0.0D
+                : (now - this.spriteNanos) / 1.0E9D;
+        this.spriteNanos = now;
         Entry hovered = entryAt(mouseX, mouseY);
         // Rows are laid out from the drawn offset — whole rows pick where
         // the list starts, the fraction slides it — and clipped to the
@@ -624,10 +676,16 @@ final class ChatPopupMenu {
                             1.0F, 1.0F);
                 }
             } else if (entry.sprite != null) {
-                entry.sprite.drawWithShadow(
-                        this.x + this.labelX - ChatChannelIcons.SIZE
-                                - ChatChannelIcons.GAP + 1,
-                        rowY + 2, 255);
+                int spriteX = this.x + this.labelX - ChatChannelIcons.SIZE
+                        - ChatChannelIcons.GAP + 1;
+                if (entry.litSprite == null) {
+                    entry.sprite.drawWithShadow(spriteX, rowY + 2, 255);
+                } else {
+                    ChatIconSheet.drawPairWithShadow(entry.sprite,
+                            entry.litSprite,
+                            spriteFade(entry, entry == hovered, elapsed),
+                            spriteX, rowY + 2, 255);
+                }
             }
             // Text at full opacity always; a muted channel is italic, the
             // hovered row is told by its highlight.

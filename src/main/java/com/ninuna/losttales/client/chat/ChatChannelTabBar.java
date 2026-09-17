@@ -226,17 +226,18 @@ final class ChatChannelTabBar {
      * The tab search control at the row's left end: a framed button with
      * the sheet's chevron run centred in it, pointing down while its
      * panel is away and folding up to a rule and over as the panel
-     * opens. The button keeps one size however the run plays, so the
-     * row's geometry does not move.
+     * opens. The run rests in the sheet's muted chevrons and lights to
+     * the ivory ones. The button keeps one size however the run plays,
+     * so the row's geometry does not move.
      */
     private static final ChatIconSheet[] SEARCH_FRAMES = {
+            ChatIconSheet.CHEVRON_1_MUTED, ChatIconSheet.CHEVRON_2_MUTED,
+            ChatIconSheet.CHEVRON_3_MUTED, ChatIconSheet.CHEVRON_4_MUTED,
+            ChatIconSheet.CHEVRON_5_MUTED};
+    private static final ChatIconSheet[] SEARCH_FRAMES_HOVER = {
             ChatIconSheet.CHEVRON_1, ChatIconSheet.CHEVRON_2,
             ChatIconSheet.CHEVRON_3, ChatIconSheet.CHEVRON_4,
             ChatIconSheet.CHEVRON_5};
-    private static final ChatIconSheet[] SEARCH_FRAMES_HOVER = {
-            ChatIconSheet.CHEVRON_1_HOVER, ChatIconSheet.CHEVRON_2_HOVER,
-            ChatIconSheet.CHEVRON_3_HOVER, ChatIconSheet.CHEVRON_4_HOVER,
-            ChatIconSheet.CHEVRON_5_HOVER};
     /**
      * The search button's square: the chevron's width with the strips'
      * wide inset either side. Square, so the chevron's three rows stand
@@ -253,23 +254,16 @@ final class ChatChannelTabBar {
     /** The search bar's well, cut out of the tool strip; null for none. */
     private ChatHitBox toolStripHole;
     /**
-     * The window's left frame edge: the strip's first column, drawn on
-     * the border, one pixel wide. The gaps are measured from it rather
-     * than from the strip's edge, so the frame counts toward none.
-     */
-    private static final int FRAME_EDGE_WIDTH =
-            ChatTimestampColumn.BORDER_WIDTH;
-    /**
      * Clear space either side of the search button: the window's frame
      * edge, this, the button, this again, and then the first tab.
      */
     private static final int SEARCH_MARGIN = 3;
     /**
      * Where the search button begins, measured from the row's left: the
-     * margin past the frame edge.
+     * margin in from the window's edge, the frame standing just outside
+     * it.
      */
-    private static final int SEARCH_LEFT =
-            FRAME_EDGE_WIDTH + SEARCH_MARGIN - STRIP_INSET;
+    private static final int SEARCH_LEFT = SEARCH_MARGIN - STRIP_INSET;
     /** Where the row's tabs begin: past the search button and its gaps. */
     private static final int SEARCH_RUN =
             SEARCH_LEFT + SEARCH_SIZE + SEARCH_MARGIN;
@@ -2384,7 +2378,7 @@ final class ChatChannelTabBar {
      * leaves for it, lit while the pointer is on it or its panel is out —
      * the way a main-menu button lights while it is hovered or chosen —
      * with the chevron whose run says whether the panel is out centred in
-     * the frame.
+     * the frame, lit with it.
      */
     private void drawSearch(int left, int top, boolean open,
                             boolean hovered) {
@@ -2392,7 +2386,7 @@ final class ChatChannelTabBar {
                 hovered || open, this.frameElapsed);
         ChatFramedButton.drawSurface(left, top, SEARCH_SIZE, SEARCH_SIZE,
                 this.searchFade, scaled(TAB_SURFACE_ALPHA));
-        this.searchChevron.advance(open, hovered);
+        this.searchChevron.advance(open, hovered || open);
         this.searchChevron.draw(left, top, SEARCH_SIZE, SEARCH_SIZE,
                 scaled(0xFF));
         ChatFramedButton.drawInk(left, top, SEARCH_SIZE, SEARCH_SIZE,

@@ -526,7 +526,7 @@ public class LostTalesHudPlacementGui extends GuiScreen
         @Override
         public void moveTo(double x, double y, LostTalesHudPlacementGui gui) {
             ChatWindowPlacement.Box box = preciseBounds(gui);
-            apply(ChatWindowPlacement.windowPercentX(x, gui.mc, gui.width),
+            apply(ChatWindowPlacement.feedPercentX(x, gui.mc, gui.width),
                     ChatWindowPlacement.feedPercentY(y + box.height, gui.mc,
                             gui.height));
         }

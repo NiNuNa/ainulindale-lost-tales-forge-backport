@@ -49,6 +49,7 @@ import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatUpdatePacket;
 import com.ninuna.losttales.party.model.Party;
+import com.ninuna.losttales.quest.LostTalesQuestShareResolver;
 import com.ninuna.losttales.permission.LostTalesCapability;
 import com.ninuna.losttales.permission.LostTalesPermissionCatalog;
 import com.ninuna.losttales.permission.LostTalesPermissions;
@@ -319,7 +320,12 @@ public final class LostTalesChatService {
                 // faction it was spoken to, or the party it was spoken
                 // in. The client files it under that conversation's tab
                 // and shows it under no other.
-                .withScope(replyScope);
+                .withScope(replyScope)
+                // The players its @names reach, as they are now: kept with
+                // the line, so a replay shows each mention as this one
+                // does, whether or not the player is still online.
+                .withNamedPlayers(LostTalesServerBroadcastHook
+                        .mentionedPlayers(message));
 
         FMLLog.info("[losttales/chat/%s] <%s (%s)> %s%s%s",
                 channel.getId(), identityName, accountName, message,
@@ -442,7 +448,9 @@ public final class LostTalesChatService {
                 displayName, "", ivory, ivory, message,
                 System.currentTimeMillis(), "", null, "", "", 0, true,
                 messageId, reply)
-                .withScope(factionScope == null ? "" : factionScope);
+                .withScope(factionScope == null ? "" : factionScope)
+                .withNamedPlayers(LostTalesServerBroadcastHook
+                        .mentionedPlayers(message));
         FMLLog.info("[losttales/chat/%s] <%s (discord)> %s", channel.getId(),
                 displayName, message);
         // Routed by the channel's own rule with no sender behind the
@@ -950,6 +958,12 @@ public final class LostTalesChatService {
                 readableChannels(player));
     }
 
+    /** Current authoritative chat/party identity used by quest-card joins. */
+    public static ChatHistory.Requester historyRequesterFor(
+            EntityPlayerMP player) {
+        return requesterFor(player);
+    }
+
     /**
      * The name a player reacts as in a channel: the character they are
      * playing where lines are signed in character, the account where
@@ -1349,6 +1363,7 @@ public final class LostTalesChatService {
         boolean itemUnavailable = false;
         boolean itemTooLarge = false;
         boolean markerUnavailable = false;
+        boolean questUnavailable = false;
         boolean overBudget = false;
         int budget = ChatShowcase.MAX_TOTAL_BYTES;
         for (int index = 0; index < count; index++) {
@@ -1357,6 +1372,8 @@ public final class LostTalesChatService {
             if (reference == null || reference.getKind() != token.kind) {
                 if (token.kind == ChatShareKind.MARKER) {
                     markerUnavailable = true;
+                } else if (token.kind == ChatShareKind.QUEST) {
+                    questUnavailable = true;
                 } else {
                     itemUnavailable = true;
                 }
@@ -1380,7 +1397,7 @@ public final class LostTalesChatService {
                 }
                 budget -= item.serializedBytes();
                 result.add(item);
-            } else {
+            } else if (token.kind == ChatShareKind.MARKER) {
                 ChatShowcase marker = resolveMarker(
                         sender, reference, token, index);
                 if (marker == null) {
@@ -1393,6 +1410,20 @@ public final class LostTalesChatService {
                 }
                 budget -= marker.serializedBytes();
                 result.add(marker);
+            } else {
+                ChatShowcase quest = LostTalesQuestShareResolver.resolve(
+                        sender, reference.getQuestReference(),
+                        token.normalizedName(), index);
+                if (quest == null) {
+                    questUnavailable = true;
+                    continue;
+                }
+                if (quest.serializedBytes() > budget) {
+                    overBudget = true;
+                    continue;
+                }
+                budget -= quest.serializedBytes();
+                result.add(quest);
             }
         }
         if (itemUnavailable) {
@@ -1406,6 +1437,10 @@ public final class LostTalesChatService {
         if (markerUnavailable) {
             sender.addChatMessage(new ChatComponentTranslation(
                     "chat.losttales.marker.unavailable"));
+        }
+        if (questUnavailable) {
+            sender.addChatMessage(new ChatComponentTranslation(
+                    "chat.losttales.quest.unavailable"));
         }
         if (overBudget) {
             sender.addChatMessage(new ChatComponentTranslation(

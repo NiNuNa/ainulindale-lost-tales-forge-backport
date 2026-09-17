@@ -1,8 +1,9 @@
 {
   "id": "losttales:tutorial/starter_note",
   "title": "The Sealed Note",
-  "description": "A development quest that starts from an NBT-tagged item. Use /losttales quest starter losttales:tutorial/starter_note to create the note.",
+  "description": "A sealed note carries a simple warning for the road: make light before dusk finds you unprepared.",
   "repeatable": true,
+  "restartable": true,
   "startMode": "item",
   "rewards": {
     "experience": "12",

@@ -101,6 +101,7 @@ public final class ChatShareTokenParserTest {
         assertEquals("", ChatShareTokenParser.normalizeName(null));
         assertEquals(ChatShareKind.ITEM, ChatShareKind.fromCode('i'));
         assertEquals(ChatShareKind.MARKER, ChatShareKind.fromCode('m'));
+        assertEquals(ChatShareKind.QUEST, ChatShareKind.fromCode('q'));
         assertEquals(null, ChatShareKind.fromCode('x'));
     }
 }

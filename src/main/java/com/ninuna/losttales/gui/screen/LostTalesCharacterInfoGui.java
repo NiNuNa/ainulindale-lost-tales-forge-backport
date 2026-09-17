@@ -23,6 +23,7 @@ import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
+import com.ninuna.losttales.quest.LostTalesQuestObjectiveSelection;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveTextHelper;
 import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
@@ -363,7 +364,8 @@ public class LostTalesCharacterInfoGui extends GuiScreen
     }
 
     private String getPrimaryObjectiveText(LostTalesQuestDefinition quest, LostTalesQuestProgress progress) {
-        LostTalesQuestStageDefinition stage = findStage(quest, progress);
+        LostTalesQuestStageDefinition stage = LostTalesQuestObjectiveSelection
+                .getCurrentStage(quest, progress);
         if (stage == null || stage.getObjectives().isEmpty()) {
             return "No active objective.";
         }
@@ -375,19 +377,6 @@ public class LostTalesCharacterInfoGui extends GuiScreen
             }
         }
         return LostTalesQuestObjectiveTextHelper.buildObjectiveLine(progress, stage.getObjectives().get(0), true, false, false, false);
-    }
-
-    private LostTalesQuestStageDefinition findStage(LostTalesQuestDefinition quest, LostTalesQuestProgress progress) {
-        if (quest == null || progress == null || quest.getStages().isEmpty()) {
-            return null;
-        }
-        for (LostTalesQuestStageDefinition stage : quest.getStages()) {
-            if (stage.getId() != null && stage.getId().equals(progress.getStageId())) {
-                return stage;
-            }
-        }
-        int index = progress.getStageIndex();
-        return index >= 0 && index < quest.getStages().size() ? quest.getStages().get(index) : quest.getFirstStage();
     }
 
     private void drawEntityModel(int x, int y, int scale, float yaw, float pitch, EntityLivingBase entity) {

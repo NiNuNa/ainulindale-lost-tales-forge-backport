@@ -1046,7 +1046,9 @@ final class ChatScreenMenus {
                             "gui.losttales.chat.character_selection.narrator"),
                     false, ClientChatIdentities.isNarrating()
                             ? LostTalesColors.rgb(LostTalesColors.HONEY) : -1, null)
-                    .withSprite(ChatIconSheet.SPEECH_BUBBLE));
+                    .withSprite(ChatIconSheet.SPEECH_BUBBLE,
+                            ChatIconSheet.SPEECH_BUBBLE_HOVER,
+                            ClientChatIdentities.isNarrating()));
         }
         addSection(entries,
                 "gui.losttales.chat.character_selection.characters",

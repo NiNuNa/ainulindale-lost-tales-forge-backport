@@ -33,6 +33,15 @@ public final class ClientChatShowcaseStore {
         return register(new Entry(null, new Marker(showcase)));
     }
 
+    static synchronized int registerQuest(ChatShowcase showcase,
+                                           long messageId) {
+        if (showcase == null || showcase.getKind() != ChatShareKind.QUEST) {
+            return -1;
+        }
+        return register(new Entry(null, null,
+                new Quest(showcase, messageId)));
+    }
+
     private static int register(Entry entry) {
         int id = nextId++;
         ENTRIES.put(Integer.valueOf(id), entry);
@@ -55,6 +64,11 @@ public final class ClientChatShowcaseStore {
         return entry == null ? null : entry.marker;
     }
 
+    static synchronized Quest getQuest(int id) {
+        Entry entry = id < 0 ? null : ENTRIES.get(Integer.valueOf(id));
+        return entry == null ? null : entry.quest;
+    }
+
     public static synchronized void clear() {
         ENTRIES.clear();
         nextId = 0;
@@ -63,10 +77,16 @@ public final class ClientChatShowcaseStore {
     private static final class Entry {
         final ItemStack stack;
         final Marker marker;
+        final Quest quest;
 
         Entry(ItemStack stack, Marker marker) {
+            this(stack, marker, null);
+        }
+
+        Entry(ItemStack stack, Marker marker, Quest quest) {
             this.stack = stack;
             this.marker = marker;
+            this.quest = quest;
         }
     }
 
@@ -88,6 +108,31 @@ public final class ClientChatShowcaseStore {
             this.dimensionId = showcase.getMarkerDimension();
             this.x = showcase.getMarkerX();
             this.z = showcase.getMarkerZ();
+        }
+    }
+
+    /** Immutable quest-card fields validated by the sending server. */
+    static final class Quest {
+        final long messageId;
+        final int tokenIndex;
+        final String reference;
+        final String title;
+        final String category;
+        final String objective;
+        final String reward;
+        final boolean joinable;
+
+        Quest(ChatShowcase showcase, long messageId) {
+            this.messageId = messageId;
+            this.tokenIndex = showcase.getTokenIndex();
+            this.reference = showcase.getQuestReference();
+            this.title = showcase.getQuestTitle();
+            this.category = showcase.getQuestCategory();
+            this.objective = showcase.getQuestObjective();
+            this.reward = showcase.getQuestReward();
+            this.joinable = showcase.isQuestJoinable()
+                    && com.ninuna.losttales.chat.ChatMessageIds.isServerId(
+                            messageId);
         }
     }
 }

@@ -9,6 +9,8 @@ import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatTabIds;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
+import com.ninuna.losttales.chat.share.ChatShareKind;
+import com.ninuna.losttales.chat.share.ChatShowcase;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -222,6 +224,40 @@ public final class ChatHistory {
         }
         return withHead(ChatReplyReference.of(messageId, entry.author,
                 entry.excerpt, entry.forOthers.getNameColor()), entry);
+    }
+
+    /**
+     * A server-recorded quest card this account may still read. The join
+     * request names only the immutable message and token position; the quest
+     * reference itself is recovered here, never trusted from the client.
+     */
+    public static synchronized QuestShareClaim questShareFor(
+            long messageId, int tokenIndex, Requester requester) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        if (entry == null || requester == null || requester.accountId == null
+                || tokenIndex < 0
+                || !(entry.seenBy.contains(requester.accountId)
+                        || entry.audience.admits(requester, entry))) {
+            return null;
+        }
+        for (ChatShowcase showcase : entry.forOthers.getShowcases()) {
+            if (showcase != null && showcase.getKind() == ChatShareKind.QUEST
+                    && showcase.getTokenIndex() == tokenIndex
+                    && showcase.isQuestJoinable()) {
+                return new QuestShareClaim(entry.authorId, showcase);
+            }
+        }
+        return null;
+    }
+
+    public static final class QuestShareClaim {
+        public final UUID authorId;
+        public final ChatShowcase showcase;
+
+        QuestShareClaim(UUID authorId, ChatShowcase showcase) {
+            this.authorId = authorId;
+            this.showcase = showcase;
+        }
     }
 
     /** The quote wearing the head the quoted line was drawn with. */

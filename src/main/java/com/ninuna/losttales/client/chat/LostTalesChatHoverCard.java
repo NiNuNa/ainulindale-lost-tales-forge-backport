@@ -17,6 +17,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ChatLine;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiNewChat;
+import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
 import net.minecraft.util.StatCollector;
 import org.lwjgl.opengl.GL11;
@@ -57,6 +58,9 @@ final class LostTalesChatHoverCard {
     private static final int MAX_DESCRIPTION_LINES = 4;
     /** Holders a role card lists before folding the rest into a count. */
     private static final int MAX_ROLE_MEMBER_LINES = 8;
+    /** The label of the row naming the command a Server line answers. */
+    private static final String COMMAND_LABEL_KEY =
+            "gui.losttales.chat.card.command";
 
     private LostTalesChatHoverCard() {}
 
@@ -256,8 +260,9 @@ final class LostTalesChatHoverCard {
             lines.add(title);
         }
         // The Server's card says what it is answering: the command the
-        // line under the pointer was the answer to.
-        addDetail(lines, "gui.losttales.chat.card.command", target.note);
+        // line under the pointer was the answer to, as inline code.
+        int commandRow = addDetail(lines, COMMAND_LABEL_KEY, target.note)
+                ? lines.size() - 1 : -1;
         // The roles the identity wears, whichever channel the line was
         // said in: an account its own, a character the account's and its
         // own. A role not worn on an in-character line is still held, and
@@ -354,6 +359,9 @@ final class LostTalesChatHoverCard {
                 if (index == 0 && title.length() > 0) {
                     LostTalesChatVisualStyle.drawPlain(font, line,
                             textX, textY, 255);
+                } else if (index == commandRow) {
+                    drawCommandDetail(font, target.note, textX, textY,
+                            textWidth);
                 } else {
                     drawColored(font, line, textX, textY,
                             LostTalesSkyrimUiStyle.TEXT_MUTED);
@@ -488,12 +496,35 @@ final class LostTalesChatHoverCard {
         return names.toString();
     }
 
-    private static void addDetail(List<String> lines, String labelKey,
-                                  String value) {
+    /** Adds a {@code Label: value} row for a known value; whether it did. */
+    private static boolean addDetail(List<String> lines, String labelKey,
+                                     String value) {
         String text = value == null ? "" : value.trim();
-        if (text.length() > 0) {
-            lines.add(StatCollector.translateToLocal(labelKey) + ": "
-                    + text);
+        if (text.length() == 0) {
+            return false;
+        }
+        lines.add(StatCollector.translateToLocal(labelKey) + ": " + text);
+        return true;
+    }
+
+    /**
+     * The row naming the command a Server line answers: the label in the
+     * card's muted tone, and the command as the chat's inline code, in
+     * italics and the aside tone, as the chat shows a command wherever
+     * it shows one.
+     */
+    private static void drawCommandDetail(FontRenderer font, String command,
+                                          int x, int y, int width) {
+        String label = LostTalesSkyrimUiStyle.trimToWidth(font,
+                StatCollector.translateToLocal(COMMAND_LABEL_KEY) + ": ",
+                width);
+        drawColored(font, label, x, y, LostTalesSkyrimUiStyle.TEXT_MUTED);
+        int labelWidth = font.getStringWidth(label);
+        String code = LostTalesSkyrimUiStyle.trimToWidth(font,
+                command == null ? "" : command.trim(), width - labelWidth);
+        if (code.length() > 0) {
+            drawColored(font, EnumChatFormatting.ITALIC + code,
+                    x + labelWidth, y, LostTalesChatVisualStyle.asideRgb());
         }
     }
 

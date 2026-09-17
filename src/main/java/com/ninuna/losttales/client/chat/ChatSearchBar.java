@@ -7,7 +7,8 @@ import net.minecraft.util.StatCollector;
 
 /**
  * The search bar in a window's tool strip, the strip's reason to be:
- * the magnifier, a field in a well cut out of the strip, the count of
+ * the magnifier, lit while the field takes the keys or the pointer is
+ * on its well, a field in a well cut out of the strip, the count of
  * matches and the place stood on, an up and a down chevron to walk
  * them, and a cross to close. Everything stands on the strip's one
  * centre row, laid out from the strip's edges as the tabs are, and
@@ -52,6 +53,7 @@ final class ChatSearchBar {
     private ChatInputField field;
     private Layout layout;
     private String layoutWindowId;
+    private float magnifierFade;
     private float previousFade;
     private float nextFade;
     private float closeFade;
@@ -177,7 +179,11 @@ final class ChatSearchBar {
                 LostTalesChatVisualStyle.argb(LostTalesChatVisualStyle.SURFACE_RGB,
                         surfaceAlpha));
         LostTalesChatVisualStyle.beginContent();
-        ChatIconSheet.SEARCH.drawWithShadow(laid.magnifierX,
+        this.magnifierFade = LostTalesChatVisualStyle.hoverFade(this.magnifierFade,
+                under == Part.FIELD || (this.field != null && this.field.isFocused()),
+                elapsed);
+        ChatIconSheet.drawPairWithShadow(ChatIconSheet.SEARCH,
+                ChatIconSheet.SEARCH_HOVER, this.magnifierFade, laid.magnifierX,
                 laid.textTop + LostTalesChatOverlayRenderer.centredBoxTop(
                         ChatIconSheet.SEARCH.getHeight()), ink);
         if (this.field != null) {

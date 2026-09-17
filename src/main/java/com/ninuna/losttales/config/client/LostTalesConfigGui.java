@@ -118,7 +118,8 @@ public class LostTalesConfigGui extends GuiConfig {
                 "quickLootHudMaxRows")));
         elements.add(group("questHud", "losttales.config.category.client.questHud", pick(client,
                 "questHudMaxObjectives", "questHudMaxTrackedQuests", "questHudObjectiveLineCount",
-                "showQuestHudNotifications", "showWorldQuestMarkers", "showDiscoveredWorldMapMarkers",
+                "showQuestHudNotifications", "showNativeLotrQuestTracker",
+                "showWorldQuestMarkers", "showDiscoveredWorldMapMarkers",
                 "worldQuestMarkerMaxDistance", "showQuestChatFeedback", "playQuestSounds")));
         elements.add(group("chat", "losttales.config.category.client.chat", pick(client,
                 "showTimestamps", "enableChatEmojis", "convertChatEmoticons",

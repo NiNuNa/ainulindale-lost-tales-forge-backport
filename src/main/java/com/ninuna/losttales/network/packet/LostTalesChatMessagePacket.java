@@ -732,6 +732,20 @@ public final class LostTalesChatMessagePacket implements IMessage {
             return ChatShowcase.marker(tokenIndex, id, name, icon, color,
                     dimension, x, z);
         }
+        if (kind == ChatShareKind.QUEST) {
+            String reference = LostTalesPacketCodec.readUtf8String(buffer,
+                    ChatShowcase.MAX_QUEST_REFERENCE_BYTES);
+            String title = LostTalesPacketCodec.readUtf8String(buffer,
+                    ChatShowcase.MAX_QUEST_TITLE_BYTES);
+            String category = LostTalesPacketCodec.readUtf8String(buffer,
+                    ChatShowcase.MAX_QUEST_CATEGORY_BYTES);
+            String objective = LostTalesPacketCodec.readUtf8String(buffer,
+                    ChatShowcase.MAX_QUEST_OBJECTIVE_BYTES);
+            String reward = LostTalesPacketCodec.readUtf8String(buffer,
+                    ChatShowcase.MAX_QUEST_REWARD_BYTES);
+            return ChatShowcase.quest(tokenIndex, reference, title, category,
+                    objective, reward, buffer.readBoolean());
+        }
         throw new LostTalesPacketCodec.DecodeException("unknown showcase kind");
     }
 
@@ -763,7 +777,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 LostTalesPacketCodec.writeBytes(buffer,
                         showcase.getStackData(),
                         ChatShowcase.MAX_STACK_BYTES);
-            } else {
+            } else if (showcase.getKind() == ChatShareKind.MARKER) {
                 LostTalesPacketCodec.writeUtf8String(buffer,
                         showcase.getMarkerId(),
                         ChatShowcase.MAX_MARKER_ID_BYTES);
@@ -779,6 +793,23 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 buffer.writeInt(showcase.getMarkerDimension());
                 buffer.writeDouble(showcase.getMarkerX());
                 buffer.writeDouble(showcase.getMarkerZ());
+            } else {
+                LostTalesPacketCodec.writeUtf8String(buffer,
+                        showcase.getQuestReference(),
+                        ChatShowcase.MAX_QUEST_REFERENCE_BYTES);
+                LostTalesPacketCodec.writeUtf8String(buffer,
+                        showcase.getQuestTitle(),
+                        ChatShowcase.MAX_QUEST_TITLE_BYTES);
+                LostTalesPacketCodec.writeUtf8String(buffer,
+                        showcase.getQuestCategory(),
+                        ChatShowcase.MAX_QUEST_CATEGORY_BYTES);
+                LostTalesPacketCodec.writeUtf8String(buffer,
+                        showcase.getQuestObjective(),
+                        ChatShowcase.MAX_QUEST_OBJECTIVE_BYTES);
+                LostTalesPacketCodec.writeUtf8String(buffer,
+                        showcase.getQuestReward(),
+                        ChatShowcase.MAX_QUEST_REWARD_BYTES);
+                buffer.writeBoolean(showcase.isQuestJoinable());
             }
         }
         LostTalesPacketCodec.writeUtf8String(
@@ -1068,10 +1099,24 @@ public final class LostTalesChatMessagePacket implements IMessage {
         return copy;
     }
 
+    /**
+     * The same line naming {@code named} as the server knows them now:
+     * the players a message's {@code @names} reach as it is said, kept
+     * with it so a replay shows each mention as the live line did once
+     * the player has gone. The line's component, if it has one, stays.
+     */
+    public LostTalesChatMessagePacket withNamedPlayers(
+            List<ChatNamedPlayer> named) {
+        return withServerBody(this.bodyJson, named);
+    }
+
     /** The server line's own component as chat JSON; empty for none. */
     public String getBodyJson() { return this.bodyJson; }
 
-    /** The players a server line names, as the server knew them; never null. */
+    /**
+     * The players the line names as the server knew them when it was
+     * said — a server line's players, a message's mentions; never null.
+     */
     public List<ChatNamedPlayer> getNamedPlayers() { return this.namedPlayers; }
 
     /**

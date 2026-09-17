@@ -3,6 +3,7 @@
   "title": "Path of the Survivalist: Tools of the Trail",
   "description": "Good tools are quiet companions. The axe, the pick, and the blade each answer a different danger on the road.",
   "repeatable": false,
+  "restartable": true,
   "startMode": "item",
   "prerequisites": {
     "completed": "losttales:path/survivalist/food_for_the_road"

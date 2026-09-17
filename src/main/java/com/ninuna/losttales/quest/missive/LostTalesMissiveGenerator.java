@@ -75,14 +75,11 @@ public final class LostTalesMissiveGenerator {
 
     public static LostTalesMissiveData createRandomMissive(World world, String boardKey, long worldTime, int sequence, Random random) {
         Random safeRandom = random == null ? new Random() : random;
-        int choice = safeRandom.nextInt(3);
+        int choice = safeRandom.nextInt(2);
         if (choice == 0) {
             return createKillMissive(world, boardKey, worldTime, sequence, safeRandom);
         }
-        if (choice == 1) {
-            return createGatherMissive(world, boardKey, worldTime, sequence, safeRandom, false);
-        }
-        return createDeliveryPreparationMissive(world, boardKey, worldTime, sequence, safeRandom);
+        return createGatherMissive(world, boardKey, worldTime, sequence, safeRandom);
     }
 
     private static LostTalesMissiveData createKillMissive(World world, String boardKey, long worldTime, int sequence, Random random) {
@@ -132,7 +129,7 @@ public final class LostTalesMissiveGenerator {
                 .build();
     }
 
-    private static LostTalesMissiveData createGatherMissive(World world, String boardKey, long worldTime, int sequence, Random random, boolean deliveryStyle) {
+    private static LostTalesMissiveData createGatherMissive(World world, String boardKey, long worldTime, int sequence, Random random) {
         GatherTemplate template = GATHER_TEMPLATES[random.nextInt(GATHER_TEMPLATES.length)];
         int count = randomBetween(random, template.minCount, template.maxCount);
         int xp = count * template.xpPerItem + randomBetween(random, 6, 18);
@@ -144,27 +141,18 @@ public final class LostTalesMissiveGenerator {
         params.put("count", String.valueOf(count));
 
         LostTalesMissiveObjectiveData objective = new LostTalesMissiveObjectiveData(
-                deliveryStyle ? "prepare_" + normalizeId(template.displayName) : "gather_" + normalizeId(template.displayName),
+                "gather_" + normalizeId(template.displayName),
                 LostTalesMissiveObjectiveData.TYPE_GATHER,
-                (deliveryStyle ? "Gather and prepare " : "Gather ") + count + " " + template.displayName + ".",
+                "Gather " + count + " " + template.displayName + ".",
                 false,
                 params
         );
 
-        return LostTalesMissiveData.builder(questId, deliveryStyle ? LostTalesMissiveObjectiveData.TYPE_DELIVER : LostTalesMissiveObjectiveData.TYPE_GATHER)
-                .title(deliveryStyle
-                        ? randomChoice(random, "Missive: Supplies for the Road", "Delivery Notice: Goods Wanted", "Missive: A Parcel Prepared")
-                        : randomChoice(random, "Missive: Materials Wanted", "Notice: Gatherer's Pay", "Missive: Stores Run Low"))
-                .description(deliveryStyle
-                        ? "A parcel of " + template.displayName + " must be gathered before it can be sent onward. Bring the goods and the issuer will see them dispatched."
-                        : "The stores are running short of " + template.displayName + ". Bring what is asked and take the posted reward.")
+        return LostTalesMissiveData.builder(questId, LostTalesMissiveObjectiveData.TYPE_GATHER)
+                .title(randomChoice(random, "Missive: Materials Wanted", "Notice: Gatherer's Pay", "Missive: Stores Run Low"))
+                .description("The stores are running short of " + template.displayName + ". Bring what is asked and take the posted reward.")
                 .issuer(issuer)
-                .flavorText(deliveryStyle
-                        ? randomChoice(random,
-                                "A wax mark has been pressed beside the notice, but the destination is written only for the courier.",
-                                "The roads are long, and even simple goods can decide whether a journey succeeds.",
-                                "The issuer asks for steady hands before swift feet.")
-                        : randomChoice(random,
+                .flavorText(randomChoice(random,
                                 "Every hall and camp depends on small stores gathered before they are missed.",
                                 "The notice is plain, but the reward is marked clearly beneath it.",
                                 "Useful materials are worth more than idle promises."))
@@ -176,19 +164,9 @@ public final class LostTalesMissiveGenerator {
                 .context("board", safeBoardKey(boardKey))
                 .context("dimension", String.valueOf(getDimensionId(world)))
                 .context("target", template.displayName)
-                .context("deliveryPlaceholder", String.valueOf(deliveryStyle))
                 .objective(objective)
                 .rewardData(LostTalesMissiveRewardData.experienceAndItems(xp, rewardItemsForDifficulty(random, Math.max(1, count / 2))))
                 .build();
-    }
-
-    /**
-     * Delivery objectives are not tracked by the existing quest runtime yet.
-     * This first stage therefore creates delivery-flavoured gather quests so the
-     * generated data remains completable once server-side acceptance is added.
-     */
-    private static LostTalesMissiveData createDeliveryPreparationMissive(World world, String boardKey, long worldTime, int sequence, Random random) {
-        return createGatherMissive(world, boardKey, worldTime, sequence, random, true);
     }
 
     private static long randomTimeLimitTicks(Random random) {

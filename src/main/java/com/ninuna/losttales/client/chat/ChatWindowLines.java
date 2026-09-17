@@ -5,6 +5,7 @@ import cpw.mods.fml.common.FMLLog;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -173,6 +174,31 @@ final class ChatWindowLines {
         boolean[] opens = new boolean[days == null ? 0 : days.length];
         for (int index = 0; index < opens.length; index++) {
             opens[index] = days[index] != null;
+        }
+        return opens;
+    }
+
+    /**
+     * The messages that open a run of their own in a window: each day's
+     * first, under its rule, and the first unread one,
+     * {@code unreadLineId}, under the unread divider. Either is a voice
+     * of the chat's own between two messages, so the message under it
+     * starts again with its header; the unread divider only while it
+     * stands, so a run it split is whole again once it goes.
+     */
+    static boolean[] runsOpened(String[] days, int[] lineIds,
+                                int unreadLineId) {
+        boolean[] opens = runsOpenedByDays(days);
+        if (unreadLineId == 0 || lineIds == null) {
+            return opens;
+        }
+        if (opens.length < lineIds.length) {
+            opens = Arrays.copyOf(opens, lineIds.length);
+        }
+        for (int index = 0; index < lineIds.length; index++) {
+            if (lineIds[index] == unreadLineId) {
+                opens[index] = true;
+            }
         }
         return opens;
     }
@@ -377,13 +403,16 @@ final class ChatWindowLines {
     /**
      * The window's lines, laid out at {@code chatWidth} for the open
      * chat screen, or null when the unwrapped history cannot be read and
-     * the window should fall back to the shared list.
+     * the window should fall back to the shared list. The message the
+     * window's unread divider stands over, {@code unreadLineId} (zero
+     * for none), opens a run of its own while the divider stands.
      */
     static synchronized List<ChatLine> forWindow(Minecraft minecraft,
                                                  GuiNewChat chat,
                                                  ChatWindow window,
                                                  ChatLineFilter filter,
-                                                 int chatWidth) {
+                                                 int chatWidth,
+                                                 int unreadLineId) {
         if (minecraft == null || minecraft.fontRenderer == null
                 || chat == null || window == null || chatWidth <= 0) {
             return null;
@@ -396,7 +425,7 @@ final class ChatWindowLines {
         return forView(minecraft, chat, window.getId(), filter,
                 ChatWindowPlacement.wrapWidth(chatWidth,
                         chat.func_146244_h()) - (columns.messageX() - 2),
-                true, false);
+                true, false, unreadLineId);
     }
 
     /**
@@ -414,7 +443,7 @@ final class ChatWindowLines {
         return forView(minecraft, chat, ChatWindowFrame.feed().windowId,
                 filter, ChatWindowPlacement.wrapWidth(
                         ChatWindowPlacement.chatWidth(minecraft),
-                        chat.func_146244_h()), false, true);
+                        chat.func_146244_h()), false, true, 0);
     }
 
     /**
@@ -430,7 +459,7 @@ final class ChatWindowLines {
                                           GuiNewChat chat, String viewId,
                                           ChatLineFilter filter,
                                           int wrapWidth, boolean chatOpen,
-                                          boolean fading) {
+                                          boolean fading, int unreadLineId) {
         if (CHAT_LINES == null || minecraft == null
                 || minecraft.fontRenderer == null || filter == null
                 || viewId == null) {
@@ -453,7 +482,7 @@ final class ChatWindowLines {
             CACHE.put(viewId, cached);
         }
         cached.refresh(minecraft.fontRenderer, messages, filter,
-                signatureOf(messages));
+                signatureOf(messages), unreadLineId);
         return cached.lines;
     }
 
@@ -680,6 +709,8 @@ final class ChatWindowLines {
         private final ChatLineFilter filter;
         /** The history this layout describes; unchanged means reusable. */
         private long signature = Long.MIN_VALUE;
+        /** The message the unread divider stood over when last laid out. */
+        private int unreadLineId;
         /** Each message's own lines, held against the message itself. */
         private Map<ChatLine, Piece> wrapped =
                 new IdentityHashMap<ChatLine, Piece>();
@@ -706,17 +737,21 @@ final class ChatWindowLines {
         }
 
         /**
-         * Brings the layout up to date with the history. Messages
+         * Brings the layout up to date with the history and with the
+         * message the unread divider stands over. Messages
          * already laid out in the form this view still wants keep the
          * lines they had; only the rest are wrapped, and messages the
          * history has dropped go with them.
          */
         void refresh(FontRenderer font, List<ChatLine> messages,
-                     ChatLineFilter filter, long signature) {
-            if (signature == this.signature) {
+                     ChatLineFilter filter, long signature,
+                     int unreadLineId) {
+            if (signature == this.signature
+                    && unreadLineId == this.unreadLineId) {
                 return;
             }
             this.signature = signature;
+            this.unreadLineId = unreadLineId;
             List<ChatLine> visible =
                     new ArrayList<ChatLine>(messages.size());
             for (int index = 0; index < messages.size(); index++) {
@@ -735,13 +770,14 @@ final class ChatWindowLines {
                 lineIds[index] = visible.get(index).getChatLineID();
             }
             // A window stands a dated rule over each day's first
-            // message, and the rule ends the run it lands in; the feed,
-            // which shows the last few seconds, has no rules.
+            // message and the unread divider over its first unread one,
+            // and either ends the run it lands in; the feed, which shows
+            // the last few seconds, has neither.
             String[] days = this.fading ? null : dayDividersAfter(lineIds);
             boolean[] grouped = this.fading
                     ? ChatGroupRuns.continuationsInFeed(lineIds)
                     : ChatGroupRuns.continuationsOf(lineIds,
-                            runsOpenedByDays(days));
+                            runsOpened(days, lineIds, unreadLineId));
             if (this.fading) {
                 int[] arrivals = new int[visible.size()];
                 for (int index = 0; index < visible.size(); index++) {

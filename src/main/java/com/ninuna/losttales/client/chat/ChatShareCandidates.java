@@ -6,6 +6,8 @@ import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerVisibility;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapMarkerData;
+import com.ninuna.losttales.client.quest.ClientQuestCatalog;
+import com.ninuna.losttales.client.quest.ClientQuestEntry;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -73,6 +75,25 @@ final class ChatShareCandidates {
             int ordinal = nextOrdinal(seenNames, seenCounts, name);
             if (ordinal > 0) {
                 entries.add(new MarkerEntry(marker, name, ordinal));
+            }
+        }
+        return entries;
+    }
+
+    /** Active quests from the unified journal, including view-only LOTR quests. */
+    static List<QuestEntry> quests() {
+        List<QuestEntry> entries = new ArrayList<QuestEntry>();
+        List<String> seenNames = new ArrayList<String>();
+        List<Integer> seenCounts = new ArrayList<Integer>();
+        for (ClientQuestEntry quest : ClientQuestCatalog.getEntries(
+                net.minecraft.client.Minecraft.getMinecraft())) {
+            if (quest == null || !quest.isActive()) {
+                continue;
+            }
+            String name = ChatShareTokenParser.plainName(quest.getTitle());
+            int ordinal = nextOrdinal(seenNames, seenCounts, name);
+            if (ordinal > 0) {
+                entries.add(new QuestEntry(quest, name, ordinal));
             }
         }
         return entries;
@@ -173,6 +194,20 @@ final class ChatShareCandidates {
         @Override
         ChatShareKind kind() {
             return ChatShareKind.MARKER;
+        }
+    }
+
+    static final class QuestEntry extends Entry {
+        final ClientQuestEntry quest;
+
+        QuestEntry(ClientQuestEntry quest, String name, int ordinal) {
+            super(name, ordinal);
+            this.quest = quest;
+        }
+
+        @Override
+        ChatShareKind kind() {
+            return ChatShareKind.QUEST;
         }
     }
 }

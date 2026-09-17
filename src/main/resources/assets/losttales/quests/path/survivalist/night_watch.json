@@ -3,6 +3,7 @@
   "title": "Path of the Survivalist: Night Watch",
   "description": "The wilds do not sleep when the sun goes down. A survivalist learns to hear the dark and answer before it reaches the firelight.",
   "repeatable": false,
+  "restartable": true,
   "startMode": "item",
   "prerequisites": {
     "completed": "losttales:path/survivalist/under_open_sky"

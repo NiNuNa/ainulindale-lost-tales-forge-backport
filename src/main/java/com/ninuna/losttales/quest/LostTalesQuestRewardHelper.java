@@ -1,5 +1,7 @@
 package com.ninuna.losttales.quest;
 
+import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import net.minecraft.entity.item.EntityItem;
@@ -13,11 +15,63 @@ public final class LostTalesQuestRewardHelper {
     private LostTalesQuestRewardHelper() {}
 
     public static boolean grantRewards(EntityPlayerMP player, LostTalesQuestDefinition quest) {
-        if (player == null || quest == null || quest.getRewards().isEmpty()) {
+        return grantRewards(player, quest, null);
+    }
+
+    public static boolean grantRewards(EntityPlayerMP player,
+            LostTalesQuestDefinition quest,
+            LostTalesQuestProgress progress) {
+        if (player == null || quest == null) {
             return false;
         }
 
-        Map<String, String> rewards = quest.getRewards();
+        boolean granted = grantRewardMap(player, quest.getRewards());
+        granted = grantOptionalRewards(player, quest, progress, granted);
+        if (granted) {
+            player.addChatMessage(new net.minecraft.util.ChatComponentText(EnumChatFormatting.DARK_AQUA + "[Lost Tales] " + EnumChatFormatting.RESET + EnumChatFormatting.GOLD + "Quest rewards received."));
+        }
+        return granted;
+    }
+
+    private static boolean grantOptionalRewards(EntityPlayerMP player,
+            LostTalesQuestDefinition quest, LostTalesQuestProgress progress,
+            boolean alreadyGranted) {
+        boolean granted = alreadyGranted;
+        if (player == null || quest == null || progress == null) {
+            return granted;
+        }
+        for (LostTalesQuestStageDefinition stage : quest.getStages()) {
+            for (LostTalesQuestObjectiveDefinition objective
+                    : stage.getObjectives()) {
+                if (!objective.isOptional()
+                        || progress.getObjectiveProgress(objective.getId())
+                        < LostTalesQuestObjectiveTextHelper
+                        .getObjectiveTargetCount(objective)) {
+                    continue;
+                }
+                Map<String, String> optionalRewards =
+                        new LinkedHashMap<String, String>();
+                for (Map.Entry<String, String> entry
+                        : objective.getParams().entrySet()) {
+                    String key = entry.getKey();
+                    if (key != null && key.startsWith("reward.")
+                            && key.length() > "reward.".length()) {
+                        optionalRewards.put(
+                                key.substring("reward.".length()),
+                                entry.getValue());
+                    }
+                }
+                granted |= grantRewardMap(player, optionalRewards);
+            }
+        }
+        return granted;
+    }
+
+    private static boolean grantRewardMap(EntityPlayerMP player,
+            Map<String, String> rewards) {
+        if (player == null || rewards == null || rewards.isEmpty()) {
+            return false;
+        }
         boolean granted = false;
 
         int xp = parseInt(firstNonEmpty(rewards.get("experience"), rewards.get("xp"), rewards.get("experiencePoints")), 0);
@@ -47,9 +101,6 @@ public final class LostTalesQuestRewardHelper {
             }
         }
 
-        if (granted) {
-            player.addChatMessage(new net.minecraft.util.ChatComponentText(EnumChatFormatting.DARK_AQUA + "[Lost Tales] " + EnumChatFormatting.RESET + EnumChatFormatting.GOLD + "Quest rewards received."));
-        }
         return granted;
     }
 

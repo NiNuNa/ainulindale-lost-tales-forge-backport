@@ -99,7 +99,8 @@ public final class LostTalesQuestDefinitionJsonParser {
         String title = getString(object, "title", id);
         String description = getString(object, "description", "");
         boolean repeatable = getBoolean(object, "repeatable", false);
-        String startMode = getString(object, "startMode", getString(object, "start", LostTalesQuestDefinition.START_MODE_JOURNAL));
+        boolean restartable = getBoolean(object, "restartable", false);
+        String startMode = getString(object, "startMode", getString(object, "start", LostTalesQuestDefinition.START_MODE_LOCKED));
         Map<String, String> prerequisites = parseStringMap(object.get("prerequisites"));
         prerequisites.putAll(parseStringMap(object.get("requirements")));
         Map<String, String> rewards = parseStringMap(object.get("rewards"));
@@ -113,7 +114,9 @@ public final class LostTalesQuestDefinitionJsonParser {
         if (id == null || id.length() == 0) {
             return null;
         }
-        return new LostTalesQuestDefinition(id, title, description, repeatable, startMode, prerequisites, rewards, interaction, markers, journalLog, stages);
+        return new LostTalesQuestDefinition(id, title, description,
+                repeatable, restartable, startMode, prerequisites, rewards,
+                interaction, markers, journalLog, stages);
     }
 
     private static List<LostTalesQuestStageDefinition> parseStages(JsonElement element) {

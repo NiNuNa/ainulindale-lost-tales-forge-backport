@@ -142,10 +142,6 @@ public final class LostTalesQuestProgress {
         this.objectiveProgress.put(objectiveId, Math.max(0, value));
     }
 
-    public void clearObjectiveProgress() {
-        this.objectiveProgress.clear();
-    }
-
     public NBTTagCompound writeToNBT() {
         NBTTagCompound tag = new NBTTagCompound();
         tag.setString("QuestId", this.questId);

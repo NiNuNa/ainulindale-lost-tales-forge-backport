@@ -5,6 +5,7 @@ import com.ninuna.losttales.character.identity.PlayableIdentityResolver;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.chat.ChatBroadcastIdMarkers;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatMentions;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
@@ -17,6 +18,7 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import cpw.mods.fml.common.FMLLog;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -331,6 +333,39 @@ public final class LostTalesServerBroadcastHook {
             // is their character's; an account name still names them.
             if (player != null && (ChatNamedPlayer.names(text, accountOf(player))
                     || ChatNamedPlayer.names(text, player.getDisplayName()))) {
+                named.add(namedPlayer(player));
+            }
+        }
+        return named;
+    }
+
+    /**
+     * The online players a message's {@code @names} reach, each as a
+     * line names them ({@link #namedPlayer}): kept with the message, so
+     * a replay shows every mention the live line showed, the players
+     * long gone included. Only a player the message names is resolved,
+     * and at most {@link ChatNamedPlayer#MAX_PER_LINE} are kept.
+     */
+    public static List<ChatNamedPlayer> mentionedPlayers(String message) {
+        MinecraftServer server = MinecraftServer.getServer();
+        if (message == null || message.indexOf('@') < 0 || server == null
+                || server.getConfigurationManager() == null
+                || server.getConfigurationManager().playerEntityList == null) {
+            return Collections.emptyList();
+        }
+        @SuppressWarnings("unchecked")
+        List<EntityPlayerMP> online =
+                server.getConfigurationManager().playerEntityList;
+        List<ChatNamedPlayer> named = new ArrayList<ChatNamedPlayer>();
+        for (EntityPlayerMP player : online) {
+            if (named.size() >= ChatNamedPlayer.MAX_PER_LINE) {
+                break;
+            }
+            // Their account or their character's name, as a mention
+            // of either reaches them.
+            if (player != null && ChatMentions.mentionsAny(message,
+                    Arrays.asList(accountOf(player),
+                            player.getDisplayName()))) {
                 named.add(namedPlayer(player));
             }
         }

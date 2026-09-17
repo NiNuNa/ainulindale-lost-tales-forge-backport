@@ -6,8 +6,8 @@ import java.util.Map;
 /**
  * Immutable description of one quest objective loaded from JSON.
  *
- * This is deliberately data-only for the first 1.7.10 quest backport stage.
- * Runtime progress, event handlers, and syncing can be layered on top later.
+ * Runtime state stays server-owned; this class only describes the authored
+ * objective and its policy parameters.
  */
 public final class LostTalesQuestObjectiveDefinition {
     private final String id;

@@ -5,10 +5,12 @@ import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
+import com.ninuna.losttales.quest.progress.LostTalesQuestHistoryEntry;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import java.util.Arrays;
 import java.util.Collections;
 import org.junit.Test;
 
@@ -49,8 +51,15 @@ public final class LostTalesQuestSyncPacketTest {
 
         LostTalesQuestSyncPacket original = new LostTalesQuestSyncPacket(
                 Collections.singletonList(progress),
-                Collections.singleton("losttales:completed"),
-                Collections.singleton("losttales:failed"),
+                Arrays.asList(new LostTalesQuestHistoryEntry(
+                        "losttales:completed",
+                        LostTalesQuestHistoryEntry.Outcome.COMPLETED,
+                        "The scouts survived.", 47000L,
+                        Collections.singleton("rescue_scouts")),
+                        new LostTalesQuestHistoryEntry(
+                        "losttales:failed",
+                        LostTalesQuestHistoryEntry.Outcome.FAILED,
+                        "Time limit expired.", 48000L)),
                 Collections.singleton("losttales:test_quest"),
                 Collections.singleton("runtime:camp"),
                 "runtime:camp", Collections.singletonList(marker),
@@ -68,8 +77,15 @@ public final class LostTalesQuestSyncPacketTest {
                 .getObjectiveProgress("collect"));
         assertEquals(Collections.singleton("losttales:completed"),
                 decoded.getCompletedQuestIds());
-        assertEquals(Collections.singleton("losttales:failed"),
-                decoded.getFailedQuestIds());
+        assertTrue(decoded.getQuestHistory().get(1).isFailed());
+        assertEquals("Time limit expired.",
+                decoded.getQuestHistory().get(1).getDetail());
+        assertEquals(48000L,
+                decoded.getQuestHistory().get(1).getWorldTime());
+        assertEquals("The scouts survived.",
+                decoded.getQuestHistory().get(0).getDetail());
+        assertTrue(decoded.getQuestHistory().get(0)
+                .isOptionalObjectiveCompleted("rescue_scouts"));
         assertEquals(Collections.singleton("losttales:test_quest"),
                 decoded.getPinnedQuestIds());
         assertEquals("runtime:camp", decoded.getPinnedMapMarkerId());

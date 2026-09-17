@@ -112,13 +112,11 @@ public final class ChatInputBarTest {
         int caretTop = ChatInputField.caretTop(textTop);
         int caretBottom = caretTop + (int)ChatInlineIcons.CONTENT_SIZE;
         // The well stands the clearance below the rule and as far above
-        // the bar's bottom frame edge, its last row, which counts toward
-        // no gap; and it is the icon's box with the wide inset above and
-        // below, a row taller at either end than the framed buttons
-        // beside it.
+        // the bar's bottom, the window's frame running just below it; and
+        // it is the icon's box with the wide inset above and below, a row
+        // taller at either end than the framed buttons beside it.
         assertEquals(1 + ChatInputBar.CLEARANCE, wellTop - barTop);
-        assertEquals(1, ChatInputBar.BAR_BORDER_WIDTH);
-        assertEquals(ChatInputBar.CLEARANCE + ChatInputBar.BAR_BORDER_WIDTH,
+        assertEquals(ChatInputBar.CLEARANCE,
                 barTop + ChatInputBar.HEIGHT - wellBottom);
         assertEquals(ChatChannelIcons.SIZE + 2 * ChatFramedButton.WIDE_INSET,
                 ChatInputBar.CONTENT_HEIGHT);
@@ -132,6 +130,10 @@ public final class ChatInputBarTest {
         assertEquals(1, caretTop - rowTop);
         assertEquals(1, rowTop + LostTalesChatOverlayRenderer.LINE_HEIGHT
                 - caretBottom);
+        // The caret's shadow fills the clear row under the caret, and
+        // stays inside the message row.
+        assertEquals(rowTop + LostTalesChatOverlayRenderer.LINE_HEIGHT,
+                caretBottom + LostTalesChatVisualStyle.SHADOW_OFFSET);
         assertEquals(textTop + LostTalesChatOverlayRenderer.centredBoxTop(
                         (int)ChatInlineIcons.CONTENT_SIZE),
                 ChatInlineIcons.boxTop(textTop, ChatInlineIcons.SLOT_WIDTH),

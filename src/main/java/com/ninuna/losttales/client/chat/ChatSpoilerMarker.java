@@ -76,6 +76,12 @@ final class ChatSpoilerMarker {
         return keyOf(component) != null;
     }
 
+    /** Whether the two runs are pieces of one spoiler. */
+    static boolean sameSpoiler(IChatComponent one, IChatComponent other) {
+        String key = keyOf(one);
+        return key != null && key.equals(keyOf(other));
+    }
+
     /** Whether the run's spoiler has been revealed by this player. */
     static boolean isRevealed(IChatComponent component) {
         String key = keyOf(component);

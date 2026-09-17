@@ -56,6 +56,32 @@ final class ChatInputRules {
         return (command == null ? "" : command.trim()).split("\\s+", 3);
     }
 
+    /**
+     * Where the words a whisper command sends begin in the raw text:
+     * after the verb, the name and the spaces after each, as
+     * {@link #whisperParts} splits them; the text's length while no
+     * words follow yet.
+     */
+    static int whisperMessageStart(String command) {
+        String text = command == null ? "" : command;
+        int index = 0;
+        for (int part = 0; part < 2; part++) {
+            while (index < text.length()
+                    && Character.isWhitespace(text.charAt(index))) {
+                index++;
+            }
+            while (index < text.length()
+                    && !Character.isWhitespace(text.charAt(index))) {
+                index++;
+            }
+        }
+        while (index < text.length()
+                && Character.isWhitespace(text.charAt(index))) {
+            index++;
+        }
+        return index;
+    }
+
     /** Whether a message holds as many visible characters as may be sent. */
     static boolean atMessageLimit(String text) {
         return ChatMessageValidator.visibleLength(text)

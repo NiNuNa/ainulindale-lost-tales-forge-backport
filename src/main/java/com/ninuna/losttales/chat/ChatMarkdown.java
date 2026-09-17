@@ -6,10 +6,11 @@ import java.util.List;
 
 /**
  * The light markup a message may be typed with, as the chat shows it:
- * {@code **bold**}, {@code *italic*}, {@code __underlined__},
- * {@code ~~struck~~}, {@code `code`} and {@code ||spoiler||} — the
- * inline marks Discord reads the same way, so a message reads alike on
- * both sides of the bridge without being rewritten for either.
+ * {@code **bold**}, {@code *italic*} or {@code _italic_},
+ * {@code __underlined__}, {@code ~~struck~~}, {@code `code`} and
+ * {@code ||spoiler||} — the inline marks Discord reads the same way, so
+ * a message reads alike on both sides of the bridge without being
+ * rewritten for either.
  *
  * <p>Display only. The wire, the copy text and the log keep exactly what
  * was typed, markers and all, so nothing here can change what a message
@@ -20,8 +21,12 @@ import java.util.List;
  * <p>A marker only opens when something follows it directly and only
  * closes when something precedes it directly, so arithmetic and
  * ordinary punctuation are left alone: {@code 2 * 3 * 4} is a sum, not
- * an italic. Code spans are literal inside — the point of quoting
- * something is that it is not read again — and every other span nests.</p>
+ * an italic. A single underscore also has to stand at a word's edge, as
+ * Discord reads one: it opens only where no letter, digit or underscore
+ * stands before it and closes only where none stands after it, so
+ * {@code snake_case} and a name like {@code Cool_Player_1} keep theirs.
+ * Code spans are literal inside — the point of quoting something is
+ * that it is not read again — and every other span nests.</p>
  *
  * <p>Free of Minecraft imports, so it is testable without a game
  * runtime.</p>
@@ -30,7 +35,7 @@ public final class ChatMarkdown {
     /** How deep spans may nest before the rest is left literal. */
     private static final int MAX_DEPTH = 8;
     private static final String[] DELIMITERS = {
-            "**", "__", "~~", "||", "*", "`" };
+            "**", "__", "~~", "||", "*", "_", "`" };
 
     private ChatMarkdown() {}
 
@@ -143,7 +148,9 @@ public final class ChatMarkdown {
             }
             int after = index + delimiter.length();
             if (after < text.length()
-                    && !Character.isWhitespace(text.charAt(after))) {
+                    && !Character.isWhitespace(text.charAt(after))
+                    && (!"_".equals(delimiter)
+                            || opensUnderscore(text, index))) {
                 return delimiter;
             }
         }
@@ -166,7 +173,9 @@ public final class ChatMarkdown {
             if (at < 0) {
                 return -1;
             }
-            if (at > from && !Character.isWhitespace(text.charAt(at - 1))) {
+            if (at > from && !Character.isWhitespace(text.charAt(at - 1))
+                    && (!"_".equals(delimiter)
+                            || closesUnderscore(text, at))) {
                 if (delimiter.length() > 1) {
                     char mark = delimiter.charAt(0);
                     while (at + delimiter.length() < text.length()
@@ -180,6 +189,32 @@ public final class ChatMarkdown {
             at += delimiter.length();
         }
         return -1;
+    }
+
+    /**
+     * Whether a single underscore at {@code index} may open an italic: at
+     * the start of a word, with no letter, digit or underscore before it,
+     * and not the first of two.
+     */
+    private static boolean opensUnderscore(String text, int index) {
+        return (index == 0 || !isWordCharacter(text.charAt(index - 1)))
+                && index + 1 < text.length()
+                && text.charAt(index + 1) != '_';
+    }
+
+    /**
+     * Whether a single underscore at {@code index} may close an italic: at
+     * the end of a word, with no underscore before it and no letter, digit
+     * or underscore after it.
+     */
+    private static boolean closesUnderscore(String text, int index) {
+        return text.charAt(index - 1) != '_'
+                && (index + 1 >= text.length()
+                        || !isWordCharacter(text.charAt(index + 1)));
+    }
+
+    private static boolean isWordCharacter(char character) {
+        return Character.isLetterOrDigit(character) || character == '_';
     }
 
     private static int styleOf(String delimiter) {
