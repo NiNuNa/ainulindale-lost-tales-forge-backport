@@ -1,5 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.client.gui.animation.LostTalesUiEasing;
 import com.ninuna.losttales.client.gui.animation.LostTalesUiTransition;
@@ -199,16 +201,35 @@ final class ChatWindowFrame {
      */
     int hoveredToolbarKind = -1;
     /** How far each toolbar control has lit, by kind, and on whose toolbar. */
-    private final float[] toolbarFades = new float[4];
+    /**
+     * A beat per toolbar control. The react face and the reply arrow
+     * rise; copying is a decisive act, so its glyph answers like a
+     * switch. Kept per window rather than per message, and started
+     * afresh when the toolbar moves to another line.
+     */
+    private final LostTalesUiButtonMotion[] toolbarMotions =
+            newToolbarMotions();
+
+    private static LostTalesUiButtonMotion[] newToolbarMotions() {
+        LostTalesUiButtonMotion[] motions = new LostTalesUiButtonMotion[4];
+        for (int kind = 0; kind < motions.length; kind++) {
+            motions[kind] = new LostTalesUiButtonMotion(
+                    kind == LostTalesChatOverlayRenderer.TOOLBAR_COPY
+                            ? LostTalesUiButtonMotion.Character.SNAP
+                            : LostTalesUiButtonMotion.Character.LIFT);
+        }
+        return motions;
+    }
+
+    /** The message the beats above belong to; another one starts them afresh. */
     private int toolbarFadesLineId;
-    long toolbarFadeNanos;
 
     private static final int[] NO_KINDS = new int[0];
 
     /** Whether the point lies on the toolbar drawn this frame. */
     boolean toolbarContains(double x, double y) {
         return this.drawn && this.toolbarKinds.length > 0
-                && ChatHitBox.contains(x, y, this.toolbarLeft, this.toolbarTop,
+                && LostTalesUiHitBox.contains(x, y, this.toolbarLeft, this.toolbarTop,
                         this.toolbarRight - this.toolbarLeft,
                         this.toolbarBottom - this.toolbarTop);
     }
@@ -232,27 +253,35 @@ final class ChatWindowFrame {
      */
     void startToolbarFades(int chatLineId) {
         if (chatLineId != this.toolbarFadesLineId) {
-            Arrays.fill(this.toolbarFades, 0.0F);
+            System.arraycopy(newToolbarMotions(), 0, this.toolbarMotions, 0,
+                    this.toolbarMotions.length);
             this.toolbarFadesLineId = chatLineId;
         }
     }
 
-    /** Advances one toolbar control's fade and answers how far it has lit. */
-    float toolbarFade(int kind, double elapsed) {
-        if (kind < 0 || kind >= this.toolbarFades.length) {
-            return 0.0F;
+    /**
+     * Steps one toolbar control's beat and answers it, so the control is
+     * drawn in the pose it has reached.
+     */
+    LostTalesUiButtonMotion toolbarMotion(int kind, long nowNanos) {
+        if (kind < 0 || kind >= this.toolbarMotions.length) {
+            return this.toolbarMotions[0];
         }
-        this.toolbarFades[kind] = LostTalesChatVisualStyle.hoverFade(
-                this.toolbarFades[kind], kind == this.hoveredToolbarKind,
-                elapsed);
-        return this.toolbarFades[kind];
+        boolean on = kind == this.hoveredToolbarKind;
+        this.toolbarMotions[kind].advance(nowNanos, on,
+                LostTalesConfig.enableChatAnimations);
+        return this.toolbarMotions[kind];
     }
 
     /** Whether the pointer is on the jump-to-present button this frame. */
     boolean jumpHovered;
-    /** How far the jump-to-present button has lit, and when it last moved. */
-    float jumpFade;
-    long jumpFadeNanos;
+    /**
+     * The jump-to-present button's beat. It is a framed button, so its
+     * frame keeps its place and the chevron inside it moves.
+     */
+    final LostTalesUiButtonMotion jumpButtonMotion =
+            new LostTalesUiButtonMotion(
+                    LostTalesUiButtonMotion.Character.LIFT);
     /**
      * The scrollbar's thumb as drawn this frame, in screen GUI pixels;
      * width zero while none was drawn. The track it slides in is the
@@ -951,7 +980,7 @@ final class ChatWindowFrame {
      * draws is measured. The border outside it is the resize band's.
      */
     boolean contains(double x, double y) {
-        return ChatHitBox.contains(x, y, drawnLeft(),
+        return LostTalesUiHitBox.contains(x, y, drawnLeft(),
                 this.boxTop + this.motionY, this.boxRight - this.boxLeft,
                 this.boxBottom - this.boxTop);
     }

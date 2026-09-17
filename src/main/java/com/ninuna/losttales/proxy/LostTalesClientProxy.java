@@ -640,7 +640,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     }
 
     /**
-     * Entries of the operator console: one as it happens, or the kept
+     * Entries of the Server Console: one as it happens, or the kept
      * ones the server replays on joining, which sound no cue and are
      * filed against where this player last read the Console — one read
      * before is not unread again. An entry from before this player

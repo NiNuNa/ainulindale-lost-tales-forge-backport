@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import java.util.UUID;
 import net.minecraft.util.ChatComponentText;
 import org.junit.Test;
@@ -27,7 +28,7 @@ public final class ChatReplyMarkerTest {
         assertEquals(Integer.valueOf(0xB8A79A), ChatReplyMarker.colorOf(bubble));
         assertNull("the bubble is not the quoted sender's head",
                 ChatReplyMarker.headOf(bubble));
-        assertEquals(ChatIconSheet.SPEECH_BUBBLE.getWidth() + 3,
+        assertEquals(LostTalesUiSheet.SPEECH_BUBBLE.getWidth() + 3,
                 ChatReplyMarker.ICON_SLOT_WIDTH);
         assertEquals(ChatReplyMarker.ICON_SLOT_WIDTH,
                 ChatInlineIcons.declaredWidth(bubble));

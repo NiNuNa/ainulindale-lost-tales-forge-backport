@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -63,7 +64,7 @@ final class ChatCommandSuggestionBox {
             return false;
         }
         int top = boxTop(screenHeight);
-        return ChatHitBox.contains(mouseX, mouseY, inputX, top,
+        return LostTalesUiHitBox.contains(mouseX, mouseY, inputX, top,
                 boxWidth(font), screenHeight - BOTTOM_MARGIN - top);
     }
 

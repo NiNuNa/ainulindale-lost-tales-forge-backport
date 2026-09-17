@@ -216,7 +216,8 @@ public final class LostTalesChatService {
                 worn == null ? null : worn.getCharacterId());
         String refusal = ChatChannelPolicy.sendRefusal(channel, party,
                 worn == null ? sender.getUniqueID() : worn.getCharacterId(), factionId,
-                wornRoles, LostTalesPermissions.isOperator(sender));
+                wornRoles, LostTalesPermissions.isOperator(sender),
+                ChatChannelPolicy.readsConsole(sender));
         if (refusal != null) {
             if (ChatChannelPolicy.isGateRefusal(refusal)) {
                 // The client only offers the tab while the server last said
@@ -508,7 +509,7 @@ public final class LostTalesChatService {
                         + "without it until the server restarts");
     }
 
-    /* ---- the shared operator console ---- */
+    /* ---- the Server Console ---- */
 
     /**
      * Records one administrative event and shows it at once to every
@@ -702,7 +703,8 @@ public final class LostTalesChatService {
                 worn == null ? sender.getUniqueID() : worn.getCharacterId(), factionId,
                 ChatAccountRoleResolver.resolve(sender,
                         worn == null ? null : worn.getCharacterId()),
-                LostTalesPermissions.isOperator(sender)) != null) {
+                LostTalesPermissions.isOperator(sender),
+                ChatChannelPolicy.readsConsole(sender)) != null) {
             return;
         }
         if (typing && DiscordBridgePolicy.relaysOutbound(
@@ -1490,16 +1492,14 @@ public final class LostTalesChatService {
                 packet.withoutEcho(), shared, routing.recipientIds(), routing.audience);
     }
 
-    /** The channels the player may read right now; the console asks besides. */
+    /** The channels the player may read right now. */
     private static List<ChatChannel> readableChannels(EntityPlayerMP player) {
         RoleplayCharacter active = ChatIdentitySelection.character(player);
         int roles = ChatAccountRoleResolver.resolve(player,
                 active == null ? null : active.getCharacterId());
         List<ChatChannel> readable = new ArrayList<ChatChannel>();
-        boolean console = ChatChannelPolicy.readsConsole(player);
         for (ChatChannel channel : ChatChannel.values()) {
-            if (ChatChannelPolicy.canRead(player, channel, roles)
-                    && (channel != ChatChannel.CONSOLE || console)) {
+            if (ChatChannelPolicy.canRead(player, channel, roles)) {
                 readable.add(channel);
             }
         }

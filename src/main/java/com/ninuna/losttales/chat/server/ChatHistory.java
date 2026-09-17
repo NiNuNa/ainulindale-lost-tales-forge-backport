@@ -5,6 +5,7 @@ import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatChannelScope;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReactionSummary;
+import com.ninuna.losttales.chat.ChatRecipientRule;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatTabIds;
 import com.ninuna.losttales.config.LostTalesConfig;
@@ -800,6 +801,16 @@ public final class ChatHistory {
         }
 
         boolean admits(Requester requester, Entry entry) {
+            // A private channel's line belongs to the accounts it was
+            // sent to and to nobody else, so one whose audience names no
+            // account at all is shown to nobody: the console is the
+            // reader's own, and an audience that cannot say whose it was
+            // may not stand for everybody's.
+            ChatChannel channel = ChatChannel.fromId(entry.channelId);
+            if (this.accounts == null && channel != null
+                    && channel.getRecipientRule() == ChatRecipientRule.SELF) {
+                return false;
+            }
             if (this.accounts != null && (requester.accountId == null
                     || !this.accounts.contains(requester.accountId))) {
                 return false;

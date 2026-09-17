@@ -16,6 +16,24 @@ import java.util.Locale;
 public class LostTalesQuestActionPacket implements IMessage {
     public static final String ACTION_PIN = "pin";
     public static final String ACTION_UNPIN = "unpin";
+    /**
+     * Giving a quest up. The client names the quest; the server decides
+     * whether it is one this player is on and one that may be given up
+     * at all, so a forged id abandons nothing.
+     */
+    public static final String ACTION_ABANDON = "abandon";
+    /**
+     * Taking a quest that was offered in conversation. The client names
+     * the quest; the server checks that somebody the quest names as its
+     * giver is within reach and that the quest may be started that way,
+     * so a client that never spoke to anybody starts nothing.
+     */
+    public static final String ACTION_ACCEPT = "accept";
+    /**
+     * Giving over what a quest asked for, in conversation. Checked the
+     * same way, and it moves only the objectives of the quest named.
+     */
+    public static final String ACTION_HAND_IN = "hand_in";
 
     private String action = "";
     private String questId = "";
@@ -63,11 +81,16 @@ public class LostTalesQuestActionPacket implements IMessage {
     }
 
     private static boolean isKnownAction(String action) {
-        return ACTION_PIN.equals(action) || ACTION_UNPIN.equals(action);
+        return ACTION_PIN.equals(action) || ACTION_UNPIN.equals(action)
+                || ACTION_ABANDON.equals(action)
+                || ACTION_ACCEPT.equals(action)
+                || ACTION_HAND_IN.equals(action);
     }
 
     private static boolean hasValidIdentifierUsage(String action, String identifier) {
-        if (ACTION_PIN.equals(action)) {
+        if (ACTION_PIN.equals(action) || ACTION_ABANDON.equals(action)
+                || ACTION_ACCEPT.equals(action)
+                || ACTION_HAND_IN.equals(action)) {
             return identifier.length() > 0;
         }
         return true;
@@ -82,6 +105,12 @@ public class LostTalesQuestActionPacket implements IMessage {
             } else {
                 LostTalesQuestManager.unpinQuest(player);
             }
+        } else if (ACTION_ABANDON.equals(action)) {
+            LostTalesQuestManager.abandonOwnQuest(player, questId);
+        } else if (ACTION_ACCEPT.equals(action)) {
+            LostTalesQuestManager.acceptFromConversation(player, questId);
+        } else if (ACTION_HAND_IN.equals(action)) {
+            LostTalesQuestManager.handInFromConversation(player, questId);
         }
     }
 

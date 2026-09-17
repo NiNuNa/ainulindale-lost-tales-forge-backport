@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiEasing;
 import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
 import org.lwjgl.opengl.GL11;
@@ -204,7 +205,7 @@ final class ChatLockAnimation {
     private static void drawFrame(int frame, int block, float x, float top,
                                   int alpha) {
         int[] cell = FRAMES[Math.max(0, Math.min(FRAMES.length - 1, frame))];
-        ChatIconSheet.draw(block + cell[0], cell[1], cell[2], cell[3], x,
+        LostTalesUiSheet.draw(block + cell[0], cell[1], cell[2], cell[3], x,
                 top + HEIGHT - cell[3], alpha);
     }
 

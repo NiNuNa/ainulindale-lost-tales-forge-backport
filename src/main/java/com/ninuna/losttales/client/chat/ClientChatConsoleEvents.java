@@ -4,7 +4,7 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 
 /**
- * Which operator console entries this client has already shown, by the
+ * Which Server Console entries this client has already shown, by the
  * id the server gave each. A live entry and a replayed batch can name
  * the same event; it is shown once. Bounded to what the console keeps
  * and cleared with the rest of the client's chat state.

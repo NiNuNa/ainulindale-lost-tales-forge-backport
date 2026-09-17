@@ -9,6 +9,14 @@ public enum ChatRecipientRule {
     /** Only the sender: a private console that echoes back to its author. */
     SELF,
     /**
+     * Everyone holding {@code chat.console.read}: the server's own
+     * console, one stream shared by the staff who may watch it. The rule
+     * names a capability rather than a role, because reading the
+     * server's doings is something the code grants, not something a
+     * channel gate describes — see {@code ChatChannelPolicy.readsConsole}.
+     */
+    CONSOLE_READERS,
+    /**
      * Everyone the channel's gate admits, and nobody else: the routing
      * a staff channel takes. The rule itself names no role — who may
      * read and send is the gate the config puts on the channel

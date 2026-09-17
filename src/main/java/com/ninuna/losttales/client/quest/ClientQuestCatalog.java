@@ -15,11 +15,53 @@ import java.util.List;
 import java.util.Locale;
 import net.minecraft.client.Minecraft;
 
-/** Builds the journal and HUD view without transferring quest ownership. */
+/**
+ * Builds the journal and HUD view without transferring quest ownership.
+ *
+ * <p>The tracker HUD, the compass and the world markers each ask for the
+ * list while a frame is being drawn, and a well-travelled character
+ * carries hundreds of finished LOTR quests, so the list is built once a
+ * tick and handed out unchanged for the rest of it. Nothing it is built
+ * from — the definition and progress stores, LOTR's player data — moves
+ * between ticks, since every packet that changes them is queued onto the
+ * client thread.</p>
+ */
 public final class ClientQuestCatalog {
+    private static List<ClientQuestEntry> cached = Collections.emptyList();
+    private static Object cachedPlayer;
+    private static int cachedTick = -1;
+
     private ClientQuestCatalog() {}
 
-    public static List<ClientQuestEntry> getEntries(Minecraft minecraft) {
+    /**
+     * Every quest entry, from both systems, in journal order. Built at
+     * most once per client tick; see the class comment.
+     */
+    public static synchronized List<ClientQuestEntry> getEntries(
+            Minecraft minecraft) {
+        Object player = minecraft == null ? null : minecraft.thePlayer;
+        if (player == null) {
+            forget();
+            return Collections.emptyList();
+        }
+        int tick = minecraft.thePlayer.ticksExisted;
+        if (player == cachedPlayer && tick == cachedTick) {
+            return cached;
+        }
+        cached = buildEntries(minecraft);
+        cachedPlayer = player;
+        cachedTick = tick;
+        return cached;
+    }
+
+    /** Drops the tick's list; called as a session ends. */
+    public static synchronized void forget() {
+        cached = Collections.emptyList();
+        cachedPlayer = null;
+        cachedTick = -1;
+    }
+
+    private static List<ClientQuestEntry> buildEntries(Minecraft minecraft) {
         ArrayList<ClientQuestEntry> entries = new ArrayList<ClientQuestEntry>();
         for (LostTalesQuestDefinition quest
                 : LostTalesClientQuestDefinitionStore.getQuests()) {

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.emoji.ChatForeignEmoji;
@@ -31,7 +32,7 @@ final class ChatReactionMarker {
      * From the chip's edge to what it holds: a chip is a framed button,
      * so the frame's edge and its padding.
      */
-    static final int PAD = ChatFramedButton.INSET;
+    static final int PAD = LostTalesUiFramedButton.INSET;
     /** The emoji, drawn one texel to one pixel. */
     static final int ICON = (int)ChatInlineIcons.CONTENT_SIZE;
     /**
@@ -41,7 +42,7 @@ final class ChatReactionMarker {
      * small size cannot shrink them into a line
      * ({@link ChatStackRows#reactionRowHeight}).
      */
-    static final int HEIGHT = ChatFramedButton.HEIGHT;
+    static final int HEIGHT = LostTalesUiFramedButton.HEIGHT;
     /**
      * How far below the chip's top edge the count's text starts: a row
      * below the emoji's box, so the count's capitals stand half a pixel

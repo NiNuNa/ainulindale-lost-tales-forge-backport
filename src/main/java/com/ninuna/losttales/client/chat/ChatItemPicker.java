@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import java.util.ArrayList;
 import java.util.List;
@@ -118,12 +119,12 @@ final class ChatItemPicker extends ChatPickerPanel {
     }
 
     @Override
-    ChatIconSheet buttonGlyph() {
-        return ChatIconSheet.ITEM;
+    LostTalesUiSheet buttonGlyph() {
+        return LostTalesUiSheet.ITEM;
     }
 
     @Override
-    ChatIconSheet buttonGlyphLit() {
-        return ChatIconSheet.ITEM_HOVER;
+    LostTalesUiSheet buttonGlyphLit() {
+        return LostTalesUiSheet.ITEM_HOVER;
     }
 }

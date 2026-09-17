@@ -1,4 +1,4 @@
-package com.ninuna.losttales.client.chat;
+package com.ninuna.losttales.gui.style;
 
 import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
 import net.minecraft.client.Minecraft;
@@ -17,10 +17,10 @@ import org.lwjgl.opengl.GL11;
  * texels; the sheet is drawn 1:1 in GUI pixels, so a sprite's width and
  * height are also its size on screen. The padlock's frames are the one
  * thing not held here: they are a regular grid, and
- * {@link ChatLockAnimation} walks it. {@code ChatIconSheetTest} locks
+ * {@link ChatLockAnimation} walks it. {@code LostTalesUiSheetTest} locks
  * the constants to the bundled PNG the way the emoji sheet is locked.
  */
-enum ChatIconSheet {
+public enum LostTalesUiSheet {
     EMOJI(0, 0, 10, 10),
     EMOJI_HOVER(11, 0, 10, 10),
     /** The dagger the item picker's button carries. */
@@ -170,9 +170,16 @@ enum ChatIconSheet {
     CHEVRON_4_MUTED(12, 52, 5, 2),
     CHEVRON_5_MUTED(12, 55, 5, 3);
 
-    static final String TEXTURE_PATH = "textures/gui/chat.png";
-    static final int SHEET_WIDTH = 108;
-    static final int SHEET_HEIGHT = 92;
+    /**
+     * What a frame or tab piece must clear to be drawn: the artwork
+     * previews the surface behind its ink at a low alpha, and only the
+     * ink itself is wanted. A property of the sheet, so everything drawn
+     * from it cuts at the same place.
+     */
+    public static final float INK_THRESHOLD = 0.8F;
+    public static final String TEXTURE_PATH = "textures/gui/chat.png";
+    public static final int SHEET_WIDTH = 108;
+    public static final int SHEET_HEIGHT = 92;
     private static final ResourceLocation TEXTURE =
             new ResourceLocation("losttales", TEXTURE_PATH);
 
@@ -181,20 +188,20 @@ enum ChatIconSheet {
     private final int width;
     private final int height;
 
-    ChatIconSheet(int u, int v, int width, int height) {
+    LostTalesUiSheet(int u, int v, int width, int height) {
         this.u = u;
         this.v = v;
         this.width = width;
         this.height = height;
     }
 
-    int getTextureU() { return this.u; }
-    int getTextureV() { return this.v; }
-    int getWidth() { return this.width; }
-    int getHeight() { return this.height; }
+    public int getTextureU() { return this.u; }
+    public int getTextureV() { return this.v; }
+    public int getWidth() { return this.width; }
+    public int getHeight() { return this.height; }
 
     /** The sprite at its own size, with the chat's shadow under it. */
-    void drawWithShadow(float x, float y, int alpha) {
+    public void drawWithShadow(float x, float y, int alpha) {
         drawWithShadow(this.u, this.v, this.width, this.height, x, y, alpha);
     }
 
@@ -203,7 +210,7 @@ enum ChatIconSheet {
      * what a two-pass renderer draws twice, once in the shadow tone and
      * once in the run's colour.
      */
-    void drawSilhouette(int rgb, float x, float y, int alpha) {
+    public void drawSilhouette(int rgb, float x, float y, int alpha) {
         LostTalesSilhouetteRenderState.begin(rgb);
         try {
             draw(x, y, alpha);
@@ -219,13 +226,13 @@ enum ChatIconSheet {
      * shadow, from the resting sprite, since the two are the same shape
      * and a second would darken it twice.
      */
-    static void drawPairWithShadow(ChatIconSheet resting,
-                                   ChatIconSheet hovered, float progress,
+    public static void drawPairWithShadow(LostTalesUiSheet resting,
+                                   LostTalesUiSheet hovered, float progress,
                                    float x, float y, int alpha) {
         resting.drawWithShadow(x, y, alpha);
         int over = Math.round(alpha * Math.max(0.0F, Math.min(1.0F,
                 progress)));
-        if (over >= LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+        if (over >= LostTalesUiInk.MIN_VISIBLE_ALPHA) {
             hovered.draw(x, y, over);
         }
     }
@@ -235,7 +242,7 @@ enum ChatIconSheet {
      * padlock's frames are addressed this way: they are a grid rather
      * than named cells, so they carry their own coordinates.
      */
-    static void drawWithShadow(int u, int v, int width, int height,
+    public static void drawWithShadow(int u, int v, int width, int height,
                                float x, float y, int alpha) {
         drawShadow(u, v, width, height, x, y, alpha);
         draw(u, v, width, height, x, y, alpha);
@@ -244,15 +251,15 @@ enum ChatIconSheet {
     /** The shared drop shadow: the same cell, offset, in the shadow tone. */
     private static void drawShadow(int u, int v, int width, int height,
                                    float x, float y, int alpha) {
-        int shadowAlpha = LostTalesChatVisualStyle.shadowAlpha(alpha);
+        int shadowAlpha = LostTalesUiInk.shadowAlpha(alpha);
         if (shadowAlpha <= 0) {
             return;
         }
-        LostTalesSilhouetteRenderState.begin(LostTalesChatVisualStyle.SHADOW);
+        LostTalesSilhouetteRenderState.begin(LostTalesUiInk.SHADOW);
         try {
             draw(u, v, width, height,
-                    x + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                    y + LostTalesChatVisualStyle.SHADOW_OFFSET, shadowAlpha);
+                    x + LostTalesUiInk.SHADOW_OFFSET,
+                    y + LostTalesUiInk.SHADOW_OFFSET, shadowAlpha);
         } finally {
             LostTalesSilhouetteRenderState.end();
         }
@@ -272,16 +279,16 @@ enum ChatIconSheet {
      * with it, so the pattern runs on through it unbroken. One texture
      * bind and a handful of quads.</p>
      */
-    void drawTiledFadingFromMiddle(float left, float top, float right,
+    public void drawTiledFadingFromMiddle(float left, float top, float right,
                                    float bottom, int alpha) {
         Minecraft minecraft = Minecraft.getMinecraft();
         int safeAlpha = Math.max(0, Math.min(255, alpha));
         if (minecraft == null || right <= left || bottom <= top
-                || safeAlpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+                || safeAlpha < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
             return;
         }
         minecraft.getTextureManager().bindTexture(TEXTURE);
-        LostTalesChatVisualStyle.beginContent();
+        LostTalesUiInk.beginContent();
         GL11.glShadeModel(GL11.GL_SMOOTH);
         // The GUI draws under an alpha test that throws away nearly
         // transparent fragments. A ramp ending in nothing is exactly
@@ -341,7 +348,7 @@ enum ChatIconSheet {
     }
 
     /** The sprite at its own size, 1:1, at the given opacity. */
-    void draw(float x, float y, int alpha) {
+    public void draw(float x, float y, int alpha) {
         draw(this.u, this.v, this.width, this.height, x, y, alpha);
     }
 
@@ -352,16 +359,16 @@ enum ChatIconSheet {
      * its length, which the sheet's nearest-texel sampling keeps flat; a
      * framed button's edges are drawn this way.
      */
-    static void drawStretched(int u, int v, int width, int height, float x,
+    public static void drawStretched(int u, int v, int width, int height, float x,
                               float y, float regionWidth, float regionHeight,
                               int alpha) {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (minecraft == null || regionWidth <= 0.0F || regionHeight <= 0.0F
-                || alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+                || alpha < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
             return;
         }
         minecraft.getTextureManager().bindTexture(TEXTURE);
-        LostTalesChatVisualStyle.beginContent();
+        LostTalesUiInk.beginContent();
         GL11.glColor4f(1.0F, 1.0F, 1.0F,
                 MathHelper.clamp_float(alpha / 255.0F, 0.0F, 1.0F));
         try {
@@ -383,15 +390,15 @@ enum ChatIconSheet {
     }
 
     /** Any cell of the sheet at its own size, 1:1, at the given opacity. */
-    static void draw(int u, int v, int width, int height,
+    public static void draw(int u, int v, int width, int height,
                      float x, float y, int alpha) {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (minecraft == null
-                || alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+                || alpha < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
             return;
         }
         minecraft.getTextureManager().bindTexture(TEXTURE);
-        LostTalesChatVisualStyle.beginContent();
+        LostTalesUiInk.beginContent();
         GL11.glColor4f(1.0F, 1.0F, 1.0F,
                 MathHelper.clamp_float(alpha / 255.0F, 0.0F, 1.0F));
         try {

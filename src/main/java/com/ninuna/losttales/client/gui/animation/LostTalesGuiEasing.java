@@ -24,4 +24,22 @@ public final class LostTalesGuiEasing {
     public static float clamp(float progress) {
         return Math.max(0.0F, Math.min(1.0F, progress));
     }
+
+    /**
+     * One step of a crossfade with no fixed duration, such as a hover:
+     * the value moves the same share of what is left of the way each
+     * second, so a target changed halfway is followed without a corner.
+     * A long frame is treated as a quarter second, which keeps a stall
+     * from jumping the value to its target.
+     */
+    public static double approach(double current, double target,
+                                  double elapsedSeconds,
+                                  double easeSeconds) {
+        if (easeSeconds <= 0.0D) {
+            return target;
+        }
+        double elapsed = Math.max(0.0D, Math.min(0.25D, elapsedSeconds));
+        return current + (target - current)
+                * (1.0D - Math.exp(-elapsed / easeSeconds));
+    }
 }

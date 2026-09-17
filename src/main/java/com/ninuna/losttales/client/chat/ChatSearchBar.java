@@ -1,5 +1,10 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.gui.style.LostTalesUiButton;
+import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
@@ -53,10 +58,23 @@ final class ChatSearchBar {
     private ChatInputField field;
     private Layout layout;
     private String layoutWindowId;
-    private float magnifierFade;
-    private float previousFade;
-    private float nextFade;
-    private float closeFade;
+    /**
+     * The bar's four buttons, each keeping its own beat: the magnifier
+     * turns on its handle, the two chevrons rise, and the cross answers
+     * like a switch, exactly as the strip's do.
+     */
+    private final LostTalesUiButtonMotion magnifierMotion =
+            new LostTalesUiButtonMotion(
+                    LostTalesUiButtonMotion.Character.TURN);
+    private final LostTalesUiButtonMotion previousMotion =
+            new LostTalesUiButtonMotion(
+                    LostTalesUiButtonMotion.Character.LIFT);
+    private final LostTalesUiButtonMotion nextMotion =
+            new LostTalesUiButtonMotion(
+                    LostTalesUiButtonMotion.Character.LIFT);
+    private final LostTalesUiButtonMotion closeMotion =
+            new LostTalesUiButtonMotion(
+                    LostTalesUiButtonMotion.Character.SNAP);
     private long frameNanos;
 
     void bind(FontRenderer font) {
@@ -125,15 +143,15 @@ final class ChatSearchBar {
                 + (ChatWindowPlacement.TOOL_STRIP_HEIGHT - 1 - WELL_HEIGHT) / 2;
         laid.wellBottom = laid.wellTop + WELL_HEIGHT;
         laid.textTop = laid.wellTop + 2;
-        laid.closeX = stripRight - GAP - ChatIconSheet.CLOSE.getWidth();
-        laid.nextX = laid.closeX - GAP - ChatIconSheet.CHEVRON_1.getWidth();
-        laid.previousX = laid.nextX - GAP - ChatIconSheet.CHEVRON_5.getWidth();
+        laid.closeX = stripRight - GAP - LostTalesUiSheet.CLOSE.getWidth();
+        laid.nextX = laid.closeX - GAP - LostTalesUiSheet.CHEVRON_1.getWidth();
+        laid.previousX = laid.nextX - GAP - LostTalesUiSheet.CHEVRON_5.getWidth();
         laid.countRight = laid.previousX - GAP;
         int countSlot = font.getStringWidth(WIDEST_COUNT);
         laid.wellLeft = stripLeft + GAP;
         laid.wellRight = laid.countRight - countSlot - GAP;
         laid.magnifierX = laid.wellLeft + 2;
-        laid.fieldX = laid.magnifierX + ChatIconSheet.SEARCH.getWidth() + GAP;
+        laid.fieldX = laid.magnifierX + LostTalesUiSheet.SEARCH.getWidth() + GAP;
         laid.fieldWidth = laid.wellRight - 2 - ChatInputField.CARET_WIDTH - laid.fieldX;
         if (laid.fieldWidth < 24) {
             // Too narrow a window for a search bar: nothing is drawn and
@@ -145,7 +163,7 @@ final class ChatSearchBar {
         }
         this.layout = laid;
         this.layoutWindowId = frame.windowId;
-        frame.tabBar.setToolStripHole(new ChatHitBox(laid.wellLeft, laid.wellTop,
+        frame.tabBar.setToolStripHole(new LostTalesUiHitBox(laid.wellLeft, laid.wellTop,
                 laid.wellRight - laid.wellLeft, WELL_HEIGHT));
         if (this.field != null) {
             this.field.xPosition = laid.fieldX;
@@ -179,13 +197,18 @@ final class ChatSearchBar {
                 LostTalesChatVisualStyle.argb(LostTalesChatVisualStyle.SURFACE_RGB,
                         surfaceAlpha));
         LostTalesChatVisualStyle.beginContent();
-        this.magnifierFade = LostTalesChatVisualStyle.hoverFade(this.magnifierFade,
-                under == Part.FIELD || (this.field != null && this.field.isFocused()),
-                elapsed);
-        ChatIconSheet.drawPairWithShadow(ChatIconSheet.SEARCH,
-                ChatIconSheet.SEARCH_HOVER, this.magnifierFade, laid.magnifierX,
+        boolean onField = under == Part.FIELD;
+        // The magnifier is lit while the field has the keys as well as
+        // while the pointer is on it, but it only moves for the pointer.
+        this.magnifierMotion.advance(now,
+                onField || (this.field != null && this.field.isFocused()),
+                onField, onField && org.lwjgl.input.Mouse.isButtonDown(0),
+                LostTalesConfig.enableChatAnimations);
+        LostTalesUiButton.drawGlyph(LostTalesUiSheet.SEARCH,
+                LostTalesUiSheet.SEARCH_HOVER, this.magnifierMotion,
+                laid.magnifierX,
                 laid.textTop + LostTalesChatOverlayRenderer.centredBoxTop(
-                        ChatIconSheet.SEARCH.getHeight()), ink);
+                        LostTalesUiSheet.SEARCH.getHeight()), ink);
         if (this.field != null) {
             if (this.field.getText().length() == 0) {
                 int x = this.field.xPosition + ChatInputField.CARET_WIDTH + 1;
@@ -207,25 +230,24 @@ final class ChatSearchBar {
                             ? LostTalesChatVisualStyle.asideRgb()
                             : LostTalesChatVisualStyle.IVORY, ink);
         }
-        this.previousFade = LostTalesChatVisualStyle.hoverFade(this.previousFade,
-                under == Part.PREVIOUS, elapsed);
-        this.nextFade = LostTalesChatVisualStyle.hoverFade(this.nextFade,
-                under == Part.NEXT, elapsed);
-        this.closeFade = LostTalesChatVisualStyle.hoverFade(this.closeFade,
-                under == Part.CLOSE, elapsed);
-        ChatIconSheet.drawPairWithShadow(ChatIconSheet.CHEVRON_5,
-                ChatIconSheet.CHEVRON_5_HOVER, this.previousFade, laid.previousX,
-                glyphTop(laid, ChatIconSheet.CHEVRON_5), ink);
-        ChatIconSheet.drawPairWithShadow(ChatIconSheet.CHEVRON_1,
-                ChatIconSheet.CHEVRON_1_HOVER, this.nextFade, laid.nextX,
-                glyphTop(laid, ChatIconSheet.CHEVRON_1), ink);
-        ChatIconSheet.drawPairWithShadow(ChatIconSheet.CLOSE,
-                ChatIconSheet.CLOSE_HOVER, this.closeFade, laid.closeX,
-                glyphTop(laid, ChatIconSheet.CLOSE), ink);
+        boolean animate = LostTalesConfig.enableChatAnimations;
+        this.previousMotion.advance(now, under == Part.PREVIOUS, animate);
+        this.nextMotion.advance(now, under == Part.NEXT, animate);
+        this.closeMotion.advance(now, under == Part.CLOSE, animate);
+        LostTalesUiButton.drawGlyph(LostTalesUiSheet.CHEVRON_5,
+                LostTalesUiSheet.CHEVRON_5_HOVER, this.previousMotion,
+                laid.previousX, glyphTop(laid, LostTalesUiSheet.CHEVRON_5),
+                ink);
+        LostTalesUiButton.drawGlyph(LostTalesUiSheet.CHEVRON_1,
+                LostTalesUiSheet.CHEVRON_1_HOVER, this.nextMotion, laid.nextX,
+                glyphTop(laid, LostTalesUiSheet.CHEVRON_1), ink);
+        LostTalesUiButton.drawGlyph(LostTalesUiSheet.CLOSE,
+                LostTalesUiSheet.CLOSE_HOVER, this.closeMotion, laid.closeX,
+                glyphTop(laid, LostTalesUiSheet.CLOSE), ink);
     }
 
     /** A glyph's top: centred on the capitals, its odd pixel below their middle. */
-    private static int glyphTop(Layout laid, ChatIconSheet glyph) {
+    private static int glyphTop(Layout laid, LostTalesUiSheet glyph) {
         return laid.textTop + LostTalesChatOverlayRenderer.centredBoxTop(glyph.getHeight());
     }
 
@@ -242,16 +264,16 @@ final class ChatSearchBar {
         }
         double x = mouseX - row.fractionX;
         double y = mouseY - row.fractionY;
-        if (controlBox(laid.closeX, laid, ChatIconSheet.CLOSE).contains(x, y)) {
+        if (controlBox(laid.closeX, laid, LostTalesUiSheet.CLOSE).contains(x, y)) {
             return Part.CLOSE;
         }
-        if (controlBox(laid.nextX, laid, ChatIconSheet.CHEVRON_1).contains(x, y)) {
+        if (controlBox(laid.nextX, laid, LostTalesUiSheet.CHEVRON_1).contains(x, y)) {
             return Part.NEXT;
         }
-        if (controlBox(laid.previousX, laid, ChatIconSheet.CHEVRON_5).contains(x, y)) {
+        if (controlBox(laid.previousX, laid, LostTalesUiSheet.CHEVRON_5).contains(x, y)) {
             return Part.PREVIOUS;
         }
-        if (ChatHitBox.contains(x, y, laid.wellLeft, laid.wellTop,
+        if (LostTalesUiHitBox.contains(x, y, laid.wellLeft, laid.wellTop,
                 laid.wellRight - laid.wellLeft, WELL_HEIGHT)) {
             return Part.FIELD;
         }
@@ -259,10 +281,10 @@ final class ChatSearchBar {
     }
 
     /** The nine-pixel square round a glyph, centred on it. */
-    private static ChatHitBox controlBox(int glyphX, Layout laid, ChatIconSheet glyph) {
+    private static LostTalesUiHitBox controlBox(int glyphX, Layout laid, LostTalesUiSheet glyph) {
         double left = glyphX + glyph.getWidth() / 2.0D - CONTROL_BOX / 2.0D;
         double top = glyphTop(laid, glyph) + glyph.getHeight() / 2.0D - CONTROL_BOX / 2.0D;
-        return new ChatHitBox(left, top, CONTROL_BOX, CONTROL_BOX);
+        return new LostTalesUiHitBox(left, top, CONTROL_BOX, CONTROL_BOX);
     }
 
     /** A press on the field: the caret goes where the pointer is. */

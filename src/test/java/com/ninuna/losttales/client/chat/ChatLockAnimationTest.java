@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import java.awt.image.BufferedImage;
 import java.io.InputStream;
 import java.lang.reflect.Field;
@@ -113,7 +114,7 @@ public final class ChatLockAnimationTest {
 
     private static BufferedImage readSheet() throws Exception {
         InputStream stream = ChatLockAnimationTest.class.getResourceAsStream(
-                "/assets/losttales/" + ChatIconSheet.TEXTURE_PATH);
+                "/assets/losttales/" + LostTalesUiSheet.TEXTURE_PATH);
         assertNotNull("Chat icon sheet is missing", stream);
         try {
             BufferedImage sheet = ImageIO.read(stream);

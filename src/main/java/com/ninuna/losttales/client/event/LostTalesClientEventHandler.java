@@ -64,6 +64,8 @@ import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapMarkerIconOverlay;
 import com.ninuna.losttales.client.party.ClientPartyMemberStatusCache;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.client.party.ClientPartyTrackingCache;
+import com.ninuna.losttales.client.quest.ClientQuestCatalog;
+import com.ninuna.losttales.client.quest.LostTalesQuestDialogueHooks;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestNotificationStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
@@ -98,6 +100,7 @@ import cpw.mods.fml.common.network.FMLNetworkEvent.ClientDisconnectionFromServer
 import cpw.mods.fml.common.gameevent.TickEvent;
 import java.util.Arrays;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.inventory.GuiContainerCreative;
 import net.minecraft.client.gui.inventory.GuiInventory;
 import net.minecraft.inventory.Slot;
@@ -106,8 +109,10 @@ import net.minecraft.client.resources.IResourceManager;
 import net.minecraft.client.resources.IResourceManagerReloadListener;
 import net.minecraftforge.client.MinecraftForgeClient;
 import lotr.client.gui.LOTRGuiMap;
+import lotr.client.gui.LOTRGuiMiniquestOffer;
 import lotr.client.gui.LOTRGuiRedBook;
 import net.minecraftforge.client.event.GuiOpenEvent;
+import net.minecraftforge.event.entity.player.EntityInteractEvent;
 import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.client.event.EntityViewRenderEvent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
@@ -156,6 +161,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         LostTalesClientQuestProgressStore.clear();
         LostTalesClientQuestNotificationStore.clear();
         LostTalesClientQuestDefinitionStore.clearDynamicQuestDefinitions();
+        ClientQuestCatalog.forget();
         LostTalesClientMapMarkerNotificationStore.clear();
         LostTalesClientMapMarkerStore.clearDynamicMarkers();
         LostTalesLotrMapMarkerIconOverlay.clearClientState();
@@ -505,6 +511,15 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void replaceLotrMapGui(GuiOpenEvent event) {
         if (event.gui != null
+                && event.gui.getClass() == LOTRGuiMiniquestOffer.class) {
+            // A quest offered in Middle-earth is talked about in the Lost
+            // Tales screen; an offer that cannot be read keeps LOTR's own.
+            GuiScreen conversation = LostTalesQuestDialogueHooks
+                    .replaceLotrOffer((LOTRGuiMiniquestOffer)event.gui);
+            if (conversation != null) {
+                event.gui = conversation;
+            }
+        } else if (event.gui != null
                 && event.gui.getClass() == LOTRGuiRedBook.class) {
             event.gui = new LostTalesQuestJournalGui(null);
         } else if (event.gui != null
@@ -518,6 +533,35 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
                 instanceof LostTalesContainerPlayer) {
             event.gui = new LostTalesGuiInventory(
                     Minecraft.getMinecraft().thePlayer);
+        }
+    }
+
+    /**
+     * Touching somebody a Lost Tales quest is about opens the
+     * conversation. The interaction itself is left alone, so anything
+     * else the entity does still happens; the server refuses to start or
+     * hand in a quest that is talked about until a reply says so.
+     */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public void openQuestConversation(EntityInteractEvent event) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (event == null || event.target == null || minecraft == null
+                || minecraft.thePlayer == null
+                || event.entityPlayer != minecraft.thePlayer
+                || minecraft.currentScreen != null
+                || event.entityPlayer.worldObj == null
+                || !event.entityPlayer.worldObj.isRemote) {
+            return;
+        }
+        try {
+            GuiScreen conversation = LostTalesQuestDialogueHooks.forEntity(
+                    event.target);
+            if (conversation != null) {
+                minecraft.displayGuiScreen(conversation);
+            }
+        } catch (RuntimeException ignored) {
+            // A conversation that cannot be built is no conversation;
+            // the interaction itself is untouched.
         }
     }
 

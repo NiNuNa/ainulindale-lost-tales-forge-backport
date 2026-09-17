@@ -1,5 +1,9 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiButton;
+import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.client.gui.animation.LostTalesUiEasing;
 import com.ninuna.losttales.client.gui.animation.LostTalesUiTransition;
 import com.ninuna.losttales.config.LostTalesConfig;
@@ -33,12 +37,18 @@ import org.lwjgl.opengl.GL11;
  * live screen size, so GUI scale and resolution changes are handled.
  */
 abstract class ChatPickerPanel {
-    /** How far the button has crossed to its hovered artwork, and when. */
-    private float buttonFade;
-    private long buttonFadeNanos;
-    /** How far the search row's magnifier has crossed to its lit artwork, and when. */
-    private float magnifierFade;
-    private long magnifierFadeNanos;
+    /**
+     * The toggle's own beat. It stays risen while its panel is out, as
+     * well as under the pointer, so the button reads as held down by
+     * what it opened.
+     */
+    private final LostTalesUiButtonMotion buttonMotion =
+            new LostTalesUiButtonMotion(
+                    LostTalesUiButtonMotion.Character.LIFT);
+    /** The panel's magnifier, which turns on its handle. */
+    private final LostTalesUiButtonMotion magnifierMotion =
+            new LostTalesUiButtonMotion(
+                    LostTalesUiButtonMotion.Character.TURN);
     static final int BUTTON_SIZE = 12;
     static final int BUTTON_MARGIN = 2;
     /** The buttons stand this far below the anchor the caller passes. */
@@ -50,7 +60,7 @@ abstract class ChatPickerPanel {
      * and the gap an icon keeps from its label in the chat's lists.
      */
     private static final int SEARCH_ICON_RUN =
-            ChatIconSheet.SEARCH.getWidth() + ChatChannelIcons.GAP;
+            LostTalesUiSheet.SEARCH.getWidth() + ChatChannelIcons.GAP;
     static final int LABEL_HEIGHT = 10;
     /** Anchor-to-panel-bottom distance: the panel ends just above the
      *  bar the buttons stand in. */
@@ -187,7 +197,7 @@ abstract class ChatPickerPanel {
                            int anchorRight, int anchorY) {
         int left = buttonLeft(anchorRight);
         int top = buttonTop(anchorY);
-        return ChatHitBox.contains(mouseX, mouseY, left, top, BUTTON_SIZE,
+        return LostTalesUiHitBox.contains(mouseX, mouseY, left, top, BUTTON_SIZE,
                 BUTTON_SIZE);
     }
 
@@ -197,7 +207,7 @@ abstract class ChatPickerPanel {
             return false;
         }
         Layout layout = buildLayout(anchorRight, screenHeight);
-        return ChatHitBox.contains(mouseX, mouseY, layout.left, layout.top,
+        return LostTalesUiHitBox.contains(mouseX, mouseY, layout.left, layout.top,
                 panelWidth(), layout.height);
     }
 
@@ -304,34 +314,39 @@ abstract class ChatPickerPanel {
     void drawRestingButton(int anchorRight, int anchorY) {
         int left = buttonLeft(anchorRight);
         int top = buttonTop(anchorY);
-        ChatIconSheet glyph = buttonGlyph();
-        ChatIconSheet.drawPairWithShadow(glyph, buttonGlyphLit(), 0.0F,
+        LostTalesUiSheet glyph = buttonGlyph();
+        LostTalesUiSheet.drawPairWithShadow(glyph, buttonGlyphLit(), 0.0F,
                 left + (BUTTON_SIZE - glyph.getWidth()) / 2,
                 top + (BUTTON_SIZE - glyph.getHeight()) / 2, 255);
+    }
+
+    /** The glyph's place inside the button's square, centred in it. */
+    private static int glyphLeft(int left, LostTalesUiSheet glyph) {
+        return left + (BUTTON_SIZE - glyph.getWidth()) / 2;
+    }
+
+    private static int glyphTop(int top, LostTalesUiSheet glyph) {
+        return top + (BUTTON_SIZE - glyph.getHeight()) / 2;
     }
 
     private void drawButton(ChatPointerRegions regions, int anchorRight,
                             int screenHeight, double mouseX, double mouseY) {
         int left = buttonLeft(anchorRight);
         int top = buttonTop(screenHeight);
-        boolean lifted = this.targetOpen || isInsideButton(mouseX, mouseY,
-                anchorRight, screenHeight);
-        long now = System.nanoTime();
-        double elapsed = this.buttonFadeNanos == 0L ? 0.0D
-                : (now - this.buttonFadeNanos) / 1.0E9D;
-        this.buttonFadeNanos = now;
-        this.buttonFade = LostTalesChatVisualStyle.hoverFade(this.buttonFade,
-                lifted, elapsed);
+        boolean inside = isInsideButton(mouseX, mouseY, anchorRight,
+                screenHeight);
+        boolean lifted = this.targetOpen || inside;
+        this.buttonMotion.advance(System.nanoTime(), lifted, lifted,
+                inside && org.lwjgl.input.Mouse.isButtonDown(0),
+                LostTalesConfig.enableChatAnimations);
         // A bare glyph with the shared shadow, centred in the button's
-        // square; hover and open states lift it a pixel rather than
-        // painting a backdrop, and the glyph crosses to its lit artwork
-        // rather than swapping to it.
-        ChatIconSheet glyph = buttonGlyph();
-        ChatIconSheet.drawPairWithShadow(glyph, buttonGlyphLit(),
-                this.buttonFade,
-                left + (BUTTON_SIZE - glyph.getWidth()) / 2,
-                top - (lifted ? 1 : 0)
-                        + (BUTTON_SIZE - glyph.getHeight()) / 2, 255);
+        // square; hover and open states lift it rather than painting a
+        // backdrop, and the glyph crosses to its lit artwork rather than
+        // swapping to it.
+        LostTalesUiSheet glyph = buttonGlyph();
+        LostTalesUiButton.drawGlyph(glyph, buttonGlyphLit(),
+                this.buttonMotion, glyphLeft(left, glyph),
+                glyphTop(top, glyph), 255);
         regions.add(left, top, left + BUTTON_SIZE, top + BUTTON_SIZE);
     }
 
@@ -441,19 +456,16 @@ abstract class ChatPickerPanel {
                 LostTalesChatVisualStyle.argb(
                         LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB,
                         Math.min(alpha, 0xA0)));
-        long now = System.nanoTime();
-        double elapsed = this.magnifierFadeNanos == 0L ? 0.0D
-                : (now - this.magnifierFadeNanos) / 1.0E9D;
-        this.magnifierFadeNanos = now;
-        this.magnifierFade = LostTalesChatVisualStyle.hoverFade(
-                this.magnifierFade, lit, elapsed);
+        this.magnifierMotion.advance(System.nanoTime(), lit, false, false,
+                LostTalesConfig.enableChatAnimations);
         // The magnifier stands on the capitals of what is typed beside
-        // it, as every icon in a chat row does.
-        ChatIconSheet.drawPairWithShadow(ChatIconSheet.SEARCH,
-                ChatIconSheet.SEARCH_HOVER, this.magnifierFade,
+        // it, as every icon in a chat row does. It is not a button of
+        // its own, so it lights with the field and never travels.
+        LostTalesUiButton.drawGlyph(LostTalesUiSheet.SEARCH,
+                LostTalesUiSheet.SEARCH_HOVER, this.magnifierMotion,
                 layout.left + PADDING + 1,
                 layout.searchY + LostTalesChatOverlayRenderer.centredBoxTop(
-                        ChatIconSheet.SEARCH.getHeight()), alpha);
+                        LostTalesUiSheet.SEARCH.getHeight()), alpha);
         if (this.searchField == null) {
             return;
         }
@@ -537,8 +549,8 @@ abstract class ChatPickerPanel {
      * press test asks, so the magnifier lights on the pixels a press
      * would put the caret from.
      */
-    private ChatHitBox searchFieldBox() {
-        return new ChatHitBox(this.searchField.xPosition,
+    private LostTalesUiHitBox searchFieldBox() {
+        return new LostTalesUiHitBox(this.searchField.xPosition,
                 this.searchField.yPosition, this.searchField.width,
                 this.searchField.height);
     }
@@ -702,10 +714,10 @@ abstract class ChatPickerPanel {
     abstract String insertionText(Entry entry);
 
     /** The button's glyph, a cell of the chat's sheet. */
-    abstract ChatIconSheet buttonGlyph();
+    abstract LostTalesUiSheet buttonGlyph();
 
     /** The same glyph lit, which the button crosses to under the pointer. */
-    abstract ChatIconSheet buttonGlyphLit();
+    abstract LostTalesUiSheet buttonGlyphLit();
 
     static final class Section {
         final String label;

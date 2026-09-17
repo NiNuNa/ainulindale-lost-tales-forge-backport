@@ -34,7 +34,7 @@ public final class ChatChannelRegistryTest {
         List<ChatChannel> built = Arrays.asList(ChatChannel.ALL,
                 ChatChannel.PROXIMITY, ChatChannel.PARTY, ChatChannel.FACTION,
                 ChatChannel.OOC, ChatChannel.ADMIN, ChatChannel.CONSOLE,
-                ChatChannel.WHISPER);
+                ChatChannel.SERVER_CONSOLE, ChatChannel.WHISPER);
         List<ChatChannel> inForce = Arrays.asList(ChatChannel.values());
 
         assertEquals(built.size(), inForce.size());

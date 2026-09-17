@@ -1,11 +1,14 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
+import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
@@ -37,10 +40,8 @@ import org.lwjgl.opengl.GL11;
  * to), and layout markers advance the cursor without drawing.</p>
  */
 final class LostTalesChatVisualStyle {
-    static final int IVORY = LostTalesSkyrimUiStyle.rgb(
-            LostTalesSkyrimUiStyle.HUD_LABEL);
-    static final int SHADOW = LostTalesSkyrimUiStyle.rgb(
-            LostTalesSkyrimUiStyle.HUD_SHADOW);
+    static final int IVORY = LostTalesUiInk.IVORY;
+    static final int SHADOW = LostTalesUiInk.SHADOW;
     /**
      * The one opacity of every surface the chat lays out — backdrop,
      * strips, tabs, bars: half, thinned by the game's chat opacity.
@@ -48,10 +49,8 @@ final class LostTalesChatVisualStyle {
      */
     static final int SURFACE_ALPHA = 0x80;
     /** Alpha-free surface tones for what animates its own opacity. */
-    static final int SURFACE_RGB = LostTalesSkyrimUiStyle.rgb(
-            LostTalesSkyrimUiStyle.PLUM_BLACK);
-    static final int SURFACE_HIGHLIGHT_RGB = LostTalesSkyrimUiStyle.rgb(
-            LostTalesSkyrimUiStyle.PLUM_GRAY);
+    static final int SURFACE_RGB = LostTalesUiInk.SURFACE_RGB;
+    static final int SURFACE_HIGHLIGHT_RGB = LostTalesUiInk.SURFACE_HIGHLIGHT_RGB;
     /**
      * The one opacity of everything that opens over the chat — the
      * menus, the completion lists, the pickers and their tips, the
@@ -184,15 +183,15 @@ final class LostTalesChatVisualStyle {
         return LostTalesColors.rgb(LostTalesColors.paletteColor(name, fallback));
     }
     /** Shadow offset shared by text, sprites, and icons. */
-    static final int SHADOW_OFFSET = 1;
+    static final int SHADOW_OFFSET = LostTalesUiInk.SHADOW_OFFSET;
     /** Shared palette opacity for every chat text, icon and portrait shadow. */
-    static final float SHADOW_OPACITY = LostTalesSkyrimUiStyle.SHADOW_OPACITY;
+    static final float SHADOW_OPACITY = LostTalesUiInk.SHADOW_OPACITY;
     /**
      * Lowest alpha FontRenderer honours: a colour whose alpha is below four
      * is treated as opaque, so a near-invisible shadow would flash at full
      * strength. Anything under this is not drawn at all.
      */
-    static final int MIN_VISIBLE_ALPHA = 4;
+    static final int MIN_VISIBLE_ALPHA = LostTalesUiInk.MIN_VISIBLE_ALPHA;
 
     private LostTalesChatVisualStyle() {}
 
@@ -201,9 +200,7 @@ final class LostTalesChatVisualStyle {
      * would fall under {@link #MIN_VISIBLE_ALPHA} and must be skipped.
      */
     static int shadowAlpha(int alpha) {
-        int shadow = Math.round(
-                Math.max(0, Math.min(255, alpha)) * SHADOW_OPACITY);
-        return shadow < MIN_VISIBLE_ALPHA ? 0 : shadow;
+        return LostTalesUiInk.shadowAlpha(alpha);
     }
 
     /** Width of the hairline the chat divides two controls with. */
@@ -339,16 +336,7 @@ final class LostTalesChatVisualStyle {
      * cross with its artwork rather than snapping at the same moment.
      */
     static int blend(int fromRgb, int toRgb, float progress) {
-        if (progress <= 0.0F) {
-            return fromRgb;
-        }
-        if (progress >= 1.0F) {
-            return toRgb;
-        }
-        int red = channel(fromRgb, toRgb, progress, 16);
-        int green = channel(fromRgb, toRgb, progress, 8);
-        int blue = channel(fromRgb, toRgb, progress, 0);
-        return (red << 16) | (green << 8) | blue;
+        return LostTalesUiInk.blend(fromRgb, toRgb, progress);
     }
 
     private static int channel(int fromRgb, int toRgb, float progress,
@@ -613,8 +601,7 @@ final class LostTalesChatVisualStyle {
     }
 
     static int argb(int rgb, int alpha) {
-        return (Math.max(0, Math.min(255, alpha)) << 24)
-                | (rgb & 0xFFFFFF);
+        return LostTalesUiInk.argb(rgb, alpha);
     }
 
     /**
@@ -967,7 +954,7 @@ final class LostTalesChatVisualStyle {
                 // bubble reads as a smudge.
                 width = ChatReplyMarker.ICON_SLOT_WIDTH;
                 Integer quoteColor = ChatReplyMarker.colorOf(part);
-                ChatIconSheet bubble = ChatIconSheet.SPEECH_BUBBLE;
+                LostTalesUiSheet bubble = LostTalesUiSheet.SPEECH_BUBBLE;
                 bubble.drawSilhouette(shadowPass ? SHADOW
                                 : !colours || quoteColor == null ? IVORY
                                         : quoteColor.intValue(),
@@ -982,7 +969,7 @@ final class LostTalesChatVisualStyle {
                 // under a bubble reads as a smudge.
                 width = measure(font, formatting, text, colours);
                 Integer linkColor = ChatChannelLinkMarker.colorOf(part);
-                ChatInlineIcons.drawSheetSprite(ChatIconSheet.SPEECH_BUBBLE,
+                ChatInlineIcons.drawSheetSprite(LostTalesUiSheet.SPEECH_BUBBLE,
                         ChatInlineIcons.boxLeft(cursor, width),
                         ChatInlineIcons.boxTop(y, width),
                         ChatInlineIcons.contentSize(width),
@@ -1167,7 +1154,7 @@ final class LostTalesChatVisualStyle {
         try {
             GL11.glTranslatef(0.0F, 0.0F,
                     LostTalesChatOverlayRenderer.CHIP_DEPTH);
-            ChatFramedButton.drawSurface(left, top, chip.width,
+            LostTalesUiFramedButton.drawSurface(left, top, chip.width,
                     ChatReactionMarker.HEIGHT, lit,
                     Math.round(alpha * INSET_ALPHA / 255.0F));
             beginContent();
@@ -1184,7 +1171,7 @@ final class LostTalesChatVisualStyle {
             drawColored(font, chip.countText(), left + ChatReactionMarker.PAD
                     + ChatReactionMarker.ICON + ChatReactionMarker.GAP, y,
                     chip.mine && colours ? accent : IVORY, alpha);
-            ChatFramedButton.drawInk(left, top, chip.width,
+            LostTalesUiFramedButton.drawInk(left, top, chip.width,
                     ChatReactionMarker.HEIGHT, lit, alpha);
         } finally {
             GL11.glPopMatrix();
@@ -1372,7 +1359,7 @@ final class LostTalesChatVisualStyle {
         }
         if (share.kind == ChatShareKind.QUEST) {
             if (ClientChatShowcaseStore.getQuest(share.showcaseId) != null) {
-                ChatIconSheet.QUEST.drawWithShadow(boxX, boxY, alpha);
+                LostTalesUiSheet.QUEST.drawWithShadow(boxX, boxY, alpha);
             }
             return;
         }

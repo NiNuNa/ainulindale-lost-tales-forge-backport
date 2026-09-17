@@ -1,5 +1,9 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiButton;
+import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
+import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.chat.ChatDeliveryMark;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
@@ -1059,7 +1063,7 @@ final class LostTalesChatOverlayRenderer {
                 float hatchedHeight = plannedHeight
                         + (totalLineCount <= 0 ? LINE_HEIGHT : 0.0F);
                 if (totalHeight < roomUnscaled - 0.01F) {
-                    ChatIconSheet.EMPTY_HATCH.drawTiledFadingFromMiddle(
+                    LostTalesUiSheet.EMPTY_HATCH.drawTiledFadingFromMiddle(
                             columns.enabled
                                     ? panelLeft + columns.separatorX()
                                             + ChatTimestampColumn
@@ -2158,7 +2162,7 @@ final class LostTalesChatOverlayRenderer {
      * height. The label's capitals and the chevron's three rows stand
      * in its middle, the odd row below each.
      */
-    private static final int JUMP_BUTTON_HEIGHT = ChatFramedButton.HEIGHT;
+    private static final int JUMP_BUTTON_HEIGHT = LostTalesUiFramedButton.HEIGHT;
     /** Clear pixels between the jump button's chevron and its label. */
     private static final int JUMP_ICON_GAP = 2;
 
@@ -2175,8 +2179,8 @@ final class LostTalesChatOverlayRenderer {
     private static int jumpButtonWidth(FontRenderer font) {
         int label = font == null ? 0
                 : Math.max(0, font.getStringWidth(jumpButtonLabel()) - 1);
-        return ChatFramedButton.WIDE_INSET + ChatIconSheet.CHEVRON_1.getWidth()
-                + JUMP_ICON_GAP + label + ChatFramedButton.WIDE_INSET;
+        return LostTalesUiFramedButton.WIDE_INSET + LostTalesUiSheet.CHEVRON_1.getWidth()
+                + JUMP_ICON_GAP + label + LostTalesUiFramedButton.WIDE_INSET;
     }
 
     /**
@@ -2229,14 +2233,11 @@ final class LostTalesChatOverlayRenderer {
         if (alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
             return;
         }
-        long now = System.nanoTime();
-        double elapsed = frame.jumpFadeNanos == 0L ? 0.0D
-                : (now - frame.jumpFadeNanos) / 1.0E9D;
-        frame.jumpFadeNanos = now;
-        frame.jumpFade = LostTalesChatVisualStyle.hoverFade(frame.jumpFade,
-                frame.jumpHovered, elapsed);
-        ChatFramedButton.drawSurface(left, top, width, JUMP_BUTTON_HEIGHT,
-                frame.jumpFade, Math.round(alpha
+        frame.jumpButtonMotion.advance(System.nanoTime(), frame.jumpHovered,
+                LostTalesConfig.enableChatAnimations);
+        float jumpLit = frame.jumpButtonMotion.lit();
+        LostTalesUiFramedButton.drawSurface(left, top, width, JUMP_BUTTON_HEIGHT,
+                jumpLit, Math.round(alpha
                         * LostTalesChatVisualStyle.INSET_ALPHA / 255.0F));
         // The label and the badge's count are text, which is drawn at
         // whole coordinates: the matrix carries the button's own place
@@ -2249,8 +2250,8 @@ final class LostTalesChatOverlayRenderer {
             // The label's capitals in the button's middle, the icon gap
             // past the chevron.
             LostTalesChatVisualStyle.drawColored(minecraft.fontRenderer,
-                    jumpButtonLabel(), ChatFramedButton.WIDE_INSET
-                            + ChatIconSheet.CHEVRON_1.getWidth()
+                    jumpButtonLabel(), LostTalesUiFramedButton.WIDE_INSET
+                            + LostTalesUiSheet.CHEVRON_1.getWidth()
                             + JUMP_ICON_GAP,
                     (JUMP_BUTTON_HEIGHT - GLYPH_CAP_HEIGHT) / 2,
                     LostTalesChatVisualStyle.IVORY, alpha);
@@ -2262,14 +2263,15 @@ final class LostTalesChatOverlayRenderer {
         } finally {
             GL11.glPopMatrix();
         }
-        // The chevron first, the wide inset in from the frame's edge.
-        ChatIconSheet.drawPairWithShadow(ChatIconSheet.CHEVRON_1,
-                ChatIconSheet.CHEVRON_1_HOVER, frame.jumpFade,
-                left + ChatFramedButton.WIDE_INSET,
+        // The chevron first, the wide inset in from the frame's edge, and
+        // posed by the button's beat while the frame keeps its place.
+        LostTalesUiButton.drawGlyph(LostTalesUiSheet.CHEVRON_1,
+                LostTalesUiSheet.CHEVRON_1_HOVER, frame.jumpButtonMotion,
+                left + LostTalesUiFramedButton.WIDE_INSET,
                 top + (JUMP_BUTTON_HEIGHT
-                        - ChatIconSheet.CHEVRON_1.getHeight()) / 2, alpha);
-        ChatFramedButton.drawInk(left, top, width, JUMP_BUTTON_HEIGHT,
-                frame.jumpFade, alpha);
+                        - LostTalesUiSheet.CHEVRON_1.getHeight()) / 2, alpha);
+        LostTalesUiFramedButton.drawInk(left, top, width, JUMP_BUTTON_HEIGHT,
+                jumpLit, alpha);
         frame.jumpPillLeft = originX + left * scale;
         frame.jumpPillTop = originY + top * scale;
         frame.jumpPillRight = originX + (left + width) * scale;
@@ -2537,7 +2539,7 @@ final class LostTalesChatOverlayRenderer {
      * Edge of one toolbar button's square: the framed buttons' one
      * height, an emoji's box with the frame's inset either side.
      */
-    static final int TOOLBAR_BUTTON_SIZE = ChatFramedButton.HEIGHT;
+    static final int TOOLBAR_BUTTON_SIZE = LostTalesUiFramedButton.HEIGHT;
     /** Clear pixels between two of the toolbar's buttons, and after the last. */
     static final int TOOLBAR_GAP = 2;
     /** From one toolbar button's left edge to the next one's. */
@@ -2772,36 +2774,43 @@ final class LostTalesChatOverlayRenderer {
             return;
         }
         long now = System.nanoTime();
-        double elapsed = frame.toolbarFadeNanos == 0L ? 0.0D
-                : (now - frame.toolbarFadeNanos) / 1.0E9D;
-        frame.toolbarFadeNanos = now;
         frame.startToolbarFades(chatLineId);
         int surfaceAlpha = Math.round(alpha
                 * LostTalesChatVisualStyle.INSET_ALPHA / 255.0F);
         for (int index = 0; index < kinds.length; index++) {
             int kind = kinds[index];
             float buttonLeft = left + index * TOOLBAR_STRIDE;
-            float lit = frame.toolbarFade(kind, elapsed);
-            ChatFramedButton.drawSurface(buttonLeft, top,
+            LostTalesUiButtonMotion motion = frame.toolbarMotion(kind, now);
+            float lit = motion.lit();
+            LostTalesUiFramedButton.drawSurface(buttonLeft, top,
                     TOOLBAR_BUTTON_SIZE, TOOLBAR_BUTTON_SIZE, lit,
                     surfaceAlpha);
-            if (kind == TOOLBAR_REACT) {
-                drawReactGlyph(buttonLeft + (TOOLBAR_BUTTON_SIZE
-                                - CONTENT_BOX_HEIGHT) / 2,
-                        top + (TOOLBAR_BUTTON_SIZE - CONTENT_BOX_HEIGHT) / 2,
-                        alpha);
-            } else if (kind == TOOLBAR_REPLY) {
-                drawPixelGlyph(REPLY_GLYPH, buttonLeft + (TOOLBAR_BUTTON_SIZE
-                                - REPLY_GLYPH_WIDTH) / 2,
-                        top + (TOOLBAR_BUTTON_SIZE - REPLY_GLYPH_HEIGHT) / 2,
-                        LostTalesChatVisualStyle.IVORY, alpha);
-            } else {
-                drawPixelGlyph(COPY_GLYPH, buttonLeft + (TOOLBAR_BUTTON_SIZE
-                                - COPY_GLYPH_WIDTH) / 2,
-                        top + (TOOLBAR_BUTTON_SIZE - COPY_GLYPH_HEIGHT) / 2,
-                        LostTalesChatVisualStyle.IVORY, alpha);
+            // The frame keeps its place and the glyph moves inside it,
+            // as every other framed button in the chat does.
+            LostTalesUiButton.beginPose(motion, buttonLeft, top,
+                    TOOLBAR_BUTTON_SIZE, TOOLBAR_BUTTON_SIZE);
+            try {
+                if (kind == TOOLBAR_REACT) {
+                    drawReactGlyph(buttonLeft + (TOOLBAR_BUTTON_SIZE
+                                    - CONTENT_BOX_HEIGHT) / 2,
+                            top + (TOOLBAR_BUTTON_SIZE - CONTENT_BOX_HEIGHT) / 2,
+                            alpha);
+                } else if (kind == TOOLBAR_REPLY) {
+                    drawPixelGlyph(REPLY_GLYPH,
+                            buttonLeft + (TOOLBAR_BUTTON_SIZE
+                                    - REPLY_GLYPH_WIDTH) / 2,
+                            top + (TOOLBAR_BUTTON_SIZE - REPLY_GLYPH_HEIGHT) / 2,
+                            LostTalesChatVisualStyle.IVORY, alpha);
+                } else {
+                    drawPixelGlyph(COPY_GLYPH, buttonLeft + (TOOLBAR_BUTTON_SIZE
+                                    - COPY_GLYPH_WIDTH) / 2,
+                            top + (TOOLBAR_BUTTON_SIZE - COPY_GLYPH_HEIGHT) / 2,
+                            LostTalesChatVisualStyle.IVORY, alpha);
+                }
+            } finally {
+                LostTalesUiButton.endPose();
             }
-            ChatFramedButton.drawInk(buttonLeft, top, TOOLBAR_BUTTON_SIZE,
+            LostTalesUiFramedButton.drawInk(buttonLeft, top, TOOLBAR_BUTTON_SIZE,
                     TOOLBAR_BUTTON_SIZE, lit, alpha);
         }
         frame.toolbarLeft = originX + left * scale;
@@ -3509,9 +3518,9 @@ final class LostTalesChatOverlayRenderer {
         drawTopEdge(left, right, edgeTop, alpha);
         drawRightEdgeSegment(right, top, (float)frame.barTop(), edgeTop,
                 (float)(frame.boxBottom - frame.boxTop) + edge, alpha);
-        ChatFramedButton.drawCornerInk(ChatIconSheet.FRAME_LIT_TOP_RIGHT,
+        LostTalesUiFramedButton.drawCornerInk(LostTalesUiSheet.FRAME_LIT_TOP_RIGHT,
                 right + ChatWindowPlacement.FRAME_WIDTH
-                        - ChatFramedButton.CORNER,
+                        - LostTalesUiFramedButton.CORNER,
                 top - ChatWindowPlacement.FRAME_WIDTH, alpha);
     }
 

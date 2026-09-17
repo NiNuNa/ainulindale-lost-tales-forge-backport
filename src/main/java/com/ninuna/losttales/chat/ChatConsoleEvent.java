@@ -1,7 +1,7 @@
 package com.ninuna.losttales.chat;
 
 /**
- * One entry of the shared operator console: something administrative
+ * One entry of the Server Console: something administrative
  * that happened on the server, said once for every staff member to
  * read. Not a chat message — nobody signs it, nobody replies to it,
  * nothing bridges it — and not a mirror of the server log either: only

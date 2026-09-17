@@ -71,7 +71,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
 
     /**
      * The sender id of the server's own lines: a command's answer, and
-     * the operator console's word on who ran what. Nobody's account, so
+     * the Server Console's word on who ran what. Nobody's account, so
      * it is never ignored, muted, whispered or looked up a skin for; a
      * client shows it with the console mark for a head. Such lines are
      * built on the client from what the server sent and never travel

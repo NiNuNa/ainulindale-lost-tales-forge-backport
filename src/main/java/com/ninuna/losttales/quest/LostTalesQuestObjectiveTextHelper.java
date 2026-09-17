@@ -48,22 +48,51 @@ public final class LostTalesQuestObjectiveTextHelper {
         }
         int target = getObjectiveTargetCount(objective);
         String type = objective.getType() == null ? "" : objective.getType();
-        if ("goto".equalsIgnoreCase(type)) {
-            return "Travel to the destination.";
+        switch (LostTalesQuestObjectiveType.of(type)) {
+            case GOTO:
+                return "Travel to the destination.";
+            case GATHER: {
+                String item = firstNonEmpty(objective.getParam("item", ""), objective.getParam("itemId", ""), objective.getParam("target", ""));
+                return "Gather " + target + (item.length() > 0 ? " " + prettifyResourceName(item) : " item" + (target == 1 ? "" : "s")) + ".";
+            }
+            case CRAFT: {
+                String item = firstNonEmpty(objective.getParam("item", ""), objective.getParam("itemId", ""), objective.getParam("target", ""));
+                return "Craft " + target + (item.length() > 0 ? " " + prettifyResourceName(item) : " item" + (target == 1 ? "" : "s")) + ".";
+            }
+            case KILL: {
+                String entity = firstNonEmpty(objective.getParam("entity", ""), objective.getParam("entityId", ""), objective.getParam("target", ""), objective.getParam("group", ""));
+                return "Defeat " + target + (entity.length() > 0 ? " " + prettifyResourceName(entity) : " enem" + (target == 1 ? "y" : "ies")) + ".";
+            }
+            case TALK: {
+                String who = objectiveEntityName(objective);
+                return "Speak to " + (who.length() > 0 ? who : "the person named") + ".";
+            }
+            case DELIVER: {
+                String who = objectiveEntityName(objective);
+                String item = firstNonEmpty(objective.getParam("item", ""), objective.getParam("itemId", ""));
+                return "Bring " + (who.length() > 0 ? who + " " : "")
+                        + target + (item.length() > 0 ? " " + prettifyResourceName(item) : " item" + (target == 1 ? "" : "s")) + ".";
+            }
+            default:
+                return getReadableObjectiveType(type);
         }
-        if ("gather".equalsIgnoreCase(type) || "gather_item".equalsIgnoreCase(type) || "pickup".equalsIgnoreCase(type) || "pickup_item".equalsIgnoreCase(type) || "collect".equalsIgnoreCase(type)) {
-            String item = firstNonEmpty(objective.getParam("item", ""), objective.getParam("itemId", ""), objective.getParam("target", ""));
-            return "Gather " + target + (item.length() > 0 ? " " + prettifyResourceName(item) : " item" + (target == 1 ? "" : "s")) + ".";
+    }
+
+    /** Who a talk or delivery objective names, prettified; empty for none. */
+    private static String objectiveEntityName(
+            LostTalesQuestObjectiveDefinition objective) {
+        String entity = firstNonEmpty(objective.getParam("entity", ""),
+                objective.getParam("entityId", ""),
+                objective.getParam("npc", ""),
+                objective.getParam("target", ""));
+        if (entity.length() == 0) {
+            return "";
         }
-        if ("craft".equalsIgnoreCase(type)) {
-            String item = firstNonEmpty(objective.getParam("item", ""), objective.getParam("itemId", ""), objective.getParam("target", ""));
-            return "Craft " + target + (item.length() > 0 ? " " + prettifyResourceName(item) : " item" + (target == 1 ? "" : "s")) + ".";
-        }
-        if ("kill".equalsIgnoreCase(type)) {
-            String entity = firstNonEmpty(objective.getParam("entity", ""), objective.getParam("entityId", ""), objective.getParam("target", ""), objective.getParam("group", ""));
-            return "Defeat " + target + (entity.length() > 0 ? " " + prettifyResourceName(entity) : " enem" + (target == 1 ? "y" : "ies")) + ".";
-        }
-        return getReadableObjectiveType(type);
+        // A selector may list several spellings of the same person; the
+        // first is the one written for a reader.
+        int comma = entity.indexOf(',');
+        return prettifyResourceName(comma < 0 ? entity
+                : entity.substring(0, comma));
     }
 
     private static String prettifyResourceName(String value) {
@@ -87,19 +116,22 @@ public final class LostTalesQuestObjectiveTextHelper {
         if (type == null || type.length() == 0) {
             return "Objective";
         }
-        if ("goto".equalsIgnoreCase(type)) {
-            return "Travel";
+        switch (LostTalesQuestObjectiveType.of(type)) {
+            case GOTO:
+                return "Travel";
+            case GATHER:
+                return "Gather";
+            case CRAFT:
+                return "Craft";
+            case KILL:
+                return "Defeat";
+            case TALK:
+                return "Speak";
+            case DELIVER:
+                return "Deliver";
+            default:
+                return Character.toUpperCase(type.charAt(0)) + type.substring(1);
         }
-        if ("gather".equalsIgnoreCase(type) || "gather_item".equalsIgnoreCase(type) || "pickup".equalsIgnoreCase(type) || "pickup_item".equalsIgnoreCase(type) || "collect".equalsIgnoreCase(type)) {
-            return "Gather";
-        }
-        if ("craft".equalsIgnoreCase(type)) {
-            return "Craft";
-        }
-        if ("kill".equalsIgnoreCase(type)) {
-            return "Defeat";
-        }
-        return Character.toUpperCase(type.charAt(0)) + type.substring(1);
     }
 
     public static String buildObjectiveParamSummary(LostTalesQuestObjectiveDefinition objective) {
@@ -108,7 +140,7 @@ public final class LostTalesQuestObjectiveTextHelper {
         }
 
         String type = objective.getType() == null ? "" : objective.getType();
-        if ("goto".equalsIgnoreCase(type)) {
+        if (LostTalesQuestObjectiveType.GOTO.is(objective)) {
             String x = objective.getParam("x", "?");
             String y = objective.getParam("y", "?");
             String z = objective.getParam("z", "?");
@@ -137,7 +169,8 @@ public final class LostTalesQuestObjectiveTextHelper {
             return text.toString();
         }
 
-        if ("gather".equalsIgnoreCase(type) || "gather_item".equalsIgnoreCase(type) || "pickup".equalsIgnoreCase(type) || "pickup_item".equalsIgnoreCase(type) || "collect".equalsIgnoreCase(type) || "craft".equalsIgnoreCase(type)) {
+        if (LostTalesQuestObjectiveType.GATHER.is(objective)
+                || LostTalesQuestObjectiveType.CRAFT.is(objective)) {
             String item = firstNonEmpty(objective.getParam("item", ""), objective.getParam("itemId", ""), objective.getParam("target", ""));
             if (item.length() > 0) {
                 return "Item " + item;
@@ -146,7 +179,24 @@ public final class LostTalesQuestObjectiveTextHelper {
             return tag.length() == 0 ? "" : "Tag " + tag;
         }
 
-        if ("kill".equalsIgnoreCase(type)) {
+        if (LostTalesQuestObjectiveType.of(objective).isNpcVisit()) {
+            String who = firstNonEmpty(objective.getParam("entity", ""),
+                    objective.getParam("entityId", ""),
+                    objective.getParam("npc", ""),
+                    objective.getParam("target", ""));
+            String item = firstNonEmpty(objective.getParam("item", ""),
+                    objective.getParam("itemId", ""));
+            StringBuilder text = new StringBuilder();
+            if (who.length() > 0) {
+                text.append("Recipient ").append(who);
+            }
+            if (item.length() > 0) {
+                text.append(text.length() > 0 ? ", item " : "Item ").append(item);
+            }
+            return text.toString();
+        }
+
+        if (LostTalesQuestObjectiveType.KILL.is(objective)) {
             String entity = firstNonEmpty(objective.getParam("entity", ""), objective.getParam("entityId", ""), objective.getParam("target", ""));
             String group = firstNonEmpty(objective.getParam("tag", ""), objective.getParam("group", ""));
             String radius = objective.getParam("radius", "");
@@ -174,7 +224,7 @@ public final class LostTalesQuestObjectiveTextHelper {
         if (objective == null) {
             return 1;
         }
-        if ("goto".equalsIgnoreCase(objective.getType())) {
+        if (LostTalesQuestObjectiveType.of(objective).countsToOne()) {
             return 1;
         }
         try {

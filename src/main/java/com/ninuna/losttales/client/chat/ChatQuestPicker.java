@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import java.util.ArrayList;
@@ -79,7 +80,7 @@ final class ChatQuestPicker extends ChatPickerPanel {
                    int alpha, boolean hovered) {
         ChatShareCandidates.QuestEntry quest =
                 (ChatShareCandidates.QuestEntry)entry.value;
-        ChatIconSheet.QUEST.drawWithShadow(x + 1, y + 1, alpha);
+        LostTalesUiSheet.QUEST.drawWithShadow(x + 1, y + 1, alpha);
         String label = LostTalesSkyrimUiStyle.trimToWidth(
                 minecraft.fontRenderer, quest.label(), ROW_WIDTH - 18);
         LostTalesChatVisualStyle.drawPlain(minecraft.fontRenderer, label,
@@ -99,12 +100,12 @@ final class ChatQuestPicker extends ChatPickerPanel {
     }
 
     @Override
-    ChatIconSheet buttonGlyph() {
-        return ChatIconSheet.QUEST;
+    LostTalesUiSheet buttonGlyph() {
+        return LostTalesUiSheet.QUEST;
     }
 
     @Override
-    ChatIconSheet buttonGlyphLit() {
-        return ChatIconSheet.QUEST_HOVER;
+    LostTalesUiSheet buttonGlyphLit() {
+        return LostTalesUiSheet.QUEST_HOVER;
     }
 }

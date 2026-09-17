@@ -71,9 +71,13 @@ public final class ChatChannelPolicy {
      * @param operator whether the sender holds the server's operator level,
      *                 which is what reaches a staff channel the config
      *                 names no gate for; see {@link #staffOnly}
+     * @param consoleReader whether the sender holds
+     *                 {@code chat.console.read}, which is what reaches
+     *                 the server's console; see {@link #readsConsole}
      */
     public static String sendRefusal(ChatChannel channel, Party party, UUID gameplayId,
-                                     String factionId, int roles, boolean operator) {
+                                     String factionId, int roles, boolean operator,
+                                     boolean consoleReader) {
         if (channel == null) {
             return "chat.losttales.channel.role_unavailable";
         }
@@ -87,6 +91,10 @@ public final class ChatChannelPolicy {
         }
         if (staffOnly(channel, ChatChannelGates.current())) {
             return operator ? null : "chat.losttales.channel.role_unavailable";
+        }
+        if (channel.getRecipientRule() == ChatRecipientRule.CONSOLE_READERS
+                && !consoleReader) {
+            return "chat.losttales.channel.role_unavailable";
         }
         if (!ChatChannelGates.current().canSend(roles, channel)) {
             return "chat.losttales.channel.role_unavailable";
@@ -109,12 +117,24 @@ public final class ChatChannelPolicy {
                 && !gates.hasEntry(channel);
     }
 
+    /**
+     * Whether the channel is the server's own console, which a
+     * capability opens rather than a role gate.
+     */
+    public static boolean isServerConsole(ChatChannel channel) {
+        return channel != null
+                && channel.getRecipientRule() == ChatRecipientRule.CONSOLE_READERS;
+    }
+
     /** Whether the player may read the channel, the staff floor included. */
     public static boolean canRead(EntityPlayerMP player, ChatChannel channel,
                                   int roles) {
         ChatChannelGates gates = ChatChannelGates.current();
         if (staffOnly(channel, gates)) {
             return LostTalesPermissions.isOperator(player);
+        }
+        if (isServerConsole(channel) && !readsConsole(player)) {
+            return false;
         }
         return gates.canRead(ChatRolePresentation.isInCharacter(channel)
                 ? roles : ChatAccountRoleResolver.resolve(player, null), channel);
@@ -126,6 +146,9 @@ public final class ChatChannelPolicy {
         ChatChannelGates gates = ChatChannelGates.current();
         if (staffOnly(channel, gates)) {
             return LostTalesPermissions.isOperator(player);
+        }
+        if (isServerConsole(channel) && !readsConsole(player)) {
+            return false;
         }
         return gates.canSend(ChatRolePresentation.isInCharacter(channel)
                 ? roles : ChatAccountRoleResolver.resolve(player, null), channel);
@@ -154,11 +177,6 @@ public final class ChatChannelPolicy {
         boolean gated = gates.isGated(channel);
         boolean staffOnly = staffOnly(channel, gates);
         ChatRecipientRule rule = channel.getRecipientRule();
-        // A line typed in a private channel by someone who may read the
-        // shared console is staff talk and reaches every reader of it;
-        // typed by anyone else it is their own note and reaches them alone.
-        boolean staffTalk = rule == ChatRecipientRule.SELF && sender != null
-                && readsConsole(sender);
         double proximity = proximityDistanceSquared();
         for (EntityPlayerMP candidate : online) {
             if (candidate == null || candidate.getUniqueID() == null) {
@@ -178,7 +196,10 @@ public final class ChatChannelPolicy {
                     reached = true;
                     break;
                 case SELF:
-                    reached = candidate == sender || (staffTalk && readsConsole(candidate));
+                    reached = candidate == sender;
+                    break;
+                case CONSOLE_READERS:
+                    reached = readsConsole(candidate);
                     break;
                 case PROXIMITY:
                     reached = sender != null && candidate.dimension == sender.dimension
@@ -200,12 +221,8 @@ public final class ChatChannelPolicy {
             }
         }
         Routing routing = new Routing(recipients, null);
-        // Staff talk in a private channel is the console readers' own
-        // and opens to whoever reads the console later, as the Operator
-        // channel does; a note to oneself stays with who was sent it.
-        return new Routing(recipients, staffTalk
-                ? ChatHistory.Audience.readers()
-                : audienceFor(channel, party, factionId, routing.recipientIds()));
+        return new Routing(recipients,
+                audienceFor(channel, party, factionId, routing.recipientIds()));
     }
 
     /**
@@ -220,8 +237,7 @@ public final class ChatChannelPolicy {
      * the characters of the faction then and now; everything else —
      * proximity, whispers, a private channel's line — exactly who was
      * sent it, since where a player stood cannot be asked again and a
-     * note to oneself is nobody else's ({@link #route} opens staff talk
-     * in a private channel to the console's readers instead).
+     * note to oneself is nobody else's.
      */
     public static ChatHistory.Audience audienceFor(ChatChannel channel, Party party,
                                                    String factionId,
@@ -234,6 +250,10 @@ public final class ChatChannelPolicy {
                         ? ChatHistory.Audience.readers()
                         : ChatHistory.Audience.everyone();
             case OPERATORS:
+            // The server's console opens to whoever may read it when it
+            // is asked, so a capability granted afterwards shows the
+            // stream's past as a Discord channel shows its own.
+            case CONSOLE_READERS:
                 return ChatHistory.Audience.readers();
             case PARTY:
                 List<UUID> owners = new ArrayList<UUID>();
@@ -268,7 +288,7 @@ public final class ChatChannelPolicy {
                 active == null ? null : active.getCharacterId());
     }
 
-    /** Whether the player may read the shared operator console. */
+    /** Whether the player may read the Server Console. */
     public static boolean readsConsole(EntityPlayerMP player) {
         return LostTalesPermissions.has(player, LostTalesCapability.CHAT_CONSOLE_READ);
     }

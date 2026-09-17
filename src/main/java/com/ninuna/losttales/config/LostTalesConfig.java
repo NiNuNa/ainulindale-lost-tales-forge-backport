@@ -138,6 +138,13 @@ public final class LostTalesConfig {
     public static int questHudObjectiveLineCount = 2;
     public static boolean showQuestHudNotifications = true;
     public static boolean showNativeLotrQuestTracker = false;
+    /**
+     * Whether a quest offered by somebody is talked about in the Lost
+     * Tales conversation screen. Off, a Middle-earth quest is offered on
+     * LOTR's own screen and a Lost Tales quest starts the moment its
+     * giver is touched, as they did before there was a conversation.
+     */
+    public static boolean enableQuestDialogue = true;
     /** The one slot every passing notice shares: quest banners, discoveries, area names. */
     public static double notificationHudOffsetX = 50.0D;
     public static double notificationHudOffsetY = 35.0D;
@@ -923,6 +930,12 @@ public final class LostTalesConfig {
                     showNativeLotrQuestTracker,
                     "Also render LOTR's original single-quest tracker as a compatibility fallback."
             );
+            enableQuestDialogue = config.getBoolean(
+                    "enableQuestDialogue",
+                    CATEGORY_CLIENT,
+                    enableQuestDialogue,
+                    "Talk to a quest giver in the Lost Tales conversation screen. Off, Middle-earth quests are offered on LOTR's own screen and Lost Tales quests start as soon as their giver is touched."
+            );
             notificationHudOffsetX = getHudPercent(
                     config, "notificationHudOffsetX",
                     notificationHudOffsetX, 0.0D, 100.0D,
@@ -1011,7 +1024,7 @@ public final class LostTalesConfig {
                     "permissions",
                     CATEGORY_ROLES,
                     chatPermissions,
-                    "What a role may grant, in the server's own words, one per line as <id>=capability:<id>;capability:<id>;desc:<text>. capability may repeat and names something the code can do: chat.moderate (mute, unmute, remove any message), chat.console.read (the shared operator console), chat.narrate (speak as the Narrator in the roleplaying channels), roles.manage (/losttales role), server.config (the server settings, which includes these roles and permissions), character.admin, quest.admin, party.admin, mapmarker.manage, waystone.manage, hud.admin. A permission naming no capability the code has is kept and allows nothing. A role's grant naming no permission here is read as the capability of that id, so grant:chat.moderate needs nothing defined."
+                    "What a role may grant, in the server's own words, one per line as <id>=capability:<id>;capability:<id>;desc:<text>. capability may repeat and names something the code can do: chat.moderate (mute, unmute, remove any message), chat.console.read (the Server Console), chat.narrate (speak as the Narrator in the roleplaying channels), roles.manage (/losttales role), server.config (the server settings, which includes these roles and permissions), character.admin, quest.admin, party.admin, mapmarker.manage, waystone.manage, hud.admin. A permission naming no capability the code has is kept and allows nothing. A role's grant naming no permission here is read as the capability of that id, so grant:chat.moderate needs nothing defined."
             );
             chatRoles = config.getStringList(
                     "definitions",

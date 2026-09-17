@@ -53,9 +53,8 @@ final class LostTalesChatMotion {
      */
     static double approach(double current, double target,
                            double elapsedSeconds, double easeSeconds) {
-        double elapsed = Math.max(0.0D, Math.min(0.25D, elapsedSeconds));
-        return current + (target - current)
-                * (1.0D - Math.exp(-elapsed / easeSeconds));
+        return LostTalesGuiEasing.approach(current, target, elapsedSeconds,
+                easeSeconds);
     }
 
     static float smoothStep(float value) {

@@ -5,6 +5,7 @@ import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveSelection;
+import com.ninuna.losttales.quest.LostTalesQuestObjectiveType;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
@@ -167,12 +168,7 @@ public final class LostTalesClientQuestMarkerHelper {
     }
 
     private static boolean isGotoObjective(LostTalesQuestObjectiveDefinition objective) {
-        String type = objective.getType();
-        if (type == null) {
-            return false;
-        }
-        String normalized = type.trim().toLowerCase(Locale.ROOT);
-        return "goto".equals(normalized) || "go_to".equals(normalized) || "travel".equals(normalized) || "location".equals(normalized);
+        return LostTalesQuestObjectiveType.GOTO.is(objective);
     }
 
     private static String firstParam(LostTalesQuestObjectiveDefinition objective, String... keys) {

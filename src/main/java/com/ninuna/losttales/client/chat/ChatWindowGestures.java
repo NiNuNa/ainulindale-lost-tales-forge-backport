@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
 import com.ninuna.losttales.gui.hud.HudPlacementLayout;
@@ -618,7 +619,7 @@ final class ChatWindowGestures {
         double right = left + (frame.boxRight - frame.boxLeft);
         double top = frame.boxTop + frame.motionY;
         double bottom = frame.boxBottom + frame.motionY;
-        if (!new ChatHitBox(left, top, right - left, bottom - top)
+        if (!new LostTalesUiHitBox(left, top, right - left, bottom - top)
                 .grown(RESIZE_BORDER).contains(mouseX, mouseY)) {
             return null;
         }

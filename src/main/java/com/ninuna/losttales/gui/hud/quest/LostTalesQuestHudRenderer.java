@@ -12,10 +12,13 @@ import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import com.ninuna.losttales.gui.hud.LostTalesNotificationHud;
 import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderHelper;
+import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveSelection;
+import com.ninuna.losttales.quest.LostTalesQuestObjectiveType;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveTextHelper;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import java.util.ArrayList;
@@ -30,6 +33,7 @@ import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.MathHelper;
+import net.minecraft.util.StatCollector;
 import org.lwjgl.opengl.GL11;
 /** Shared Lost Tales and LOTR quest tracker plus sync-derived notifications. */
 public final class LostTalesQuestHudRenderer {
@@ -114,8 +118,13 @@ public final class LostTalesQuestHudRenderer {
         }
 
         if (overflow > 0) {
-            String more = "+" + overflow + " more tracked";
-            font.drawStringWithShadow(more, x + PANEL_WIDTH - PANEL_PADDING - font.getStringWidth(more), lineY - 1, 0xCCCCCC);
+            String more = StatCollector.translateToLocalFormatted(
+                    "gui.losttales.quest.hud.more", String.valueOf(overflow));
+            LostTalesSkyrimUiStyle.beginContent();
+            font.drawStringWithShadow(more,
+                    x + PANEL_WIDTH - PANEL_PADDING - font.getStringWidth(more),
+                    lineY - 1,
+                    LostTalesColors.rgb(LostTalesColors.TEXT_MUTED));
         }
     }
 
@@ -137,33 +146,51 @@ public final class LostTalesQuestHudRenderer {
         int right = x + width - PANEL_PADDING;
         int titleY = y + 1;
         String title = trimToWidth(font, entry.title, right - left - 28);
+        int titleRgb = LostTalesColors.rgb(entry.complete
+                ? LostTalesColors.GREEN : LostTalesColors.TEXT_BRIGHT);
 
-        Gui.drawRect(left + 17, titleY + 5, Math.max(left + 17, right - font.getStringWidth(title) - 10), titleY + 6, 0x88FFFFFF);
-        Gui.drawRect(right - 8, titleY + 5, right, titleY + 6, 0x88FFFFFF);
-        drawSmallDiamond(left + 5, titleY + 5, entry.complete ? 0x77DD77 : 0xFFFBDE);
-        font.drawStringWithShadow(title, right - font.getStringWidth(title), titleY, entry.complete ? 0xBBDD88 : 0xFFFBDE);
+        // The rule runs from the mark to the title and closes past it,
+        // the way a section's rule does in the journal.
+        int ruleColor = LostTalesColors.withAlpha(LostTalesColors.SAND, 0x88);
+        Gui.drawRect(left + 17, titleY + 5,
+                Math.max(left + 17, right - font.getStringWidth(title) - 10),
+                titleY + 6, ruleColor);
+        Gui.drawRect(right - 8, titleY + 5, right, titleY + 6, ruleColor);
+        drawSmallDiamond(left + 5, titleY + 5, titleRgb);
+        LostTalesSkyrimUiStyle.beginContent();
+        font.drawStringWithShadow(title, right - font.getStringWidth(title),
+                titleY, titleRgb);
 
         int objectiveY = y + 15;
         int maxLines = Math.max(1, Math.min(getConfiguredObjectiveLineCount(), entry.objectiveLines.size()));
         for (int i = 0; i < maxLines; i++) {
             String line = trimToWidth(font, entry.objectiveLines.get(i), right - left - 10);
-            font.drawStringWithShadow(line, left + 4, objectiveY + i * QUEST_ENTRY_LINE_HEIGHT, entry.complete ? 0x77DD77 : 0xDDDDDD);
+            font.drawStringWithShadow(line, left + 4,
+                    objectiveY + i * QUEST_ENTRY_LINE_HEIGHT,
+                    LostTalesColors.rgb(entry.complete
+                            ? LostTalesColors.GREEN : LostTalesColors.TEXT));
         }
 
         if (entry.target > 1) {
             int barY = y + height - 4;
             int barWidth = right - left - 8;
             int filled = MathHelper.clamp_int(barWidth * Math.min(entry.current, entry.target) / Math.max(1, entry.target), 0, barWidth);
-            Gui.drawRect(left + 4, barY, left + 4 + barWidth, barY + 2, 0x663D3A33);
+            Gui.drawRect(left + 4, barY, left + 4 + barWidth, barY + 2,
+                    LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, 0x66));
             if (filled > 0) {
-                Gui.drawRect(left + 4, barY, left + 4 + filled, barY + 2, entry.complete ? 0xAA77DD77 : 0xAADDBB77);
+                Gui.drawRect(left + 4, barY, left + 4 + filled, barY + 2,
+                        LostTalesColors.withAlpha(entry.complete
+                                ? LostTalesColors.GREEN
+                                : LostTalesColors.GOLD, 0xAA));
             }
+            LostTalesSkyrimUiStyle.beginContent();
         }
     }
 
     private static void drawSmallDiamond(int centerX, int centerY, int color) {
         Gui.drawRect(centerX, centerY - 3, centerX + 1, centerY + 4, color);
         Gui.drawRect(centerX - 2, centerY - 1, centerX + 3, centerY + 2, color);
+        LostTalesSkyrimUiStyle.beginContent();
     }
 
     private static List<TrackedQuestHudEntry> collectVisibleTrackedQuestEntries(Minecraft minecraft, float partialTicks) {
@@ -195,14 +222,16 @@ public final class LostTalesQuestHudRenderer {
                 complete &= objective.isComplete();
             }
             if (objectiveLines.isEmpty()) {
-                objectiveLines.add("◇ No current objective");
+                objectiveLines.add("\u25c7 " + StatCollector.translateToLocal(
+                        "gui.losttales.quest.objective.none"));
                 target = 1;
                 complete = false;
             }
             if (entry.hasDeadline()) {
-                objectiveLines.set(0, objectiveLines.get(0) + " | "
-                        + formatRemainingTime(entry.getRemainingTicks())
-                        + " left");
+                objectiveLines.set(0, objectiveLines.get(0) + " \u00b7 "
+                        + StatCollector.translateToLocalFormatted(
+                                "gui.losttales.quest.deadline",
+                                formatRemainingTime(entry.getRemainingTicks())));
             }
             entries.add(new TrackedQuestHudEntry(entry.getTitle(),
                     objectiveLines, current, Math.max(1, target), complete,
@@ -387,12 +416,7 @@ public final class LostTalesQuestHudRenderer {
     }
 
     private static boolean isGotoObjective(LostTalesQuestObjectiveDefinition objective) {
-        String type = objective == null ? null : objective.getType();
-        if (type == null) {
-            return false;
-        }
-        String normalized = type.trim().toLowerCase(Locale.ROOT);
-        return "goto".equals(normalized) || "go_to".equals(normalized) || "travel".equals(normalized) || "location".equals(normalized);
+        return LostTalesQuestObjectiveType.GOTO.is(objective);
     }
 
     private static String firstParam(LostTalesQuestObjectiveDefinition objective, String... keys) {
@@ -472,7 +496,8 @@ public final class LostTalesQuestHudRenderer {
                     resolution.getScaledHeight(), NOTIFICATION_HEIGHT);
             int background = (a << 24);
             int border = (MathHelper.clamp_int((int) (alpha * 170.0F), 0, 170) << 24) | notification.getType().getColor();
-            int textColor = (MathHelper.clamp_int((int) (alpha * 255.0F), 0, 255) << 24) | 0xFFFFFF;
+            int textColor = LostTalesColors.withAlpha(LostTalesColors.TEXT_BRIGHT,
+                    MathHelper.clamp_int((int)(alpha * 255.0F), 0, 255));
             int accentColor = (MathHelper.clamp_int((int) (alpha * 255.0F), 0, 255) << 24) | notification.getType().getColor();
 
             Gui.drawRect(x + 1, y + 1, x + NOTIFICATION_WIDTH + 1, y + NOTIFICATION_HEIGHT + 1, MathHelper.clamp_int((int) (alpha * 95.0F), 0, 95) << 24);
@@ -510,7 +535,9 @@ public final class LostTalesQuestHudRenderer {
 
         private TrackedQuestHudEntry(String title, List<String> objectiveText,
                 int current, int target, boolean complete, FontRenderer font) {
-            this.title = title == null || title.length() == 0 ? "Tracked Quest" : title;
+            this.title = title == null || title.length() == 0
+                    ? StatCollector.translateToLocal(
+                            "gui.losttales.quest.hud.untitled") : title;
             this.current = Math.max(0, current);
             this.target = Math.max(1, target);
             this.complete = complete;

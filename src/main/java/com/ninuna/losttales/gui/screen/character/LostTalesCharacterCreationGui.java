@@ -1,5 +1,6 @@
 package com.ninuna.losttales.gui.screen.character;
 
+import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceGameplayProfile;
@@ -156,6 +157,16 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
 
     private CharacterCreatorCategory category = CharacterCreatorCategory.RACE;
     private CharacterCreatorLayout layout;
+    /**
+     * The two buttons under the panel, each keeping its own beat: the
+     * frame stands still and the label moves inside it.
+     */
+    private final LostTalesUiButtonMotion submitMotion =
+            new LostTalesUiButtonMotion(
+                    LostTalesUiButtonMotion.Character.LIFT);
+    private final LostTalesUiButtonMotion cancelMotion =
+            new LostTalesUiButtonMotion(
+                    LostTalesUiButtonMotion.Character.SNAP);
     private CreatorContext context;
     private final List<CreatorControl> controls = new ArrayList<CreatorControl>();
     private CreatorControl focusedControl;
@@ -1134,10 +1145,10 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
                 LostTalesSkyrimUiStyle.BORDER_DIM);
         CreatorWidgets.drawButton(this.fontRendererObj, secondary[0], secondary[1],
                 secondary[2], secondary[3], I18n.format("gui.cancel"), true,
-                within(secondary, mouseX, mouseY));
+                within(secondary, mouseX, mouseY), this.cancelMotion);
         CreatorWidgets.drawButton(this.fontRendererObj, primary[0], primary[1],
                 primary[2], primary[3], primaryLabel(), canSubmit(),
-                within(primary, mouseX, mouseY));
+                within(primary, mouseX, mouseY), this.submitMotion);
     }
 
     private String primaryLabel() {

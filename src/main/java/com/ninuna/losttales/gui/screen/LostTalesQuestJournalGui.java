@@ -11,8 +11,26 @@ import com.ninuna.losttales.client.quest.ClientQuestCatalog;
 import com.ninuna.losttales.client.quest.ClientQuestEntry;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
+import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderHelper;
+import com.ninuna.losttales.chat.share.ChatShareKind;
+import com.ninuna.losttales.chat.share.ChatShareTokenParser;
+import com.ninuna.losttales.client.chat.LostTalesChatGui;
+import com.ninuna.losttales.gui.screen.quest.QuestJournalLayout;
+import com.ninuna.losttales.gui.screen.quest.QuestSearchQuery;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
+import com.ninuna.losttales.gui.style.LostTalesUiButton;
+import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
+import com.ninuna.losttales.gui.style.LostTalesUiTextField;
+import com.ninuna.losttales.client.gui.animation.LostTalesGuiEasing;
+import com.ninuna.losttales.client.gui.animation.LostTalesUiEasing;
+import com.ninuna.losttales.client.gui.animation.LostTalesUiTransition;
+import java.util.HashMap;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesQuestActionPacket;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
@@ -35,8 +53,7 @@ import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.world.World;
+import net.minecraft.util.StatCollector;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
@@ -48,28 +65,82 @@ import org.lwjgl.opengl.GL11;
  */
 public class LostTalesQuestJournalGui extends GuiScreen
         implements LostTalesPointerInteractable {
-    private static final int OUTER_PADDING = 16;
-    private static final int TOP_BAR_HEIGHT = 38;
-    private static final int FOOTER_HEIGHT = LostTalesControlBar.HEIGHT;
-    private static final int LEFT_WIDTH = 270;
-    private static final int LIST_ROW_HEIGHT = 24;
-    private static final int CATEGORY_ROW_HEIGHT = 24;
+    private static final int LIST_ROW_HEIGHT = QuestJournalLayout.ROW_STRIDE;
+    private static final int CATEGORY_ROW_HEIGHT = QuestJournalLayout.CATEGORY_STRIDE;
     private static final int DETAIL_LINE_HEIGHT = 10;
     private static final long DOUBLE_CLICK_TRACK_MS = 350L;
+    /** Where a quest row's glyph and title stand inside its row. */
+    private static final int ROW_GLYPH_X = 3;
+    private static final int ROW_TITLE_X = 15;
+    /** The square a category's chevron answers on. */
+    private static final int CHEVRON_BOX = 9;
+    /** The longest a search may be; a title is shorter than this. */
+    private static final int MAX_SEARCH = 64;
 
-    private static final int QUEST_BUTTON_WIDTH = 175;
-    private static final int QUEST_BUTTON_HEIGHT = 18;
-    private static final int CATEGORY_HEADER_WIDTH = 192;
-    private static final int CATEGORY_HEADER_HEIGHT = 24;
-    private static final int ACTIVE_ICON_WIDTH = 11;
-    private static final int ACTIVE_ICON_HEIGHT = 10;
+    /** What the pointer is on: asked once a frame, read by every draw. */
+    private enum Hovered { NOTHING, FILTER, CATEGORY, QUEST, ACTION, SEARCH }
 
-    private static final ResourceLocation QUEST_BUTTON_TEXTURE = new ResourceLocation(LostTalesMetaData.MOD_ID, "textures/gui/quest/button_quest.png");
-    private static final ResourceLocation CATEGORY_HEADER_TEXTURE = new ResourceLocation(LostTalesMetaData.MOD_ID, "textures/gui/quest/header_quest.png");
-    private static final ResourceLocation ACTIVE_QUEST_ICON_TEXTURE = new ResourceLocation(LostTalesMetaData.MOD_ID, "textures/gui/quest/active_quest_icon.png");
+    /** How long a fold, a glide or the search opening takes. */
+    private static final int MOTION_MILLIS = 140;
+    /** Seconds a scroll takes to reach where it was sent. */
+    private static final double SCROLL_EASE_SECONDS = 0.09D;
+
+    /** The filters, in the order their buttons stand. */
+    private static final QuestFilter[] FILTERS = QuestFilter.values();
+
+    /** The actions a quest being read offers, in the order they stand. */
+    private enum QuestAction { TRACK, SHARE, ABANDON }
+
+    private static final QuestAction[] ACTIONS = QuestAction.values();
 
     private final GuiScreen parent;
     private final Set<String> collapsedCategories = new HashSet<String>();
+    private Hovered hovered = Hovered.NOTHING;
+    private int hoveredIndex = -1;
+    private String hoveredCategory = "";
+    /** The search field, made once the screen knows its font. */
+    private LostTalesUiTextField searchField;
+    /**
+     * A motion each for the controls the pointer can press, so they dip,
+     * rise and settle the way every other button in the mod does. The
+     * magnifier turns on its handle, which is lopsided enough to show a
+     * turn; a labelled button carries words, and a category's plus and
+     * minus are four-fold symmetric, so both only lift
+     * ({@code LostTalesUiGlyphTurnTest} says which glyphs may turn).
+     */
+    private final LostTalesUiButtonMotion searchMotion =
+            new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.TURN);
+    private final Map<String, LostTalesUiButtonMotion> filterMotions =
+            new HashMap<String, LostTalesUiButtonMotion>();
+    private final Map<String, LostTalesUiButtonMotion> categoryMotions =
+            new HashMap<String, LostTalesUiButtonMotion>();
+    /** The frame the visible list was built for; see {@link #getVisibleQuests}. */
+    private List<ClientQuestEntry> visibleQuests;
+    private long visibleFrame = -1L;
+    private QuestFilter visibleFilter;
+    private String visibleQuery = "";
+    private long frameCounter;
+    private final LostTalesUiTransition searchOpen = new LostTalesUiTransition();
+    private boolean searching;
+    /**
+     * How far each category is unfolded, one transition each: a row's
+     * height is its full height times this, so a category opens and
+     * closes by growing rather than appearing.
+     */
+    private final Map<String, LostTalesUiTransition> categoryOpen =
+            new HashMap<String, LostTalesUiTransition>();
+    /**
+     * How far the search has opened as it was last drawn: the field
+     * answers to a press on the box it is actually drawn in, not on the
+     * one it will have once it finishes opening.
+     */
+    private float searchShown;
+    /** Where each half is drawn right now, easing toward where it was sent. */
+    private double listShown;
+    private double detailShown;
+    /** Where the read row's surface is drawn, easing toward the row itself. */
+    private double selectionShown = Double.NaN;
+    private long lastFrameNanos;
     private int selectedQuestIndex;
     private int listScroll;
     private int detailScroll;
@@ -85,224 +156,818 @@ public class LostTalesQuestJournalGui extends GuiScreen
     public void initGui() {
         LostTalesClientQuestDefinitionStore.ensureLoaded(this.mc.getResourceManager());
         this.buttonList.clear();
+        if (this.searchField == null && this.fontRendererObj != null) {
+            this.searchField = new LostTalesUiTextField(this.fontRendererObj,
+                    0, 0, 10, 10);
+            this.searchField.setMaxStringLength(MAX_SEARCH);
+        }
         clampSelectionAndScroll();
         ensureSelectedQuestVisible();
     }
 
     @Override
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+        advanceMotion();
         clampSelectionAndScroll();
+        QuestJournalLayout layout = layout();
+        this.hovered = hoverAt(layout, mouseX, mouseY);
 
-        drawWorldDimmedBackground();
-        drawTopBar();
+        drawBackdrop(layout);
+        drawHeader(layout);
 
         List<ClientQuestEntry> quests = getVisibleQuests();
-        JournalLayout layout = getLayout();
-        drawVerticalDivider(layout);
-        drawQuestList(quests, layout, mouseX, mouseY);
+        drawDivider(layout);
+        drawQuestList(quests, layout);
         drawQuestDetails(quests, layout);
+        drawActions(layout);
         drawFooterHelp();
 
         super.drawScreen(mouseX, mouseY, partialTicks);
     }
 
-    private void drawWorldDimmedBackground() {
-        if (!LostTalesGuiAnimations.isManagingBackdrop(this)) {
-            drawGradientRect(0, 0, this.width, this.height,
-                    0xD0000000, 0xC8000000);
+    /**
+     * Moves everything that eases one frame on: both halves' scroll and
+     * the surface under the row being read. A value is read from where
+     * it is and sent toward where it belongs, so a second press part way
+     * through carries on from what is on screen rather than jumping.
+     */
+    private void advanceMotion() {
+        this.frameCounter++;
+        long now = System.nanoTime();
+        double elapsed = this.lastFrameNanos == 0L ? 0.0D
+                : (now - this.lastFrameNanos) / 1000000000.0D;
+        this.lastFrameNanos = now;
+        if (!motionWanted()) {
+            this.listShown = this.listScroll;
+            this.detailShown = this.detailScroll;
+            this.selectionShown = selectionTarget();
+            return;
         }
-        drawRect(0, 0, this.width, 1, LostTalesSkyrimUiStyle.BORDER);
-        drawRect(0, TOP_BAR_HEIGHT, this.width, TOP_BAR_HEIGHT + 1, LostTalesSkyrimUiStyle.BORDER);
+        this.listShown = LostTalesGuiEasing.approach(this.listShown,
+                this.listScroll, elapsed, SCROLL_EASE_SECONDS);
+        this.detailShown = LostTalesGuiEasing.approach(this.detailShown,
+                this.detailScroll, elapsed, SCROLL_EASE_SECONDS);
+        double target = selectionTarget();
+        this.selectionShown = Double.isNaN(this.selectionShown)
+                || Double.isNaN(target) ? target
+                : LostTalesGuiEasing.approach(this.selectionShown, target,
+                        elapsed, SCROLL_EASE_SECONDS);
     }
 
-    private void drawTopBar() {
-        String title = "QUEST JOURNAL";
-        this.fontRendererObj.drawStringWithShadow(title, OUTER_PADDING, 14, LostTalesSkyrimUiStyle.TEXT_BRIGHT);
-        LostTalesSkyrimUiStyle.drawDiamond(OUTER_PADDING + this.fontRendererObj.getStringWidth(title) + 14, 18, LostTalesSkyrimUiStyle.TEXT_MUTED);
-
-        String filterInfo = "Filter: " + this.filter.displayName;
-        this.fontRendererObj.drawStringWithShadow(filterInfo, OUTER_PADDING, 26, LostTalesSkyrimUiStyle.TEXT_MUTED);
-
-        String worldInfo = getWorldTimeText();
-        this.fontRendererObj.drawStringWithShadow(worldInfo, this.width - OUTER_PADDING - this.fontRendererObj.getStringWidth(worldInfo), 14, LostTalesSkyrimUiStyle.TEXT);
+    /** Whether the player wants motion at all; the chat's own setting. */
+    private static boolean motionWanted() {
+        return LostTalesConfig.enableGuiAnimations
+                && !LostTalesConfig.reducedGuiMotion;
     }
 
-    private String getWorldTimeText() {
-        World world = this.mc == null ? null : this.mc.theWorld;
-        if (world == null) {
-            return "Middle-earth";
-        }
-        long total = world.getWorldTime();
-        long day = total / 24000L + 1L;
-        long timeOfDay = (total + 6000L) % 24000L;
-        int hour = (int)(timeOfDay / 1000L);
-        int minute = (int)((timeOfDay % 1000L) * 60L / 1000L);
-        String time = (hour < 10 ? "0" : "") + hour + ":" + (minute < 10 ? "0" : "") + minute;
-        String dimension = "Middle-earth";
-        try {
-            if (world.provider != null && world.provider.getDimensionName() != null) {
-                dimension = world.provider.getDimensionName();
-            }
-        } catch (Throwable ignored) {
-            // Some 1.7.10 dimension providers can be fragile during early GUI init.
-        }
-        return dimension + ", Day " + day + ", " + time;
-    }
-
-    private void drawVerticalDivider(JournalLayout layout) {
-        int x = layout.dividerX;
-        drawRect(x, layout.contentTop, x + 1, layout.contentBottom, LostTalesSkyrimUiStyle.BORDER);
-        drawRect(x + 5, layout.contentTop, x + 6, layout.contentBottom, LostTalesSkyrimUiStyle.BORDER_DIM);
-        LostTalesSkyrimUiStyle.drawDiamond(x + 3, layout.contentTop + 54, LostTalesSkyrimUiStyle.GOLD);
-        LostTalesSkyrimUiStyle.drawDiamond(x + 3, layout.contentTop + 64, LostTalesSkyrimUiStyle.TEXT_MUTED);
-    }
-
-    private void drawQuestList(List<ClientQuestEntry> quests, JournalLayout layout, int mouseX, int mouseY) {
-        List<QuestListRow> rows = buildQuestListRows(quests);
-        int visibleHeight = layout.contentBottom - layout.contentTop;
-        int maxScroll = Math.max(0, getRowsHeight(rows) - visibleHeight);
-        if (this.listScroll > maxScroll) {
-            this.listScroll = maxScroll;
-        }
-        if (this.listScroll < 0) {
-            this.listScroll = 0;
-        }
-
-        QuestListRow hoveredRow = rowAt(rows, mouseX, mouseY);
-        enableScissor(layout.leftX - 8, layout.contentTop - 2, layout.leftWidth + 20, visibleHeight + 4);
-        int rowY = layout.contentTop - this.listScroll;
+    /**
+     * Where the read row stands in the list's own run of rows, or NaN
+     * when nothing is read or its category is folded away.
+     */
+    private double selectionTarget() {
+        List<QuestListRow> rows = buildQuestListRows(getVisibleQuests());
+        double y = 0.0D;
         for (QuestListRow row : rows) {
-            if (rowY + row.height >= layout.contentTop && rowY <= layout.contentBottom) {
+            if (!row.category && row.questIndex == this.selectedQuestIndex) {
+                return row.height <= 0.0D ? Double.NaN : y;
+            }
+            y += row.height;
+        }
+        return Double.NaN;
+    }
+
+    /**
+     * How far a category is unfolded, eased. A fold is not a row
+     * appearing and disappearing: its quests' rows grow and shrink, so
+     * the list never jumps under the pointer.
+     */
+    private float categoryOpenShare(String category) {
+        LostTalesUiTransition transition = this.categoryOpen.get(category);
+        if (transition == null) {
+            transition = new LostTalesUiTransition();
+            transition.settle(!this.collapsedCategories.contains(category));
+            this.categoryOpen.put(category, transition);
+        }
+        boolean open = !this.collapsedCategories.contains(category);
+        if (!motionWanted()) {
+            transition.settle(open);
+            return open ? 1.0F : 0.0F;
+        }
+        return transition.advance(System.nanoTime(), open, MOTION_MILLIS,
+                LostTalesUiEasing.SETTLE);
+    }
+
+    /** The screen's own geometry, worked out fresh every frame. */
+    private QuestJournalLayout layout() {
+        return new QuestJournalLayout(this.width,
+                this.height - LostTalesControlBar.HEIGHT);
+    }
+
+    /**
+     * The world behind, dimmed, and one surface for each strip. A strip
+     * does not lie over the backdrop: each is its own flat colour, so
+     * nothing is ever two translucent layers deep.
+     */
+    private void drawBackdrop(QuestJournalLayout layout) {
+        if (!LostTalesGuiAnimations.isManagingBackdrop(this)) {
+            drawRect(0, 0, this.width, this.height,
+                    LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, 0xC8));
+        }
+        drawStrip(layout.header());
+        drawStrip(layout.actions());
+        drawRule(layout.headerRule(), LostTalesColors.BORDER);
+        drawRule(layout.actionRule(), LostTalesColors.BORDER);
+    }
+
+    private void drawStrip(LostTalesUiHitBox box) {
+        drawRect((int)box.left, (int)box.top, (int)box.right(),
+                (int)box.bottom(),
+                LostTalesColors.withAlpha(LostTalesColors.PLUM_DARK, 0x9A));
+    }
+
+    private void drawRule(LostTalesUiHitBox box, int color) {
+        if (box.width <= 0.0D || box.height <= 0.0D) {
+            return;
+        }
+        drawRect((int)box.left, (int)box.top, (int)box.right(),
+                (int)box.bottom(), color);
+    }
+
+    /**
+     * The title on the left, the filters on the right. Every control is
+     * a framed button drawn from the same box its hit test asks, so a
+     * press lands exactly where the frame is.
+     */
+    private void drawHeader(QuestJournalLayout layout) {
+        LostTalesUiHitBox header = layout.header();
+        LostTalesSkyrimUiStyle.beginContent();
+        this.fontRendererObj.drawStringWithShadow(
+                translate("gui.losttales.quest.title"),
+                QuestJournalLayout.MARGIN, textTop(header),
+                LostTalesColors.rgb(LostTalesColors.TEXT_BRIGHT));
+
+        float open = motionWanted()
+                ? this.searchOpen.advance(System.nanoTime(), this.searching,
+                        MOTION_MILLIS, LostTalesUiEasing.SETTLE)
+                : this.searching ? 1.0F : 0.0F;
+        this.searchShown = open;
+        drawSearchControl(layout, open);
+        if (open < 1.0F) {
+            int[] widths = filterWidths();
+            double left = filtersLeft(layout, widths);
+            for (int index = 0; index < FILTERS.length; index++) {
+                drawFramedLabel(QuestJournalLayout.buttonAt(header, left,
+                                widths, index),
+                        translate(FILTERS[index].labelKey),
+                        FILTERS[index] == this.filter,
+                        this.hovered == Hovered.FILTER
+                                && this.hoveredIndex == index,
+                        LostTalesColors.rgb(LostTalesColors.TEXT_BRIGHT));
+            }
+        }
+    }
+
+    /**
+     * The magnifier at the header's right, and the field that grows out
+     * of it over the filters as it opens. The filters are still in force
+     * while a search is being typed; the search narrows what they leave.
+     */
+    private void drawSearchControl(QuestJournalLayout layout, float open) {
+        LostTalesUiHitBox button = searchBox(layout);
+        if (open > 0.0F) {
+            LostTalesUiHitBox well = searchFieldBox(layout, open);
+            LostTalesUiFramedButton.drawSurface((float)well.left,
+                    (float)well.top, (float)well.width, (float)well.height,
+                    0.0F, 0xC8);
+            LostTalesUiFramedButton.drawInk((float)well.left, (float)well.top,
+                    (int)well.width, (int)well.height, 0.0F, 0xFF);
+            if (this.searchField != null && open > 0.6F) {
+                placeSearchField(well);
+                LostTalesSkyrimUiStyle.beginContent();
+                this.searchField.drawTextBox();
+                this.searchField.drawHint(
+                        translate("gui.losttales.quest.search"));
+            }
+        }
+        boolean hovered = this.hovered == Hovered.SEARCH;
+        this.searchMotion.advance(System.nanoTime(),
+                this.searching || hovered, hovered,
+                hovered && Mouse.isButtonDown(0), motionWanted());
+        float lit = this.searchMotion.lit();
+        LostTalesUiFramedButton.drawSurface((float)button.left,
+                (float)button.top, (float)button.width, (float)button.height,
+                lit, 0xC8);
+        LostTalesUiFramedButton.drawInk((float)button.left, (float)button.top,
+                (int)button.width, (int)button.height, lit, 0xFF);
+        LostTalesSkyrimUiStyle.beginContent();
+        LostTalesUiButton.drawGlyph(LostTalesUiSheet.SEARCH,
+                LostTalesUiSheet.SEARCH_HOVER, this.searchMotion,
+                (float)Math.round(button.left + (button.width
+                        - LostTalesUiSheet.SEARCH.getWidth()) / 2.0D),
+                (float)Math.round(button.top + (button.height
+                        - LostTalesUiSheet.SEARCH.getHeight()) / 2.0D), 0xFF);
+    }
+
+    /** The magnifier's own square, at the header's right end. */
+    private LostTalesUiHitBox searchBox(QuestJournalLayout layout) {
+        LostTalesUiHitBox header = layout.header();
+        int size = LostTalesUiFramedButton.HEIGHT;
+        return new LostTalesUiHitBox(
+                header.right() - QuestJournalLayout.CONTROL_INSET - size,
+                Math.floor(header.top + (header.height - size) / 2.0D),
+                size, size);
+    }
+
+    /** The field's well, growing left out of the magnifier as it opens. */
+    private LostTalesUiHitBox searchFieldBox(QuestJournalLayout layout,
+                                             float open) {
+        LostTalesUiHitBox button = searchBox(layout);
+        double full = Math.max(LostTalesUiFramedButton.MIN_SIZE,
+                Math.min(200.0D, layout.header().width * 0.4D));
+        double width = Math.max(LostTalesUiFramedButton.MIN_SIZE,
+                Math.round(full * open));
+        return new LostTalesUiHitBox(
+                button.left - QuestJournalLayout.CONTROL_GAP - width,
+                button.top, width, button.height);
+    }
+
+    private void placeSearchField(LostTalesUiHitBox well) {
+        this.searchField.xPosition = (int)well.left
+                + LostTalesUiFramedButton.WIDE_INSET;
+        this.searchField.yPosition = textTop(well);
+        this.searchField.width = Math.max(4, (int)well.width
+                - 2 * LostTalesUiFramedButton.WIDE_INSET);
+    }
+
+    /** Opens or closes the search, moving the keys with it. */
+    private void toggleSearch() {
+        this.searching = !this.searching;
+        if (this.searchField != null) {
+            this.searchField.setFocused(this.searching);
+            if (!this.searching) {
+                this.searchField.setText("");
+            }
+        }
+        this.selectedQuestIndex = 0;
+        this.listScroll = 0;
+        this.detailScroll = 0;
+        clampSelectionAndScroll();
+    }
+
+    /** What is being searched for; empty while the search is closed. */
+    private String searchQuery() {
+        return this.searching && this.searchField != null
+                ? this.searchField.getText().trim() : "";
+    }
+
+    /** The row a line of text stands on to be centred in a strip. */
+    private static int textTop(LostTalesUiHitBox strip) {
+        return (int)Math.round(strip.top + (strip.height - 8) / 2.0D);
+    }
+
+    /** Each filter button's width: its label with the frame round it. */
+    private int[] filterWidths() {
+        int[] widths = new int[FILTERS.length];
+        for (int index = 0; index < FILTERS.length; index++) {
+            widths[index] = QuestJournalLayout.buttonWidthFor(
+                    this.fontRendererObj.getStringWidth(
+                            translate(FILTERS[index].labelKey)));
+        }
+        return widths;
+    }
+
+    /** Where the filter row begins: right-aligned in the header strip. */
+    private double filtersLeft(QuestJournalLayout layout, int[] widths) {
+        return layout.header().right() - QuestJournalLayout.CONTROL_INSET
+                - QuestJournalLayout.buttonsWidth(widths);
+    }
+
+    /**
+     * A framed button holding one label, centred: the surface in the
+     * hole the strip leaves for it, the frame at its lit share, and the
+     * label inside the frame's clear pixels.
+     */
+    private void drawFramedLabel(LostTalesUiHitBox box, String label,
+                                 boolean selected, boolean hovered,
+                                 int rgb) {
+        if (box.width < LostTalesUiFramedButton.MIN_SIZE) {
+            return;
+        }
+        LostTalesUiButtonMotion motion = labelMotion(label);
+        motion.advance(System.nanoTime(), selected || hovered, hovered,
+                hovered && Mouse.isButtonDown(0), motionWanted());
+        float lit = motion.lit();
+        // The frame stands still; only what it holds moves, so a row of
+        // buttons keeps its shape while one of them answers.
+        LostTalesUiFramedButton.drawSurface((float)box.left, (float)box.top,
+                (float)box.width, (float)box.height, lit, 0xC8);
+        LostTalesUiFramedButton.drawInk((float)box.left, (float)box.top,
+                (int)box.width, (int)box.height, lit, 0xFF);
+        LostTalesSkyrimUiStyle.beginContent();
+        int width = this.fontRendererObj.getStringWidth(label);
+        int textX = (int)Math.round(box.left + (box.width - width) / 2.0D);
+        int textY = textTop(box);
+        LostTalesUiButton.beginPose(motion, textX, textY, width, 8);
+        try {
+            this.fontRendererObj.drawStringWithShadow(label, textX, textY,
+                    LostTalesUiInk.blend(
+                            LostTalesColors.rgb(LostTalesColors.TEXT_MUTED),
+                            rgb, lit));
+        } finally {
+            LostTalesUiButton.endPose();
+        }
+    }
+
+    /** How a quest's state reads on its own line. */
+    private static String statusWord(ClientQuestEntry quest) {
+        if (quest.isFailed()) {
+            return translate("gui.losttales.quest.status.failed");
+        }
+        if (quest.isAbandoned()) {
+            return translate("gui.losttales.quest.status.abandoned");
+        }
+        if (quest.isCompleted()) {
+            return translate("gui.losttales.quest.status.completed");
+        }
+        return translate("gui.losttales.quest.status.active");
+    }
+
+    /**
+     * The motion of a labelled button, made on first sight and kept by
+     * the words it carries, so a button that changes its label — Track
+     * becoming Stop tracking — keeps moving rather than starting over.
+     */
+    private LostTalesUiButtonMotion labelMotion(String key) {
+        LostTalesUiButtonMotion motion = this.filterMotions.get(key);
+        if (motion == null) {
+            motion = new LostTalesUiButtonMotion(
+                    LostTalesUiButtonMotion.Character.LIFT);
+            this.filterMotions.put(key, motion);
+        }
+        return motion;
+    }
+
+    private LostTalesUiButtonMotion categoryMotion(String category) {
+        LostTalesUiButtonMotion motion = this.categoryMotions.get(category);
+        if (motion == null) {
+            motion = new LostTalesUiButtonMotion(
+                    LostTalesUiButtonMotion.Character.LIFT);
+            this.categoryMotions.put(category, motion);
+        }
+        return motion;
+    }
+
+    /** A translated line. */
+    private static String translate(String key) {
+        return StatCollector.translateToLocal(key);
+    }
+
+    private static String translate(String key, Object... args) {
+        return StatCollector.translateToLocalFormatted(key, args);
+    }
+
+    /** One rule between the halves; the chat divides with one, so does this. */
+    private void drawDivider(QuestJournalLayout layout) {
+        drawRule(layout.divider(), LostTalesColors.BORDER_DIM);
+    }
+
+    /**
+     * The quest list: a category's chevron and name with a rule running
+     * out to the column's edge, then its quests. The row under the
+     * pointer and the row being read each take one flat surface, never
+     * two laid over each other.
+     */
+    private void drawQuestList(List<ClientQuestEntry> quests,
+                               QuestJournalLayout layout) {
+        LostTalesUiHitBox list = layout.list();
+        if (list.width <= 0.0D || list.height <= 0.0D) {
+            return;
+        }
+        List<QuestListRow> rows = buildQuestListRows(quests);
+        int content = getRowsHeight(rows);
+        this.listScroll = clamp(this.listScroll, 0,
+                Math.max(0, content - (int)list.height));
+
+        enableScissor((int)list.left, (int)list.top, (int)list.width,
+                (int)list.height);
+        drawSelectionSurface(layout, list);
+        double y = list.top - this.listShown;
+        for (QuestListRow row : rows) {
+            if (y + row.height >= list.top && y <= list.bottom()) {
                 if (row.category) {
-                    drawCategoryHeader(row.label, layout.leftX, rowY, layout.leftWidth);
+                    drawCategoryRow(row.label, layout, y);
                 } else if (row.quest != null) {
-                    drawQuestRow(row.quest, row.questIndex, layout.leftX + 14, rowY, layout.leftWidth - 22, row.height, row == hoveredRow);
+                    drawQuestRow(row.quest, row.questIndex, layout,
+                            row.height, y);
                 }
             }
-            rowY += row.height;
+            y += row.height;
         }
         disableScissor();
-        drawListBottomFade(layout);
-
-        ClientQuestEntry selected = getSelectedQuest();
-        if (selected != null) {
-            int selectedY = getQuestRowY(rows, this.selectedQuestIndex, layout.contentTop - this.listScroll);
-            if (selectedY >= layout.contentTop && selectedY <= layout.contentBottom - LIST_ROW_HEIGHT) {
-                drawSelectorArrow(layout.leftX + layout.leftWidth - 6,
-                        selectedY + LIST_ROW_HEIGHT / 2,
-                        selected.isTracked());
-            }
-        }
+        drawScrollbar(list, content, this.listShown);
 
         if (rows.isEmpty()) {
-            String message = LostTalesClientQuestDefinitionStore.getQuests().isEmpty()
-                    ? "No quest definitions were loaded from assets/losttales/quests."
-                    : "No started quests yet. Collect or accept a quest to add it to the journal.";
-            drawWrappedText(message, layout.leftX + 8, layout.contentTop + 10, layout.leftWidth - 16, LostTalesSkyrimUiStyle.TEXT_MUTED, visibleHeight - 20);
+            drawEmptyList(layout);
         }
     }
 
-    private void drawListBottomFade(JournalLayout layout) {
-        int fadeHeight = Math.min(36, Math.max(0, layout.contentBottom - layout.contentTop));
-        if (fadeHeight <= 0) {
-            return;
-        }
-        drawGradientRect(layout.leftX - 8, layout.contentBottom - fadeHeight, layout.leftX + layout.leftWidth + 12, layout.contentBottom + 2, 0x00000000, 0xDD000000);
+    /** What the list says when it holds nothing. */
+    private void drawEmptyList(QuestJournalLayout layout) {
+        LostTalesUiHitBox rows = layout.listRows();
+        boolean loaded = !LostTalesClientQuestDefinitionStore.getQuests().isEmpty();
+        LostTalesSkyrimUiStyle.beginContent();
+        this.fontRendererObj.drawStringWithShadow(
+                translate("gui.losttales.quest.empty.title"),
+                (int)rows.left, (int)rows.top,
+                LostTalesColors.rgb(LostTalesColors.TEXT_MUTED));
+        drawWrappedText(translate(loaded
+                        ? "gui.losttales.quest.empty.body"
+                        : "gui.losttales.quest.empty.definitions"),
+                (int)rows.left, (int)rows.top + 14, (int)rows.width,
+                LostTalesColors.rgb(LostTalesColors.TEXT_DIM),
+                (int)rows.height - 14);
     }
 
-    private void drawCategoryHeader(String label, int x, int y, int width) {
+    /**
+     * A category: its chevron, its name, and a rule filling what the
+     * name leaves of the column, so the eye reads the group before the
+     * quests in it.
+     */
+    private void drawCategoryRow(String label, QuestJournalLayout layout,
+                                 double y) {
+        LostTalesUiHitBox rows = layout.listRows();
         boolean collapsed = this.collapsedCategories.contains(label);
-        int texX = x + Math.max(0, width - CATEGORY_HEADER_WIDTH - 2);
-        LostTalesCompassHudRenderHelper.drawTexturedRectNoAlphaTest(this.mc, CATEGORY_HEADER_TEXTURE, texX, y, 0, 0, CATEGORY_HEADER_WIDTH, CATEGORY_HEADER_HEIGHT, CATEGORY_HEADER_WIDTH, CATEGORY_HEADER_HEIGHT, 1.0F);
-        String collapse = collapsed ? "+ " : "- ";
-        String text = collapse + LostTalesSkyrimUiStyle.uppercase(label);
-        this.fontRendererObj.drawStringWithShadow(LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj, text, Math.max(40, width - 36)), x + 12, y + 8, LostTalesSkyrimUiStyle.TEXT_BRIGHT);
+        boolean lit = this.hovered == Hovered.CATEGORY
+                && label.equals(this.hoveredCategory);
+        String name = LostTalesSkyrimUiStyle.uppercase(categoryName(label));
+        int top = (int)Math.round(y + (CATEGORY_ROW_HEIGHT - 8) / 2.0D) + 1;
+
+        LostTalesSkyrimUiStyle.beginContent();
+        LostTalesUiButtonMotion motion = categoryMotion(label);
+        motion.advance(System.nanoTime(), lit, motionWanted());
+        LostTalesUiSheet resting = collapsed
+                ? LostTalesUiSheet.PLUS : LostTalesUiSheet.MINUS;
+        LostTalesUiSheet marked = collapsed
+                ? LostTalesUiSheet.PLUS_HOVER : LostTalesUiSheet.MINUS_HOVER;
+        LostTalesUiButton.drawGlyph(resting, marked, motion,
+                (float)rows.left + 2,
+                (float)Math.round(y + (CATEGORY_ROW_HEIGHT
+                        - resting.getHeight()) / 2.0D), 0xFF);
+        int nameX = (int)rows.left + CHEVRON_BOX + 2;
+        this.fontRendererObj.drawStringWithShadow(name, nameX, top,
+                LostTalesColors.rgb(lit ? LostTalesColors.TEXT_BRIGHT
+                        : LostTalesColors.TEXT));
+        int ruleLeft = nameX + this.fontRendererObj.getStringWidth(name) + 5;
+        if (ruleLeft < rows.right()) {
+            drawRect(ruleLeft, top + 3, (int)rows.right(), top + 4,
+                    LostTalesColors.BORDER_DIM);
+        }
     }
 
-    private void drawQuestRow(ClientQuestEntry quest, int questIndex, int x, int y, int width, int height, boolean hovered) {
+    /**
+     * One quest: its state glyph, its title, and a mark where it is
+     * tracked. The row being read, and the row under the pointer, each
+     * take one surface of their own.
+     */
+    private void drawQuestRow(ClientQuestEntry quest, int questIndex,
+                              QuestJournalLayout layout, double height,
+                              double y) {
+        LostTalesUiHitBox rows = layout.listRows();
         boolean selected = questIndex == this.selectedQuestIndex;
-        boolean active = quest.isActive();
-        boolean completed = quest.isCompleted();
-        boolean failed = quest.isFailed();
-        boolean abandoned = quest.isAbandoned();
-        boolean pinned = quest.isTracked();
-
-        if (selected) {
-            int texW = Math.min(QUEST_BUTTON_WIDTH, width);
-            LostTalesCompassHudRenderHelper.drawTexturedRectNoAlphaTest(this.mc, QUEST_BUTTON_TEXTURE, x + width - texW, y + 3, QUEST_BUTTON_WIDTH - texW, 0, texW, QUEST_BUTTON_HEIGHT, QUEST_BUTTON_WIDTH, QUEST_BUTTON_HEIGHT, completed ? 0.46F : 1.0F);
-        } else if (hovered) {
-            drawRect(x + Math.max(0, width - QUEST_BUTTON_WIDTH), y + 3, x + width, y + height - 3, completed ? 0x24111111 : 0x342B2D31);
+        boolean lit = !selected && this.hovered == Hovered.QUEST
+                && this.hoveredIndex == questIndex;
+        if (lit) {
+            drawRect((int)rows.left - 2, (int)Math.round(y),
+                    (int)rows.right(), (int)Math.round(y + height),
+                    LostTalesColors.withAlpha(LostTalesColors.PLUM_DARK, 0x72));
         }
-
-        int indicatorX = x + 12;
-        int indicatorY = y + height / 2;
-        LostTalesSkyrimUiStyle.drawObjectiveIndicator(indicatorX, indicatorY, completed, active);
-        if (pinned) {
-            drawActiveQuestIcon(x + width - 15, indicatorY - ACTIVE_ICON_HEIGHT / 2, completed ? 0.45F : 1.0F);
+        LostTalesSkyrimUiStyle.beginContent();
+        int top = (int)Math.round(y + (height - 8) / 2.0D);
+        int titleRgb = LostTalesColors.rgb(questRgb(quest, selected));
+        this.fontRendererObj.drawStringWithShadow(stateGlyph(quest),
+                (int)rows.left + ROW_GLYPH_X, top,
+                LostTalesColors.rgb(glyphRgb(quest)));
+        int titleX = (int)rows.left + ROW_TITLE_X;
+        int room = (int)rows.right() - titleX - (quest.isTracked() ? 10 : 0);
+        this.fontRendererObj.drawStringWithShadow(
+                LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj,
+                        quest.getTitle(), Math.max(20, room)),
+                titleX, top, titleRgb);
+        if (quest.isTracked()) {
+            this.fontRendererObj.drawStringWithShadow("\u25c6",
+                    (int)rows.right() - 7, top,
+                    LostTalesColors.rgb(LostTalesColors.GOLD));
         }
-
-        int titleColor = failed ? LostTalesSkyrimUiStyle.RED
-                : abandoned ? LostTalesSkyrimUiStyle.GOLD
-                : completed ? LostTalesSkyrimUiStyle.TEXT_DIM
-                : selected ? LostTalesSkyrimUiStyle.TEXT_BRIGHT
-                : active ? LostTalesSkyrimUiStyle.TEXT
-                : LostTalesSkyrimUiStyle.TEXT_DIM;
-        String title = LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj, quest.getTitle(), width - 48);
-        this.fontRendererObj.drawStringWithShadow(title, x + 32, y + 8, titleColor);
     }
 
-    private void drawSelectorArrow(int x, int y, boolean gold) {
-        drawActiveQuestIcon(x - ACTIVE_ICON_WIDTH, y - ACTIVE_ICON_HEIGHT / 2, gold ? 1.0F : 0.8F);
+    /**
+     * The surface under the row being read, laid before the rows so no
+     * row is drawn over another's highlight. It stands where the glide
+     * has reached, which is why it is one surface rather than a flag on
+     * a row.
+     */
+    private void drawSelectionSurface(QuestJournalLayout layout,
+                                      LostTalesUiHitBox list) {
+        if (Double.isNaN(this.selectionShown)) {
+            return;
+        }
+        LostTalesUiHitBox rows = layout.listRows();
+        double y = list.top - this.listShown + this.selectionShown;
+        drawRect((int)rows.left - 2, (int)Math.round(y), (int)rows.right(),
+                (int)Math.round(y) + LIST_ROW_HEIGHT,
+                LostTalesColors.withAlpha(LostTalesColors.PLUM_GRAY, 0xB4));
+        LostTalesSkyrimUiStyle.beginContent();
     }
 
-    private void drawActiveQuestIcon(int x, int y, float alpha) {
-        LostTalesCompassHudRenderHelper.drawTexturedRectNoAlphaTest(this.mc, ACTIVE_QUEST_ICON_TEXTURE, x, y, 0, 0, ACTIVE_ICON_WIDTH, ACTIVE_ICON_HEIGHT, ACTIVE_ICON_WIDTH, ACTIVE_ICON_HEIGHT, alpha);
+    /** The mark a quest's state is read by, in the list and in the detail. */
+    private static String stateGlyph(ClientQuestEntry quest) {
+        if (quest.isCompleted()) {
+            return "\u2714";
+        }
+        if (quest.isFailed() || quest.isAbandoned()) {
+            return "\u2715";
+        }
+        return "\u25c7";
     }
 
-    private void drawQuestDetails(List<ClientQuestEntry> quests, JournalLayout layout) {
+    private static int glyphRgb(ClientQuestEntry quest) {
+        if (quest.isCompleted()) {
+            return LostTalesColors.GREEN;
+        }
+        if (quest.isFailed()) {
+            return LostTalesColors.RED;
+        }
+        if (quest.isAbandoned()) {
+            return LostTalesColors.GOLD;
+        }
+        return LostTalesColors.TEXT;
+    }
+
+    private static int questRgb(ClientQuestEntry quest, boolean selected) {
+        if (quest.isFailed()) {
+            return LostTalesColors.RED;
+        }
+        if (quest.isAbandoned()) {
+            return LostTalesColors.GOLD;
+        }
+        if (quest.isCompleted()) {
+            return LostTalesColors.TEXT_DIM;
+        }
+        return selected ? LostTalesColors.TEXT_BRIGHT : LostTalesColors.TEXT;
+    }
+
+    /** A category's name, translated where the code chose it. */
+    private static String categoryName(String category) {
+        if (category == null || category.length() == 0) {
+            return translate("gui.losttales.quest.category.misc");
+        }
+        String key = "gui.losttales.quest.category."
+                + category.toLowerCase(Locale.ROOT).replace(' ', '_')
+                        .replace("-", "");
+        String translated = translate(key);
+        return key.equals(translated) ? category : translated;
+    }
+
+    /**
+     * A scrollbar inside an area's right edge, drawn only where there is
+     * something to scroll: one quiet column and a brighter handle.
+     */
+    private void drawScrollbar(LostTalesUiHitBox area, int contentHeight,
+                               double scroll) {
+        // The bar follows where the view is drawn, not where it is sent,
+        // so the handle and the rows move as one.
+        LostTalesUiHitBox bar = QuestJournalLayout.scrollbar(area, contentHeight);
+        if (bar.width <= 0.0D) {
+            return;
+        }
+        drawRect((int)bar.left, (int)bar.top, (int)bar.right(),
+                (int)bar.bottom(),
+                LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, 0x8C));
+        LostTalesUiHitBox handle = QuestJournalLayout.scrollHandle(bar,
+                contentHeight, scroll);
+        drawRect((int)handle.left, (int)Math.round(handle.top),
+                (int)handle.right(),
+                (int)Math.round(handle.top + handle.height),
+                LostTalesColors.withAlpha(LostTalesColors.MAUVE, 0xC8));
+    }
+
+    private static int clamp(int value, int least, int most) {
+        return value < least ? least : value > most ? most : value;
+    }
+
+    /**
+     * What the chosen quest says: its lines laid out in the detail
+     * column, clipped to it, with a scrollbar where there is more than
+     * fits. A separator is one rule, as everywhere else.
+     */
+    private void drawQuestDetails(List<ClientQuestEntry> quests,
+                                  QuestJournalLayout layout) {
+        LostTalesUiHitBox area = layout.detail();
+        LostTalesUiHitBox rows = layout.detailRows();
+        if (area.width <= 0.0D || area.height <= 0.0D) {
+            return;
+        }
         if (quests.isEmpty()) {
-            String message = LostTalesClientQuestDefinitionStore.getQuests().isEmpty()
-                    ? "The client did not load any quest JSON files. Check quests/index.json and bundled quest files."
-                    : "Started quests will appear here after you collect or accept them in the world.";
-            drawWrappedText(message, layout.rightX, layout.contentTop + 12, layout.rightWidth, LostTalesSkyrimUiStyle.TEXT_MUTED, layout.contentBottom - layout.contentTop - 24);
+            LostTalesSkyrimUiStyle.beginContent();
+            drawWrappedText(translate("gui.losttales.quest.empty.detail"),
+                    (int)rows.left, (int)rows.top + 8, (int)rows.width,
+                    LostTalesColors.rgb(LostTalesColors.TEXT_MUTED),
+                    (int)rows.height - 16);
             this.detailScroll = 0;
             return;
         }
 
-        ClientQuestEntry quest = quests.get(this.selectedQuestIndex);
-        List<DetailLine> lines = buildDetailLines(quest, layout.rightWidth - 20);
-        int visibleHeight = layout.contentBottom - layout.contentTop;
-        int maxScroll = Math.max(0, lines.size() * DETAIL_LINE_HEIGHT - visibleHeight + 4);
-        if (this.detailScroll < 0) {
-            this.detailScroll = 0;
-        }
-        if (this.detailScroll > maxScroll) {
-            this.detailScroll = maxScroll;
-        }
+        List<DetailLine> lines = buildDetailLines(
+                quests.get(this.selectedQuestIndex), (int)rows.width);
+        int content = lines.size() * DETAIL_LINE_HEIGHT;
+        this.detailScroll = clamp(this.detailScroll, 0,
+                Math.max(0, content - (int)area.height));
 
-        enableScissor(layout.rightX - 2, layout.contentTop - 2, layout.rightWidth + 4, visibleHeight + 4);
-        int y = layout.contentTop - this.detailScroll;
+        enableScissor((int)area.left, (int)area.top, (int)area.width,
+                (int)area.height);
+        LostTalesSkyrimUiStyle.beginContent();
+        double y = area.top - this.detailShown;
         for (DetailLine line : lines) {
-            if (y + DETAIL_LINE_HEIGHT >= layout.contentTop && y <= layout.contentBottom) {
-                if (line.separator) {
-                    drawRect(layout.rightX + line.indent, y + 4, layout.rightX + layout.rightWidth, y + 5, line.color);
-                } else if (line.objective) {
-                    LostTalesSkyrimUiStyle.drawObjectiveIndicator(layout.rightX + line.indent + 8, y + 4, line.complete, line.active);
-                    this.fontRendererObj.drawStringWithShadow(line.text, layout.rightX + line.indent + 22, y, line.color);
-                } else if (line.centered) {
-                    this.fontRendererObj.drawStringWithShadow(line.text, layout.rightX + (layout.rightWidth - this.fontRendererObj.getStringWidth(line.text)) / 2, y, line.color);
-                } else {
-                    this.fontRendererObj.drawStringWithShadow(line.text, layout.rightX + line.indent, y, line.color);
-                }
+            if (y + DETAIL_LINE_HEIGHT >= area.top && y <= area.bottom()) {
+                drawDetailLine(line, rows, (int)Math.round(y));
             }
             y += DETAIL_LINE_HEIGHT;
         }
         disableScissor();
+        drawScrollbar(area, content, this.detailShown);
+    }
 
-        if (maxScroll > 0) {
-            String count = (this.detailScroll + 1) + " / " + (maxScroll + 1);
-            this.fontRendererObj.drawStringWithShadow(count, layout.rightX + layout.rightWidth - this.fontRendererObj.getStringWidth(count), layout.contentBottom - 10, LostTalesSkyrimUiStyle.TEXT_DIM);
+    private void drawDetailLine(DetailLine line, LostTalesUiHitBox rows, int y) {
+        if (line.separator) {
+            drawRect((int)rows.left + line.indent, y + 4,
+                    (int)rows.right(), y + 5, line.color);
+            LostTalesSkyrimUiStyle.beginContent();
+            return;
         }
+        if (line.objective) {
+            this.fontRendererObj.drawStringWithShadow(
+                    line.complete ? "\u2714" : line.active ? "\u25c7" : "\u25cb",
+                    (int)rows.left + line.indent, y,
+                    LostTalesColors.rgb(line.complete
+                            ? LostTalesColors.GREEN
+                            : line.active ? LostTalesColors.GOLD
+                            : LostTalesColors.TEXT_DIM));
+            this.fontRendererObj.drawStringWithShadow(line.text,
+                    (int)rows.left + line.indent + 10, y, line.color);
+            return;
+        }
+        int x = line.centered
+                ? (int)Math.round(rows.left + (rows.width
+                        - this.fontRendererObj.getStringWidth(line.text)) / 2.0D)
+                : (int)rows.left + line.indent;
+        this.fontRendererObj.drawStringWithShadow(line.text, x, y, line.color);
+    }
+
+    /**
+     * The actions for the quest being read: framed buttons on the strip
+     * across the bottom, and the control bar's hints beside them.
+     */
+    private void drawActions(QuestJournalLayout layout) {
+        ClientQuestEntry quest = getSelectedQuest();
+        if (quest == null) {
+            return;
+        }
+        LostTalesUiHitBox strip = layout.actions();
+        int[] widths = actionWidths(quest);
+        double left = QuestJournalLayout.MARGIN;
+        for (int index = 0; index < ACTIONS.length; index++) {
+            if (!actionOffered(quest, ACTIONS[index])) {
+                continue;
+            }
+            drawFramedLabel(QuestJournalLayout.buttonAt(strip, left, widths,
+                            index),
+                    actionLabel(quest, ACTIONS[index]), false,
+                    this.hovered == Hovered.ACTION && this.hoveredIndex == index,
+                    LostTalesColors.rgb(ACTIONS[index] == QuestAction.ABANDON
+                            ? LostTalesColors.RED
+                            : LostTalesColors.TEXT_BRIGHT));
+        }
+    }
+
+    /** Each action button's width; one it does not offer takes none. */
+    private int[] actionWidths(ClientQuestEntry quest) {
+        int[] widths = new int[ACTIONS.length];
+        for (int index = 0; index < ACTIONS.length; index++) {
+            widths[index] = actionOffered(quest, ACTIONS[index])
+                    ? QuestJournalLayout.buttonWidthFor(
+                            this.fontRendererObj.getStringWidth(
+                                    actionLabel(quest, ACTIONS[index])))
+                    : 0;
+        }
+        return widths;
+    }
+
+    /** Whether the quest being read offers the action at all. */
+    private static boolean actionOffered(ClientQuestEntry quest,
+                                         QuestAction action) {
+        if (quest == null) {
+            return false;
+        }
+        if (action == QuestAction.ABANDON) {
+            return quest.isActive()
+                    && quest.getSource() == ClientQuestEntry.Source.LOST_TALES;
+        }
+        if (action == QuestAction.TRACK) {
+            return quest.isActive();
+        }
+        return true;
+    }
+
+    private static String actionLabel(ClientQuestEntry quest,
+                                      QuestAction action) {
+        if (action == QuestAction.TRACK) {
+            return translate(quest.isTracked()
+                    ? "gui.losttales.quest.action.untrack"
+                    : "gui.losttales.quest.action.track");
+        }
+        if (action == QuestAction.SHARE) {
+            return translate("gui.losttales.quest.action.share");
+        }
+        return translate("gui.losttales.quest.action.abandon");
+    }
+
+    /** Runs the action on the quest being read. */
+    private void runAction(ClientQuestEntry quest, QuestAction action) {
+        if (!actionOffered(quest, action)) {
+            return;
+        }
+        if (action == QuestAction.TRACK) {
+            toggleSelectedQuestTracking(quest);
+            return;
+        }
+        if (action == QuestAction.SHARE) {
+            // The chat opens with the quest's own token already typed, so
+            // the share is written the way a player writes one.
+            this.mc.displayGuiScreen(new LostTalesChatGui(
+                    ChatShareTokenParser.buildToken(ChatShareKind.QUEST,
+                            quest.getTitle(), 1)));
+            return;
+        }
+        LostTalesNetworkHandler.CHANNEL.sendToServer(
+                new LostTalesQuestActionPacket(
+                        LostTalesQuestActionPacket.ACTION_ABANDON,
+                        quest.getReference()));
+    }
+
+    /**
+     * What the pointer is on, asked once before anything is drawn and
+     * read by every highlight and every press, so no two of them can
+     * read an edge differently.
+     */
+    private Hovered hoverAt(QuestJournalLayout layout, int mouseX,
+                            int mouseY) {
+        this.hoveredIndex = -1;
+        this.hoveredCategory = "";
+        if (searchBox(layout).contains(mouseX, mouseY)) {
+            return Hovered.SEARCH;
+        }
+        if (this.searching) {
+            // The filters are behind the open field and answer to nothing.
+            return questRowHover(layout, mouseX, mouseY);
+        }
+        int[] filters = filterWidths();
+        double filtersX = filtersLeft(layout, filters);
+        for (int index = 0; index < FILTERS.length; index++) {
+            if (QuestJournalLayout.buttonAt(layout.header(), filtersX, filters,
+                    index).contains(mouseX, mouseY)) {
+                this.hoveredIndex = index;
+                return Hovered.FILTER;
+            }
+        }
+        ClientQuestEntry selected = getSelectedQuest();
+        if (selected != null) {
+            int[] actions = actionWidths(selected);
+            for (int index = 0; index < ACTIONS.length; index++) {
+                if (actions[index] > 0 && QuestJournalLayout.buttonAt(
+                        layout.actions(), QuestJournalLayout.MARGIN, actions,
+                        index).contains(mouseX, mouseY)) {
+                    this.hoveredIndex = index;
+                    return Hovered.ACTION;
+                }
+            }
+        }
+        return questRowHover(layout, mouseX, mouseY);
+    }
+
+    /** The list row under the point, as one of the hover answers. */
+    private Hovered questRowHover(QuestJournalLayout layout, int mouseX,
+                                  int mouseY) {
+        QuestListRow row = rowAt(buildQuestListRows(getVisibleQuests()),
+                layout, mouseX, mouseY);
+        if (row == null) {
+            return Hovered.NOTHING;
+        }
+        if (row.category) {
+            this.hoveredCategory = row.label;
+            return Hovered.CATEGORY;
+        }
+        this.hoveredIndex = row.questIndex;
+        return Hovered.QUEST;
     }
 
     private List<DetailLine> buildDetailLines(ClientQuestEntry entry,
@@ -335,11 +1000,6 @@ public class LostTalesQuestJournalGui extends GuiScreen
                 entry.getHistoryEntry(), width);
         addRewardSummary(lines, quest, width, completed || failed);
 
-        if (pinned && progress != null && !completed) {
-            addBlankLine(lines);
-            addWrappedLines(lines, "This quest is being tracked.", LostTalesSkyrimUiStyle.TEXT_MUTED, 8, width - 16);
-        }
-
         return lines;
     }
 
@@ -350,14 +1010,15 @@ public class LostTalesQuestJournalGui extends GuiScreen
             return lines;
         }
         addTitleHeader(lines, quest.getTitle(), width);
-        String status = quest.isFailed() ? "Failed"
-                : quest.isAbandoned() ? "Abandoned"
-                : quest.isCompleted() ? "Completed" : "Active";
-        String tracking = quest.isTracked() ? "tracked" : "not tracked";
+        String status = statusWord(quest);
+        String tracking = translate(quest.isTracked()
+                ? "gui.losttales.quest.status.tracked"
+                : "gui.losttales.quest.status.untracked");
         String stage = quest.getStageCount() > 1
-                ? " | Stage " + quest.getStageNumber() + "/"
-                        + quest.getStageCount() : "";
-        addWrappedLines(lines, "Status: " + status + " | " + tracking
+                ? " \u00b7 " + translate("gui.losttales.quest.stage",
+                        String.valueOf(quest.getStageNumber()),
+                        String.valueOf(quest.getStageCount())) : "";
+        addWrappedLines(lines, status + " \u00b7 " + tracking
                 + stage, quest.isFailed() ? LostTalesSkyrimUiStyle.RED
                         : quest.isAbandoned() ? LostTalesSkyrimUiStyle.GOLD
                         : LostTalesSkyrimUiStyle.TEXT_MUTED,
@@ -366,12 +1027,6 @@ public class LostTalesQuestJournalGui extends GuiScreen
             addWrappedLines(lines, quest.getSubtitle(),
                     LostTalesSkyrimUiStyle.GOLD, 8, width - 16);
         }
-        if (quest.isActive()) {
-            addWrappedLines(lines, "Press Space or Enter to "
-                    + (quest.isTracked() ? "stop tracking this quest."
-                            : "track this quest on the HUD."),
-                    LostTalesSkyrimUiStyle.TEXT_MUTED, 8, width - 16);
-        }
         addBlankLine(lines);
         addWrappedLines(lines, quest.getJournalText(),
                 quest.isCompleted() ? LostTalesSkyrimUiStyle.TEXT_MUTED
@@ -379,7 +1034,7 @@ public class LostTalesQuestJournalGui extends GuiScreen
                 8, width - 16);
         addBlankLine(lines);
         addSeparator(lines, 0, LostTalesSkyrimUiStyle.BORDER_DIM);
-        addSectionTitle(lines, "Objectives");
+        addSectionTitle(lines, translate("gui.losttales.quest.section.objectives"));
         for (ClientQuestEntry.Objective objective : quest.getObjectives()) {
             int color = objective.isComplete()
                     ? LostTalesSkyrimUiStyle.GREEN
@@ -389,7 +1044,7 @@ public class LostTalesQuestJournalGui extends GuiScreen
                     quest.isActive() && !objective.isComplete());
         }
         if (!quest.getRewards().isEmpty()) {
-            addSectionTitle(lines, "Rewards");
+            addSectionTitle(lines, translate("gui.losttales.quest.section.rewards"));
             for (String reward : quest.getRewards()) {
                 addWrappedLines(lines, reward,
                         quest.isCompleted() ? LostTalesSkyrimUiStyle.TEXT_DIM
@@ -428,16 +1083,16 @@ public class LostTalesQuestJournalGui extends GuiScreen
         if (best == null || best.length() == 0) {
             best = quest.getDescription();
         }
-        return best == null || best.length() == 0 ? "No journal text has been written for this quest yet." : best;
+        return best == null || best.length() == 0 ? translate("gui.losttales.quest.log.none") : best;
     }
 
     private void addStageSummary(List<DetailLine> lines,
             LostTalesQuestDefinition quest, LostTalesQuestProgress progress,
             boolean completed, LostTalesQuestHistoryEntry history,
             int width) {
-        addSectionTitle(lines, "Objectives");
+        addSectionTitle(lines, translate("gui.losttales.quest.section.objectives"));
         if (quest.getStages().isEmpty()) {
-            addWrappedLines(lines, "No objectives are written for this quest.", LostTalesSkyrimUiStyle.TEXT_MUTED, 16, width - 16);
+            addWrappedLines(lines, translate("gui.losttales.quest.objectives.none"), LostTalesSkyrimUiStyle.TEXT_MUTED, 16, width - 16);
             return;
         }
 
@@ -480,10 +1135,10 @@ public class LostTalesQuestJournalGui extends GuiScreen
         }
 
         if (!addedAny) {
-            addWrappedLines(lines, completed ? "Quest complete." : "No current objective.", completed ? LostTalesSkyrimUiStyle.TEXT_DIM : LostTalesSkyrimUiStyle.TEXT_MUTED, 16, width - 16);
+            addWrappedLines(lines, completed ? translate("gui.losttales.quest.status.completed") : translate("gui.losttales.quest.objective.none"), completed ? LostTalesSkyrimUiStyle.TEXT_DIM : LostTalesSkyrimUiStyle.TEXT_MUTED, 16, width - 16);
         }
         if (completed) {
-            addWrappedLines(lines, "Quest complete.", LostTalesSkyrimUiStyle.TEXT_DIM, 16, width - 16);
+            addWrappedLines(lines, translate("gui.losttales.quest.status.completed"), LostTalesSkyrimUiStyle.TEXT_DIM, 16, width - 16);
         }
         addBlankLine(lines);
     }
@@ -492,7 +1147,7 @@ public class LostTalesQuestJournalGui extends GuiScreen
         if (quest.getRewards().isEmpty()) {
             return;
         }
-        addSectionTitle(lines, "Rewards");
+        addSectionTitle(lines, translate("gui.losttales.quest.section.rewards"));
         for (String rewardLine : buildRewardLines(quest)) {
             addWrappedLines(lines, rewardLine, completed ? LostTalesSkyrimUiStyle.TEXT_DIM : LostTalesSkyrimUiStyle.TEXT_MUTED, 16, width - 16);
         }
@@ -500,24 +1155,26 @@ public class LostTalesQuestJournalGui extends GuiScreen
     }
 
     private void addQuestStatusLines(List<DetailLine> lines, LostTalesQuestDefinition quest, LostTalesQuestProgress progress, boolean completed, boolean failed, boolean abandoned, boolean pinned, int width) {
-        String status = failed ? "Failed" : abandoned ? "Abandoned"
-                : completed ? "Completed"
-                : progress != null ? "Active" : "Known";
-        String tracking = pinned ? "tracked" : "not tracked";
-        String stageText = progress == null ? "" : " | Stage "
-                + (LostTalesQuestObjectiveSelection
-                .getCurrentStageIndex(quest, progress) + 1) + "/"
-                + Math.max(1, quest.getStages().size());
+        String status = translate(failed ? "gui.losttales.quest.status.failed"
+                : abandoned ? "gui.losttales.quest.status.abandoned"
+                : completed ? "gui.losttales.quest.status.completed"
+                : "gui.losttales.quest.status.active");
+        String tracking = translate(pinned
+                ? "gui.losttales.quest.status.tracked"
+                : "gui.losttales.quest.status.untracked");
+        String stageText = progress == null ? "" : " \u00b7 "
+                + translate("gui.losttales.quest.stage",
+                        String.valueOf(LostTalesQuestObjectiveSelection
+                                .getCurrentStageIndex(quest, progress) + 1),
+                        String.valueOf(Math.max(1, quest.getStages().size())));
         int color = failed ? LostTalesSkyrimUiStyle.RED
                 : abandoned ? LostTalesSkyrimUiStyle.GOLD
                 : LostTalesSkyrimUiStyle.TEXT_MUTED;
-        addWrappedLines(lines, "Status: " + status + " | " + tracking + stageText, color, 8, width - 16);
+        addWrappedLines(lines, status + " \u00b7 " + tracking + stageText,
+                color, 8, width - 16);
         if (progress != null && progress.hasTimeLimit() && this.mc != null && this.mc.theWorld != null) {
             String remaining = formatRemainingTime(progress.getRemainingTicks(this.mc.theWorld.getTotalWorldTime()));
-            addWrappedLines(lines, "Time remaining: " + remaining, remaining.equals("expired") ? LostTalesSkyrimUiStyle.RED : LostTalesSkyrimUiStyle.GOLD, 8, width - 16);
-        }
-        if (progress != null && !completed) {
-            addWrappedLines(lines, "Press Space or Enter to " + (pinned ? "stop tracking this quest." : "track this quest on the HUD."), LostTalesSkyrimUiStyle.TEXT_MUTED, 8, width - 16);
+            addWrappedLines(lines, translate("gui.losttales.quest.remaining", remaining), remaining.equals("expired") ? LostTalesSkyrimUiStyle.RED : LostTalesSkyrimUiStyle.GOLD, 8, width - 16);
         }
     }
 
@@ -528,16 +1185,18 @@ public class LostTalesQuestJournalGui extends GuiScreen
         }
         if (history.getDetail().length() > 0) {
             addWrappedLines(lines,
-                    (history.isCompleted() ? "Outcome: " : "Reason: ")
-                            + history.getDetail(),
+                    translate(history.isCompleted()
+                            ? "gui.losttales.quest.outcome"
+                            : "gui.losttales.quest.reason",
+                            history.getDetail()),
                     history.isFailed() ? LostTalesSkyrimUiStyle.RED
                             : history.isCompleted()
                             ? LostTalesSkyrimUiStyle.GREEN
                             : LostTalesSkyrimUiStyle.GOLD,
                     8, width - 16);
         }
-        addWrappedLines(lines, "Recorded: "
-                + formatWorldDate(history.getWorldTime()),
+        addWrappedLines(lines, translate("gui.losttales.quest.recorded",
+                formatWorldDate(history.getWorldTime())),
                 LostTalesSkyrimUiStyle.TEXT_MUTED, 8, width - 16);
     }
 
@@ -548,8 +1207,10 @@ public class LostTalesQuestJournalGui extends GuiScreen
         long totalMinutes = (timeOfDay * 60L / 1000L + 360L) % 1440L;
         long hour = totalMinutes / 60L;
         long minute = totalMinutes % 60L;
-        return "Day " + day + ", " + (hour < 10L ? "0" : "") + hour
-                + ":" + (minute < 10L ? "0" : "") + minute;
+        return translate("gui.losttales.quest.worlddate",
+                String.valueOf(day),
+                (hour < 10L ? "0" : "") + hour,
+                (minute < 10L ? "0" : "") + minute);
     }
 
     private List<String> buildRewardLines(LostTalesQuestDefinition quest) {
@@ -582,7 +1243,7 @@ public class LostTalesQuestJournalGui extends GuiScreen
             }
         }
         if (result.isEmpty()) {
-            result.add("A reward will be given when the quest is completed.");
+            result.add(translate("gui.losttales.quest.reward.pending"));
         }
         return result;
     }
@@ -761,28 +1422,59 @@ public class LostTalesQuestJournalGui extends GuiScreen
             return;
         }
         List<Hint> hints = new ArrayList<Hint>();
-        hints.add(Hint.wheel(this.mc, this.fontRendererObj, "Scroll"));
-        hints.add(Hint.mouseButton(
-                this.mc, this.fontRendererObj, 0, "Select"));
+        hints.add(Hint.wheel(this.mc, this.fontRendererObj,
+                translate("gui.losttales.quest.hint.scroll")));
+        hints.add(Hint.mouseButton(this.mc, this.fontRendererObj, 0,
+                translate("gui.losttales.quest.hint.select")));
         hints.add(Hint.key(this.mc, this.fontRendererObj,
-                Keyboard.KEY_SPACE, "Track"));
+                Keyboard.KEY_SPACE,
+                translate("gui.losttales.quest.hint.track")));
         hints.add(Hint.key(this.mc, this.fontRendererObj,
-                Keyboard.KEY_F, "Filter"));
+                Keyboard.KEY_F,
+                translate("gui.losttales.quest.hint.filter")));
         hints.add(Hint.binding(this.mc, this.fontRendererObj,
-                LostTalesKeyBindings.getQuestJournalKeyBinding(), "Close"));
+                LostTalesKeyBindings.getQuestJournalKeyBinding(),
+                translate("gui.losttales.quest.hint.close")));
         hints.add(Hint.binding(this.mc, this.fontRendererObj,
                 LostTalesKeyBindings.getCharacterMenuKeyBinding(),
-                "Character"));
-        String sync = LostTalesClientQuestProgressStore.hasReceivedSync()
-                ? "Server-synced" : "Waiting for sync";
+                translate("gui.losttales.quest.hint.character")));
+        String sync = translate(
+                LostTalesClientQuestProgressStore.hasReceivedSync()
+                        ? "gui.losttales.quest.sync.ready"
+                        : "gui.losttales.quest.sync.waiting");
         LostTalesControlBar.render(this, this.mc, this.fontRendererObj,
                 this.width, this.height, hints, 4, 0,
                 Arrays.asList(sync), true);
     }
 
+    /**
+     * The quests the filter and the search leave, built once a frame.
+     * Every part of the screen asks for it several times over — the
+     * rows, the glide, the pointer, the detail — and searching measures
+     * each quest's words, so it is worked out once and handed back.
+     */
     private List<ClientQuestEntry> getVisibleQuests() {
+        String query = searchQuery();
+        if (this.visibleQuests != null
+                && this.visibleFrame == this.frameCounter
+                && this.visibleFilter == this.filter
+                && this.visibleQuery.equals(query)) {
+            return this.visibleQuests;
+        }
+        this.visibleQuests = buildVisibleQuests(query);
+        this.visibleFrame = this.frameCounter;
+        this.visibleFilter = this.filter;
+        this.visibleQuery = query;
+        return this.visibleQuests;
+    }
+
+    private List<ClientQuestEntry> buildVisibleQuests(String rawQuery) {
         List<ClientQuestEntry> visible = new ArrayList<ClientQuestEntry>();
+        QuestSearchQuery query = QuestSearchQuery.of(rawQuery);
         for (ClientQuestEntry quest : ClientQuestCatalog.getEntries(this.mc)) {
+            if (!query.isEmpty() && !matchesSearch(quest, query)) {
+                continue;
+            }
             if (this.filter == QuestFilter.ACTIVE && !quest.isActive()) {
                 continue;
             }
@@ -798,19 +1490,34 @@ public class LostTalesQuestJournalGui extends GuiScreen
         return visible;
     }
 
+    /** Everything a quest says, put to the search. */
+    private static boolean matchesSearch(ClientQuestEntry quest,
+                                         QuestSearchQuery query) {
+        List<String> parts = new ArrayList<String>();
+        parts.add(quest.getTitle());
+        parts.add(quest.getCategory());
+        parts.add(quest.getSubtitle());
+        for (ClientQuestEntry.Objective objective : quest.getObjectives()) {
+            parts.add(objective.getText());
+        }
+        return query.matches(parts.toArray(new String[parts.size()]));
+    }
+
     private List<QuestListRow> buildQuestListRows(List<ClientQuestEntry> quests) {
         List<QuestListRow> rows = new ArrayList<QuestListRow>();
         String lastCategory = null;
         for (int i = 0; i < quests.size(); i++) {
             ClientQuestEntry quest = quests.get(i);
             String category = quest.getCategory().length() == 0
-                    ? "Miscellaneous" : quest.getCategory();
+                    ? translate("gui.losttales.quest.category.misc") : quest.getCategory();
             if (!category.equals(lastCategory)) {
                 rows.add(QuestListRow.category(category));
                 lastCategory = category;
             }
-            if (!this.collapsedCategories.contains(category)) {
-                rows.add(QuestListRow.quest(quest, i));
+            int height = Math.round(LIST_ROW_HEIGHT
+                    * categoryOpenShare(category));
+            if (height > 0) {
+                rows.add(QuestListRow.quest(quest, i, height));
             }
         }
         return rows;
@@ -901,16 +1608,10 @@ public class LostTalesQuestJournalGui extends GuiScreen
             this.selectedQuestIndex = quests.size() - 1;
         }
 
-        JournalLayout layout = getLayout();
         List<QuestListRow> rows = buildQuestListRows(quests);
-        int visibleHeight = Math.max(20, layout.contentBottom - layout.contentTop);
+        int visibleHeight = listHeight();
         int maxScroll = Math.max(0, getRowsHeight(rows) - visibleHeight);
-        if (this.listScroll > maxScroll) {
-            this.listScroll = maxScroll;
-        }
-        if (this.listScroll < 0) {
-            this.listScroll = 0;
-        }
+        this.listScroll = clamp(this.listScroll, 0, maxScroll);
 
         int maxDetailScroll = getDetailMaxScroll();
         if (this.detailScroll > maxDetailScroll) {
@@ -926,9 +1627,8 @@ public class LostTalesQuestJournalGui extends GuiScreen
         if (quests.isEmpty()) {
             return;
         }
-        JournalLayout layout = getLayout();
         List<QuestListRow> rows = buildQuestListRows(quests);
-        int visibleHeight = Math.max(20, layout.contentBottom - layout.contentTop);
+        int visibleHeight = listHeight();
         int selectedY = getQuestCategoryStartY(rows, this.selectedQuestIndex);
         int selectedBottom = selectedY + LIST_ROW_HEIGHT;
         if (selectedY < this.listScroll + 32) {
@@ -950,20 +1650,16 @@ public class LostTalesQuestJournalGui extends GuiScreen
         if (quest == null || this.fontRendererObj == null) {
             return 0;
         }
-        JournalLayout layout = getLayout();
-        List<DetailLine> lines = buildDetailLines(quest, layout.rightWidth - 20);
-        int visibleHeight = layout.contentBottom - layout.contentTop;
-        return Math.max(0, lines.size() * DETAIL_LINE_HEIGHT - visibleHeight + 4);
+        QuestJournalLayout layout = layout();
+        List<DetailLine> lines = buildDetailLines(quest,
+                (int)layout.detailRows().width);
+        return Math.max(0, lines.size() * DETAIL_LINE_HEIGHT
+                - (int)layout.detail().height);
     }
 
-    private boolean isMouseOverDetails(int mouseX, int mouseY) {
-        JournalLayout layout = getLayout();
-        return mouseX >= layout.rightX && mouseX < layout.rightX + layout.rightWidth && mouseY >= layout.contentTop && mouseY < layout.contentBottom;
-    }
-
-    private boolean isMouseOverList(int mouseX, int mouseY) {
-        JournalLayout layout = getLayout();
-        return mouseX >= layout.leftX && mouseX < layout.leftX + layout.leftWidth && mouseY >= layout.contentTop && mouseY < layout.contentBottom;
+    /** How tall the list's viewport is; at least a row, for the maths. */
+    private int listHeight() {
+        return Math.max(LIST_ROW_HEIGHT, (int)layout().list().height);
     }
 
     /**
@@ -971,11 +1667,13 @@ public class LostTalesQuestJournalGui extends GuiScreen
      * spans the list's full width, so the hover highlight, the click and the
      * pointer all answer for the same pixels.
      */
-    private QuestListRow rowAt(List<QuestListRow> rows, int mouseX, int mouseY) {
-        if (rows == null || !isMouseOverList(mouseX, mouseY)) {
+    private QuestListRow rowAt(List<QuestListRow> rows,
+                               QuestJournalLayout layout, int mouseX,
+                               int mouseY) {
+        if (rows == null || !layout.list().contains(mouseX, mouseY)) {
             return null;
         }
-        int relativeY = mouseY - getLayout().contentTop + this.listScroll;
+        int relativeY = (int)(mouseY - layout.list().top) + this.listScroll;
         int y = 0;
         for (QuestListRow row : rows) {
             if (relativeY >= y && relativeY < y + row.height) {
@@ -998,22 +1696,36 @@ public class LostTalesQuestJournalGui extends GuiScreen
     }
 
     private void scrollList(int amount) {
-        List<QuestListRow> rows = buildQuestListRows(getVisibleQuests());
-        JournalLayout layout = getLayout();
-        int maxScroll = Math.max(0, getRowsHeight(rows) - (layout.contentBottom - layout.contentTop));
-        this.listScroll += amount;
-        if (this.listScroll < 0) {
-            this.listScroll = 0;
-        }
-        if (this.listScroll > maxScroll) {
-            this.listScroll = maxScroll;
-        }
+        int content = getRowsHeight(buildQuestListRows(getVisibleQuests()));
+        this.listScroll = clamp(this.listScroll + amount, 0,
+                Math.max(0, content - listHeight()));
     }
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) {
         if (mouseButton == 0) {
-            QuestListRow row = rowAt(buildQuestListRows(getVisibleQuests()), mouseX, mouseY);
+            QuestJournalLayout layout = layout();
+            Hovered where = hoverAt(layout, mouseX, mouseY);
+            if (where == Hovered.SEARCH) {
+                toggleSearch();
+                return;
+            }
+            if (this.searching && this.searchField != null
+                    && searchFieldBox(layout, this.searchShown)
+                            .contains(mouseX, mouseY)) {
+                this.searchField.setFocused(true);
+                return;
+            }
+            if (where == Hovered.FILTER) {
+                setFilter(FILTERS[this.hoveredIndex]);
+                return;
+            }
+            if (where == Hovered.ACTION) {
+                runAction(getSelectedQuest(), ACTIONS[this.hoveredIndex]);
+                return;
+            }
+            QuestListRow row = rowAt(buildQuestListRows(getVisibleQuests()),
+                    layout, mouseX, mouseY);
             if (row != null && row.category) {
                 toggleCategory(row.label);
                 return;
@@ -1039,8 +1751,7 @@ public class LostTalesQuestJournalGui extends GuiScreen
      */
     @Override
     public boolean isPointerOverInteractable(int mouseX, int mouseY) {
-        QuestListRow row = rowAt(buildQuestListRows(getVisibleQuests()), mouseX, mouseY);
-        if (row != null && (row.category || row.quest != null)) {
+        if (hoverAt(layout(), mouseX, mouseY) != Hovered.NOTHING) {
             return true;
         }
         return LostTalesGuiPointerTargets.isOverEnabledButton(this, mouseX, mouseY);
@@ -1090,17 +1801,11 @@ public class LostTalesQuestJournalGui extends GuiScreen
                 notches = wheel > 0 ? 1 : -1;
             }
             int amount = -notches * 24;
-            if (isMouseOverDetails(eventMouseX, eventMouseY)) {
-                scrollDetails(amount);
-            } else if (isMouseOverList(eventMouseX, eventMouseY)) {
+            QuestJournalLayout layout = layout();
+            if (layout.list().contains(eventMouseX, eventMouseY)) {
                 scrollList(amount);
             } else {
-                JournalLayout layout = getLayout();
-                if (eventMouseX >= layout.dividerX) {
-                    scrollDetails(amount);
-                } else {
-                    scrollList(amount);
-                }
+                scrollDetails(amount);
             }
         }
         super.handleMouseInput();
@@ -1108,6 +1813,43 @@ public class LostTalesQuestJournalGui extends GuiScreen
 
     @Override
     protected void keyTyped(char typedChar, int keyCode) {
+        // A field taking the keys answers first, so a letter types
+        // rather than reaching a shortcut; Escape closes the search
+        // before it closes the screen.
+        if (this.searching && this.searchField != null
+                && this.searchField.isFocused()) {
+            if (keyCode == Keyboard.KEY_ESCAPE) {
+                toggleSearch();
+                return;
+            }
+            if (keyCode == Keyboard.KEY_UP) {
+                setSelectedQuestIndex(this.selectedQuestIndex - 1);
+                return;
+            }
+            if (keyCode == Keyboard.KEY_DOWN) {
+                setSelectedQuestIndex(this.selectedQuestIndex + 1);
+                return;
+            }
+            if (keyCode == Keyboard.KEY_RETURN) {
+                this.searchField.setFocused(false);
+                return;
+            }
+            if (this.searchField.textboxKeyTyped(typedChar, keyCode)) {
+                this.selectedQuestIndex = 0;
+                this.listScroll = 0;
+                this.detailScroll = 0;
+                clampSelectionAndScroll();
+                return;
+            }
+        }
+        if (keyCode == Keyboard.KEY_F && isCtrlKeyDown()) {
+            if (!this.searching) {
+                toggleSearch();
+            } else if (this.searchField != null) {
+                this.searchField.setFocused(true);
+            }
+            return;
+        }
         if (keyCode == Keyboard.KEY_ESCAPE || LostTalesKeyBindings.isQuestJournalKey(keyCode)) {
             this.mc.displayGuiScreen(this.parent);
             return;
@@ -1152,7 +1894,15 @@ public class LostTalesQuestJournalGui extends GuiScreen
     }
 
     private void cycleFilter() {
-        this.filter = this.filter.next();
+        setFilter(this.filter.next());
+    }
+
+    /** Chooses a filter and reads the list from its top again. */
+    private void setFilter(QuestFilter chosen) {
+        if (chosen == null || chosen == this.filter) {
+            return;
+        }
+        this.filter = chosen;
         this.selectedQuestIndex = 0;
         this.listScroll = 0;
         this.detailScroll = 0;
@@ -1171,56 +1921,33 @@ public class LostTalesQuestJournalGui extends GuiScreen
     }
 
     @Override
+    public void updateScreen() {
+        super.updateScreen();
+        if (this.searchField != null) {
+            this.searchField.updateCursorCounter();
+        }
+    }
+
+    @Override
     public boolean doesGuiPauseGame() {
         return false;
     }
 
-    private JournalLayout getLayout() {
-        int contentTop = TOP_BAR_HEIGHT + 8;
-        int contentBottom = this.height - FOOTER_HEIGHT - 6;
-        int leftWidth = Math.min(LEFT_WIDTH, Math.max(170, this.width / 3));
-        int leftX = OUTER_PADDING;
-        int dividerX = leftX + leftWidth + 20;
-        int rightX = dividerX + 28;
-        int rightWidth = Math.max(120, this.width - rightX - OUTER_PADDING);
-        return new JournalLayout(leftX, leftWidth, rightX, rightWidth, dividerX, contentTop, contentBottom);
-    }
-
     private enum QuestFilter {
-        ALL("All"),
-        ACTIVE("Active"),
-        COMPLETED("Completed"),
-        HISTORY("History");
+        ALL("gui.losttales.quest.filter.all"),
+        ACTIVE("gui.losttales.quest.filter.active"),
+        COMPLETED("gui.losttales.quest.filter.completed"),
+        HISTORY("gui.losttales.quest.filter.history");
 
-        private final String displayName;
+        private final String labelKey;
 
-        QuestFilter(String displayName) {
-            this.displayName = displayName;
+        QuestFilter(String labelKey) {
+            this.labelKey = labelKey;
         }
 
         private QuestFilter next() {
             QuestFilter[] values = values();
             return values[(ordinal() + 1) % values.length];
-        }
-    }
-
-    private static final class JournalLayout {
-        private final int leftX;
-        private final int leftWidth;
-        private final int rightX;
-        private final int rightWidth;
-        private final int dividerX;
-        private final int contentTop;
-        private final int contentBottom;
-
-        private JournalLayout(int leftX, int leftWidth, int rightX, int rightWidth, int dividerX, int contentTop, int contentBottom) {
-            this.leftX = leftX;
-            this.leftWidth = leftWidth;
-            this.rightX = rightX;
-            this.rightWidth = rightWidth;
-            this.dividerX = dividerX;
-            this.contentTop = contentTop;
-            this.contentBottom = contentBottom;
         }
     }
 
@@ -1241,11 +1968,12 @@ public class LostTalesQuestJournalGui extends GuiScreen
         }
 
         private static QuestListRow category(String label) {
-            return new QuestListRow(true, label == null ? "Miscellaneous" : label, null, -1, CATEGORY_ROW_HEIGHT);
+            return new QuestListRow(true, label == null ? translate("gui.losttales.quest.category.misc") : label, null, -1, CATEGORY_ROW_HEIGHT);
         }
 
-        private static QuestListRow quest(ClientQuestEntry quest, int index) {
-            return new QuestListRow(false, null, quest, index, LIST_ROW_HEIGHT);
+        private static QuestListRow quest(ClientQuestEntry quest, int index,
+                int height) {
+            return new QuestListRow(false, null, quest, index, height);
         }
     }
 

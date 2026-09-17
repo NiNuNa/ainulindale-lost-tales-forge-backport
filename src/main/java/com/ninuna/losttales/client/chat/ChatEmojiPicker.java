@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import java.util.ArrayList;
@@ -115,12 +116,12 @@ final class ChatEmojiPicker extends ChatPickerPanel {
         // emoji is one, plain under the pointer as the control a
         // right-click toggles.
         if (ChatEmojiUsageStore.isFavorite(emoji)) {
-            ChatIconSheet.HEART_FAVORITE.drawWithShadow(x + CELL_SIZE
-                    - ChatIconSheet.HEART_FAVORITE.getWidth() - 1, y + 1,
+            LostTalesUiSheet.HEART_FAVORITE.drawWithShadow(x + CELL_SIZE
+                    - LostTalesUiSheet.HEART_FAVORITE.getWidth() - 1, y + 1,
                     alpha);
         } else if (hovered) {
-            ChatIconSheet.HEART.drawWithShadow(x + CELL_SIZE
-                    - ChatIconSheet.HEART.getWidth() - 1, y + 1, alpha);
+            LostTalesUiSheet.HEART.drawWithShadow(x + CELL_SIZE
+                    - LostTalesUiSheet.HEART.getWidth() - 1, y + 1, alpha);
         }
     }
 
@@ -159,13 +160,13 @@ final class ChatEmojiPicker extends ChatPickerPanel {
     }
 
     @Override
-    ChatIconSheet buttonGlyph() {
-        return ChatIconSheet.EMOJI;
+    LostTalesUiSheet buttonGlyph() {
+        return LostTalesUiSheet.EMOJI;
     }
 
     @Override
-    ChatIconSheet buttonGlyphLit() {
-        return ChatIconSheet.EMOJI_HOVER;
+    LostTalesUiSheet buttonGlyphLit() {
+        return LostTalesUiSheet.EMOJI_HOVER;
     }
 
     /** The emoji cell under the mouse while the picker is open, else null. */

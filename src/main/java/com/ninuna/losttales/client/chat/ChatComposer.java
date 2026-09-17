@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
@@ -216,7 +217,7 @@ final class ChatComposer {
                         : StatCollector.translateToLocalFormatted(
                                 "gui.losttales.chat.message.replying",
                                 this.replyToName),
-                Math.max(20, room - ChatIconSheet.CLOSE.getWidth() - 6));
+                Math.max(20, room - LostTalesUiSheet.CLOSE.getWidth() - 6));
         int width = font.getStringWidth(label);
         // The cross is the control, so its own box is what answers to
         // the pointer — a little wider than the sprite, so a five-pixel
@@ -225,12 +226,12 @@ final class ChatComposer {
         int crossY = y + 1;
         this.chipLeft = crossX - 2;
         this.chipTop = crossY - 2;
-        this.chipRight = crossX + ChatIconSheet.CLOSE.getWidth() + 2;
-        this.chipBottom = crossY + ChatIconSheet.CLOSE.getHeight() + 2;
+        this.chipRight = crossX + LostTalesUiSheet.CLOSE.getWidth() + 2;
+        this.chipBottom = crossY + LostTalesUiSheet.CLOSE.getHeight() + 2;
         LostTalesChatVisualStyle.drawColored(font, label, x, y,
                 LostTalesChatVisualStyle.asideRgb(), alpha);
-        ChatIconSheet cross = chipContains(mouseX, mouseY)
-                ? ChatIconSheet.CLOSE_HOVER : ChatIconSheet.CLOSE;
+        LostTalesUiSheet cross = chipContains(mouseX, mouseY)
+                ? LostTalesUiSheet.CLOSE_HOVER : LostTalesUiSheet.CLOSE;
         cross.drawWithShadow(crossX, crossY, alpha);
         return true;
     }

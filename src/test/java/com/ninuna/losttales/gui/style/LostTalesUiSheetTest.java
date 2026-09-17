@@ -1,4 +1,4 @@
-package com.ninuna.losttales.client.chat;
+package com.ninuna.losttales.gui.style;
 
 import java.awt.image.BufferedImage;
 import java.io.InputStream;
@@ -15,20 +15,20 @@ import static org.junit.Assert.assertTrue;
  * dimensions, a cell outside the sheet, an empty cell, or two cells
  * overlapping fails the build instead of shipping misaddressed controls.
  */
-public final class ChatIconSheetTest {
+public final class LostTalesUiSheetTest {
 
     @Test
     public void sheetMetadataMatchesBundledSprite() throws Exception {
-        InputStream stream = ChatIconSheetTest.class.getResourceAsStream(
-                "/assets/losttales/" + ChatIconSheet.TEXTURE_PATH);
+        InputStream stream = LostTalesUiSheetTest.class.getResourceAsStream(
+                "/assets/losttales/" + LostTalesUiSheet.TEXTURE_PATH);
         assertNotNull("Chat icon sheet is missing", stream);
         try {
             BufferedImage sheet = ImageIO.read(stream);
             assertNotNull("Chat icon sheet is not a readable PNG", sheet);
-            assertEquals(ChatIconSheet.SHEET_WIDTH, sheet.getWidth());
-            assertEquals(ChatIconSheet.SHEET_HEIGHT, sheet.getHeight());
-            ChatIconSheet[] icons = ChatIconSheet.values();
-            for (ChatIconSheet icon : icons) {
+            assertEquals(LostTalesUiSheet.SHEET_WIDTH, sheet.getWidth());
+            assertEquals(LostTalesUiSheet.SHEET_HEIGHT, sheet.getHeight());
+            LostTalesUiSheet[] icons = LostTalesUiSheet.values();
+            for (LostTalesUiSheet icon : icons) {
                 assertTrue(icon + " cell exceeds sheet width",
                         icon.getTextureU() + icon.getWidth()
                                 <= sheet.getWidth());
@@ -43,7 +43,7 @@ public final class ChatIconSheetTest {
                 assertTrue(icon + " cell is cut off at the bottom",
                         rowHasOpaquePixels(sheet, icon,
                                 icon.getHeight() - 1));
-                for (ChatIconSheet other : icons) {
+                for (LostTalesUiSheet other : icons) {
                     if (other != icon) {
                         assertFalse(icon + " overlaps " + other,
                                 overlaps(icon, other));
@@ -64,7 +64,7 @@ public final class ChatIconSheetTest {
     @Test
     public void everyCellHoldsItsWholeArtwork() throws Exception {
         BufferedImage sheet = readSheet();
-        for (ChatIconSheet icon : ChatIconSheet.values()) {
+        for (LostTalesUiSheet icon : LostTalesUiSheet.values()) {
             int u = icon.getTextureU();
             int v = icon.getTextureV();
             for (int y = v; y < v + icon.getHeight(); y++) {
@@ -97,8 +97,8 @@ public final class ChatIconSheetTest {
     }
 
     private static BufferedImage readSheet() throws Exception {
-        InputStream stream = ChatIconSheetTest.class.getResourceAsStream(
-                "/assets/losttales/" + ChatIconSheet.TEXTURE_PATH);
+        InputStream stream = LostTalesUiSheetTest.class.getResourceAsStream(
+                "/assets/losttales/" + LostTalesUiSheet.TEXTURE_PATH);
         assertNotNull("Chat icon sheet is missing", stream);
         try {
             BufferedImage sheet = ImageIO.read(stream);
@@ -112,7 +112,7 @@ public final class ChatIconSheetTest {
     /**
      * The bar paints a tab's surface itself and keeps only the border
      * pieces' <em>ink</em>, cutting everything under
-     * {@link ChatChannelTabBar#TAB_INK_THRESHOLD} away at draw time —
+     * {@link LostTalesUiSheet#INK_THRESHOLD} away at draw time —
      * the artwork's backdrop texels are a preview, not a layer. That
      * only works while every texel is on the right side of the
      * threshold: ink fully opaque, everything else safely below it. A
@@ -121,26 +121,26 @@ public final class ChatIconSheetTest {
      */
     @Test
     public void tabPiecesSeparateInkFromSurfacePreview() throws Exception {
-        InputStream stream = ChatIconSheetTest.class.getResourceAsStream(
-                "/assets/losttales/" + ChatIconSheet.TEXTURE_PATH);
+        InputStream stream = LostTalesUiSheetTest.class.getResourceAsStream(
+                "/assets/losttales/" + LostTalesUiSheet.TEXTURE_PATH);
         assertNotNull("Chat icon sheet is missing", stream);
         try {
             BufferedImage sheet = ImageIO.read(stream);
-            assertInkOrPreview(sheet, ChatIconSheet.TAB_LEFT);
-            assertInkOrPreview(sheet, ChatIconSheet.TAB_RIGHT);
-            assertInkOrPreview(sheet, ChatIconSheet.TAB_HOVER_LEFT);
-            assertInkOrPreview(sheet, ChatIconSheet.TAB_HOVER_RIGHT);
-            assertInkOrPreview(sheet, ChatIconSheet.TAB_SELECTED_LEFT);
-            assertInkOrPreview(sheet, ChatIconSheet.TAB_SELECTED_RIGHT);
+            assertInkOrPreview(sheet, LostTalesUiSheet.TAB_LEFT);
+            assertInkOrPreview(sheet, LostTalesUiSheet.TAB_RIGHT);
+            assertInkOrPreview(sheet, LostTalesUiSheet.TAB_HOVER_LEFT);
+            assertInkOrPreview(sheet, LostTalesUiSheet.TAB_HOVER_RIGHT);
+            assertInkOrPreview(sheet, LostTalesUiSheet.TAB_SELECTED_LEFT);
+            assertInkOrPreview(sheet, LostTalesUiSheet.TAB_SELECTED_RIGHT);
             // A framed button's corners are cut the same way.
-            assertInkOrPreview(sheet, ChatIconSheet.FRAME_TOP_LEFT);
-            assertInkOrPreview(sheet, ChatIconSheet.FRAME_TOP_RIGHT);
-            assertInkOrPreview(sheet, ChatIconSheet.FRAME_BOTTOM_LEFT);
-            assertInkOrPreview(sheet, ChatIconSheet.FRAME_BOTTOM_RIGHT);
-            assertInkOrPreview(sheet, ChatIconSheet.FRAME_LIT_TOP_LEFT);
-            assertInkOrPreview(sheet, ChatIconSheet.FRAME_LIT_TOP_RIGHT);
-            assertInkOrPreview(sheet, ChatIconSheet.FRAME_LIT_BOTTOM_LEFT);
-            assertInkOrPreview(sheet, ChatIconSheet.FRAME_LIT_BOTTOM_RIGHT);
+            assertInkOrPreview(sheet, LostTalesUiSheet.FRAME_TOP_LEFT);
+            assertInkOrPreview(sheet, LostTalesUiSheet.FRAME_TOP_RIGHT);
+            assertInkOrPreview(sheet, LostTalesUiSheet.FRAME_BOTTOM_LEFT);
+            assertInkOrPreview(sheet, LostTalesUiSheet.FRAME_BOTTOM_RIGHT);
+            assertInkOrPreview(sheet, LostTalesUiSheet.FRAME_LIT_TOP_LEFT);
+            assertInkOrPreview(sheet, LostTalesUiSheet.FRAME_LIT_TOP_RIGHT);
+            assertInkOrPreview(sheet, LostTalesUiSheet.FRAME_LIT_BOTTOM_LEFT);
+            assertInkOrPreview(sheet, LostTalesUiSheet.FRAME_LIT_BOTTOM_RIGHT);
         } finally {
             stream.close();
         }
@@ -155,9 +155,9 @@ public final class ChatIconSheetTest {
     private static final float PREVIEW_ALPHA_CEILING = 0.75F;
 
     private static void assertInkOrPreview(BufferedImage sheet,
-                                           ChatIconSheet piece) {
+                                           LostTalesUiSheet piece) {
         int ceiling = (int)Math.floor(
-                ChatChannelTabBar.TAB_INK_THRESHOLD * 255.0F);
+                LostTalesUiSheet.INK_THRESHOLD * 255.0F);
         // A preview texel keeps a margin below the threshold, so a
         // re-export nudging it up is caught before it is drawn as ink.
         int previewCeiling = (int)Math.floor(PREVIEW_ALPHA_CEILING * 255.0F);
@@ -182,81 +182,81 @@ public final class ChatIconSheetTest {
 
     @Test
     public void hoverStatesMatchTheirRestingSprite() {
-        assertSameSize(ChatIconSheet.EMOJI, ChatIconSheet.EMOJI_HOVER);
-        assertSameSize(ChatIconSheet.PLUS, ChatIconSheet.PLUS_HOVER);
-        assertSameSize(ChatIconSheet.COG, ChatIconSheet.COG_HOVER);
-        assertSameSize(ChatIconSheet.CLOSE, ChatIconSheet.CLOSE_HOVER);
-        assertSameSize(ChatIconSheet.ITEM, ChatIconSheet.ITEM_HOVER);
-        assertSameSize(ChatIconSheet.GRIP, ChatIconSheet.GRIP_HOVER);
-        assertSameSize(ChatIconSheet.HEART, ChatIconSheet.HEART_FAVORITE);
-        assertSameSize(ChatIconSheet.TOGGLE_1, ChatIconSheet.TOGGLE_1_HOVER);
-        assertSameSize(ChatIconSheet.TOGGLE_2, ChatIconSheet.TOGGLE_2_HOVER);
-        assertSameSize(ChatIconSheet.TOGGLE_3, ChatIconSheet.TOGGLE_3_HOVER);
-        assertSameSize(ChatIconSheet.TOGGLE_4, ChatIconSheet.TOGGLE_4_HOVER);
-        assertSameSize(ChatIconSheet.TOGGLE_5, ChatIconSheet.TOGGLE_5_HOVER);
+        assertSameSize(LostTalesUiSheet.EMOJI, LostTalesUiSheet.EMOJI_HOVER);
+        assertSameSize(LostTalesUiSheet.PLUS, LostTalesUiSheet.PLUS_HOVER);
+        assertSameSize(LostTalesUiSheet.COG, LostTalesUiSheet.COG_HOVER);
+        assertSameSize(LostTalesUiSheet.CLOSE, LostTalesUiSheet.CLOSE_HOVER);
+        assertSameSize(LostTalesUiSheet.ITEM, LostTalesUiSheet.ITEM_HOVER);
+        assertSameSize(LostTalesUiSheet.GRIP, LostTalesUiSheet.GRIP_HOVER);
+        assertSameSize(LostTalesUiSheet.HEART, LostTalesUiSheet.HEART_FAVORITE);
+        assertSameSize(LostTalesUiSheet.TOGGLE_1, LostTalesUiSheet.TOGGLE_1_HOVER);
+        assertSameSize(LostTalesUiSheet.TOGGLE_2, LostTalesUiSheet.TOGGLE_2_HOVER);
+        assertSameSize(LostTalesUiSheet.TOGGLE_3, LostTalesUiSheet.TOGGLE_3_HOVER);
+        assertSameSize(LostTalesUiSheet.TOGGLE_4, LostTalesUiSheet.TOGGLE_4_HOVER);
+        assertSameSize(LostTalesUiSheet.TOGGLE_5, LostTalesUiSheet.TOGGLE_5_HOVER);
         // The chevron's end frames mirror each other, so the flip stays
         // centred on the control from either side.
-        assertSameSize(ChatIconSheet.TOGGLE_1, ChatIconSheet.TOGGLE_5);
-        assertSameSize(ChatIconSheet.TOGGLE_2, ChatIconSheet.TOGGLE_4);
+        assertSameSize(LostTalesUiSheet.TOGGLE_1, LostTalesUiSheet.TOGGLE_5);
+        assertSameSize(LostTalesUiSheet.TOGGLE_2, LostTalesUiSheet.TOGGLE_4);
         // The vertical chevron's three colourways are one run, frame by
         // frame, and its end frames mirror each other too.
-        ChatIconSheet[][] chevrons = {
-                {ChatIconSheet.CHEVRON_1, ChatIconSheet.CHEVRON_1_HOVER,
-                        ChatIconSheet.CHEVRON_1_MUTED},
-                {ChatIconSheet.CHEVRON_2, ChatIconSheet.CHEVRON_2_HOVER,
-                        ChatIconSheet.CHEVRON_2_MUTED},
-                {ChatIconSheet.CHEVRON_3, ChatIconSheet.CHEVRON_3_HOVER,
-                        ChatIconSheet.CHEVRON_3_MUTED},
-                {ChatIconSheet.CHEVRON_4, ChatIconSheet.CHEVRON_4_HOVER,
-                        ChatIconSheet.CHEVRON_4_MUTED},
-                {ChatIconSheet.CHEVRON_5, ChatIconSheet.CHEVRON_5_HOVER,
-                        ChatIconSheet.CHEVRON_5_MUTED}};
-        for (ChatIconSheet[] frame : chevrons) {
+        LostTalesUiSheet[][] chevrons = {
+                {LostTalesUiSheet.CHEVRON_1, LostTalesUiSheet.CHEVRON_1_HOVER,
+                        LostTalesUiSheet.CHEVRON_1_MUTED},
+                {LostTalesUiSheet.CHEVRON_2, LostTalesUiSheet.CHEVRON_2_HOVER,
+                        LostTalesUiSheet.CHEVRON_2_MUTED},
+                {LostTalesUiSheet.CHEVRON_3, LostTalesUiSheet.CHEVRON_3_HOVER,
+                        LostTalesUiSheet.CHEVRON_3_MUTED},
+                {LostTalesUiSheet.CHEVRON_4, LostTalesUiSheet.CHEVRON_4_HOVER,
+                        LostTalesUiSheet.CHEVRON_4_MUTED},
+                {LostTalesUiSheet.CHEVRON_5, LostTalesUiSheet.CHEVRON_5_HOVER,
+                        LostTalesUiSheet.CHEVRON_5_MUTED}};
+        for (LostTalesUiSheet[] frame : chevrons) {
             assertSameSize(frame[0], frame[1]);
             assertSameSize(frame[0], frame[2]);
         }
-        assertSameSize(ChatIconSheet.CHEVRON_1, ChatIconSheet.CHEVRON_5);
-        assertSameSize(ChatIconSheet.CHEVRON_2, ChatIconSheet.CHEVRON_4);
-        assertSameSize(ChatIconSheet.SEARCH, ChatIconSheet.SEARCH_HOVER);
-        assertSameSize(ChatIconSheet.SPEECH_BUBBLE,
-                ChatIconSheet.SPEECH_BUBBLE_HOVER);
-        assertSameSize(ChatIconSheet.SEND, ChatIconSheet.SEND_HOVER);
-        assertSameSize(ChatIconSheet.FULLSCREEN,
-                ChatIconSheet.FULLSCREEN_HOVER);
-        assertSameSize(ChatIconSheet.FULLSCREEN_EXIT,
-                ChatIconSheet.FULLSCREEN_EXIT_HOVER);
+        assertSameSize(LostTalesUiSheet.CHEVRON_1, LostTalesUiSheet.CHEVRON_5);
+        assertSameSize(LostTalesUiSheet.CHEVRON_2, LostTalesUiSheet.CHEVRON_4);
+        assertSameSize(LostTalesUiSheet.SEARCH, LostTalesUiSheet.SEARCH_HOVER);
+        assertSameSize(LostTalesUiSheet.SPEECH_BUBBLE,
+                LostTalesUiSheet.SPEECH_BUBBLE_HOVER);
+        assertSameSize(LostTalesUiSheet.SEND, LostTalesUiSheet.SEND_HOVER);
+        assertSameSize(LostTalesUiSheet.FULLSCREEN,
+                LostTalesUiSheet.FULLSCREEN_HOVER);
+        assertSameSize(LostTalesUiSheet.FULLSCREEN_EXIT,
+                LostTalesUiSheet.FULLSCREEN_EXIT_HOVER);
         // The fullscreen control crosses between its two glyphs on one
         // spot, so they are one size.
-        assertSameSize(ChatIconSheet.FULLSCREEN,
-                ChatIconSheet.FULLSCREEN_EXIT);
+        assertSameSize(LostTalesUiSheet.FULLSCREEN,
+                LostTalesUiSheet.FULLSCREEN_EXIT);
         // The send button takes the square the other bar buttons take.
-        assertSameSize(ChatIconSheet.EMOJI, ChatIconSheet.SEND);
+        assertSameSize(LostTalesUiSheet.EMOJI, LostTalesUiSheet.SEND);
         // So do the map-marker and quest buttons, in both states.
-        assertSameSize(ChatIconSheet.EMOJI, ChatIconSheet.MAP_MARKER);
-        assertSameSize(ChatIconSheet.MAP_MARKER,
-                ChatIconSheet.MAP_MARKER_HOVER);
-        assertSameSize(ChatIconSheet.EMOJI, ChatIconSheet.QUEST);
-        assertSameSize(ChatIconSheet.QUEST, ChatIconSheet.QUEST_HOVER);
+        assertSameSize(LostTalesUiSheet.EMOJI, LostTalesUiSheet.MAP_MARKER);
+        assertSameSize(LostTalesUiSheet.MAP_MARKER,
+                LostTalesUiSheet.MAP_MARKER_HOVER);
+        assertSameSize(LostTalesUiSheet.EMOJI, LostTalesUiSheet.QUEST);
+        assertSameSize(LostTalesUiSheet.QUEST, LostTalesUiSheet.QUEST_HOVER);
         // A framed button's corners are one square in both colourways.
-        assertSameSize(ChatIconSheet.FRAME_TOP_LEFT,
-                ChatIconSheet.FRAME_TOP_RIGHT);
-        assertSameSize(ChatIconSheet.FRAME_TOP_LEFT,
-                ChatIconSheet.FRAME_BOTTOM_LEFT);
-        assertSameSize(ChatIconSheet.FRAME_TOP_LEFT,
-                ChatIconSheet.FRAME_BOTTOM_RIGHT);
-        assertSameSize(ChatIconSheet.FRAME_TOP_LEFT,
-                ChatIconSheet.FRAME_LIT_TOP_LEFT);
-        assertSameSize(ChatIconSheet.FRAME_LIT_TOP_LEFT,
-                ChatIconSheet.FRAME_LIT_TOP_RIGHT);
-        assertSameSize(ChatIconSheet.FRAME_LIT_TOP_LEFT,
-                ChatIconSheet.FRAME_LIT_BOTTOM_LEFT);
-        assertSameSize(ChatIconSheet.FRAME_LIT_TOP_LEFT,
-                ChatIconSheet.FRAME_LIT_BOTTOM_RIGHT);
+        assertSameSize(LostTalesUiSheet.FRAME_TOP_LEFT,
+                LostTalesUiSheet.FRAME_TOP_RIGHT);
+        assertSameSize(LostTalesUiSheet.FRAME_TOP_LEFT,
+                LostTalesUiSheet.FRAME_BOTTOM_LEFT);
+        assertSameSize(LostTalesUiSheet.FRAME_TOP_LEFT,
+                LostTalesUiSheet.FRAME_BOTTOM_RIGHT);
+        assertSameSize(LostTalesUiSheet.FRAME_TOP_LEFT,
+                LostTalesUiSheet.FRAME_LIT_TOP_LEFT);
+        assertSameSize(LostTalesUiSheet.FRAME_LIT_TOP_LEFT,
+                LostTalesUiSheet.FRAME_LIT_TOP_RIGHT);
+        assertSameSize(LostTalesUiSheet.FRAME_LIT_TOP_LEFT,
+                LostTalesUiSheet.FRAME_LIT_BOTTOM_LEFT);
+        assertSameSize(LostTalesUiSheet.FRAME_LIT_TOP_LEFT,
+                LostTalesUiSheet.FRAME_LIT_BOTTOM_RIGHT);
         // The tab controls share one square.
-        assertEquals(ChatIconSheet.CLOSE.getWidth(),
-                ChatIconSheet.COG.getWidth());
-        assertEquals(ChatIconSheet.CLOSE.getWidth(),
-                ChatIconSheet.FULLSCREEN.getWidth());
+        assertEquals(LostTalesUiSheet.CLOSE.getWidth(),
+                LostTalesUiSheet.COG.getWidth());
+        assertEquals(LostTalesUiSheet.CLOSE.getWidth(),
+                LostTalesUiSheet.FULLSCREEN.getWidth());
     }
 
     /**
@@ -266,43 +266,14 @@ public final class ChatIconSheetTest {
      * width — the layout reserves one border width per end. The
      * selected pair is a row taller and a foot wider.
      */
-    @Test
-    public void tabBordersPairUpAcrossStates() {
-        assertSameSize(ChatIconSheet.TAB_LEFT, ChatIconSheet.TAB_RIGHT);
-        assertSameSize(ChatIconSheet.TAB_HOVER_LEFT,
-                ChatIconSheet.TAB_HOVER_RIGHT);
-        assertSameSize(ChatIconSheet.TAB_SELECTED_LEFT,
-                ChatIconSheet.TAB_SELECTED_RIGHT);
-        assertSameSize(ChatIconSheet.TAB_LEFT, ChatIconSheet.TAB_HOVER_LEFT);
-        // The selected pieces are their feet wider than the resting
-        // ones: the feet reach past the tab on the rule's row.
-        assertEquals(ChatIconSheet.TAB_LEFT.getWidth()
-                        + ChatChannelTabBar.SELECTED_FOOT,
-                ChatIconSheet.TAB_SELECTED_LEFT.getWidth());
-        assertEquals(1, ChatChannelTabBar.SELECTED_FOOT);
-        // The selected pieces are one row taller: the row they stand on
-        // the rule with. Every tab stands at one top, so there is no
-        // lift; a sheet with taller selected pieces would lift the tab.
-        assertEquals(ChatChannelTabBar.LIFT + 1,
-                ChatIconSheet.TAB_SELECTED_LEFT.getHeight()
-                        - ChatIconSheet.TAB_LEFT.getHeight());
-        assertEquals(0, ChatChannelTabBar.LIFT);
-        // A tab draws its pieces whole and stands on the window's top
-        // rule, so the row is one row taller than the artwork; a
-        // re-export at another height moves the row with it.
-        assertEquals("A tab is its pieces whole, plus the rule they stand on",
-                ChatChannelTabBar.HEIGHT,
-                ChatIconSheet.TAB_LEFT.getHeight() + 1);
-    }
-
-    private static void assertSameSize(ChatIconSheet a, ChatIconSheet b) {
+    private static void assertSameSize(LostTalesUiSheet a, LostTalesUiSheet b) {
         assertEquals(a + " and " + b + " differ in width",
                 a.getWidth(), b.getWidth());
         assertEquals(a + " and " + b + " differ in height",
                 a.getHeight(), b.getHeight());
     }
 
-    private static boolean overlaps(ChatIconSheet a, ChatIconSheet b) {
+    private static boolean overlaps(LostTalesUiSheet a, LostTalesUiSheet b) {
         return a.getTextureU() < b.getTextureU() + b.getWidth()
                 && b.getTextureU() < a.getTextureU() + a.getWidth()
                 && a.getTextureV() < b.getTextureV() + b.getHeight()
@@ -310,7 +281,7 @@ public final class ChatIconSheetTest {
     }
 
     private static boolean cellHasOpaquePixels(BufferedImage sheet,
-                                               ChatIconSheet icon) {
+                                               LostTalesUiSheet icon) {
         for (int y = 0; y < icon.getHeight(); y++) {
             if (rowHasOpaquePixels(sheet, icon, y)) {
                 return true;
@@ -320,7 +291,7 @@ public final class ChatIconSheetTest {
     }
 
     private static boolean rowHasOpaquePixels(BufferedImage sheet,
-                                              ChatIconSheet icon, int y) {
+                                              LostTalesUiSheet icon, int y) {
         for (int x = 0; x < icon.getWidth(); x++) {
             if (isOpaque(sheet, icon, x, y)) {
                 return true;
@@ -330,7 +301,7 @@ public final class ChatIconSheetTest {
     }
 
     private static boolean columnHasOpaquePixels(BufferedImage sheet,
-                                                 ChatIconSheet icon, int x) {
+                                                 LostTalesUiSheet icon, int x) {
         for (int y = 0; y < icon.getHeight(); y++) {
             if (isOpaque(sheet, icon, x, y)) {
                 return true;
@@ -339,7 +310,7 @@ public final class ChatIconSheetTest {
         return false;
     }
 
-    private static boolean isOpaque(BufferedImage sheet, ChatIconSheet icon,
+    private static boolean isOpaque(BufferedImage sheet, LostTalesUiSheet icon,
                                     int x, int y) {
         int argb = sheet.getRGB(icon.getTextureU() + x,
                 icon.getTextureV() + y);

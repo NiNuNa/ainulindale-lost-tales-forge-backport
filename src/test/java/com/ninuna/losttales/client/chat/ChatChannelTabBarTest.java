@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import org.junit.Test;
 
 import static org.junit.Assert.assertArrayEquals;
@@ -33,7 +34,7 @@ public final class ChatChannelTabBarTest {
     public void everyControlAnswersOnItsOwnBox() {
         int rowBottom = 100;
         int rowTop = ChatChannelTabBar.rowTop(rowBottom);
-        ChatHitBox search = ChatChannelTabBar.searchBox(40, rowBottom);
+        LostTalesUiHitBox search = ChatChannelTabBar.searchBox(40, rowBottom);
         assertEquals(search.width, search.height, EPSILON);
         // The strip begins two pixels left of the row, on the window's
         // own edge, its one-pixel frame standing just outside it; the
@@ -55,7 +56,7 @@ public final class ChatChannelTabBarTest {
         assertFalse(search.contains(middleX, rowBottom - 1));
         assertFalse(search.contains(search.left - 1, search.top));
 
-        ChatHitBox glyph = ChatChannelTabBar.endControlBox(70, 5, 5, rowBottom);
+        LostTalesUiHitBox glyph = ChatChannelTabBar.endControlBox(70, 5, 5, rowBottom);
         assertEquals(ChatChannelTabBar.END_CONTROL_SIZE, glyph.width, EPSILON);
         assertEquals(ChatChannelTabBar.END_CONTROL_SIZE, glyph.height, EPSILON);
         assertEquals(68, glyph.left, EPSILON);
@@ -65,14 +66,14 @@ public final class ChatChannelTabBarTest {
         assertFalse(glyph.contains(72, rowBottom - 1));
         assertFalse(glyph.contains(72, rowTop));
         // The ink itself is what the control is drawn with.
-        ChatHitBox ink = ChatChannelTabBar.endControlInk(70, 5, 5, rowBottom);
+        LostTalesUiHitBox ink = ChatChannelTabBar.endControlInk(70, 5, 5, rowBottom);
         assertEquals(70, ink.left, EPSILON);
         assertEquals(glyph.top + 2, ink.top, EPSILON);
 
         int liftedTop = ChatChannelTabBar.tabTop(rowBottom, true);
         assertEquals(ChatChannelTabBar.tabTop(rowBottom, false)
                 - ChatChannelTabBar.LIFT, liftedTop);
-        ChatHitBox control = ChatChannelTabBar.tabControlBox(50, liftedTop);
+        LostTalesUiHitBox control = ChatChannelTabBar.tabControlBox(50, liftedTop);
         assertEquals(ChatChannelTabBar.CONTROL_SIZE, control.width, EPSILON);
         assertEquals(ChatChannelTabBar.CONTROL_SIZE, control.height, EPSILON);
         assertTrue(control.top >= liftedTop);

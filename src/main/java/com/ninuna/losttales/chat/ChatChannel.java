@@ -63,13 +63,26 @@ public final class ChatChannel {
             ChatRecipientRule.OPERATORS, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.CRIMSON), true);
     /**
-     * The player's private console: what only they see anyway — command
+     * This player's own console: what only they see anyway — command
      * output, fast-travel countdowns, other mods' notices — plus anything
-     * they type there, which is echoed back to them alone.
+     * they type there, which is echoed back to them alone. Nobody else
+     * is ever shown a line of it. The wire id stays {@code console}: it
+     * is the console every player has had, and layouts and read marks
+     * name it by that.
      */
-    public static final ChatChannel CONSOLE = register("console", "Console", ChatPresentationMode.OUT_OF_CHARACTER,
+    public static final ChatChannel CONSOLE = register("console", "Client Console", ChatPresentationMode.OUT_OF_CHARACTER,
             ChatRecipientRule.SELF, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.ROSE_GRAY), false);
+    /**
+     * The server's own console, one stream every reader shares: what the
+     * server did — started, stopped, a command run, a message taken
+     * back, a setting changed, a warning it had to raise — and the talk
+     * its readers have over it. Held by the {@code chat.console.read}
+     * capability rather than by a channel gate, and never bridged.
+     */
+    public static final ChatChannel SERVER_CONSOLE = register("server_console", "Server Console", ChatPresentationMode.OUT_OF_CHARACTER,
+            ChatRecipientRule.CONSOLE_READERS, ChatChannelAccess.NONE,
+            LostTalesColors.rgb(LostTalesColors.TEAL), false);
     /**
      * A private conversation between two players, in character. Not a tab of its own:
      * every whisper partner is one tab on this channel, and the client
@@ -81,12 +94,14 @@ public final class ChatChannel {
 
     /** Tab, indicator, and cycle order for the built-in channels: the two
      *  global ones bracket the scoped role-play ones, then Party, staff,
-     *  and the console. Whispers are not listed: their tabs exist per
-     *  conversation. Anything registered besides these follows them, in
-     *  the order it was registered. */
+     *  and the two consoles, this player's before the server's. Whispers
+     *  are not listed: their tabs exist per conversation. Anything
+     *  registered besides these follows them, in the order it was
+     *  registered. */
     private static final List<ChatChannel> BUILT_IN_ORDER =
             Collections.unmodifiableList(Arrays.asList(
-                    ALL, PROXIMITY, FACTION, OOC, PARTY, ADMIN, CONSOLE));
+                    ALL, PROXIMITY, FACTION, OOC, PARTY, ADMIN, CONSOLE,
+                    SERVER_CONSOLE));
 
     /** The ids that are the code's own and are never taken out of force. */
     private static final java.util.Set<String> BUILT_IN_IDS =

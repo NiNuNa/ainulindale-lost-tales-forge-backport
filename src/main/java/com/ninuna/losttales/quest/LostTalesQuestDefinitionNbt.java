@@ -36,6 +36,7 @@ public final class LostTalesQuestDefinitionNbt {
     private static final String KEY_INTERACTION = "Interaction";
     private static final String KEY_MARKERS = "Markers";
     private static final String KEY_JOURNAL_LOG = "JournalLog";
+    private static final String KEY_DIALOGUE = "Dialogue";
     private static final String KEY_STAGES = "Stages";
     private static final String KEY_STAGE_ID = "StageId";
     private static final String KEY_OBJECTIVES = "Objectives";
@@ -66,6 +67,7 @@ public final class LostTalesQuestDefinitionNbt {
         tag.setTag(KEY_INTERACTION, writeStringMap(quest.getInteraction()));
         tag.setTag(KEY_MARKERS, writeStringMap(quest.getMarkers()));
         tag.setTag(KEY_JOURNAL_LOG, writeStringMap(quest.getJournalLog()));
+        tag.setTag(KEY_DIALOGUE, writeStringMap(quest.getDialogue()));
 
         NBTTagList stages = new NBTTagList();
         for (LostTalesQuestStageDefinition stage : quest.getStages()) {
@@ -143,6 +145,7 @@ public final class LostTalesQuestDefinitionNbt {
                 readStringMap(tag.getTagList(KEY_INTERACTION, Constants.NBT.TAG_COMPOUND)),
                 readStringMap(tag.getTagList(KEY_MARKERS, Constants.NBT.TAG_COMPOUND)),
                 readStringMap(tag.getTagList(KEY_JOURNAL_LOG, Constants.NBT.TAG_COMPOUND)),
+                readStringMap(tag.getTagList(KEY_DIALOGUE, Constants.NBT.TAG_COMPOUND)),
                 stages
         );
     }

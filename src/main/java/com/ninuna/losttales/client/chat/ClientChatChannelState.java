@@ -9,6 +9,7 @@ import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatChannelGates;
 import com.ninuna.losttales.chat.ChatChannelIconSpec;
 import com.ninuna.losttales.chat.ChatChannelScope;
+import com.ninuna.losttales.chat.ChatRecipientRule;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
@@ -419,15 +420,23 @@ public final class ClientChatChannelState {
         return gates.contains(channel.getId());
     }
 
-    /** The channels the seeded gates leave open to a player with no role. */
+    /**
+     * The channels the seeded gates leave open to a player with no role.
+     * The Server Console is left out whatever the gates say: a
+     * capability opens it, and only the server knows who holds one, so
+     * its tab waits for the server's word rather than showing for a
+     * frame to everybody.
+     */
     private static java.util.Set<String> seededGates(boolean read) {
         ChatChannelGates seeded = ChatRoleConfig.parseGates(
                 new String[] {ChatRoleConfig.DEFAULT_ADMIN_GATE},
                 ChatRoleCatalog.builtIn(), ChatRoleConfig.SILENT);
         java.util.Set<String> open = new java.util.HashSet<String>();
         for (ChatChannel channel : ChatChannel.values()) {
-            boolean allowed = read ? seeded.canRead(0, channel)
-                    : seeded.canSend(0, channel);
+            boolean allowed = (read ? seeded.canRead(0, channel)
+                    : seeded.canSend(0, channel))
+                    && channel.getRecipientRule()
+                            != ChatRecipientRule.CONSOLE_READERS;
             if (allowed) {
                 open.add(channel.getId());
             }

@@ -1,5 +1,10 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
+import com.ninuna.losttales.gui.style.LostTalesUiButton;
+import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
+import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import java.util.ArrayList;
@@ -13,6 +18,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
+import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
 
 /**
@@ -79,7 +85,7 @@ final class ChatChannelTabBar {
     /** Height of a resting tab's border pieces; the selected pair is
      *  one row taller, the row it stands on the rule with. */
     private static final int PIECE_HEIGHT =
-            ChatIconSheet.TAB_LEFT.getHeight();
+            LostTalesUiSheet.TAB_LEFT.getHeight();
     /**
      * Body height of a tab: the sheet's resting border pieces whole,
      * and under them the strip's rule, which is the strip's last row
@@ -94,7 +100,7 @@ final class ChatChannelTabBar {
      * selected pieces' extra rows less the rule row they stand on, so
      * none — every tab stands at one top.
      */
-    static final int LIFT = ChatIconSheet.TAB_SELECTED_LEFT.getHeight()
+    static final int LIFT = LostTalesUiSheet.TAB_SELECTED_LEFT.getHeight()
             - PIECE_HEIGHT - 1;
     /**
      * Clear rows the strip keeps above its tabs: the strip is this much
@@ -104,14 +110,14 @@ final class ChatChannelTabBar {
     /** Full height of the row: a resting tab, the lift and the head-room. */
     static final int ROW_HEIGHT = HEIGHT + LIFT + HEADROOM;
     /** Width of a tab's border pieces inside the tab; the same in every state. */
-    private static final int BORDER_WIDTH = ChatIconSheet.TAB_LEFT.getWidth();
+    private static final int BORDER_WIDTH = LostTalesUiSheet.TAB_LEFT.getWidth();
     /**
      * How far the selected pieces reach past the tab's sides: their
      * feet, on the rule's row, spread this far out on either side, and
      * the rule's two pieces begin where the feet end.
      */
     static final int SELECTED_FOOT =
-            ChatIconSheet.TAB_SELECTED_LEFT.getWidth() - BORDER_WIDTH;
+            LostTalesUiSheet.TAB_SELECTED_LEFT.getWidth() - BORDER_WIDTH;
     /**
      * The rows of a tab, measured from its top: a chamfered row, the
      * line joining the border tips, a clear row, the channel accent,
@@ -216,12 +222,12 @@ final class ChatChannelTabBar {
      * placed against the resting shape would be swung into.
      */
     private static final int LOCK_WIDTH = ChatLockAnimation.WIDTH;
-    private static final int PLUS_WIDTH = ChatIconSheet.PLUS.getWidth();
-    private static final int COG_WIDTH = ChatIconSheet.COG.getWidth();
-    private static final int CLOSE_WIDTH = ChatIconSheet.CLOSE.getWidth();
+    private static final int PLUS_WIDTH = LostTalesUiSheet.PLUS.getWidth();
+    private static final int COG_WIDTH = LostTalesUiSheet.COG.getWidth();
+    private static final int CLOSE_WIDTH = LostTalesUiSheet.CLOSE.getWidth();
     private static final int FULLSCREEN_WIDTH =
-            ChatIconSheet.FULLSCREEN.getWidth();
-    private static final int GRIP_WIDTH = ChatIconSheet.GRIP.getWidth();
+            LostTalesUiSheet.FULLSCREEN.getWidth();
+    private static final int GRIP_WIDTH = LostTalesUiSheet.GRIP.getWidth();
     /**
      * The tab search control at the row's left end: a framed button with
      * the sheet's chevron run centred in it, pointing down while its
@@ -230,21 +236,21 @@ final class ChatChannelTabBar {
      * the ivory ones. The button keeps one size however the run plays,
      * so the row's geometry does not move.
      */
-    private static final ChatIconSheet[] SEARCH_FRAMES = {
-            ChatIconSheet.CHEVRON_1_MUTED, ChatIconSheet.CHEVRON_2_MUTED,
-            ChatIconSheet.CHEVRON_3_MUTED, ChatIconSheet.CHEVRON_4_MUTED,
-            ChatIconSheet.CHEVRON_5_MUTED};
-    private static final ChatIconSheet[] SEARCH_FRAMES_HOVER = {
-            ChatIconSheet.CHEVRON_1, ChatIconSheet.CHEVRON_2,
-            ChatIconSheet.CHEVRON_3, ChatIconSheet.CHEVRON_4,
-            ChatIconSheet.CHEVRON_5};
+    private static final LostTalesUiSheet[] SEARCH_FRAMES = {
+            LostTalesUiSheet.CHEVRON_1_MUTED, LostTalesUiSheet.CHEVRON_2_MUTED,
+            LostTalesUiSheet.CHEVRON_3_MUTED, LostTalesUiSheet.CHEVRON_4_MUTED,
+            LostTalesUiSheet.CHEVRON_5_MUTED};
+    private static final LostTalesUiSheet[] SEARCH_FRAMES_HOVER = {
+            LostTalesUiSheet.CHEVRON_1, LostTalesUiSheet.CHEVRON_2,
+            LostTalesUiSheet.CHEVRON_3, LostTalesUiSheet.CHEVRON_4,
+            LostTalesUiSheet.CHEVRON_5};
     /**
      * The search button's square: the chevron's width with the strips'
      * wide inset either side. Square, so the chevron's three rows stand
      * in its middle exactly, four clear rows above and below them.
      */
     private static final int SEARCH_SIZE = SEARCH_FRAMES[0].getWidth()
-            + 2 * ChatFramedButton.WIDE_INSET;
+            + 2 * LostTalesUiFramedButton.WIDE_INSET;
     /**
      * How far the strip reaches left of {@link Row#left}: the row is
      * laid out from the first thing standing in it, and the surface it
@@ -252,7 +258,7 @@ final class ChatChannelTabBar {
      */
     private static final int STRIP_INSET = 2;
     /** The search bar's well, cut out of the tool strip; null for none. */
-    private ChatHitBox toolStripHole;
+    private LostTalesUiHitBox toolStripHole;
     /**
      * Clear space either side of the search button: the window's frame
      * edge, this, the button, this again, and then the first tab.
@@ -285,10 +291,10 @@ final class ChatChannelTabBar {
      * preview at about {@link #TAB_SURFACE_ALPHA}, and only what clears the
      * threshold is drawn. The surface itself is painted by the bar in a
      * single layer, so the states stay one colour instead of stacking;
-     * {@link ChatIconSheetTest} keeps the artwork on the right sides of
+     * {@link LostTalesUiSheetTest} keeps the artwork on the right sides of
      * the threshold.
      */
-    static final float TAB_INK_THRESHOLD = 0.8F;
+    static final float TAB_INK_THRESHOLD = LostTalesUiSheet.INK_THRESHOLD;
     /** The line joining a resting tab's border tips. */
     private static final int TIP_RGB =
             LostTalesColors.rgb(LostTalesColors.ROSE_BEIGE);
@@ -356,14 +362,46 @@ final class ChatChannelTabBar {
      * artwork. A control the pointer leaves crosses back the same way,
      * so nothing in the strip ever swaps in one frame.
      */
-    private float searchFade;
-    private float restoreFade;
-    private float windowSettingsFade;
-    private float windowFullscreenFade;
-    private float windowCloseFade;
+    /**
+     * How each of the strip's buttons answers the pointer: its crossing
+     * to the lit artwork and the place it is drawn. One per button, since
+     * each keeps its own beat ({@link LostTalesUiButtonMotion}). The grip is not
+     * a button and only lights.
+     */
+    private final LostTalesUiButtonMotion searchMotion =
+            new LostTalesUiButtonMotion(
+                    LostTalesUiButtonMotion.Character.LIFT);
+    private final LostTalesUiButtonMotion restoreMotion =
+            new LostTalesUiButtonMotion(
+                    LostTalesUiButtonMotion.Character.LIFT);
+    /**
+     * The cog only rises. Its artwork is unchanged by a quarter turn and
+     * has no whole-pixel form at any smaller angle, so a turn shows
+     * either nothing or a mess (see the gui-rendering skill).
+     */
+    /**
+     * The cog only rises. Its artwork is unchanged by a quarter turn and
+     * has no whole-pixel form at any smaller angle, so a turn shows
+     * either nothing at all or a mess; the same goes for the {@code +}.
+     */
+    private final LostTalesUiButtonMotion windowSettingsMotion =
+            new LostTalesUiButtonMotion(
+                    LostTalesUiButtonMotion.Character.LIFT);
+    private final LostTalesUiButtonMotion windowFullscreenMotion =
+            new LostTalesUiButtonMotion(
+                    LostTalesUiButtonMotion.Character.LIFT);
+    /** Closing a window is decisive, so its cross answers like a switch. */
+    private final LostTalesUiButtonMotion windowCloseMotion =
+            new LostTalesUiButtonMotion(
+                    LostTalesUiButtonMotion.Character.SNAP);
+    private final LostTalesUiButtonMotion lockMotion =
+            new LostTalesUiButtonMotion(
+                    LostTalesUiButtonMotion.Character.LIFT);
     private float gripFade;
     /** Seconds since the row was last drawn; what the fades step by. */
     private double frameElapsed;
+    /** This frame's instant, which the buttons read their beats from. */
+    private long frameNanos;
     /** The row's own lower cut, handed down to each tab's contents. */
     private double rowClipBottom = Double.NaN;
     /** {@link Row#fractionX} of the row being drawn, for {@link #clipX}. */
@@ -591,7 +629,7 @@ final class ChatChannelTabBar {
      * surface, in row space; null for a whole strip. The well wears a
      * surface of its own, and no two surfaces are laid over each other.
      */
-    void setToolStripHole(ChatHitBox hole) {
+    void setToolStripHole(LostTalesUiHitBox hole) {
         this.toolStripHole = hole;
     }
 
@@ -646,23 +684,23 @@ final class ChatChannelTabBar {
             return new Hit(HitKind.LOCK, null);
         }
         if (this.restoreX >= 0 && endControlBox(this.restoreX,
-                this.restoreWidth, ChatIconSheet.PLUS.getHeight(), bottom)
+                this.restoreWidth, LostTalesUiSheet.PLUS.getHeight(), bottom)
                 .contains(localX, localY)) {
             return new Hit(HitKind.RESTORE, null);
         }
         if (this.windowSettingsX >= 0 && endControlBox(this.windowSettingsX,
-                COG_WIDTH, ChatIconSheet.COG.getHeight(), bottom)
+                COG_WIDTH, LostTalesUiSheet.COG.getHeight(), bottom)
                 .contains(localX, localY)) {
             return new Hit(HitKind.WINDOW_SETTINGS, null);
         }
         if (this.windowFullscreenX >= 0 && endControlBox(
                 this.windowFullscreenX, FULLSCREEN_WIDTH,
-                ChatIconSheet.FULLSCREEN.getHeight(), bottom)
+                LostTalesUiSheet.FULLSCREEN.getHeight(), bottom)
                 .contains(localX, localY)) {
             return new Hit(HitKind.WINDOW_FULLSCREEN, null);
         }
         if (this.windowCloseX >= 0 && endControlBox(this.windowCloseX,
-                CLOSE_WIDTH, ChatIconSheet.CLOSE.getHeight(), bottom)
+                CLOSE_WIDTH, LostTalesUiSheet.CLOSE.getHeight(), bottom)
                 .contains(localX, localY)) {
             return new Hit(HitKind.WINDOW_CLOSE, null);
         }
@@ -784,7 +822,7 @@ final class ChatChannelTabBar {
         // surface in a single layer, never over this one.
         // The search button stands in a hole of its own, in the box it
         // answers on.
-        ChatHitBox search = searchBox(row.left, bottom);
+        LostTalesUiHitBox search = searchBox(row.left, bottom);
         int searchLeft = row.offsetX + (int)search.left;
         int searchTop = (int)search.top;
         drawStripAround(row, tabs, row.offsetX + row.left - STRIP_INSET,
@@ -860,7 +898,8 @@ final class ChatChannelTabBar {
                 GL11.glTranslatef(this.endFraction, 0.0F, 0.0F);
                 try {
                     drawLock(row.offsetX + this.lockX, bottom, row.locked,
-                            hovered != null && hovered.kind == HitKind.LOCK);
+                            hovered != null && hovered.kind == HitKind.LOCK,
+                            step(this.lockMotion, hovered, HitKind.LOCK));
                 } finally {
                     GL11.glPopMatrix();
                 }
@@ -871,20 +910,16 @@ final class ChatChannelTabBar {
                 drawDivider(row.offsetX + this.tabDividerX, bottom);
             }
             if (this.restoreX >= 0) {
-                boolean restoreHovered = hovered != null
-                        && hovered.kind == HitKind.RESTORE;
-                this.restoreFade = fade(this.restoreFade, hovered,
-                        HitKind.RESTORE);
                 // The control says which way it goes: a + while the
                 // list it opens is away, and the same crossbar without
                 // its upright — a minus — while the list is out.
                 drawEndControl(
-                        row.restoreOpen ? ChatIconSheet.MINUS
-                                : ChatIconSheet.PLUS,
-                        row.restoreOpen ? ChatIconSheet.MINUS_HOVER
-                                : ChatIconSheet.PLUS_HOVER,
-                        this.restoreFade, row.offsetX + this.restoreX,
-                        bottom);
+                        row.restoreOpen ? LostTalesUiSheet.MINUS
+                                : LostTalesUiSheet.PLUS,
+                        row.restoreOpen ? LostTalesUiSheet.MINUS_HOVER
+                                : LostTalesUiSheet.PLUS_HOVER,
+                        step(this.restoreMotion, hovered, HitKind.RESTORE),
+                        row.offsetX + this.restoreX, bottom);
                 if (this.restoreBadge.length() > 0) {
                     // What waits behind the +, in the tabs' unread honey.
                     LostTalesChatVisualStyle.drawColored(font, this.restoreBadge,
@@ -897,6 +932,7 @@ final class ChatChannelTabBar {
             GL11.glPopMatrix();
             // The tab search sits at the row's left end, before the
             // first tab, where a browser keeps it.
+            step(this.searchMotion, hovered, HitKind.SEARCH, row.searchOpen);
             drawSearch(searchLeft, searchTop, row.searchOpen,
                     hovered != null && hovered.kind == HitKind.SEARCH);
             // The window's own controls, in the order a title bar
@@ -911,25 +947,22 @@ final class ChatChannelTabBar {
                     drawDivider(row.offsetX + this.firstDividerX, bottom);
                 }
                 if (this.windowSettingsX >= 0) {
-                    this.windowSettingsFade = fade(this.windowSettingsFade,
-                            hovered, HitKind.WINDOW_SETTINGS);
-                    drawEndControl(ChatIconSheet.COG, ChatIconSheet.COG_HOVER,
-                            this.windowSettingsFade,
+                    drawEndControl(LostTalesUiSheet.COG, LostTalesUiSheet.COG_HOVER,
+                            step(this.windowSettingsMotion, hovered,
+                                    HitKind.WINDOW_SETTINGS),
                             row.offsetX + this.windowSettingsX, bottom);
                 }
                 if (this.windowFullscreenX >= 0) {
-                    this.windowFullscreenFade = fade(
-                            this.windowFullscreenFade, hovered,
-                            HitKind.WINDOW_FULLSCREEN);
                     drawFullscreenControl(row.fullscreenShare,
-                            this.windowFullscreenFade,
+                            step(this.windowFullscreenMotion, hovered,
+                                    HitKind.WINDOW_FULLSCREEN),
                             row.offsetX + this.windowFullscreenX, bottom);
                 }
                 if (this.windowCloseX >= 0) {
-                    this.windowCloseFade = fade(this.windowCloseFade, hovered,
-                            HitKind.WINDOW_CLOSE);
-                    drawEndControl(ChatIconSheet.CLOSE,
-                            ChatIconSheet.CLOSE_HOVER, this.windowCloseFade,
+                    drawEndControl(LostTalesUiSheet.CLOSE,
+                            LostTalesUiSheet.CLOSE_HOVER,
+                            step(this.windowCloseMotion, hovered,
+                                    HitKind.WINDOW_CLOSE),
                             row.offsetX + this.windowCloseX, bottom);
                 }
                 if (this.secondDividerX >= 0) {
@@ -990,7 +1023,7 @@ final class ChatChannelTabBar {
         int toolArgb = LostTalesChatVisualStyle.argb(
                 LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB,
                 scaled(TAB_SURFACE_ALPHA));
-        ChatHitBox hole = this.toolStripHole;
+        LostTalesUiHitBox hole = this.toolStripHole;
         if (hole == null) {
             LostTalesChatOverlayRenderer.fillRect(stripLeft, bottom, stripRight,
                     toolBottom - 1, toolArgb);
@@ -1495,20 +1528,17 @@ final class ChatChannelTabBar {
         if (drawn.close) {
             double closeX = snapped(
                     closeLeftExact(drawn, left, right - left), step);
-            tab.closeFade = LostTalesChatVisualStyle.hoverFade(tab.closeFade,
-                    onControl(hovered, tab, HitKind.CLOSE),
-                    this.frameElapsed);
-            drawTabControl(ChatIconSheet.CLOSE, ChatIconSheet.CLOSE_HOVER,
-                    tab.closeFade, (float)closeX, controlTop, controlAlpha);
+            drawTabControl(LostTalesUiSheet.CLOSE,
+                    LostTalesUiSheet.CLOSE_HOVER,
+                    step(tab.closeMotion, hovered, tab, HitKind.CLOSE),
+                    (float)closeX, controlTop, controlAlpha);
             edge = closeX - CONTROL_GAP;
         }
         if (drawn.cog) {
-            tab.cogFade = LostTalesChatVisualStyle.hoverFade(tab.cogFade,
-                    onControl(hovered, tab, HitKind.SETTINGS),
-                    this.frameElapsed);
-            drawTabControl(ChatIconSheet.COG, ChatIconSheet.COG_HOVER,
-                    tab.cogFade, (float)snapped(edge - CONTROL_SIZE, step),
-                    controlTop, controlAlpha);
+            drawTabControl(LostTalesUiSheet.COG, LostTalesUiSheet.COG_HOVER,
+                    step(tab.cogMotion, hovered, tab, HitKind.SETTINGS),
+                    (float)snapped(edge - CONTROL_SIZE, step), controlTop,
+                    controlAlpha);
         }
     }
 
@@ -1524,24 +1554,24 @@ final class ChatChannelTabBar {
     private static void drawTabShape(float left, float right, int top,
                                      boolean selected, float lit,
                                      int spriteAlpha, int interiorAlpha) {
-        ChatIconSheet leftPiece;
-        ChatIconSheet rightPiece;
+        LostTalesUiSheet leftPiece;
+        LostTalesUiSheet rightPiece;
         // The lit border artwork laid over the resting pair as far as the
         // tab has crossed to it; its tones cross by the same share, so
         // the whole tab lights together rather than in two steps.
-        ChatIconSheet leftLit = null;
-        ChatIconSheet rightLit = null;
+        LostTalesUiSheet leftLit = null;
+        LostTalesUiSheet rightLit = null;
         int surfaceRgb = tabSurfaceRgb(selected, lit);
         int tipRgb;
         if (selected) {
-            leftPiece = ChatIconSheet.TAB_SELECTED_LEFT;
-            rightPiece = ChatIconSheet.TAB_SELECTED_RIGHT;
+            leftPiece = LostTalesUiSheet.TAB_SELECTED_LEFT;
+            rightPiece = LostTalesUiSheet.TAB_SELECTED_RIGHT;
             tipRgb = TIP_LIT_RGB;
         } else {
-            leftPiece = ChatIconSheet.TAB_LEFT;
-            rightPiece = ChatIconSheet.TAB_RIGHT;
-            leftLit = ChatIconSheet.TAB_HOVER_LEFT;
-            rightLit = ChatIconSheet.TAB_HOVER_RIGHT;
+            leftPiece = LostTalesUiSheet.TAB_LEFT;
+            rightPiece = LostTalesUiSheet.TAB_RIGHT;
+            leftLit = LostTalesUiSheet.TAB_HOVER_LEFT;
+            rightLit = LostTalesUiSheet.TAB_HOVER_RIGHT;
             tipRgb = LostTalesChatVisualStyle.blend(TIP_RGB, TIP_LIT_RGB,
                     lit);
         }
@@ -1696,6 +1726,7 @@ final class ChatChannelTabBar {
                 : (now - this.slideNanos) / 1.0E9D;
         this.slideNanos = now;
         this.frameElapsed = elapsed;
+        this.frameNanos = now;
         measureRun(tabs, row);
         boolean animate = LostTalesConfig.enableChatAnimations;
         // The row is laid down from one running cursor over the widths
@@ -2204,10 +2235,11 @@ final class ChatChannelTabBar {
     /* The controls are the sheet's sprites, drawn 1:1 and centred in
        their hit squares; hovering swaps in the sprite's hover state. */
 
-    private void drawTabControl(ChatIconSheet resting,
-                                ChatIconSheet hovered, float fade, float x,
+    private void drawTabControl(LostTalesUiSheet resting,
+                                LostTalesUiSheet hovered,
+                                LostTalesUiButtonMotion motion, float x,
                                 int y, int alpha) {
-        ChatIconSheet.drawPairWithShadow(resting, hovered, fade,
+        LostTalesUiButton.drawGlyph(resting, hovered, motion,
                 x + (CONTROL_SIZE - resting.getWidth()) / 2,
                 y + (CONTROL_SIZE - resting.getHeight()) / 2, alpha);
     }
@@ -2237,16 +2269,16 @@ final class ChatChannelTabBar {
      * The search button's frame, where it is drawn: a framed button
      * answers on its frame and nowhere else.
      */
-    static ChatHitBox searchBox(int rowLeft, int rowBottom) {
-        return new ChatHitBox(rowLeft + SEARCH_LEFT,
+    static LostTalesUiHitBox searchBox(int rowLeft, int rowBottom) {
+        return new LostTalesUiHitBox(rowLeft + SEARCH_LEFT,
                 centredInStrip(rowBottom, SEARCH_SIZE), SEARCH_SIZE,
                 SEARCH_SIZE);
     }
 
     /** An end control's ink, centred in the strip where it is drawn. */
-    static ChatHitBox endControlInk(int x, int width, int height,
+    static LostTalesUiHitBox endControlInk(int x, int width, int height,
                                     int rowBottom) {
-        return new ChatHitBox(x, centredInStrip(rowBottom, height), width,
+        return new LostTalesUiHitBox(x, centredInStrip(rowBottom, height), width,
                 height);
     }
 
@@ -2256,7 +2288,7 @@ final class ChatChannelTabBar {
      * a five-pixel glyph the {@link #END_CONTROL_SIZE} square the chat
      * draws its small controls in elsewhere.
      */
-    static ChatHitBox endControlBox(int x, int width, int height,
+    static LostTalesUiHitBox endControlBox(int x, int width, int height,
                                     int rowBottom) {
         return endControlInk(x, width, height, rowBottom)
                 .grown(END_CONTROL_SLACK);
@@ -2275,8 +2307,8 @@ final class ChatChannelTabBar {
      * What the lock answers on: its whole artwork, shackle included,
      * with the end controls' clearing.
      */
-    static ChatHitBox lockBox(int x, int rowBottom) {
-        return new ChatHitBox(x, lockTop(rowBottom), LOCK_WIDTH,
+    static LostTalesUiHitBox lockBox(int x, int rowBottom) {
+        return new LostTalesUiHitBox(x, lockTop(rowBottom), LOCK_WIDTH,
                 ChatLockAnimation.HEIGHT).grown(END_CONTROL_SLACK);
     }
 
@@ -2285,17 +2317,17 @@ final class ChatChannelTabBar {
      * the interior of a tab whose rows start at {@code tabTop}, as it is
      * drawn.
      */
-    static ChatHitBox tabControlBox(double x, int tabTop) {
-        return new ChatHitBox(x,
+    static LostTalesUiHitBox tabControlBox(double x, int tabTop) {
+        return new LostTalesUiHitBox(x,
                 centredInInterior(tabTop + INTERIOR_TOP, CONTROL_SIZE),
                 CONTROL_SIZE, CONTROL_SIZE);
     }
 
     /** The grip's glyph, where it is drawn against the row's right edge. */
-    static ChatHitBox gripGlyphBox(int rowRight, int rowBottom) {
-        return new ChatHitBox(rowRight - GRIP_INSET - GRIP_WIDTH,
-                centredInStrip(rowBottom, ChatIconSheet.GRIP.getHeight()),
-                GRIP_WIDTH, ChatIconSheet.GRIP.getHeight());
+    static LostTalesUiHitBox gripGlyphBox(int rowRight, int rowBottom) {
+        return new LostTalesUiHitBox(rowRight - GRIP_INSET - GRIP_WIDTH,
+                centredInStrip(rowBottom, LostTalesUiSheet.GRIP.getHeight()),
+                GRIP_WIDTH, LostTalesUiSheet.GRIP.getHeight());
     }
 
     /**
@@ -2304,14 +2336,24 @@ final class ChatChannelTabBar {
      * row, the open shackle reaching past the square into the gap.
      */
     private void drawLock(int x, int rowBottom, boolean locked,
-                          boolean hovered) {
+                          boolean hovered, LostTalesUiButtonMotion motion) {
         // The frames stand on the floor of the box the swing needs, and
         // that box is taller than the padlock at rest: centring the box
         // would leave the resting lock a row below its neighbours, so
         // the resting shape is what is centred and the swing reaches up
         // out of the strip's middle.
-        this.lockAnimation.draw(x, lockTop(rowBottom), locked, hovered,
-                scaled(0xFF));
+        //
+        // The button's own beat lifts and springs the whole padlock on
+        // the matrix, so the turn of its shackle stays the padlock's and
+        // the two read as one movement.
+        LostTalesUiButton.beginPose(motion, x, lockTop(rowBottom),
+                LOCK_WIDTH, ChatLockAnimation.HEIGHT);
+        try {
+            this.lockAnimation.draw(x, lockTop(rowBottom), locked, hovered,
+                    scaled(0xFF));
+        } finally {
+            LostTalesUiButton.endPose();
+        }
     }
 
     /**
@@ -2319,12 +2361,13 @@ final class ChatChannelTabBar {
      * window's cog, the window's cross — drawn where it was laid out
      * and centred in the strip, the way the lock beside them is.
      */
-    private void drawEndControl(ChatIconSheet resting, ChatIconSheet hovered,
-                                float fade, int x, int rowBottom) {
-        ChatHitBox ink = endControlInk(x, resting.getWidth(),
+    private void drawEndControl(LostTalesUiSheet resting, LostTalesUiSheet hovered,
+                                LostTalesUiButtonMotion motion, int x,
+                                int rowBottom) {
+        LostTalesUiHitBox ink = endControlInk(x, resting.getWidth(),
                 resting.getHeight(), rowBottom);
-        ChatIconSheet.drawPairWithShadow(resting, hovered, fade,
-                (int)ink.left, (int)ink.top, scaled(0xFF));
+        LostTalesUiButton.drawGlyph(resting, hovered, motion,
+                (float)ink.left, (float)ink.top, scaled(0xFF));
     }
 
     /**
@@ -2336,18 +2379,15 @@ final class ChatChannelTabBar {
      * window rather than swapping in a frame, and each crosses to its
      * lit artwork under the pointer as every end control does.
      */
-    private void drawFullscreenControl(float share, float fade, int x,
-                                       int rowBottom) {
-        int alpha = scaled(0xFF);
-        int y = (int)endControlInk(x, FULLSCREEN_WIDTH,
-                ChatIconSheet.FULLSCREEN.getHeight(), rowBottom).top;
-        float inward = Math.max(0.0F, Math.min(1.0F, share));
-        ChatIconSheet.drawPairWithShadow(ChatIconSheet.FULLSCREEN,
-                ChatIconSheet.FULLSCREEN_HOVER, fade, x, y,
-                Math.round(alpha * (1.0F - inward)));
-        ChatIconSheet.drawPairWithShadow(ChatIconSheet.FULLSCREEN_EXIT,
-                ChatIconSheet.FULLSCREEN_EXIT_HOVER, fade, x, y,
-                Math.round(alpha * inward));
+    private void drawFullscreenControl(float share, LostTalesUiButtonMotion motion,
+                                       int x, int rowBottom) {
+        float y = (float)endControlInk(x, FULLSCREEN_WIDTH,
+                LostTalesUiSheet.FULLSCREEN.getHeight(), rowBottom).top;
+        LostTalesUiButton.drawCrossingGlyphs(LostTalesUiSheet.FULLSCREEN,
+                LostTalesUiSheet.FULLSCREEN_HOVER,
+                LostTalesUiSheet.FULLSCREEN_EXIT,
+                LostTalesUiSheet.FULLSCREEN_EXIT_HOVER, motion, share, x, y,
+                scaled(0xFF));
     }
 
     /** Whether the pointer is on that control of that very tab. */
@@ -2356,10 +2396,34 @@ final class ChatChannelTabBar {
                 && hovered.tab != null && hovered.tab.equals(tab.tab);
     }
 
-    /** One step of a control's crossfade, by what the row is hovering. */
-    private float fade(float progress, Hit hovered, HitKind kind) {
-        return LostTalesChatVisualStyle.hoverFade(progress,
-                hovered != null && hovered.kind == kind, this.frameElapsed);
+    /**
+     * One step of a button's motion, by what the row is hovering. The
+     * pointer's button is read straight from the mouse: the row already
+     * answers nothing while a tab or an edge is under the hand, so a
+     * drag cannot press a control, and a press this misses costs a
+     * flourish rather than an action.
+     */
+    private LostTalesUiButtonMotion step(LostTalesUiButtonMotion motion, Hit hovered,
+                                  HitKind kind) {
+        return step(motion, hovered, kind, false);
+    }
+
+    /** The same, for a button lit by its own state as well as the pointer. */
+    private LostTalesUiButtonMotion step(LostTalesUiButtonMotion motion, Hit hovered,
+                                  HitKind kind, boolean litByState) {
+        boolean on = hovered != null && hovered.kind == kind;
+        motion.advance(this.frameNanos, on || litByState, on,
+                on && Mouse.isButtonDown(0),
+                LostTalesConfig.enableChatAnimations);
+        return motion;
+    }
+
+    /** One step of a control of a single tab, by what the row is hovering. */
+    private LostTalesUiButtonMotion step(LostTalesUiButtonMotion motion,
+                                         Hit hovered, Tab tab, HitKind kind) {
+        motion.advance(this.frameNanos, onControl(hovered, tab, kind),
+                LostTalesConfig.enableChatAnimations);
+        return motion;
     }
 
     /**
@@ -2382,15 +2446,23 @@ final class ChatChannelTabBar {
      */
     private void drawSearch(int left, int top, boolean open,
                             boolean hovered) {
-        this.searchFade = LostTalesChatVisualStyle.hoverFade(this.searchFade,
-                hovered || open, this.frameElapsed);
-        ChatFramedButton.drawSurface(left, top, SEARCH_SIZE, SEARCH_SIZE,
-                this.searchFade, scaled(TAB_SURFACE_ALPHA));
+        float lit = this.searchMotion.lit();
+        LostTalesUiFramedButton.drawSurface(left, top, SEARCH_SIZE, SEARCH_SIZE,
+                lit, scaled(TAB_SURFACE_ALPHA));
         this.searchChevron.advance(open, hovered || open);
-        this.searchChevron.draw(left, top, SEARCH_SIZE, SEARCH_SIZE,
-                scaled(0xFF));
-        ChatFramedButton.drawInk(left, top, SEARCH_SIZE, SEARCH_SIZE,
-                this.searchFade, scaled(0xFF));
+        // The frame keeps its place and the chevron moves inside it, so
+        // the button reads as a socket holding something rather than one
+        // piece sliding about the strip.
+        LostTalesUiButton.beginPose(this.searchMotion, left, top, SEARCH_SIZE,
+                SEARCH_SIZE);
+        try {
+            this.searchChevron.draw(left, top, SEARCH_SIZE, SEARCH_SIZE,
+                    scaled(0xFF));
+        } finally {
+            LostTalesUiButton.endPose();
+        }
+        LostTalesUiFramedButton.drawInk(left, top, SEARCH_SIZE, SEARCH_SIZE,
+                lit, scaled(0xFF));
     }
 
     /** The drag handle at the strip's right end, where a title bar keeps it. */
@@ -2398,9 +2470,9 @@ final class ChatChannelTabBar {
         if (right - left < MIN_GRIP_WIDTH) {
             return;
         }
-        ChatHitBox glyph = gripGlyphBox(right, rowBottom);
-        ChatIconSheet.drawPairWithShadow(ChatIconSheet.GRIP,
-                ChatIconSheet.GRIP_HOVER, fade, (int)glyph.left,
+        LostTalesUiHitBox glyph = gripGlyphBox(right, rowBottom);
+        LostTalesUiSheet.drawPairWithShadow(LostTalesUiSheet.GRIP,
+                LostTalesUiSheet.GRIP_HOVER, fade, (int)glyph.left,
                 (int)glyph.top, scaled(0xFF));
     }
 
@@ -2630,8 +2702,11 @@ final class ChatChannelTabBar {
                             : was.drawnLeftOffset + was.slide;
                     built.needsSeed = true;
                     built.hoverFade = was.hoverFade;
-                    built.cogFade = was.cogFade;
-                    built.closeFade = was.closeFade;
+                    // The buttons' beats are carried over whole rather
+                    // than copied as values, so a button caught mid-beat by
+                    // a re-layout carries on instead of starting over.
+                    built.cogMotion = was.cogMotion;
+                    built.closeMotion = was.closeMotion;
                     built.hoverSeconds = was.hoverSeconds;
                     built.marqueeOffset = was.marqueeOffset;
                     break;
@@ -3225,8 +3300,17 @@ final class ChatChannelTabBar {
         /** How far the tab and its controls have crossed to their lit
          *  artwork; carried on when the row is laid out again. */
         float hoverFade;
-        float cogFade;
-        float closeFade;
+        /**
+         * The tab's own two buttons, each keeping its own beat: the cog
+         * rises, the cross answers like a switch, exactly as their
+         * larger counterparts on the strip do.
+         */
+        LostTalesUiButtonMotion cogMotion =
+                new LostTalesUiButtonMotion(
+                        LostTalesUiButtonMotion.Character.LIFT);
+        LostTalesUiButtonMotion closeMotion =
+                new LostTalesUiButtonMotion(
+                        LostTalesUiButtonMotion.Character.SNAP);
         final int width;
         /** Resting left edge of the cog once settled, or -1 when the tab shows none. */
         final int settingsX;

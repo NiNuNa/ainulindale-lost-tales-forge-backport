@@ -1,15 +1,30 @@
 package com.ninuna.losttales.client.gui;
 
+import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesButtonStyle;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiButton;
+import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiButton;
 
-/** A resizable framed button. Override drawContents for an icon or model. */
+/**
+ * A resizable framed button. Override drawContents for an icon or model.
+ *
+ * <p>It answers the pointer the way every other button in the mod does
+ * ({@link LostTalesUiButtonMotion}): the frame keeps its place and what
+ * the button holds rises, drops onto the surface while pressed, and
+ * springs back. A selected button stays risen, since it is held down by
+ * what it chose.</p>
+ */
 public class LostTalesButton extends GuiButton {
     private boolean selected;
+    /** How this button answers the pointer; one beat per button. */
+    private final LostTalesUiButtonMotion motion =
+            new LostTalesUiButtonMotion(
+                    LostTalesUiButtonMotion.Character.LIFT);
 
     public LostTalesButton(int id, int x, int y, int width, int height,
                           String label) {
@@ -41,10 +56,31 @@ public class LostTalesButton extends GuiButton {
                 && mouseY < this.yPosition + this.height;
         boolean highlighted = this.enabled
                 && (this.field_146123_n || this.selected);
+        // A button that cannot be pressed does not answer the pointer,
+        // and a selected one stays risen because its own state holds it
+        // there.
+        boolean answers = this.enabled && this.field_146123_n;
+        this.motion.advance(System.nanoTime(), highlighted,
+                answers || this.selected,
+                answers && org.lwjgl.input.Mouse.isButtonDown(0),
+                LostTalesConfig.enableGuiAnimations);
         LostTalesButtonStyle.drawFrame(minecraft, this.xPosition, this.yPosition,
                 this.width, this.height, highlighted);
         this.mouseDragged(minecraft, mouseX, mouseY);
-        drawContents(minecraft, mouseX, mouseY, highlighted);
+        // The frame stands still and what the button holds moves inside
+        // it, as every framed button in the mod does.
+        LostTalesUiButton.beginPose(this.motion, this.xPosition,
+                this.yPosition, this.width, this.height);
+        try {
+            drawContents(minecraft, mouseX, mouseY, highlighted);
+        } finally {
+            LostTalesUiButton.endPose();
+        }
+    }
+
+    /** How far the button has crossed to its lit look, for a subclass. */
+    protected final float lit() {
+        return this.motion.lit();
     }
 
     /** The default content is a centered label using the shared palette. */

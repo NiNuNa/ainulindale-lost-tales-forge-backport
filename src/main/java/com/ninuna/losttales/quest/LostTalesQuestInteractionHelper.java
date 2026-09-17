@@ -21,8 +21,16 @@ public final class LostTalesQuestInteractionHelper {
     private LostTalesQuestInteractionHelper() {}
 
     public static boolean handleEntityInteraction(EntityPlayerMP player, Entity target) {
-        if (!canProcess(player) || target == null || !LostTalesConfig.allowQuestInteractionStarts) {
+        if (!canProcess(player) || target == null) {
             return false;
+        }
+        // Somebody a quest sent the player to is answered first: a
+        // delivery or a word owed to this person is what the player came
+        // for, whether or not this server lets quests start from an
+        // interaction at all.
+        boolean answered = LostTalesQuestManager.handleTalkedTo(player, target);
+        if (!LostTalesConfig.allowQuestInteractionStarts) {
+            return answered;
         }
 
         String nbtQuestId = getQuestIdFromEntityNbt(target);
@@ -45,6 +53,11 @@ public final class LostTalesQuestInteractionHelper {
             if (!quest.canStartFromInteraction() || quest.getInteraction().isEmpty()) {
                 continue;
             }
+            // A quest that is offered in conversation waits to be taken;
+            // touching its giver opens the talk rather than starting it.
+            if (LostTalesQuestDialogue.of(quest).isOffered()) {
+                continue;
+            }
             if (matchesDimension(player, quest.getInteraction()) && matchesEntity(target, firstValue(quest.getInteraction(), "entity", "entityId", "npc", "target"))) {
                 boolean markerChanged = LostTalesQuestManager.revealQuestGiverMarker(player, quest, target, false);
                 LostTalesQuestManager.StartResult result = LostTalesQuestManager.startQuest(player, quest.getId(), LostTalesQuestStartSource.INTERACTION);
@@ -59,7 +72,7 @@ public final class LostTalesQuestInteractionHelper {
                 }
             }
         }
-        return false;
+        return answered;
     }
 
     public static boolean handleBlockInteraction(EntityPlayerMP player, Block block, int metadata, int x, int y, int z) {

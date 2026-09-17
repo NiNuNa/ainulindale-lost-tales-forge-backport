@@ -1,5 +1,6 @@
 package com.ninuna.losttales.gui.screen.character.creator;
 
+import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import net.minecraft.client.gui.FontRenderer;
 import org.lwjgl.input.Keyboard;
@@ -14,6 +15,17 @@ public final class CreatorStepper extends CreatorControl {
 
     private final String label;
     private final CreatorChoice choice;
+    /**
+     * The two arrows, each keeping its own beat: the box stands still
+     * and the chevron inside it moves, so stepping reads as a press
+     * rather than as a colour change.
+     */
+    private final LostTalesUiButtonMotion leftMotion =
+            new LostTalesUiButtonMotion(
+                    LostTalesUiButtonMotion.Character.LIFT);
+    private final LostTalesUiButtonMotion rightMotion =
+            new LostTalesUiButtonMotion(
+                    LostTalesUiButtonMotion.Character.LIFT);
 
     public CreatorStepper(CreatorContext context, String label,
                           CreatorChoice choice) {
@@ -49,9 +61,10 @@ public final class CreatorStepper extends CreatorControl {
         int arrow = steps ? arrowAt(mouseX, mouseY) : 0;
         boolean overLeft = arrow < 0;
         boolean overRight = arrow > 0;
-        CreatorWidgets.drawArrowBox(font, this.x, top, false, steps, overLeft);
+        CreatorWidgets.drawArrowBox(font, this.x, top, false, steps, overLeft,
+                this.leftMotion);
         CreatorWidgets.drawArrowBox(font, rightArrowX(), top, true, steps,
-                overRight);
+                overRight, this.rightMotion);
         if (isFocused()) {
             LostTalesSkyrimUiStyle.drawSelectionBrackets(
                     this.x + CreatorWidgets.ARROW_BOX + 2, top,

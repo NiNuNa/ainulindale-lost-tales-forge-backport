@@ -29,6 +29,7 @@ public final class LostTalesQuestDefinition {
     private final Map<String, String> interaction;
     private final Map<String, String> markers;
     private final Map<String, String> journalLog;
+    private final Map<String, String> dialogue;
     private final List<LostTalesQuestStageDefinition> stages;
 
     public LostTalesQuestDefinition(String id, String title, String description, boolean repeatable, String startMode, Map<String, String> prerequisites, Map<String, String> rewards, Map<String, String> interaction, Map<String, String> markers, Map<String, String> journalLog, List<LostTalesQuestStageDefinition> stages) {
@@ -43,6 +44,18 @@ public final class LostTalesQuestDefinition {
             Map<String, String> rewards, Map<String, String> interaction,
             Map<String, String> markers, Map<String, String> journalLog,
             List<LostTalesQuestStageDefinition> stages) {
+        this(id, title, description, repeatable, restartable, startMode,
+                prerequisites, rewards, interaction, markers, journalLog,
+                Collections.<String, String>emptyMap(), stages);
+    }
+
+    public LostTalesQuestDefinition(String id, String title,
+            String description, boolean repeatable, boolean restartable,
+            String startMode, Map<String, String> prerequisites,
+            Map<String, String> rewards, Map<String, String> interaction,
+            Map<String, String> markers, Map<String, String> journalLog,
+            Map<String, String> dialogue,
+            List<LostTalesQuestStageDefinition> stages) {
         this.id = id;
         this.title = title;
         this.description = description;
@@ -54,7 +67,17 @@ public final class LostTalesQuestDefinition {
         this.interaction = Collections.unmodifiableMap(new LinkedHashMap<String, String>(interaction == null ? Collections.<String, String>emptyMap() : interaction));
         this.markers = Collections.unmodifiableMap(new LinkedHashMap<String, String>(markers == null ? Collections.<String, String>emptyMap() : markers));
         this.journalLog = Collections.unmodifiableMap(new LinkedHashMap<String, String>(journalLog == null ? Collections.<String, String>emptyMap() : journalLog));
+        this.dialogue = Collections.unmodifiableMap(new LinkedHashMap<String, String>(dialogue == null ? Collections.<String, String>emptyMap() : dialogue));
         this.stages = Collections.unmodifiableList(new ArrayList<LostTalesQuestStageDefinition>(stages == null ? Collections.<LostTalesQuestStageDefinition>emptyList() : stages));
+    }
+
+    /**
+     * What the quest's giver says and what the player may say back, as
+     * written; empty for a quest nobody talks about. Read it through
+     * {@link LostTalesQuestDialogue}.
+     */
+    public Map<String, String> getDialogue() {
+        return this.dialogue;
     }
 
     public String getId() {

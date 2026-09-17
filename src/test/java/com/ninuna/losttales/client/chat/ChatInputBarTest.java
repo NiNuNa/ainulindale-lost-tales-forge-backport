@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.chat.ChatChannel;
 import org.junit.After;
 import org.junit.Test;
@@ -77,22 +78,22 @@ public final class ChatInputBarTest {
      */
     @Test
     public void theFramedButtonsShareOneHeight() {
-        assertEquals(18, ChatFramedButton.HEIGHT);
-        assertEquals(ChatChannelIcons.SIZE + 2 * ChatFramedButton.INSET,
-                ChatFramedButton.HEIGHT);
+        assertEquals(18, LostTalesUiFramedButton.HEIGHT);
+        assertEquals(ChatChannelIcons.SIZE + 2 * LostTalesUiFramedButton.INSET,
+                LostTalesUiFramedButton.HEIGHT);
         assertEquals(LostTalesChatOverlayRenderer.CONTENT_BOX_HEIGHT
-                + 2 * ChatFramedButton.INSET, ChatFramedButton.HEIGHT);
-        assertEquals(ChatFramedButton.HEIGHT,
+                + 2 * LostTalesUiFramedButton.INSET, LostTalesUiFramedButton.HEIGHT);
+        assertEquals(LostTalesUiFramedButton.HEIGHT,
                 LostTalesChatOverlayRenderer.TOOLBAR_BUTTON_SIZE);
-        assertEquals(ChatFramedButton.HEIGHT, ChatReactionMarker.HEIGHT);
+        assertEquals(LostTalesUiFramedButton.HEIGHT, ChatReactionMarker.HEIGHT);
         assertEquals(ChatReactionMarker.ICON + 2 * ChatReactionMarker.PAD,
                 ChatReactionMarker.HEIGHT);
-        assertEquals(ChatFramedButton.HEIGHT,
+        assertEquals(LostTalesUiFramedButton.HEIGHT,
                 ChatInputBar.CHARACTER_BUTTON_SIZE);
         assertEquals(LostTalesChatOverlayRenderer.HEAD_SIZE
-                        + 2 * ChatFramedButton.WIDE_INSET,
+                        + 2 * LostTalesUiFramedButton.WIDE_INSET,
                 ChatInputBar.CHARACTER_BUTTON_SIZE);
-        assertEquals(2, ChatInputBar.CONTENT_HEIGHT - ChatFramedButton.HEIGHT);
+        assertEquals(2, ChatInputBar.CONTENT_HEIGHT - LostTalesUiFramedButton.HEIGHT);
     }
 
     /**
@@ -118,7 +119,7 @@ public final class ChatInputBarTest {
         assertEquals(1 + ChatInputBar.CLEARANCE, wellTop - barTop);
         assertEquals(ChatInputBar.CLEARANCE,
                 barTop + ChatInputBar.HEIGHT - wellBottom);
-        assertEquals(ChatChannelIcons.SIZE + 2 * ChatFramedButton.WIDE_INSET,
+        assertEquals(ChatChannelIcons.SIZE + 2 * LostTalesUiFramedButton.WIDE_INSET,
                 ChatInputBar.CONTENT_HEIGHT);
         assertEquals(ChatInputBar.HEIGHT, ChatWindowPlacement.INPUT_HEIGHT);
         // A message row stands in the well's middle, and its text where

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelSuggester;
 import com.ninuna.losttales.chat.ChatMessageIds;
@@ -1046,8 +1047,8 @@ final class ChatScreenMenus {
                             "gui.losttales.chat.character_selection.narrator"),
                     false, ClientChatIdentities.isNarrating()
                             ? LostTalesColors.rgb(LostTalesColors.HONEY) : -1, null)
-                    .withSprite(ChatIconSheet.SPEECH_BUBBLE,
-                            ChatIconSheet.SPEECH_BUBBLE_HOVER,
+                    .withSprite(LostTalesUiSheet.SPEECH_BUBBLE,
+                            LostTalesUiSheet.SPEECH_BUBBLE_HOVER,
                             ClientChatIdentities.isNarrating()));
         }
         addSection(entries,

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMarkdown;
@@ -1003,7 +1004,7 @@ final class ChatInputField extends GuiTextField {
     public void mouseClicked(int mouseX, int mouseY, int button) {
         String text = getText();
         List<TokenPreview> resolved = previewsFor(text);
-        boolean inside = ChatHitBox.contains(mouseX, mouseY, this.xPosition,
+        boolean inside = LostTalesUiHitBox.contains(mouseX, mouseY, this.xPosition,
                 this.yPosition, getWidth(), this.fieldHeight);
         if (resolved.isEmpty() || !isStyled() || !inside || button != 0
                 || !isFocused()) {

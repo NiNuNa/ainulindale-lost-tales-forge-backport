@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelSuggester;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
@@ -94,7 +95,7 @@ final class ChatChannelSuggestionBox {
             return false;
         }
         int top = boxTop(screenHeight);
-        return ChatHitBox.contains(mouseX, mouseY, inputX, top,
+        return LostTalesUiHitBox.contains(mouseX, mouseY, inputX, top,
                 boxWidth(font), screenHeight - BOTTOM_MARGIN - top);
     }
 

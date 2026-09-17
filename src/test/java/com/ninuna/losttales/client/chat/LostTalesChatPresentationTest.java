@@ -295,12 +295,14 @@ public final class LostTalesChatPresentationTest {
                 ChatHeadMarker.Data marker = ChatHeadMarker.decode(part);
                 head |= marker != null && marker.isSystemSender()
                         && marker.mark() == com.ninuna.losttales.chat.emoji.ChatEmoji.CONSOLE;
-                if ("Console".equals(part.getUnformattedTextForChat())) {
+                if (ChatChannel.CONSOLE.getDisplayName().equals(
+                        part.getUnformattedTextForChat())) {
                     prefixColor = ChatPrefixMarker.decode(part);
                 }
             }
             String rendered = plainText.toString();
-            assertTrue(rendered, rendered.startsWith("Console: ["));
+            assertTrue(rendered, rendered.startsWith(
+                    ChatChannel.CONSOLE.getDisplayName() + ": ["));
             assertTrue(rendered, rendered.endsWith("Your game mode has been updated"));
             assertTrue(anchor);
             assertTrue("the Client wears the console mark for a head", head);

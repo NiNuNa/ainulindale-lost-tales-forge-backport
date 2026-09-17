@@ -1,5 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
+import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -119,7 +121,7 @@ public final class ChatRowCentringTest {
     public void aReactionChipIsAFramedButtonCentredInItsRow() {
         int height = ChatReactionMarker.HEIGHT;
         // The emoji's box with the frame's inset above and below it.
-        assertEquals(BOX + 2 * ChatFramedButton.INSET, height);
+        assertEquals(BOX + 2 * LostTalesUiFramedButton.INSET, height);
         // A reaction row grows to hold its chips only where the small
         // size cannot shrink them into a line: GUI scale 1 draws them
         // whole and 4 at three quarters; 2 and 3 fit a line as they are.
@@ -136,8 +138,8 @@ public final class ChatRowCentringTest {
         // Its emoji has the inset above and below it, and the count's
         // capitals stand half a pixel above the emoji's middle.
         int emojiTop = LostTalesChatVisualStyle.chipEmojiTop(0);
-        assertEquals(ChatFramedButton.INSET, emojiTop);
-        assertEquals(ChatFramedButton.INSET, height - (emojiTop + BOX));
+        assertEquals(LostTalesUiFramedButton.INSET, emojiTop);
+        assertEquals(LostTalesUiFramedButton.INSET, height - (emojiTop + BOX));
         float capsMiddle = ChatReactionMarker.TEXT_DROP + CAPS / 2.0F;
         float emojiMiddle = emojiTop + BOX / 2.0F;
         assertEquals(0.5F, emojiMiddle - capsMiddle, 0.0F);
@@ -170,7 +172,7 @@ public final class ChatRowCentringTest {
 
     @Test
     public void theSpeechBubbleTakesOneRowWhereverItIsDrawn() {
-        int height = ChatIconSheet.SPEECH_BUBBLE.getHeight();
+        int height = LostTalesUiSheet.SPEECH_BUBBLE.getHeight();
         assertEquals(6, height);
         // A reply's quote and the typing line place it as a box of its
         // own: six rows, the pill and its tail, half a pixel above the

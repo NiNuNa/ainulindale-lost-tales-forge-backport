@@ -337,7 +337,8 @@ final class ChatChannelIcons {
         if (channel == ChatChannel.ADMIN) {
             return ChatEmoji.EXPRESSIONLESS;
         }
-        if (channel == ChatChannel.CONSOLE) {
+        if (channel == ChatChannel.CONSOLE
+                || channel == ChatChannel.SERVER_CONSOLE) {
             return ChatEmoji.CONSOLE;
         }
         if (channel == ChatChannel.WHISPER) {

@@ -46,6 +46,48 @@ public final class ClientChatChannelViewsTest {
         assertEquals(1, ClientChatChannelViews.unreadCount(ChatChannel.PARTY));
     }
 
+    /**
+     * Arriving somewhere for the first time counts nothing unread: the
+     * whole replay was said before this player was there, so it is filed
+     * and read, and the count begins with the next line said.
+     */
+    @Test
+    public void aFirstVisitCountsNoneOfTheReplayUnread() {
+        ClientChatSession.resumeAt("server:new.example");
+        ChatTab global = ChatTab.of(ChatChannel.ALL);
+        ChatTab console = ChatTab.of(ChatChannel.CONSOLE);
+        for (int index = 0; index < 200; index++) {
+            ClientChatChannelViews.record(-100 - index, global, console,
+                    index % 10 == 0, 500L + index, 1000L, true);
+        }
+        assertFalse(ClientChatChannelViews.hasUnread(ChatChannel.ALL));
+        assertEquals(0, ClientChatChannelViews.unreadCount(ChatChannel.ALL));
+        // Said after they arrived, in a tab they are not looking at.
+        ClientChatChannelViews.record(-400, global, console, false, 900L,
+                1000L, false);
+        assertEquals(1, ClientChatChannelViews.unreadCount(ChatChannel.ALL));
+    }
+
+    /**
+     * Coming back is not a first visit: the replay is measured against
+     * the mark this player left, so what was said while they were away
+     * still counts.
+     */
+    @Test
+    public void aReturnVisitStillCountsWhatWasSaidWhileAway() {
+        ClientChatSession.resumeAt("server:known.example");
+        ChatTab global = ChatTab.of(ChatChannel.ALL);
+        ChatTab console = ChatTab.of(ChatChannel.CONSOLE);
+        ClientChatReadMarks.markRead("server:known.example", global, 500L);
+        ClientChatChannelViews.record(-1, global, console, false, 500L,
+                1000L, true);
+        ClientChatChannelViews.record(-2, global, console, false, 501L,
+                1000L, true);
+        ClientChatChannelViews.record(-3, global, console, false, 502L,
+                1000L, true);
+        assertEquals(2, ClientChatChannelViews.unreadCount(ChatChannel.ALL));
+    }
+
     private static ChatLine line(int chatLineId) {
         return new ChatLine(0, new ChatComponentText("x"), chatLineId);
     }

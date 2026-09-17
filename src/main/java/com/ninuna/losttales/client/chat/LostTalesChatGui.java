@@ -1,5 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.chat.ChatDeliveryMark;
 import com.ninuna.losttales.chat.ChatMentionCandidate;
 import com.ninuna.losttales.chat.ChatMessageValidator;
@@ -337,7 +339,7 @@ public final class LostTalesChatGui extends GuiChat
         // its own, on the row a quote's and a message link's bubble take,
         // and the line itself in the asides' tone rather than the
         // message ivory.
-        ChatIconSheet bubble = ChatIconSheet.SPEECH_BUBBLE;
+        LostTalesUiSheet bubble = LostTalesUiSheet.SPEECH_BUBBLE;
         bubble.drawWithShadow(x, y + LostTalesChatOverlayRenderer
                 .centredBoxTop(bubble.getHeight()), alpha);
         int textX = x + bubble.getWidth() + TYPING_BUBBLE_GAP;
@@ -666,7 +668,7 @@ public final class LostTalesChatGui extends GuiChat
      * Sends a command the server answers, however it was asked for —
      * typed, clicked in a line, chosen from a menu. The command and
      * what it answers are shown in the tab in front — the answer as a
-     * line of the Server's own — and the operator console is told by
+     * line of the Server's own — and the Server Console is told by
      * the server who ran what, and where. The tab in front stays in
      * front.
      */
@@ -1441,8 +1443,8 @@ public final class LostTalesChatGui extends GuiChat
         // leave blending off behind them; everything drawn after one
         // turns it back on for itself.
         LostTalesChatVisualStyle.beginContent();
-        ChatIconSheet plus = hovered
-                ? ChatIconSheet.PLUS_HOVER : ChatIconSheet.PLUS;
+        LostTalesUiSheet plus = hovered
+                ? LostTalesUiSheet.PLUS_HOVER : LostTalesUiSheet.PLUS;
         plus.drawWithShadow(this.emptyPlusLeft
                         + (ChatChannelTabBar.END_CONTROL_SIZE
                                 - plus.getWidth()) / 2,
@@ -1462,7 +1464,7 @@ public final class LostTalesChatGui extends GuiChat
 
     /** Whether the point is on the empty state's + as drawn last frame. */
     private boolean emptyStateContains(double mouseX, double mouseY) {
-        return ChatHitBox.contains(mouseX, mouseY, this.emptyPlusLeft,
+        return LostTalesUiHitBox.contains(mouseX, mouseY, this.emptyPlusLeft,
                 this.emptyPlusTop, this.emptyPlusRight - this.emptyPlusLeft,
                 this.emptyPlusBottom - this.emptyPlusTop);
     }

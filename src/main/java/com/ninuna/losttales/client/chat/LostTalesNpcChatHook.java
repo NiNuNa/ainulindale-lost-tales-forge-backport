@@ -9,6 +9,7 @@ import lotr.client.render.entity.LOTRNPCRendering;
 import lotr.common.entity.npc.LOTREntityNPC;
 import lotr.common.fac.LOTRFaction;
 import net.minecraft.client.Minecraft;
+import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
@@ -125,6 +126,52 @@ public final class LostTalesNpcChatHook {
         } catch (Throwable throwable) {
             logFailureOnce(throwable);
         }
+    }
+
+    /**
+     * Somebody saying something to this player, filed the way an NPC's
+     * speech always is: a bubble over their head and a line in their own
+     * conversation tab. What a quest conversation uses, so a giver's
+     * words are read where every other word is read and stay in the log
+     * once the talk is over.
+     *
+     * <p>{@code nameColor} is the colour their name is written in, and
+     * {@code faction} what stands under it; either may be empty.</p>
+     */
+    public static void sayToPlayer(EntityLivingBase speaker, String speech,
+                                   int nameColor, String faction) {
+        try {
+            if (speaker == null || speech == null) {
+                return;
+            }
+            String plain = EnumChatFormatting.getTextWithoutFormattingCodes(
+                    speech);
+            plain = plain == null ? "" : plain.trim();
+            String name = speaker.getCommandSenderName();
+            if (name == null || name.length() == 0 || plain.length() == 0) {
+                return;
+            }
+            ChatSpeechBubbles.receiveNpc(speaker.getUniqueID(), name,
+                    nameColor, plain);
+            ResourceLocation texture =
+                    EntityRenderTextureAccess.resolveEntityTexture(speaker);
+            LostTalesChatPresentation.receiveNpcSpeech(ChatTab.npc(name),
+                    speaker.getUniqueID(), name,
+                    texture == null ? "" : texture.toString(), plain,
+                    nameColor, faction == null ? "" : faction);
+        } catch (Throwable throwable) {
+            logFailureOnce(throwable);
+        }
+    }
+
+    /** The colour a LOTR NPC's name is written in; for callers outside. */
+    public static int speakerColor(LOTREntityNPC npc) {
+        return nameColor(npc);
+    }
+
+    /** What stands under a LOTR NPC's name; for callers outside. */
+    public static String speakerFaction(LOTREntityNPC npc) {
+        return factionName(npc);
     }
 
     /** Whether the immersive path filed exactly this speech just now. */

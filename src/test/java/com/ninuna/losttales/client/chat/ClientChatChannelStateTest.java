@@ -127,7 +127,7 @@ public final class ClientChatChannelStateTest {
         assertEquals(java.util.Arrays.asList(ChatChannel.ALL,
                 ChatChannel.PROXIMITY, ChatChannel.FACTION, ChatChannel.OOC,
                 ChatChannel.PARTY, ChatChannel.ADMIN,
-                ChatChannel.CONSOLE),
+                ChatChannel.CONSOLE, ChatChannel.SERVER_CONSOLE),
                 ClientChatChannelState.getAvailableChannels());
         ClientChatChannelState.select(ChatChannel.ADMIN);
         ClientChatChannelState.setAdminAccess(false);

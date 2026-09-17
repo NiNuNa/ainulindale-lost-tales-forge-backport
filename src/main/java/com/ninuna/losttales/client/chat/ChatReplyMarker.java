@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import java.nio.charset.Charset;
 import java.util.Base64;
 import java.util.UUID;
@@ -27,7 +28,7 @@ final class ChatReplyMarker {
      * gap after it, the gap the typing line keeps after the same bubble.
      */
     static final int ICON_SLOT_WIDTH =
-            ChatIconSheet.SPEECH_BUBBLE.getWidth() + 3;
+            LostTalesUiSheet.SPEECH_BUBBLE.getWidth() + 3;
 
     private ChatReplyMarker() {}
 

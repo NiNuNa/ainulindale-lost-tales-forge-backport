@@ -12,7 +12,8 @@ public final class ChatChannelTest {
     public void presentationOrderIsGlobalProximityFactionOocParty() {
         assertEquals(Arrays.asList(ChatChannel.ALL, ChatChannel.PROXIMITY,
                 ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.PARTY,
-                ChatChannel.ADMIN, ChatChannel.CONSOLE),
+                ChatChannel.ADMIN, ChatChannel.CONSOLE,
+                ChatChannel.SERVER_CONSOLE),
                 ChatChannel.presentationOrder());
         // Every channel but Whisper is presented exactly once (whispers
         // are tabs per conversation, never a channel tab).
@@ -35,6 +36,7 @@ public final class ChatChannelTest {
         assertEquals("ooc", ChatChannel.OOC.getId());
         assertEquals("admin", ChatChannel.ADMIN.getId());
         assertEquals("console", ChatChannel.CONSOLE.getId());
+        assertEquals("server_console", ChatChannel.SERVER_CONSOLE.getId());
         assertEquals(ChatChannel.PARTY, ChatChannel.fromId(" Party "));
         // Every id resolves back to its own channel, so no two collide.
         for (ChatChannel channel : ChatChannel.values()) {
@@ -53,6 +55,14 @@ public final class ChatChannelTest {
         assertEquals("OOC & Discord", ChatChannel.OOC.getDisplayName());
         assertEquals(ChatRecipientRule.SELF,
                 ChatChannel.CONSOLE.getRecipientRule());
+        assertEquals(ChatRecipientRule.CONSOLE_READERS,
+                ChatChannel.SERVER_CONSOLE.getRecipientRule());
+        assertEquals("Client Console", ChatChannel.CONSOLE.getDisplayName());
+        assertEquals("Server Console",
+                ChatChannel.SERVER_CONSOLE.getDisplayName());
+        // Neither console ever leaves the game.
+        assertEquals(false, ChatChannel.CONSOLE.isBridgeable());
+        assertEquals(false, ChatChannel.SERVER_CONSOLE.isBridgeable());
         assertEquals(ChatRecipientRule.OPERATORS,
                 ChatChannel.ADMIN.getRecipientRule());
         assertEquals(ChatPresentationMode.OUT_OF_CHARACTER,

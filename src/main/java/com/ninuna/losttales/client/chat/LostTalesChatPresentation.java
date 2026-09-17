@@ -2001,7 +2001,7 @@ public final class LostTalesChatPresentation {
     /**
      * As above; {@code mayAnswerACommand} says whether a console line
      * arriving while a command's answer is expected is taken as that
-     * answer. An entry of the operator console never is: it is about
+     * answer. An entry of the Server Console never is: it is about
      * a command, not the command's reply.
      */
     private static boolean receiveSystemLine(IChatComponent message,
@@ -2073,16 +2073,15 @@ public final class LostTalesChatPresentation {
     }
 
     /**
-     * Shows one entry of the shared operator console, once. A command
-     * is a line of the Server's own — {@code @Player used /command in
-     * #Channel.}, the channel a link to the tab the command was typed
-     * in, landing on the command itself when this client is the one
-     * that typed it. Every other kind says plainly who did it and what,
-     * as a sentence with its full stop ({@link #asSentence}). Filed in
-     * the Console tab like every console line, stamped
-     * with when it happened, and never a cue: the console is read, not
-     * answered. The server sent it only because this player may read
-     * the console; nothing here decides that.
+     * Shows one entry of the Server Console, once. A command is a line
+     * of the Server's own — {@code @Player used /command in #Channel.},
+     * the channel a link to the tab the command was typed in, landing
+     * on the command itself when this client is the one that typed it.
+     * Every other kind says plainly who did it and what, as a sentence
+     * with its full stop ({@link #asSentence}). Filed in the Server
+     * Console tab, stamped with when it happened, and never a cue: the
+     * stream is read, not answered. The server sent it only because
+     * this player may read it; nothing here decides that.
      */
     public static void receiveConsoleEvent(ChatConsoleEvent event) {
         receiveConsoleEvent(event, false, false);
@@ -2092,11 +2091,11 @@ public final class LostTalesChatPresentation {
      * As above for an entry the server {@code replayed}: one of the kept
      * entries a player is sent on joining. It sounds no cue even where
      * it names them, and it is filed against where this player last read
-     * the Console on this server — one they had read is filed and
+     * the Server Console on this server — one they had read is filed and
      * nothing more, and the first they had not stands under the unread
      * divider. One that happened {@code beforeArrival}, before this
-     * player arrived, is history: it stands in the Console, never in the
-     * closed feed.
+     * player arrived, is history: it stands in the Server Console, never
+     * in the closed feed.
      */
     public static void receiveConsoleEvent(ChatConsoleEvent event,
                                            boolean replayed,
@@ -2108,7 +2107,7 @@ public final class LostTalesChatPresentation {
         if (minecraft == null || minecraft.ingameGUI == null) {
             return;
         }
-        ChatTab console = ChatTab.of(ChatChannel.CONSOLE);
+        ChatTab console = ChatTab.of(ChatChannel.SERVER_CONSOLE);
         boolean[] mentioned = new boolean[1];
         IChatComponent body;
         if (event.getKind() == ChatConsoleEvent.Kind.COMMAND) {
@@ -2177,8 +2176,8 @@ public final class LostTalesChatPresentation {
         if (account.length() == 0 || isServerActor(account)) {
             return text(account, null, false);
         }
-        IChatComponent placed = asMentionName(account, ChatChannel.CONSOLE,
-                localNames, mentioned,
+        IChatComponent placed = asMentionName(account,
+                ChatChannel.SERVER_CONSOLE, localNames, mentioned,
                 Collections.<ChatNamedPlayer>emptyList());
         if (placed != null) {
             return placed;

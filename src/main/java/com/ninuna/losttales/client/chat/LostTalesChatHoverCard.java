@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatMentionCandidate;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
@@ -886,7 +887,7 @@ final class LostTalesChatHoverCard {
     /** Whether the point lies between two corners, whichever way round they are given. */
     static boolean contains(float x, float y, float left, float top,
                             float right, float bottom) {
-        return ChatHitBox.contains(x, y, Math.min(left, right),
+        return LostTalesUiHitBox.contains(x, y, Math.min(left, right),
                 Math.min(top, bottom), Math.abs(right - left),
                 Math.abs(bottom - top));
     }

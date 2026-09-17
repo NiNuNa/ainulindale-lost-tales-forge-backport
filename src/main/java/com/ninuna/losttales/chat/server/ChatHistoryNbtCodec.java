@@ -89,7 +89,7 @@ public final class ChatHistoryNbtCodec {
     private static final String TAG_REACTOR_NAME = "Name";
     private static final String TAG_UUID_MOST = "Most";
     private static final String TAG_UUID_LEAST = "Least";
-    /** The operator console's events, written beside the lines. */
+    /** The Server Console's events, written beside the lines. */
     private static final String TAG_CONSOLE_EVENTS = "ConsoleEvents";
     private static final String TAG_EVENT_ID = "Id";
     private static final String TAG_EVENT_TIMESTAMP = "Timestamp";

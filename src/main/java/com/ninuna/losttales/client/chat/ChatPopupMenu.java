@@ -1,5 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.client.input.LostTalesInputBinding;
 import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
@@ -53,7 +55,7 @@ final class ChatPopupMenu {
      * glyph and the gap an icon keeps from its label in these lists.
      */
     private static final int SEARCH_ICON_RUN =
-            ChatIconSheet.SEARCH_LARGE.getWidth() + ChatChannelIcons.GAP;
+            LostTalesUiSheet.SEARCH_LARGE.getWidth() + ChatChannelIcons.GAP;
 
     /** Width of the upright colour bar before a channel's name, and its gap. */
     private static final int SWATCH_WIDTH = 1;
@@ -86,13 +88,13 @@ final class ChatPopupMenu {
         /** Player whose head stands before the name, or null for none. */
         ChatHeadOwner head;
         /** A sheet sprite before the name, or null. */
-        ChatIconSheet sprite;
+        LostTalesUiSheet sprite;
         /**
          * The sprite's lit artwork, or null for none: the sprite crosses
          * to it while the pointer is on the row, and rests on it while
          * the row is {@link #chosen}.
          */
-        ChatIconSheet litSprite;
+        LostTalesUiSheet litSprite;
         /** Whether the row is the one chosen, which keeps its sprite lit. */
         boolean chosen;
         /**
@@ -149,7 +151,7 @@ final class ChatPopupMenu {
             return this;
         }
 
-        Entry withSprite(ChatIconSheet sprite) {
+        Entry withSprite(LostTalesUiSheet sprite) {
             this.sprite = sprite;
             return this;
         }
@@ -158,7 +160,7 @@ final class ChatPopupMenu {
          * The same entry with a sprite that lights: under the pointer,
          * and for as long as the row is {@code chosen}.
          */
-        Entry withSprite(ChatIconSheet sprite, ChatIconSheet litSprite,
+        Entry withSprite(LostTalesUiSheet sprite, LostTalesUiSheet litSprite,
                          boolean chosen) {
             this.sprite = sprite;
             this.litSprite = litSprite;
@@ -439,9 +441,9 @@ final class ChatPopupMenu {
         int quiet = LostTalesColors.rgb(LostTalesColors.SAND);
         // The magnifier stands on the capitals of what is typed beside
         // it, as every icon in a chat row does.
-        ChatIconSheet.SEARCH_LARGE.drawWithShadow(this.x + PADDING_X,
+        LostTalesUiSheet.SEARCH_LARGE.drawWithShadow(this.x + PADDING_X,
                 textY + LostTalesChatOverlayRenderer.centredBoxTop(
-                        ChatIconSheet.SEARCH_LARGE.getHeight()), 255);
+                        LostTalesUiSheet.SEARCH_LARGE.getHeight()), 255);
         int textX = this.x + PADDING_X + SEARCH_ICON_RUN;
         if (typed.length() == 0) {
             // A pixel clear of the caret waiting at the field's start.
@@ -491,7 +493,7 @@ final class ChatPopupMenu {
     }
 
     boolean contains(double mouseX, double mouseY) {
-        return isOpen() && ChatHitBox.contains(mouseX, mouseY, this.x, this.y,
+        return isOpen() && LostTalesUiHitBox.contains(mouseX, mouseY, this.x, this.y,
                 this.width, this.height);
     }
 
@@ -681,7 +683,7 @@ final class ChatPopupMenu {
                 if (entry.litSprite == null) {
                     entry.sprite.drawWithShadow(spriteX, rowY + 2, 255);
                 } else {
-                    ChatIconSheet.drawPairWithShadow(entry.sprite,
+                    LostTalesUiSheet.drawPairWithShadow(entry.sprite,
                             entry.litSprite,
                             spriteFade(entry, entry == hovered, elapsed),
                             spriteX, rowY + 2, 255);

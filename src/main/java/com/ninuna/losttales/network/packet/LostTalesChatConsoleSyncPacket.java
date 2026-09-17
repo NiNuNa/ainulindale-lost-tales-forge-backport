@@ -11,7 +11,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Server-to-client: entries of the shared operator console, oldest
+ * Server-to-client: entries of the Server Console, oldest
  * first — one as it happens, a batch when a staff member joins. Sent
  * only to players the server has found to hold {@code chat.console.read}
  * at that moment; the client is told nothing it may not read and

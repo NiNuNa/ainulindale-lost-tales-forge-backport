@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * The shared operator console's memory: the last {@link #MAX_EVENTS}
+ * The Server Console's memory: the last {@link #MAX_EVENTS}
  * administrative events, in the order they happened, so a staff member
  * who joins is shown what went on before them. Written to the world
  * with the chat history ({@link ChatHistoryWorldData}) and read back

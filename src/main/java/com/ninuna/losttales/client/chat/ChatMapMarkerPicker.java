@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerUsageStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapMarkerData;
@@ -190,12 +191,12 @@ final class ChatMapMarkerPicker extends ChatPickerPanel {
         // picker marks its cells: filled while the marker is one, plain
         // under the pointer as the control a right-click toggles.
         if (LostTalesClientMapMarkerUsageStore.isFavorite(data.getId())) {
-            ChatIconSheet.HEART_FAVORITE.drawWithShadow(x + ROW_WIDTH
-                    - ChatIconSheet.HEART_FAVORITE.getWidth() - 2, y + 3,
+            LostTalesUiSheet.HEART_FAVORITE.drawWithShadow(x + ROW_WIDTH
+                    - LostTalesUiSheet.HEART_FAVORITE.getWidth() - 2, y + 3,
                     alpha);
         } else if (hovered) {
-            ChatIconSheet.HEART.drawWithShadow(x + ROW_WIDTH
-                    - ChatIconSheet.HEART.getWidth() - 2, y + 3, alpha);
+            LostTalesUiSheet.HEART.drawWithShadow(x + ROW_WIDTH
+                    - LostTalesUiSheet.HEART.getWidth() - 2, y + 3, alpha);
         }
     }
 
@@ -225,12 +226,12 @@ final class ChatMapMarkerPicker extends ChatPickerPanel {
     }
 
     @Override
-    ChatIconSheet buttonGlyph() {
-        return ChatIconSheet.MAP_MARKER;
+    LostTalesUiSheet buttonGlyph() {
+        return LostTalesUiSheet.MAP_MARKER;
     }
 
     @Override
-    ChatIconSheet buttonGlyphLit() {
-        return ChatIconSheet.MAP_MARKER_HOVER;
+    LostTalesUiSheet buttonGlyphLit() {
+        return LostTalesUiSheet.MAP_MARKER_HOVER;
     }
 }

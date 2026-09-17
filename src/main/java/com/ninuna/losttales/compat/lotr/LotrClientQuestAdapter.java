@@ -15,7 +15,6 @@ import lotr.common.quest.LOTRMiniQuestKill;
 import lotr.common.quest.LOTRMiniQuestWelcome;
 import net.minecraft.client.Minecraft;
 import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ChunkCoordinates;
 
 /** Converts LOTR miniquests into the shared Lost Tales presentation. */
@@ -154,19 +153,13 @@ public final class LotrClientQuestAdapter {
             LOTRMiniQuest quest) {
         ArrayList<ClientQuestEntry.Target> targets =
                 new ArrayList<ClientQuestEntry.Target>();
-        ChunkCoordinates coordinates = quest.getLastLocation();
-        if (coordinates == null) {
+        LotrMiniQuestLocationAccess.Location location =
+                LotrMiniQuestLocationAccess.lastLocation(quest);
+        if (location == null || location.getCoordinates() == null) {
             return targets;
         }
-        int dimension = 0;
-        try {
-            NBTTagCompound tag = new NBTTagCompound();
-            quest.writeToNBT(tag);
-            dimension = tag.getInteger("Dimension");
-        } catch (RuntimeException ignored) {
-            return targets;
-        }
-        targets.add(new ClientQuestEntry.Target(dimension,
+        ChunkCoordinates coordinates = location.getCoordinates();
+        targets.add(new ClientQuestEntry.Target(location.getDimensionId(),
                 coordinates.posX, coordinates.posY, coordinates.posZ));
         return targets;
     }

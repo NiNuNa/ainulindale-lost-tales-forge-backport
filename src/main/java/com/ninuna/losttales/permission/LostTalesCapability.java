@@ -35,9 +35,9 @@ public final class LostTalesCapability {
     /** Mute and unmute accounts, list the mutes, take anyone's message back. */
     public static final LostTalesCapability CHAT_MODERATE = register("chat.moderate", OPERATOR,
             "mute and unmute accounts, list mutes, and remove anyone's message");
-    /** Read the shared operator console: commands run, moderation, config changes. */
+    /** Read the Server Console: commands run, moderation, config changes. */
     public static final LostTalesCapability CHAT_CONSOLE_READ = register("chat.console.read",
-            OPERATOR, "read the shared operator console and talk in it");
+            OPERATOR, "read the Server Console and talk in it");
     /** Speak as the Narrator in the roleplaying channels and whispers. */
     public static final LostTalesCapability CHAT_NARRATE = register("chat.narrate",
             OPERATOR, "speak as the Narrator in the roleplaying channels");

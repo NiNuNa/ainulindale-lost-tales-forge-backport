@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.client.gui.animation.LostTalesUiEasing;
 import com.ninuna.losttales.client.gui.animation.LostTalesUiTransition;
 import com.ninuna.losttales.config.LostTalesConfig;
@@ -18,13 +19,13 @@ import com.ninuna.losttales.config.LostTalesConfig;
  * control's box rather than pinned to a corner.</p>
  */
 final class ChatIconFlipbook {
-    private final ChatIconSheet[] frames;
-    private final ChatIconSheet[] hoverFrames;
+    private final LostTalesUiSheet[] frames;
+    private final LostTalesUiSheet[] hoverFrames;
     private final LostTalesUiTransition flip = new LostTalesUiTransition();
     private float hoverFade;
     private long hoverNanos;
 
-    ChatIconFlipbook(ChatIconSheet[] frames, ChatIconSheet[] hoverFrames) {
+    ChatIconFlipbook(LostTalesUiSheet[] frames, LostTalesUiSheet[] hoverFrames) {
         this.frames = frames;
         this.hoverFrames = hoverFrames;
     }
@@ -83,8 +84,8 @@ final class ChatIconFlipbook {
 
     private void drawFrame(int index, float lit, int boxLeft, int boxTop,
                            int boxWidth, int boxHeight, int alpha) {
-        ChatIconSheet icon = this.frames[index];
-        ChatIconSheet.drawPairWithShadow(icon, this.hoverFrames[index], lit,
+        LostTalesUiSheet icon = this.frames[index];
+        LostTalesUiSheet.drawPairWithShadow(icon, this.hoverFrames[index], lit,
                 boxLeft + (boxWidth - icon.getWidth()) / 2,
                 boxTop + (boxHeight - icon.getHeight()) / 2, alpha);
     }

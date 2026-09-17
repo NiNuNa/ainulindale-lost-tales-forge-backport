@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarker;
@@ -332,7 +333,7 @@ final class ChatInlineIcons {
      * stands in. The sheet's cells are smaller than the box; the box is
      * never scaled to them.
      */
-    static void drawSheetSprite(ChatIconSheet sprite, float boxX,
+    static void drawSheetSprite(LostTalesUiSheet sprite, float boxX,
                                 float boxY, float size, int rgb, int alpha,
                                 boolean silhouette) {
         if (sprite == null || size <= 0.0F) {

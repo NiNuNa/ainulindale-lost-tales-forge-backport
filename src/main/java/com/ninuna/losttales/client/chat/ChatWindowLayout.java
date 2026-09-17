@@ -92,6 +92,7 @@ public final class ChatWindowLayout {
     private static final List<ChatTab> CONSOLE_WINDOW_TABS =
             Collections.unmodifiableList(Arrays.asList(
                     ChatTab.of(ChatChannel.CONSOLE),
+                    ChatTab.of(ChatChannel.SERVER_CONSOLE),
                     ChatTab.of(ChatChannel.ADMIN)));
 
     private static final List<ChatWindow> WINDOWS = new ArrayList<ChatWindow>();
@@ -154,8 +155,10 @@ public final class ChatWindowLayout {
     }
 
     /**
-     * The default layout: the console window (Console, Admin) top-left
-     * and the conversation window with every other channel bottom-left.
+     * The default layout: the console window (Client Console, Server
+     * Console, Operator) top-left and the conversation window with every
+     * other channel bottom-left. The two staff tabs are there for
+     * everyone and shown to whoever the server lets read them.
      */
     public static synchronized void reset() {
         WINDOWS.clear();

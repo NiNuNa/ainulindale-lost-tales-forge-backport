@@ -315,7 +315,7 @@ public final class ChatWindowLayoutStoreTest {
         assertTrue(lines.contains("feed x=12.25 y=88.00"));
         assertTrue(lines.contains("toolbar collapsed=true"));
         assertTrue(lines.contains("window w1 locked=false x=0.00 y=0.00 "
-                + "active=console tabs=console"));
+                + "active=console tabs=console,server_console"));
         assertTrue(lines.contains("window w2 locked=false x=3.00 y=97.50 "
                 + "active=ooc tabs=all,proximity,ooc"));
         assertTrue(lines.contains("window w3 locked=true x=62.50 y=8.00 "
@@ -387,7 +387,8 @@ public final class ChatWindowLayoutStoreTest {
         // Unknown ids dropped, unplaced channels appended, Admin closed.
         assertEquals(Arrays.asList(ChatChannel.ALL, ChatChannel.OOC,
                 ChatChannel.PROXIMITY, ChatChannel.FACTION,
-                ChatChannel.CONSOLE), main.getChannels());
+                ChatChannel.CONSOLE, ChatChannel.SERVER_CONSOLE),
+                main.getChannels());
         assertEquals(ChatChannel.ALL, main.getActiveChannel());
         assertEquals(2, ChatWindowLayout.windows().size());
         ChatWindow w2 = ChatWindowLayout.window("w2");
