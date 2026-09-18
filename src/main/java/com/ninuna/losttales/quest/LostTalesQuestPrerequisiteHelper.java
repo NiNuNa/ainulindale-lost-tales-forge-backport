@@ -8,10 +8,6 @@ public final class LostTalesQuestPrerequisiteHelper {
 
     private LostTalesQuestPrerequisiteHelper() {}
 
-    public static boolean areMet(LostTalesQuestDefinition quest, EntityPlayer player, LostTalesQuestPlayerData data) {
-        return getFailureReason(quest, player, data) == null;
-    }
-
     public static String getFailureReason(LostTalesQuestDefinition quest, EntityPlayer player, LostTalesQuestPlayerData data) {
         if (quest == null) {
             return "Unknown quest.";

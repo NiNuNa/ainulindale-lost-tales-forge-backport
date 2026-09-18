@@ -162,11 +162,6 @@ public final class LostTalesClientQuestProgressStore {
                 && PINNED_QUESTS.contains(questReference);
     }
 
-    public static synchronized LostTalesQuestProgress getPinnedQuest() {
-        LostTalesQuestProgress progress = ACTIVE_QUESTS.get(getPinnedQuestId());
-        return progress == null ? null : progress.copy();
-    }
-
     public static synchronized Collection<LostTalesQuestProgress> getPinnedQuests() {
         ArrayList<LostTalesQuestProgress> copy = new ArrayList<LostTalesQuestProgress>();
         for (String questId : PINNED_QUESTS) {
@@ -192,10 +187,6 @@ public final class LostTalesClientQuestProgressStore {
 
     public static synchronized boolean hasPinnedMapMarker() {
         return findDiscoveredMarkerId(pinnedMapMarkerId) != null;
-    }
-
-    public static synchronized boolean hasAnyState() {
-        return !ACTIVE_QUESTS.isEmpty() || !QUEST_HISTORY.isEmpty();
     }
 
     public static synchronized boolean hasReceivedSync() {

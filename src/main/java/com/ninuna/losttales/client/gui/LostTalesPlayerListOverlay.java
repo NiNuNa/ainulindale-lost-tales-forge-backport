@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.gui;
 
 import com.ninuna.losttales.character.sync.CharacterAppearance;
+import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.gui.style.LostTalesColors;
@@ -38,6 +39,12 @@ public final class LostTalesPlayerListOverlay extends Gui {
     static final int TOP = 10;
     /** A head as the chat draws one, then a gap before the name. */
     static final int HEAD_SIZE = 8;
+    /**
+     * The icon's whole width: the head and the presence sphere standing
+     * past it. Every row keeps the same column, so a row whose account
+     * this client cannot place still lines up with the rest.
+     */
+    static final int ICON_WIDTH = HEAD_SIZE + ChatPresenceMark.OVERHANG_X;
     static final int HEAD_GAP = 2;
     private static final int PING_WIDTH = 10;
     private static final int PING_HEIGHT = 8;
@@ -89,12 +96,31 @@ public final class LostTalesPlayerListOverlay extends Gui {
             CharacterAppearance appearance =
                     ClientCharacterAppearanceCache.appearanceFor(player.name);
             LostTalesSkyrimUiStyle.beginContent();
-            drawHead(minecraft, appearance, x, y);
-            if (appearance != null && appearance.getPlayerId() != null) {
-                ChatPresenceMark.draw(x, y, HEAD_SIZE,
-                        ClientChatPresence.presenceOf(appearance.getPlayerId()), 255);
+            boolean known = appearance != null
+                    && appearance.getPlayerId() != null;
+            if (known) {
+                ChatPresenceMark.beginHeadCut(x, y, HEAD_SIZE);
             }
-            int nameX = x + HEAD_SIZE + HEAD_GAP;
+            try {
+                drawHead(minecraft, appearance, x, y);
+            } finally {
+                if (known) {
+                    ChatPresenceMark.endHeadCut();
+                }
+            }
+            if (known) {
+                // The row names the identity being played, so it wears
+                // that identity's status.
+                ChatPresenceMark.draw(x, y, HEAD_SIZE,
+                        ClientChatPresence.presenceOf(
+                                appearance.getPlayerId(),
+                                appearance.isAccount()
+                                        ? ChatPresenceIdentity.ACCOUNT
+                                        : ChatPresenceIdentity.character(
+                                                appearance.getCharacterId())),
+                        255);
+            }
+            int nameX = x + ICON_WIDTH + HEAD_GAP;
             ScorePlayerTeam team = scoreboard.getPlayersTeam(player.name);
             String shown = ScorePlayerTeam.formatPlayerName(team,
                     shownNameOf(appearance, player.name));

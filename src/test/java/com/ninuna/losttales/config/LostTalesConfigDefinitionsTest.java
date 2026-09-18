@@ -91,7 +91,7 @@ public final class LostTalesConfigDefinitionsTest {
         LostTalesConfig.defineOptions(definitions);
         ConfigCategory client = definitions.getCategory(LostTalesConfig.CATEGORY_CLIENT);
         Property alignment = client.get("chatFeedAlignment");
-        assertEquals("LEFT", alignment.getDefault());
+        assertEquals("CENTRE", alignment.getDefault());
         assertTrue(alignment.comment.length() > 0);
         Property history = client.get("chatHistoryLines");
         assertEquals("1000", history.getDefault());
@@ -121,7 +121,7 @@ public final class LostTalesConfigDefinitionsTest {
         LostTalesConfigDefinitions.apply(definitions, screen);
 
         assertEquals("RIGHT", alignment.getString());
-        assertEquals("LEFT", alignment.getDefault());
+        assertEquals("CENTRE", alignment.getDefault());
     }
 
     private static void initializeForgeHome(File directory) throws Exception {

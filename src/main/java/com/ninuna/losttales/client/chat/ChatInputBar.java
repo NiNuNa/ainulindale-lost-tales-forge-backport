@@ -7,10 +7,10 @@ import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.chat.ChatMarkdown;
 import com.ninuna.losttales.chat.ChatMessageValidator;
+import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.config.LostTalesConfig;
-import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import java.util.List;
@@ -1097,11 +1097,13 @@ final class ChatInputBar {
 
     /**
      * Whether the bar of a window whose front tab is {@code tab} wears
-     * the head button: on a roleplaying channel, where it chooses the
-     * chat identity. An account channel always speaks as the account.
+     * the head button. Every bar does: on a roleplaying channel it
+     * chooses the chat identity as well as the status, and on an account
+     * channel — which always speaks as the account — it is the player's
+     * own head and their status alone.
      */
     static boolean hasCharacterButton(ChatTab tab) {
-        return ClientChatIdentities.speaksInCharacter(tab);
+        return true;
     }
 
     /**
@@ -1118,7 +1120,11 @@ final class ChatInputBar {
     }
 
     /**
-     * The chat identity's head, inside the shared head button. The frame
+     * The chat identity's head, inside the shared head button, wearing
+     * the sphere of the status everyone else sees of the identity the tab
+     * speaks as. The head and its sphere are one icon, centred in the
+     * button with the framed buttons' two clear pixels round it; the
+     * Narrator's mark wears none and keeps the wide inset. The frame
      * keeps its place and the head moves inside it, so the button reads
      * as a socket holding a face rather than the whole thing sliding.
      */
@@ -1136,27 +1142,53 @@ final class ChatInputBar {
         UUID self = this.mc.thePlayer == null ? null
                 : this.mc.thePlayer.getUniqueID();
         if (self != null) {
-            float headX = left + LostTalesUiFramedButton.WIDE_INSET;
-            float headY = top + LostTalesUiFramedButton.WIDE_INSET;
             boolean account = shown.account || shown.skinId.length() == 0;
+            // The Narrator is a voice for roleplaying; an account
+            // channel shows the player's own head whatever is chosen
+            // elsewhere.
+            boolean narrating = ClientChatIdentities.isNarrating()
+                    && ClientChatIdentities.speaksInCharacter(tab);
+            int iconWidth = narrating ? CHARACTER_HEAD_SIZE
+                    : CHARACTER_HEAD_SIZE + ChatPresenceMark.OVERHANG_X;
+            int iconHeight = narrating ? CHARACTER_HEAD_SIZE
+                    : CHARACTER_HEAD_SIZE + ChatPresenceMark.OVERHANG_Y;
+            // Centred, the odd pixel up and to the left.
+            float headX = left + (CHARACTER_BUTTON_SIZE - iconWidth) / 2;
+            float headY = top + (CHARACTER_BUTTON_SIZE - iconHeight) / 2;
             LostTalesChatVisualStyle.beginContent();
-            LostTalesUiButton.beginPose(motion, headX, headY,
-                    CHARACTER_HEAD_SIZE, CHARACTER_HEAD_SIZE);
+            LostTalesUiButton.beginPose(motion, headX, headY, iconWidth,
+                    iconHeight);
             try {
-                if (ClientChatIdentities.isNarrating()) {
+                if (narrating) {
                     drawNarratorMark(headX, headY);
                 } else {
-                    drawButtonHeadShadow(self, account, shown.skinId, headX,
-                            headY);
-                    if (account) {
-                        LostTalesCharacterHeadIconRenderer.drawAccountHead(
-                                this.mc, self, headX, headY,
-                                CHARACTER_HEAD_SIZE, 1.0F, 1.0F);
-                    } else {
-                        LostTalesCharacterHeadIconRenderer.drawSnapshotHead(
-                                this.mc, self, shown.skinId, headX, headY,
-                                CHARACTER_HEAD_SIZE, 1.0F, 1.0F);
+                    ChatPresence presence = ClientChatPresence.presenceOf(
+                            self, ClientChatPresence.speakerOf(tab));
+                    ChatPresenceMark.beginShadowCut(headX, headY,
+                            CHARACTER_HEAD_SIZE);
+                    try {
+                        drawButtonHeadShadow(self, account, shown.skinId,
+                                headX, headY);
+                    } finally {
+                        ChatPresenceMark.endHeadCut();
                     }
+                    ChatPresenceMark.beginHeadCut(headX, headY,
+                            CHARACTER_HEAD_SIZE);
+                    try {
+                        if (account) {
+                            LostTalesCharacterHeadIconRenderer.drawAccountHead(
+                                    this.mc, self, headX, headY,
+                                    CHARACTER_HEAD_SIZE, 1.0F, 1.0F);
+                        } else {
+                            LostTalesCharacterHeadIconRenderer.drawSnapshotHead(
+                                    this.mc, self, shown.skinId, headX, headY,
+                                    CHARACTER_HEAD_SIZE, 1.0F, 1.0F);
+                        }
+                    } finally {
+                        ChatPresenceMark.endHeadCut();
+                    }
+                    ChatPresenceMark.draw(headX, headY, CHARACTER_HEAD_SIZE,
+                            presence, 255);
                 }
             } finally {
                 LostTalesUiButton.endPose();

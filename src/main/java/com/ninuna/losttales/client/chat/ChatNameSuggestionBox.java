@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.chat.ChatMentionCandidate;
 import com.ninuna.losttales.chat.ChatNameSuggester;
+import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import java.util.Collections;
@@ -32,6 +33,12 @@ final class ChatNameSuggestionBox {
     private static final int PADDING = 2;
     /** The face's box and the gap after it, shared by every row. */
     private static final int ICON_SIZE = 8;
+    /**
+     * The icon's whole width: the head and the presence sphere that
+     * stands past it, which is one icon.
+     */
+    private static final int ICON_WIDTH =
+            ICON_SIZE + ChatPresenceMark.OVERHANG_X;
     private static final int ICON_GAP = 3;
     /**
      * How far above the input anchor ({@link ChatInputBar#inputAnchor})
@@ -163,7 +170,7 @@ final class ChatNameSuggestionBox {
             drawFace(minecraft, candidate, inputX + 4, rowTop + 1);
             LostTalesChatVisualStyle.drawColored(font,
                     "@" + candidate.getDisplayName(),
-                    inputX + 4 + ICON_SIZE + ICON_GAP, rowTop + 2,
+                    inputX + 4 + ICON_WIDTH + ICON_GAP, rowTop + 2,
                     rowColor(candidate), 255);
         }
     }
@@ -194,6 +201,7 @@ final class ChatNameSuggestionBox {
         }
         int shadow = LostTalesChatVisualStyle.shadowAlpha(255);
         if (shadow > 0) {
+            ChatPresenceMark.beginShadowCut(x, y, ICON_SIZE);
             LostTalesSilhouetteRenderState.begin(
                     LostTalesChatVisualStyle.SHADOW);
             try {
@@ -204,12 +212,33 @@ final class ChatNameSuggestionBox {
                         ICON_SIZE, 1.0F, 1.0F, 1.0F, shadow / 255.0F);
             } finally {
                 LostTalesSilhouetteRenderState.end();
+                ChatPresenceMark.endHeadCut();
             }
         }
-        LostTalesCharacterHeadIconRenderer.drawAccountHead(minecraft,
-                account, x, y, ICON_SIZE, 1.0F, 1.0F);
+        ChatPresenceMark.beginHeadCut(x, y, ICON_SIZE);
+        try {
+            LostTalesCharacterHeadIconRenderer.drawAccountHead(minecraft,
+                    account, x, y, ICON_SIZE, 1.0F, 1.0F);
+        } finally {
+            ChatPresenceMark.endHeadCut();
+        }
         ChatPresenceMark.draw(x, y, ICON_SIZE,
-                ClientChatPresence.presenceOf(account), 255);
+                ClientChatPresence.presenceOf(account, identityOf(candidate)),
+                255);
+    }
+
+    /** The identity a row shows: the character it names, else the account. */
+    private static ChatPresenceIdentity identityOf(
+            ChatMentionCandidate candidate) {
+        String id = candidate.getCharacterId();
+        if (id.length() == 0) {
+            return ChatPresenceIdentity.ACCOUNT;
+        }
+        try {
+            return ChatPresenceIdentity.character(UUID.fromString(id));
+        } catch (IllegalArgumentException notAnId) {
+            return ChatPresenceIdentity.ACCOUNT;
+        }
     }
 
     private static UUID accountId(ChatMentionCandidate candidate) {
@@ -230,7 +259,7 @@ final class ChatNameSuggestionBox {
             width = Math.max(width, font.getStringWidth(
                     "@" + this.matches.get(index).getDisplayName()));
         }
-        return width + 8 + ICON_SIZE + ICON_GAP;
+        return width + 8 + ICON_WIDTH + ICON_GAP;
     }
 
     private int boxTop(int screenHeight) {

@@ -46,7 +46,10 @@ public final class LostTalesChatWrapHooks {
                             return font.getStringWidth(colours ? text
                                     : LostTalesChatVisualStyle.stripCodes(text));
                         }
-                    }, root, width);
+                    }, root, width, false,
+                    LostTalesChatVisualStyle.speakerRowScale(false),
+                    LostTalesChatVisualStyle.messageRowScale(false),
+                    LostTalesChatVisualStyle.quoteRowScale(false), null);
             if (lines == null || lines.isEmpty()) {
                 return vanillaLines;
             }

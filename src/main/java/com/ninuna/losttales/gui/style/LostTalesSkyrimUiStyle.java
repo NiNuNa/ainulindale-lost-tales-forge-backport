@@ -190,42 +190,6 @@ public final class LostTalesSkyrimUiStyle extends LostTalesColors {
         Gui.drawRect(centerX - 1, centerY - 2, centerX + 2, centerY + 3, color);
     }
 
-    public static void drawObjectiveIndicator(int x, int y, boolean complete, boolean active) {
-        int color = complete ? GREEN : active ? GOLD : TEXT_DIM;
-        drawDiamond(x, y, color);
-        if (complete) {
-            Gui.drawRect(x - 1, y, x, y + 1, TEXT_BRIGHT);
-            Gui.drawRect(x, y + 1, x + 3, y + 2, TEXT_BRIGHT);
-            Gui.drawRect(x + 2, y - 2, x + 3, y + 1, TEXT_BRIGHT);
-        }
-    }
-
-    public static void drawProgressBar(int x, int y, int width, int current, int target, boolean complete) {
-        if (target <= 1 || width <= 4) {
-            return;
-        }
-        int clampedTarget = Math.max(1, target);
-        int clampedCurrent = Math.max(0, Math.min(current, clampedTarget));
-        int fill = width * clampedCurrent / clampedTarget;
-        Gui.drawRect(x, y, x + width, y + 2, withAlpha(PLUM_DARK, 0x55));
-        if (fill > 0) {
-            Gui.drawRect(x, y, x + fill, y + 2, complete ? GREEN : GOLD);
-        }
-        Gui.drawRect(x, y + 2, x + width, y + 3,
-                withAlpha(PLUM_BLACK, 0x55));
-    }
-
-    public static void drawCompassFrame(int x, int y, int width, int height) {
-        int barY = y + 10;
-        Gui.drawRect(x + 4, barY - 3, x + width - 4, barY + 4,
-                withAlpha(PLUM_BLACK, 0x5A));
-        Gui.drawRect(x + 8, barY, x + width - 8, barY + 1,
-                withAlpha(SAND, 0xB8));
-        Gui.drawRect(x + width / 2 - 10, barY - 6, x + width / 2 + 10, barY - 5, BORDER_DIM);
-        Gui.drawRect(x + width / 2 - 1, barY - 8, x + width / 2 + 1, barY + 6, TEXT_BRIGHT);
-        drawDiamond(x + width / 2, barY - 9, GOLD);
-    }
-
     public static String trimToWidth(FontRenderer font, String text, int width) {
         if (text == null || width <= 0) {
             return "";

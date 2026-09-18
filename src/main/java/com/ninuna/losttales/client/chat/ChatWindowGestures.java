@@ -3,14 +3,12 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
-import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.gui.Gui;
 
 /**
  * The press-to-drag state machines of the chat screen: a tab carried

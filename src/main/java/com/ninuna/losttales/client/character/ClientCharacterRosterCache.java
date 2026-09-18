@@ -116,10 +116,6 @@ public final class ClientCharacterRosterCache {
         return snapshot;
     }
 
-    public static synchronized CharacterOperationFeedback getLastOperation() {
-        return lastOperation;
-    }
-
     public static synchronized CharacterOperationFeedback getOperation(int requestId) {
         return lastOperation != null && lastOperation.getRequestId() == requestId
                 ? lastOperation : null;
@@ -133,14 +129,6 @@ public final class ClientCharacterRosterCache {
 
     public static synchronized boolean isRequestPending(int requestId) {
         return PENDING_REQUESTS.containsKey(Integer.valueOf(requestId));
-    }
-
-    public static synchronized boolean hasPendingRequest(CharacterOperationType operationType) {
-        return PENDING_REQUESTS.containsValue(operationType);
-    }
-
-    public static synchronized void clearLastOperation() {
-        lastOperation = null;
     }
 
     public static synchronized void clear() {

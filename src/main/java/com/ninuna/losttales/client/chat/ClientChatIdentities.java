@@ -63,6 +63,11 @@ final class ClientChatIdentities {
         return active == null ? accountIdentity() : of(active);
     }
 
+    /** The account's own name, which is what an account channel speaks as. */
+    static synchronized String accountName() {
+        return accountIdentity().name;
+    }
+
     /**
      * Whether the Narrator's voice is chosen over the identity: the
      * roleplaying channels sign as the Narrator while it is, on the

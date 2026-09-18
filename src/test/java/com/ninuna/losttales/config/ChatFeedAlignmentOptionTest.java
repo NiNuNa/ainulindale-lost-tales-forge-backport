@@ -6,8 +6,8 @@ import static org.junit.Assert.assertEquals;
 
 /**
  * The closed feed's alignment is one of three names, read however it was
- * typed; anything else is the left, which is where the lines stood before
- * the option existed.
+ * typed; anything else is the middle, which is where the lines stand
+ * until the player chooses.
  */
 public final class ChatFeedAlignmentOptionTest {
 
@@ -20,11 +20,11 @@ public final class ChatFeedAlignmentOptionTest {
     }
 
     @Test
-    public void anythingElseIsTheLeft() {
-        assertEquals("LEFT", LostTalesConfig.normalizeFeedAlignment(""));
-        assertEquals("LEFT", LostTalesConfig.normalizeFeedAlignment(null));
-        assertEquals("LEFT", LostTalesConfig.normalizeFeedAlignment("JUSTIFY"));
-        assertEquals("LEFT", LostTalesConfig.chatFeedAlignment);
+    public void anythingElseIsTheMiddle() {
+        assertEquals("CENTRE", LostTalesConfig.normalizeFeedAlignment(""));
+        assertEquals("CENTRE", LostTalesConfig.normalizeFeedAlignment(null));
+        assertEquals("CENTRE", LostTalesConfig.normalizeFeedAlignment("JUSTIFY"));
+        assertEquals("CENTRE", LostTalesConfig.chatFeedAlignment);
         assertEquals(3, LostTalesConfig.CHAT_FEED_ALIGNMENTS.length);
     }
 }

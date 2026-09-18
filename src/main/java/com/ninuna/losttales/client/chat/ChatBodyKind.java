@@ -2,7 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 /**
  * How a line built from a message packet presents its body. The header
- * — channel prefix, timestamp, role tags, head, name and title — reads
+ * — channel prefix, head, name and title — reads
  * the same whatever the kind; the kind decides what stands between the
  * sender and the body, and whether the body is read for markup, emoji,
  * links, mentions and shares or shown exactly as it is.

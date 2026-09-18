@@ -46,13 +46,12 @@ import net.minecraft.util.IChatComponent;
  */
 final class ChatGroupRuns {
     /**
-     * How long a sender keeps their run: a message this close behind the
-     * previous one from the same identity in the same tab drops the
-     * repeated head and name, Discord-style. Short on purpose — chat
-     * moves fast, and a header returning after a couple of quiet
-     * minutes reads better than one missing after them.
+     * How long a sender keeps their run in a window: a message from the
+     * same identity in the same tab no later than this after the one that
+     * opened the run drops the repeated head and name. Eight minutes, as
+     * Discord ends a group eight minutes after its first message.
      */
-    private static final long GROUP_WINDOW_MILLIS = 120L * 1000L;
+    private static final long GROUP_WINDOW_MILLIS = 8L * 60L * 1000L;
     /**
      * How long the closed feed keeps a line on screen, in milliseconds:
      * the fade the renderer draws, in the units a message's timestamp is
@@ -209,26 +208,6 @@ final class ChatGroupRuns {
                 && previous.accountLine == next.accountLine
                 && previous.identityName.equalsIgnoreCase(next.identityName)
                 && next.timestampMillis >= previous.timestampMillis;
-    }
-
-    /**
-     * Whether two printed messages are the same voice — the same sender
-     * as the same identity in the same tab — whenever they were said.
-     * Two lines with no identity, system lines both, count as one
-     * voice; a system line beside a player's message does not. What
-     * the timestamp column reads to stamp each speaker's turn once
-     * rather than each minute once.
-     */
-    static synchronized boolean sameVoice(int chatLineId, int otherChatLineId) {
-        Entry entry = of(chatLineId);
-        Entry other = of(otherChatLineId);
-        if (entry == null || other == null) {
-            return entry == other;
-        }
-        return entry.tab.equals(other.tab)
-                && entry.senderId.equals(other.senderId)
-                && entry.accountLine == other.accountLine
-                && entry.identityName.equalsIgnoreCase(other.identityName);
     }
 
     static synchronized void clear() {

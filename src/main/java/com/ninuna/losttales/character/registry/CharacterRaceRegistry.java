@@ -118,11 +118,6 @@ public final class CharacterRaceRegistry {
         return DEFINITIONS.values();
     }
 
-    public static boolean supportsGenderedModels(String raceId) {
-        CharacterRaceDefinition definition = get(raceId);
-        return definition != null && definition.hasGenderedModels();
-    }
-
     /**
      * Repairs an incompatible gender value deterministically. Gendered
      * races fall back to male; unisex races always use non-binary.

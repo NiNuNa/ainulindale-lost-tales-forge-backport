@@ -1,6 +1,5 @@
 package com.ninuna.losttales.client.chat;
 
-import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
@@ -18,9 +17,7 @@ public final class LostTalesNpcChatTest {
 
     @Test
     public void npcSpeechLineMirrorsThePlayerPresentation() {
-        boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
         boolean originalEmojis = LostTalesConfig.enableChatEmojis;
-        LostTalesConfig.showChatTimestamps = true;
         LostTalesConfig.enableChatEmojis = true;
         try {
             UUID npcId = UUID.randomUUID();
@@ -28,7 +25,7 @@ public final class LostTalesNpcChatTest {
             IChatComponent line = LostTalesChatPresentation.buildNpcSpeech(
                     ChatTab.whisper("Grey Wanderer"), npcId, "Grey Wanderer",
                     "lotr:mob/wanderer.png",
-                    "Good day to you! :smile:", 123456789L, factionColor);
+                    "Good day to you! :smile:", factionColor);
 
             StringBuilder plainText = new StringBuilder();
             ChatHeadMarker.Data marker = null;
@@ -47,8 +44,9 @@ public final class LostTalesNpcChatTest {
             String rendered = plainText.toString();
             // NPC speech is a whisper from the NPC: the feed prefix
             // names the channel, since the line already names the NPC.
-            assertTrue(rendered.startsWith("Whisper: ["));
-            assertTrue(rendered.contains("] <"));
+            // The line holds no time: a window stands it behind the name
+            // as it lays the line out.
+            assertTrue(rendered.startsWith("Whisper: <"));
             assertTrue(rendered.contains("Grey Wanderer> Good day"));
             assertNotNull(marker);
             assertTrue(marker.npcIdentity);
@@ -63,7 +61,6 @@ public final class LostTalesNpcChatTest {
                     marker.titleColor);
             assertSame(ChatEmoji.SMILE, emoji);
         } finally {
-            LostTalesConfig.showChatTimestamps = originalTimestamps;
             LostTalesConfig.enableChatEmojis = originalEmojis;
         }
     }

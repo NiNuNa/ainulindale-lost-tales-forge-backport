@@ -60,4 +60,33 @@ public final class ChatReactionMarkerTest {
         assertFalse(ChatReactionMarker.isMarker(ChatReactionMarker.create(
                 "", 1, false, MESSAGE, 6)));
     }
+
+    /**
+     * The button a reaction row ends on is a square as tall as a chip,
+     * aimed at its message; it is no chip, and a press on it is a click
+     * of its own, opening the picker.
+     */
+    @Test
+    public void theAddButtonIsASquareAimedAtItsMessage() {
+        IChatComponent button = ChatReactionMarker.addButton(MESSAGE);
+        assertTrue(ChatReactionMarker.isAddButton(button));
+        assertEquals(MESSAGE, ChatReactionMarker.addButtonMessageId(button));
+        assertFalse(ChatReactionMarker.isMarker(button));
+        assertEquals(ChatReactionMarker.HEIGHT, ChatReactionMarker.ADD_WIDTH);
+        assertEquals(ChatReactionMarker.ADD_WIDTH,
+                ChatReactionMarker.widthOf(button));
+        assertEquals(ChatReactionMarker.ADD_WIDTH,
+                ChatInlineIcons.declaredWidth(button));
+        assertEquals(ChatInteractions.Action.ADD_REACTION,
+                ChatInteractions.actionOf(button, true));
+        assertTrue(ChatInteractions.isClick(
+                ChatInteractions.actionOf(button, false)));
+        assertNull(ChatInteractions.genuineClick(button));
+        // A chip is not the button.
+        assertFalse(ChatReactionMarker.isAddButton(ChatReactionMarker.create(
+                ChatEmoji.SMILE, 1, false, MESSAGE, 6)));
+        // Nor is a button aimed at a message the server never named.
+        assertFalse(ChatReactionMarker.isAddButton(
+                ChatReactionMarker.addButton(-4L)));
+    }
 }

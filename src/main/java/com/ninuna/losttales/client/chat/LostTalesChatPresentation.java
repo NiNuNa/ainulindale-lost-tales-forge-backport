@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatAccountRole;
+import com.ninuna.losttales.chat.ChatSystemLineClassifier;
 import com.ninuna.losttales.chat.ChatBroadcastIdMarkers;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelSuggester;
@@ -276,7 +277,7 @@ public final class LostTalesChatPresentation {
             // playing right now: it waits, counted, for that identity.
             if (!replayed && ChatWindowLayout.isPingAudible(tab)
                     && ClientChatChannelState.isAvailable(tab)) {
-                playPingSound(minecraft);
+                playPingSound(minecraft, tab);
             }
         }
     }
@@ -490,8 +491,8 @@ public final class LostTalesChatPresentation {
 
     /**
      * Adds the quiet note that a line is not what was first said. It
-     * goes on the end of the body, in the timestamp's own muted colour,
-     * so it reads as something the chat is saying about the message
+     * goes on the end of the body, in the chat's aside tone, so it
+     * reads as something the chat is saying about the message
      * rather than something the sender wrote.
      */
     private static IChatComponent markEdited(IChatComponent line) {
@@ -710,6 +711,8 @@ public final class LostTalesChatPresentation {
             List<ChatShowcase> showcases, ChatReplyReference reply,
             long messageId, long timestampMillis) {
         ClientChatSignature.Signature signature = ClientChatSignature.of(tab);
+        // The character the tab speaks as, as the server names it on its
+        // own copy: whose presence the line's head wears.
         LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
                 tab.getChannel(), minecraft.thePlayer.getUniqueID(),
                 signature.identityName, signature.accountName, "",
@@ -719,7 +722,8 @@ public final class LostTalesChatPresentation {
                 showcases, "", tab.isWhisper() ? tab.getPartner() : "",
                 signature.roles, signature.accountLine, messageId, reply,
                 tab.isWhisper() && !tab.isNpc()
-                        ? tab.getPartnerIdentity() : "");
+                        ? tab.getPartnerIdentity() : "", 0L,
+                ClientChatPresence.speakerOf(tab).getCharacterId());
         if (signature.accountLine) {
             LostTalesCharacterHeadIconRenderer.rememberAccountSkin(
                     minecraft, packet.getSenderId(),
@@ -765,7 +769,7 @@ public final class LostTalesChatPresentation {
         if (mentioned) {
             markPinged(chatLineId);
             if (ChatWindowLayout.isPingAudible(tab)) {
-                playPingSound(minecraft);
+                playPingSound(minecraft, tab);
             }
         }
         return true;
@@ -932,10 +936,11 @@ public final class LostTalesChatPresentation {
      * can hear it. Played as a UI sound so the player's position, the
      * dimension, or a respawn in progress cannot swallow or duplicate it.
      */
-    private static void playPingSound(Minecraft minecraft) {
-        // Do Not Disturb holds the cue: the mention still counts and
-        // tints, and nothing sounds.
-        if (ClientChatPresence.isDoNotDisturb()) {
+    private static void playPingSound(Minecraft minecraft, ChatTab tab) {
+        // Do Not Disturb, chosen for the identity the tab speaks as,
+        // holds the cue: the mention still counts and tints, and nothing
+        // sounds.
+        if (ClientChatPresence.holdsCues(tab)) {
             return;
         }
         String sound = LostTalesConfig.chatPingSound == null
@@ -1273,7 +1278,8 @@ public final class LostTalesChatPresentation {
             new HashMap<Integer, HoverFade>();
     /**
      * How far each reaction chip has lit under the pointer, by message
-     * and emoji, kept and forgotten the same way.
+     * and emoji, and each message's add button, kept and forgotten the
+     * same way.
      */
     private static final Map<String, HoverFade> CHIP_FADES =
             new HashMap<String, HoverFade>();
@@ -1350,10 +1356,21 @@ public final class LostTalesChatPresentation {
      */
     static float chipHoverFade(ChatReactionMarker.Data chip,
                                boolean hovered) {
-        if (chip == null || !LostTalesConfig.enableChatAnimations) {
+        if (chip == null) {
             return hovered ? 1.0F : 0.0F;
         }
-        String key = chip.messageId + ":" + chip.key;
+        return chipFade(chip.messageId + ":" + chip.key, hovered);
+    }
+
+    /** As {@link #chipHoverFade}, for the button a reaction row ends on. */
+    static float addButtonHoverFade(long messageId, boolean hovered) {
+        return chipFade(messageId + ":+", hovered);
+    }
+
+    private static float chipFade(String key, boolean hovered) {
+        if (!LostTalesConfig.enableChatAnimations) {
+            return hovered ? 1.0F : 0.0F;
+        }
         HoverFade fade = CHIP_FADES.get(key);
         if (fade == null) {
             if (!hovered) {
@@ -1552,8 +1569,8 @@ public final class LostTalesChatPresentation {
     /**
      * As above; a <em>grouped</em> line continues its sender's run and
      * drops the repeated header — the channel prefix, tags, brackets,
-     * head, name and title — keeping only the timestamp and the body,
-     * which starts behind the same chevron the run's first body row
+     * head, name and title — keeping only the body, which starts
+     * behind the same chevron the run's first body row
      * does, so a run reads as one voice speaking in paragraphs.
      * The prefix goes with the rest: in the closed feed the run's
      * header line already named the channel, so its continuations do
@@ -1623,6 +1640,11 @@ public final class LostTalesChatPresentation {
                     reaction.count, reaction.mine, packet.getMessageId(),
                     ChatReactionMarker.countWidth(font, reaction.count)));
         }
+        // The row ends on a button adding another, as Discord's does;
+        // the window shows it while the pointer rests on the message.
+        root.appendSibling(ChatSpacerMarker.of(ChatReactionMarker.BETWEEN));
+        root.appendSibling(ChatReactionMarker.addButton(
+                packet.getMessageId()));
     }
 
     private static IChatComponent buildLine(LostTalesChatMessagePacket packet,
@@ -1633,7 +1655,6 @@ public final class LostTalesChatPresentation {
         ChatComponentText root = new ChatComponentText("");
         ChatTab named = tab == null ? tabOf(packet) : tab;
         if (grouped) {
-            appendTimestamp(root, packet.getTimestampMillis());
             root.appendSibling(ChatLayoutMarker.anchor());
             appendBody(root, packet, showcaseIds, channel, kind, body);
             return root;
@@ -1656,25 +1677,14 @@ public final class LostTalesChatPresentation {
                 : ClientChatChannelState.displayColor(named));
         // (An NPC conversation names the same partner, so its prefix
         // reads the same.)
-        appendTimestamp(root, packet.getTimestampMillis());
         // Continuation lines of a wrapped message align here, under the
         // sender's opening bracket; see ChatLineWrapper.
         root.appendSibling(ChatLayoutMarker.anchor());
 
-        // The server's word on an account line's sender: every role it
-        // holds, tagged ahead of the name in the role's own colour. The
-        // name's colour is the primary role's too, but that is already
-        // the packet's name colour — the server set it when it built the
-        // line, so nothing here decides what a role looks like. The tag
-        // carries the role mention marker, so hovering it shows the
-        // role's card exactly as hovering @Operator does.
-        for (ChatAccountRole role : ChatAccountRole.fromMask(
-                packet.getRoles())) {
-            root.appendSibling(ChatMentionMarker.applyRole(
-                    text(role.getDisplayTag() + " ",
-                            nearestFormatting(role.getColor()), false),
-                    role.getColor(), role));
-        }
+        // An account line's sender wears no role beside the name: the
+        // name's colour is its primary role's — the packet's name colour,
+        // which the server set when it built the line — and the roles it
+        // holds are read on the sender's card.
         // The brackets are part of the name: they answer to a hover
         // and a click exactly as it does, so the card comes up wherever
         // the pointer is over the sender. Their colour comes from the
@@ -1694,6 +1704,7 @@ public final class LostTalesChatPresentation {
                 new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
                         ChatHeadMarker.encode(packet.getSenderId(),
                                 packet.isAccountLine(),
+                                packet.getIdentityCharacterId(),
                                 packet.getSkinId(), packet.getMessage(),
                                 packet.getTitleColor(),
                                 packet.getNameColor()))));
@@ -1799,8 +1810,8 @@ public final class LostTalesChatPresentation {
 
     /**
      * The row a reply opens with: the message it answers, quoted the
-     * way that message was said — the chat's speech bubble in the
-     * timestamps' quiet tone, then {@code <HEAD Name>} in the name's own
+     * way that message was said — the chat's speech bubble in its aside
+     * tone, then {@code <HEAD Name>} in the name's own
      * colour and the words in the chat's ivory, or as the chat's inline
      * code when they are a command, so the quote reads as the line it
      * quotes rather than as a line about it. The head is the quoted
@@ -1900,8 +1911,8 @@ public final class LostTalesChatPresentation {
     /**
      * Prints a vanilla or third-party line that Lost Tales classified
      * into a channel — an achievement, a death message, command output,
-     * a fast-travel countdown — with the channel prefix and timestamp
-     * every other line carries and a tracked line id, so the feed names
+     * a fast-travel countdown — with the channel prefix every other
+     * line carries and a tracked line id, so the feed names
      * its channel and the tabs can file it. The component itself is the
      * server's, untouched; no head, no mention check.
      *
@@ -1960,12 +1971,40 @@ public final class LostTalesChatPresentation {
         } catch (RuntimeException unreadable) {
             return null;
         }
-        if (component == null || !LostTalesConfig.enableChatPings) {
-            return component;
+        if (component == null) {
+            return null;
         }
-        return rewritePlayerNames(component, packet.getChannel(),
-                localMentionNames(minecraft), localMentioned,
-                packet.getNamedPlayers());
+        ChatSystemLineClassifier.Kind kind =
+                ChatSystemLineClassifier.kindOf(component);
+        if (LostTalesConfig.enableChatPings) {
+            component = rewritePlayerNames(component, packet.getChannel(),
+                    localMentionNames(minecraft), localMentioned,
+                    packet.getNamedPlayers());
+        }
+        return asAnnouncement(component, kind);
+    }
+
+    /**
+     * A line the server announces — a join, a leave, a death, an
+     * achievement — as the sentence it is, with its full stop, as the
+     * console's entries read ({@link #asSentence}); anything else, a
+     * {@code /say} above all, stays exactly as it was said. The stop is
+     * the line's own last run, in the line's own style.
+     */
+    static IChatComponent asAnnouncement(IChatComponent line,
+                                         ChatSystemLineClassifier.Kind kind) {
+        if (line == null || kind == null
+                || kind == ChatSystemLineClassifier.Kind.OTHER) {
+            return line;
+        }
+        String words = line.getUnformattedText().trim();
+        if (words.length() == 0
+                || asSentence(words).length() == words.length()) {
+            return line;
+        }
+        IChatComponent sentence = line.createCopy();
+        sentence.appendSibling(new ChatComponentText("."));
+        return sentence;
     }
 
     /**
@@ -2043,6 +2082,10 @@ public final class LostTalesChatPresentation {
                     Collections.<ChatNamedPlayer>emptyList());
             mentioned = localMentioned[0];
         }
+        // A join, a leave, a death or an achievement is a sentence the
+        // server says, and ends as one.
+        shown = asAnnouncement(shown,
+                ChatSystemLineClassifier.kindOf(message));
         long now = timestampMillis;
         // Whatever the server says is said by the Server: an
         // achievement, a death, a join, a notice, a command's answer.
@@ -2066,7 +2109,7 @@ public final class LostTalesChatPresentation {
         if (mentioned) {
             markPinged(chatLineId);
             if (audibleMentionCue && ChatWindowLayout.isPingAudible(tab)) {
-                playPingSound(minecraft);
+                playPingSound(minecraft, tab);
             }
         }
         return true;
@@ -2145,7 +2188,7 @@ public final class LostTalesChatPresentation {
         if (mentioned[0]) {
             markPinged(chatLineId);
             if (!replayed && ChatWindowLayout.isPingAudible(console)) {
-                playPingSound(minecraft);
+                playPingSound(minecraft, console);
             }
         }
     }
@@ -2669,7 +2712,7 @@ public final class LostTalesChatPresentation {
         if (repliedTo) {
             markPinged(chatLineId);
             if (ChatWindowLayout.isPingAudible(tab)) {
-                playPingSound(minecraft);
+                playPingSound(minecraft, tab);
             }
         }
         return true;
@@ -2927,11 +2970,11 @@ public final class LostTalesChatPresentation {
         GuiNewChat chat = minecraft.ingameGUI.getChatGUI();
         chat.printChatMessageWithOptionalDeletion(
                 buildNpcSpeech(tab, npcId, npcName,
-                        texturePath, message, now, nameColor, false),
+                        texturePath, message, nameColor, false),
                 chatLineId);
         ChatGroupRuns.remember(chatLineId, tab, npcId, npcName, false, now,
                 true, buildNpcSpeech(tab, npcId, npcName, texturePath,
-                        message, now, nameColor, true));
+                        message, nameColor, true));
         // An NPC's speech is this client's own line too: nobody else
         // sees it, so it is named locally like the player's replies.
         ClientChatMessageIds.remember(chatLineId,
@@ -2940,7 +2983,7 @@ public final class LostTalesChatPresentation {
         if (mentioned) {
             markPinged(chatLineId);
             if (ChatWindowLayout.isPingAudible(tab)) {
-                playPingSound(minecraft);
+                playPingSound(minecraft, tab);
             }
         }
         return true;
@@ -2950,10 +2993,9 @@ public final class LostTalesChatPresentation {
                                          String npcName,
                                          String texturePath,
                                          String message,
-                                         long timestampMillis,
                                          int nameColor) {
         return buildNpcSpeech(tab, npcId, npcName, texturePath, message,
-                timestampMillis, nameColor, false);
+                nameColor, false);
     }
 
     /**
@@ -2965,13 +3007,11 @@ public final class LostTalesChatPresentation {
                                          String npcName,
                                          String texturePath,
                                          String message,
-                                         long timestampMillis,
                                          int nameColor, boolean grouped) {
         ChatComponentText root = new ChatComponentText("");
         if (grouped) {
             // A grouped line drops the channel prefix with the rest of
             // the header, so the feed's run names its channel once.
-            appendTimestamp(root, timestampMillis);
             root.appendSibling(ChatLayoutMarker.anchor());
             root.appendSibling(ChatLayoutMarker.bodyBreak(nameColor));
             appendMessageBody(root, ChatMentions.mentionNames(message,
@@ -2981,7 +3021,6 @@ public final class LostTalesChatPresentation {
         }
         appendChannelPrefix(root, tab,
                 ClientChatChannelState.displayColor(tab));
-        appendTimestamp(root, timestampMillis);
         root.appendSibling(ChatLayoutMarker.anchor());
         nameColor &= 0xFFFFFF;
         int bodyColor = LostTalesColors.rgb(LostTalesColors.HUD_LABEL);
@@ -3034,45 +3073,6 @@ public final class LostTalesChatPresentation {
         root.appendSibling(ChatPrefixMarker.channel(
                 text(": ", nearestFormatting(channelColor), false),
                 channelColor));
-    }
-
-    /**
-     * {@code [HH:mm] } in the Console's rose grey — a quiet tone a step
-     * below the sand body text — with the time itself — digits and their
-     * colon — italic; the brackets stay upright. Marked as a timestamp
-     * run, so the closed feed leaves it out: the feed is a glance at
-     * what was just said, not a log to read times off.
-     */
-    private static void appendTimestamp(ChatComponentText root,
-                                        long timestampMillis) {
-        if (!LostTalesConfig.showChatTimestamps) {
-            return;
-        }
-        String formatted = "[" + ChatTimestampFormatter.format(
-                timestampMillis) + "] ";
-        // The chat's aside tone: what is said about a line rather than
-        // in it.
-        int color = LostTalesChatVisualStyle.asideRgb();
-        int index = 0;
-        while (index < formatted.length()) {
-            boolean time = isTimeCharacter(formatted.charAt(index));
-            int end = index;
-            while (end < formatted.length() && isTimeCharacter(
-                    formatted.charAt(end)) == time) {
-                end++;
-            }
-            ChatComponentText run = text(formatted.substring(index, end),
-                    nearestFormatting(color), false);
-            if (time) {
-                run.getChatStyle().setItalic(Boolean.TRUE);
-            }
-            root.appendSibling(ChatPrefixMarker.timestamp(run, color));
-            index = end;
-        }
-    }
-
-    private static boolean isTimeCharacter(char character) {
-        return Character.isDigit(character) || character == ':';
     }
 
     /**

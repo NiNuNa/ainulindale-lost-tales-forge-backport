@@ -69,6 +69,13 @@ final class ChatInlineIcons {
      * wider.
      */
     static final int MARK_HEAD_SLOT_WIDTH = 13;
+    /**
+     * The slot a head wearing a presence sphere reserves: the sphere
+     * stands past the face, and the head and its sphere are one icon, so
+     * what follows keeps its clear space from the sphere.
+     */
+    static final int PRESENCE_HEAD_SLOT_WIDTH =
+            HEAD_SLOT_WIDTH + ChatPresenceMark.OVERHANG_X;
     /** Where the face starts inside that slot. */
     static final float HEAD_SLOT_INSET = 1.0F;
     /** The clear space a name keeps from what is written either side. */
@@ -94,8 +101,8 @@ final class ChatInlineIcons {
 
     /**
      * How far the cursor moves past a component that declares its own
-     * width rather than being measured — a head's slot, a plain gap —
-     * or -1 for anything measured from its text. Every walk over a line
+     * width rather than being measured — a head's slot, a plain gap, the
+     * stamp behind a name — or -1 for anything measured from its text. Every walk over a line
      * asks here, so drawing, wrapping and hit testing cannot disagree
      * about where the next glyph starts.
      */
@@ -112,8 +119,15 @@ final class ChatInlineIcons {
                              int displayScaleFactor) {
         ChatHeadMarker.Data head = ChatHeadMarker.headOf(part);
         if (head != null) {
-            return head.mark() != null
-                    ? MARK_HEAD_SLOT_WIDTH : HEAD_SLOT_WIDTH;
+            if (head.avatar) {
+                // Drawn in the open window's timestamp area, not the row.
+                return 0;
+            }
+            if (head.mark() != null) {
+                return MARK_HEAD_SLOT_WIDTH;
+            }
+            return ChatPresenceMark.wears(head)
+                    ? PRESENCE_HEAD_SLOT_WIDTH : HEAD_SLOT_WIDTH;
         }
         if (ChatReplyMarker.isIconSlot(part)) {
             return ChatReplyMarker.ICON_SLOT_WIDTH;
@@ -129,6 +143,10 @@ final class ChatInlineIcons {
         if (share != null && share.icon && share.kind == ChatShareKind.ITEM) {
             return displayScaleFactor < 0 ? itemSlotWidth()
                     : itemSlotWidth(displayScaleFactor);
+        }
+        int stamp = ChatStampMarker.widthOf(part);
+        if (stamp >= 0) {
+            return stamp;
         }
         return ChatSpacerMarker.decode(part);
     }

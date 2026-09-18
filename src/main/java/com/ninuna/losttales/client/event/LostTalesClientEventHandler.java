@@ -203,6 +203,9 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         // else instead; see onClientConnect. Only what describes the
         // connection itself goes here.
         ClientChatTypingState.clear();
+        // Who shows what is this connection's news; the next server says
+        // it afresh. This player's own choices stay on file.
+        ClientChatPresence.clear();
         // What the server said about this session's Discord posts is not
         // said again on the next join.
         ClientChatDeliveryMarks.clear();
@@ -256,7 +259,6 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
             // somewhere else leaves the code's own channels alone.
             ChatChannel.resetToBuiltIn();
             ChatProfanityCatalog.resetToBundled();
-            ClientChatPresence.clear();
             ClientChatShowcaseStore.clear();
             LostTalesChatPresentation.clear();
             LostTalesCharacterHeadIconRenderer.clearAccountSkinCache();
@@ -264,6 +266,9 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         // The place's remembered whisper tabs come back where they were,
         // before anything is replayed into them.
         ChatWindowLayout.restoreConversations(ClientChatSession.currentKey());
+        // So do the statuses chosen here, told once the player stands in
+        // the world.
+        ClientChatPresence.beginSession(ClientChatSession.currentKey());
     }
 
     @SubscribeEvent

@@ -97,11 +97,6 @@ final class ChatHover {
     ChatInputCompletion.Slot suggestion;
     int toolbarKind = -1;
     /**
-     * On a window's lines, the chat line id of the message whose stamp
-     * is under the pointer; 0 anywhere else.
-     */
-    int stampLineId;
-    /**
      * On a window's lines, the chat line id of the message whose
      * delivery mark is under the pointer; 0 anywhere else.
      */

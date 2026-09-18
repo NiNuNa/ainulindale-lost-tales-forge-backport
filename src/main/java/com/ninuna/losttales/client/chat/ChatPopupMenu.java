@@ -216,11 +216,13 @@ final class ChatPopupMenu {
     private int[] filterHint = NO_KEYS;
     private long filterNanos;
     /**
-     * How far each lighting sprite has crossed to its lit artwork, by its
-     * row's id, so a list handed over again as it is typed into carries
-     * on from what is on screen; and when the crossfades last stepped.
+     * How far each lighting row has crossed to its lit look, by the row's
+     * id — a sprite to its lit artwork, a tab's name to the tab's colour
+     * — so a list handed over again as it is typed into carries on from
+     * what is on screen; and when the crossfades last stepped.
      */
     private final Map<String, Float> spriteFades = new HashMap<String, Float>();
+    private final Map<String, Float> labelFades = new HashMap<String, Float>();
     private long spriteNanos;
 
     boolean isOpen() {
@@ -365,6 +367,7 @@ final class ChatPopupMenu {
             // on the open list glide.
             this.renderedScrollRows = this.scrollRows;
             this.spriteFades.clear();
+            this.labelFades.clear();
         }
     }
 
@@ -419,6 +422,7 @@ final class ChatPopupMenu {
         this.filterPrompt = "";
         this.filterHint = NO_KEYS;
         this.spriteFades.clear();
+        this.labelFades.clear();
         this.spriteNanos = 0L;
         this.fieldHeight = 0;
     }
@@ -534,12 +538,27 @@ final class ChatPopupMenu {
      * shows its sprite lit instead of lighting it up.
      */
     private float spriteFade(Entry entry, boolean hovered, double elapsed) {
-        boolean lit = hovered || entry.chosen;
-        Float kept = this.spriteFades.get(entry.id);
+        return stepFade(this.spriteFades, entry, hovered || entry.chosen,
+                elapsed);
+    }
+
+    /**
+     * One step of the crossfade a row naming a tab takes its name to the
+     * tab's colour on, while the row is hovered: the tab's own name does
+     * the same under the pointer.
+     */
+    private float labelFade(Entry entry, boolean hovered, double elapsed) {
+        return stepFade(this.labelFades, entry, hovered, elapsed);
+    }
+
+    /** One step of a row's crossfade in {@code fades}, a new row starting where it is headed. */
+    private static float stepFade(Map<String, Float> fades, Entry entry,
+                                  boolean lit, double elapsed) {
+        Float kept = fades.get(entry.id);
         float fade = kept == null ? (lit ? 1.0F : 0.0F)
                 : LostTalesChatVisualStyle.hoverFade(kept.floatValue(), lit,
                         elapsed);
-        this.spriteFades.put(entry.id, Float.valueOf(fade));
+        fades.put(entry.id, Float.valueOf(fade));
         return fade;
     }
 
@@ -678,29 +697,37 @@ final class ChatPopupMenu {
                             1.0F, 1.0F);
                 }
             } else if (entry.sprite != null) {
+                // Centred in the icon column and on the label's capitals,
+                // the odd pixel right and up.
                 int spriteX = this.x + this.labelX - ChatChannelIcons.SIZE
-                        - ChatChannelIcons.GAP + 1;
+                        - ChatChannelIcons.GAP + (ChatChannelIcons.SIZE
+                                - entry.sprite.getWidth() + 1) / 2;
+                int spriteY = labelTop + Math.floorDiv(
+                        LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT
+                                - entry.sprite.getHeight(), 2);
                 if (entry.litSprite == null) {
-                    entry.sprite.drawWithShadow(spriteX, rowY + 2, 255);
+                    entry.sprite.drawWithShadow(spriteX, spriteY, 255);
                 } else {
                     LostTalesUiSheet.drawPairWithShadow(entry.sprite,
                             entry.litSprite,
                             spriteFade(entry, entry == hovered, elapsed),
-                            spriteX, rowY + 2, 255);
+                            spriteX, spriteY, 255);
                 }
             }
             // Text at full opacity always; a muted channel is italic, the
-            // hovered row is told by its highlight.
-            if (entry.labelColor >= 0) {
-                LostTalesChatVisualStyle.drawColored(font,
-                        entry.dim ? "§o" + entry.label : entry.label,
-                        this.x + this.labelX, rowY + 2, entry.labelColor,
-                        255);
-            } else {
-                LostTalesChatVisualStyle.drawPlain(font,
-                        entry.dim ? "§o" + entry.label : entry.label,
-                        this.x + this.labelX, rowY + 2, 255);
+            // hovered row is told by its highlight, and a row naming a
+            // tab takes the tab's colour as it lights, as the tab's own
+            // name does.
+            int labelRgb = entry.labelColor >= 0 ? entry.labelColor
+                    : LostTalesChatVisualStyle.IVORY;
+            if (entry.icon != null) {
+                labelRgb = LostTalesChatVisualStyle.blend(labelRgb,
+                        ClientChatChannelState.displayColor(entry.icon),
+                        labelFade(entry, entry == hovered, elapsed));
             }
+            LostTalesChatVisualStyle.drawColored(font,
+                    entry.dim ? "§o" + entry.label : entry.label,
+                    this.x + this.labelX, rowY + 2, labelRgb, 255);
             rowY += ROW_HEIGHT;
         }
         } finally {

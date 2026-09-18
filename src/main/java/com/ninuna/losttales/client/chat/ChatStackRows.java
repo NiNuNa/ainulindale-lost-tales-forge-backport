@@ -3,14 +3,17 @@ package com.ninuna.losttales.client.chat;
 import java.util.Arrays;
 import java.util.List;
 import net.minecraft.client.gui.ChatLine;
+import net.minecraft.util.IChatComponent;
 
 /**
  * How tall each row of a view's stack is, and where every row starts,
  * measured up from the baseline in the chat's own (unscaled) pixels.
  *
- * <p>The stack's rows are not all one height: a message's row and a
- * day's rule are a whole line, while the blank row between two runs is
- * two thirds of one, so groups read apart without a whole empty line
+ * <p>The stack's rows are not all one height: every row is as tall as
+ * the text it is drawn in — a message's row and a day's rule a whole
+ * line, the row naming its speaker the large text's height, a reply's
+ * quote the small text's — and the blank row between two runs is two
+ * thirds of a line, so groups read apart without a whole empty line
  * between them. The unread divider is a chat element like a run: its
  * row holds its own line and the same gap on either side of it, sharing
  * a blank row that already stands beside it. Scrolling still counts
@@ -49,8 +52,25 @@ final class ChatStackRows {
     private int dividerGapBelow;
     /** The height reaction rows were laid out at: it follows the display. */
     private int reactionHeight;
+    /** The state the rows were laid out for: the sizes differ by it. */
+    private boolean chatOpen = true;
+    /** The height the speaker's rows were laid out at; the display's too. */
+    private int speakerHeight;
+    /** The height a reply's quote row was laid out at. */
+    private int quoteHeight;
+    /** The height the rows of a message's words were laid out at. */
+    private int messageHeight;
 
-    /** Lays the rows of a view's line list out, the divider's row included. */
+    /**
+     * Lays the rows of a view's line list out, the divider's row
+     * included, at the sizes {@code chatOpen} draws them at.
+     */
+    void reset(List<ChatLine> lines, int dividerIndex, boolean chatOpen) {
+        this.chatOpen = chatOpen;
+        reset(lines, dividerIndex);
+    }
+
+    /** Lays the rows out for the open window's sizes. */
     void reset(List<ChatLine> lines, int dividerIndex) {
         this.source = lines;
         this.sourceSize = lines == null ? 0 : lines.size();
@@ -58,6 +78,9 @@ final class ChatStackRows {
         this.dividerGapBelow = dividerIndex >= 0
                 ? gapBeside(lines, dividerIndex) : 0;
         this.reactionHeight = reactionRowHeight();
+        this.speakerHeight = speakerRowHeight(this.chatOpen);
+        this.quoteHeight = quoteRowHeight(this.chatOpen);
+        this.messageHeight = messageRowHeight(this.chatOpen);
         int rows = this.sourceSize + (dividerIndex >= 0 ? 1 : 0);
         ensureCapacity(rows);
         this.count = rows;
@@ -69,7 +92,9 @@ final class ChatStackRows {
             } else {
                 int line = LostTalesChatOverlayRenderer.lineOfRow(row,
                         dividerIndex);
-                height = heightOf(lines.get(line), this.reactionHeight);
+                height = heightOf(lines.get(line), this.reactionHeight,
+                        this.speakerHeight, this.quoteHeight,
+                        this.messageHeight);
             }
             this.tops[row + 1] = this.tops[row] + height;
         }
@@ -99,30 +124,61 @@ final class ChatStackRows {
 
     /**
      * True when the rows describe the given list with the given divider,
-     * at the height a reaction row takes on the display as it is now.
+     * at the heights every kind of row takes on the display, and in the
+     * state, as they are now.
      */
-    boolean describes(List<ChatLine> lines, int size, int dividerIndex) {
+    boolean describes(List<ChatLine> lines, int size, int dividerIndex,
+                      boolean chatOpen) {
         return this.source == lines && this.sourceSize == size
                 && this.dividerIndex == dividerIndex
-                && this.reactionHeight == reactionRowHeight();
+                && this.chatOpen == chatOpen
+                && this.reactionHeight == reactionRowHeight()
+                && this.speakerHeight == speakerRowHeight(chatOpen)
+                && this.quoteHeight == quoteRowHeight(chatOpen)
+                && this.messageHeight == messageRowHeight(chatOpen);
+    }
+
+    /** As above for the open window's sizes. */
+    boolean describes(List<ChatLine> lines, int size, int dividerIndex) {
+        return describes(lines, size, dividerIndex, true);
     }
 
     /**
      * The height a line's row takes: {@link #SPACER_HEIGHT} for a blank
      * row, between two runs or beside a day's rule, a message's reaction
-     * row as tall as its chips need ({@link #reactionRowHeight}), and a
-     * whole line for any other.
+     * row as tall as its chips need ({@link #reactionRowHeight}), and
+     * every other row as tall as the text it is drawn in: the row naming
+     * the speaker ({@link #speakerRowHeight}), a reply's quote
+     * ({@link #quoteRowHeight}) and the rows of a message's own words
+     * ({@link #messageRowHeight}), which the closed feed may draw
+     * smaller. A whole line for anything else, a line of another mod's
+     * included.
      */
     static int heightOf(ChatLine line) {
-        return heightOf(line, reactionRowHeight());
+        return heightOf(line, reactionRowHeight(), speakerRowHeight(true),
+                quoteRowHeight(true), messageRowHeight(true));
     }
 
-    private static int heightOf(ChatLine line, int reactionHeight) {
+    private static int heightOf(ChatLine line, int reactionHeight,
+                                int speakerHeight, int quoteHeight,
+                                int messageHeight) {
         if (ChatWindowLines.isSpacer(line)) {
             return SPACER_HEIGHT;
         }
-        return line != null && ChatReactionMarker.isReactionRow(
-                line.func_151461_a()) ? reactionHeight : LINE_HEIGHT;
+        if (line == null) {
+            return LINE_HEIGHT;
+        }
+        IChatComponent row = line.func_151461_a();
+        if (ChatReactionMarker.isReactionRow(row)) {
+            return reactionHeight;
+        }
+        if (ChatLayoutMarker.isHeaderRow(row)) {
+            return speakerHeight;
+        }
+        if (ChatReplyMarker.isQuoteRow(row)) {
+            return quoteHeight;
+        }
+        return ChatLayoutMarker.isBodyRow(row) ? messageHeight : LINE_HEIGHT;
     }
 
     /**
@@ -140,6 +196,32 @@ final class ChatStackRows {
     static int reactionRowHeight(float smallScale) {
         return Math.max(LINE_HEIGHT, (int)Math.ceil(
                 ChatReactionMarker.HEIGHT * smallScale - 0.001F));
+    }
+
+    /**
+     * How tall a row drawn at {@code rowScale} of a message's words is:
+     * the words' own row at that size. Every row keeps the line it
+     * stands on, so the room one gains or gives back is above it, and a
+     * speaker stays over their words while a quote sits close over the
+     * message answering it.
+     */
+    static int rowHeight(float rowScale) {
+        return Math.max(1, (int)Math.ceil(LINE_HEIGHT * rowScale - 0.001F));
+    }
+
+    /** How tall the row a message names its speaker on is. */
+    static int speakerRowHeight(boolean chatOpen) {
+        return rowHeight(LostTalesChatVisualStyle.speakerRowScale(chatOpen));
+    }
+
+    /** How tall the row a reply opens with is. */
+    static int quoteRowHeight(boolean chatOpen) {
+        return rowHeight(LostTalesChatVisualStyle.quoteRowScale(chatOpen));
+    }
+
+    /** How tall a row of a message's own words is. */
+    static int messageRowHeight(boolean chatOpen) {
+        return rowHeight(LostTalesChatVisualStyle.messageRowScale(chatOpen));
     }
 
     /**

@@ -6,7 +6,6 @@ import java.util.List;
 import com.ninuna.losttales.client.gui.LostTalesGuiPointer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiNewChat;
-import org.lwjgl.input.Mouse;
 
 /**
  * Where chat windows sit on screen. A window is one unit — tab row,

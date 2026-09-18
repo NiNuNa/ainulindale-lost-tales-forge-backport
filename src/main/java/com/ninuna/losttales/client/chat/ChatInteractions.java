@@ -37,6 +37,8 @@ final class ChatInteractions {
         REPLY_JUMP,
         /** A reaction chip adds the reader's reaction, or takes it back. */
         REACTION,
+        /** The button a reaction row ends on opens the picker to add one. */
+        ADD_REACTION,
         /** An achievement opens on its page of the achievements screen. */
         ACHIEVEMENT,
         /** A shared map marker flies the map to it. */
@@ -89,6 +91,9 @@ final class ChatInteractions {
         if (ChatReactionMarker.isMarker(part)) {
             return Action.REACTION;
         }
+        if (ChatReactionMarker.isAddButton(part)) {
+            return Action.ADD_REACTION;
+        }
         if (isAchievement(part)) {
             return Action.ACHIEVEMENT;
         }
@@ -103,11 +108,12 @@ final class ChatInteractions {
                     : Action.CONSUMED;
         }
         // The chat's own metadata rides on click events too — a colour,
-        // a timestamp, an emoji, a title, the chevron, an indent, a gap
-        // — and is wide enough to be hit; a click on any of it is spent
-        // rather than read as a suggestion.
+        // a channel prefix, the time behind a name, an emoji, a title,
+        // the chevron, an indent, a gap — and is wide enough to be hit;
+        // a click on any of it is spent rather than read as a suggestion.
         if (ChatColorMarker.isMarker(part)
                 || ChatPrefixMarker.isMarker(part)
+                || ChatStampMarker.isMarker(part)
                 || ChatEmojiMarker.isMarker(part)
                 || ChatTitleMarker.isMarker(part)
                 || ChatBodyMarker.isMarker(part)
@@ -231,6 +237,7 @@ final class ChatInteractions {
         ClickEvent click = part.getChatStyle().getChatClickEvent();
         if (click == null || ChatColorMarker.isMarker(part)
                 || ChatPrefixMarker.isMarker(part)
+                || ChatStampMarker.isMarker(part)
                 || ChatEmojiMarker.isMarker(part)
                 || ChatTitleMarker.isMarker(part)
                 || ChatReplyMarker.isMarker(part)
@@ -242,7 +249,8 @@ final class ChatInteractions {
                 || ChatHeadMarker.isMarker(part)
                 || ChatShowcaseMarker.decode(part) != null
                 || ChatMentionMarker.decode(part) != null
-                || ChatReactionMarker.isMarker(part)) {
+                || ChatReactionMarker.isMarker(part)
+                || ChatReactionMarker.isAddButton(part)) {
             return null;
         }
         return click;

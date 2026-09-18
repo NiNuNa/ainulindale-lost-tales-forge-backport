@@ -97,24 +97,4 @@ public final class LostTalesQuestMarkerHelper {
     public static String normalizeMarkerId(String markerId) {
         return markerId == null ? "" : markerId.trim();
     }
-
-    public static String describeMarkerMap(Map<String, String> markers) {
-        ArrayList<String> ids = new ArrayList<String>();
-        if (markers != null) {
-            for (String value : markers.values()) {
-                addMarkerIds(ids, value);
-            }
-        }
-        if (ids.isEmpty()) {
-            return "none";
-        }
-        StringBuilder builder = new StringBuilder();
-        for (String id : ids) {
-            if (builder.length() > 0) {
-                builder.append(", ");
-            }
-            builder.append(id);
-        }
-        return builder.toString();
-    }
 }

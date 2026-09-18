@@ -59,6 +59,12 @@ public final class LostTalesConfigFiles {
      * folder under the client folder holding one file per account.
      */
     public static final String CHAT_READ_MARKS = "chat/read_marks";
+    /**
+     * The status each account last chose for each of its identities on
+     * each server, a folder under the client folder holding one file per
+     * account.
+     */
+    public static final String CHAT_PRESENCE = "chat/statuses";
     /** Map marker favourites and recent destinations, under the client folder. */
     public static final String MAP_MARKERS = "map_markers.txt";
     /**

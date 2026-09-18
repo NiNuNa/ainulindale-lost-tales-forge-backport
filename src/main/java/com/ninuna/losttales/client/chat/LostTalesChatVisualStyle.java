@@ -339,13 +339,6 @@ final class LostTalesChatVisualStyle {
         return LostTalesUiInk.blend(fromRgb, toRgb, progress);
     }
 
-    private static int channel(int fromRgb, int toRgb, float progress,
-                               int shift) {
-        int from = (fromRgb >> shift) & 0xFF;
-        int to = (toRgb >> shift) & 0xFF;
-        return from + Math.round((to - from) * progress);
-    }
-
     /**
      * Puts the pipeline into the state every chat element is drawn in:
      * blended, so a shadow's two-thirds opacity and a fading line's alpha both
@@ -415,9 +408,7 @@ final class LostTalesChatVisualStyle {
      * default chat scale that is {@link #smallTextScale}.
      */
     static float stackSmallScale() {
-        int factor = ChatWindowFrame.displayScaleFactor();
-        float chat = chatScale();
-        return smallPixels(chat, factor) / (float)factor / chat;
+        return stackRowScale(-1);
     }
 
     /**
@@ -432,15 +423,105 @@ final class LostTalesChatVisualStyle {
     }
 
     /**
+     * Display pixels per font pixel of a row drawn {@code step} whole
+     * display pixels from the words' own size, at {@code chatScale} on a
+     * display of {@code displayScaleFactor} pixels per GUI pixel: that
+     * many steps below or above the nearest whole number the words
+     * reach, never under one. Step zero is the words' own size, whatever
+     * the chat scale makes of it.
+     *
+     * <p>Only a whole number of display pixels per font pixel keeps the
+     * font and the pixel art crisp, so this ladder is every size the
+     * chat has: the small text is one step down and a message's speaker
+     * one step up.</p>
+     */
+    static int rowPixels(float chatScale, int displayScaleFactor, int step) {
+        float words = Math.max(0.0F, chatScale)
+                * Math.max(1, displayScaleFactor);
+        if (step > 0) {
+            return (int)Math.floor(words + 0.001F) + step;
+        }
+        if (step < 0) {
+            return Math.max(1, (int)Math.ceil(words - 0.001F) + step);
+        }
+        return Math.max(1, Math.round(words));
+    }
+
+    /**
+     * The size a row drawn {@code step} steps from the words is, in the
+     * stack's own units, since its matrix already carries the chat
+     * scale. Step zero is the words' own size exactly.
+     */
+    static float stackRowScale(int step) {
+        if (step == 0) {
+            return 1.0F;
+        }
+        int factor = ChatWindowFrame.displayScaleFactor();
+        float chat = chatScale();
+        float scale = rowPixels(chat, factor, step) / (float)factor / chat;
+        // A display with no smaller size to offer keeps the words' own,
+        // rather than handing a step down back as a step up.
+        return step < 0 ? Math.min(1.0F, scale) : Math.max(1.0F, scale);
+    }
+
+    /**
+     * The step a size option names. The words are read here, where the
+     * option is read: {@code SMALLER} is one display pixel per font
+     * pixel down the ladder, {@code LARGER} one up, and anything else —
+     * {@code SAME} — the words' own size.
+     */
+    static int sizeStep(String option) {
+        if (LostTalesConfig.CHAT_SIZE_SMALLER.equals(option)) {
+            return -1;
+        }
+        return LostTalesConfig.CHAT_SIZE_LARGER.equals(option) ? 1 : 0;
+    }
+
+    /**
+     * The step a message's own words take in this state. The open
+     * window's words are the size every other row is measured against,
+     * so they never step; the closed feed may take them down, and
+     * everything a message is made of goes with them.
+     */
+    static int messageStep(boolean chatOpen) {
+        return chatOpen ? 0
+                : sizeStep(LostTalesConfig.chatFeedMessageSize);
+    }
+
+    /**
+     * The size the row naming a message's speaker is drawn at: its own
+     * step from the words <em>of that state</em>, so the feed moves the
+     * speaker, the words and a quote together by moving the words.
+     */
+    static float speakerRowScale(boolean chatOpen) {
+        return stackRowScale(messageStep(chatOpen) + sizeStep(chatOpen
+                ? LostTalesConfig.chatSpeakerSize
+                : LostTalesConfig.chatFeedSpeakerSize));
+    }
+
+    /** The size a message's own words are drawn at. */
+    static float messageRowScale(boolean chatOpen) {
+        return stackRowScale(messageStep(chatOpen));
+    }
+
+    /**
+     * The size the row a reply opens with is drawn at: its own step from
+     * the words of that state, the window's option or the feed's.
+     */
+    static float quoteRowScale(boolean chatOpen) {
+        return stackRowScale(messageStep(chatOpen) + sizeStep(chatOpen
+                ? LostTalesConfig.chatQuoteSize
+                : LostTalesConfig.chatFeedQuoteSize));
+    }
+
+    /**
      * Display pixels per font pixel of small text beside words drawn at
      * {@code chatScale} on a display of {@code displayScaleFactor}
      * pixels per GUI pixel: the largest whole number below the words'
-     * own, and never under one.
+     * own, and never under one — one step down the ladder.
      */
     static int smallPixels(float chatScale, int displayScaleFactor) {
-        float words = Math.max(0.0F, chatScale)
-                * Math.max(1, displayScaleFactor);
-        return Math.max(1, (int)Math.ceil(words - 0.001F) - 1);
+        return rowPixels(chatScale, displayScaleFactor, -1);
     }
 
     /**
@@ -453,6 +534,59 @@ final class LostTalesChatVisualStyle {
         float spare = LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT
                 * (words - smallPixels(chatScale, displayScaleFactor));
         return Math.max(0, (int)Math.floor(spare / 2.0F + 0.001F));
+    }
+
+    /**
+     * The size large text is drawn at: one display pixel more per font
+     * pixel than the text beside it, the next step up the screen can
+     * draw without pixels of two sizes. Double at GUI scale 1, three
+     * halves at 2, four thirds at 3, five quarters at 4. Asked with the
+     * display scale of this frame, so a GUI-scale change picks the new
+     * step at once.
+     */
+    static float largeTextScale(int displayScaleFactor) {
+        int factor = Math.max(1, displayScaleFactor);
+        return (factor + 1) / (float)factor;
+    }
+
+    /**
+     * How far from the words' top edge a row drawn at another size than
+     * they are starts, in the stack's units ({@link #rowRise}), negative
+     * being up the screen: every row of the stack stands on the line the
+     * words stand on, so a speaker's row takes the room it gains above
+     * them and a reply's quote gives its room back there.
+     */
+    static float stackRowTopOffset(float rowScale) {
+        int factor = ChatWindowFrame.displayScaleFactor();
+        float chat = chatScale();
+        float words = Math.max(0.001F, factor * chat);
+        return -rowRise(chat, factor,
+                Math.max(1, Math.round(rowScale * words))) / words;
+    }
+
+    /**
+     * Display pixels per font pixel of large text beside words drawn at
+     * {@code chatScale} on a display of {@code displayScaleFactor}
+     * pixels per GUI pixel: the smallest whole number above the words'
+     * own. Unlike the small size, every scale has one.
+     */
+    static int largePixels(float chatScale, int displayScaleFactor) {
+        return rowPixels(chatScale, displayScaleFactor, 1);
+    }
+
+    /**
+     * Display pixels a row drawn at {@code rowPixels} display pixels per
+     * font pixel starts above the words' own top edge, negative for a
+     * row drawn smaller than they are: the row is the words' row grown
+     * or shrunk from the bottom, so the two share the line they stand
+     * on.
+     */
+    static int rowRise(float chatScale, int displayScaleFactor,
+                       int rowPixels) {
+        float words = Math.max(0.0F, chatScale)
+                * Math.max(1, displayScaleFactor);
+        return Math.round(LostTalesChatOverlayRenderer.TEXT_OFFSET
+                * (rowPixels - words));
     }
 
     static void drawFormatted(FontRenderer font, IChatComponent line,
@@ -764,11 +898,14 @@ final class LostTalesChatVisualStyle {
     /**
      * Whether a run draws something across the whole slot it takes — a
      * head or the mark standing for one, an emoji, a shared item's or
-     * marker's icon, a bubble, a reaction chip — rather than glyphs.
+     * marker's icon, a bubble, a reaction chip, the time behind a name —
+     * rather than glyphs of its own size.
      */
     private static boolean drawsSlot(IChatComponent part) {
         ChatShowcaseMarker.Data share = ChatShowcaseMarker.decode(part);
         return ChatHeadMarker.headOf(part) != null
+                || ChatStampMarker.isMarker(part)
+                || ChatReactionMarker.isAddButton(part)
                 || ChatReplyMarker.isIconSlot(part)
                 || ChatReactionMarker.isMarker(part)
                 || ChatEmojiMarker.decode(part) != null
@@ -863,6 +1000,20 @@ final class LostTalesChatVisualStyle {
                 // Zero-width layout metadata; an indent marker insets a
                 // continuation line under the message body.
                 cursor += layout.indent(chatOpen);
+                continue;
+            }
+            if (ChatStampMarker.isMarker(part)
+                    || ChatReactionMarker.isAddButton(part)) {
+                // The time behind a name and the button a reaction row
+                // ends on are the renderer's to draw; here they are room,
+                // and past the sender: the name's rule ends before them.
+                if (ruleStart >= 0) {
+                    drawRule(ruleStart, ruleEnd - ruleTrailing, y, ruleColor,
+                            alpha);
+                    ruleStart = -1;
+                }
+                identitySpan = false;
+                cursor += ChatInlineIcons.declaredWidth(part);
                 continue;
             }
             ChatReactionMarker.Data reaction = ChatReactionMarker.decode(part);
@@ -1176,6 +1327,63 @@ final class LostTalesChatVisualStyle {
         } finally {
             GL11.glPopMatrix();
         }
+    }
+
+    /**
+     * The button a reaction row ends on ({@link ChatReactionMarker#addButton}),
+     * at {@code x} on a reaction row whose text stands at zero: a framed
+     * button as tall as a chip, holding the picker's own smile — what the
+     * toolbar's React holds — lit as far as {@code lit}.
+     */
+    static void drawReactionAddButton(int x, int alpha, float lit) {
+        if (alpha < MIN_VISIBLE_ALPHA) {
+            return;
+        }
+        int top = -ChatReactionMarker.TEXT_DROP;
+        GL11.glPushMatrix();
+        try {
+            GL11.glTranslatef(0.0F, 0.0F,
+                    LostTalesChatOverlayRenderer.CHIP_DEPTH);
+            LostTalesUiFramedButton.drawSurface(x, top,
+                    ChatReactionMarker.ADD_WIDTH, ChatReactionMarker.HEIGHT,
+                    lit, Math.round(alpha * INSET_ALPHA / 255.0F));
+            beginContent();
+            ChatInlineIcons.drawEmoji(Minecraft.getMinecraft(),
+                    ChatEmoji.SLIGHT_SMILE, x + ChatReactionMarker.PAD,
+                    chipEmojiTop(top), ChatInlineIcons.CONTENT_SIZE, alpha);
+            LostTalesUiFramedButton.drawInk(x, top,
+                    ChatReactionMarker.ADD_WIDTH, ChatReactionMarker.HEIGHT,
+                    lit, alpha);
+        } finally {
+            GL11.glPopMatrix();
+        }
+    }
+
+    /**
+     * Where a reaction row's add button stands in its text space — its
+     * left edge and its width — found by the walk that draws the row, or
+     * null for a row without one.
+     */
+    static int[] addButtonBox(FontRenderer font, IChatComponent row,
+                              boolean chatOpen) {
+        if (font == null || row == null) {
+            return null;
+        }
+        int cursor = 0;
+        for (Object value : row) {
+            if (!(value instanceof IChatComponent)) {
+                continue;
+            }
+            IChatComponent part = (IChatComponent)value;
+            if (ChatPrefixMarker.isHidden(part, chatOpen)) {
+                continue;
+            }
+            if (ChatReactionMarker.isAddButton(part)) {
+                return new int[] {cursor, ChatReactionMarker.ADD_WIDTH};
+            }
+            cursor += partWidth(font, part, chatOpen);
+        }
+        return null;
     }
 
     /**

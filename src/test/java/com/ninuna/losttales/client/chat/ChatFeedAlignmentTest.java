@@ -19,8 +19,8 @@ public final class ChatFeedAlignmentTest {
         assertEquals(ChatFeedAlignment.RIGHT, ChatFeedAlignment.of(" right "));
         assertEquals(ChatFeedAlignment.CENTRE, ChatFeedAlignment.of("Centre"));
         assertEquals(ChatFeedAlignment.CENTRE, ChatFeedAlignment.of("CENTER"));
-        assertEquals(ChatFeedAlignment.LEFT, ChatFeedAlignment.of("middle"));
-        assertEquals(ChatFeedAlignment.LEFT, ChatFeedAlignment.of(null));
+        assertEquals(ChatFeedAlignment.CENTRE, ChatFeedAlignment.of("middle"));
+        assertEquals(ChatFeedAlignment.CENTRE, ChatFeedAlignment.of(null));
     }
 
     @Test

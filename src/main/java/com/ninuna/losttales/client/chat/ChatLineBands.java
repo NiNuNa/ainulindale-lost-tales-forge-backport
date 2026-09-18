@@ -16,6 +16,12 @@ final class ChatLineBands {
 
     private int[] viewIndex = new int[INITIAL_CAPACITY];
     private float[] left = new float[INITIAL_CAPACITY];
+    /**
+     * Per band, where it starts answering the pointer: the text origin, or
+     * the window's own edge for a row of an open window, whose timestamp
+     * area lights the row as its words do.
+     */
+    private float[] reach = new float[INITIAL_CAPACITY];
     private float[] right = new float[INITIAL_CAPACITY];
     private float[] top = new float[INITIAL_CAPACITY];
     private float[] bottom = new float[INITIAL_CAPACITY];
@@ -57,10 +63,23 @@ final class ChatLineBands {
     void add(int lineViewIndex, float bandLeft, float bandRight,
              float bandTop, float bandBottom, float rowPivot,
              float rowScale) {
+        add(lineViewIndex, bandLeft, bandRight, bandTop, bandBottom,
+                rowPivot, rowScale, bandLeft);
+    }
+
+    /**
+     * As above for a band that answers the pointer from {@code reachLeft}
+     * on, left of where its text starts: an open window's row, from the
+     * window's edge across its timestamp area.
+     */
+    void add(int lineViewIndex, float bandLeft, float bandRight,
+             float bandTop, float bandBottom, float rowPivot,
+             float rowScale, float reachLeft) {
         if (this.count == this.viewIndex.length) {
             int capacity = this.viewIndex.length * 2;
             this.viewIndex = Arrays.copyOf(this.viewIndex, capacity);
             this.left = Arrays.copyOf(this.left, capacity);
+            this.reach = Arrays.copyOf(this.reach, capacity);
             this.right = Arrays.copyOf(this.right, capacity);
             this.top = Arrays.copyOf(this.top, capacity);
             this.bottom = Arrays.copyOf(this.bottom, capacity);
@@ -69,6 +88,7 @@ final class ChatLineBands {
         }
         this.viewIndex[this.count] = lineViewIndex;
         this.left[this.count] = bandLeft;
+        this.reach[this.count] = Math.min(bandLeft, reachLeft);
         this.right[this.count] = bandRight;
         this.top[this.count] = Math.min(bandTop, bandBottom);
         this.bottom[this.count] = Math.max(bandTop, bandBottom);
@@ -86,7 +106,7 @@ final class ChatLineBands {
     int find(float x, float y) {
         for (int index = 0; index < this.count; index++) {
             if (y >= this.top[index] && y < this.bottom[index]
-                    && x >= this.left[index] && x < this.right[index]) {
+                    && x >= this.reach[index] && x < this.right[index]) {
                 return index;
             }
         }

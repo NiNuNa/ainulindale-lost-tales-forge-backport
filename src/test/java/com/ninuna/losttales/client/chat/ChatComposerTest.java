@@ -110,7 +110,8 @@ public final class ChatComposerTest {
         ChatComposer composer = new ChatComposer();
         composer.startReply(ChatTab.of(ChatChannel.ALL), -7L, "Aldric",
                 "/warp home", head(ChatHeadMarker.encode(self, false,
-                        "skin", "Aldric", 0xFCECD1, 0x64B082)));
+                        UUID.randomUUID(), "skin", "Aldric", 0xFCECD1,
+                        0x64B082)));
         ChatReplyReference reference = composer.replyReference();
         assertEquals(self, reference.getSenderId());
         assertFalse(reference.isAccountLine());
@@ -130,8 +131,8 @@ public final class ChatComposerTest {
 
         composer.startReply(ChatTab.of(ChatChannel.ALL), ChatMessageIds.NONE,
                 "Server", "Unknown command", head(ChatHeadMarker.encode(
-                        LostTalesChatMessagePacket.SERVER_SENDER_ID, true, "",
-                        "Server", 0xFCECD1, 0x9C807E)));
+                        LostTalesChatMessagePacket.SERVER_SENDER_ID, true,
+                        null, "", "Server", 0xFCECD1, 0x9C807E)));
         reference = composer.replyReference();
         assertEquals(LostTalesChatMessagePacket.SERVER_SENDER_ID,
                 reference.getSenderId());
@@ -148,8 +149,8 @@ public final class ChatComposerTest {
         line.appendSibling(ChatReplyMarker.applyHead(
                 new ChatComponentText("  "), 0xFFFFFF, 10L, quoted, true,
                 false, ""));
-        line.appendSibling(slot(ChatHeadMarker.encode(sender, true, "",
-                "Steve", 0xFCECD1, 0xFCECD1)));
+        line.appendSibling(slot(ChatHeadMarker.encode(sender, true, null,
+                "", "Steve", 0xFCECD1, 0xFCECD1)));
         ChatHeadMarker.Data head = ChatHeadMarker.of(line);
         assertEquals(sender, head.senderId);
         assertNull(ChatHeadMarker.of(new ChatComponentText("no head")));

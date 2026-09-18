@@ -5,6 +5,7 @@ import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 import com.ninuna.losttales.client.skin.LostTalesAccountSkins;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
+import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.minecraft.MinecraftProfileTexture;
 import java.util.Map;
@@ -37,6 +38,16 @@ import org.lwjgl.opengl.GL11;
  * is the one thing drawn larger than its texels — a quarter again,
  * about the face's centre, which is what stands it off as the model's
  * second cube stands off the first.</p>
+ *
+ * <p>A head always stands on the display's own grid, wherever the caller
+ * puts it ({@link LostTalesDisplayPixels#snapShift}): the headwear's
+ * texels do not fill whole pixels, so how many pixels each one takes
+ * depends on where the head stands, and a head carried by fractions of
+ * a pixel — a chat scrolling under it — would shuffle them every frame;
+ * and where one of their edges falls on a pixel's middle, the pixel
+ * would show one texel or the other by rounding alone. On the grid, a
+ * hair past each pixel's edge, every texel keeps its pixels, and the
+ * head moves as the text beside it does.</p>
  */
 public final class LostTalesCharacterHeadIconRenderer {
 
@@ -51,6 +62,34 @@ public final class LostTalesCharacterHeadIconRenderer {
      * it is a hat, and the depth is worth more than its edges are.
      */
     private static final float OUTER_LAYER_SCALE = 1.25F;
+
+    /**
+     * The corner every head drawn right now gives up, in the units the
+     * head is drawn in: a head wearing a presence sphere is cut away
+     * from the sphere so the sphere sits in the head rather than on it,
+     * with a clear pixel between them. Set around a head's draw and
+     * cleared after it, like the silhouette state, so a head is cut
+     * whatever matrix it is drawn in and whichever of its layers is
+     * being drawn.
+     *
+     * <p>Two steps, not one square: the sphere is round, so the corner
+     * it points at keeps its pixel while the sides beside it go. The
+     * lower step reaches further left, the upper one starts higher and
+     * further right, and what survives is the three bands between
+     * them.</p>
+     */
+    private static boolean cutting;
+    private static float cutX;
+    private static float cutY;
+    private static float cutStepX;
+    private static float cutStepY;
+    /**
+     * How far the head being drawn was moved onto the display's grid; the
+     * cut, given where the caller put the head, moves with it.
+     */
+    private static float shiftX;
+    private static float shiftY;
+    private static final float[] SHIFT = new float[2];
 
     private static final Map<UUID, ResourceLocation> ACCOUNT_SKINS =
             new ConcurrentHashMap<UUID, ResourceLocation>();
@@ -193,6 +232,11 @@ public final class LostTalesCharacterHeadIconRenderer {
                 || alpha <= 0.0F) {
             return false;
         }
+        LostTalesDisplayPixels.snapShift(x, y, SHIFT);
+        x += SHIFT[0];
+        y += SHIFT[1];
+        shiftX = SHIFT[0];
+        shiftY = SHIFT[1];
         try {
             ResourceLocation location = new ResourceLocation(texturePath);
             float[] dimensions = measureNpcTexture(minecraft, location);
@@ -229,6 +273,8 @@ public final class LostTalesCharacterHeadIconRenderer {
         } catch (Throwable ignored) {
             return false;
         } finally {
+            shiftX = 0.0F;
+            shiftY = 0.0F;
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
         }
     }
@@ -303,6 +349,37 @@ public final class LostTalesCharacterHeadIconRenderer {
         } catch (RuntimeException ignored) {
             REQUESTED_ACCOUNT_SKINS.remove(ownerId);
         }
+    }
+
+    /**
+     * Cuts every head drawn until {@link #endCorner} away from
+     * {@code x}, {@code y} down and to the right. Always paired in a
+     * {@code finally}, so a head that fails to draw does not leave the
+     * cut standing.
+     */
+    public static void beginCorner(float x, float y) {
+        beginCorner(x, y, x, y);
+    }
+
+    /**
+     * As above in two steps: everything at or past {@code x} from
+     * {@code y} down goes, and so does everything at or past
+     * {@code stepX} from {@code stepY} down. {@code stepX} is the
+     * further right of the two and {@code stepY} the higher, so the
+     * head keeps the pixel in the notch between them.
+     */
+    public static void beginCorner(float x, float y, float stepX,
+                                   float stepY) {
+        cutting = true;
+        cutX = x;
+        cutY = y;
+        cutStepX = Math.max(x, stepX);
+        cutStepY = Math.min(y, stepY);
+    }
+
+    /** Ends the cut {@link #beginCorner} opened. */
+    public static void endCorner() {
+        cutting = false;
     }
 
     public static void clearAccountSkinCache() {
@@ -436,6 +513,11 @@ public final class LostTalesCharacterHeadIconRenderer {
                 || (red <= 0.0F && green <= 0.0F && blue <= 0.0F)) {
             return false;
         }
+        LostTalesDisplayPixels.snapShift(x, y, SHIFT);
+        x += SHIFT[0];
+        y += SHIFT[1];
+        shiftX = SHIFT[0];
+        shiftY = SHIFT[1];
         try {
             minecraft.getTextureManager().bindTexture(head.location);
             // A head is drawn wherever a caller wants one, and a GUI
@@ -479,6 +561,8 @@ public final class LostTalesCharacterHeadIconRenderer {
         } catch (Throwable ignored) {
             return false;
         } finally {
+            shiftX = 0.0F;
+            shiftY = 0.0F;
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
         }
     }
@@ -592,13 +676,63 @@ public final class LostTalesCharacterHeadIconRenderer {
         }
         double v0 = textureY / imageHeight;
         double v1 = (textureY + textureHeight) / imageHeight;
+        if (!cutting) {
+            quad(x, y, x + width, y + height, u0, v0, u1, v1);
+            return;
+        }
+        // The corner a head gives up to its presence sphere, in three
+        // bands: the rows above the upper step whole, the rows between
+        // the steps cut to the upper one, and the rows below cut to the
+        // lower. Each piece keeps the texels it covers, so every layer
+        // of the head is cut in the same place whatever size it is drawn
+        // at.
+        // The cut was given where the caller put the head; the head was
+        // moved onto the display's grid, and the cut goes with it.
+        float bottom = y + height;
+        float above = Math.min(bottom, cutStepY + shiftY);
+        if (above > y) {
+            quadPart(x, y, width, height, u0, v0, u1, v1,
+                    x, y, x + width, above);
+        }
+        float between = Math.min(bottom, cutY + shiftY);
+        float betweenTop = Math.max(y, above);
+        float stepRight = Math.min(x + width, cutStepX + shiftX);
+        if (between > betweenTop && stepRight > x) {
+            quadPart(x, y, width, height, u0, v0, u1, v1,
+                    x, betweenTop, stepRight, between);
+        }
+        float belowTop = Math.max(y, between);
+        float beside = Math.min(x + width, cutX + shiftX);
+        if (bottom > belowTop && beside > x) {
+            quadPart(x, y, width, height, u0, v0, u1, v1,
+                    x, belowTop, beside, bottom);
+        }
+    }
+
+    /** One piece of a quad, with the texels that piece covers. */
+    private static void quadPart(float x, float y, float width, float height,
+                                 double u0, double v0, double u1, double v1,
+                                 float left, float top, float right,
+                                 float bottom) {
+        quad(left, top, right, bottom,
+                lerp(u0, u1, (left - x) / width),
+                lerp(v0, v1, (top - y) / height),
+                lerp(u0, u1, (right - x) / width),
+                lerp(v0, v1, (bottom - y) / height));
+    }
+
+    private static double lerp(double from, double to, float share) {
+        return from + (to - from) * share;
+    }
+
+    private static void quad(float left, float top, float right, float bottom,
+                             double u0, double v0, double u1, double v1) {
         Tessellator tessellator = Tessellator.instance;
         tessellator.startDrawingQuads();
-        tessellator.addVertexWithUV(x, y + height, 0.0D, u0, v1);
-        tessellator.addVertexWithUV(
-                x + width, y + height, 0.0D, u1, v1);
-        tessellator.addVertexWithUV(x + width, y, 0.0D, u1, v0);
-        tessellator.addVertexWithUV(x, y, 0.0D, u0, v0);
+        tessellator.addVertexWithUV(left, bottom, 0.0D, u0, v1);
+        tessellator.addVertexWithUV(right, bottom, 0.0D, u1, v1);
+        tessellator.addVertexWithUV(right, top, 0.0D, u1, v0);
+        tessellator.addVertexWithUV(left, top, 0.0D, u0, v0);
         tessellator.draw();
     }
 

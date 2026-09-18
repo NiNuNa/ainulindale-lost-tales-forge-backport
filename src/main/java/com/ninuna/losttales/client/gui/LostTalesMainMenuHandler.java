@@ -1,6 +1,5 @@
 package com.ninuna.losttales.client.gui;
 
-import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.client.character.CharacterTemplate;
 import com.ninuna.losttales.client.character.CharacterTemplateStore;
 import com.ninuna.losttales.client.character.LostTalesClientAccount;

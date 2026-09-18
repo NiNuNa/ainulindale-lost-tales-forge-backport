@@ -63,9 +63,7 @@ public final class ChatEmojiMarkerTest {
     @Test
     public void presentationReplacesShortcodesWithMarkersInOrder() {
         boolean originalEmojis = LostTalesConfig.enableChatEmojis;
-        boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
         LostTalesConfig.enableChatEmojis = true;
-        LostTalesConfig.showChatTimestamps = false;
         try {
             IChatComponent message = LostTalesChatPresentation.build(
                     packet("Hi :smile: there :joy:"));
@@ -89,16 +87,13 @@ public final class ChatEmojiMarkerTest {
             assertEquals("Hi :smile: there :joy:", head.copyText);
         } finally {
             LostTalesConfig.enableChatEmojis = originalEmojis;
-            LostTalesConfig.showChatTimestamps = originalTimestamps;
         }
     }
 
     @Test
     public void disabledConfigKeepsShortcodesAsPlainText() {
         boolean originalEmojis = LostTalesConfig.enableChatEmojis;
-        boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
         LostTalesConfig.enableChatEmojis = false;
-        LostTalesConfig.showChatTimestamps = false;
         try {
             IChatComponent message = LostTalesChatPresentation.build(
                     packet("Hi :smile:"));
@@ -111,7 +106,6 @@ public final class ChatEmojiMarkerTest {
             assertTrue(plainText.toString().endsWith("Hi :smile:"));
         } finally {
             LostTalesConfig.enableChatEmojis = originalEmojis;
-            LostTalesConfig.showChatTimestamps = originalTimestamps;
         }
     }
 

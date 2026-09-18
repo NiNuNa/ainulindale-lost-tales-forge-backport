@@ -74,15 +74,6 @@ public final class LostTalesQuestRegistry {
         return sortedQuests;
     }
 
-    public static synchronized Collection<LostTalesQuestDefinition> getRuntimeQuests() {
-        ensureLoaded();
-        return Collections.unmodifiableCollection(new ArrayList<LostTalesQuestDefinition>(RUNTIME_QUESTS_BY_ID.values()));
-    }
-
-    public static synchronized boolean containsQuest(String questId) {
-        return getQuest(questId) != null;
-    }
-
     /**
      * Registers or replaces a runtime-authored quest definition.
      *
@@ -116,18 +107,6 @@ public final class LostTalesQuestRegistry {
             rebuildSortedQuests();
         }
         return registered;
-    }
-
-    public static synchronized boolean unregisterRuntimeQuest(String questId) {
-        ensureLoaded();
-        if (questId == null || questId.length() == 0) {
-            return false;
-        }
-        boolean removed = RUNTIME_QUESTS_BY_ID.remove(questId) != null;
-        if (removed) {
-            rebuildSortedQuests();
-        }
-        return removed;
     }
 
     public static synchronized void clearRuntimeQuests() {

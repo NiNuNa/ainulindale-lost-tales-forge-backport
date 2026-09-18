@@ -417,9 +417,9 @@ final class ChatWindowLines {
                 || chat == null || window == null || chatWidth <= 0) {
             return null;
         }
-        // The timestamp column at the window's left edge comes out of
-        // the room the messages may wrap to, so a line never runs out
-        // under the window's right edge to pay for it.
+        // The timestamp area at the window's left edge comes out of the
+        // room the messages may wrap to, so a line never runs out under
+        // the window's right edge to pay for it.
         ChatTimestampColumn columns =
                 ChatTimestampColumn.current(minecraft.fontRenderer);
         return forView(minecraft, chat, window.getId(), filter,
@@ -474,11 +474,26 @@ final class ChatWindowLines {
         // An item's slot is laid out for the display scale, so a change
         // of GUI scale lays the lines out again.
         int displayScale = ChatWindowFrame.displayScaleFactor();
+        // A row drawn at another size than the words has another width
+        // in its own text, so a size chosen in the config lays the lines
+        // out again.
+        float speakerScale =
+                LostTalesChatVisualStyle.speakerRowScale(chatOpen);
+        float messageScale =
+                LostTalesChatVisualStyle.messageRowScale(chatOpen);
+        float quoteScale =
+                LostTalesChatVisualStyle.quoteRowScale(chatOpen);
+        // A stamp behind a name says the day once it is not today, so a
+        // window is laid out again when the day turns.
+        long day = chatOpen ? ChatTimestampFormatter.dayKey(
+                System.currentTimeMillis()) : 0L;
         Cached cached = CACHE.get(viewId);
         if (cached == null || !cached.describes(width, colours, chatOpen,
-                displayScale, fading, filter)) {
+                displayScale, fading, filter, speakerScale, messageScale,
+                quoteScale, day)) {
             cached = new Cached(width, colours, chatOpen, displayScale,
-                    fading, filter);
+                    fading, filter, speakerScale, messageScale, quoteScale,
+                    day);
             CACHE.put(viewId, cached);
         }
         cached.refresh(minecraft.fontRenderer, messages, filter,
@@ -707,6 +722,12 @@ final class ChatWindowLines {
         /** Whether this view drops its lines a few seconds after they arrive. */
         private final boolean fading;
         private final ChatLineFilter filter;
+        /** The sizes the rows of a message were laid out at. */
+        private final float speakerScale;
+        private final float messageScale;
+        private final float quoteScale;
+        /** The day the stamps behind the names were written against. */
+        private final long day;
         /** The history this layout describes; unchanged means reusable. */
         private long signature = Long.MIN_VALUE;
         /** The message the unread divider stood over when last laid out. */
@@ -717,23 +738,34 @@ final class ChatWindowLines {
         List<ChatLine> lines = Collections.emptyList();
 
         Cached(int wrapWidth, boolean colours, boolean chatOpen,
-               int displayScale, boolean fading, ChatLineFilter filter) {
+               int displayScale, boolean fading, ChatLineFilter filter,
+               float speakerScale, float messageScale,
+               float quoteScale, long day) {
             this.wrapWidth = wrapWidth;
             this.colours = colours;
             this.chatOpen = chatOpen;
             this.displayScale = displayScale;
             this.fading = fading;
             this.filter = filter;
+            this.speakerScale = speakerScale;
+            this.messageScale = messageScale;
+            this.quoteScale = quoteScale;
+            this.day = day;
         }
 
         boolean describes(int wrapWidth, boolean colours, boolean chatOpen,
                           int displayScale, boolean fading,
-                          ChatLineFilter filter) {
+                          ChatLineFilter filter, float speakerScale,
+                          float messageScale, float quoteScale, long day) {
             return this.wrapWidth == wrapWidth && this.colours == colours
                     && this.chatOpen == chatOpen
                     && this.displayScale == displayScale
                     && this.fading == fading
-                    && this.filter.equals(filter);
+                    && this.filter.equals(filter)
+                    && this.speakerScale == speakerScale
+                    && this.messageScale == messageScale
+                    && this.quoteScale == quoteScale
+                    && this.day == day;
         }
 
         /**
@@ -821,7 +853,9 @@ final class ChatWindowLines {
          * One message laid out at the width, its last line first: the
          * renderer draws index zero on the baseline and works upward. A
          * grouped message is laid out from the headerless form kept for
-         * it, and from the full one when the history outlived that.
+         * it, and from the full one when the history outlived that. In a
+         * window, a message that names its speaker wears its time behind
+         * the name, written against today.
          */
         private Piece layOut(FontRenderer font, ChatLine message,
                              boolean grouped, int updatedCounter) {
@@ -829,8 +863,15 @@ final class ChatWindowLines {
                     ? ChatGroupRuns.of(message.getChatLineID()) : null;
             IChatComponent root = entry == null ? message.func_151461_a()
                     : entry.groupedLine;
+            Long said = this.chatOpen && entry == null
+                    ? ClientChatChannelViews.timeOf(message.getChatLineID())
+                    : null;
             List<IChatComponent> wrappedLines = ChatMessageWrapper.wrap(font,
-                    root, this.wrapWidth, this.colours, this.chatOpen);
+                    root, this.wrapWidth, this.colours, this.chatOpen,
+                    said == null ? null
+                            : ChatTimestampFormatter.formatDrawnStamp(
+                                    said.longValue(),
+                                    System.currentTimeMillis()));
             return new Piece(grouped, updatedCounter, wrappedLines,
                     message.getChatLineID());
         }

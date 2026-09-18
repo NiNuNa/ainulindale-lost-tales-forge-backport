@@ -8,7 +8,6 @@ import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeDefinition;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterFactionDefinition;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinDefinition;
@@ -47,10 +46,6 @@ public final class ClientCharacterDisplayNames {
         return Collections.unmodifiableList(ids);
     }
 
-    public static List<String> getGenderIds() {
-        return Collections.unmodifiableList(new ArrayList<String>(CharacterGenderRegistry.getAll()));
-    }
-
     public static List<String> getCompatibleGenderIds(String raceId) {
         CharacterRaceDefinition race = CharacterRaceRegistry.get(raceId);
         if (race == null) {
@@ -67,10 +62,6 @@ public final class ClientCharacterDisplayNames {
             ids.add(definition.getId());
         }
         return Collections.unmodifiableList(ids);
-    }
-
-    public static List<String> getCompatibleFactionIds(String raceId) {
-        return getFactionIds(raceId, false);
     }
 
     public static List<String> getFactionIds(String raceId,

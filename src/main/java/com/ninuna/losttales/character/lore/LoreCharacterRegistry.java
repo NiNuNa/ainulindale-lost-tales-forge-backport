@@ -113,11 +113,6 @@ public final class LoreCharacterRegistry {
         return loadErrors;
     }
 
-    public static synchronized File getExternalDirectory() {
-        ensureLoaded();
-        return externalDirectory;
-    }
-
     private static int loadBundled(
             Map<String, LoreCharacterDefinition> byId,
             Map<String, LoreCharacterDefinition> byName,

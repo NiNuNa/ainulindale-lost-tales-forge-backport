@@ -31,7 +31,7 @@ enum ChatFeedAlignment {
 
     /**
      * The alignment a config value names, read as the config reads it
-     * ({@link LostTalesConfig#normalizeFeedAlignment}): the left for
+     * ({@link LostTalesConfig#normalizeFeedAlignment}): the middle for
      * anything it does not name.
      */
     static ChatFeedAlignment of(String name) {

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.chat.ChatChannel;
@@ -12,10 +13,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ChatLine;
 import net.minecraft.client.gui.GuiNewChat;
-import net.minecraft.client.gui.ScaledResolution;
 
 /**
  * Per-window render state: the line bands the last draw recorded, the
@@ -39,12 +38,6 @@ final class ChatWindowFrame {
             new HashMap<String, ChatWindowFrame>();
     /** The closed-chat feed's frame; not a window, never pruned. */
     private static final ChatWindowFrame FEED = new ChatWindowFrame("feed");
-    /** The display the scale factor below was measured for. */
-    private static int measuredWidth;
-    private static int measuredHeight;
-    private static int measuredFactor = 1;
-    private static int measuredGuiScale = -1;
-    private static boolean measuredUnicode;
 
     final String windowId;
     final ChatLineBands bands = new ChatLineBands();
@@ -155,13 +148,14 @@ final class ChatWindowFrame {
     /** When an advance last found the glide still moving; 0 before one has. */
     private long fillGlideNanos;
     /**
-     * The timestamps drawn this frame, and the delivery marks, each with
-     * the chat line id it belongs to, in screen GUI pixels. Recorded from
-     * the draw itself, like the toolbar, so the tip either shows answers
-     * exactly where it stands.
+     * The delivery marks drawn this frame, each with the chat line id it
+     * belongs to, in screen GUI pixels. Recorded from the draw itself,
+     * like the toolbar, so the tip a mark shows answers exactly where it
+     * stands.
      */
-    private final LineBoxes stamps = new LineBoxes();
     private final LineBoxes marks = new LineBoxes();
+    /** The avatars drawn this frame, each with its message's chat line id. */
+    private final LineBoxes avatars = new LineBoxes();
     /**
      * The jump-to-present button drawn this frame, in screen GUI
      * pixels; width zero while none was drawn. Recorded from the draw
@@ -523,41 +517,9 @@ final class ChatWindowFrame {
                 : Math.round(position * factor) / (double)factor;
     }
 
-    /**
-     * Display pixels per GUI pixel. It is asked several times for every
-     * window of every frame, so it is measured once for each display
-     * size, GUI Scale option and font choice — everything the answer is
-     * made of. The option and the font change it with the window left
-     * as it is; without them in the key, everything laid on display
-     * pixels would land between them after a scale change.
-     */
+    /** Display pixels per GUI pixel ({@link LostTalesDisplayPixels#scaleFactor}). */
     static int displayScaleFactor() {
-        Minecraft minecraft = Minecraft.getMinecraft();
-        if (minecraft == null || minecraft.displayWidth <= 0
-                || minecraft.displayHeight <= 0
-                || minecraft.gameSettings == null) {
-            return 1;
-        }
-        int guiScale = minecraft.gameSettings.guiScale;
-        boolean unicode = minecraft.func_152349_b();
-        if (minecraft.displayWidth == measuredWidth
-                && minecraft.displayHeight == measuredHeight
-                && guiScale == measuredGuiScale
-                && unicode == measuredUnicode) {
-            return measuredFactor;
-        }
-        try {
-            measuredFactor = Math.max(1, new ScaledResolution(minecraft,
-                    minecraft.displayWidth,
-                    minecraft.displayHeight).getScaleFactor());
-            measuredWidth = minecraft.displayWidth;
-            measuredHeight = minecraft.displayHeight;
-            measuredGuiScale = guiScale;
-            measuredUnicode = unicode;
-        } catch (RuntimeException unavailable) {
-            return 1;
-        }
-        return measuredFactor;
+        return LostTalesDisplayPixels.scaleFactor();
     }
 
     /**
@@ -654,23 +616,7 @@ final class ChatWindowFrame {
                         < GLIDE_TAIL_NANOS);
     }
 
-    /** Forgets the stamps of the frame before; the draw records its own. */
-    void clearStamps() {
-        this.stamps.clear();
-    }
-
-    /** Records one stamp as drawn, in screen GUI pixels. */
-    void recordStamp(float left, float top, float right, float bottom,
-                     int chatLineId) {
-        this.stamps.add(left, top, right, bottom, chatLineId);
-    }
-
-    /** The chat line id of the stamp drawn under the point, or 0. */
-    int stampLineAt(double x, double y) {
-        return this.drawn ? this.stamps.at(x, y) : 0;
-    }
-
-    /** Forgets the delivery marks of the frame before. */
+    /** Forgets the delivery marks of the frame before; the draw records its own. */
     void clearMarks() {
         this.marks.clear();
     }
@@ -684,6 +630,25 @@ final class ChatWindowFrame {
     /** The chat line id of the delivery mark drawn under the point, or 0. */
     int markLineAt(double x, double y) {
         return this.drawn ? this.marks.at(x, y) : 0;
+    }
+
+    /** Forgets the avatars of the frame before. */
+    void clearAvatars() {
+        this.avatars.clear();
+    }
+
+    /**
+     * Records where one avatar answers the pointer, in screen GUI pixels:
+     * its square, its sphere included.
+     */
+    void recordAvatar(float left, float top, float right, float bottom,
+                      int chatLineId) {
+        this.avatars.add(left, top, right, bottom, chatLineId);
+    }
+
+    /** The chat line id of the message whose avatar is under the point, or 0. */
+    int avatarLineAt(double x, double y) {
+        return this.drawn ? this.avatars.at(x, y) : 0;
     }
 
     /**
@@ -831,15 +796,27 @@ final class ChatWindowFrame {
      */
     void resolveRows() {
         int size = this.lines == null ? 0 : this.lines.size();
-        if (!this.rows.describes(this.lines, size, this.dividerLineIndex)) {
-            this.rows.reset(this.lines, this.dividerLineIndex);
+        boolean open = !isFeed();
+        if (!this.rows.describes(this.lines, size, this.dividerLineIndex,
+                open)) {
+            this.rows.reset(this.lines, this.dividerLineIndex, open);
         }
+    }
+
+    /**
+     * Whether this is the closed feed's frame rather than a window's:
+     * the feed draws a message at sizes of its own, so its rows are laid
+     * out for the feed.
+     */
+    boolean isFeed() {
+        return this == FEED;
     }
 
     /** Whether {@link #rows} describes the stack as it stands. */
     private boolean rowsResolved() {
         int size = this.lines == null ? 0 : this.lines.size();
-        return this.rows.describes(this.lines, size, this.dividerLineIndex)
+        return this.rows.describes(this.lines, size, this.dividerLineIndex,
+                !isFeed())
                 && this.rows.count() == contentRows();
     }
 

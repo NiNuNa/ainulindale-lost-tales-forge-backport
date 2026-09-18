@@ -25,6 +25,7 @@ import com.ninuna.losttales.client.chat.ChatEmojiUsageStore;
 import com.ninuna.losttales.client.chat.ChatSpeechBubbles;
 import com.ninuna.losttales.client.chat.ChatWindowLayoutStore;
 import com.ninuna.losttales.client.chat.LostTalesChatClientHandler;
+import com.ninuna.losttales.client.chat.ClientChatChannelViews;
 import com.ninuna.losttales.client.chat.LostTalesChatPresentation;
 import com.ninuna.losttales.client.camera.ThirdPersonCameraHooks;
 import com.ninuna.losttales.client.camera.ThirdPersonBlockActionHooks;
@@ -55,7 +56,6 @@ import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntit
 import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntityRendererWaystone;
 import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntityRendererUrn;
 import com.ninuna.losttales.chat.ChatChannel;
-import com.ninuna.losttales.chat.ChatChannelDescriptor;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.compat.minecraft.ModDisableabilityAccess;
@@ -92,6 +92,7 @@ import com.ninuna.losttales.client.chat.ClientChatAccountRoles;
 import com.ninuna.losttales.client.chat.ClientChatChannelState;
 import com.ninuna.losttales.client.chat.ClientChatDeliveryMarks;
 import com.ninuna.losttales.client.chat.ClientChatIgnores;
+import com.ninuna.losttales.client.chat.ClientChatPresenceChoices;
 import com.ninuna.losttales.client.chat.ClientChatReadMarks;
 import com.ninuna.losttales.client.chat.ClientChatTypingState;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
@@ -147,6 +148,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         ClientChatProfanity.initialize(clientFolder);
         ChatWindowLayoutStore.initialize(clientFolder);
         ClientChatReadMarks.initialize(clientFolder);
+        ClientChatPresenceChoices.initialize(clientFolder);
         LostTalesClientMapMarkerUsageStore.initialize(clientFolder);
         CharacterTemplateStore.initialize(clientFolder);
         LostTalesThirdPersonConfig.load(
@@ -652,6 +654,9 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         if (packet == null || packet.isMalformed()) {
             return;
         }
+        if (packet.isReplay()) {
+            ClientChatChannelViews.noteArrival(packet.getArrivalId());
+        }
         for (ChatConsoleEvent event : packet.getEvents()) {
             LostTalesChatPresentation.receiveConsoleEvent(event,
                     packet.isReplay(), packet.saidBeforeArrival(event));
@@ -671,6 +676,11 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     public void handleChatHistory(LostTalesChatHistorySyncPacket packet) {
         if (packet == null || packet.isMalformed()) {
             return;
+        }
+        // A login replay says where this player arrived; a page of older
+        // history asked for later says nothing of it.
+        if (packet.getArrivalId() != Long.MAX_VALUE) {
+            ClientChatChannelViews.noteArrival(packet.getArrivalId());
         }
         for (LostTalesChatMessagePacket line : packet.getMessages()) {
             if (!isIgnoredLine(line)) {

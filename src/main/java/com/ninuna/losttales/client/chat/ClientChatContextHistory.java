@@ -68,11 +68,6 @@ final class ClientChatContextHistory {
                 && tab.getOwnerKey().length() > 0;
     }
 
-    /** Test hook: whether the conversation has been asked about. */
-    static synchronized boolean hasAsked(ChatTab tab) {
-        return tab != null && ASKED.contains(tab.id());
-    }
-
     /** The conversation is asked about again in the next world. */
     static synchronized void clear() {
         ASKED.clear();

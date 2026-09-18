@@ -1,7 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
-import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;

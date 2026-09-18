@@ -70,10 +70,42 @@ public enum LostTalesUiSheet {
      * the window keeps its own size, pointing in while it fills the
      * screen, each with its lit artwork.
      */
-    FULLSCREEN(58, 18, 5, 5),
+    FULLSCREEN(64, 18, 5, 5),
     FULLSCREEN_HOVER(70, 18, 5, 5),
     FULLSCREEN_EXIT(52, 18, 5, 5),
-    FULLSCREEN_EXIT_HOVER(64, 18, 5, 5),
+    FULLSCREEN_EXIT_HOVER(58, 18, 5, 5),
+    /**
+     * The pen a tab wears while something is written in its input and
+     * not yet sent, resting and lit: the draft mark, beside the
+     * fullscreen controls on the sheet.
+     */
+    DRAFT(76, 18, 4, 5),
+    DRAFT_HOVER(81, 18, 4, 5),
+    /**
+     * A question mark and an exclamation mark, each in the chat's ivory
+     * and in a colour of its own — the question green, the exclamation
+     * crimson. Nothing draws them yet; they are here so the sheet and
+     * these constants stay one description of the artwork.
+     */
+    QUESTION(86, 18, 3, 5),
+    QUESTION_LIT(90, 18, 3, 5),
+    EXCLAMATION(94, 18, 1, 5),
+    EXCLAMATION_LIT(96, 18, 1, 5),
+    /**
+     * The sphere a head wears for the presence of the identity it shows,
+     * at the head's bottom-right corner in a notch cut out of the head
+     * ({@link com.ninuna.losttales.client.chat.ChatPresenceMark}): green
+     * for Online, honey for Away, crimson for Do Not Disturb, and the
+     * muted one for Offline, which is what everyone else sees of
+     * Invisible. The ivory sphere is not a presence: it is the lit look a
+     * status row's sphere crosses to under the pointer in the head
+     * button's menu.
+     */
+    PRESENCE_SELECTED(52, 24, 5, 5),
+    PRESENCE_OFFLINE(58, 24, 5, 5),
+    PRESENCE_ONLINE(64, 24, 5, 5),
+    PRESENCE_AWAY(70, 24, 5, 5),
+    PRESENCE_BUSY(76, 24, 5, 5),
     /**
      * The magnifier a search field opens with, in two sizes: eight
      * pixels for a field one chat row tall, ten for one as tall as the

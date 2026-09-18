@@ -144,12 +144,14 @@ final class ChatChannelTabBar {
     /** Gap between the label and a counter, and between the counters. */
     private static final int COUNTER_GAP = 3;
     /**
-     * The pencil after a tab's counters while the tab holds unsent
-     * text: a slanted stick five pixels square, drawn from its own
-     * pixels in the chat's aside tone with the chat's shadow. The tab
-     * being typed in shows none; its draft is in the field.
+     * The draft mark after a tab's counters while the tab holds unsent
+     * text: the sheet's own, with the chat's shadow like every other
+     * sprite. It is a button: a press takes the input to the tab with
+     * the whole draft chosen. The tab being typed in shows none; its
+     * draft is in the field.
      */
-    private static final int PENCIL_SIZE = 5;
+    private static final int DRAFT_WIDTH =
+            LostTalesUiSheet.DRAFT.getWidth();
     /** Hit square of a control inside the selected tab. */
     static final int CONTROL_SIZE = 7;
     static final int CONTROL_GAP = 2;
@@ -454,13 +456,13 @@ final class ChatChannelTabBar {
     private float alphaScale = 1.0F;
 
     /**
-     * What a point in the row resolves to. {@code SETTINGS} and
-     * {@code CLOSE} carry a tab and act on it; {@code WINDOW_SETTINGS},
-     * {@code WINDOW_FULLSCREEN} and {@code WINDOW_CLOSE} carry none and
-     * act on the window.
+     * What a point in the row resolves to. {@code SETTINGS},
+     * {@code CLOSE} and {@code DRAFT} carry a tab and act on it;
+     * {@code WINDOW_SETTINGS}, {@code WINDOW_FULLSCREEN} and
+     * {@code WINDOW_CLOSE} carry none and act on the window.
      */
     enum HitKind {
-        TAB, CLOSE, SETTINGS, SEARCH, LOCK, RESTORE, WINDOW_SETTINGS,
+        TAB, CLOSE, SETTINGS, DRAFT, SEARCH, LOCK, RESTORE, WINDOW_SETTINGS,
         WINDOW_FULLSCREEN, WINDOW_CLOSE, GRIP
     }
 
@@ -672,6 +674,10 @@ final class ChatChannelTabBar {
             if (tab.settingsX >= 0 && tabControlBox(tab.settingsX, tabTop)
                     .contains(localX, localY)) {
                 return new Hit(HitKind.SETTINGS, tab.tab);
+            }
+            if (tab.draftX >= 0 && draftBox(tab.draftX, tabTop)
+                    .contains(localX, localY)) {
+                return new Hit(HitKind.DRAFT, tab.tab);
             }
             return new Hit(HitKind.TAB, tab.tab, tab.labelWidth > tab.labelRoom);
         }
@@ -1203,9 +1209,11 @@ final class ChatChannelTabBar {
                 scaled(Math.round(TAB_SURFACE_ALPHA * dim)));
         // A resting tab's own shade lies on its surface and under
         // everything the tab holds: the accent line, the icon, the name,
-        // the counters and the controls all stand over it.
-        if (!selected) {
-            drawTabShade(tab, left, right, rowBottom);
+        // the counters and the controls all stand over it. It fades out
+        // as the tab lights, on the crossfade its name takes the tab's
+        // colour on, so a lit tab wears none, as the selected one.
+        if (!selected && lit < 1.0F) {
+            drawTabShade(tab, left, right, rowBottom, 1.0F - lit);
         }
         // Channel accent across the tab's face, clear of the border
         // artwork on every side: full at the centre and gone at the ends
@@ -1219,6 +1227,13 @@ final class ChatChannelTabBar {
         // Text is always at full opacity; a muted tab is told by its
         // italics alone.
         int textAlpha = scaled(Math.round(255 * dim));
+        // The name takes the tab's own colour as the tab lights, on the
+        // same crossfade as its shape, and keeps it while the tab is in
+        // front.
+        int labelRgb = LostTalesChatVisualStyle.blend(
+                LostTalesChatVisualStyle.IVORY,
+                ClientChatChannelState.displayColor(tab.tab),
+                selected ? 1.0F : lit);
         // A name the row has cut short is read whole by resting the
         // pointer on it: the marquee runs on the clock while the tab is
         // hovered and glides home once it is not, so a pointer sweeping
@@ -1243,7 +1258,7 @@ final class ChatChannelTabBar {
                 true);
         try {
             drawTabContents(font, tab, row, hovered, left, right,
-                    top + INTERIOR_TOP, drawn, textAlpha,
+                    top + INTERIOR_TOP, drawn, labelRgb, textAlpha,
                     scaled(Math.round(0xFF * dim)));
         } finally {
             LostTalesChatOverlayRenderer.endVerticalClip(clipped);
@@ -1262,7 +1277,8 @@ final class ChatChannelTabBar {
     private void drawTabContents(FontRenderer font, Tab tab, Row row,
                                  Hit hovered, float left, float right,
                                  int interiorTop, TabControls drawn,
-                                 int textAlpha, int controlAlpha) {
+                                 int labelRgb, int textAlpha,
+                                 int controlAlpha) {
         // The words are drawn at whole coordinates inside a matrix moved
         // by whatever fraction of a pixel the tab stands on, since the
         // font draws at whole ones: the glyphs then land on the same
@@ -1291,10 +1307,10 @@ final class ChatChannelTabBar {
         // move with the tab's edge by the same fraction the edge moves.
         double labelRoom = labelRoomExact(drawn, tab.labelWidth,
                 right - left - tab.fixedWidth);
-        drawTabLabel(font, tab, textX, fraction, textY, textAlpha, left, right,
-                labelRoom);
-        drawTabCounters(font, tab, textX + fraction + labelRoom, textY,
-                textAlpha);
+        drawTabLabel(font, tab, textX, fraction, textY, labelRgb, textAlpha,
+                left, right, labelRoom);
+        drawTabCounters(font, tab, hovered, textX + fraction + labelRoom,
+                textY, textAlpha);
         drawTabControls(tab, hovered, drawn, left, right, interiorTop,
                 controlAlpha);
     }
@@ -1310,12 +1326,13 @@ final class ChatChannelTabBar {
      * tab's surface.
      */
     private void drawTabLabel(FontRenderer font, Tab tab, int textX,
-                              float fraction, int textY, int textAlpha,
-                              float tabLeft, float tabRight,
+                              float fraction, int textY, int labelRgb,
+                              int textAlpha, float tabLeft, float tabRight,
                               double labelRoom) {
         String text = tab.muted ? "§o" + tab.label : tab.label;
         if (tab.labelWidth <= labelRoom) {
-            drawWords(font, text, textX, fraction, textY, textAlpha);
+            drawWords(font, text, textX, fraction, textY, labelRgb,
+                    textAlpha);
             return;
         }
         double roomLeft = textX + fraction;
@@ -1334,7 +1351,7 @@ final class ChatChannelTabBar {
         double wordsLeft = roomLeft - offset;
         LostTalesChatOverlayRenderer.drawFadingText(Minecraft.getMinecraft(),
                 font, text, textX, (float)(fraction - offset), textY,
-                LostTalesChatVisualStyle.IVORY, textAlpha, clipX(clipLeft),
+                labelRgb, textAlpha, clipX(clipLeft),
                 clipX(clipRight), this.rowClipBottom, depth,
                 LostTalesChatOverlayRenderer.sideFadeStrength(
                         clipLeft - wordsLeft, depth),
@@ -1391,14 +1408,16 @@ final class ChatChannelTabBar {
      * A resting tab's own shade, over the tab: the same fade up from
      * the rule in the tab's channel accent, a bell across the tab's
      * width — strongest under its middle, gone at its sides — so the
-     * tab sinks into the rule in its own colour.
+     * tab sinks into the rule in its own colour; at {@code share} of its
+     * strength, as far as the pointer has left the tab unlit.
      */
     private void drawTabShade(Tab tab, float left, float right,
-                              int rowBottom) {
+                              int rowBottom, float share) {
         LostTalesChatOverlayRenderer.drawBellFade(left, right, rowBottom - 1,
                 rowTop(rowBottom),
                 LostTalesChatOverlayRenderer.TOP_EDGE_FADE_HEIGHT,
-                scaled(LostTalesChatOverlayRenderer.EDGE_FADE_ALPHA),
+                scaled(Math.round(LostTalesChatOverlayRenderer.EDGE_FADE_ALPHA
+                        * share)),
                 ClientChatChannelState.displayColor(tab.tab));
     }
 
@@ -1426,11 +1445,11 @@ final class ChatChannelTabBar {
 
     /** Text at a whole x inside a matrix moved by the fraction it stands on. */
     private static void drawWords(FontRenderer font, String text, int x,
-                                  float fraction, int y, int alpha) {
+                                  float fraction, int y, int rgb, int alpha) {
         GL11.glPushMatrix();
         GL11.glTranslatef(fraction, 0.0F, 0.0F);
         try {
-            LostTalesChatVisualStyle.drawPlain(font, text, x, y, alpha);
+            LostTalesChatVisualStyle.drawColored(font, text, x, y, rgb, alpha);
         } finally {
             GL11.glPopMatrix();
         }
@@ -1439,11 +1458,11 @@ final class ChatChannelTabBar {
     /**
      * The counters after the name's room, left to right, from the exact
      * x the room ends at: laid on a display pixel and drawn at whole
-     * coordinates inside a matrix moved by the rest, like the name.
+     * coordinates inside a matrix moved by the rest, like the name. The
+     * draft mark after them is a button and moves as one.
      */
-    private static void drawTabCounters(FontRenderer font, Tab tab,
-                                        double exactX, int textY,
-                                        int textAlpha) {
+    private void drawTabCounters(FontRenderer font, Tab tab, Hit hovered,
+                                 double exactX, int textY, int textAlpha) {
         if (tab.pingText.length() == 0 && tab.otherText.length() == 0
                 && !tab.draft) {
             return;
@@ -1468,40 +1487,16 @@ final class ChatChannelTabBar {
             }
             if (tab.draft) {
                 textX += COUNTER_GAP;
-                // The pencil's five rows on the capitals' seven, a row
+                // The mark's five rows on the capitals' seven, a row
                 // below their top.
-                drawPencil(textX, textY + 1,
-                        LostTalesChatVisualStyle.asideRgb(), textAlpha);
+                LostTalesUiButton.drawGlyph(LostTalesUiSheet.DRAFT,
+                        LostTalesUiSheet.DRAFT_HOVER,
+                        step(tab.draftMotion, hovered, tab, HitKind.DRAFT),
+                        textX, textY + 1, textAlpha);
             }
         } finally {
             GL11.glPopMatrix();
         }
-    }
-
-    /**
-     * The draft pencil at ({@code x}, {@code y}): a stick two pixels
-     * thick slanting down to the left to a one-pixel tip, its shadow a
-     * pixel down and right at the chat's shadow opacity.
-     */
-    private static void drawPencil(int x, int y, int rgb, int alpha) {
-        int shadow = LostTalesChatVisualStyle.shadowAlpha(alpha);
-        if (shadow > 0) {
-            drawPencilPixels(x + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                    y + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                    LostTalesChatVisualStyle.argb(
-                            LostTalesChatVisualStyle.SHADOW, shadow));
-        }
-        drawPencilPixels(x, y, LostTalesChatVisualStyle.argb(rgb, alpha));
-    }
-
-    private static void drawPencilPixels(int x, int y, int argb) {
-        for (int row = 0; row < PENCIL_SIZE - 1; row++) {
-            int left = x + PENCIL_SIZE - 2 - row;
-            LostTalesChatOverlayRenderer.fillRect(left, y + row, left + 2,
-                    y + row + 1, argb);
-        }
-        LostTalesChatOverlayRenderer.fillRect(x, y + PENCIL_SIZE - 1, x + 1,
-                y + PENCIL_SIZE, argb);
     }
 
     /**
@@ -2667,12 +2662,18 @@ final class ChatChannelTabBar {
                 settingsX = tabEdge - CONTROL_SIZE;
             }
             Boolean muted = this.cachedMuted.get(channel);
-            Boolean draft = this.cachedDraft.get(channel);
+            Boolean cachedDraftMark = this.cachedDraft.get(channel);
+            // The draft mark is one of the counters: a row that takes
+            // them off takes it off too, since its room went with them.
+            boolean draft = showCounters && cachedDraftMark != null
+                    && cachedDraftMark.booleanValue();
+            int draftX = draft ? draftLeft(x, icon != null && settled.icon,
+                    settled.labelRoom, pingWidth, otherWidth) : -1;
             Tab built = new Tab(channel, index, icon, label, labelWidth,
                     settled.labelRoom, content[index], fixed[index],
                     pingText, pingWidth, otherText, otherWidth,
-                    draft != null && draft.booleanValue(), x, tabWidth,
-                    settingsX, closeX, muted != null && muted.booleanValue());
+                    draft, x, tabWidth, settingsX, closeX, draftX,
+                    muted != null && muted.booleanValue());
             // A tab the row has not held before stands in its own place
             // at its own size; one it has keeps what it was drawn at
             // below, and travels from there.
@@ -2707,6 +2708,7 @@ final class ChatChannelTabBar {
                     // a re-layout carries on instead of starting over.
                     built.cogMotion = was.cogMotion;
                     built.closeMotion = was.closeMotion;
+                    built.draftMotion = was.draftMotion;
                     built.hoverSeconds = was.hoverSeconds;
                     built.marqueeOffset = was.marqueeOffset;
                     break;
@@ -2894,6 +2896,37 @@ final class ChatChannelTabBar {
      */
     static int closeLeft(TabControls controls, int tabLeft, int tabWidth) {
         return (int)Math.floor(closeLeftExact(controls, tabLeft, tabWidth));
+    }
+
+    /**
+     * Where a tab's draft mark stands once the tab has settled: after
+     * the padding, the icon when it shows, the name's room and whichever
+     * counters stand before it, exactly as the draw lays them down.
+     * Whole pixels, for the hit test.
+     */
+    static int draftLeft(int tabLeft, boolean iconShown, int labelRoom,
+                         int pingWidth, int otherWidth) {
+        int x = tabLeft + PADDING_X
+                + (iconShown ? ChatChannelIcons.SIZE + ChatChannelIcons.GAP
+                        : 0)
+                + labelRoom;
+        if (pingWidth > 0) {
+            x += COUNTER_GAP + pingWidth;
+        }
+        if (otherWidth > 0) {
+            x += COUNTER_GAP + otherWidth;
+        }
+        return x + COUNTER_GAP;
+    }
+
+    /**
+     * What the draft mark answers on: a {@link #CONTROL_SIZE} square
+     * centred in the interior like the cog and the cross, round the
+     * mark's own four columns — a small glyph is a small thing to hit.
+     */
+    static LostTalesUiHitBox draftBox(int draftX, int tabTop) {
+        return tabControlBox(draftX - (CONTROL_SIZE - DRAFT_WIDTH) / 2,
+                tabTop);
     }
 
     /** As {@link #closeLeft}, from the tab's edges as they are drawn. */
@@ -3159,11 +3192,11 @@ final class ChatChannelTabBar {
                                      boolean draft) {
         return (pingWidth > 0 ? COUNTER_GAP + pingWidth : 0)
                 + (otherWidth > 0 ? COUNTER_GAP + otherWidth : 0)
-                + (draft ? COUNTER_GAP + PENCIL_SIZE : 0);
+                + (draft ? COUNTER_GAP + DRAFT_WIDTH : 0);
     }
 
     /**
-     * Whether the tab wears the draft pencil: it holds unsent text and
+     * Whether the tab wears the draft mark: it holds unsent text and
      * is not the tab being typed in, whose draft is in the field.
      */
     private static boolean hasDraft(ChatTab tab) {
@@ -3311,18 +3344,24 @@ final class ChatChannelTabBar {
         LostTalesUiButtonMotion closeMotion =
                 new LostTalesUiButtonMotion(
                         LostTalesUiButtonMotion.Character.SNAP);
+        /** The draft mark's beat: it rises like any glyph that is pressed. */
+        LostTalesUiButtonMotion draftMotion =
+                new LostTalesUiButtonMotion(
+                        LostTalesUiButtonMotion.Character.LIFT);
         final int width;
         /** Resting left edge of the cog once settled, or -1 when the tab shows none. */
         final int settingsX;
         /** Resting left edge of the close cross once settled, or -1. */
         final int closeX;
+        /** Resting left edge of the draft mark once settled, or -1. */
+        final int draftX;
         final boolean muted;
 
         Tab(ChatTab tab, int rowIndex, ChatEmoji icon, String label,
             int labelWidth, int labelRoom, int contentRoom, int fixedWidth,
             String pingText, int pingWidth, String otherText, int otherWidth,
             boolean draft, int x, int width, int settingsX, int closeX,
-            boolean muted) {
+            int draftX, boolean muted) {
             this.tab = tab;
             this.rowIndex = rowIndex;
             this.icon = icon;
@@ -3343,6 +3382,7 @@ final class ChatChannelTabBar {
             this.drawnWidthSnapped = width;
             this.settingsX = settingsX;
             this.closeX = closeX;
+            this.draftX = draftX;
             this.muted = muted;
         }
     }

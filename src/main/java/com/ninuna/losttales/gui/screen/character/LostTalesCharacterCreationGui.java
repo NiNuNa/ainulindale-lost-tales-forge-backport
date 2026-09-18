@@ -34,7 +34,6 @@ import com.ninuna.losttales.client.gui.controlbar.LostTalesControlBar;
 import com.ninuna.losttales.client.gui.controlbar.LostTalesControlBar.Hint;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterFigureRenderer;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
-import com.ninuna.losttales.gui.screen.character.creator.AgeSliderScale;
 import com.ninuna.losttales.gui.screen.character.creator.CharacterCreatorCategory;
 import com.ninuna.losttales.gui.screen.character.creator.CharacterCreatorLayout;
 import com.ninuna.losttales.gui.screen.character.creator.CharacterStagePose;
@@ -1394,11 +1393,6 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
 
     private String currentName() {
         return this.nameControl != null ? this.nameControl.getText() : this.draftName;
-    }
-
-    private String currentDescription() {
-        return this.descriptionControl != null
-                ? this.descriptionControl.getText() : this.draftDescription;
     }
 
     // ------------------------------------------------------------------

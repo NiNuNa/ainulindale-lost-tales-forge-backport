@@ -2,6 +2,7 @@ package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.chat.ChatPresence;
+import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
@@ -12,33 +13,67 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Server-to-client: the presence of one or more accounts. One entry
- * when someone's presence changes, to everyone; the whole roster to a
- * player who has just joined. Online travels like any other status and
- * tells the client to forget the account's entry. A payload naming an
- * account twice, an unknown status or more entries than a server holds
- * players is refused whole.
+ * Server-to-client: which identities of one or more accounts show a
+ * presence, and which. Each account stated replaces whatever the client
+ * held of it: an identity it leaves out reads as Offline, and an account
+ * stated with none is offline everywhere — it left, or hides in every
+ * identity it uses. One account when someone's presence changes, to
+ * everyone; every account shown to a player who has just joined. Only
+ * Online, Away and Do Not Disturb travel: Invisible is never told to
+ * anyone, and Offline is what is not said. A payload naming an account or
+ * an identity twice, another status, or more than the bounds allow is
+ * refused whole.
  */
 public final class LostTalesChatPresenceSyncPacket implements IMessage {
-    public static final int MAX_ENTRIES = 1024;
-    private static final int MAX_PACKET_BYTES = 2 + MAX_ENTRIES * 17;
+    public static final int MAX_ACCOUNTS = 1024;
+    /** Identities one account may show at once: the account, the played character and the chat character, with room. */
+    public static final int MAX_SHOWN = 8;
+    private static final int MAX_PACKET_BYTES =
+            2 + MAX_ACCOUNTS * (17 + MAX_SHOWN * 18);
 
-    private Map<UUID, ChatPresence> entries = Collections.emptyMap();
+    private Map<UUID, Map<ChatPresenceIdentity, ChatPresence>> accounts =
+            Collections.emptyMap();
     private boolean malformed;
 
     public LostTalesChatPresenceSyncPacket() {}
 
-    public LostTalesChatPresenceSyncPacket(Map<UUID, ChatPresence> entries) {
-        Map<UUID, ChatPresence> kept = new LinkedHashMap<UUID, ChatPresence>();
-        if (entries != null) {
-            for (Map.Entry<UUID, ChatPresence> entry : entries.entrySet()) {
-                if (entry.getKey() != null && entry.getValue() != null
-                        && kept.size() < MAX_ENTRIES) {
+    public LostTalesChatPresenceSyncPacket(
+            Map<UUID, Map<ChatPresenceIdentity, ChatPresence>> accounts) {
+        Map<UUID, Map<ChatPresenceIdentity, ChatPresence>> kept =
+                new LinkedHashMap<UUID, Map<ChatPresenceIdentity, ChatPresence>>();
+        if (accounts != null) {
+            for (Map.Entry<UUID, Map<ChatPresenceIdentity, ChatPresence>> account
+                    : accounts.entrySet()) {
+                if (account.getKey() == null || kept.size() >= MAX_ACCOUNTS) {
+                    continue;
+                }
+                kept.put(account.getKey(), shownOnly(account.getValue()));
+            }
+        }
+        this.accounts = Collections.unmodifiableMap(kept);
+    }
+
+    /** One account's identities, bounded, with nothing but what travels. */
+    private static Map<ChatPresenceIdentity, ChatPresence> shownOnly(
+            Map<ChatPresenceIdentity, ChatPresence> shown) {
+        Map<ChatPresenceIdentity, ChatPresence> kept =
+                new LinkedHashMap<ChatPresenceIdentity, ChatPresence>();
+        if (shown != null) {
+            for (Map.Entry<ChatPresenceIdentity, ChatPresence> entry
+                    : shown.entrySet()) {
+                if (entry.getKey() != null && travels(entry.getValue())
+                        && kept.size() < MAX_SHOWN) {
                     kept.put(entry.getKey(), entry.getValue());
                 }
             }
         }
-        this.entries = Collections.unmodifiableMap(kept);
+        return Collections.unmodifiableMap(kept);
+    }
+
+    /** Whether a status is ever told: never Invisible, and Offline is what is left unsaid. */
+    static boolean travels(ChatPresence presence) {
+        return presence == ChatPresence.ONLINE || presence == ChatPresence.AWAY
+                || presence == ChatPresence.DO_NOT_DISTURB;
     }
 
     @Override
@@ -50,40 +85,61 @@ public final class LostTalesChatPresenceSyncPacket implements IMessage {
                         "invalid chat presence sync size");
             }
             int count = buffer.readUnsignedShort();
-            if (count > MAX_ENTRIES) {
+            if (count > MAX_ACCOUNTS) {
                 throw new LostTalesPacketCodec.DecodeException("too many presences");
             }
-            Map<UUID, ChatPresence> read = new LinkedHashMap<UUID, ChatPresence>();
+            Map<UUID, Map<ChatPresenceIdentity, ChatPresence>> read =
+                    new LinkedHashMap<UUID, Map<ChatPresenceIdentity, ChatPresence>>();
             for (int index = 0; index < count; index++) {
                 UUID account = new UUID(buffer.readLong(), buffer.readLong());
-                ChatPresence presence = ChatPresence.fromCode(buffer.readUnsignedByte());
-                if (presence == null || read.containsKey(account)) {
-                    throw new LostTalesPacketCodec.DecodeException("invalid presence entry");
+                int shownCount = buffer.readUnsignedByte();
+                if (read.containsKey(account) || shownCount > MAX_SHOWN) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "invalid presence account");
                 }
-                read.put(account, presence);
+                Map<ChatPresenceIdentity, ChatPresence> shown =
+                        new LinkedHashMap<ChatPresenceIdentity, ChatPresence>();
+                for (int at = 0; at < shownCount; at++) {
+                    ChatPresenceIdentity identity =
+                            LostTalesChatPresencePacket.readIdentity(buffer);
+                    ChatPresence presence = ChatPresence.fromCode(
+                            buffer.readUnsignedByte());
+                    if (!travels(presence) || shown.containsKey(identity)) {
+                        throw new LostTalesPacketCodec.DecodeException(
+                                "invalid presence entry");
+                    }
+                    shown.put(identity, presence);
+                }
+                read.put(account, Collections.unmodifiableMap(shown));
             }
             LostTalesPacketCodec.requireFinished(buffer);
-            this.entries = Collections.unmodifiableMap(read);
+            this.accounts = Collections.unmodifiableMap(read);
         } catch (RuntimeException failure) {
             this.malformed = true;
-            this.entries = Collections.emptyMap();
+            this.accounts = Collections.emptyMap();
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
 
     @Override
     public void toBytes(ByteBuf buffer) {
-        buffer.writeShort(this.entries.size());
-        for (Map.Entry<UUID, ChatPresence> entry : this.entries.entrySet()) {
-            buffer.writeLong(entry.getKey().getMostSignificantBits());
-            buffer.writeLong(entry.getKey().getLeastSignificantBits());
-            buffer.writeByte(entry.getValue().code());
+        buffer.writeShort(this.accounts.size());
+        for (Map.Entry<UUID, Map<ChatPresenceIdentity, ChatPresence>> account
+                : this.accounts.entrySet()) {
+            buffer.writeLong(account.getKey().getMostSignificantBits());
+            buffer.writeLong(account.getKey().getLeastSignificantBits());
+            buffer.writeByte(account.getValue().size());
+            for (Map.Entry<ChatPresenceIdentity, ChatPresence> entry
+                    : account.getValue().entrySet()) {
+                LostTalesChatPresencePacket.writeIdentity(buffer, entry.getKey());
+                buffer.writeByte(entry.getValue().code());
+            }
         }
     }
 
-    /** The presences stated, by account, in the order stated. */
-    public Map<UUID, ChatPresence> getEntries() {
-        return this.entries;
+    /** What each account stated shows, by account, in the order stated. */
+    public Map<UUID, Map<ChatPresenceIdentity, ChatPresence>> getAccounts() {
+        return this.accounts;
     }
 
     public boolean isMalformed() {

@@ -50,10 +50,6 @@ public final class LostTalesMissiveNbt {
         return readFromNBT(root.getCompoundTag(TAG_MISSIVE));
     }
 
-    public static boolean hasMissive(ItemStack stack) {
-        return readFromItemStack(stack) != null;
-    }
-
     public static NBTTagCompound writeToNBT(LostTalesMissiveData missive) {
         NBTTagCompound tag = new NBTTagCompound();
         if (missive == null) {

@@ -29,26 +29,55 @@ final class ChatMessageWrapper {
      * code is measured and drawn as nothing, so the layout has to agree.
      * {@code chatOpen} lays the message out for the open chat screen,
      * which draws no channel prefix and so has that width to spare for
-     * the body.
+     * the body. The header is laid out against the room its own large
+     * size leaves it, the size the stack draws it at. {@code stamp} is
+     * the time the open window stands behind the name, as the chat draws
+     * it, or null for none.
      */
     static List<IChatComponent> wrap(final FontRenderer font,
                                      IChatComponent root, int width,
                                      final boolean colours,
-                                     boolean chatOpen) {
+                                     boolean chatOpen, String stamp) {
         List<IChatComponent> lines = null;
         if (font != null && root != null && width > 0) {
-            lines = ChatLineWrapper.wrap(new ChatLineWrapper.TextMetrics() {
-                @Override
-                public int width(String text) {
-                    return font.getStringWidth(colours ? text
-                            : LostTalesChatVisualStyle.stripCodes(text));
-                }
-            }, root, width, chatOpen);
+            ChatLineWrapper.TextMetrics metrics =
+                    new ChatLineWrapper.TextMetrics() {
+                        @Override
+                        public int width(String text) {
+                            return font.getStringWidth(colours ? text
+                                    : LostTalesChatVisualStyle.stripCodes(
+                                            text));
+                        }
+                    };
+            float speakerScale =
+                    LostTalesChatVisualStyle.speakerRowScale(chatOpen);
+            lines = ChatLineWrapper.wrap(metrics, root, width, chatOpen,
+                    speakerScale,
+                    LostTalesChatVisualStyle.messageRowScale(chatOpen),
+                    LostTalesChatVisualStyle.quoteRowScale(chatOpen),
+                    stamp == null ? null : ChatStampMarker.of(stamp,
+                            stampWidth(metrics.width(stamp),
+                                    LostTalesChatVisualStyle.stackSmallScale(),
+                                    speakerScale)));
         }
         if (lines != null && !lines.isEmpty()) {
             return lines;
         }
         return vanillaWrap(font, root, width, colours);
+    }
+
+    /**
+     * The width a stamp {@code textWidth} pixels wide at the font's own
+     * size takes in the row behind the name: the stamp is the chat's
+     * small text and the row is drawn at the speaker's size, so it takes
+     * its small width in the row's own pixels, rounded up.
+     */
+    static int stampWidth(int textWidth, float smallScale,
+                          float headerScale) {
+        if (headerScale <= 0.0F) {
+            return textWidth;
+        }
+        return (int)Math.ceil(textWidth * smallScale / headerScale - 1.0E-4F);
     }
 
     /**

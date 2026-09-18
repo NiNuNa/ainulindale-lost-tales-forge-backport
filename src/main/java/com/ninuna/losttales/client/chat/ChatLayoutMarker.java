@@ -30,7 +30,10 @@ import net.minecraft.util.IChatComponent;
  * the anchor's offset twice — for the closed HUD (channel prefix shown)
  * and the open screen (prefix hidden) — so continuation lines land under
  * the anchor in both states. The renderer and every hit test advance the
- * cursor by that width.</p>
+ * cursor by that width. A <em>header</em> marker on every row of a
+ * message's header and a <em>body</em> marker on every row of its body
+ * say which rows name its speaker and which carry its words, so the
+ * stack can lay each out, measure it and draw it at its own size.</p>
  */
 final class ChatLayoutMarker {
     private static final String PREFIX = "losttales-chat-layout:";
@@ -39,6 +42,8 @@ final class ChatLayoutMarker {
     private static final String BODY = "body:";
     private static final String INDENT = "indent:";
     private static final String ROW = "row";
+    private static final String HEADER = "header";
+    private static final String BODY_ROW = "bodyrow";
 
     private ChatLayoutMarker() {}
 
@@ -62,6 +67,28 @@ final class ChatLayoutMarker {
      */
     static ChatComponentText rowBreak() {
         return marker(PREFIX + ROW);
+    }
+
+    /**
+     * Marks a row the message names its speaker on, which the stack
+     * lays out, measures and draws at the chat's large size. The wrapper
+     * adds it to every row of a header once the body begins, so a
+     * grouped continuation — which names nobody and has no header row —
+     * carries none. Draws and measures nothing itself.
+     */
+    static ChatComponentText header() {
+        return marker(PREFIX + HEADER);
+    }
+
+    /**
+     * Marks a row carrying a message's own words, which the closed feed
+     * may draw at a size of its own. The wrapper adds it to every row
+     * from the body break down, a grouped continuation's included, since
+     * those are the words of a run as much as the first message's are.
+     * Draws and measures nothing itself.
+     */
+    static ChatComponentText bodyRow() {
+        return marker(PREFIX + BODY_ROW);
     }
 
     /**
@@ -145,6 +172,12 @@ final class ChatLayoutMarker {
         if (ROW.equals(payload)) {
             return Data.ROW;
         }
+        if (HEADER.equals(payload)) {
+            return Data.HEADER;
+        }
+        if (BODY_ROW.equals(payload)) {
+            return Data.BODY_ROW;
+        }
         if (payload.startsWith(BODY)) {
             return Data.BODY;
         }
@@ -188,6 +221,33 @@ final class ChatLayoutMarker {
     static boolean isRowBreak(IChatComponent component) {
         Data data = decode(component);
         return data != null && data.rowBreak;
+    }
+
+    /**
+     * Whether the row is one of those a message names its speaker on.
+     * Read straight from the payload rather than through {@link Data},
+     * since every drawn row is asked once a frame.
+     */
+    static boolean isHeaderRow(IChatComponent row) {
+        return marked(row, HEADER);
+    }
+
+    /** Whether the row is one of those carrying a message's own words. */
+    static boolean isBodyRow(IChatComponent row) {
+        return marked(row, BODY_ROW);
+    }
+
+    private static boolean marked(IChatComponent row, String kind) {
+        if (row == null) {
+            return false;
+        }
+        for (Object value : row) {
+            if (value instanceof IChatComponent
+                    && kind.equals(payloadOf((IChatComponent)value))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -238,11 +298,17 @@ final class ChatLayoutMarker {
                 new Data(false, false, true, 0, 0, -1, -1);
         static final Data ROW =
                 new Data(false, false, false, 0, 0, -1, -1, true);
+        static final Data HEADER =
+                new Data(false, false, false, 0, 0, -1, -1, false, true);
+        static final Data BODY_ROW =
+                new Data(false, false, false, 0, 0, -1, -1, false, true);
 
         final boolean anchor;
         final boolean lineBreak;
         final boolean bodyBreak;
         final boolean rowBreak;
+        /** Whether this marker says what kind of row it is on. */
+        final boolean rowMark;
         private final int closedIndent;
         private final int openIndent;
         /** The sender's colours, or -1 when the line carries none. */
@@ -265,7 +331,15 @@ final class ChatLayoutMarker {
         private Data(boolean anchor, boolean lineBreak, boolean bodyBreak,
                      int closedIndent, int openIndent, int nameColor,
                      int titleColor, boolean rowBreak) {
+            this(anchor, lineBreak, bodyBreak, closedIndent, openIndent,
+                    nameColor, titleColor, rowBreak, false);
+        }
+
+        private Data(boolean anchor, boolean lineBreak, boolean bodyBreak,
+                     int closedIndent, int openIndent, int nameColor,
+                     int titleColor, boolean rowBreak, boolean rowMark) {
             this.rowBreak = rowBreak;
+            this.rowMark = rowMark;
             this.anchor = anchor;
             this.lineBreak = lineBreak;
             this.bodyBreak = bodyBreak;

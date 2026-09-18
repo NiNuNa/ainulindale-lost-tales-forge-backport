@@ -37,6 +37,7 @@ public final class ClientChatChannelViewsTest {
     @Test
     public void aPlayersOwnLineIsReadOnceTheServerNamesIt() {
         ClientChatSession.resumeAt("server:play.example");
+        ClientChatReadMarks.markArrival("server:play.example", 4000L);
         ChatTab party = ChatTab.of(ChatChannel.PARTY);
         ChatTab global = ChatTab.of(ChatChannel.ALL);
         ClientChatChannelViews.noteOwnLine(party, -7, 4200L);
@@ -48,18 +49,24 @@ public final class ClientChatChannelViewsTest {
 
     /**
      * Arriving somewhere for the first time counts nothing unread: the
-     * whole replay was said before this player was there, so it is filed
-     * and read, and the count begins with the next line said.
+     * replay up to this player's own arrival was said before they were
+     * there, so it is filed and read, and so is their arrival itself; the
+     * count begins with the next line said.
      */
     @Test
     public void aFirstVisitCountsNoneOfTheReplayUnread() {
         ClientChatSession.resumeAt("server:new.example");
+        ClientChatChannelViews.noteArrival(700L);
+        assertEquals(700L, ClientChatReadMarks.arrival("server:new.example"));
         ChatTab global = ChatTab.of(ChatChannel.ALL);
         ChatTab console = ChatTab.of(ChatChannel.CONSOLE);
         for (int index = 0; index < 200; index++) {
             ClientChatChannelViews.record(-100 - index, global, console,
                     index % 10 == 0, 500L + index, 1000L, true);
         }
+        // Their own join line.
+        ClientChatChannelViews.record(-399, global, console, false, 700L,
+                1000L, true);
         assertFalse(ClientChatChannelViews.hasUnread(ChatChannel.ALL));
         assertEquals(0, ClientChatChannelViews.unreadCount(ChatChannel.ALL));
         // Said after they arrived, in a tab they are not looking at.
@@ -76,6 +83,7 @@ public final class ClientChatChannelViewsTest {
     @Test
     public void aReturnVisitStillCountsWhatWasSaidWhileAway() {
         ClientChatSession.resumeAt("server:known.example");
+        ClientChatReadMarks.markArrival("server:known.example", 100L);
         ChatTab global = ChatTab.of(ChatChannel.ALL);
         ChatTab console = ChatTab.of(ChatChannel.CONSOLE);
         ClientChatReadMarks.markRead("server:known.example", global, 500L);
@@ -86,6 +94,55 @@ public final class ClientChatChannelViewsTest {
         ClientChatChannelViews.record(-3, global, console, false, 502L,
                 1000L, true);
         assertEquals(2, ClientChatChannelViews.unreadCount(ChatChannel.ALL));
+    }
+
+    /**
+     * A view this player never opened has no mark of its own, and still
+     * counts what was said in it after they first came to the server:
+     * only what was said before their first arrival, and their own
+     * arrival this time, are never news. A later arrival does not move
+     * where they first came.
+     */
+    @Test
+    public void aViewNeverReadCountsWhatWasSaidSinceTheFirstArrival() {
+        ClientChatSession.resumeAt("server:return.example");
+        ClientChatReadMarks.markArrival("server:return.example", 400L);
+        ClientChatChannelViews.noteArrival(900L);
+        assertEquals(400L,
+                ClientChatReadMarks.arrival("server:return.example"));
+        ChatTab proximity = ChatTab.of(ChatChannel.PROXIMITY);
+        ChatTab global = ChatTab.of(ChatChannel.ALL);
+        ClientChatChannelViews.record(-1, proximity, global, false, 300L,
+                1000L, true);
+        ClientChatChannelViews.record(-2, proximity, global, false, 500L,
+                1000L, true);
+        ClientChatChannelViews.record(-3, proximity, global, true, 600L,
+                1000L, true);
+        ClientChatChannelViews.record(-4, global, global, false, 900L,
+                1000L, true);
+        assertEquals(2,
+                ClientChatChannelViews.unreadCount(ChatChannel.PROXIMITY));
+        assertTrue(ClientChatChannelViews.hasUnreadMention(
+                ChatChannel.PROXIMITY));
+        assertEquals(Integer.valueOf(-2),
+                ClientChatChannelViews.unreadDividerLine(proximity));
+    }
+
+    /** A line said while the player is here, in a tab not in front, is unread. */
+    @Test
+    public void aLiveLineInAnotherTabIsUnread() {
+        ClientChatSession.resumeAt("server:live.example");
+        ClientChatChannelViews.noteArrival(100L);
+        ChatTab proximity = ChatTab.of(ChatChannel.PROXIMITY);
+        ChatTab global = ChatTab.of(ChatChannel.ALL);
+        ClientChatChannelViews.record(-1, proximity, global, false, 150L,
+                1000L, false);
+        assertEquals(1,
+                ClientChatChannelViews.unreadCount(ChatChannel.PROXIMITY));
+        // In the tab in front, at the newest line, it is read as it comes.
+        ClientChatChannelViews.record(-2, global, global, false, 151L,
+                1000L, false);
+        assertEquals(0, ClientChatChannelViews.unreadCount(ChatChannel.ALL));
     }
 
     private static ChatLine line(int chatLineId) {

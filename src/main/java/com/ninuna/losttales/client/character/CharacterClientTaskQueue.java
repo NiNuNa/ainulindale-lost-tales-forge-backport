@@ -63,10 +63,6 @@ public final class CharacterClientTaskQueue {
         }
     }
 
-    public static int getQueuedTaskCount() {
-        return QUEUED_TASK_COUNT.get();
-    }
-
     public static void clear() {
         TASKS.clear();
         QUEUED_TASK_COUNT.set(0);

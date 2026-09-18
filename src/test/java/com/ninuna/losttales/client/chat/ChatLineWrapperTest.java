@@ -2,7 +2,6 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
-import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.List;
 import java.util.UUID;
@@ -72,35 +71,18 @@ public final class ChatLineWrapperTest {
         return root;
     }
 
-    /** As above with a timestamp between the channel and the name. */
-    private static ChatComponentText timedLine(String time, String prefix,
-                                               String body) {
-        ChatComponentText root = new ChatComponentText("");
-        root.appendSibling(ChatPrefixMarker.channel(
-                text("Global: "), 0x00FF00));
-        root.appendSibling(ChatPrefixMarker.timestamp(text(time), 0xDBC9B4));
-        root.appendSibling(text(prefix));
-        root.appendSibling(ChatLayoutMarker.anchor());
-        root.appendSibling(text(body));
-        return root;
-    }
-
     /**
      * Each state pays only for the header runs it draws inline: the
-     * closed feed reserves the channel prefix and never the timestamp,
-     * and the open screen reserves neither — its timestamp lives in the
-     * column at the window's edge, so the whole width belongs to the
-     * name and body. "Global: " and "[12:34] " are 48px each,
-     * "&lt;N&gt; " is 24.
+     * closed feed reserves the channel prefix, and the open screen does
+     * not — its tabs name the channel — so the whole width belongs to
+     * the name and body. "Global: " is 48px, "&lt;N&gt; " is 24.
      */
     @Test
     public void eachStateReservesOnlyTheHeaderRunsItDraws() {
         List<IChatComponent> closed = ChatLineWrapper.wrap(METRICS,
-                timedLine("[12:34] ", "<N> ", "aaa bbb ccc ddd"),
-                150, false);
+                line("<N> ", "aaa bbb ccc ddd"), 150, false);
         List<IChatComponent> open = ChatLineWrapper.wrap(METRICS,
-                timedLine("[12:34] ", "<N> ", "aaa bbb ccc ddd"),
-                150, true);
+                line("<N> ", "aaa bbb ccc ddd"), 150, true);
         // Closed: 48 + 24 = 72 taken, 78 left — two words of 18 and a
         // space. Open: only the name's 24 taken, so the 90px body fits
         // on the first line whole.
@@ -123,7 +105,7 @@ public final class ChatLineWrapperTest {
         for (Object value : line) {
             ChatLayoutMarker.Data data =
                     ChatLayoutMarker.decode((IChatComponent)value);
-            if (data != null && !data.anchor) {
+            if (data != null && !data.anchor && !data.rowMark) {
                 return data.indent(chatOpen);
             }
         }
@@ -341,42 +323,41 @@ public final class ChatLineWrapperTest {
 
     @Test
     public void realMessagesPutTheirBodyUnderTheirSender() {
-        boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
-        LostTalesConfig.showChatTimestamps = false;
-        try {
-            IChatComponent message = LostTalesChatPresentation.build(
-                    new LostTalesChatMessagePacket(
-                            ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
-                            "Ranger", "", 0x55AA55, 0x336633,
-                            "The road goes ever on and on, down from the "
-                                    + "door where it began.", 1L,
-                            "losttales:human_ranger_male_2"));
-            for (int state = 0; state < 2; state++) {
-                boolean chatOpen = state == 1;
-                List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
-                        message, 200, chatOpen);
-                assertNotNull(lines);
-                assertTrue(lines.size() > 2);
-                assertEquals("Global: <  Arathorn> The road goes ever on "
-                        + "and on, down from the door where it began.",
-                        joinedText(lines));
-                // The header stands alone on the first row; the body
-                // opens the next behind the chevron, at the edge, and
-                // every continuation of it is inset by the chevron.
-                assertEquals("Global: <  Arathorn> ", plain(lines.get(0)));
-                assertNull(indentMarker(lines.get(0)));
-                assertTrue(plain(lines.get(1)).startsWith(
-                        ChatLineWrapper.BODY_SEPARATOR));
-                assertEquals(-1, indentOf(lines.get(1), chatOpen));
-                int separator = METRICS.width(
-                        ChatLineWrapper.BODY_SEPARATOR);
-                for (int index = 2; index < lines.size(); index++) {
-                    assertEquals(separator,
-                            indentOf(lines.get(index), chatOpen));
-                }
+        IChatComponent message = LostTalesChatPresentation.build(
+                new LostTalesChatMessagePacket(
+                        ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
+                        "Ranger", "", 0x55AA55, 0x336633,
+                        "The road goes ever on and on, down from the "
+                                + "door where it began.", 1L,
+                        "losttales:human_ranger_male_2"));
+        for (int state = 0; state < 2; state++) {
+            boolean chatOpen = state == 1;
+            List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
+                    message, 200, chatOpen);
+            assertNotNull(lines);
+            assertTrue(lines.size() > 2);
+            // The feed names the sender in brackets round the head;
+            // the open window names them plainly, the head standing
+            // as the avatar and the brackets left out.
+            String header = chatOpen ? "Global:   Arathorn"
+                    : "Global: <  Arathorn> ";
+            assertEquals(header.trim() + " The road goes ever on "
+                    + "and on, down from the door where it began.",
+                    joinedText(lines));
+            // The header stands alone on the first row; the body
+            // opens the next behind the chevron, at the edge, and
+            // every continuation of it is inset by the chevron.
+            assertEquals(header, plain(lines.get(0)));
+            assertNull(indentMarker(lines.get(0)));
+            assertTrue(plain(lines.get(1)).startsWith(
+                    ChatLineWrapper.BODY_SEPARATOR));
+            assertEquals(-1, indentOf(lines.get(1), chatOpen));
+            int separator = METRICS.width(
+                    ChatLineWrapper.BODY_SEPARATOR);
+            for (int index = 2; index < lines.size(); index++) {
+                assertEquals(separator,
+                        indentOf(lines.get(index), chatOpen));
             }
-        } finally {
-            LostTalesConfig.showChatTimestamps = originalTimestamps;
         }
     }
 
@@ -388,38 +369,32 @@ public final class ChatLineWrapperTest {
      */
     @Test
     public void groupedMessagesKeepTheBodyIndentWithoutAHeaderRow() {
-        boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
-        LostTalesConfig.showChatTimestamps = false;
-        try {
-            LostTalesChatMessagePacket packet =
-                    new LostTalesChatMessagePacket(
-                            ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
-                            "Ranger", "", 0x55AA55, 0x336633,
-                            "and on, down from the door where it began.",
-                            1L, "losttales:human_ranger_male_2");
-            IChatComponent grouped = LostTalesChatPresentation.build(packet,
-                    ChatTab.of(ChatChannel.ALL), new int[0], true);
-            for (int state = 0; state < 2; state++) {
-                boolean chatOpen = state == 1;
-                List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
-                        grouped, 200, chatOpen);
-                assertNotNull(lines);
-                assertEquals("and on, down from the door where it began.",
-                        joinedText(lines));
-                // No header row: the chevron opens the row the line is
-                // already on, and the wrapped rest is inset by it.
-                assertTrue(plain(lines.get(0)).startsWith(
-                        ChatLineWrapper.BODY_SEPARATOR));
-                assertEquals(-1, indentOf(lines.get(0), chatOpen));
-                int separator = METRICS.width(
-                        ChatLineWrapper.BODY_SEPARATOR);
-                for (int index = 1; index < lines.size(); index++) {
-                    assertEquals(separator,
-                            indentOf(lines.get(index), chatOpen));
-                }
+        LostTalesChatMessagePacket packet =
+                new LostTalesChatMessagePacket(
+                        ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
+                        "Ranger", "", 0x55AA55, 0x336633,
+                        "and on, down from the door where it began.",
+                        1L, "losttales:human_ranger_male_2");
+        IChatComponent grouped = LostTalesChatPresentation.build(packet,
+                ChatTab.of(ChatChannel.ALL), new int[0], true);
+        for (int state = 0; state < 2; state++) {
+            boolean chatOpen = state == 1;
+            List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
+                    grouped, 200, chatOpen);
+            assertNotNull(lines);
+            assertEquals("and on, down from the door where it began.",
+                    joinedText(lines));
+            // No header row: the chevron opens the row the line is
+            // already on, and the wrapped rest is inset by it.
+            assertTrue(plain(lines.get(0)).startsWith(
+                    ChatLineWrapper.BODY_SEPARATOR));
+            assertEquals(-1, indentOf(lines.get(0), chatOpen));
+            int separator = METRICS.width(
+                    ChatLineWrapper.BODY_SEPARATOR);
+            for (int index = 1; index < lines.size(); index++) {
+                assertEquals(separator,
+                        indentOf(lines.get(index), chatOpen));
             }
-        } finally {
-            LostTalesConfig.showChatTimestamps = originalTimestamps;
         }
     }
 
@@ -431,52 +406,48 @@ public final class ChatLineWrapperTest {
      */
     @Test
     public void commandEchoesOpenTheBodyBehindTheChevron() {
-        boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
-        LostTalesConfig.showChatTimestamps = false;
-        try {
-            String command = "/losttales mapmarker add a marker with a "
-                    + "name long enough to wrap around the window";
-            IChatComponent line = LostTalesChatPresentation.build(
-                    new LostTalesChatMessagePacket(
-                            ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
-                            "Ranger", "", 0x55AA55, 0x336633, command, 1L,
-                            "losttales:human_ranger_male_2"),
-                    ChatTab.of(ChatChannel.ALL), new int[0], false,
-                    ChatBodyKind.COMMAND);
-            for (int state = 0; state < 2; state++) {
-                boolean chatOpen = state == 1;
-                List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
-                        line, 200, chatOpen);
-                assertNotNull(lines);
-                assertTrue(lines.size() > 2);
-                assertEquals("Global: <  Arathorn> ", plain(lines.get(0)));
-                assertTrue(plain(lines.get(1)).startsWith(
-                        ChatLineWrapper.BODY_SEPARATOR + "/losttales"));
-                assertEquals(-1, indentOf(lines.get(1), chatOpen));
-                int separator = METRICS.width(
-                        ChatLineWrapper.BODY_SEPARATOR);
-                for (int index = 2; index < lines.size(); index++) {
-                    assertEquals(separator,
-                            indentOf(lines.get(index), chatOpen));
-                }
-                // The command reads back as typed; the chevron adds
-                // nothing.
-                assertEquals("Global: <  Arathorn> " + command,
-                        joinedText(lines));
-                // The chevron carries the sender's colour.
-                Integer color = null;
-                for (Object value : lines.get(1)) {
-                    IChatComponent part = (IChatComponent)value;
-                    if (ChatBodyMarker.isMarker(part)) {
-                        color = ChatBodyMarker.decode(part);
-                        assertEquals(ChatLineWrapper.BODY_SEPARATOR,
-                                part.getUnformattedTextForChat());
-                    }
-                }
-                assertEquals(Integer.valueOf(0x336633), color);
+        String command = "/losttales mapmarker add a marker with a "
+                + "name long enough to wrap around the window";
+        IChatComponent line = LostTalesChatPresentation.build(
+                new LostTalesChatMessagePacket(
+                        ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
+                        "Ranger", "", 0x55AA55, 0x336633, command, 1L,
+                        "losttales:human_ranger_male_2"),
+                ChatTab.of(ChatChannel.ALL), new int[0], false,
+                ChatBodyKind.COMMAND);
+        for (int state = 0; state < 2; state++) {
+            boolean chatOpen = state == 1;
+            List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
+                    line, 200, chatOpen);
+            assertNotNull(lines);
+            assertTrue(lines.size() > 2);
+            String header = chatOpen ? "Global:   Arathorn"
+                    : "Global: <  Arathorn> ";
+            assertEquals(header, plain(lines.get(0)));
+            assertTrue(plain(lines.get(1)).startsWith(
+                    ChatLineWrapper.BODY_SEPARATOR + "/losttales"));
+            assertEquals(-1, indentOf(lines.get(1), chatOpen));
+            int separator = METRICS.width(
+                    ChatLineWrapper.BODY_SEPARATOR);
+            for (int index = 2; index < lines.size(); index++) {
+                assertEquals(separator,
+                        indentOf(lines.get(index), chatOpen));
             }
-        } finally {
-            LostTalesConfig.showChatTimestamps = originalTimestamps;
+            // The command reads back as typed; the chevron adds
+            // nothing.
+            assertEquals(header.trim() + " " + command,
+                    joinedText(lines));
+            // The chevron carries the sender's colour.
+            Integer color = null;
+            for (Object value : lines.get(1)) {
+                IChatComponent part = (IChatComponent)value;
+                if (ChatBodyMarker.isMarker(part)) {
+                    color = ChatBodyMarker.decode(part);
+                    assertEquals(ChatLineWrapper.BODY_SEPARATOR,
+                            part.getUnformattedTextForChat());
+                }
+            }
+            assertEquals(Integer.valueOf(0x336633), color);
         }
     }
 
@@ -519,7 +490,7 @@ public final class ChatLineWrapperTest {
         head.setChatStyle(head.getChatStyle().setChatClickEvent(
                 new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
                         ChatHeadMarker.encode(UUID.randomUUID(),
-                                true, "", "hello",
+                                true, null, "", "hello",
                                 0x123456, 0xA94B54))));
         root.appendSibling(head);
         root.appendSibling(ChatLayoutMarker.anchor());
@@ -546,40 +517,34 @@ public final class ChatLineWrapperTest {
      */
     @Test
     public void theBodyChevronIsDrawnButNeverReadBack() {
-        boolean originalTimestamps = LostTalesConfig.showChatTimestamps;
-        LostTalesConfig.showChatTimestamps = false;
-        try {
-            IChatComponent message = LostTalesChatPresentation.build(
-                    new LostTalesChatMessagePacket(
-                            ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
-                            "Ranger", "", 0x55AA55, 0x336633, "Halt.", 1L,
-                            "losttales:human_ranger_male_2"));
-            List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
-                    message, 400, true);
-            assertNotNull(lines);
-            assertEquals(2, lines.size());
-            IChatComponent chevron = null;
-            for (Object value : lines.get(1)) {
-                if (ChatBodyMarker.isMarker((IChatComponent)value)) {
-                    chevron = (IChatComponent)value;
-                }
+        IChatComponent message = LostTalesChatPresentation.build(
+                new LostTalesChatMessagePacket(
+                        ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
+                        "Ranger", "", 0x55AA55, 0x336633, "Halt.", 1L,
+                        "losttales:human_ranger_male_2"));
+        List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
+                message, 400, true);
+        assertNotNull(lines);
+        assertEquals(2, lines.size());
+        IChatComponent chevron = null;
+        for (Object value : lines.get(1)) {
+            if (ChatBodyMarker.isMarker((IChatComponent)value)) {
+                chevron = (IChatComponent)value;
             }
-            assertNotNull("the body opens with no chevron", chevron);
-            assertEquals(ChatLineWrapper.BODY_SEPARATOR,
-                    chevron.getUnformattedTextForChat());
-            // The sender's name colour, exactly as the packet gave it
-            // (the packet names its title colour first).
-            assertEquals(Integer.valueOf(0x336633),
-                    ChatBodyMarker.decode(chevron));
-            // Drawn: the row's text carries it. Not said: the words do not.
-            assertEquals("> Halt.", plain(lines.get(1)));
-            assertEquals("Halt.", words(lines.get(1)));
-            // And the message it was built from never held it at all.
-            for (Object value : message) {
-                assertFalse(ChatBodyMarker.isMarker((IChatComponent)value));
-            }
-        } finally {
-            LostTalesConfig.showChatTimestamps = originalTimestamps;
+        }
+        assertNotNull("the body opens with no chevron", chevron);
+        assertEquals(ChatLineWrapper.BODY_SEPARATOR,
+                chevron.getUnformattedTextForChat());
+        // The sender's name colour, exactly as the packet gave it
+        // (the packet names its title colour first).
+        assertEquals(Integer.valueOf(0x336633),
+                ChatBodyMarker.decode(chevron));
+        // Drawn: the row's text carries it. Not said: the words do not.
+        assertEquals("> Halt.", plain(lines.get(1)));
+        assertEquals("Halt.", words(lines.get(1)));
+        // And the message it was built from never held it at all.
+        for (Object value : message) {
+            assertFalse(ChatBodyMarker.isMarker((IChatComponent)value));
         }
     }
 
@@ -598,11 +563,159 @@ public final class ChatLineWrapperTest {
         for (Object value : line) {
             ChatLayoutMarker.Data data =
                     ChatLayoutMarker.decode((IChatComponent)value);
-            if (data != null && !data.anchor) {
+            if (data != null && !data.anchor && !data.rowMark) {
                 return data;
             }
         }
         return null;
+    }
+
+    /**
+     * Laid out for an open window, the speaker's head stands as the row's
+     * avatar and takes no room in it, and the brackets round the name go
+     * with the closing bracket's clear space; the feed keeps all of it.
+     */
+    @Test
+    public void anOpenWindowStandsTheHeadAsTheAvatarAndDropsTheBrackets() {
+        IChatComponent message = LostTalesChatPresentation.build(
+                new LostTalesChatMessagePacket(
+                        ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
+                        "Ranger", "", 0x55AA55, 0x336633, "Well met.",
+                        1L, "losttales:human_ranger_male_2"));
+        List<IChatComponent> open = ChatLineWrapper.wrap(METRICS,
+                message, 200, true);
+        ChatHeadMarker.Data avatar = ChatAvatar.of(open.get(0));
+        assertNotNull(avatar);
+        assertTrue(avatar.avatar);
+        assertEquals(0x336633, avatar.nameColor);
+        int headIndex = ChatAvatar.headIndex(open.get(0));
+        assertTrue(headIndex >= 0);
+        for (Object value : open.get(0)) {
+            IChatComponent part = (IChatComponent)value;
+            String text = part.getUnformattedTextForChat().trim();
+            assertTrue("no bracket in the open window: " + text,
+                    !text.equals("<") && !text.equals(">"));
+            assertTrue(ChatSpacerMarker.decode(part) < 0);
+            if (ChatHeadMarker.decode(part) != null) {
+                assertEquals(0, ChatLineWrapper.partWidth(METRICS, part));
+            }
+        }
+        // The feed keeps the head in the row and the brackets round it.
+        List<IChatComponent> feed = ChatLineWrapper.wrap(METRICS,
+                message, 200, false);
+        assertEquals(null, ChatAvatar.of(feed.get(0)));
+        assertEquals("Global: <  Arathorn> ", plain(feed.get(0)));
+    }
+
+    /**
+     * An open window's name row ends on the message's time, a word's
+     * space clear of the name, as Discord dates a message; the words'
+     * rows wear none, and neither does the feed nor a grouped line, which
+     * has no name row to wear it.
+     */
+    @Test
+    public void anOpenWindowsNameRowEndsOnItsTime() {
+        LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
+                ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
+                "Ranger", "", 0x55AA55, 0x336633, "Well met.",
+                1L, "losttales:human_ranger_male_2");
+        IChatComponent message = LostTalesChatPresentation.build(packet);
+        IChatComponent stamp = ChatStampMarker.of("9:54 PM", 30);
+        List<IChatComponent> open = ChatLineWrapper.wrap(METRICS, message,
+                200, true, 1.0F, 1.0F, 1.0F, stamp);
+        assertTrue(ChatLayoutMarker.isHeaderRow(open.get(0)));
+        List<IChatComponent> header = runs(open.get(0));
+        int at = stampAt(header);
+        assertTrue(at > 0);
+        assertEquals(METRICS.width(" "),
+                ChatSpacerMarker.decode(header.get(at - 1)));
+        assertEquals("9:54 PM", ChatStampMarker.textOf(header.get(at)));
+        assertEquals(30, ChatLineWrapper.partWidth(METRICS,
+                header.get(at)));
+        for (int row = 1; row < open.size(); row++) {
+            assertEquals(-1, stampAt(runs(open.get(row))));
+        }
+        for (IChatComponent row : ChatLineWrapper.wrap(METRICS, message,
+                200, false, 1.0F, 1.0F, 1.0F, stamp)) {
+            assertEquals(-1, stampAt(runs(row)));
+        }
+        IChatComponent grouped = LostTalesChatPresentation.build(packet,
+                ChatTab.of(ChatChannel.ALL), new int[0], true);
+        for (IChatComponent row : ChatLineWrapper.wrap(METRICS, grouped,
+                200, true, 1.0F, 1.0F, 1.0F, stamp)) {
+            assertEquals(-1, stampAt(runs(row)));
+        }
+    }
+
+    /**
+     * A name row without room for its time stands the time on a row of
+     * its own under the name, still the speaker's; the words follow.
+     * "Arathorn" is 48 pixels, the gap 6 and the time 30: 84 is more
+     * than the 80 the row has.
+     */
+    @Test
+    public void aTimeWithNoRoomBesideTheNameTakesARowOfItsOwn() {
+        IChatComponent message = LostTalesChatPresentation.build(
+                new LostTalesChatMessagePacket(
+                        ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
+                        "Ranger", "", 0x55AA55, 0x336633, "Well met.",
+                        1L, "losttales:human_ranger_male_2"));
+        List<IChatComponent> open = ChatLineWrapper.wrap(METRICS, message,
+                80, true, 1.0F, 1.0F, 1.0F, ChatStampMarker.of("9:54 PM", 30));
+        assertEquals(-1, stampAt(runs(open.get(0))));
+        assertTrue(stampAt(runs(open.get(1))) >= 0);
+        assertTrue(ChatLayoutMarker.isHeaderRow(open.get(1)));
+        assertEquals("Well met.", words(open.get(2)));
+    }
+
+    private static List<IChatComponent> runs(IChatComponent row) {
+        List<IChatComponent> runs = new java.util.ArrayList<IChatComponent>();
+        for (Object value : row) {
+            runs.add((IChatComponent)value);
+        }
+        return runs;
+    }
+
+    private static int stampAt(List<IChatComponent> runs) {
+        for (int index = 0; index < runs.size(); index++) {
+            if (ChatStampMarker.isMarker(runs.get(index))) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * A reply's quote loses its opening bracket in an open window, and its
+     * closing one stands a word's space after the quoted name, as the
+     * chevron before the quoted words.
+     */
+    @Test
+    public void anOpenWindowsQuoteKeepsTheChevronBeforeTheQuotedWords() {
+        ChatComponentText root = new ChatComponentText("");
+        root.appendSibling(ChatReplyMarker.apply(text("<"), 0x336633, 7L));
+        root.appendSibling(ChatReplyMarker.apply(text("Beren"), 0x336633, 7L));
+        root.appendSibling(ChatSpacerMarker.of(ChatInlineIcons.NAME_GAP - 1));
+        root.appendSibling(ChatReplyMarker.apply(text("> "), 0x336633, 7L));
+        root.appendSibling(ChatReplyMarker.apply(text("Where to?"), 0xFCECD1,
+                7L));
+        root.appendSibling(ChatLayoutMarker.lineBreak());
+        root.appendSibling(ChatLayoutMarker.anchor());
+        root.appendSibling(text("Rivendell."));
+        List<IChatComponent> open = ChatLineWrapper.wrap(METRICS, root, 200,
+                true);
+        assertEquals("Beren> Where to?", plain(open.get(0)));
+        int spacer = -1;
+        for (Object value : open.get(0)) {
+            int width = ChatSpacerMarker.decode((IChatComponent)value);
+            if (width >= 0) {
+                spacer = width;
+            }
+        }
+        assertEquals(METRICS.width(" "), spacer);
+        List<IChatComponent> feed = ChatLineWrapper.wrap(METRICS, root, 200,
+                false);
+        assertEquals("<Beren> Where to?", plain(feed.get(0)));
     }
 
     /** A line opening with a row of its own: quote, break, then the message. */

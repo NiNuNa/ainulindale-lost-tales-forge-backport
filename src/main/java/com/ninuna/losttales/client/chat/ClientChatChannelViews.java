@@ -112,15 +112,11 @@ public final class ClientChatChannelViews {
     private static final Map<ChatTab, Long> NEWEST_MESSAGE_BY_VIEW =
             new HashMap<ChatTab, Long>();
     /**
-     * Which views this player is meeting for the first time on this
-     * server, decided once per view from whether it held a read mark
-     * when its first replayed line arrived. A conversation nobody has
-     * read yet has no "where you left off" to mark, so its replay is
-     * everything said before the player was there: it is filed, read,
-     * and counted nowhere. Unread begins with what is said from then on.
+     * Where this player arrived on joining this time, as the login replay
+     * states it: the id of their own join line, which is never news to
+     * them; {@link ChatMessageIds#NONE} until the replay says.
      */
-    private static final Map<ChatTab, Boolean> FIRST_VISIT =
-            new HashMap<ChatTab, Boolean>();
+    private static long sessionArrival = ChatMessageIds.NONE;
 
     private static long openedNanos;
     private static final LostTalesGuiAnimationState OPEN_STATE =
@@ -163,11 +159,13 @@ public final class ClientChatChannelViews {
      * mark moves once the line is seen: a message's own id, or for a
      * console line the id of the entry it shows, which comes from the
      * same clock. A {@code replayed} line is one the server is catching
-     * this player up on: one this player was shown before — no newer
-     * than the view's read mark on this server — is filed and nothing
-     * else, and the first one they were not stands under the unread
-     * divider, in the tab in front as in any other, the way a messenger
-     * marks where its reader left off.
+     * this player up on: one said before this player first arrived on
+     * this server ({@link ClientChatReadMarks#arrival}), and their own
+     * arrival, were never news to them and are filed as read; one they
+     * were shown before — no newer than the view's read mark — is filed
+     * and nothing else; and the first one they were not stands under the
+     * unread divider, in the tab in front as in any other, the way a
+     * messenger marks where its reader left off.
      */
     public static synchronized void record(int chatLineId, ChatTab tab,
                                            ChatTab selected,
@@ -195,11 +193,12 @@ public final class ClientChatChannelViews {
         }
         String server = ClientChatSession.currentKey();
         if (replayed && named) {
-            if (isFirstVisit(server, view)) {
-                // Never read here before: everything the server is
-                // catching this player up on was said before they
-                // arrived, so it is filed and read, and the count
-                // starts with the next line said.
+            long arrived = ClientChatReadMarks.arrival(server);
+            if (!ChatMessageIds.isServerId(arrived) || serverId < arrived
+                    || serverId == sessionArrival) {
+                // Said before this player first came to this server, or
+                // their own arrival: never news to them, so it is filed
+                // and read, whether or not they ever opened the view.
                 ClientChatReadMarks.markRead(server, view, serverId);
                 return;
             }
@@ -256,6 +255,21 @@ public final class ClientChatChannelViews {
                         new UnreadDivider(chatLineId, timestampMillis));
             }
         }
+    }
+
+    /**
+     * Where this player arrived on joining, as the login replay states
+     * it. The first arrival on a server is remembered for good: what was
+     * said before it was never news to them, and anything said since
+     * that they were not shown is unread.
+     */
+    public static synchronized void noteArrival(long arrivalId) {
+        if (!ChatMessageIds.isServerId(arrivalId)) {
+            return;
+        }
+        sessionArrival = arrivalId;
+        ClientChatReadMarks.markArrival(ClientChatSession.currentKey(),
+                arrivalId);
     }
 
     /**
@@ -948,7 +962,7 @@ public final class ClientChatChannelViews {
         UNREAD_OTHER.clear();
         UNREAD_DIVIDERS.clear();
         NEWEST_MESSAGE_BY_VIEW.clear();
-        FIRST_VISIT.clear();
+        sessionArrival = ChatMessageIds.NONE;
         openedNanos = 0L;
         invalidateCache();
         ChatGroupRuns.clear();
@@ -996,7 +1010,7 @@ public final class ClientChatChannelViews {
         UNREAD_OTHER.clear();
         UNREAD_DIVIDERS.clear();
         NEWEST_MESSAGE_BY_VIEW.clear();
-        FIRST_VISIT.clear();
+        sessionArrival = ChatMessageIds.NONE;
         invalidateCache();
         ChatGroupRuns.clear();
         ClientChatMessageIds.clear();
@@ -1008,26 +1022,6 @@ public final class ClientChatChannelViews {
         ChatWindowFrame.clear();
         ClientChatConsoleEvents.clear();
         ChatTabSelection.clear();
-    }
-
-    /**
-     * Whether {@code view} is one this player is meeting for the first
-     * time on this server. Asked as the view's first replayed line
-     * arrives and answered the same way for the rest of the replay: the
-     * first line moves the read mark, so asking the mark again would
-     * call the second line new. A view without a mark once the replay
-     * has begun is a first visit; one that held a mark never becomes
-     * one again this session.
-     */
-    private static boolean isFirstVisit(String server, ChatTab view) {
-        Boolean decided = FIRST_VISIT.get(view);
-        if (decided != null) {
-            return decided.booleanValue();
-        }
-        boolean first = !ChatMessageIds.isServerId(
-                ClientChatReadMarks.lastRead(server, view));
-        FIRST_VISIT.put(view, Boolean.valueOf(first));
-        return first;
     }
 
     /** Line ids remembered: the history's capacity and a margin. */

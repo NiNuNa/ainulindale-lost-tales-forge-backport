@@ -3,7 +3,6 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.chat.ChatDeliveryMark;
-import com.ninuna.losttales.chat.ChatMentionCandidate;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.client.gui.LostTalesPointerOwner;
@@ -31,7 +30,6 @@ import net.minecraft.client.gui.ChatLine;
 import net.minecraft.client.gui.GuiChat;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.gui.GuiConfirmOpenLink;
-import net.minecraft.client.gui.GuiNewChat;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.event.HoverEvent;
 import net.minecraft.item.ItemStack;
@@ -1007,22 +1005,14 @@ public final class LostTalesChatGui extends GuiChat
         }
         drawChatLineHover(line, mouseX, mouseY);
         this.bar.drawNotice();
-        ChatMentionCandidate candidate =
-                this.hover.is(ChatHover.Kind.SUGGESTION)
-                        ? this.completion.mentionAt(this.hover.suggestion)
-                        : null;
-        if (candidate != null) {
-            LostTalesChatHoverCard.drawForCandidate(this.mc, candidate,
-                    mouseX, mouseY, this.width, this.height);
-        } else if (this.hover.is(ChatHover.Kind.CHARACTER_BUTTON)
+        // A person's or a role's card opens on a click, not under the
+        // pointer; only the head button's hover shows one: the chosen
+        // identity's own brief card, who the roleplaying channels speak
+        // as right now.
+        if (this.hover.is(ChatHover.Kind.CHARACTER_BUTTON)
                 && !this.menus.isOpen()) {
-            // The head button's hover is the chosen identity's own brief
-            // card: who the roleplaying channels speak as right now.
             LostTalesChatHoverCard.drawForIdentity(this.mc,
                     ClientChatChannelState.getSelected(), mouseX, mouseY,
-                    this.width, this.height);
-        } else {
-            LostTalesChatHoverCard.draw(this.mc, person, mouseX, mouseY,
                     this.width, this.height);
         }
         // The card a click opened stands over the lines until it is
@@ -1240,10 +1230,8 @@ public final class LostTalesChatGui extends GuiChat
             ChatHover hover = new ChatHover(ChatHover.Kind.WINDOW);
             hover.frame = under;
             hover.acts = focuses || cycles;
-            // A stamp or a delivery mark is part of its window and
-            // answers a press as the window does; resting on one reads it
-            // out.
-            hover.stampLineId = under.stampLineAt(x, y);
+            // A delivery mark is part of its window and answers a press
+            // as the window does; resting on one reads it out.
             hover.markLineId = under.markLineAt(x, y);
             return hover;
         }
@@ -1352,9 +1340,17 @@ public final class LostTalesChatGui extends GuiChat
                                         == LostTalesChatOverlayRenderer.TOOLBAR_REPLY
                                         ? "gui.losttales.chat.message.reply"
                                         : "gui.losttales.chat.message.copy");
+            case LINE:
+                // The button beside a message's reactions says what the
+                // toolbar's own React says.
+                return hover.line != null
+                        && ChatReactionMarker.isAddButton(hover.line.component)
+                        ? StatCollector.translateToLocal(
+                                "gui.losttales.chat.message.react")
+                        : "";
             case WINDOW:
                 return hover.markLineId != 0 ? markTip(hover.markLineId)
-                        : stampTip(hover.stampLineId);
+                        : "";
             case CHARACTER_BUTTON:
                 // The hover shows the chosen identity's card instead of words.
                 return "";
@@ -1366,18 +1362,6 @@ public final class LostTalesChatGui extends GuiChat
             default:
                 return "";
         }
-    }
-
-    /**
-     * The whole date and time a stamp stands for — the day of the week
-     * included, as Discord reads out a message's time — or nothing where
-     * no stamp is under the pointer.
-     */
-    private static String stampTip(int chatLineId) {
-        Long said = chatLineId == 0 ? null
-                : ClientChatChannelViews.timeOf(chatLineId);
-        return said == null ? ""
-                : ChatTimestampFormatter.formatFull(said.longValue());
     }
 
     /**
@@ -1684,6 +1668,9 @@ public final class LostTalesChatGui extends GuiChat
             case SETTINGS:
                 return StatCollector.translateToLocal(
                         "gui.losttales.chat.tab.settings");
+            case DRAFT:
+                return StatCollector.translateToLocal(
+                        "gui.losttales.chat.tab.draft");
             case LOCK:
                 return StatCollector.translateToLocal(window.isLocked()
                         ? "gui.losttales.chat.tab.unlock"
@@ -1780,7 +1767,11 @@ public final class LostTalesChatGui extends GuiChat
      */
     private void drawChatLineHover(LostTalesChatOverlayRenderer.Hit hovered,
                                    int drawMouseX, int drawMouseY) {
-        if (hovered == null) {
+        if (hovered == null || ChatInteractions.actionOf(hovered.component,
+                this.mc.gameSettings.chatLinks)
+                == ChatInteractions.Action.PERSON) {
+            // A name, a head, a mention or a role reads out nothing under
+            // the pointer; a click opens its card.
             return;
         }
         ChatReactionMarker.Data chip =
@@ -2054,7 +2045,9 @@ public final class LostTalesChatGui extends GuiChat
                         closedPopupKind)) {
                     this.menus.openCharacterSelectionMenu(
                             this.bar.characterButtonLeft(),
-                            this.bar.characterButtonTop() - 2);
+                            this.bar.characterButtonTop() - 2,
+                            !ClientChatIdentities.speaksInCharacter(
+                                    ClientChatChannelState.getSelected()));
                 }
                 return;
             case INDICATOR:
@@ -2586,6 +2579,15 @@ public final class LostTalesChatGui extends GuiChat
                 this.menus.openSettingsPopup(hit.tab, mouseX,
                         ChatChannelTabBar.rowTop(row.rowBottom) - 2);
                 return true;
+            case DRAFT:
+                // The draft mark takes the input to its tab, which brings
+                // the draft into the field, and chooses every word of it
+                // as Ctrl+A would there. A press, not a drag.
+                ChatTabSelection.selectOnly(window.getId(), hit.tab);
+                this.tabActions.selectChannel(hit.tab);
+                this.inputField.setCursorPositionEnd();
+                this.inputField.setSelectionPos(0);
+                return true;
             case LOCK:
                 this.tabActions.setWindowLocked(window, !window.isLocked());
                 return true;
@@ -2736,6 +2738,11 @@ public final class LostTalesChatGui extends GuiChat
                 }
                 return true;
             }
+            case ADD_REACTION:
+                // The button a reaction row ends on: the picker, aimed at
+                // the message, as the toolbar's React opens it.
+                openReactionPicker(ChatReactionMarker.addButtonMessageId(part));
+                return true;
             case ACHIEVEMENT:
                 ChatAchievementScreens.open(this.mc, part);
                 return true;

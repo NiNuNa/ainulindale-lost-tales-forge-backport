@@ -70,6 +70,9 @@ public final class ChatIdentitySelection {
             LostTalesChatService.sendContextHistory(player, ChatChannel.PARTY,
                     party.getPartyId().toString(), ChatMessageIds.NONE);
         }
+        // The character spoken as is one the player uses, so it shows a
+        // presence, and the one given up may not any more.
+        ChatPresenceService.refresh(player);
     }
 
     public static RoleplayCharacter character(EntityPlayerMP player) {

@@ -81,11 +81,11 @@ public final class ChatGroupRunsTest {
     @Test
     public void aDaysRuleOpensARunOfItsOwn() {
         remember(1, ChatChannel.ALL, ALICE, "Alice", START);
-        remember(2, ChatChannel.ALL, ALICE, "Alice", START + 60000L);
-        remember(3, ChatChannel.ALL, ALICE, "Alice", START + 90000L);
-        remember(4, ChatChannel.ALL, ALICE, "Alice", START + 150000L);
+        remember(2, ChatChannel.ALL, ALICE, "Alice", START + 240000L);
+        remember(3, ChatChannel.ALL, ALICE, "Alice", START + 360000L);
+        remember(4, ChatChannel.ALL, ALICE, "Alice", START + 540000L);
         int[] ids = newestFirst(1, 2, 3, 4);
-        // Without a rule: one run from 1 for two minutes, then 4 opens one.
+        // Without a rule: one run from 1 for eight minutes, then 4 opens one.
         assertArrayEquals(new boolean[] { false, true, true, false },
                 ChatGroupRuns.continuationsOf(ids));
         assertArrayEquals(ChatGroupRuns.continuationsOf(ids),
@@ -144,9 +144,9 @@ public final class ChatGroupRunsTest {
         remember(2, ChatChannel.ALL, ALICE, "Aldric", START + 1000L);
         remember(3, ChatChannel.ALL, BOB, "Bob", START + 2000L);
         remember(4, ChatChannel.ALL, BOB, "Bob",
-                START + 2000L + 121L * 1000L);
+                START + 2000L + 481L * 1000L);
         remember(5, ChatChannel.ALL, BOB, "Bob",
-                START + 2000L + 122L * 1000L);
+                START + 2000L + 482L * 1000L);
         // Line 99 was never recorded: it is not groupable and ends the run.
         // Newest first, so only line 5 continues anything.
         assertArrayEquals(
@@ -207,14 +207,15 @@ public final class ChatGroupRunsTest {
 
     /**
      * A window keeps its messages instead of fading them, so its runs
-     * are measured from the message that opened them: a burst gets one
-     * header, and a speaker cannot extend a single run all evening.
+     * are measured from the message that opened them, as Discord's are:
+     * eight minutes from the first, so a speaker cannot extend a single
+     * run all evening.
      */
     @Test
     public void aWindowRunIsMeasuredFromItsHead() {
         remember(1, ChatChannel.ALL, ALICE, "Alice", START);
-        remember(2, ChatChannel.ALL, ALICE, "Alice", START + 100000L);
-        remember(3, ChatChannel.ALL, ALICE, "Alice", START + 200000L);
+        remember(2, ChatChannel.ALL, ALICE, "Alice", START + 300000L);
+        remember(3, ChatChannel.ALL, ALICE, "Alice", START + 600000L);
         assertArrayEquals(new boolean[] { false, true, false },
                 ChatGroupRuns.continuationsOf(newestFirst(1, 2, 3)));
         // The feed would have kept none of that: every gap is past its

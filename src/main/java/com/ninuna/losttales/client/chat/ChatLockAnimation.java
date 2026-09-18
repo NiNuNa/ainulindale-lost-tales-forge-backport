@@ -159,25 +159,6 @@ final class ChatLockAnimation {
         }
     }
 
-    /** The shut padlock at rest: a badge, not a control. */
-    static void drawShut(int x, int top, int alpha) {
-        int frame = FRAMES.length - 1;
-        int shadowAlpha = LostTalesChatVisualStyle.shadowAlpha(alpha);
-        if (shadowAlpha > 0) {
-            LostTalesSilhouetteRenderState.begin(
-                    LostTalesChatVisualStyle.SHADOW);
-            try {
-                drawFrame(frame, RESTING_U,
-                        x + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                        top + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                        shadowAlpha);
-            } finally {
-                LostTalesSilhouetteRenderState.end();
-            }
-        }
-        drawFrame(frame, RESTING_U, x, top, alpha);
-    }
-
     /**
      * Puts the pose on the matrix. The lock turns and scales about the
      * middle of its body's foot, the one part of it standing on

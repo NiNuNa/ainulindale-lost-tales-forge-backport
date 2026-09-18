@@ -11,6 +11,7 @@ import com.ninuna.losttales.network.packet.LostTalesChatDeletePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.chat.ChatNarrator;
 import com.ninuna.losttales.chat.ChatPresence;
+import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.permission.LostTalesCapability;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -127,6 +128,12 @@ final class ChatScreenMenus {
     private String menuMessageIdentity = "";
     /** Whether it came over the Discord bridge, where nobody can be reached. */
     private boolean menuMessageFromDiscord;
+    /**
+     * Whether the head button's menu was opened on an account channel,
+     * where it offers a status and nothing else: kept from the opening,
+     * so the rows stay the same while the menu is up.
+     */
+    private boolean charactersStatusOnly;
     /** The sender's account, when the line still has its packet; else null. */
     private UUID menuMessageSenderId;
     private String menuMessageText = "";
@@ -1012,12 +1019,18 @@ final class ChatScreenMenus {
     /**
      * The character selection menu, anchored above its button, with a
      * search field over its rows that narrows them as it is typed into.
+     * On an account channel, which always speaks as the account, the
+     * menu is the status rows alone: nothing there chooses an identity,
+     * so it carries no roster and no search field either.
      */
-    void openCharacterSelectionMenu(int anchorX, int anchorBottom) {
+    void openCharacterSelectionMenu(int anchorX, int anchorBottom,
+                                    boolean statusOnly) {
+        this.charactersStatusOnly = statusOnly;
         this.popup.open(POPUP_CHARACTERS, null, characterSelectionEntries(""),
                 this.font, anchorX, anchorBottom, this.screenWidth,
-                this.screenHeight, StatCollector.translateToLocal(
-                        "gui.losttales.chat.character_selection.search"),
+                this.screenHeight, statusOnly ? null
+                        : StatCollector.translateToLocal(
+                                "gui.losttales.chat.character_selection.search"),
                 null);
     }
 
@@ -1036,6 +1049,16 @@ final class ChatScreenMenus {
                 ClientChatIdentities.viewing();
         List<ChatPopupMenu.Entry> entries =
                 new ArrayList<ChatPopupMenu.Entry>();
+        if (this.charactersStatusOnly) {
+            // The account speaking, and what it may say of itself.
+            entries.add(ChatPopupMenu.Entry.passive(
+                    ClientChatIdentities.accountName())
+                    .withHead(self, ""));
+            addSection(entries,
+                    "gui.losttales.chat.character_selection.status",
+                    statusRows());
+            return entries;
+        }
         entries.add(ChatPopupMenu.Entry.passive(ClientChatIdentities.isNarrating()
                 ? ChatNarrator.NAME : current.name)
                 .withHead(self, current.account ? "" : current.skinId));
@@ -1068,14 +1091,27 @@ final class ChatScreenMenus {
         return entries;
     }
 
-    /** The presences to choose from, the chosen one marked; the account's, not a character's. */
+    /**
+     * The statuses to choose from for the identity the selected tab
+     * speaks as — the chat identity on a roleplaying tab, the account on
+     * any other — each with the sphere it shows, lighting to the ivory
+     * one under the pointer, and the one chosen for it marked.
+     */
     private static List<ChatPopupMenu.Entry> statusRows() {
+        ChatPresenceIdentity speaker = ClientChatPresence.speakerOf(
+                ClientChatChannelState.getSelected());
+        ChatPresence chosen = ClientChatPresence.chosen(speaker);
         List<ChatPopupMenu.Entry> rows = new ArrayList<ChatPopupMenu.Entry>();
         for (ChatPresence presence : ChatPresence.values()) {
+            if (!presence.isChoosable()) {
+                continue;
+            }
             rows.add(new ChatPopupMenu.Entry("characters:status:" + presence.name(),
                     StatCollector.translateToLocal(presence.labelKey()), false,
-                    ClientChatPresence.chosen() == presence
-                            ? LostTalesColors.rgb(LostTalesColors.HONEY) : -1, null));
+                    chosen == presence
+                            ? LostTalesColors.rgb(LostTalesColors.HONEY) : -1, null)
+                    .withSprite(ChatPresenceMark.sphereOf(presence),
+                            LostTalesUiSheet.PRESENCE_SELECTED, false));
         }
         return rows;
     }
@@ -1115,8 +1151,10 @@ final class ChatScreenMenus {
         }
         if (entry.id.startsWith("characters:status:")) {
             try {
-                ClientChatPresence.choose(ChatPresence.valueOf(
-                        entry.id.substring("characters:status:".length())));
+                ClientChatPresence.choose(ClientChatPresence.speakerOf(
+                                ClientChatChannelState.getSelected()),
+                        ChatPresence.valueOf(entry.id.substring(
+                                "characters:status:".length())));
             } catch (IllegalArgumentException ignored) {
                 // A row this build never made names no status.
             }

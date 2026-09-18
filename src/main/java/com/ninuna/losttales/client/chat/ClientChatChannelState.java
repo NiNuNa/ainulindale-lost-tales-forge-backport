@@ -1012,12 +1012,6 @@ public final class ClientChatChannelState {
         SENT_HISTORY.clear();
     }
 
-    private static CharacterSummary activeCharacter() {
-        CharacterRosterSnapshot roster =
-                ClientCharacterRosterCache.getSnapshot();
-        return roster == null ? null : roster.getActiveCharacter();
-    }
-
     /** The shared chat identity's faction or server-confirmed party. */
     public static synchronized String scopeKeyRead(ChatChannel channel) {
         if (channel == null || !channel.isScoped()) {

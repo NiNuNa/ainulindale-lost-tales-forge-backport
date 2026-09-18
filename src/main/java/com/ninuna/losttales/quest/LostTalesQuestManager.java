@@ -36,10 +36,6 @@ public final class LostTalesQuestManager {
 
     private LostTalesQuestManager() {}
 
-    public static LostTalesQuestPlayerData getPlayerData(EntityPlayer player) {
-        return LostTalesQuestPlayerData.get(player);
-    }
-
     public static StartResult startQuest(EntityPlayer player, String questId) {
         return startQuest(player, questId, LostTalesQuestStartSource.COMMAND);
     }

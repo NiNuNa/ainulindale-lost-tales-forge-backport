@@ -26,7 +26,6 @@ import com.ninuna.losttales.compat.lotr.hired.LotrHiredUnitCustodyHandler;
 import com.ninuna.losttales.character.server.CharacterStateCheckpointHandler;
 import com.ninuna.losttales.character.switching.CharacterLifecycleStateTracker;
 import com.ninuna.losttales.character.switching.CharacterSwitchCoordinator;
-import com.ninuna.losttales.character.server.CharacterServerPacketDispatcher;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityLamp;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityMissiveBoard;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityPlushie;
@@ -179,6 +178,7 @@ public class LostTalesCommonProxy {
         LostTalesWaystoneGenerationHandler waystoneGenerationHandler =
                 new LostTalesWaystoneGenerationHandler();
         cpw.mods.fml.common.FMLCommonHandler.instance().bus().register(new ChatIdentitySelection());
+        cpw.mods.fml.common.FMLCommonHandler.instance().bus().register(new ChatPresenceService());
         LostTalesChatRoleRosterWatcher chatRoleRosterWatcher =
                 new LostTalesChatRoleRosterWatcher();
         MinecraftForge.EVENT_BUS.register(questPlayerEventHandler);
@@ -404,6 +404,9 @@ public class LostTalesCommonProxy {
         LostTalesChatService.clear();
         ChatIdentitySelection.clear();
         ChatPresenceService.clear();
+        // Generated quests belong to the world that made them; each
+        // player's saved data registers its own again as it loads.
+        LostTalesQuestRegistry.clearRuntimeQuests();
         LostTalesServerBroadcastHook.clear();
         LostTalesChatService.console(ChatConsoleEvent.Kind.SERVER,
                 ChatConsoleEvent.Severity.INFO, "Server", "Server started");
@@ -503,6 +506,9 @@ public class LostTalesCommonProxy {
         LostTalesChatService.clear();
         ChatIdentitySelection.clear();
         ChatPresenceService.clear();
+        // Generated quests belong to the world that made them; each
+        // player's saved data registers its own again as it loads.
+        LostTalesQuestRegistry.clearRuntimeQuests();
         LostTalesServerBroadcastHook.clear();
         ChatAuditLog.onServerStopping();
         LostTalesMobAggroEventHandler.clearAll();

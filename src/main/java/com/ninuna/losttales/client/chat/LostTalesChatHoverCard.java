@@ -2,7 +2,8 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.chat.ChatAccountRole;
-import com.ninuna.losttales.chat.ChatMentionCandidate;
+import com.ninuna.losttales.chat.ChatPresence;
+import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
@@ -17,30 +18,29 @@ import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ChatLine;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.gui.GuiNewChat;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
 import net.minecraft.util.StatCollector;
 import org.lwjgl.opengl.GL11;
 
 /**
- * The bounded player card: shown for the head or name of a chat line, and
- * for a row of the mention completion list, so hovering either tells the
- * same story about the same player. A chat line supplies its snapshotted
- * identity; the details — race, starting faction, level, gender, age, and
- * biography — come from the public appearance the server already synced
- * for that player, and are only shown when they describe the character
- * the line names. An NPC's head and name carry the same card — the
- * portrait, the name in its faction's colour, and the faction its
- * speech was captured with — so an NPC reads as a player that happens
- * not to exist.
+ * The bounded player card: opened by a click on the head or name of a
+ * chat line, or on a mention, and shown in brief under the pointer for
+ * the identity the head button speaks as. A chat line supplies its
+ * snapshotted identity; the details — race, starting faction, level,
+ * gender, age, and biography — come from the public appearance the
+ * server already synced for that player, and are only shown when they
+ * describe the character the line names. An NPC's head and name carry
+ * the same card — the portrait, the name in its faction's colour, and
+ * the faction its speech was captured with — so an NPC reads as a player
+ * that happens not to exist.
  */
 final class LostTalesChatHoverCard {
     /**
      * The card a click opened, standing where it was opened until a
      * click elsewhere, Escape or the screen closing takes it down; null
-     * while none is. The hover card shows the person in brief, this one
-     * in full, the way a messenger's profile opens from a name.
+     * while none is. It shows the person in full, the way a messenger's
+     * profile opens from a name.
      */
     private static Target pinned;
     private static int pinnedX;
@@ -66,20 +66,6 @@ final class LostTalesChatHoverCard {
     private LostTalesChatHoverCard() {}
 
     /**
-     * The brief card of whoever the pointer rests on: who they are and
-     * what they wear, the rest waiting on a click. Nothing while a
-     * clicked card stands open, so the two never show at once.
-     */
-    static void draw(Minecraft minecraft, Found found, int mouseX,
-                     int mouseY, int screenWidth, int screenHeight) {
-        if (pinned != null || found == null) {
-            return;
-        }
-        drawCard(minecraft, found.target, mouseX, mouseY, screenWidth,
-                screenHeight, false);
-    }
-
-    /**
      * The brief card of the identity a tab speaks as: what the head
      * button shows on hover, so who the roleplaying channels speak as
      * is read the way anyone else in the chat is. Nothing while a
@@ -91,33 +77,12 @@ final class LostTalesChatHoverCard {
             return;
         }
         ClientChatSignature.Signature signature = ClientChatSignature.of(tab);
+        ChatPresenceIdentity speaker = ClientChatPresence.speakerOf(tab);
         drawCard(minecraft, new Target(minecraft.thePlayer.getUniqueID(),
-                        signature.accountLine, signature.skinId,
-                        signature.identityName, "", signature.accountName,
-                        signature.nameColor),
+                        signature.accountLine, speaker.getCharacterId(),
+                        signature.skinId, signature.identityName, "",
+                        signature.accountName, signature.nameColor),
                 mouseX, mouseY, screenWidth, screenHeight, false);
-    }
-
-    /**
-     * Whether the pointer stands on somebody — a sender's identity span
-     * or a mention — rather than on message text: exactly where a card
-     * is showing. A right-click there belongs to the person, so the
-     * message-copy action stands aside.
-     */
-    static boolean isPointerOnPerson(Minecraft minecraft, float mouseX,
-                                     float mouseY) {
-        return personAt(minecraft, mouseX, mouseY) != null;
-    }
-
-    /**
-     * The person under the pointer, exactly where a card shows; null
-     * anywhere else. What the player menu opens over.
-     */
-    static Target personAt(Minecraft minecraft, float mouseX,
-                           float mouseY) {
-        Found found = locate(minecraft,
-                LostTalesChatOverlayRenderer.hitAt(minecraft, mouseX, mouseY));
-        return found == null ? null : found.target;
     }
 
     /**
@@ -151,71 +116,6 @@ final class LostTalesChatHoverCard {
         if (pinned != null) {
             drawCard(minecraft, pinned, pinnedX, pinnedY, screenWidth,
                     screenHeight, true);
-        }
-    }
-
-    /**
-     * Card for a mention candidate. The candidate's key is the player's
-     * UUID when the appearance sync knows them; without it only the
-     * account identity can be shown.
-     */
-    static void drawForCandidate(Minecraft minecraft,
-                                 ChatMentionCandidate candidate,
-                                 int mouseX, int mouseY,
-                                 int screenWidth, int screenHeight) {
-        if (minecraft == null || candidate == null
-                || !candidate.isUsable()) {
-            return;
-        }
-        if (candidate.isRole()) {
-            // A role row shows the role's own card, exactly as its
-            // mention in a message does. The row's key is
-            // "role:<name>", the same token the mention marker carries.
-            for (ChatAccountRole role : ChatAccountRole.mentionable()) {
-                if (candidate.getKey().equalsIgnoreCase(
-                        "role:" + role.getId())) {
-                    drawRoleCard(minecraft, role, mouseX, mouseY,
-                            screenWidth, screenHeight, false);
-                    return;
-                }
-            }
-            return;
-        }
-        UUID playerId = parseUuid(candidate.getKey());
-        if (playerId == null && minecraft.thePlayer != null
-                && candidate.getAccountName().equalsIgnoreCase(
-                        minecraft.thePlayer.getCommandSenderName())) {
-            playerId = minecraft.thePlayer.getUniqueID();
-        }
-        if (playerId == null) {
-            return;
-        }
-        CharacterAppearance appearance =
-                ClientCharacterAppearanceCache.getAuthoritative(playerId);
-        boolean accountIdentity = appearance == null
-                || !appearance.hasCharacter()
-                || candidate.getCharacterName().length() == 0;
-        if (accountIdentity) {
-            LostTalesCharacterHeadIconRenderer.rememberAccountSkin(
-                    minecraft, playerId, candidate.getAccountName());
-        }
-        drawCard(minecraft, new Target(playerId, accountIdentity,
-                        appearance == null ? "" : appearance.getSkinId(),
-                        accountIdentity ? candidate.getAccountName()
-                                : candidate.getCharacterName(),
-                        "", candidate.getAccountName(),
-                        LostTalesColors.rgb(LostTalesColors.HUD_LABEL)),
-                mouseX, mouseY, screenWidth, screenHeight, false);
-    }
-
-    private static UUID parseUuid(String value) {
-        if (value == null || value.length() != 36) {
-            return null;
-        }
-        try {
-            return UUID.fromString(value);
-        } catch (IllegalArgumentException ignored) {
-            return null;
         }
     }
 
@@ -274,10 +174,10 @@ final class LostTalesChatHoverCard {
                         details.getCharacterId());
         addDetail(lines, "gui.losttales.chat.card.roles", target.npcIdentity
                 ? "" : roleNames(worn));
-        // Away or Do Not Disturb, when the person said so; Online is no news.
-        addDetail(lines, "gui.losttales.chat.card.status", target.npcIdentity
-                ? "" : ChatPresenceMark.label(
-                        ClientChatPresence.presenceOf(target.playerId)));
+        // Away, Do Not Disturb or Offline, for the identity the card
+        // is about; Online is no news.
+        addDetail(lines, "gui.losttales.chat.card.status",
+                ChatPresenceMark.label(target.presence()));
         // An NPC's faction is what its speech was captured with, and the
         // brief card says it too: without it the card is a name alone.
         if (full || target.npcIdentity) {
@@ -565,10 +465,13 @@ final class LostTalesChatHoverCard {
 
     /**
      * What the pointer rests on: the person or role, whether it is the
-     * row's sender rather than a mention, and the drawn row itself.
+     * row's sender's name — not a mention, and not the sender's head,
+     * which answers for the same person as an element of its own — and
+     * the drawn row itself.
      */
     static final class Found {
         final Target target;
+        /** Whether the name's underline follows the pointer. */
         final boolean sender;
         final IChatComponent row;
 
@@ -628,6 +531,15 @@ final class LostTalesChatHoverCard {
             for (int at = 0; at < parts.size(); at++) {
                 IChatComponent part = parts.get(at);
                 boolean atHit = places.get(at).intValue() == hit.index;
+                if (ChatStampMarker.isMarker(part)) {
+                    // The time behind a name is past the sender; it
+                    // reads out its moment instead.
+                    if (atHit) {
+                        return null;
+                    }
+                    identitySpan = false;
+                    continue;
+                }
                 ChatMentionMarker.Data mention =
                         ChatMentionMarker.decode(part);
                 if (mention != null) {
@@ -692,7 +604,11 @@ final class LostTalesChatHoverCard {
                             return null;
                         }
                     }
-                    return found(targetForGroup(lines, viewIndex), true, row);
+                    // The head answers for the sender too, but it is
+                    // an element of its own: the name is not underlined
+                    // under it.
+                    return found(targetForGroup(lines, viewIndex),
+                            head == null, row);
                 }
                 if (closesSpan) {
                     identitySpan = false;
@@ -725,6 +641,7 @@ final class LostTalesChatHoverCard {
                     minecraft, playerId, account);
         }
         return new Target(playerId, accountIdentity,
+                accountIdentity ? null : appearance.getCharacterId(),
                 appearance == null ? "" : appearance.getSkinId(),
                 accountIdentity ? account
                         : appearance.getCharacterName(),
@@ -805,14 +722,15 @@ final class LostTalesChatHoverCard {
         if (marker.npcIdentity) {
             // A fake player's card: the portrait, the name in the
             // faction's colour, no account behind it.
-            return new Target(marker.senderId, false, true, marker.skinId,
-                    identity, "", "", marker.nameColor);
+            return new Target(marker.senderId, false, true, null,
+                    marker.skinId, identity, "", "", marker.nameColor);
         }
         if (account.length() == 0) {
             return null;
         }
         Target target = new Target(marker.senderId, marker.accountIdentity,
-                marker.skinId, identity, title, account, marker.nameColor);
+                marker.characterId, marker.skinId, identity, title, account,
+                marker.nameColor);
         if (marker.isSystemSender()) {
             target = target.withNote(LostTalesChatPresentation
                     .commandAnsweredOn(selected.getChatLineID()));
@@ -966,6 +884,11 @@ final class LostTalesChatHoverCard {
     static final class Target {
         final UUID playerId;
         final boolean accountIdentity;
+        /**
+         * The character the card is about; null for the account, an NPC,
+         * and a card that does not know which character.
+         */
+        final UUID characterId;
         /** An NPC's card: the portrait for a head, no account, and the
          *  faction its speech was captured with — a player's card in
          *  everything but the data behind it. */
@@ -984,28 +907,29 @@ final class LostTalesChatHoverCard {
          */
         final String note;
 
-        Target(UUID playerId, boolean accountIdentity, String skinId,
-               String identityName, String title, String accountName,
-               int nameColor) {
-            this(playerId, accountIdentity, false, skinId, identityName,
-                    title, accountName, nameColor);
+        Target(UUID playerId, boolean accountIdentity, UUID characterId,
+               String skinId, String identityName, String title,
+               String accountName, int nameColor) {
+            this(playerId, accountIdentity, false, characterId, skinId,
+                    identityName, title, accountName, nameColor);
         }
 
         Target(UUID playerId, boolean accountIdentity, boolean npcIdentity,
-               String skinId, String identityName, String title,
-               String accountName, int nameColor) {
-            this(playerId, accountIdentity, npcIdentity, skinId,
+               UUID characterId, String skinId, String identityName,
+               String title, String accountName, int nameColor) {
+            this(playerId, accountIdentity, npcIdentity, characterId, skinId,
                     identityName, title, accountName, nameColor, null, "");
         }
 
         private Target(UUID playerId, boolean accountIdentity,
-                       boolean npcIdentity, String skinId,
+                       boolean npcIdentity, UUID characterId, String skinId,
                        String identityName, String title,
                        String accountName, int nameColor,
                        ChatAccountRole role, String note) {
             this.playerId = playerId;
             this.accountIdentity = accountIdentity;
             this.npcIdentity = npcIdentity;
+            this.characterId = characterId;
             this.skinId = skinId == null ? "" : skinId;
             this.identityName = identityName;
             this.title = title;
@@ -1018,14 +942,34 @@ final class LostTalesChatHoverCard {
         /** The same target with a line of its own about the line hovered. */
         Target withNote(String value) {
             return new Target(this.playerId, this.accountIdentity,
-                    this.npcIdentity, this.skinId, this.identityName,
-                    this.title, this.accountName, this.nameColor, this.role,
-                    value);
+                    this.npcIdentity, this.characterId, this.skinId,
+                    this.identityName, this.title, this.accountName,
+                    this.nameColor, this.role, value);
         }
 
         static Target forRole(ChatAccountRole role) {
-            return new Target(null, false, false, "", "", "", "",
+            return new Target(null, false, false, null, "", "", "", "",
                     role.getColor(), role, "");
+        }
+
+        /**
+         * The status of the identity the card is about; null where there
+         * is none to tell — a role, an NPC, the server, the client, the
+         * Discord bridge, or a character the card cannot name.
+         */
+        ChatPresence presence() {
+            if (this.role != null || this.npcIdentity || this.playerId == null
+                    || LostTalesChatMessagePacket.isSystemSender(this.playerId)
+                    || LostTalesChatMessagePacket.isDiscordSender(this.playerId)) {
+                return null;
+            }
+            if (this.accountIdentity) {
+                return ClientChatPresence.presenceOf(this.playerId,
+                        ChatPresenceIdentity.ACCOUNT);
+            }
+            return this.characterId == null ? null
+                    : ClientChatPresence.presenceOf(this.playerId,
+                            ChatPresenceIdentity.character(this.characterId));
         }
     }
 }

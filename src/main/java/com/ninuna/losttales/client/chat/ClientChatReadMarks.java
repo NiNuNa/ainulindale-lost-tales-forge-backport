@@ -40,6 +40,8 @@ public final class ClientChatReadMarks {
     static final int MAX_MARKS = 1024;
     private static final Charset UTF_8 = Charset.forName("UTF-8");
     private static final char SEPARATOR = '\t';
+    /** What a server's first arrival is kept under in place of a view; no view is named so. */
+    private static final String ARRIVAL = "@arrival";
 
     private static File storeFile;
     /**
@@ -119,6 +121,44 @@ public final class ClientChatReadMarks {
         }
     }
 
+    /**
+     * Where this account first arrived on that server, as a message id:
+     * what was said before it was never news to it, and anything said
+     * from then on it was not shown is unread, in whichever view;
+     * {@link ChatMessageIds#NONE} before its first arrival there.
+     */
+    static synchronized long arrival(String serverKey) {
+        String key = arrivalKey(serverKey);
+        Long mark = key == null ? null : MARKS.get(key);
+        return mark == null ? ChatMessageIds.NONE : mark.longValue();
+    }
+
+    /**
+     * Remembers where this account first arrived on that server; a later
+     * arrival moves nothing, and an id the server never gave is no
+     * arrival.
+     */
+    static synchronized void markArrival(String serverKey, long messageId) {
+        String key = arrivalKey(serverKey);
+        if (key == null || !ChatMessageIds.isServerId(messageId)
+                || MARKS.containsKey(key)) {
+            return;
+        }
+        MARKS.put(key, Long.valueOf(messageId));
+        dirty = true;
+        while (MARKS.size() > MAX_MARKS) {
+            Iterator<String> oldest = MARKS.keySet().iterator();
+            oldest.next();
+            oldest.remove();
+        }
+    }
+
+    private static String arrivalKey(String serverKey) {
+        return serverKey == null || serverKey.length() == 0
+                || serverKey.indexOf(SEPARATOR) >= 0 ? null
+                : serverKey + SEPARATOR + ARRIVAL;
+    }
+
     /** Writes the marks when any has moved since they were last written. */
     public static synchronized void save() {
         if (!dirty) {
@@ -150,7 +190,8 @@ public final class ClientChatReadMarks {
     /** The file's lines: one mark each, oldest touched first. */
     static synchronized List<String> describe() {
         List<String> lines = new ArrayList<String>(MARKS.size() + 1);
-        lines.add("# Lost Tales chat read marks: server, view, newest message read.");
+        lines.add("# Lost Tales chat read marks: server, view, newest message read"
+                + " (" + ARRIVAL + ": where this account first arrived).");
         for (Map.Entry<String, Long> mark : MARKS.entrySet()) {
             lines.add(mark.getKey() + SEPARATOR + mark.getValue());
         }

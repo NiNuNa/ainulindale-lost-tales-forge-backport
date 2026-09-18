@@ -28,6 +28,8 @@ import net.minecraft.util.IChatComponent;
  */
 final class ChatReactionMarker {
     private static final String PREFIX = "losttales-chat-reaction:";
+    /** The button a reaction row ends on, adding another reaction. */
+    private static final String ADD_PREFIX = "losttales-chat-reaction-add:";
     /**
      * From the chip's edge to what it holds: a chip is a framed button,
      * so the frame's edge and its padding.
@@ -58,6 +60,11 @@ final class ChatReactionMarker {
     static final int TRAIL = PAD - 1;
     /** Between two chips. */
     static final int BETWEEN = 2;
+    /**
+     * The add button's width: the emoji's box with the frame's inset
+     * either side, a square as tall as a chip.
+     */
+    static final int ADD_WIDTH = PAD + ICON + PAD;
     /** A digit's advance when no font can be asked: the game's own. */
     private static final int DIGIT_WIDTH = 6;
 
@@ -121,10 +128,60 @@ final class ChatReactionMarker {
         return decode(component) != null;
     }
 
-    /** The width the chip declares, or -1 when the run is not a chip. */
+    /**
+     * The width the chip declares, or the add button's, or -1 when the
+     * run is neither.
+     */
     static int widthOf(IChatComponent component) {
+        if (isAddButton(component)) {
+            return ADD_WIDTH;
+        }
         Data data = decode(component);
         return data == null ? -1 : data.width;
+    }
+
+    /**
+     * The button a message's reaction row ends on, the way Discord's
+     * does: a press opens the emoji picker aimed at the message, so
+     * another reaction is added without reaching for the message's
+     * toolbar.
+     */
+    static ChatComponentText addButton(long messageId) {
+        ChatComponentText marker = new ChatComponentText("");
+        ChatStyle style = marker.getChatStyle().setChatClickEvent(
+                new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
+                        ADD_PREFIX + messageId));
+        marker.setChatStyle(style);
+        return marker;
+    }
+
+    static boolean isAddButton(IChatComponent component) {
+        return addButtonMessageId(component) != ChatMessageIds.NONE;
+    }
+
+    /**
+     * The message an add button reacts to, or {@link ChatMessageIds#NONE}
+     * when the run is not one.
+     */
+    static long addButtonMessageId(IChatComponent component) {
+        if (component == null || component.getChatStyle() == null) {
+            return ChatMessageIds.NONE;
+        }
+        ClickEvent event = component.getChatStyle().getChatClickEvent();
+        String value = event == null ? null : event.getValue();
+        if (event == null || event.getAction()
+                != ClickEvent.Action.SUGGEST_COMMAND
+                || value == null || !value.startsWith(ADD_PREFIX)) {
+            return ChatMessageIds.NONE;
+        }
+        try {
+            long messageId = Long.parseLong(
+                    value.substring(ADD_PREFIX.length()));
+            return ChatMessageIds.isServerId(messageId) ? messageId
+                    : ChatMessageIds.NONE;
+        } catch (NumberFormatException ignored) {
+            return ChatMessageIds.NONE;
+        }
     }
 
     /**

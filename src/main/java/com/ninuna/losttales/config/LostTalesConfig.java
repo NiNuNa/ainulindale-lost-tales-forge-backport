@@ -13,18 +13,15 @@ import cpw.mods.fml.common.FMLLog;
 import com.ninuna.losttales.chat.ChatRoleConfig;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatChannel;
-import com.ninuna.losttales.chat.ChatChannelDescriptor;
 import com.ninuna.losttales.chat.ChatChannelGates;
 import com.ninuna.losttales.chat.ChatChannelIconCatalog;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.permission.LostTalesPermissionCatalog;
 import com.ninuna.losttales.LostTalesMetaData;
-import com.ninuna.losttales.compat.discord.DiscordChannelBindings;
 import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
 import com.ninuna.losttales.chat.profanity.ChatProfanityMode;
 import com.ninuna.losttales.chat.profanity.ChatProfanityWords;
 import net.minecraft.server.MinecraftServer;
-import net.minecraftforge.common.config.ConfigCategory;
 import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.common.config.Property;
 /**
@@ -158,7 +155,6 @@ public final class LostTalesConfig {
     /** Server-authoritative recipient radius for the Proximity channel. */
     public static int chatProximityRadius = 64;
     /** Client-only presentation preferences; neither affects recipients. */
-    public static boolean showChatTimestamps = true;
     public static boolean enableChatEmojis = true;
     public static boolean convertChatEmoticons = true;
     /**
@@ -199,8 +195,32 @@ public final class LostTalesConfig {
     public static String chatReplyHighlightColor = DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR;
     /** The edges the closed-chat feed's lines may stand against. */
     static final String[] CHAT_FEED_ALIGNMENTS = {"LEFT", "CENTRE", "RIGHT"};
-    /** Which of them the feed's lines stand against: the left until chosen. */
-    public static String chatFeedAlignment = CHAT_FEED_ALIGNMENTS[0];
+    /** Where the feed's lines stand until chosen: the middle. */
+    static final String DEFAULT_CHAT_FEED_ALIGNMENT = "CENTRE";
+    /** Which of them the feed's lines stand against. */
+    public static String chatFeedAlignment = DEFAULT_CHAT_FEED_ALIGNMENT;
+    /**
+     * The sizes a row of the chat may be drawn at, against the words of
+     * a message in the open window: one whole display pixel per font
+     * pixel down, the same, or one up. Only whole display pixels keep
+     * the font and the pixel art crisp, so these are the steps there
+     * are.
+     */
+    public static final String CHAT_SIZE_SMALLER = "SMALLER";
+    public static final String CHAT_SIZE_SAME = "SAME";
+    public static final String CHAT_SIZE_LARGER = "LARGER";
+    static final String[] CHAT_SIZES = {
+            CHAT_SIZE_SMALLER, CHAT_SIZE_SAME, CHAT_SIZE_LARGER};
+    /** The row a message names its speaker on, in the open window. */
+    public static String chatSpeakerSize = CHAT_SIZE_LARGER;
+    /** The same row in the closed feed, a step over the feed's own words. */
+    public static String chatFeedSpeakerSize = CHAT_SIZE_LARGER;
+    /** What a message says, in the closed feed. */
+    public static String chatFeedMessageSize = CHAT_SIZE_SMALLER;
+    /** The row a reply opens with, in the open window. */
+    public static String chatQuoteSize = CHAT_SIZE_SMALLER;
+    /** The same row in the closed feed, as large as the feed's words. */
+    public static String chatFeedQuoteSize = CHAT_SIZE_SAME;
     /**
      * Whether the game's HUD and the mod's panels fade out while the chat
      * screen is open, leaving the world and the chat.
@@ -1140,12 +1160,6 @@ public final class LostTalesConfig {
             discordProfanityProperty.setValidValues(ChatProfanityMode.names());
             discordProfanityFilter = ChatProfanityMode.of(
                     discordProfanityProperty.getString(), ChatProfanityMode.OFF).name();
-            showChatTimestamps = config.getBoolean(
-                    "showTimestamps",
-                    CATEGORY_CLIENT,
-                    showChatTimestamps,
-                    "Show short local-time timestamps on Lost Tales player channel messages."
-            );
             enableChatEmojis = config.getBoolean(
                     "enableChatEmojis",
                     CATEGORY_CLIENT,
@@ -1225,10 +1239,44 @@ public final class LostTalesConfig {
             ), DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR);
             Property feedAlignmentProperty = config.get(
                     CATEGORY_CLIENT, "chatFeedAlignment", chatFeedAlignment,
-                    "Which edge the closed chat feed's lines stand against: LEFT, CENTRE, or RIGHT. Each line's background thins out away from that edge, from the middle to both sides for CENTRE.");
+                    "Which edge the closed chat feed's lines stand against: LEFT, CENTRE (the default), or RIGHT. Each line's background thins out away from that edge, from the middle to both sides for CENTRE.");
             feedAlignmentProperty.setValidValues(CHAT_FEED_ALIGNMENTS);
             chatFeedAlignment = normalizeFeedAlignment(
                     feedAlignmentProperty.getString());
+            chatSpeakerSize = readSize(config, "chatSpeakerSize",
+                    chatSpeakerSize,
+                    "How big the row a message names its speaker on is in "
+                            + "the open chat window, against the words under "
+                            + "it: SMALLER, SAME or LARGER, each one whole "
+                            + "display pixel per font pixel, which is the "
+                            + "only step that keeps the font crisp. The row "
+                            + "is as tall as the text it is drawn in.");
+            chatFeedSpeakerSize = readSize(config, "chatFeedSpeakerSize",
+                    chatFeedSpeakerSize,
+                    "The same row in the closed chat feed, against the "
+                            + "feed's own words: SMALLER, SAME or LARGER. "
+                            + "LARGER, the default, stands it a step over "
+                            + "them, which is the size the open window's "
+                            + "words have, so a glance reads the voices "
+                            + "first.");
+            chatFeedMessageSize = readSize(config, "chatFeedMessageSize",
+                    chatFeedMessageSize,
+                    "How big what a message says is in the closed chat feed, "
+                            + "against the same words in the open window: "
+                            + "SMALLER, SAME or LARGER. The open window's "
+                            + "words are the size every other row is measured "
+                            + "against and are set by the game's Chat Scale.");
+            chatQuoteSize = readSize(config, "chatQuoteSize", chatQuoteSize,
+                    "How big the row a reply opens with is in the open "
+                            + "chat window, the quote of the message it "
+                            + "answers, against the words under it: "
+                            + "SMALLER, SAME or LARGER.");
+            chatFeedQuoteSize = readSize(config, "chatFeedQuoteSize",
+                    chatFeedQuoteSize,
+                    "The same row in the closed chat feed, against the "
+                            + "feed's own words: SMALLER, SAME or LARGER. "
+                            + "SAME, the default, draws the quote as large "
+                            + "as the words it stands over.");
             hideHudWhileChatting = config.getBoolean(
                     "hideHudWhileChatting",
                     CATEGORY_CLIENT,
@@ -2092,8 +2140,6 @@ public final class LostTalesConfig {
         config.get(CATEGORY_CHANNELS, "icons", chatChannelIcons).set(chatChannelIcons);
         config.get(CATEGORY_CHAT, "profanityWords", chatProfanityWords)
                 .set(chatProfanityWords);
-        config.get(CATEGORY_CLIENT, "showTimestamps",
-                showChatTimestamps).set(showChatTimestamps);
         config.get(CATEGORY_CLIENT, "enableChatEmojis",
                 enableChatEmojis).set(enableChatEmojis);
         config.get(CATEGORY_CLIENT, "enableNpcChatStyling",
@@ -2116,6 +2162,11 @@ public final class LostTalesConfig {
                 CATEGORY_CLIENT, "chatFeedAlignment", chatFeedAlignment);
         feedAlignmentProperty.set(chatFeedAlignment);
         feedAlignmentProperty.setValidValues(CHAT_FEED_ALIGNMENTS);
+        writeSize(config, "chatSpeakerSize", chatSpeakerSize);
+        writeSize(config, "chatFeedSpeakerSize", chatFeedSpeakerSize);
+        writeSize(config, "chatFeedMessageSize", chatFeedMessageSize);
+        writeSize(config, "chatQuoteSize", chatQuoteSize);
+        writeSize(config, "chatFeedQuoteSize", chatFeedQuoteSize);
         Property profanityProperty = config.get(
                 CATEGORY_CLIENT, "chatProfanityFilter", chatProfanityFilter);
         profanityProperty.set(chatProfanityFilter);
@@ -2430,14 +2481,49 @@ public final class LostTalesConfig {
      * aside: {@code LEFT}, {@code CENTRE} — {@code CENTER} is read as it —
      * or {@code RIGHT}, and the left for anything else.
      */
+    /**
+     * One of the chat's row sizes as the file names it, the shipped
+     * value for anything else. The words a screen steps through are
+     * named on the option itself, so it is a button rather than a text
+     * box.
+     */
+    private static String readSize(Configuration config,
+                                   String key, String shipped,
+                                   String comment) {
+        Property property = config.get(CATEGORY_CLIENT, key, shipped,
+                comment);
+        property.setValidValues(CHAT_SIZES);
+        return normalizeSize(property.getString(), shipped);
+    }
+
+    /** That option's current value, with its words, for the next save. */
+    private static void writeSize(Configuration config,
+                                  String key, String value) {
+        Property property = config.get(CATEGORY_CLIENT, key, value);
+        property.set(value);
+        property.setValidValues(CHAT_SIZES);
+    }
+
+    /** The named size, or {@code shipped} when the file names no size. */
+    public static String normalizeSize(String value, String shipped) {
+        String normalized = value == null
+                ? "" : value.trim().toUpperCase(java.util.Locale.ROOT);
+        for (int index = 0; index < CHAT_SIZES.length; index++) {
+            if (CHAT_SIZES[index].equals(normalized)) {
+                return CHAT_SIZES[index];
+            }
+        }
+        return shipped;
+    }
+
     public static String normalizeFeedAlignment(String value) {
         String normalized = value == null
                 ? "" : value.trim().toUpperCase(java.util.Locale.ROOT);
         if ("CENTER".equals(normalized)) {
             return "CENTRE";
         }
-        return "CENTRE".equals(normalized) || "RIGHT".equals(normalized)
-                ? normalized : CHAT_FEED_ALIGNMENTS[0];
+        return "LEFT".equals(normalized) || "RIGHT".equals(normalized)
+                ? normalized : DEFAULT_CHAT_FEED_ALIGNMENT;
     }
 
     private static String normalizeGuiDirection(String value) {
