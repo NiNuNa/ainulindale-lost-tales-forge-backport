@@ -979,6 +979,37 @@ public final class ChatWindowLayout {
         return true;
     }
 
+    /**
+     * Drives a window's timestamp area out, or back in: the window keeps
+     * its size and its words take the area's room. Written to the file.
+     */
+    public static synchronized boolean setAreaHidden(String windowId,
+                                                     boolean hidden) {
+        ChatWindow window = window(windowId);
+        if (window == null || window.isAreaHidden() == hidden) {
+            return false;
+        }
+        window.setAreaHidden(hidden);
+        changed();
+        return true;
+    }
+
+    /**
+     * Puts a window's member list away, or brings it out: the window
+     * keeps its size and its words take the list's room. Written to the
+     * file.
+     */
+    public static synchronized boolean setMembersHidden(String windowId,
+                                                        boolean hidden) {
+        ChatWindow window = window(windowId);
+        if (window == null || window.isMembersHidden() == hidden) {
+            return false;
+        }
+        window.setMembersHidden(hidden);
+        changed();
+        return true;
+    }
+
     /** Brings a tab to the front of its own window; not a layout change. */
     public static synchronized boolean setActiveTab(ChatTab tab) {
         ChatWindow window = windowOf(tab);
@@ -1382,6 +1413,8 @@ public final class ChatWindowLayout {
                         clampWindowPercent(spec.offsetY));
                 window.setLocked(spec.locked);
                 window.setFill(spec.fill);
+                window.setAreaHidden(spec.areaHidden);
+                window.setMembersHidden(spec.membersHidden);
                 window.setMaxLines(clampWindowLines(spec.maxLines));
                 window.setWidth(clampChatWidth(spec.width));
                 window.setActiveTab(spec.activeTab);
@@ -1469,7 +1502,8 @@ public final class ChatWindowLayout {
                     window.isLocked(), window.getOffsetX(),
                     window.getOffsetY(), window.getLinkTarget(),
                     window.getLinkSide(), window.getMaxLines(),
-                    window.getWidth(), window.getFill()));
+                    window.getWidth(), window.getFill(),
+                    window.isAreaHidden(), window.isMembersHidden()));
         }
         return result;
     }
@@ -1644,6 +1678,10 @@ public final class ChatWindowLayout {
         final int width;
         /** The part of the screen the window fills; none in its own box. */
         final ChatWindow.ScreenFill fill;
+        /** Whether the window's timestamp area is driven out. */
+        final boolean areaHidden;
+        /** Whether the window's member list is put away. */
+        final boolean membersHidden;
 
         WindowSpec(String id, List<?> tabs, Object activeTab,
                    boolean locked, double offsetX, double offsetY) {
@@ -1685,6 +1723,15 @@ public final class ChatWindowLayout {
                    boolean locked, double offsetX, double offsetY,
                    String linkTarget, ChatWindow.LinkSide linkSide,
                    double maxLines, int width, ChatWindow.ScreenFill fill) {
+            this(id, tabs, activeTab, locked, offsetX, offsetY, linkTarget,
+                    linkSide, maxLines, width, fill, false, false);
+        }
+
+        WindowSpec(String id, List<?> tabs, Object activeTab,
+                   boolean locked, double offsetX, double offsetY,
+                   String linkTarget, ChatWindow.LinkSide linkSide,
+                   double maxLines, int width, ChatWindow.ScreenFill fill,
+                   boolean areaHidden, boolean membersHidden) {
             this.id = id;
             List<ChatTab> converted = new ArrayList<ChatTab>();
             if (tabs != null) {
@@ -1707,6 +1754,8 @@ public final class ChatWindowLayout {
             this.maxLines = clampWindowLines(maxLines);
             this.width = clampChatWidth(width);
             this.fill = fill == null ? ChatWindow.ScreenFill.NONE : fill;
+            this.areaHidden = areaHidden;
+            this.membersHidden = membersHidden;
         }
 
         private static ChatTab toTab(Object value) {

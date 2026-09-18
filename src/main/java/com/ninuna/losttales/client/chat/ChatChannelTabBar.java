@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
@@ -615,7 +616,7 @@ final class ChatChannelTabBar {
      * row's band and the tool strip under its rule, down to the window's
      * top rule, which is the tool strip's last row.
      */
-    /** The tool strip's left edge in row space, where the search bar starts. */
+    /** The tool strip's left edge in row space, the window's own left edge. */
     static int toolStripLeft(Row row) {
         return row.offsetX + row.left - STRIP_INSET;
     }
@@ -627,7 +628,7 @@ final class ChatChannelTabBar {
     }
 
     /**
-     * Where the search bar's well is cut out of the tool strip's
+     * Where the message search's well is cut out of the tool strip's
      * surface, in row space; null for a whole strip. The well wears a
      * surface of its own, and no two surfaces are laid over each other.
      */
@@ -1073,11 +1074,12 @@ final class ChatChannelTabBar {
      * Where a run of {@code height} rows sits in a tab's interior,
      * centred on the icon that fills it. The icon is an even number of
      * rows and the caps and the control glyphs are odd, so neither can
-     * land on its centre; the remainder is spent above the run, which
-     * is the half they read as level with the icon from.
+     * land on its centre: each stands half a pixel up, its shadow counted
+     * as part of its shape ({@link LostTalesUiInk#centredStart}).
      */
     private static int centredInInterior(int interiorTop, int height) {
-        return interiorTop + (INTERIOR_HEIGHT - height + 1) / 2;
+        return interiorTop + LostTalesUiInk.centredStart(INTERIOR_HEIGHT,
+                height);
     }
 
     private int scaled(int alpha) {
@@ -1521,7 +1523,7 @@ final class ChatChannelTabBar {
         double step = displayStep();
         double edge = right - PADDING_X;
         if (drawn.close) {
-            double closeX = snapped(
+            double closeX = snappedLeft(
                     closeLeftExact(drawn, left, right - left), step);
             drawTabControl(LostTalesUiSheet.CLOSE,
                     LostTalesUiSheet.CLOSE_HOVER,
@@ -1702,6 +1704,15 @@ final class ChatChannelTabBar {
     /** {@code value} laid on the nearest whole display pixel. */
     static double snapped(double value, double step) {
         return Math.round(value / step) * step;
+    }
+
+    /**
+     * {@code value} laid on the whole display pixel at or left of it: a
+     * place centred between two pixels takes the left one, as the one
+     * centring rule has it.
+     */
+    static double snappedLeft(double value, double step) {
+        return Math.floor(value / step + 1.0E-6D) * step;
     }
 
     /**
@@ -2268,6 +2279,19 @@ final class ChatChannelTabBar {
         return new LostTalesUiHitBox(rowLeft + SEARCH_LEFT,
                 centredInStrip(rowBottom, SEARCH_SIZE), SEARCH_SIZE,
                 SEARCH_SIZE);
+    }
+
+    /**
+     * The tab search's left edge in row space, as the row draws it: the
+     * tool strip stands its own first control under it.
+     */
+    static int searchButtonLeft(Row row) {
+        return row.offsetX + (int)searchBox(row.left, row.rowBottom).left;
+    }
+
+    /** The tab search's square. */
+    static int searchButtonSize() {
+        return SEARCH_SIZE;
     }
 
     /** An end control's ink, centred in the strip where it is drawn. */

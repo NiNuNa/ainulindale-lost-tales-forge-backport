@@ -271,6 +271,27 @@ final class ChatHeadMarker {
                     skinId, "", 0, 0, true, false);
         }
 
+        /**
+         * A member's head in a member list: whose it is, the character it
+         * shows, and what it is drawn with, wearing that identity's
+         * status as a message's head does.
+         */
+        static Data member(UUID senderId, boolean accountIdentity,
+                           UUID characterId, String skinId) {
+            return new Data(senderId, accountIdentity, false,
+                    accountIdentity ? null : characterId, skinId, "", 0, 0,
+                    false, false);
+        }
+
+        /**
+         * An NPC's head in a member list: its portrait, which wears no
+         * sphere, an NPC having no account and no presence.
+         */
+        static Data npc(UUID npcId, String portrait) {
+            return new Data(npcId, false, true, null, portrait, "", 0, 0,
+                    false, false);
+        }
+
         private Data(UUID senderId, boolean accountIdentity,
                      boolean npcIdentity, UUID characterId, String skinId,
                      String copyText, int titleColor, int nameColor,

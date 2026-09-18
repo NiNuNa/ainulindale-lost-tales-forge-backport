@@ -111,7 +111,9 @@ import com.ninuna.losttales.network.packet.party.PartyStateSyncPacket;
 import com.ninuna.losttales.network.packet.party.PartyTrackingSyncPacket;
 import com.ninuna.losttales.client.chat.ClientChatProfanity;
 import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
+import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatPresenceSyncPacket;
+import com.ninuna.losttales.client.chat.ClientChatMembers;
 import com.ninuna.losttales.client.chat.ClientChatPresence;
 import cpw.mods.fml.client.registry.ClientRegistry;
 import cpw.mods.fml.client.registry.RenderingRegistry;
@@ -490,6 +492,11 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     @Override
     public void handleChatPresence(LostTalesChatPresenceSyncPacket packet) {
         ClientChatPresence.accept(packet);
+    }
+
+    @Override
+    public void handleChatMembers(LostTalesChatMembersPacket packet) {
+        ClientChatMembers.accept(packet);
     }
 
     @Override

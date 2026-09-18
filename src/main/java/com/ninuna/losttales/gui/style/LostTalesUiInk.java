@@ -62,6 +62,36 @@ public final class LostTalesUiInk {
     }
 
     /**
+     * Where something {@code ink} pixels long starts in a box
+     * {@code box} pixels long, by the one centring rule the mod's
+     * interface keeps, across and down alike. Where the two differ by an
+     * even number of pixels it stands in the middle exactly. Where they
+     * differ by an odd number it cannot, and its one shadow — a pixel
+     * down and right — counts as part of its shape: the shape is centred,
+     * which stands the ink half a pixel up, or left, of the middle.
+     * Something that casts no shadow, a frame or a rule, keeps the same
+     * side. {@code ink} is measured without the shadow; a string's ink is
+     * its advance less the spacing column after its last glyph.
+     */
+    public static int centredStart(int box, int ink) {
+        return Math.floorDiv(box - ink, 2);
+    }
+
+    /**
+     * The same where the box and the ink are counted in the units of a
+     * space drawn at {@code pixelsPerUnit} display pixels to a unit — a
+     * scaled chat, small text — and the answer is laid on the display's
+     * grid, the odd display pixel up or left: measured from the box's
+     * own start.
+     */
+    public static float centredStart(float box, float ink,
+                                     float pixelsPerUnit) {
+        float perUnit = Math.max(0.0001F, pixelsPerUnit);
+        return (float)Math.floor((box - ink) / 2.0F * perUnit + 1.0E-4F)
+                / perUnit;
+    }
+
+    /**
      * A colour {@code progress} of the way from one to another, channel
      * by channel: what a control lighting under the pointer crosses
      * through, so it reaches its lit tone with its artwork rather than

@@ -58,4 +58,31 @@ public final class LostTalesChatHoverCardTest {
         assertEquals(4,
                 LostTalesChatHoverCard.cardY(1, 80, 70));
     }
+
+    /**
+     * The gap before the time behind a name ends the sender's span, so
+     * the pointer on it is on nobody, as the underline stops short of
+     * it; a gap with more of the sender after it — a title — is still
+     * the sender, and so is nothing at the row's end.
+     */
+    @Test
+    public void theGapBeforeTheTimeIsNotTheName() {
+        java.util.List<net.minecraft.util.IChatComponent> header =
+                java.util.Arrays.<net.minecraft.util.IChatComponent>asList(
+                        new net.minecraft.util.ChatComponentText("NiNuNa"),
+                        ChatSpacerMarker.of(4),
+                        ChatStampMarker.of("6:18 PM", 20));
+        assertFalse(LostTalesChatHoverCard.spanGoesOnAfter(header, 1));
+        java.util.List<net.minecraft.util.IChatComponent> titled =
+                java.util.Arrays.<net.minecraft.util.IChatComponent>asList(
+                        new net.minecraft.util.ChatComponentText("Aldric"),
+                        ChatSpacerMarker.of(4),
+                        new net.minecraft.util.ChatComponentText("the Farmer"),
+                        ChatSpacerMarker.of(4),
+                        ChatStampMarker.of("6:18 PM", 20));
+        assertTrue(LostTalesChatHoverCard.spanGoesOnAfter(titled, 1));
+        assertFalse(LostTalesChatHoverCard.spanGoesOnAfter(titled, 3));
+        assertFalse(LostTalesChatHoverCard.spanGoesOnAfter(
+                titled.subList(0, 2), 1));
+    }
 }

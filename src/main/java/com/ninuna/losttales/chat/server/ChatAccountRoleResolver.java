@@ -21,9 +21,14 @@ import net.minecraft.entity.player.EntityPlayerMP;
  * account's roles, what a capability is granted through; {@link
  * #resolve(EntityPlayerMP, UUID)} adds the roles assigned to one of the
  * account's characters, what a line is signed with and a gate is passed
- * with. Nothing a client sends takes part in either.</p>
+ * with. Nothing a client sends takes part in either. {@link #absentMask}
+ * answers the second question for an identity whose player is not here,
+ * which a member list asks of everyone absent.</p>
  */
 public final class ChatAccountRoleResolver {
+    /** The operator level of an account the server does not list as an operator. */
+    public static final int NOT_OPERATOR = -1;
+
     private ChatAccountRoleResolver() {}
 
     /** The account's own role mask; zero for no roles or no player. */
@@ -41,17 +46,52 @@ public final class ChatAccountRoleResolver {
             return 0;
         }
         ChatRoleCatalog catalog = ChatRoleCatalog.server();
-        int mask = assignedMask(catalog, player.getUniqueID(), characterId);
-        if (ELostTalesUser.byUniqueId(player.getUniqueID()).getRecognition()
-                .getChatRole() == ChatAccountRole.TEAM) {
-            mask |= ChatAccountRole.TEAM.bit();
-        }
+        int mask = assignedMask(catalog, player.getUniqueID(), characterId)
+                | teamMask(player.getUniqueID());
         for (ChatAccountRole role : catalog.roles()) {
             if (!role.isLocked() && grantedBySource(player, role)) {
                 mask |= role.bit();
             }
         }
         return mask;
+    }
+
+    /**
+     * The roles of an identity whose player is not here, from what the
+     * server knows without them: the catalogue's assignments, the team
+     * mark, and every role an operator level grants, for {@code opLevel} —
+     * the account's level on the server's operator list, or
+     * {@link #NOT_OPERATOR}. A role a LOTR faction rank grants is read
+     * from LOTR's data for the identity being played, which only a player
+     * here has, so it is not counted.
+     */
+    public static int absentMask(ChatRoleCatalog catalog, UUID accountId,
+                                 UUID characterId, int opLevel) {
+        int mask = assignedMask(catalog, accountId, characterId)
+                | teamMask(accountId);
+        if (catalog == null || opLevel == NOT_OPERATOR) {
+            return mask;
+        }
+        for (ChatAccountRole role : catalog.roles()) {
+            if (role.isLocked()) {
+                continue;
+            }
+            for (ChatRoleSource source : role.getSources()) {
+                if (source.getKind() == ChatRoleSource.Kind.OP_LEVEL
+                        && opLevel >= source.getLevel()) {
+                    mask |= role.bit();
+                    break;
+                }
+            }
+        }
+        return mask;
+    }
+
+    /** The team mark's bit for an account the code recognises; zero otherwise. */
+    private static int teamMask(UUID accountId) {
+        return accountId != null && ELostTalesUser.byUniqueId(accountId)
+                .getRecognition().getChatRole() == ChatAccountRole.TEAM
+                ? ChatAccountRole.TEAM.bit() : 0;
     }
 
     /**

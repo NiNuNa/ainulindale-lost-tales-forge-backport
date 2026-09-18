@@ -877,9 +877,11 @@ public final class ChatHistoryTest {
         ChatHistory.record(id, LostTalesChatMessagePacket.SERVER_SENDER_ID,
                 "Server", null, line, Collections.singletonList(BOB),
                 ChatHistory.Audience.everyone());
-        ChatNamedPlayer asAccount = new ChatNamedPlayer("alice", "alice", 0x123456);
+        ChatNamedPlayer asAccount = new ChatNamedPlayer(ALICE, "alice", null,
+                "alice", "", 0x123456);
         ChatHistory.namePlayer(id, asAccount);
-        ChatHistory.namePlayer(id, new ChatNamedPlayer("alice", "Aldric", 0xABCDEF));
+        ChatHistory.namePlayer(id, new ChatNamedPlayer(ALICE, "alice",
+                UUID.randomUUID(), "Aldric", "human/male/1", 0xABCDEF));
         List<LostTalesChatMessagePacket> replay = ChatHistory.replayFor(
                 requester(CAROL), ChatMessageIds.NONE);
         assertEquals(1, replay.size());

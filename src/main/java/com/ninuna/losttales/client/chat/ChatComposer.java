@@ -202,10 +202,11 @@ final class ChatComposer {
         }
         // The line begins where the messages above it do: past the
         // timestamp column, not across it.
-        ChatTimestampColumn columns = ChatTimestampColumn.current(font);
+        ChatTimestampColumn columns = ChatTimestampColumn.of(frame, font);
         int inset = Math.round(columns.messageX() * frame.scale);
         int x = (int)Math.floor(frame.drawnLeft()) + inset;
-        int room = (int)Math.round(frame.boxRight - frame.boxLeft)
+        int room = (int)Math.round(frame.boxRight - frame.boxLeft
+                - ChatMemberList.drawnWidth(frame) * frame.scale)
                 - inset - 6;
         int y = (int)Math.floor(frame.drawnBaseline())
                 + LostTalesChatOverlayRenderer.LINE_HEIGHT

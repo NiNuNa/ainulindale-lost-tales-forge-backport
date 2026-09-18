@@ -9,16 +9,13 @@ import java.util.Locale;
 /**
  * The chat's time formats, on a twelve-hour clock: a message's time
  * behind its speaker's name ({@code 9:54 PM}), which says the day too
- * once it is not today, the clock alone in the timestamp area
- * ({@code 9:54}), and the day alone for a day's rule.
+ * once it is not today, the time alone in the timestamp area, and the
+ * day alone for a day's rule.
  */
 public final class ChatTimestampFormatter {
     /** The time of day: {@code 9:54 PM}. */
     private static final SimpleDateFormat FORMAT =
             new SimpleDateFormat("h:mm a", Locale.ROOT);
-    /** The clock alone: {@code 9:54}. */
-    private static final SimpleDateFormat CLOCK_FORMAT =
-            new SimpleDateFormat("h:mm", Locale.ROOT);
     /** The day written out: {@code September 19, 2026}. */
     private static final SimpleDateFormat DAY_FORMAT =
             new SimpleDateFormat("MMMM d, yyyy", Locale.ROOT);
@@ -59,20 +56,13 @@ public final class ChatTimestampFormatter {
                 "%s at %s", formatDay(timestampMillis), time);
     }
 
-    /** The time of day in italics, the way the chat draws it behind a name. */
-    private static String formatDrawnTime(long timestampMillis) {
-        return ITALIC + format(timestampMillis) + RESET;
-    }
-
     /**
-     * The clock alone, {@code 9:54}, in italics: what the timestamp area
-     * shows beside a later message of a group, which the time behind the
-     * group's name already puts in its half of the day. It is narrow
-     * enough to stand in the area beside the avatar at every GUI scale.
+     * The time of day in italics, the way the chat draws it: behind a
+     * name, and on its own in the timestamp area beside a later message
+     * of a group.
      */
-    static synchronized String formatDrawnClock(long timestampMillis) {
-        return ITALIC + CLOCK_FORMAT.format(
-                new Date(Math.max(0L, timestampMillis))) + RESET;
+    static String formatDrawnTime(long timestampMillis) {
+        return ITALIC + format(timestampMillis) + RESET;
     }
 
     /**

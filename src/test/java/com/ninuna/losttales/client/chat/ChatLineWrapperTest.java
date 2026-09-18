@@ -718,6 +718,49 @@ public final class ChatLineWrapperTest {
         assertEquals("<Beren> Where to?", plain(feed.get(0)));
     }
 
+    /**
+     * In an open window a reply's quote stands pushed right of the name's
+     * column, opening on a gap the line leading into the message runs
+     * through, and wears no bubble; its row still shrinks from its first
+     * drawn run, so the quote keeps that place at any size. The closed
+     * feed keeps the bubble and no gap.
+     */
+    @Test
+    public void anOpenWindowsQuoteStandsPushedRightWithoutItsBubble() {
+        ChatComponentText root = new ChatComponentText("");
+        root.appendSibling(ChatReplyMarker.applyIcon(text(""), 0x336633, 7L));
+        root.appendSibling(ChatReplyMarker.apply(text("<"), 0x336633, 7L));
+        root.appendSibling(ChatReplyMarker.apply(text("Beren"), 0x336633, 7L));
+        root.appendSibling(ChatReplyMarker.apply(text("> "), 0x336633, 7L));
+        root.appendSibling(ChatReplyMarker.apply(text("Where to?"), 0xFCECD1,
+                7L));
+        root.appendSibling(ChatLayoutMarker.lineBreak());
+        root.appendSibling(ChatLayoutMarker.anchor());
+        root.appendSibling(text("Rivendell."));
+        IChatComponent open = ChatLineWrapper.wrap(METRICS, root, 200, true)
+                .get(0);
+        IChatComponent first = null;
+        boolean bubble = false;
+        for (Object value : open) {
+            IChatComponent part = (IChatComponent)value;
+            if (first == null && (part.getUnformattedTextForChat().length() > 0
+                    || ChatInlineIcons.declaredWidth(part) >= 0)) {
+                first = part;
+            }
+            bubble |= ChatReplyMarker.isIconSlot(part);
+        }
+        assertEquals(ChatReplyMarker.OPEN_INDENT, ChatSpacerMarker.decode(first));
+        assertFalse(bubble);
+        assertEquals(ChatReplyMarker.OPEN_INDENT,
+                LostTalesChatVisualStyle.contentStart(open, true));
+        boolean feedBubble = false;
+        for (Object value : ChatLineWrapper.wrap(METRICS, root, 200, false)
+                .get(0)) {
+            feedBubble |= ChatReplyMarker.isIconSlot((IChatComponent)value);
+        }
+        assertTrue(feedBubble);
+    }
+
     /** A line opening with a row of its own: quote, break, then the message. */
     private static ChatComponentText quoted(String quote, String body) {
         ChatComponentText root = new ChatComponentText("");

@@ -2,10 +2,12 @@ package com.ninuna.losttales.chat;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 /**
- * A player a server line names, as the server knew them when the line
- * was said: the account, the identity it was playing, and the colour
+ * A player a line names, as the server knew them when the line was
+ * said: the account and its id, the identity it was playing — the
+ * character's id and skin, or none for the account — and the colour
  * that identity's name is drawn in.
  *
  * <p>A live client turns an account name inside an achievement, a join
@@ -13,33 +15,63 @@ import java.util.Locale;
  * is signed, from the appearances the server syncs for everyone
  * online. A line replayed from the history names players who may be
  * long gone, so the server records the answer beside the line, and the
- * replay reads it from there.</p>
+ * replay reads it from there: the name and colour to draw, and the head
+ * and names a card about them shows.</p>
  */
 public final class ChatNamedPlayer {
     /** The most players one line names; a death names two. */
     public static final int MAX_PER_LINE = 8;
     public static final int MAX_ACCOUNT_BYTES = 64;
     public static final int MAX_IDENTITY_BYTES = 256;
+    /** A skin snapshot id, as bounded wherever a line carries one. */
+    public static final int MAX_SKIN_ID_BYTES = 128;
 
+    private final UUID playerId;
     private final String account;
+    private final UUID characterId;
     private final String identityName;
+    private final String skinId;
     private final int nameColor;
 
-    public ChatNamedPlayer(String account, String identityName,
+    /**
+     * {@code characterId} is null, and {@code skinId} empty, for a player
+     * who was playing as the account.
+     */
+    public ChatNamedPlayer(UUID playerId, String account, UUID characterId,
+                           String identityName, String skinId,
                            int nameColor) {
+        this.playerId = playerId;
         this.account = account == null ? "" : account.trim();
+        this.characterId = characterId;
         String identity = identityName == null ? "" : identityName.trim();
         this.identityName = identity.length() == 0 ? this.account : identity;
+        this.skinId = characterId == null || skinId == null ? ""
+                : skinId.trim();
         this.nameColor = nameColor & 0xFFFFFF;
+    }
+
+    /** The account's id; null only where nobody could name it. */
+    public UUID getPlayerId() {
+        return this.playerId;
     }
 
     public String getAccount() {
         return this.account;
     }
 
+    /** The character the player was playing; null for the account. */
+    public UUID getCharacterId() {
+        return this.characterId;
+    }
+
     /** The name the player's lines were signed with when the line was said. */
     public String getIdentityName() {
         return this.identityName;
+    }
+
+    /** The character's skin snapshot; empty for the account's own skin. */
+    public String getSkinId() {
+        return this.skinId;
     }
 
     public int getNameColor() {
@@ -115,15 +147,27 @@ public final class ChatNamedPlayer {
             return false;
         }
         ChatNamedPlayer that = (ChatNamedPlayer)other;
-        return this.account.equals(that.account)
+        return same(this.playerId, that.playerId)
+                && this.account.equals(that.account)
+                && same(this.characterId, that.characterId)
                 && this.identityName.equals(that.identityName)
+                && this.skinId.equals(that.skinId)
                 && this.nameColor == that.nameColor;
+    }
+
+    private static boolean same(UUID one, UUID other) {
+        return one == null ? other == null : one.equals(other);
     }
 
     @Override
     public int hashCode() {
-        return (this.account.hashCode() * 31 + this.identityName.hashCode())
-                * 31 + this.nameColor;
+        int hash = this.playerId == null ? 0 : this.playerId.hashCode();
+        hash = hash * 31 + this.account.hashCode();
+        hash = hash * 31 + (this.characterId == null ? 0
+                : this.characterId.hashCode());
+        hash = hash * 31 + this.identityName.hashCode();
+        hash = hash * 31 + this.skinId.hashCode();
+        return hash * 31 + this.nameColor;
     }
 
     @Override

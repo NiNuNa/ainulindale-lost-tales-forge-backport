@@ -33,6 +33,7 @@ import com.ninuna.losttales.block.tileentity.LostTalesTileEntityStatue;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityWaystone;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityUrn;
 import com.ninuna.losttales.command.ELostTalesCommand;
+import com.ninuna.losttales.compat.discord.DiscordGameEventRelay;
 import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.config.LostTalesConfigFiles;
@@ -118,6 +119,7 @@ import com.ninuna.losttales.chat.server.ChatCommandContexts;
 import com.ninuna.losttales.chat.server.ChatConsoleStream;
 import com.ninuna.losttales.chat.server.ChatHistory;
 import com.ninuna.losttales.chat.server.ChatHistoryStorage;
+import com.ninuna.losttales.chat.server.ChatMemberDirectory;
 import com.ninuna.losttales.chat.server.LostTalesChatRoleRosterWatcher;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.chat.server.LostTalesServerBroadcastHook;
@@ -126,6 +128,7 @@ import com.ninuna.losttales.world.room.CharacterRoomWorldHandler;
 import com.ninuna.losttales.world.room.CharacterRoomWorldType;
 import com.ninuna.losttales.world.waystone.LostTalesWaystoneGenerationHandler;
 import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
+import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatPresenceSyncPacket;
 import com.ninuna.losttales.chat.server.ChatPresenceService;
 import software.bernie.geckolib3.GeckoLib;
@@ -334,6 +337,8 @@ public class LostTalesCommonProxy {
 
     public void handleChatPresence(LostTalesChatPresenceSyncPacket packet) {}
 
+    public void handleChatMembers(LostTalesChatMembersPacket packet) {}
+
     public void handleChatMessage(LostTalesChatMessagePacket packet) {}
 
     public void handleChatAccess(LostTalesChatAccessPacket packet) {}
@@ -408,6 +413,8 @@ public class LostTalesCommonProxy {
         // player's saved data registers its own again as it loads.
         LostTalesQuestRegistry.clearRuntimeQuests();
         LostTalesServerBroadcastHook.clear();
+        DiscordGameEventRelay.clear();
+        ChatMemberDirectory.clear();
         LostTalesChatService.console(ChatConsoleEvent.Kind.SERVER,
                 ChatConsoleEvent.Severity.INFO, "Server", "Server started");
         ChatAuditLog.onServerStarting();
@@ -452,11 +459,16 @@ public class LostTalesCommonProxy {
         }
     }
 
-    /** The server accepts players from here on; the bridge may say so. */
+    /**
+     * The server accepts players from here on: the OOC line saying so,
+     * which the bridge's embed is linked to, and the bridge's clock.
+     */
     public void onServerStarted(FMLServerStartedEvent event) {
         if (CharacterRoomWorldType.isRoomServer(MinecraftServer.getServer())) {
             return;
         }
+        LostTalesServerBroadcastHook.announceServer(MinecraftServer.getServer(),
+                true);
         LostTalesDiscordBridge.getInstance().onServerStarted();
     }
 
@@ -467,8 +479,14 @@ public class LostTalesCommonProxy {
         // server is next up. First, before the ids are reset below.
         LostTalesChatService.console(ChatConsoleEvent.Kind.SERVER,
                 ChatConsoleEvent.Severity.INFO, "Server", "Server stopped");
-        // The farewell and the offline topic are queued before the stop,
-        // which gives the worker a bounded moment to send them.
+        // The OOC line saying the server is going down, kept by the same
+        // snapshot, and the bridge's farewell linked to it; then the
+        // offline topic. All are queued before the stop, which gives the
+        // worker a bounded moment to send them.
+        if (!CharacterRoomWorldType.isRoomServer(MinecraftServer.getServer())) {
+            LostTalesServerBroadcastHook.announceServer(
+                    MinecraftServer.getServer(), false);
+        }
         LostTalesDiscordBridge.getInstance().onServerStopping();
         LostTalesDiscordBridge.getInstance().stop();
         // Once the bridge has stopped adding to them, the links go to the
@@ -510,6 +528,8 @@ public class LostTalesCommonProxy {
         // player's saved data registers its own again as it loads.
         LostTalesQuestRegistry.clearRuntimeQuests();
         LostTalesServerBroadcastHook.clear();
+        DiscordGameEventRelay.clear();
+        ChatMemberDirectory.clear();
         ChatAuditLog.onServerStopping();
         LostTalesMobAggroEventHandler.clearAll();
         LotrRaceProfileAdapter.getInstance().clear();

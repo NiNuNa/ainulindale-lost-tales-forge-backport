@@ -637,9 +637,13 @@ public final class LostTalesChatPacketTest {
         String json = "{\"translate\":\"chat.type.achievement\","
                 + "\"with\":[\"Steve\",{\"translate\":\"achievement.openInventory\","
                 + "\"color\":\"green\"}]}";
+        UUID steve = UUID.randomUUID();
+        UUID aldric = UUID.randomUUID();
         List<ChatNamedPlayer> named = Arrays.asList(
-                new ChatNamedPlayer("Steve", "Aldric", 0x4A90D9),
-                new ChatNamedPlayer("Alex", "", 0xFFFFFF));
+                new ChatNamedPlayer(steve, "Steve", aldric, "Aldric",
+                        "human/male/2", 0x4A90D9),
+                new ChatNamedPlayer(UUID.randomUUID(), "Alex", null, "", "",
+                        0xFFFFFF));
         LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
                 ChatChannel.ALL, LostTalesChatMessagePacket.SERVER_SENDER_ID,
                 "Server", "Server", "", 0xFFFFFF, 0xFFFFFF,
@@ -654,8 +658,8 @@ public final class LostTalesChatPacketTest {
         assertFalse(decoded.isMalformed());
         assertEquals(json, decoded.getBodyJson());
         assertEquals(2, decoded.getNamedPlayers().size());
-        assertEquals(new ChatNamedPlayer("Steve", "Aldric", 0x4A90D9),
-                decoded.getNamedPlayers().get(0));
+        assertEquals(new ChatNamedPlayer(steve, "Steve", aldric, "Aldric",
+                "human/male/2", 0x4A90D9), decoded.getNamedPlayers().get(0));
         assertEquals("a nameless identity is the account",
                 "Alex", decoded.getNamedPlayers().get(1).getIdentityName());
         assertEquals(json, decoded.withNameColor(0x123456).getBodyJson());

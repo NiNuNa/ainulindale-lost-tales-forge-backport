@@ -226,6 +226,11 @@ public final class LostTalesDiscordBridge {
                 public String factionScopeOf(long messageId) {
                     return ChatHistory.factionScopeOf(messageId);
                 }
+
+                @Override
+                public boolean isAnnouncement(long messageId) {
+                    return ChatHistory.isServerLine(messageId);
+                }
             };
     private volatile boolean statusRefreshRequested;
     private volatile Worker worker;
@@ -515,9 +520,12 @@ public final class LostTalesDiscordBridge {
      * none when nothing posts; dropped when its kind is switched off in
      * the config, and under the same conditions as a line. The
      * destinations are the bindings' own answer, so no event has a
-     * routing of its own.
+     * routing of its own. {@code messageId} is the game's line announcing
+     * the same thing, or {@link ChatMessageIds#NONE}: each embed is
+     * linked to it, so a reaction or a reply to either reaches the other
+     * ({@link DiscordCopyLiveness}).
      */
-    public void announce(DiscordNotice notice) {
+    public void announce(DiscordNotice notice, long messageId) {
         Worker running = this.worker;
         if (running == null || notice == null || notice.getText().length() == 0
                 || !isEnabled(notice.getKind())) {
@@ -525,8 +533,8 @@ public final class LostTalesDiscordBridge {
         }
         for (DiscordChannelBinding destination : running.bindings.destinations()) {
             enqueueOutbound(running, new Outbound(Outbound.Kind.POST, "", "",
-                    notice.getText(), ChatMessageIds.NONE,
-                    ChatReplyReference.NONE, notice, destination.id(), null, ""));
+                    notice.getText(), messageId, ChatReplyReference.NONE,
+                    notice, destination.id(), null, "", true));
         }
     }
 
@@ -560,23 +568,25 @@ public final class LostTalesDiscordBridge {
         if (channel != null) {
             enqueueOutbound(new Outbound(Outbound.Kind.EDIT, "", "",
                     message, messageId, ChatReplyReference.NONE, null,
-                    "", channel, ChatHistory.factionScopeOf(messageId)));
+                    "", channel, ChatHistory.factionScopeOf(messageId),
+                    ChatHistory.isServerLine(messageId)));
         }
     }
 
     /**
      * Says that a game message was taken back, so each of its live
      * Discord copies is deleted too, on the same terms as an edit.
-     * {@code channel} and {@code factionScope} say where it was said:
-     * the history has forgotten the message by now, so the chat service
-     * reads them before it removes it.
+     * {@code channel} and {@code factionScope} say where it was said, and
+     * {@code announcement} whether it was one of the server's
+     * announcements: the history has forgotten the message by now, so
+     * the chat service reads them before it removes it.
      */
     public void relayDelete(long messageId, ChatChannel channel,
-                            String factionScope) {
+                            String factionScope, boolean announcement) {
         if (channel != null) {
             enqueueOutbound(new Outbound(Outbound.Kind.DELETE, "", "", "",
                     messageId, ChatReplyReference.NONE, null, "", channel,
-                    factionScope));
+                    factionScope, announcement));
         }
     }
 
@@ -600,7 +610,8 @@ public final class LostTalesDiscordBridge {
             enqueueOutbound(new Outbound(add ? Outbound.Kind.REACT
                     : Outbound.Kind.UNREACT, "", "", form,
                     messageId, ChatReplyReference.NONE, null, "", channel,
-                    ChatHistory.factionScopeOf(messageId)));
+                    ChatHistory.factionScopeOf(messageId),
+                    ChatHistory.isServerLine(messageId)));
         }
     }
 
@@ -709,20 +720,24 @@ public final class LostTalesDiscordBridge {
         this.statusRefreshRequested = true;
     }
 
-    /** The server is up and accepting players; say so. Server thread. */
+    /**
+     * The server is up and accepting players. Its announcement comes
+     * through the broadcast seam, with the game's own line for it
+     * ({@link DiscordGameEventRelay}); here the clock starts and the
+     * topic is asked for. Server thread.
+     */
     public void onServerStarted() {
         this.serverStartedMillis = System.currentTimeMillis();
-        announce(DiscordServerNotices.serverStarted());
         requestStatusRefresh();
     }
 
     /**
-     * The server is going down: queue the farewell and the offline topic
-     * ahead of {@link #stop()}, which gives the worker its bounded
-     * moment to send them. Server thread.
+     * The server is going down: queue the offline topic ahead of
+     * {@link #stop()}, which gives the worker its bounded moment to send
+     * it and the farewell the broadcast seam queued before this. Server
+     * thread.
      */
     public void onServerStopping() {
-        announce(DiscordServerNotices.serverStopping());
         Worker running = this.worker;
         if (running != null && running.manages) {
             requestTopic(DiscordServerNotices.offlineTopic());
@@ -1296,7 +1311,10 @@ public final class LostTalesDiscordBridge {
         final String avatarUrl;
         /** The text to post, or the new text of an edit. */
         final String message;
-        /** The game message the entry is about; NONE for a notice. */
+        /**
+         * The game message the entry is about; for a notice, the game's
+         * line announcing the same thing, or NONE when there is none.
+         */
         final long messageId;
         /** What a posted message replies to; NONE for an ordinary line. */
         final ChatReplyReference reply;
@@ -1318,19 +1336,35 @@ public final class LostTalesDiscordBridge {
         final UUID senderId;
         /** When a player's line was queued, by the server's clock; 0 otherwise. */
         final long queuedAtMillis;
+        /**
+         * Whether the entry's message is one of the server's
+         * announcements, whose copies every binding owns.
+         */
+        final boolean announcement;
 
         Outbound(Kind kind, String username, String avatarUrl,
                  String message, long messageId, ChatReplyReference reply,
                  DiscordNotice notice, String bindingKey, ChatChannel channel,
-                 String factionScope) {
+                 String factionScope, boolean announcement) {
             this(kind, username, avatarUrl, message, messageId, reply, notice,
-                    bindingKey, channel, factionScope, null, 0L);
+                    bindingKey, channel, factionScope, null, 0L, announcement);
         }
 
         Outbound(Kind kind, String username, String avatarUrl,
                  String message, long messageId, ChatReplyReference reply,
                  DiscordNotice notice, String bindingKey, ChatChannel channel,
                  String factionScope, UUID senderId, long queuedAtMillis) {
+            this(kind, username, avatarUrl, message, messageId, reply, notice,
+                    bindingKey, channel, factionScope, senderId,
+                    queuedAtMillis, false);
+        }
+
+        private Outbound(Kind kind, String username, String avatarUrl,
+                         String message, long messageId,
+                         ChatReplyReference reply, DiscordNotice notice,
+                         String bindingKey, ChatChannel channel,
+                         String factionScope, UUID senderId,
+                         long queuedAtMillis, boolean announcement) {
             this.kind = kind;
             this.username = username;
             this.avatarUrl = avatarUrl;
@@ -1343,6 +1377,7 @@ public final class LostTalesDiscordBridge {
             this.factionScope = factionScope == null ? "" : factionScope;
             this.senderId = senderId;
             this.queuedAtMillis = queuedAtMillis;
+            this.announcement = announcement;
         }
 
         /** Whether this is a player's line whose sender is told how its post goes. */
@@ -2055,7 +2090,8 @@ public final class LostTalesDiscordBridge {
          */
         private String webhookOf(DiscordMessageLinks.Copy copy, Outbound next) {
             return DiscordCopyLiveness.correctionWebhook(this.bindings,
-                    next.channel, next.factionScope, copy, this.known);
+                    next.channel, next.factionScope, next.announcement, copy,
+                    this.known);
         }
 
         /**
@@ -2447,8 +2483,8 @@ public final class LostTalesDiscordBridge {
             Set<String> lanesFor = new LinkedHashSet<String>();
             for (DiscordMessageLinks.Copy copy : DiscordCopyLiveness.liveCopies(
                     links, this.bindings, next.messageId, next.channel,
-                    next.factionScope, DiscordCopyLiveness.Crossing.TO_DISCORD,
-                    this.known)) {
+                    next.factionScope, next.announcement,
+                    DiscordCopyLiveness.Crossing.TO_DISCORD, this.known)) {
                 lanesFor.add(copy.webhookUrl.length() > 0 ? copy.webhookUrl
                         : copy.destination);
             }
@@ -2486,7 +2522,7 @@ public final class LostTalesDiscordBridge {
                         || (candidate.webhookUrl.length() == 0
                                 && lane.equals(candidate.destination)))
                         && DiscordCopyLiveness.isLive(this.bindings, next.channel,
-                                next.factionScope, candidate,
+                                next.factionScope, next.announcement, candidate,
                                 DiscordCopyLiveness.Crossing.TO_DISCORD, this.known)) {
                     copy = candidate;
                     break;
@@ -2598,7 +2634,8 @@ public final class LostTalesDiscordBridge {
             String header = "";
             if (next.kind == Outbound.Kind.POST && next.notice != null) {
                 // A notice is an embed under the webhook's own name; it
-                // answers nothing and is never edited or linked.
+                // answers nothing and is never edited, only linked to the
+                // game's line announcing the same thing.
                 reply = DiscordHttp.postWebhook(webhook,
                         DiscordJson.webhookEmbedBody(next.notice));
             } else if (next.kind == Outbound.Kind.POST) {
@@ -2672,14 +2709,16 @@ public final class LostTalesDiscordBridge {
                                 ? "post" : next.kind == Outbound.Kind.EDIT
                                         ? "edit" : "delete"));
             }
-            if (next.kind == Outbound.Kind.POST && next.notice == null) {
+            if (next.kind == Outbound.Kind.POST
+                    && ChatMessageIds.isServerId(next.messageId)) {
                 // The post's Discord id, from the wait=true body: what a
                 // reply from either side finds the message by, and what
                 // an edit or a removal follows it by, with the header an
                 // edit has to open with again, the webhook it went
                 // through, and its binding, which the save keeps in the
-                // webhook's place. A body that does not parse leaves the
-                // line unlinked.
+                // webhook's place. A notice's embed is linked the same way
+                // to the game's line announcing it. A body that does not
+                // parse leaves the line unlinked.
                 links.link(next.messageId,
                         DiscordJson.parseCreatedMessageId(reply.body),
                         header, destinationOf(webhook), webhook,

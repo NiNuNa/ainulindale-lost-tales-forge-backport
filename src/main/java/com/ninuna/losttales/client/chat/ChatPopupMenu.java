@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.client.input.LostTalesInputBinding;
@@ -440,7 +441,8 @@ final class ChatPopupMenu {
             return;
         }
         int top = this.y + PADDING_Y;
-        int textY = top + (this.fieldHeight - 1 - 8) / 2;
+        int textY = top + LostTalesUiInk.centredStart(this.fieldHeight - 1,
+                LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT);
         String typed = this.filter.toString();
         int quiet = LostTalesColors.rgb(LostTalesColors.SAND);
         // The magnifier stands on the capitals of what is typed beside
@@ -468,8 +470,9 @@ final class ChatPopupMenu {
             int keyY = top + (this.fieldHeight - 1
                     - LostTalesInputIconRenderer.BASE_ICON_HEIGHT) / 2;
             String joiner = keyJoiner();
-            int joinerY = keyY + (LostTalesInputIconRenderer.BASE_ICON_HEIGHT
-                    - 8) / 2;
+            int joinerY = keyY + LostTalesUiInk.centredStart(
+                    LostTalesInputIconRenderer.BASE_ICON_HEIGHT,
+                    LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT);
             LostTalesChatVisualStyle.beginContent();
             for (int index = 0; index < this.filterHint.length; index++) {
                 if (index > 0) {
@@ -698,10 +701,10 @@ final class ChatPopupMenu {
                 }
             } else if (entry.sprite != null) {
                 // Centred in the icon column and on the label's capitals,
-                // the odd pixel right and up.
+                // the odd pixel left and up.
                 int spriteX = this.x + this.labelX - ChatChannelIcons.SIZE
-                        - ChatChannelIcons.GAP + (ChatChannelIcons.SIZE
-                                - entry.sprite.getWidth() + 1) / 2;
+                        - ChatChannelIcons.GAP + LostTalesUiInk.centredStart(
+                                ChatChannelIcons.SIZE, entry.sprite.getWidth());
                 int spriteY = labelTop + Math.floorDiv(
                         LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT
                                 - entry.sprite.getHeight(), 2);

@@ -92,6 +92,7 @@ import com.ninuna.losttales.proxy.LostTalesClientProxy;
 import com.ninuna.losttales.world.map.LostTalesMapOverlay;
 import com.ninuna.losttales.compat.lotr.LotrRaceProfileAdapter;
 import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
+import com.ninuna.losttales.client.chat.ClientChatMembers;
 import com.ninuna.losttales.client.chat.ClientChatPresence;
 import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
@@ -206,6 +207,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         // Who shows what is this connection's news; the next server says
         // it afresh. This player's own choices stay on file.
         ClientChatPresence.clear();
+        ClientChatMembers.clear();
         // What the server said about this session's Discord posts is not
         // said again on the next join.
         ClientChatDeliveryMarks.clear();

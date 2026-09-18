@@ -417,14 +417,18 @@ final class ChatWindowLines {
                 || chat == null || window == null || chatWidth <= 0) {
             return null;
         }
-        // The timestamp area at the window's left edge comes out of the
-        // room the messages may wrap to, so a line never runs out under
-        // the window's right edge to pay for it.
+        // The timestamp area at the window's left edge and the member
+        // list at its right come out of the room the messages may wrap
+        // to, as far as each stands in the window, so a line never runs
+        // out under the window's edge to pay for them.
+        ChatWindowFrame frame = ChatWindowFrame.of(window);
         ChatTimestampColumn columns =
-                ChatTimestampColumn.current(minecraft.fontRenderer);
+                ChatTimestampColumn.of(frame, minecraft.fontRenderer);
         return forView(minecraft, chat, window.getId(), filter,
                 ChatWindowPlacement.wrapWidth(chatWidth,
-                        chat.func_146244_h()) - (columns.messageX() - 2),
+                        chat.func_146244_h())
+                        - (int)Math.ceil(columns.messageX() - 2.0F
+                                + ChatMemberList.drawnWidth(frame)),
                 true, false, unreadLineId);
     }
 

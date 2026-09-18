@@ -346,6 +346,13 @@ final class LostTalesChatOverlayRenderer {
         frame.advanceFill(window.getFill());
         int chatWidth = ChatWindowPlacement.drawnChatWidth(window, minecraft,
                 screenWidth);
+        // The timestamp area and the member list glide in and out before
+        // anything reads their width: the lines are laid out against it.
+        // The list stands while the words keep their least room beside it.
+        frame.advancePanels(window, view != null
+                && ChatMemberList.fits(chatWidth / chat.func_146244_h()
+                        + 6.0F - ChatTimestampColumn.of(frame,
+                                minecraft.fontRenderer).messageX()));
         // The unread divider opens a run of its own under it while it
         // stands, so the window lays its lines out knowing where it is.
         Integer unread = view == null ? null
@@ -441,7 +448,7 @@ final class LostTalesChatOverlayRenderer {
         // message text's own left edge; the timestamp area lies between
         // it and the window edge.
         ChatTimestampColumn columns =
-                ChatTimestampColumn.current(minecraft.fontRenderer);
+                ChatTimestampColumn.of(frame, minecraft.fontRenderer);
         float originX = (float)ChatWindowFrame.snapToDisplayPixels(
                 frame.drawnLeft() + columns.messageX() * scale);
         float originY = (float)frame.drawnBaseline();
@@ -1016,15 +1023,25 @@ final class LostTalesChatOverlayRenderer {
         // The panel reaches from the window's left edge — past the
         // timestamp column when there is one — to its right; the text
         // origin this method draws from lies messageX inside it.
-        float panelLeft = -(float)columns.messageX();
-        float panelRight = panelLeft + unscaledWidth + 6.0F;
+        float panelLeft = -columns.messageX();
+        // The window's right edge, and the member list standing in from
+        // it as far as it has come out; the history's panel ends where
+        // the list begins, as it begins where the timestamp area ends.
+        float windowRight = panelLeft + unscaledWidth + 6.0F;
+        float panelRight = windowRight
+                - (open ? ChatMemberList.drawnWidth(frame) : 0.0F);
         // The message area: from the timestamp column's separator, when
         // there is one, to the panel's right. The panel's backdrop and
         // every line's tint and shade stand in it and nowhere left of
         // it, so the column keeps a surface of its own and no two
-        // backgrounds are ever laid over each other.
-        float messageLeft = panelLeft
-                + (columns.enabled ? columns.separatorX() : 0.0F);
+        // backgrounds are ever laid over each other. While the area is
+        // driven out, what is left of it narrows toward the window's
+        // edge.
+        float messageLeft = panelLeft + (columns.shows()
+                ? Math.max(0.0F, columns.separatorX()) : 0.0F);
+        // Where the area's contents are cut: the window's own left edge,
+        // past which they slide as the area is driven out.
+        double areaClipLeft = originX + panelLeft * scale;
         // The panel's opacity, shared by every stretch of it a line
         // recolours, so the stretch and the panel beside it are one.
         int panelAlpha = backdropAlpha(opacity, opening) / 2;
@@ -1070,10 +1087,10 @@ final class LostTalesChatOverlayRenderer {
         float toolbarLeft = panelRight - 1.0F - SCROLLBAR_WIDTH
                 - TOOLBAR_GAP - toolbarWidth(toolbarKinds.length);
         boolean jumpShown = open && advanceJumpButton(frame, scrollLines);
-        // Centred across the panel, on a whole pixel.
+        // Centred across the panel, on a whole pixel, the odd one left.
         int jumpWidth = jumpButtonWidth(minecraft.fontRenderer);
-        float jumpLeft = Math.round((panelLeft + panelRight - jumpWidth)
-                / 2.0F);
+        float jumpLeft = (float)Math.floor((panelLeft + panelRight
+                - jumpWidth) / 2.0F);
         float jumpTop = jumpButtonTop(frame, bottomEdge, originY, scale);
         Holes holes = new Holes();
         for (int index = 0; index < toolbarKinds.length; index++) {
@@ -1111,7 +1128,7 @@ final class LostTalesChatOverlayRenderer {
                 drawChatBackdrop(panelLeft, messageLeft, topEdge,
                         panelRight, bottomEdge, panelAlpha,
                         LostTalesChatVisualStyle.backdropRgb());
-                if (columns.enabled) {
+                if (columns.shows()) {
                     // The timestamp area's own surface: the chat's inset
                     // surface, plum black at two thirds, the typing
                     // well's and a resting tab's, so the avatars and the
@@ -1142,10 +1159,9 @@ final class LostTalesChatOverlayRenderer {
                         + (totalLineCount <= 0 ? LINE_HEIGHT : 0.0F);
                 if (totalHeight < roomUnscaled - 0.01F) {
                     LostTalesUiSheet.EMPTY_HATCH.drawTiledFadingFromMiddle(
-                            columns.enabled
-                                    ? panelLeft + columns.separatorX()
-                                            + ChatTimestampColumn
-                                                    .SEPARATOR_WIDTH
+                            columns.shows()
+                                    ? messageLeft + ChatTimestampColumn
+                                            .SEPARATOR_WIDTH
                                     : panelLeft,
                             topEdge, panelRight,
                             hatchBottom(offset, hatchedHeight),
@@ -1326,15 +1342,18 @@ final class LostTalesChatOverlayRenderer {
                                     panelRight, y, panelAlpha, backdropRgb,
                                     bandRgb);
                         }
-                        if (columns.enabled && hoverFade > 0.0F) {
-                            // The line under the pointer lights its row of
-                            // the timestamp column too, so the time it
-                            // brings out there is found at a glance: the
-                            // column's own surface recoloured in place, at
-                            // the column's two thirds, toward the colour
-                            // the line's panel lights to. The pointer
-                            // lights a line from the column as well.
-                            int litRgb = lineBandRgb(backdropRgb,
+                        if (columns.shows()) {
+                            // The line's row of the timestamp area wears
+                            // the line's highlight too — a mention's tint,
+                            // a jump's flash, a search's light, and under
+                            // the pointer each a shade lighter — so a
+                            // highlighted message is lit across its whole
+                            // width, avatar and time included: the area's
+                            // own surface recoloured in place, at its own
+                            // two thirds, crossing in with the line. The
+                            // pointer lights a line from the area as well.
+                            int areaRgb = lineBandRgb(
+                                    LostTalesChatVisualStyle.SURFACE_RGB,
                                     LostTalesChatVisualStyle.selectedLineRgb(),
                                     pinged, mentionRgb,
                                     LostTalesChatVisualStyle
@@ -1343,16 +1362,25 @@ final class LostTalesChatOverlayRenderer {
                                     LostTalesChatVisualStyle.replyHighlightRgb(),
                                     LostTalesChatVisualStyle
                                             .selectedReplyHighlightRgb(),
-                                    1.0F);
-                            recolour(panelLeft, panelLeft,
-                                    y - rowHeight - headroom / scale,
-                                    messageLeft, y, columnAlpha,
-                                    LostTalesChatVisualStyle.SURFACE_RGB,
-                                    LostTalesChatVisualStyle.blend(
-                                            LostTalesChatVisualStyle
-                                                    .SURFACE_RGB,
-                                            litRgb, hoverFade),
-                                    FLAT_WEIGHTS);
+                                    hoverFade);
+                            if (areaRgb != LostTalesChatVisualStyle.SURFACE_RGB) {
+                                recolour(panelLeft, panelLeft,
+                                        y - rowHeight - headroom / scale,
+                                        messageLeft, y, columnAlpha,
+                                        LostTalesChatVisualStyle.SURFACE_RGB,
+                                        areaRgb, FLAT_WEIGHTS);
+                            }
+                        }
+                        if (pinged) {
+                            // A mention also wears a solid bar on the
+                            // window's own edge, left of the avatars, the
+                            // way Discord's does: the tint says the line,
+                            // the bar says it at a glance from across the
+                            // window. It stands with the panel, still while
+                            // the line's text slides in.
+                            fillRect(panelLeft, y - rowHeight - headroom / scale,
+                                    panelLeft + MENTION_BAR_WIDTH, y,
+                                    (alpha << 24) | mentionRgb);
                         }
                     }
                     // The closed feed has no panel — each of its lines
@@ -1392,21 +1420,14 @@ final class LostTalesChatOverlayRenderer {
                                 panelRight, y, alpha / 2, color,
                                 alignment.bandWeights());
                     }
-                    if (pinged && alignment.hasMentionBar()) {
-                        // A mention also wears a solid bar on the edge
-                        // the lines stand against — just past the
-                        // timestamp column's separator, when there is
-                        // one — the way Discord's does: the tint says
-                        // the line, the bar says it at a glance from
-                        // across the window. A feed of centred lines has
-                        // no such edge and wears the tint alone.
+                    if (!open && pinged && alignment.hasMentionBar()) {
+                        // In the feed the bar stands on the edge the
+                        // lines stand against and slides in with its
+                        // line; a feed of centred lines has no such edge
+                        // and wears the tint alone.
                         float barLeft = alignment == ChatFeedAlignment.RIGHT
                                 ? panelRight - MENTION_BAR_WIDTH
-                                : panelLeft + (columns.enabled
-                                        ? columns.separatorX()
-                                                + ChatTimestampColumn
-                                                        .SEPARATOR_WIDTH
-                                        : 0.0F);
+                                : panelLeft;
                         fillRect(barLeft, y - rowHeight - headroom / scale,
                                 barLeft + MENTION_BAR_WIDTH, y,
                                 (alpha << 24) | mentionRgb);
@@ -1429,31 +1450,38 @@ final class LostTalesChatOverlayRenderer {
                     }
                     // A message with no name row — the rest of a
                     // speaker's group, a line that is words from its
-                    // first row — shows its clock in the timestamp area
+                    // first row — shows its time in the timestamp area
                     // while the pointer rests on it, the way Discord
                     // shows a grouped line's time on hover; a message
                     // that names its speaker wears its time behind the
-                    // name. The clock rides the stack's vertical motion
+                    // name. The time rides the stack's vertical motion
                     // and the line's fade, but not the entry slide — the
                     // area does not move sideways — and it is drawn after
                     // the line's band, so on a highlighted line it stands
                     // on the tint instead of being darkened under it. It
                     // is centred on the message's words, every wrapped
                     // row of them.
-                    if (open && columns.enabled && hoverFade > 0.0F
+                    if (open && columns.shows() && hoverFade > 0.0F
                             && showsTimeInColumn(lines, lineIndex)) {
                         Long said = ClientChatChannelViews.timeOf(
                                 line.getChatLineID());
                         if (said != null) {
-                            drawColumnTime(font, columns, panelLeft,
-                                    ChatTimestampFormatter.formatDrawnClock(
-                                            said.longValue()),
-                                    stampTextTop(y, rowHeight,
-                                            messageCentreShift(lines,
-                                                    lineIndex, rows,
-                                                    dividerIndex),
-                                            sizes.small),
-                                    Math.round(alpha * hoverFade));
+                            boolean areaCut = beginClip(minecraft,
+                                    areaClipLeft, Double.NaN, clipTop,
+                                    clipBottom, true);
+                            try {
+                                drawColumnTime(font, columns, panelLeft,
+                                        ChatTimestampFormatter.formatDrawnTime(
+                                                said.longValue()),
+                                        stampTextTop(y, rowHeight,
+                                                messageCentreShift(lines,
+                                                        lineIndex, rows,
+                                                        dividerIndex),
+                                                sizes.small),
+                                        Math.round(alpha * hoverFade));
+                            } finally {
+                                endVerticalClip(areaCut);
+                            }
                         }
                     }
                     GL11.glPushMatrix();
@@ -1462,6 +1490,9 @@ final class LostTalesChatOverlayRenderer {
                     IChatComponent component = line.func_151461_a();
                     float rowShift = feedRowShift(font, component, alignment,
                             unscaledWidth, rowPivot, rowScale);
+                    if (open && ChatReplyMarker.isQuoteRow(component)) {
+                        drawQuoteSpine(y, rowScale, alpha);
+                    }
                     // A reaction row's chips are centred in the row, which
                     // is as tall as they need; any other row's text stands
                     // on the row's own line.
@@ -1494,7 +1525,7 @@ final class LostTalesChatOverlayRenderer {
                         drawHeaderStamp(font, component, rowScale,
                                 sizes.small, alpha);
                     }
-                    if (hoveredLine && reactionRow
+                    if (open && reactionRow
                             && LostTalesChatPresentation.isReactable(
                                     line.getChatLineID())) {
                         drawReactionAddButton(font, component, alpha);
@@ -1520,15 +1551,22 @@ final class LostTalesChatOverlayRenderer {
                     GL11.glPopMatrix();
                     GL11.glDisable(GL11.GL_ALPHA_TEST);
                 }
-                if (open) {
+                if (open && columns.shows()) {
                     // The avatars, over every row they stand beside, so
                     // no row's band is laid over one, and under the
-                    // shades the window ends on.
-                    drawAvatars(minecraft, frame, lines, firstLine, lastRow,
-                            dividerIndex, rows, stackBase, opacity, opening,
-                            columns, panelLeft, originX,
-                            originY + stackOffset, scale, clipTop,
-                            clipBottom);
+                    // shades the window ends on; cut at the window's
+                    // edge, past which they slide as the area goes.
+                    boolean areaCut = beginClip(minecraft, areaClipLeft,
+                            Double.NaN, clipTop, clipBottom, true);
+                    try {
+                        drawAvatars(minecraft, frame, lines, firstLine,
+                                lastRow, dividerIndex, rows, stackBase,
+                                opacity, opening, columns, panelLeft,
+                                originX, originY + stackOffset, scale,
+                                clipTop, clipBottom, areaClipLeft);
+                    } finally {
+                        endVerticalClip(areaCut);
+                    }
                 }
             } finally {
                 endVerticalClip(clipped);
@@ -1565,7 +1603,7 @@ final class LostTalesChatOverlayRenderer {
                         inviteAlpha);
             }
             if (open) {
-                if (columns.enabled) {
+                if (columns.shows() && columns.separatorX() >= 0.0F) {
                     // The separator stands over the lines, so a message
                     // sliding past never crosses it — but under the
                     // shades below, with the rest of the history: the
@@ -1576,6 +1614,17 @@ final class LostTalesChatOverlayRenderer {
                                     + ChatTimestampColumn.SEPARATOR_WIDTH,
                             topEdge, bottomEdge,
                             Math.round(255.0F * opening.getOpacity()));
+                }
+                if (panelRight < windowRight) {
+                    // The member list beside the history, on the window's
+                    // own surfaces, its rows cut to the history's rules.
+                    ChatMemberList.draw(minecraft, font, frame, panelRight,
+                            topEdge, bottomEdge, windowRight, clipTop,
+                            clipBottom, originX, originY, scale, columnAlpha,
+                            Math.round(255.0F * opacity
+                                    * opening.getOpacity()));
+                } else {
+                    frame.members.clearDrawn();
                 }
                 int fadeAlpha = Math.round(EDGE_FADE_ALPHA * opacity
                         * opening.getOpacity());
@@ -1595,6 +1644,18 @@ final class LostTalesChatOverlayRenderer {
                         TOP_EDGE_FADE_HEIGHT, fadeAlpha);
                 drawEdgeFade(panelLeft, panelRight, bottomEdge, topEdge,
                         BOTTOM_EDGE_FADE_HEIGHT, fadeAlpha);
+                if (panelRight < windowRight) {
+                    // The member list's rows fade by the rules as the
+                    // words do, evenly across its width.
+                    drawEdgeFade(panelRight, windowRight, panelRight,
+                            windowRight, topEdge, bottomEdge,
+                            TOP_EDGE_FADE_HEIGHT, fadeAlpha,
+                            LostTalesChatVisualStyle.backdropRgb(), false);
+                    drawEdgeFade(panelRight, windowRight, panelRight,
+                            windowRight, bottomEdge, topEdge,
+                            BOTTOM_EDGE_FADE_HEIGHT, fadeAlpha,
+                            LostTalesChatVisualStyle.backdropRgb(), false);
+                }
                 GL11.glPopMatrix();
             }
             endHoles(masked);
@@ -1758,7 +1819,7 @@ final class LostTalesChatOverlayRenderer {
             inkLeft = rowPivot + (inkLeft - rowPivot) * rowScale;
             inkRight = rowPivot + (inkRight - rowPivot) * rowScale;
         }
-        return snapToStackPixel(alignment.rowShift(areaWidth, inkLeft,
+        return floorToStackPixel(alignment.rowShift(areaWidth, inkLeft,
                 inkRight));
     }
 
@@ -1779,6 +1840,18 @@ final class LostTalesChatOverlayRenderer {
                                double clipRight, double clipBottom,
                                float depth, float leftStrength,
                                float rightStrength) {
+        drawFadingText(minecraft, font, text, x, fraction, y, rgb, alpha,
+                clipLeft, clipRight, Double.NaN, clipBottom, depth,
+                leftStrength, rightStrength);
+    }
+
+    /** As above, cut at {@code clipTop} as well; either may be NaN. */
+    static void drawFadingText(Minecraft minecraft, FontRenderer font,
+                               String text, int x, float fraction, int y,
+                               int rgb, int alpha, double clipLeft,
+                               double clipRight, double clipTop,
+                               double clipBottom, float depth,
+                               float leftStrength, float rightStrength) {
         if (clipRight <= clipLeft
                 || alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
             return;
@@ -1799,7 +1872,7 @@ final class LostTalesChatOverlayRenderer {
         double rightStart = ChatWindowFrame.snapToDisplayPixels(
                 clipRight - rightSlices / (double)factor);
         drawTextSlice(minecraft, font, text, x, fraction, y, rgb, alpha,
-                leftEnd, rightStart, clipBottom);
+                leftEnd, rightStart, clipTop, clipBottom);
         for (int slice = 0; slice < leftSlices; slice++) {
             // A slice's opacity is read at its middle: none at the very
             // edge for words fully gone past it, the whole at the zone's
@@ -1812,7 +1885,7 @@ final class LostTalesChatOverlayRenderer {
                             leftEnd - (leftSlices - slice) / (double)factor),
                     ChatWindowFrame.snapToDisplayPixels(
                             leftEnd - (leftSlices - slice - 1) / (double)factor),
-                    clipBottom);
+                    clipTop, clipBottom);
         }
         for (int slice = 0; slice < rightSlices; slice++) {
             float share = 1.0F - rightStrength
@@ -1823,7 +1896,7 @@ final class LostTalesChatOverlayRenderer {
                             rightStart + (rightSlices - slice - 1) / (double)factor),
                     ChatWindowFrame.snapToDisplayPixels(
                             rightStart + (rightSlices - slice) / (double)factor),
-                    clipBottom);
+                    clipTop, clipBottom);
         }
     }
 
@@ -1832,13 +1905,13 @@ final class LostTalesChatOverlayRenderer {
                                       String text, int x, float fraction,
                                       int y, int rgb, int alpha,
                                       double clipLeft, double clipRight,
-                                      double clipBottom) {
+                                      double clipTop, double clipBottom) {
         if (clipRight <= clipLeft
                 || alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
             return;
         }
         boolean clipped = beginClip(minecraft, clipLeft, clipRight,
-                Double.NaN, clipBottom, true);
+                clipTop, clipBottom, true);
         try {
             GL11.glPushMatrix();
             try {
@@ -2087,8 +2160,9 @@ final class LostTalesChatOverlayRenderer {
         if (alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
             return;
         }
-        float left = panelLeft + 3.0F + (columns.enabled
-                ? columns.separatorX() + ChatTimestampColumn.SEPARATOR_WIDTH
+        float left = panelLeft + 3.0F + (columns.shows()
+                ? Math.max(0.0F, columns.separatorX())
+                        + ChatTimestampColumn.SEPARATOR_WIDTH
                 : 0.0F);
         float right = panelRight - 3.0F;
         if (right <= left) {
@@ -2107,13 +2181,15 @@ final class LostTalesChatOverlayRenderer {
             // Everything is anchored on the date's x, laid on a display
             // pixel, so the gap is exactly three empty small columns on
             // either side whatever fraction the window's centre falls
-            // on; the font's measured width carries one trailing spacing
-            // column, so the right rule starts one short of width-plus-
-            // three.
-            float textX = snapToStackPixel((left + right - drawnWidth)
+            // on. The date is centred by its ink — the font's measured
+            // width carries one trailing spacing column, which is not ink
+            // — the odd display pixel left, and the right rule starts
+            // three small pixels past the ink.
+            float inkWidth = (textWidth - 1) * pixel;
+            float textX = floorToStackPixel((left + right - inkWidth)
                     / 2.0F);
             float gapLeft = textX - 3.0F * pixel;
-            float gapRight = textX + drawnWidth + 2.0F * pixel;
+            float gapRight = textX + inkWidth + 3.0F * pixel;
             drawHorizontalFade(left, gapLeft, ruleTop, pixel,
                     rgb, 0, alpha);
             drawHorizontalFade(gapRight, right, ruleTop, pixel,
@@ -2817,12 +2893,10 @@ final class LostTalesChatOverlayRenderer {
                         ChatReactionMarker.HEIGHT * rowScale,
                         CHIP_HOLE_DEPTH, rowScale);
             }
-            // The button the row ends on stands only while the pointer
-            // rests on its message, and its hole with it.
-            int[] add = LostTalesChatPresentation.isHoveredLine(
+            // The button the row ends on stands beside the chips, and its
+            // hole with it.
+            int[] add = LostTalesChatPresentation.isReactable(
                     line.getChatLineID())
-                    && LostTalesChatPresentation.isReactable(
-                            line.getChatLineID())
                     ? LostTalesChatVisualStyle.addButtonBox(font, row, true)
                     : null;
             if (add != null) {
@@ -2902,9 +2976,14 @@ final class LostTalesChatOverlayRenderer {
                     TOOLBAR_BUTTON_SIZE, TOOLBAR_BUTTON_SIZE);
             try {
                 if (kind == TOOLBAR_REACT) {
-                    drawReactGlyph(buttonLeft + (TOOLBAR_BUTTON_SIZE
-                                    - CONTENT_BOX_HEIGHT) / 2,
-                            top + (TOOLBAR_BUTTON_SIZE - CONTENT_BOX_HEIGHT) / 2,
+                    // The input bar's own emoji button, lit as the button
+                    // is: the same control, aimed at this message.
+                    LostTalesUiSheet.drawPairWithShadow(LostTalesUiSheet.EMOJI,
+                            LostTalesUiSheet.EMOJI_HOVER, lit,
+                            buttonLeft + (TOOLBAR_BUTTON_SIZE
+                                    - LostTalesUiSheet.EMOJI.getWidth()) / 2,
+                            top + (TOOLBAR_BUTTON_SIZE
+                                    - LostTalesUiSheet.EMOJI.getHeight()) / 2,
                             alpha);
                 } else if (kind == TOOLBAR_REPLY) {
                     drawPixelGlyph(REPLY_GLYPH,
@@ -2932,14 +3011,6 @@ final class LostTalesChatOverlayRenderer {
         frame.toolbarStride = TOOLBAR_STRIDE * scale;
         frame.toolbarKinds = kinds;
         frame.toolbarChatLineId = chatLineId;
-    }
-
-    /** A face: react to this. The picker's own smile, drawn one texel to one pixel. */
-    private static void drawReactGlyph(float x, float y, int alpha) {
-        LostTalesChatVisualStyle.beginContent();
-        ChatInlineIcons.drawEmoji(Minecraft.getMinecraft(),
-                ChatEmoji.SLIGHT_SMILE, x, y, ChatInlineIcons.CONTENT_SIZE,
-                alpha);
     }
 
     /**
@@ -3429,29 +3500,33 @@ final class LostTalesChatOverlayRenderer {
     }
 
     /**
-     * Where a message's stamp stands, measured from the bottom edge of
-     * the row that carries it: its own row box centred in the rows of
-     * the message's words ({@link #messageCentreShift}), the odd half
-     * pixel up the screen and on the display's grid. The rows of one
-     * message are not all one height, so the stamp is placed against the
+     * Where a message's time in the timestamp area stands, measured from
+     * the bottom edge of the row that carries it: its capitals centred on
+     * the capitals of the message's words ({@link #messageCentreShift}),
+     * on the display's grid, the odd display pixel up. The rows of one
+     * message are not all one height, so the time is placed against the
      * words themselves rather than against the row it happens to be
-     * written on.
+     * written on; the words' capitals stand half a pixel above the middle
+     * of their rows.
      */
     static float stampTextTop(int rowBottom, int rowHeight, int centreShift,
                               float smallScale) {
-        float wordsMiddle = rowBottom - rowHeight / 2.0F + centreShift;
-        float boxTop = floorToStackPixel(
-                wordsMiddle - LINE_HEIGHT * smallScale / 2.0F);
-        return boxTop + ROW_TEXT_TOP * smallScale;
+        float capitalsMiddle = rowBottom - rowHeight / 2.0F + centreShift
+                - 0.5F;
+        return floorToStackPixel(capitalsMiddle
+                - GLYPH_CAP_HEIGHT * smallScale / 2.0F);
     }
 
     /**
      * A stack-space coordinate laid on the whole display pixel at or
      * before it: above it for a y, left of it for an x.
      */
-    private static float floorToStackPixel(float at) {
+    static float floorToStackPixel(float at) {
         float pixelsPerUnit = stackPixelsPerUnit();
-        return (float)Math.floor(at * pixelsPerUnit) / pixelsPerUnit;
+        // A hair of slack, so a place a float's error leaves just short
+        // of a whole display pixel stays on it.
+        return (float)Math.floor(at * pixelsPerUnit + 1.0E-3F)
+                / pixelsPerUnit;
     }
 
     /** Display pixels per unit of the message stack: the GUI scale times the chat's. */
@@ -3463,9 +3538,9 @@ final class LostTalesChatOverlayRenderer {
     /**
      * A message's time in the timestamp area: the chat's small text in
      * its aside tone, the time in italics — ivory and upright with chat
-     * colours off, as every run is — centred in the area on the
-     * display's grid, the odd pixel on the separator's side, with its
-     * shadow a pixel of its own size away.
+     * colours off, as every run is — with its shadow a pixel of its own
+     * size away, the two centred in the area together on the display's
+     * grid, the odd pixel on the separator's side.
      */
     private static void drawColumnTime(FontRenderer font,
                                        ChatTimestampColumn columns,
@@ -3479,7 +3554,10 @@ final class LostTalesChatOverlayRenderer {
         String rendered = colours ? time
                 : LostTalesChatVisualStyle.stripCodes(time);
         float small = LostTalesChatVisualStyle.stackSmallScale();
-        // The advance ends in the font's one-pixel gap; the ink is the rest.
+        // Centred by its ink: the advance ends in the font's one-pixel
+        // gap, which is not ink. Where the two cannot meet in the middle
+        // the time stands the odd display pixel left, as its shadow
+        // counts toward its shape.
         float ink = (font.getStringWidth(rendered) - 1) * small;
         GL11.glPushMatrix();
         try {
@@ -3578,6 +3656,44 @@ final class LostTalesChatOverlayRenderer {
             }
             x += LostTalesChatVisualStyle.partWidth(font, part, true);
         }
+    }
+
+    /** Where the line a quote hangs from stands, right of the name's column. */
+    static final int QUOTE_SPINE_X = 2;
+    /** Clear pixels between the line's end and the quote's head. */
+    static final int QUOTE_SPINE_GAP = 2;
+
+    /**
+     * The line a reply's quote hangs from in an open window, the way
+     * Discord leads a reply into its message: from the quote's capitals,
+     * where it bends with a pixel's rounding, down to the row under the
+     * quote, above the name's first letter. The quote stands pushed right
+     * of the name's column to make room for it
+     * ({@link ChatReplyMarker#OPEN_INDENT}). One of the quote's own
+     * pixels thick, as fine as its strokes, in the chat's aside tone, and
+     * structural like a rule, so it casts no shadow. {@code rowBottom} is
+     * the quote row's bottom edge in the stack's units and
+     * {@code rowScale} the size the quote is drawn at.
+     */
+    private static void drawQuoteSpine(int rowBottom, float rowScale,
+                                       int alpha) {
+        if (alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+            return;
+        }
+        float pixel = rowScale;
+        float textTop = rowBottom - (float)TEXT_OFFSET + (rowScale == 1.0F
+                ? 0.0F : LostTalesChatVisualStyle.stackRowTopOffset(rowScale));
+        float bend = floorToStackPixel(textTop
+                + (GLYPH_CAP_HEIGHT / 2) * pixel);
+        float left = snapToStackPixel(QUOTE_SPINE_X);
+        float right = snapToStackPixel(ChatReplyMarker.OPEN_INDENT
+                - QUOTE_SPINE_GAP);
+        int argb = LostTalesChatVisualStyle.argb(
+                LostTalesChatVisualStyle.asideRgb(), alpha);
+        // The bend: the two strokes meet corner to corner, a pixel of
+        // rounding where they turn.
+        fillRect(left + pixel, bend, right, bend + pixel, argb);
+        fillRect(left, bend + pixel, left + pixel, rowBottom, argb);
     }
 
     /**
@@ -3938,6 +4054,18 @@ final class LostTalesChatOverlayRenderer {
     }
 
     /**
+     * A stretch of a surface laid in one flat colour — the timestamp
+     * area, the member list — given another colour in place, as a line's
+     * stretch of the panel is ({@link #recolourBackdrop}).
+     */
+    static void recolourSurface(float left, float top, float right,
+                                float bottom, int alpha, int fromRgb,
+                                int toRgb) {
+        recolour(left, left, top, right, bottom, alpha, fromRgb, toRgb,
+                FLAT_WEIGHTS);
+    }
+
+    /**
      * As above for a surface with the opacity profile {@code weights}:
      * the panel's thinning one, or {@link #FLAT_WEIGHTS} for one laid in
      * a single flat colour, as the timestamp column is.
@@ -4145,9 +4273,9 @@ final class LostTalesChatOverlayRenderer {
      * bridge. What the row's small head and an open window's avatar are
      * both drawn by.
      */
-    private static void drawFace(Minecraft minecraft,
-                                 ChatHeadMarker.Data marker, float x, float y,
-                                 float size, int alpha) {
+    static void drawFace(Minecraft minecraft,
+                         ChatHeadMarker.Data marker, float x, float y,
+                         float size, int alpha) {
         float opacity = alpha / 255.0F;
         boolean wearsPresence = ChatPresenceMark.wears(marker);
         if (wearsPresence) {
@@ -4243,7 +4371,8 @@ final class LostTalesChatOverlayRenderer {
                                     ChatTimestampColumn columns,
                                     float panelLeft, float originX,
                                     float originY, float scale,
-                                    float clipTop, float clipBottom) {
+                                    float clipTop, float clipBottom,
+                                    double clipLeft) {
         int reach = Math.min(rows.count() - 1, lastRow + 1);
         float left = panelLeft + columns.avatarX();
         // A mark standing for a head fills the avatar's square on the
@@ -4279,9 +4408,14 @@ final class LostTalesChatOverlayRenderer {
             }
             // Where it answers the pointer: the avatar itself, its sphere
             // included; the rest of the area lights the row it stands by.
-            frame.recordAvatar(originX + left * scale,
+            float boxLeft = (float)Math.max(clipLeft, originX + left * scale);
+            float boxRight = originX + (left + ChatAvatar.ICON_WIDTH) * scale;
+            if (boxRight <= boxLeft) {
+                continue;
+            }
+            frame.recordAvatar(boxLeft,
                     Math.max(clipTop, originY + top * scale),
-                    originX + (left + ChatAvatar.ICON_WIDTH) * scale,
+                    boxRight,
                     Math.min(clipBottom, originY + (top + ChatAvatar.SIZE
                             + ChatPresenceMark.OVERHANG_Y) * scale),
                     line.getChatLineID());

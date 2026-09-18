@@ -600,7 +600,8 @@ public class LostTalesQuestJournalGui extends GuiScreen
         boolean lit = this.hovered == Hovered.CATEGORY
                 && label.equals(this.hoveredCategory);
         String name = LostTalesSkyrimUiStyle.uppercase(categoryName(label));
-        int top = (int)Math.round(y + (CATEGORY_ROW_HEIGHT - 8) / 2.0D) + 1;
+        int top = (int)Math.round(y) + LostTalesUiInk.centredStart(
+                CATEGORY_ROW_HEIGHT, 7);
 
         LostTalesSkyrimUiStyle.beginContent();
         LostTalesUiButtonMotion motion = categoryMotion(label);

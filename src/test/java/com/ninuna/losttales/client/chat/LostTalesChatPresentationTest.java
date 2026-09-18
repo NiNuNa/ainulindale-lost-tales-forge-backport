@@ -752,6 +752,8 @@ public final class LostTalesChatPresentationTest {
         boolean originalPings = LostTalesConfig.enableChatPings;
         LostTalesConfig.enableChatPings = true;
         try {
+            UUID player = UUID.randomUUID();
+            UUID character = UUID.randomUUID();
             LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
                     ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
                     "RangerOfTheNorth", "", 0x55AA55, 0x336633,
@@ -759,8 +761,11 @@ public final class LostTalesChatPresentationTest {
                     "losttales:human_ranger_male_2").withNamedPlayers(
                             java.util.Collections.singletonList(
                                     new com.ninuna.losttales.chat
-                                            .ChatNamedPlayer("Player531",
-                                                    "Aragorn", 0x2F6FB0)));
+                                            .ChatNamedPlayer(player,
+                                                    "Player531", character,
+                                                    "Aragorn",
+                                                    "human/male/3",
+                                                    0x2F6FB0)));
             IChatComponent aragorn = null;
             IChatComponent nobody = null;
             for (IChatComponent part : bodyOf(LostTalesChatPresentation.build(
@@ -778,6 +783,17 @@ public final class LostTalesChatPresentationTest {
             assertNotNull(marker);
             assertEquals("Player531", marker.account);
             assertEquals(0x2F6FB0, marker.color);
+            // Its card is the player as the line recorded them: the
+            // character, its head and its name, in the mention's colour.
+            LostTalesChatHoverCard.Target card =
+                    LostTalesChatHoverCard.recordedTarget(null,
+                            marker.recorded, marker.color);
+            assertEquals(player, card.playerId);
+            assertEquals(character, card.characterId);
+            assertEquals("human/male/3", card.skinId);
+            assertEquals("Aragorn", card.identityName);
+            assertEquals("Player531", card.accountName);
+            assertEquals(0x2F6FB0, card.nameColor);
             assertNotNull(nobody);
             assertNull(ChatMentionMarker.decode(nobody));
         } finally {

@@ -318,14 +318,14 @@ public final class ChatRowSizesTest {
     }
 
     /**
-     * The stamp stands in the middle of the rows of words it stamps, not
-     * on the row that happens to carry it: a name of one size over words
-     * of another leaves it beside the words.
+     * The stamp's capitals stand on the capitals of the words it stamps,
+     * not on the row that happens to carry it: a name of one size over
+     * words of another leaves it beside the words.
      */
     @Test
     public void aStampIsCentredInTheRowsOfTheWords() {
-        // A message on one row: the stamp's own row box fills it, so it
-        // stands exactly where the words do.
+        // A message on one row: capitals of one size on capitals of the
+        // same size stand exactly where the words do.
         assertEquals(-TEXT_OFFSET,
                 LostTalesChatOverlayRenderer.stampTextTop(0, LINE, 0, 1.0F),
                 0.0001F);
@@ -334,13 +334,17 @@ public final class ChatRowSizesTest {
         assertEquals(-TEXT_OFFSET,
                 LostTalesChatOverlayRenderer.stampTextTop(-12, 16, 14, 1.0F),
                 0.0001F);
-        // Smaller text: its box is centred in the row, not hung from the
-        // words' own top edge.
+        // Smaller capitals cannot share the words' middle row exactly:
+        // they stand within a display pixel of it, and never below it.
         float small = 2.0F / 3.0F;
         float top = LostTalesChatOverlayRenderer.stampTextTop(0, LINE, 0,
                 small);
-        float boxTop = top - LostTalesChatOverlayRenderer.ROW_TEXT_TOP * small;
-        assertEquals(-LINE / 2.0F, boxTop + LINE * small / 2.0F, 0.0001F);
+        float wordsMiddle = -TEXT_OFFSET
+                + LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT / 2.0F;
+        float stampMiddle = top
+                + LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT * small / 2.0F;
+        assertTrue(stampMiddle <= wordsMiddle + 0.0001F);
+        assertTrue(stampMiddle > wordsMiddle - 1.0F);
     }
 
     /** A message: the anchor, the sender, the body break, then the words. */

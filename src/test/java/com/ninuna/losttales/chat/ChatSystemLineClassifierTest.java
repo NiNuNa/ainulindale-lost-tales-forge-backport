@@ -13,27 +13,41 @@ import static com.ninuna.losttales.chat.ChatChannel.CONSOLE;
 
 public final class ChatSystemLineClassifierTest {
 
+    /**
+     * The server's announcements are what Discord shows as embeds, so
+     * they go to OOC & Discord, where each is linked to its embed.
+     */
     @Test
-    public void serverVisibleLinesGoToGlobal() {
-        assertEquals(ChatChannel.ALL, ChatSystemLineClassifier.classify(
+    public void announcementsGoToOocAndDiscord() {
+        assertEquals(ChatChannel.OOC, ChatSystemLineClassifier.classify(
                 new ChatComponentTranslation("chat.type.achievement",
                         "Steve", new ChatComponentText("Taking Inventory"))));
-        assertEquals(ChatChannel.ALL, ChatSystemLineClassifier.classify(
+        assertEquals(ChatChannel.OOC, ChatSystemLineClassifier.classify(
                 new ChatComponentTranslation("chat.type.achievement.taken",
                         "Steve", "x")));
-        assertEquals(ChatChannel.ALL, ChatSystemLineClassifier.classify(
+        assertEquals(ChatChannel.OOC, ChatSystemLineClassifier.classify(
                 new ChatComponentTranslation("chat.lotr.achievement",
                         "Steve", "Middle-earth",
                         new ChatComponentText("[First Steps]"))));
-        assertEquals(ChatChannel.ALL, ChatSystemLineClassifier.classify(
+        assertEquals(ChatChannel.OOC, ChatSystemLineClassifier.classify(
                 new ChatComponentTranslation("death.attack.mob", "Steve",
                         "Zombie")));
-        assertEquals(ChatChannel.ALL, ChatSystemLineClassifier.classify(
+        assertEquals(ChatChannel.OOC, ChatSystemLineClassifier.classify(
                 new ChatComponentTranslation("multiplayer.player.joined",
                         "Steve")));
-        assertEquals(ChatChannel.ALL, ChatSystemLineClassifier.classify(
+        assertEquals(ChatChannel.OOC, ChatSystemLineClassifier.classify(
                 new ChatComponentTranslation("multiplayer.player.left",
                         "Steve")));
+        assertEquals(ChatChannel.OOC, ChatSystemLineClassifier.classify(
+                new ChatComponentTranslation(
+                        ChatSystemLineClassifier.SERVER_STARTED_KEY)));
+        assertEquals(ChatChannel.OOC, ChatSystemLineClassifier.classify(
+                new ChatComponentTranslation(
+                        ChatSystemLineClassifier.SERVER_STOPPING_KEY)));
+    }
+
+    @Test
+    public void otherSharedLinesGoToGlobal() {
         assertEquals(ChatChannel.ALL, ChatSystemLineClassifier.classify(
                 new ChatComponentTranslation("chat.type.announcement",
                         "Server", "hello")));
@@ -93,6 +107,12 @@ public final class ChatSystemLineClassifierTest {
         assertEquals(ChatSystemLineClassifier.Kind.LEAVE,
                 ChatSystemLineClassifier.kindOf(new ChatComponentTranslation(
                         "multiplayer.player.left", "Steve")));
+        assertEquals(ChatSystemLineClassifier.Kind.SERVER_STARTED,
+                ChatSystemLineClassifier.kindOf(new ChatComponentTranslation(
+                        ChatSystemLineClassifier.SERVER_STARTED_KEY)));
+        assertEquals(ChatSystemLineClassifier.Kind.SERVER_STOPPING,
+                ChatSystemLineClassifier.kindOf(new ChatComponentTranslation(
+                        ChatSystemLineClassifier.SERVER_STOPPING_KEY)));
         // Shared but of no named kind, private, plain, or nothing.
         assertEquals(ChatSystemLineClassifier.Kind.OTHER,
                 ChatSystemLineClassifier.kindOf(new ChatComponentTranslation(

@@ -1,6 +1,7 @@
 package com.ninuna.losttales.chat;
 
 import java.util.Arrays;
+import java.util.UUID;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -24,8 +25,10 @@ public final class ChatNamedPlayerTest {
 
     @Test
     public void anEntryIsFoundByAccountWhateverTheCase() {
-        ChatNamedPlayer sam = new ChatNamedPlayer("Sam", "Samwise", 0x123456);
-        ChatNamedPlayer frodo = new ChatNamedPlayer("Frodo", "", 0);
+        ChatNamedPlayer sam = new ChatNamedPlayer(UUID.randomUUID(), "Sam",
+                UUID.randomUUID(), "Samwise", "hobbit/male/1", 0x123456);
+        ChatNamedPlayer frodo = new ChatNamedPlayer(UUID.randomUUID(), "Frodo",
+                null, "", "", 0);
         assertEquals(sam, ChatNamedPlayer.find(Arrays.asList(frodo, sam), "sam"));
         assertEquals("a line the server writes names the character",
                 sam, ChatNamedPlayer.find(Arrays.asList(frodo, sam), "samwise"));
@@ -33,7 +36,28 @@ public final class ChatNamedPlayerTest {
                 Arrays.asList(frodo, sam), "Frodo").getIdentityName());
         assertNull(ChatNamedPlayer.find(Arrays.asList(frodo, sam), "Merry"));
         assertNull(ChatNamedPlayer.find(null, "Sam"));
-        assertFalse(new ChatNamedPlayer("", "x", 0).isValid());
+        assertFalse(new ChatNamedPlayer(null, "", null, "x", "", 0).isValid());
         assertEquals(0x123456, sam.getNameColor());
+    }
+
+    /**
+     * A named player keeps who they were: the account's id, and the
+     * character with its skin — none for the account, whose own skin a
+     * head draws.
+     */
+    @Test
+    public void anEntryKeepsTheHeadItNamesThePlayerWith() {
+        UUID account = UUID.randomUUID();
+        UUID character = UUID.randomUUID();
+        ChatNamedPlayer sam = new ChatNamedPlayer(account, "Sam", character,
+                "Samwise", "hobbit/male/1", 0);
+        assertEquals(account, sam.getPlayerId());
+        assertEquals(character, sam.getCharacterId());
+        assertEquals("hobbit/male/1", sam.getSkinId());
+        ChatNamedPlayer asAccount = new ChatNamedPlayer(account, "Sam", null,
+                "", "hobbit/male/1", 0);
+        assertNull(asAccount.getCharacterId());
+        assertEquals("an account wears its own skin", "", asAccount.getSkinId());
+        assertEquals("Sam", asAccount.getIdentityName());
     }
 }

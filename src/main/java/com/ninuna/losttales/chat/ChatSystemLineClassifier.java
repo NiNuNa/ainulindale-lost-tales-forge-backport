@@ -6,28 +6,38 @@ import net.minecraft.util.IChatComponent;
 /**
  * Decides what a chat line that Lost Tales did not route is, from the
  * translation key the server built it with rather than from its rendered
- * text. The client asks which channel a line belongs to: lines the whole
- * server sees — achievements, death messages, joins and leaves,
- * {@code /say} and {@code /me} — are conversation everyone shares and go
- * to Global; everything else (command output, fast-travel countdowns,
- * LOTR notices, other mods' lines, plain text components) is the
- * player's private console. The server's Discord bridge asks the finer
- * question of {@link #kindOf}: which of those shared lines is a death,
- * an achievement, a join or a leave, so each can be posted in its own
- * dress.
+ * text. The client asks which channel a line belongs to. The server's
+ * announcements — achievements, death messages, joins and leaves, and the
+ * server starting and stopping — are what the Discord bridge posts as
+ * embeds, and go to OOC &amp; Discord, the channel that mirrors Discord,
+ * where each is linked to its embed. The other lines the whole server
+ * sees — {@code /say}, {@code /me}, a travelling trader — are
+ * conversation everyone shares and go to Global. Everything else (command
+ * output, fast-travel countdowns, LOTR notices, other mods' lines, plain
+ * text components) is the player's private console. The server's
+ * Discord bridge asks the finer question of {@link #kindOf}: which
+ * announcement a line is, so each can be posted in its own dress.
  *
  * <p>Keys are the senders' own: {@code EntityPlayerMP},
  * {@code StatisticsFile}, {@code ServerConfigurationManager},
- * {@code CommandBroadcast} and {@code CommandEmote} send vanilla's, and
+ * {@code CommandBroadcast} and {@code CommandEmote} send vanilla's,
  * {@code LOTRAchievement} broadcasts Middle-earth achievements with
- * {@code chat.lotr.achievement}; all are {@code ChatComponentTranslation}s,
+ * {@code chat.lotr.achievement}, and the mod's own proxy announces the
+ * server starting and stopping; all are {@code ChatComponentTranslation}s,
  * so the classification does not depend on the language the client runs
  * in. Adding a category means adding a key here, nowhere else. The class
  * has no client dependency: a dedicated server classifies with it too.</p>
  */
 public final class ChatSystemLineClassifier {
     /** What a server-visible line announces; {@link #OTHER} for the rest. */
-    public enum Kind { ACHIEVEMENT, DEATH, JOIN, LEAVE, OTHER }
+    public enum Kind {
+        ACHIEVEMENT, DEATH, JOIN, LEAVE, SERVER_STARTED, SERVER_STOPPING, OTHER
+    }
+
+    /** The key of the server's own line saying it is up. */
+    public static final String SERVER_STARTED_KEY = "chat.losttales.server.started";
+    /** The key of the server's own line saying it is going down. */
+    public static final String SERVER_STOPPING_KEY = "chat.losttales.server.stopping";
 
     private static final String[] ACHIEVEMENT_KEYS = {
             "chat.type.achievement",
@@ -73,7 +83,10 @@ public final class ChatSystemLineClassifier {
         if (key == null) {
             return ChatChannel.CONSOLE;
         }
-        if (kindOfKey(key) != Kind.OTHER || contains(OTHER_GLOBAL_KEYS, key)) {
+        if (kindOfKey(key) != Kind.OTHER) {
+            return ChatChannel.OOC;
+        }
+        if (contains(OTHER_GLOBAL_KEYS, key)) {
             return ChatChannel.ALL;
         }
         return ChatChannel.CONSOLE;
@@ -101,6 +114,12 @@ public final class ChatSystemLineClassifier {
         }
         if (contains(LEAVE_KEYS, key)) {
             return Kind.LEAVE;
+        }
+        if (SERVER_STARTED_KEY.equals(key)) {
+            return Kind.SERVER_STARTED;
+        }
+        if (SERVER_STOPPING_KEY.equals(key)) {
+            return Kind.SERVER_STOPPING;
         }
         return Kind.OTHER;
     }

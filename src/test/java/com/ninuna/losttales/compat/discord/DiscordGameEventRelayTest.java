@@ -104,4 +104,32 @@ public final class DiscordGameEventRelayTest {
                 new ChatComponentTranslation("death.attack.mob", linked,
                         "Orc")));
     }
+
+    /**
+     * A join or a leave is posted from its login or logout event, which
+     * follows the game's line on the same tick: the line's id waits for
+     * it, by kind and account, and is taken once.
+     */
+    @Test
+    public void aJoinLineWaitsForItsLogin() {
+        DiscordGameEventRelay.clear();
+        try {
+            DiscordGameEventRelay.noteLine(
+                    com.ninuna.losttales.chat.ChatSystemLineClassifier.Kind.JOIN,
+                    "Steve", 42L);
+            assertEquals(com.ninuna.losttales.chat.ChatMessageIds.NONE,
+                    DiscordGameEventRelay.takeLine(
+                            com.ninuna.losttales.chat.ChatSystemLineClassifier.Kind.LEAVE,
+                            "Steve"));
+            assertEquals(42L, DiscordGameEventRelay.takeLine(
+                    com.ninuna.losttales.chat.ChatSystemLineClassifier.Kind.JOIN,
+                    "steve"));
+            assertEquals("taken once", com.ninuna.losttales.chat.ChatMessageIds.NONE,
+                    DiscordGameEventRelay.takeLine(
+                            com.ninuna.losttales.chat.ChatSystemLineClassifier.Kind.JOIN,
+                            "Steve"));
+        } finally {
+            DiscordGameEventRelay.clear();
+        }
+    }
 }

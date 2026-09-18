@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.chat.ChatDeliveryMark;
@@ -97,7 +98,7 @@ public final class LostTalesChatGui extends GuiChat
     private final ChatPointerRegions regions = new ChatPointerRegions();
     /** The input section: its place, its controls, its notice. */
     private final ChatInputBar bar = new ChatInputBar();
-    private final ChatSearchBar searchBar = new ChatSearchBar();
+    private final ChatToolStrip toolStrip = new ChatToolStrip();
     /** The suggestion lists, command completion and token insertion. */
     private final ChatInputCompletion completion =
             new ChatInputCompletion(this.notices);
@@ -183,7 +184,7 @@ public final class LostTalesChatGui extends GuiChat
         this.outbox.bind(this.mc);
         this.bar.bind(this.mc, this.fontRendererObj, this.regions, styled,
                 this.height);
-        this.searchBar.bind(this.fontRendererObj);
+        this.toolStrip.bind(this.fontRendererObj);
         this.inputField.setTextColor(LostTalesChatVisualStyle.IVORY);
         this.inputField.setDisabledTextColour(
                 LostTalesChatVisualStyle.SHADOW);
@@ -221,7 +222,7 @@ public final class LostTalesChatGui extends GuiChat
         super.updateScreen();
         syncChatIdentity();
         this.bar.tickPickers();
-        this.searchBar.tick();
+        this.toolStrip.tick();
         ClientChatChannelState.ensureAvailable();
         this.tabActions.syncSelection();
         if (isEmptyState()) {
@@ -323,10 +324,11 @@ public final class LostTalesChatGui extends GuiChat
         // The line begins where the messages above it do, as the reply
         // chip that shares this row does.
         ChatTimestampColumn columns =
-                ChatTimestampColumn.current(this.fontRendererObj);
+                ChatTimestampColumn.of(frame, this.fontRendererObj);
         int inset = Math.round(columns.messageX() * frame.scale);
         int x = (int)Math.floor(frame.drawnLeft()) + inset;
-        int room = (int)Math.round(frame.boxRight - frame.boxLeft)
+        int room = (int)Math.round(frame.boxRight - frame.boxLeft
+                - ChatMemberList.drawnWidth(frame) * frame.scale)
                 - inset - 6;
         // In the window's trailing strip, on the metrics a message
         // line's glyphs would take there.
@@ -390,7 +392,7 @@ public final class LostTalesChatGui extends GuiChat
             openSearch();
             return;
         }
-        if (this.searchBar.isFocused()) {
+        if (this.toolStrip.isFocused()) {
             handleSearchKey(typedChar, keyCode);
             return;
         }
@@ -522,21 +524,34 @@ public final class LostTalesChatGui extends GuiChat
             return;
         }
         ChatSearch.open(typed.getId());
-        this.searchBar.setText(ChatSearch.query());
+        this.toolStrip.setText(ChatSearch.query());
         focusSearch(true);
     }
 
     /** Closes the search: its lit matches go, and the input has the keys again. */
     private void closeSearch() {
         ChatSearch.close();
-        this.searchBar.setText("");
+        this.toolStrip.setText("");
         focusSearch(false);
     }
 
     /** The keys go to the search field or to the input, never to both. */
     private void focusSearch(boolean on) {
-        this.searchBar.focus(on);
+        this.toolStrip.focus(on);
         this.inputField.setFocused(!on);
+    }
+
+    /**
+     * The keys go back to the input: a search with words in it stays
+     * open with its matches lit, and an empty one closes, since there is
+     * nothing of it to keep.
+     */
+    private void leaveSearch() {
+        if (ChatSearch.query().length() == 0) {
+            closeSearch();
+        } else {
+            focusSearch(false);
+        }
     }
 
     private void handleSearchKey(char typedChar, int keyCode) {
@@ -549,8 +564,8 @@ public final class LostTalesChatGui extends GuiChat
             walkSearch(!isShiftKeyDown());
             return;
         }
-        if (this.searchBar.keyTyped(typedChar, keyCode)) {
-            ChatSearch.setQuery(this.searchBar.text());
+        if (this.toolStrip.keyTyped(typedChar, keyCode)) {
+            ChatSearch.setQuery(this.toolStrip.text());
         }
     }
 
@@ -576,16 +591,40 @@ public final class LostTalesChatGui extends GuiChat
         }
     }
 
-    /** A press on the search bar: the field takes the caret, the controls act. */
-    private void clickSearchBar(ChatHover press, double x, double y, int button) {
-        if (button != 0 || press.frame == null || press.searchPart == null) {
+    /**
+     * A press on a window's tool strip: the area's chevron drives the
+     * timestamp area out or back in, the member list's button puts the
+     * list away or brings it out, the well opens the search over the
+     * window — it becomes the window typed in — and takes the caret, the
+     * magnifier does the same and the cross it becomes clears the
+     * search, and the chevrons walk the matches.
+     */
+    private void clickToolStrip(ChatHover press, double x, double y,
+                                int button) {
+        if (button != 0 || press.frame == null || press.window == null
+                || press.stripPart == null) {
             return;
         }
-        this.tabActions.selectWindow(press.window);
-        switch (press.searchPart) {
+        switch (press.stripPart) {
+            case AREA_TOGGLE:
+                ChatWindowLayout.setAreaHidden(press.window.getId(),
+                        !press.window.isAreaHidden());
+                return;
+            case MEMBERS_TOGGLE:
+                ChatWindowLayout.setMembersHidden(press.window.getId(),
+                        !press.window.isMembersHidden());
+                return;
             case FIELD:
-                focusSearch(true);
-                this.searchBar.clickField(press.row, x, y);
+                searchIn(press.window);
+                this.toolStrip.clickField(press.row, x, y);
+                return;
+            case ICON:
+                if (ChatSearch.isOpenOn(press.window.getId())
+                        && ChatSearch.query().length() > 0) {
+                    closeSearch();
+                } else {
+                    searchIn(press.window);
+                }
                 return;
             case PREVIOUS:
                 walkSearch(false);
@@ -593,12 +632,22 @@ public final class LostTalesChatGui extends GuiChat
             case NEXT:
                 walkSearch(true);
                 return;
-            case CLOSE:
-                closeSearch();
-                return;
             default:
                 return;
         }
+    }
+
+    /**
+     * Opens the search over a window and gives it the keys: the window
+     * becomes the one typed in, since the search follows the input.
+     */
+    private void searchIn(ChatWindow window) {
+        this.tabActions.selectWindow(window);
+        if (!ChatSearch.isOpenOn(window.getId())) {
+            ChatSearch.open(window.getId());
+            this.toolStrip.setText(ChatSearch.query());
+        }
+        focusSearch(true);
     }
 
     /**
@@ -833,6 +882,11 @@ public final class LostTalesChatGui extends GuiChat
             return;
         }
         int wheelPixels = ChatWheelStep.historyPixels(lines);
+        if (under.is(ChatHover.Kind.MEMBER_LIST) && under.frame != null) {
+            // A member list scrolls on its own, a line's step at a time.
+            ChatMemberList.scrollBy(under.frame.members, -wheelPixels);
+            return;
+        }
         // super.handleMouseInput() scrolls vanilla's own offset, which is
         // unused; the visible history scrolls per channel view instead,
         // in the window under the pointer, else the one being typed into.
@@ -910,12 +964,17 @@ public final class LostTalesChatGui extends GuiChat
         double pointerX = pointerX();
         double pointerY = pointerY();
         this.hover = resolveHover(pointerX, pointerY);
-        // The floating controls light from the same answer.
+        // The floating controls light from the same answer, and so does
+        // a member list's row.
         ChatWindowFrame.noteHoveredControls(
                 this.hover.is(ChatHover.Kind.MESSAGE_TOOLBAR)
                         ? this.hover.frame : null, this.hover.toolbarKind,
                 this.hover.is(ChatHover.Kind.JUMP_PILL)
                         ? this.hover.frame : null);
+        for (ChatWindowFrame frame : ChatWindowFrame.drawnFrames()) {
+            frame.members.hovered = this.hover.is(ChatHover.Kind.MEMBER_LIST)
+                    && this.hover.frame == frame ? this.hover.member : null;
+        }
         this.regions.reset();
         this.hoverTip = tipFor(this.hover);
         this.hoverTipX = mouseX;
@@ -1199,6 +1258,16 @@ public final class LostTalesChatGui extends GuiChat
                 return hover;
             }
         }
+        // A window's member list, where it stands: a member's row opens
+        // their card, and the list around them answers nothing.
+        ChatWindowFrame listed = ChatWindowFrame.drawnAt(x, y);
+        if (listed != null && ChatMemberList.contains(listed.members, x, y)) {
+            ChatHover hover = new ChatHover(ChatHover.Kind.MEMBER_LIST);
+            hover.frame = listed;
+            hover.member = ChatMemberList.memberAt(listed.members, x, y);
+            hover.acts = hover.member != null;
+            return hover;
+        }
         for (int index = frames.size() - 1; index >= 0; index--) {
             ChatWindowFrame frame = frames.get(index);
             if (frame.scrollbarContains(x, y)) {
@@ -1258,15 +1327,15 @@ public final class LostTalesChatGui extends GuiChat
             ChatChannelTabBar.Hit hit = row.dragging != null || row.resizing
                     ? null : frame.tabBar.hitAt(this.fontRendererObj, row,
                             x, y);
-            ChatSearchBar.Part part = hit != null || row.dragging != null
+            ChatToolStrip.Part part = hit != null || row.dragging != null
                     || row.resizing ? null
-                    : this.searchBar.partAt(frame, row, x, y);
+                    : this.toolStrip.partAt(frame, row, x, y);
             if (part != null) {
-                ChatHover hover = new ChatHover(ChatHover.Kind.SEARCH_BAR);
+                ChatHover hover = new ChatHover(ChatHover.Kind.TOOL_STRIP);
                 hover.window = window;
                 hover.frame = frame;
                 hover.row = row;
-                hover.searchPart = part;
+                hover.stripPart = part;
                 return hover;
             }
             if (hit == null && !frame.tabBar.stripContains(
@@ -1323,8 +1392,8 @@ public final class LostTalesChatGui extends GuiChat
             case TAB_ROW:
                 return hover.tabHit == null || hover.window == null ? ""
                         : tipFor(hover.tabHit, hover.window, hover.overGrip);
-            case SEARCH_BAR:
-                return ChatSearchBar.tipFor(hover.searchPart);
+            case TOOL_STRIP:
+                return ChatToolStrip.tipFor(hover.stripPart, hover.window);
             case EMPTY_PLUS:
                 return StatCollector.translateToLocal(
                         "gui.losttales.chat.tab.restore");
@@ -1440,7 +1509,8 @@ public final class LostTalesChatGui extends GuiChat
                 "§o" + this.fontRendererObj.trimStringToWidth(
                         StatCollector.translateToLocal(
                                 "gui.losttales.chat.no_channels"), room),
-                textX, top + (EMPTY_STATE_HEIGHT - 8) / 2,
+                textX, top + LostTalesUiInk.centredStart(EMPTY_STATE_HEIGHT,
+                        LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT),
                 LostTalesChatVisualStyle.asideRgb(), 0xFF);
         this.regions.add(this.emptyPlusLeft, this.emptyPlusTop,
                 this.emptyPlusRight, this.emptyPlusBottom);
@@ -1494,7 +1564,7 @@ public final class LostTalesChatGui extends GuiChat
         String activeBarId = typed == null ? null : typed.getId();
         // The search follows the input: moved to another window, it closes.
         ChatSearch.closeUnless(activeBarId);
-        if (!ChatSearch.isOpen() && this.searchBar.isFocused()) {
+        if (!ChatSearch.isOpen() && this.toolStrip.isFocused()) {
             focusSearch(false);
         }
         boolean blurActive = LostTalesConfig.enableChatBackgroundBlur
@@ -1540,9 +1610,9 @@ public final class LostTalesChatGui extends GuiChat
             // window's fractional remainder, so it sits exactly where the
             // lines do while the window glides. The row is told the same
             // remainder, since its scissors are cut outside this matrix.
-            // The search bar lays itself out first, so the strip can
+            // The tool strip lays itself out first, so the strip can
             // leave its well out of the surface it paints.
-            this.searchBar.prepare(this.fontRendererObj, frame, row);
+            this.toolStrip.prepare(this.fontRendererObj, frame, row);
             GL11.glPushMatrix();
             try {
                 GL11.glTranslatef(row.fractionX, row.fractionY, 0.0F);
@@ -1556,14 +1626,12 @@ public final class LostTalesChatGui extends GuiChat
                         opening.getOpacity());
                 if (ChatSearch.isOpenOn(window.getId())) {
                     landSearch(frame, ChatSearch.scan(this.mc, frame));
-                    this.searchBar.draw(this.fontRendererObj, frame,
-                            onRow ? pointerX : ChatHover.AWAY,
-                            onRow ? pointerY : ChatHover.AWAY,
-                            opening.getOpacity(),
-                            this.hover.is(ChatHover.Kind.SEARCH_BAR)
-                                    && this.hover.frame == frame
-                                    ? this.hover.searchPart : null);
                 }
+                this.toolStrip.draw(this.fontRendererObj, frame, window,
+                        row, opening.getOpacity(),
+                        this.hover.is(ChatHover.Kind.TOOL_STRIP)
+                                && this.hover.frame == frame
+                                ? this.hover.stripPart : null);
             } finally {
                 GL11.glPopMatrix();
             }
@@ -1976,14 +2044,28 @@ public final class LostTalesChatGui extends GuiChat
             return;
         }
         ChatHover press = resolveHover(x, y);
-        // A press anywhere but the search bar hands the keys back to
-        // the input; the search stays open with its matches lit.
-        if (this.searchBar.isFocused() && !press.is(ChatHover.Kind.SEARCH_BAR)) {
-            focusSearch(false);
+        // A press anywhere but the tool strip hands the keys back to the
+        // input.
+        if (this.toolStrip.isFocused() && !press.is(ChatHover.Kind.TOOL_STRIP)) {
+            leaveSearch();
         }
         switch (press.kind) {
-            case SEARCH_BAR:
-                clickSearchBar(press, x, y, button);
+            case TOOL_STRIP:
+                clickToolStrip(press, x, y, button);
+                return;
+            case MEMBER_LIST:
+                // A member's row answers as their name in a message does:
+                // a click opens their card, a right-click their menu.
+                if (press.member != null) {
+                    LostTalesChatHoverCard.Target target =
+                            LostTalesChatHoverCard.forMember(this.mc,
+                                    press.member);
+                    if (button == 0) {
+                        LostTalesChatHoverCard.pin(target, mouseX, mouseY);
+                    } else if (button == 1) {
+                        this.menus.openPlayerPopup(target, mouseX, mouseY);
+                    }
+                }
                 return;
             case SUGGESTION:
                 if (button == 0) {

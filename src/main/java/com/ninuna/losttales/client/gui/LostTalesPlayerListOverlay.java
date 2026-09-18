@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.gui;
 
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
@@ -79,7 +80,10 @@ public final class LostTalesPlayerListOverlay extends Gui {
         int columns = columns(maxPlayers);
         int rows = rows(maxPlayers, columns);
         int columnWidth = columnWidth(columns);
-        int left = (width - columns * columnWidth) / 2;
+        // The panel, a pixel wider than its columns on the left, centred
+        // across the screen, the odd pixel left.
+        int left = LostTalesUiInk.centredStart(width,
+                columns * columnWidth + 1) + 1;
         Scoreboard scoreboard = minecraft.theWorld.getScoreboard();
         ScoreObjective objective = scoreboard.func_96539_a(0);
         FontRenderer font = minecraft.fontRenderer;

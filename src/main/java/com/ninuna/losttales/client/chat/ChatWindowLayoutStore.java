@@ -35,7 +35,7 @@ import java.util.UUID;
  *
  * <pre>
  * window w1 locked=false x=0.00 y=0.00 active=console tabs=console,admin
- * window w2 locked=true x=62.50 y=100.00 lines=12.40 width=320 fill=full active=all tabs=all,ooc,party link=w1:above
+ * window w2 locked=true x=62.50 y=100.00 lines=12.40 width=320 fill=full area=hidden members=hidden active=all tabs=all,ooc,party link=w1:above
  * feed x=0.00 y=100.00
  * toolbar collapsed=false
  * closed faction
@@ -217,6 +217,9 @@ public final class ChatWindowLayoutStore {
         ChatWindowLayout.loadConversations(conversations, closedConversations);
     }
 
+    /** What the file says of a window's area or member list put away. */
+    private static final String HIDDEN = "hidden";
+
     private static void addTab(List<ChatTab> tabs, String id) {
         ChatTab tab = ChatTab.fromId(id);
         if (tab != null) {
@@ -240,6 +243,8 @@ public final class ChatWindowLayoutStore {
         double maxLines = 0.0D;
         int width = 0;
         ChatWindow.ScreenFill fill = ChatWindow.ScreenFill.NONE;
+        boolean areaHidden = false;
+        boolean membersHidden = false;
         for (int index = 2; index < parts.length; index++) {
             String part = parts[index];
             int equals = part.indexOf('=');
@@ -279,11 +284,15 @@ public final class ChatWindowLayoutStore {
                 width = parseChatWidth(value);
             } else if ("fill".equals(key)) {
                 fill = ChatWindow.ScreenFill.fromId(value);
+            } else if ("area".equals(key)) {
+                areaHidden = HIDDEN.equalsIgnoreCase(value);
+            } else if ("members".equals(key)) {
+                membersHidden = HIDDEN.equalsIgnoreCase(value);
             }
         }
         return new ChatWindowLayout.WindowSpec(id, tabs, active, locked,
                 offsetX, offsetY, linkTarget, linkSide, maxLines, width,
-                fill);
+                fill, areaHidden, membersHidden);
     }
 
     /** A stored chat width; anything unreadable follows the slider. */
@@ -337,6 +346,12 @@ public final class ChatWindowLayoutStore {
             }
             if (spec.fill != ChatWindow.ScreenFill.NONE) {
                 line.append(" fill=").append(spec.fill.id());
+            }
+            if (spec.areaHidden) {
+                line.append(" area=").append(HIDDEN);
+            }
+            if (spec.membersHidden) {
+                line.append(" members=").append(HIDDEN);
             }
             if (spec.activeTab != null) {
                 line.append(" active=").append(spec.activeTab.id());

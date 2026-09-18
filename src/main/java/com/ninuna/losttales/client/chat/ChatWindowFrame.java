@@ -42,6 +42,10 @@ final class ChatWindowFrame {
     final String windowId;
     final ChatLineBands bands = new ChatLineBands();
     final ChatChannelTabBar tabBar = new ChatChannelTabBar();
+    /** The window's tool strip: where its controls stand, and their motions. */
+    final ChatToolStrip.State toolStrip = new ChatToolStrip.State();
+    /** The window's member list: its scroll, and where its rows stood. */
+    final ChatMemberList.State members = new ChatMemberList.State();
     /**
      * Where every row of {@link #lines} starts and how tall it is, the
      * divider's row included; see {@link #resolveRows}. The scroll
@@ -122,6 +126,11 @@ final class ChatWindowFrame {
      * null for the window's own box) to what it is bound for
      * ({@link #fillLegTo}, none for the window's own box).
      */
+    /** The timestamp area driving in and out: 1 while it stands whole. */
+    private final LostTalesUiTransition areaMotion = new LostTalesUiTransition();
+    /** The member list coming out and going away: 1 while it stands whole. */
+    private final LostTalesUiTransition membersMotion =
+            new LostTalesUiTransition();
     private final LostTalesUiTransition fillMotion =
             new LostTalesUiTransition();
     /** Whether {@link #fillMotion} has been advanced at all yet. */
@@ -517,6 +526,17 @@ final class ChatWindowFrame {
                 : Math.round(position * factor) / (double)factor;
     }
 
+    /**
+     * A GUI-space position laid on the whole display pixel at or left of
+     * it, above it for a y: where something centred between two display
+     * pixels stands by the one centring rule.
+     */
+    static double floorToDisplayPixels(double position) {
+        int factor = displayScaleFactor();
+        return factor <= 1 ? Math.floor(position + 1.0E-6D)
+                : Math.floor(position * factor + 1.0E-6D) / (double)factor;
+    }
+
     /** Display pixels per GUI pixel ({@link LostTalesDisplayPixels#scaleFactor}). */
     static int displayScaleFactor() {
         return LostTalesDisplayPixels.scaleFactor();
@@ -560,6 +580,35 @@ final class ChatWindowFrame {
             this.fillLegFrom = null;
             this.fillLegFromFill = ChatWindow.ScreenFill.NONE;
         }
+    }
+
+    /**
+     * Moves the timestamp area's and the member list's motions on to
+     * this instant, toward what the window asks of them — the list only
+     * while the window has the room for it. Called once a frame before
+     * the window is laid out; the first call stands them in their state.
+     */
+    void advancePanels(ChatWindow window, boolean membersFit) {
+        if (window == null) {
+            return;
+        }
+        long now = System.nanoTime();
+        int duration = LostTalesConfig.enableChatAnimations
+                ? Math.max(1, LostTalesConfig.chatAnimationDurationMillis) : 0;
+        this.areaMotion.advance(now, !window.isAreaHidden(), duration,
+                LostTalesUiEasing.SMOOTH);
+        this.membersMotion.advance(now, !window.isMembersHidden()
+                && membersFit, duration, LostTalesUiEasing.SMOOTH);
+    }
+
+    /** How far the timestamp area stands in the window, 0..1. */
+    float areaShare() {
+        return this.areaMotion.clamped();
+    }
+
+    /** How far the member list stands in the window, 0..1. */
+    float membersShare() {
+        return this.membersMotion.clamped();
     }
 
     /** Whether {@link #advanceFill} has placed the window at all yet. */

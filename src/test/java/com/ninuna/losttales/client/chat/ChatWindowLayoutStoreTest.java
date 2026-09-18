@@ -434,4 +434,37 @@ public final class ChatWindowLayoutStoreTest {
         }
     }
 
+    /**
+     * A window whose timestamp area is driven out, or whose member list is
+     * put away, says so in its line and keeps it across a reload; a window
+     * whose line says neither shows both.
+     */
+    @Test
+    public void aDrivenOutAreaAndAPutAwayListRoundTrip() {
+        ChatWindowLayoutStore.load(Arrays.asList(
+                "window w1 locked=false x=0.00 y=0.00 area=hidden members=hidden active=all tabs=all",
+                "window w2 locked=false x=0.00 y=100.00 active=ooc tabs=ooc"));
+        assertTrue(ChatWindowLayout.window("w1").isAreaHidden());
+        assertTrue(ChatWindowLayout.window("w1").isMembersHidden());
+        assertFalse(ChatWindowLayout.window("w2").isAreaHidden());
+        assertFalse(ChatWindowLayout.window("w2").isMembersHidden());
+        List<String> lines = ChatWindowLayoutStore.describe();
+        boolean hiddenLine = false;
+        boolean plainLine = false;
+        for (String line : lines) {
+            if (line.startsWith("window w1 ")) {
+                hiddenLine = line.contains(" area=hidden")
+                        && line.contains(" members=hidden");
+            } else if (line.startsWith("window w2 ")) {
+                plainLine = !line.contains("area=") && !line.contains("members=");
+            }
+        }
+        assertTrue(hiddenLine);
+        assertTrue(plainLine);
+        assertTrue(ChatWindowLayout.setAreaHidden("w2", true));
+        assertFalse("asking for what stands already changes nothing",
+                ChatWindowLayout.setAreaHidden("w2", true));
+        assertTrue(ChatWindowLayout.setMembersHidden("w1", false));
+        assertFalse(ChatWindowLayout.window("w1").isMembersHidden());
+    }
 }

@@ -29,6 +29,13 @@ final class ChatReplyMarker {
      */
     static final int ICON_SLOT_WIDTH =
             LostTalesUiSheet.SPEECH_BUBBLE.getWidth() + 3;
+    /**
+     * How far right of the name's column a quote stands in an open
+     * window, in the words' pixels: the room of the line that leads down
+     * from it to the message, as Discord leads a reply into its message.
+     * The quote wears no bubble there; the line says it is a reply.
+     */
+    static final int OPEN_INDENT = 10;
 
     private ChatReplyMarker() {}
 

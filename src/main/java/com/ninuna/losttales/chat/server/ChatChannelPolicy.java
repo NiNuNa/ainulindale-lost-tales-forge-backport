@@ -59,6 +59,22 @@ public final class ChatChannelPolicy {
         }
     }
 
+    /**
+     * What the read rule asks of whoever reads: a player here, answered
+     * from the live player, or an account whose player is not, answered
+     * from the server's own lists ({@link ChatAbsentReader}).
+     */
+    public interface Reader {
+        /** Whether the reader holds the server's operator level. */
+        boolean isOperator();
+
+        /** Whether the reader holds {@code chat.console.read}. */
+        boolean readsConsole();
+
+        /** The account's own roles: what an out-of-character gate is passed with. */
+        int accountRoles();
+    }
+
     private ChatChannelPolicy() {}
 
     /**
@@ -127,17 +143,43 @@ public final class ChatChannelPolicy {
     }
 
     /** Whether the player may read the channel, the staff floor included. */
-    public static boolean canRead(EntityPlayerMP player, ChatChannel channel,
+    public static boolean canRead(final EntityPlayerMP player, ChatChannel channel,
                                   int roles) {
-        ChatChannelGates gates = ChatChannelGates.current();
+        return canRead(new Reader() {
+            @Override
+            public boolean isOperator() {
+                return LostTalesPermissions.isOperator(player);
+            }
+
+            @Override
+            public boolean readsConsole() {
+                return ChatChannelPolicy.readsConsole(player);
+            }
+
+            @Override
+            public int accountRoles() {
+                return ChatAccountRoleResolver.resolve(player, null);
+            }
+        }, channel, roles, ChatChannelGates.current());
+    }
+
+    /**
+     * The read rule itself: a staff channel the config names no gate for
+     * is the operators', the server's console is its readers', and every
+     * other channel asks its gate — in character with the roles of the
+     * identity reading, {@code identityRoles}, and out of character with
+     * the account's.
+     */
+    public static boolean canRead(Reader reader, ChatChannel channel,
+                                  int identityRoles, ChatChannelGates gates) {
         if (staffOnly(channel, gates)) {
-            return LostTalesPermissions.isOperator(player);
+            return reader.isOperator();
         }
-        if (isServerConsole(channel) && !readsConsole(player)) {
+        if (isServerConsole(channel) && !reader.readsConsole()) {
             return false;
         }
         return gates.canRead(ChatRolePresentation.isInCharacter(channel)
-                ? roles : ChatAccountRoleResolver.resolve(player, null), channel);
+                ? identityRoles : reader.accountRoles(), channel);
     }
 
     /** Whether the player may send into the channel, the staff floor included. */

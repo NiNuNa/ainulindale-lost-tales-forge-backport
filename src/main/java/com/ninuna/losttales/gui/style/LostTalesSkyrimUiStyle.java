@@ -158,16 +158,26 @@ public final class LostTalesSkyrimUiStyle extends LostTalesColors {
     /** How far below a centered header's y its subtitle line sits. */
     public static final int HEADER_SUBTITLE_OFFSET = 15;
 
+    /**
+     * A screen's title centred across it, with a rule either side on the
+     * middle row of its capitals, and its subtitle centred under it. Each
+     * line is centred by its ink — a string's advance carries a spacing
+     * column after its last glyph — the odd pixel left
+     * ({@link LostTalesUiInk#centredStart}).
+     */
     public static void drawCenteredHeader(FontRenderer font, String title, String subtitle, int width, int y) {
         String titleText = uppercase(title);
-        int titleWidth = font.getStringWidth(titleText);
-        int centerX = width / 2;
-        Gui.drawRect(centerX - titleWidth / 2 - 32, y + 7, centerX - titleWidth / 2 - 8, y + 8, BORDER_DIM);
-        Gui.drawRect(centerX + titleWidth / 2 + 8, y + 7, centerX + titleWidth / 2 + 32, y + 8, BORDER_DIM);
-        font.drawStringWithShadow(titleText, centerX - titleWidth / 2, y + 2, TEXT_BRIGHT);
+        int titleInk = Math.max(0, font.getStringWidth(titleText) - 1);
+        int titleX = LostTalesUiInk.centredStart(width, titleInk);
+        int ruleY = y + 2 + 7 / 2;
+        Gui.drawRect(titleX - 32, ruleY, titleX - 8, ruleY + 1, BORDER_DIM);
+        Gui.drawRect(titleX + titleInk + 8, ruleY, titleX + titleInk + 32,
+                ruleY + 1, BORDER_DIM);
+        font.drawStringWithShadow(titleText, titleX, y + 2, TEXT_BRIGHT);
         if (subtitle != null && subtitle.length() > 0) {
             String subtitleText = uppercase(subtitle);
-            font.drawStringWithShadow(subtitleText, centerX - font.getStringWidth(subtitleText) / 2,
+            font.drawStringWithShadow(subtitleText, LostTalesUiInk.centredStart(
+                    width, Math.max(0, font.getStringWidth(subtitleText) - 1)),
                     y + HEADER_SUBTITLE_OFFSET, TEXT_MUTED);
         }
     }
@@ -176,7 +186,9 @@ public final class LostTalesSkyrimUiStyle extends LostTalesColors {
         if (selected) {
             Gui.drawRect(x, y, x + width, y + height, PANEL_SELECTED);
             Gui.drawRect(x, y, x + 2, y + height, GOLD);
-            drawDiamond(x + 8, y + height / 2, GOLD);
+            // The seven-row diamond centred in the row, the odd pixel up.
+            drawDiamond(x + 8, y + LostTalesUiInk.centredStart(height, 7) + 3,
+                    GOLD);
         } else if (hovered) {
             Gui.drawRect(x, y, x + width, y + height,
                     withAlpha(PLUM_GRAY, 0x36));

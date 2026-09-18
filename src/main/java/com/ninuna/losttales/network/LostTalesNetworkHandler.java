@@ -10,6 +10,8 @@ import com.ninuna.losttales.network.packet.LostTalesMissiveAcceptPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestActionPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatMembersRequestPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestShareJoinPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootDropItemPacket;
@@ -146,5 +148,7 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(LostTalesChatPresencePacket.Handler.class, LostTalesChatPresencePacket.class, 59, Side.SERVER);
         CHANNEL.registerMessage(LostTalesChatPresenceSyncPacket.Handler.class, LostTalesChatPresenceSyncPacket.class, 60, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesQuestShareJoinPacket.Handler.class, LostTalesQuestShareJoinPacket.class, 61, Side.SERVER);
+        CHANNEL.registerMessage(LostTalesChatMembersRequestPacket.Handler.class, LostTalesChatMembersRequestPacket.class, 62, Side.SERVER);
+        CHANNEL.registerMessage(LostTalesChatMembersPacket.Handler.class, LostTalesChatMembersPacket.class, 63, Side.CLIENT);
     }
 }

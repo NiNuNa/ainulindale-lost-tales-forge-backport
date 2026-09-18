@@ -8,8 +8,8 @@ import static org.junit.Assert.assertEquals;
 /**
  * The chat's clock has twelve hours. A stamp behind a name shows the
  * time alone for today and says the day otherwise, as Discord does, the
- * time itself in italics; the timestamp area shows the clock alone, in
- * the local zone the stamp itself was written in.
+ * time itself in italics, as the timestamp area shows it, in the local
+ * zone the stamp itself was written in.
  */
 public final class ChatTimestampFormatterTest {
     private static final String ITALIC = "§o";
@@ -49,14 +49,14 @@ public final class ChatTimestampFormatterTest {
                         at(2027, Calendar.JANUARY, 1, 0, 10)));
     }
 
-    /** The timestamp area shows the clock alone, in italics. */
+    /** The timestamp area shows the time whole, in italics. */
     @Test
-    public void theAreaShowsTheClockAlone() {
-        assertEquals(ITALIC + "7:04" + RESET,
-                ChatTimestampFormatter.formatDrawnClock(
+    public void theAreaShowsTheTimeWhole() {
+        assertEquals(ITALIC + "7:04 PM" + RESET,
+                ChatTimestampFormatter.formatDrawnTime(
                         at(2026, Calendar.SEPTEMBER, 14, 19, 4)));
-        assertEquals(ITALIC + "12:30" + RESET,
-                ChatTimestampFormatter.formatDrawnClock(
+        assertEquals(ITALIC + "12:30 AM" + RESET,
+                ChatTimestampFormatter.formatDrawnTime(
                         at(2026, Calendar.SEPTEMBER, 14, 0, 30)));
     }
 }

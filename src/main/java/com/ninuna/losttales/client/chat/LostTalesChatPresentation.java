@@ -1977,7 +1977,8 @@ public final class LostTalesChatPresentation {
         ChatSystemLineClassifier.Kind kind =
                 ChatSystemLineClassifier.kindOf(component);
         if (LostTalesConfig.enableChatPings) {
-            component = rewritePlayerNames(component, packet.getChannel(),
+            component = rewritePlayerNames(component,
+                    namesPresentedFor(packet.getChannel(), kind),
                     localMentionNames(minecraft), localMentioned,
                     packet.getNamedPlayers());
         }
@@ -1985,11 +1986,24 @@ public final class LostTalesChatPresentation {
     }
 
     /**
+     * The channel a server line's names are presented for: an
+     * announcement names its players as the server writes them, by the
+     * character they play and in that character's colour, whichever tab
+     * it is filed under; any other line by its own channel's rule.
+     */
+    static ChatChannel namesPresentedFor(ChatChannel channel,
+                                         ChatSystemLineClassifier.Kind kind) {
+        return kind == null || kind == ChatSystemLineClassifier.Kind.OTHER
+                ? channel : ChatChannel.ALL;
+    }
+
+    /**
      * A line the server announces — a join, a leave, a death, an
-     * achievement — as the sentence it is, with its full stop, as the
-     * console's entries read ({@link #asSentence}); anything else, a
-     * {@code /say} above all, stays exactly as it was said. The stop is
-     * the line's own last run, in the line's own style.
+     * achievement, the server starting or stopping — as the sentence it
+     * is, with its full stop, as the console's entries read
+     * ({@link #asSentence}); anything else, a {@code /say} above all,
+     * stays exactly as it was said. The stop is the line's own last run,
+     * in the line's own style.
      */
     static IChatComponent asAnnouncement(IChatComponent line,
                                          ChatSystemLineClassifier.Kind kind) {
@@ -2077,7 +2091,8 @@ public final class LostTalesChatPresentation {
         boolean mentioned = false;
         if (LostTalesConfig.enableChatPings) {
             boolean[] localMentioned = new boolean[1];
-            shown = rewritePlayerNames(message, channel,
+            shown = rewritePlayerNames(message, namesPresentedFor(channel,
+                            ChatSystemLineClassifier.kindOf(message)),
                     localMentionNames(minecraft), localMentioned,
                     Collections.<ChatNamedPlayer>emptyList());
             mentioned = localMentioned[0];
@@ -2227,7 +2242,7 @@ public final class LostTalesChatPresentation {
         }
         int color = ChatMentionColors.accountColorOf(account);
         return ChatMentionMarker.apply(text("@" + account,
-                nearestFormatting(color), false), color, account);
+                nearestFormatting(color), false), color, account, null);
     }
 
     /**
@@ -2879,7 +2894,7 @@ public final class LostTalesChatPresentation {
             ChatComponentText piece = text("@" + recorded.getIdentityName(),
                     nearestFormatting(recorded.getNameColor()), false);
             return ChatMentionMarker.apply(piece, recorded.getNameColor(),
-                    recorded.getAccount());
+                    recorded.getAccount(), recorded);
         }
         if (!local && account == null) {
             return null;
@@ -2903,7 +2918,8 @@ public final class LostTalesChatPresentation {
         ChatComponentText piece = text("@" + shown,
                 nearestFormatting(color), false);
         return account != null
-                ? ChatMentionMarker.apply(piece, color, account)
+                ? ChatMentionMarker.apply(piece, color, account,
+                        ChatNamedPlayer.find(named, text))
                 : ChatColorMarker.apply(piece, color);
     }
 
@@ -2939,7 +2955,7 @@ public final class LostTalesChatPresentation {
         // The tab wears the same portrait the line is drawn with, and
         // is named in the same colour the NPC's own name is; the
         // faction is kept for the NPC's hover card.
-        ChatChannelIcons.rememberNpcPortrait(tab, texturePath);
+        ChatChannelIcons.rememberNpc(tab, npcId, texturePath);
         ChatChannelIcons.rememberNpcFaction(npcId, factionName);
         ClientChatChannelState.rememberPartnerColor(tab,
                 nameColor & 0xFFFFFF);
@@ -3481,12 +3497,15 @@ public final class LostTalesChatPresentation {
                     ? ChatMentionColors.colorOf(
                             text.substring(at + 1, end), channel)
                     : -1;
-            ChatNamedPlayer recorded = color < 0 && opensWord
-                    && end > at + 1 && LostTalesConfig.enableChatPings
+            // The player as the server recorded them with the line: a
+            // name this client cannot place any more is coloured by it,
+            // and every mention of a player carries it for the card.
+            ChatNamedPlayer recorded = opensWord && end > at + 1
                     ? ChatNamedPlayer.find(buildingNamedPlayers,
                             text.substring(at + 1, end))
                     : null;
-            if (recorded != null) {
+            if (color < 0 && recorded != null
+                    && LostTalesConfig.enableChatPings) {
                 color = recordedMentionColor(recorded, channel);
             }
             if (color >= 0) {
@@ -3510,7 +3529,7 @@ public final class LostTalesChatPresentation {
                         nearestFormatting(color), false);
                 if (account != null) {
                     root.appendSibling(ChatMentionMarker.apply(
-                            piece, color, account));
+                            piece, color, account, recorded));
                 } else if (role != null) {
                     root.appendSibling(ChatMentionMarker.applyRole(
                             piece, color, role));

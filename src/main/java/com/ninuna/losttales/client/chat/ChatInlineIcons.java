@@ -291,10 +291,11 @@ final class ChatInlineIcons {
         // Not one whole pixel per texel fits the room: squeezed to the
         // box, as the box is all the room there is.
         float drawn = ratio <= 0 ? size : (float)(ratio * ICON_TEXELS / unit);
-        // Centred in the box, on the display grid.
-        double originX = ChatWindowFrame.snapToDisplayPixels(
+        // Centred in the box, on the display grid, the odd display pixel
+        // up and left.
+        double originX = ChatWindowFrame.floorToDisplayPixels(
                 scaleX * boxX + shiftX + (size - drawn) / 2.0D * scaleX);
-        double originY = ChatWindowFrame.snapToDisplayPixels(
+        double originY = ChatWindowFrame.floorToDisplayPixels(
                 scaleY * boxY + shiftY + (size - drawn) / 2.0D * scaleY);
         float x = (float)((originX - shiftX) / scaleX);
         float y = (float)((originY - shiftY) / scaleY);

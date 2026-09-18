@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.chat.ChatAccountRole;
+import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
@@ -546,7 +547,7 @@ final class LostTalesChatHoverCard {
                     if (atHit) {
                         ChatAccountRole role = mention.role();
                         return found(role != null ? Target.forRole(role)
-                                : targetForAccount(minecraft, mention.account),
+                                : targetForMention(minecraft, mention),
                                 false, row);
                     }
                     continue;
@@ -586,6 +587,13 @@ final class LostTalesChatHoverCard {
                     if (!inSpan) {
                         return null;
                     }
+                    if (ChatSpacerMarker.isMarker(part)
+                            && !spanGoesOnAfter(parts, at)) {
+                        // A gap the span ends on — the space before the
+                        // time behind a name — is not the name, just as
+                        // its underline stops short of it.
+                        return null;
+                    }
                     if (closesSpan) {
                         // The span's last run is the closing bracket,
                         // whose trailing space belongs to the gap before
@@ -618,6 +626,76 @@ final class LostTalesChatHoverCard {
             return null;
         }
         return null;
+    }
+
+    /**
+     * Whether the sender's span goes on past the gap at {@code at}: the
+     * next run that draws anything is still the sender — a title, a
+     * bracket — rather than the time behind the name or the row's end.
+     */
+    static boolean spanGoesOnAfter(List<IChatComponent> parts, int at) {
+        for (int next = at + 1; next < parts.size(); next++) {
+            IChatComponent part = parts.get(next);
+            if (ChatSpacerMarker.isMarker(part)
+                    || ChatLayoutMarker.decode(part) != null) {
+                continue;
+            }
+            return !ChatStampMarker.isMarker(part)
+                    && !ChatReactionMarker.isAddButton(part);
+        }
+        return false;
+    }
+
+    /**
+     * Card target for a mentioned player: whoever this client can place
+     * under the account now, and otherwise the player as the line
+     * recorded them — the identity they were playing, its head and the
+     * mention's colour — so a mention in an older line still opens its
+     * card after the player has gone. Null when neither names anybody.
+     */
+    static Target targetForMention(Minecraft minecraft,
+                                   ChatMentionMarker.Data mention) {
+        Target placed = targetForAccount(minecraft, mention.account);
+        if (placed != null || mention.recorded == null
+                || mention.recorded.getPlayerId() == null) {
+            return placed;
+        }
+        return recordedTarget(minecraft, mention.recorded, mention.color);
+    }
+
+    /**
+     * The card of a member of a conversation's list, as the list shows
+     * them; an NPC's as its lines open it.
+     */
+    static Target forMember(Minecraft minecraft,
+                            com.ninuna.losttales.network.packet
+                                    .LostTalesChatMembersPacket.Member member) {
+        if (member.isNpc()) {
+            return new Target(member.getPlayerId(), false, true, null,
+                    member.getSkinId(), member.getName(), "", "",
+                    member.getNameColor());
+        }
+        boolean accountIdentity = member.getCharacterId() == null;
+        if (accountIdentity && minecraft != null) {
+            LostTalesCharacterHeadIconRenderer.rememberAccountSkin(
+                    minecraft, member.getPlayerId(), member.getAccount());
+        }
+        return new Target(member.getPlayerId(), accountIdentity,
+                member.getCharacterId(), member.getSkinId(), member.getName(),
+                member.getTitle(), member.getAccount(), member.getNameColor());
+    }
+
+    /** The card of a player as a line recorded them, in {@code color}. */
+    static Target recordedTarget(Minecraft minecraft,
+                                 ChatNamedPlayer recorded, int color) {
+        boolean accountIdentity = recorded.getCharacterId() == null;
+        if (accountIdentity && minecraft != null) {
+            LostTalesCharacterHeadIconRenderer.rememberAccountSkin(
+                    minecraft, recorded.getPlayerId(), recorded.getAccount());
+        }
+        return new Target(recorded.getPlayerId(), accountIdentity,
+                recorded.getCharacterId(), recorded.getSkinId(),
+                recorded.getIdentityName(), "", recorded.getAccount(), color);
     }
 
     /**

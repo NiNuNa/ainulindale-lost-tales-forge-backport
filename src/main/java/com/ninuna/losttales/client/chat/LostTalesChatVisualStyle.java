@@ -825,9 +825,10 @@ final class LostTalesChatVisualStyle {
 
     /**
      * Where a row's first drawn run starts, in its text space: past the
-     * layout markers it opens with — a continuation row's indent — and
-     * the runs the chat does not draw. A row drawn small shrinks from
-     * here, so it keeps its place under the message.
+     * layout markers it opens with — a continuation row's indent — the
+     * gaps — a quote's own indent in an open window — and the runs the
+     * chat does not draw. A row drawn small shrinks from here, so it
+     * keeps its place under the message.
      */
     static int contentStart(IChatComponent row, boolean chatOpen) {
         int cursor = 0;
@@ -845,6 +846,11 @@ final class LostTalesChatVisualStyle {
             ChatLayoutMarker.Data layout = ChatLayoutMarker.decode(part);
             if (layout != null) {
                 cursor += layout.indent(chatOpen);
+                continue;
+            }
+            int gap = ChatSpacerMarker.decode(part);
+            if (gap >= 0) {
+                cursor += gap;
                 continue;
             }
             // An empty run with no slot of its own takes no room and
@@ -1251,7 +1257,13 @@ final class LostTalesChatVisualStyle {
                 }
             }
 
-            if (underlined && width > 0 && !shadowPass) {
+            // A spacer holds no ink, so it neither starts, lengthens nor
+            // ends a rule: the rule runs on over one only to the next lit
+            // run of its element, and ends where the last lit run did
+            // when none follows — the gap before the time behind a name
+            // stays bare.
+            boolean spacer = ChatSpacerMarker.decode(part) >= 0;
+            if (underlined && width > 0 && !shadowPass && !spacer) {
                 if (ruleStart < 0) {
                     ruleStart = cursor;
                     ruleColor = underlineColor;
@@ -1261,11 +1273,7 @@ final class LostTalesChatVisualStyle {
                 // after it, not to what is lit.
                 ruleTrailing = ChatInlineIcons.declaredWidth(part) >= 0 ? 0
                         : trailingSpaceWidth(font, text);
-            } else if (ruleStart >= 0
-                    && ChatSpacerMarker.decode(part) < 0) {
-                // A spacer holds no ink: a rule runs on over one to the
-                // next lit run of its element, and ends where the last
-                // lit run did when none follows.
+            } else if (ruleStart >= 0 && !spacer) {
                 drawRule(ruleStart, ruleEnd - ruleTrailing, y, ruleColor,
                         alpha);
                 ruleStart = -1;
@@ -1332,8 +1340,9 @@ final class LostTalesChatVisualStyle {
     /**
      * The button a reaction row ends on ({@link ChatReactionMarker#addButton}),
      * at {@code x} on a reaction row whose text stands at zero: a framed
-     * button as tall as a chip, holding the picker's own smile — what the
-     * toolbar's React holds — lit as far as {@code lit}.
+     * button as tall as a chip, holding the input bar's emoji button —
+     * what the toolbar's React holds — crossing to its lit artwork and
+     * lit as far as {@code lit}.
      */
     static void drawReactionAddButton(int x, int alpha, float lit) {
         if (alpha < MIN_VISIBLE_ALPHA) {
@@ -1348,9 +1357,9 @@ final class LostTalesChatVisualStyle {
                     ChatReactionMarker.ADD_WIDTH, ChatReactionMarker.HEIGHT,
                     lit, Math.round(alpha * INSET_ALPHA / 255.0F));
             beginContent();
-            ChatInlineIcons.drawEmoji(Minecraft.getMinecraft(),
-                    ChatEmoji.SLIGHT_SMILE, x + ChatReactionMarker.PAD,
-                    chipEmojiTop(top), ChatInlineIcons.CONTENT_SIZE, alpha);
+            LostTalesUiSheet.drawPairWithShadow(LostTalesUiSheet.EMOJI,
+                    LostTalesUiSheet.EMOJI_HOVER, lit,
+                    x + ChatReactionMarker.PAD, chipEmojiTop(top), alpha);
             LostTalesUiFramedButton.drawInk(x, top,
                     ChatReactionMarker.ADD_WIDTH, ChatReactionMarker.HEIGHT,
                     lit, alpha);

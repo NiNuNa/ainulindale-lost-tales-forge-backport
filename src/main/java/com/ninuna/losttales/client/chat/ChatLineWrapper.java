@@ -238,9 +238,13 @@ final class ChatLineWrapper {
                 nameColor, titleColor);
         if (breakIndex >= 0) {
             // The quote is cut to one line at its own size, which is a
-            // row of its own and may be smaller than the words.
-            placeLeadingRow(builder, metrics, parts, breakIndex,
-                    roomFor(width, quoteScale), chatOpen);
+            // row of its own and may be smaller than the words; in an open
+            // window it stands pushed right of the name's column, a gap of
+            // the words' own size the renderer's line leads down through.
+            int indent = chatOpen ? ChatReplyMarker.OPEN_INDENT : 0;
+            placeLeadingRow(builder, metrics, parts, breakIndex, indent,
+                    roomFor(Math.max(1, width - indent), quoteScale),
+                    chatOpen);
             builder.breakLine();
         }
         for (int index = breakIndex + 1; index <= bodyIndex; index++) {
@@ -342,20 +346,26 @@ final class ChatLineWrapper {
      * The row above the message, cut to the width rather than wrapped:
      * parts are placed while they fit whole, the one that does not is
      * trimmed to what is left, and anything after it is dropped. Laid
-     * out for an open window, the quoted name loses its opening bracket
-     * and its closing one stands a word's space after the name, as the
-     * chevron before the quoted words.
+     * out for an open window, the row opens on a gap of {@code indent}
+     * pixels, the quote wears no bubble, the quoted name loses its
+     * opening bracket and its closing one stands a word's space after
+     * the name, as the chevron before the quoted words. {@code width} is
+     * the room after the gap.
      */
     private static void placeLeadingRow(Builder builder,
                                         TextMetrics metrics,
                                         List<IChatComponent> parts,
-                                        int breakIndex, int width,
-                                        boolean chatOpen) {
+                                        int breakIndex, int indent,
+                                        int width, boolean chatOpen) {
+        if (indent > 0) {
+            builder.place(ChatSpacerMarker.of(indent), 0);
+        }
         int used = 0;
         for (int index = 0; index < breakIndex; index++) {
             IChatComponent part = parts.get(index);
-            if (chatOpen && ChatReplyMarker.isMarker(part)
-                    && isBracket(part, "<")) {
+            if (chatOpen && (ChatReplyMarker.isIconSlot(part)
+                    || (ChatReplyMarker.isMarker(part)
+                            && isBracket(part, "<")))) {
                 continue;
             }
             if (chatOpen && ChatSpacerMarker.decode(part) >= 0

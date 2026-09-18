@@ -45,10 +45,10 @@ final class ChatChannelIcons {
     static final int GAP = 3;
     /** A head is drawn as it is in the lines, centred in the icon's box. */
     private static final float HEAD_SIZE = 8.0F;
-    /** Portraits remembered per NPC conversation; the oldest go first. */
+    /** NPCs remembered per conversation; the oldest go first. */
     private static final int MAX_PORTRAITS = 64;
-    private static final Map<ChatTab, String> NPC_PORTRAITS =
-            new LinkedHashMap<ChatTab, String>();
+    private static final Map<ChatTab, Speaker> NPC_SPEAKERS =
+            new LinkedHashMap<ChatTab, Speaker>();
     /**
      * Faction names remembered per NPC, captured when it spoke: what the
      * hover card names as the NPC's faction, so an NPC's card reads like
@@ -66,6 +66,18 @@ final class ChatChannelIcons {
      */
     private static final Map<String, ItemStack> RESOLVED =
             new HashMap<String, ItemStack>();
+
+    /** The NPC a conversation is with, as its speech showed it. */
+    private static final class Speaker {
+        final UUID id;
+        /** The portrait its speech was drawn with; null until one is seen. */
+        final String portrait;
+
+        Speaker(UUID id, String portrait) {
+            this.id = id;
+            this.portrait = portrait;
+        }
+    }
 
     private ChatChannelIcons() {}
 
@@ -129,24 +141,37 @@ final class ChatChannelIcons {
                 ? new ItemStack((Item)registered, 1, spec.getMeta()) : null;
     }
 
-    /** Remembers the portrait an NPC's speech was drawn with, for its tab. */
-    static synchronized void rememberNpcPortrait(ChatTab tab,
-                                                 String texturePath) {
-        if (tab == null || !tab.isNpc() || texturePath == null
-                || texturePath.length() == 0) {
+    /**
+     * Remembers the NPC a conversation is with, for its tab and its member
+     * list: its id and the portrait its speech was drawn with, the last
+     * one seen kept where this speech had none.
+     */
+    static synchronized void rememberNpc(ChatTab tab, UUID npcId,
+                                         String texturePath) {
+        if (tab == null || !tab.isNpc() || npcId == null) {
             return;
         }
-        NPC_PORTRAITS.remove(tab);
-        NPC_PORTRAITS.put(tab, texturePath);
-        while (NPC_PORTRAITS.size() > MAX_PORTRAITS) {
-            Iterator<ChatTab> oldest = NPC_PORTRAITS.keySet().iterator();
+        Speaker previous = NPC_SPEAKERS.remove(tab);
+        String portrait = texturePath != null && texturePath.length() > 0
+                ? texturePath : previous == null ? null : previous.portrait;
+        NPC_SPEAKERS.put(tab, new Speaker(npcId, portrait));
+        while (NPC_SPEAKERS.size() > MAX_PORTRAITS) {
+            Iterator<ChatTab> oldest = NPC_SPEAKERS.keySet().iterator();
             oldest.next();
             oldest.remove();
         }
     }
 
+    /** The portrait an NPC conversation's speech was drawn with; null until one is seen. */
     static synchronized String npcPortrait(ChatTab tab) {
-        return tab == null ? null : NPC_PORTRAITS.get(tab);
+        Speaker speaker = tab == null ? null : NPC_SPEAKERS.get(tab);
+        return speaker == null ? null : speaker.portrait;
+    }
+
+    /** The NPC an NPC conversation is with; null until it has spoken this session. */
+    static synchronized UUID npcId(ChatTab tab) {
+        Speaker speaker = tab == null ? null : NPC_SPEAKERS.get(tab);
+        return speaker == null ? null : speaker.id;
     }
 
     /** Remembers the faction an NPC spoke for, for its hover card. */
@@ -169,9 +194,9 @@ final class ChatChannelIcons {
         return npcId == null ? null : NPC_FACTIONS.get(npcId);
     }
 
-    /** Conversations end with the session, and so do their portraits. */
+    /** Conversations end with the session, and so do the NPCs they were with. */
     static synchronized void forgetPortraits() {
-        NPC_PORTRAITS.clear();
+        NPC_SPEAKERS.clear();
         NPC_FACTIONS.clear();
     }
 

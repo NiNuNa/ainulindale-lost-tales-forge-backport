@@ -56,6 +56,11 @@ public final class LostTalesRequestRateLimiter {
         // A presence is chosen by hand now and then, and Away comes and
         // goes with idle time; a handful in five seconds covers both.
         CHAT_PRESENCE(6, 5000L),
+        // A window whose member list stands asks for its channel's members
+        // every four seconds, and at once when its tab or the chat's
+        // identity changes; a few windows doing so, and a player walking
+        // through tabs, stay well inside ten in five seconds.
+        CHAT_MEMBERS(10, 5000L),
         // An operator opens the settings screen and saves it; a few of each
         // in five seconds is already impatient.
         SERVER_CONFIG(6, 5000L),

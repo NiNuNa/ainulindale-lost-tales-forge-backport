@@ -471,6 +471,16 @@ public final class ChatHistory {
                 : entry.reactions.summaryFor(viewer);
     }
 
+    /**
+     * Whether a kept message is a line of the server's own rather than
+     * anybody's: an announcement, a {@code /say}, a command's answer.
+     */
+    public static synchronized boolean isServerLine(long messageId) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        return entry != null && LostTalesChatMessagePacket.SERVER_SENDER_ID
+                .equals(entry.authorId);
+    }
+
     /** The channel a kept message was said in, or null for none kept. */
     public static synchronized ChatChannel channelOf(long messageId) {
         Entry entry = ENTRIES.get(Long.valueOf(messageId));

@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.chat.ChatMarkdown;
@@ -777,10 +778,10 @@ final class ChatInputBar {
         this.toolbarToggleMotion.advance(System.nanoTime(), hovered,
                 LostTalesConfig.enableChatAnimations);
         LostTalesUiButton.beginPose(this.toolbarToggleMotion, toggleLeft,
-                barControlTop() + 1, ChatPickerPanel.BUTTON_SIZE,
+                barControlTop(), ChatPickerPanel.BUTTON_SIZE,
                 ChatPickerPanel.BUTTON_SIZE);
         try {
-            this.toolbarToggle.draw(toggleLeft, barControlTop() + 1,
+            this.toolbarToggle.draw(toggleLeft, barControlTop(),
                     ChatPickerPanel.BUTTON_SIZE, ChatPickerPanel.BUTTON_SIZE,
                     255);
         } finally {
@@ -1276,7 +1277,10 @@ final class ChatInputBar {
         int sendLeft = barSlotLeft(barRight, SEND_BUTTON_INDEX);
         drawBarDivider(line.leftDividerX);
         drawBarDivider(line.rightDividerX);
-        drawBarDivider((insertRight + sendLeft) / 2);
+        // One pixel in the gap between the inserts and the send button,
+        // the odd pixel left.
+        drawBarDivider(insertRight + LostTalesUiInk.centredStart(
+                sendLeft - insertRight, 1));
     }
 
     /** One of the bar's dividers, centred on its controls. */

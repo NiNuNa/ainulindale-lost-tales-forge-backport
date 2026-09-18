@@ -14,6 +14,8 @@ import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.ChatSystemLineClassifier;
 import com.ninuna.losttales.chat.ChatTabIds;
 import com.ninuna.losttales.compat.discord.DiscordGameEventRelay;
+import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
+import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import cpw.mods.fml.common.FMLLog;
@@ -35,15 +37,18 @@ import net.minecraft.util.IChatComponent;
 
 /**
  * Where every server-wide line passes on its way out — an achievement,
- * a death, a join or a leave, {@code /say} — patched by the coremod
- * into the head of {@code ServerConfigurationManager.sendChatMsg}, and
- * where every line sent to one player passes, patched into the head of
+ * a death, a join or a leave, the server starting or stopping,
+ * {@code /say} — patched by the coremod into the head of
+ * {@code ServerConfigurationManager.sendChatMsg}, and where every line
+ * sent to one player passes, patched into the head of
  * {@code EntityPlayerMP.addChatMessage}. Two things happen to a
- * server-wide line here: the Discord relay is told, and a line that
- * will land in Global is given a message id of the server's own,
- * carried as an empty run on the component and recorded in the chat
- * history under the Server's name, so a reply to it on any client
- * names the same message and a click on the quote finds it. A line
+ * server-wide line here: a line that will land in a shared channel —
+ * an announcement in OOC &amp; Discord, anything else everyone sees in
+ * Global — is given a message id of the server's own, carried as an
+ * empty run on the component and recorded in the chat history under the
+ * Server's name, so a reply to it on any client names the same message
+ * and a click on the quote finds it; and the Discord relay is told,
+ * with that id, so the embed it posts is linked to the line. A line
  * sent to one player that answers a command they typed is recorded the
  * same way, for that account alone, under the tab the command was
  * typed in ({@link #onPlayerLine}), so the answer comes back with the
@@ -78,24 +83,27 @@ public final class LostTalesServerBroadcastHook {
 
     /**
      * Sees a line about to be broadcast and hands back the one to send:
-     * the same component, with an id run appended when the line is
-     * Global's. The relay is told first, of the line as it came.
+     * the same component, with an id run appended when the line belongs
+     * to a shared channel. The relay is told after, with the id; the run
+     * is empty, so the relay reads the line's words as they came.
      */
     public static IChatComponent onBroadcast(IChatComponent message) {
         if (message == null) {
             return null;
         }
+        long messageId = ChatMessageIds.NONE;
         try {
-            DiscordGameEventRelay.onServerBroadcast(message);
-        } catch (Throwable throwable) {
-            logOnce("relay", throwable);
-        }
-        try {
-            if (ChatSystemLineClassifier.classify(message) == ChatChannel.ALL) {
-                stamp(message);
+            ChatChannel channel = ChatSystemLineClassifier.classify(message);
+            if (channel == ChatChannel.ALL || channel == ChatChannel.OOC) {
+                messageId = stamp(message, channel);
             }
         } catch (Throwable throwable) {
             logOnce("name", throwable);
+        }
+        try {
+            DiscordGameEventRelay.onServerBroadcast(message, messageId);
+        } catch (Throwable throwable) {
+            logOnce("relay", throwable);
         }
         return message;
     }
@@ -142,15 +150,16 @@ public final class LostTalesServerBroadcastHook {
     }
 
     /**
-     * Gives a server-wide line an id and records it for everyone
-     * online: they are the ones who can be shown it, so they are the
-     * ones who may reply to it by that id.
+     * Gives a server-wide line of {@code channel} an id and records it
+     * for everyone online: they are the ones who can be shown it, so they
+     * are the ones who may reply to it by that id. Answers the id, or
+     * none for a line that could not be recorded.
      */
-    private static void stamp(IChatComponent message) {
+    private static long stamp(IChatComponent message, ChatChannel channel) {
         MinecraftServer server = MinecraftServer.getServer();
         if (server == null || server.getConfigurationManager() == null
                 || server.getConfigurationManager().playerEntityList == null) {
-            return;
+            return ChatMessageIds.NONE;
         }
         List<UUID> recipients = new ArrayList<UUID>();
         @SuppressWarnings("unchecked")
@@ -160,16 +169,17 @@ public final class LostTalesServerBroadcastHook {
                 recipients.add(player.getUniqueID());
             }
         }
-        long messageId = record(message, ChatChannel.ALL, "", recipients,
+        long messageId = record(message, channel, "", recipients,
                 ChatHistory.Audience.everyone());
         if (messageId == ChatMessageIds.NONE) {
-            return;
+            return ChatMessageIds.NONE;
         }
         if (ChatSystemLineClassifier.kindOf(message)
                 == ChatSystemLineClassifier.Kind.JOIN) {
             noteJoinLine(joinerAccount(message), messageId);
         }
         mark(message, messageId);
+        return messageId;
     }
 
     /**
@@ -225,6 +235,31 @@ public final class LostTalesServerBroadcastHook {
 
     /** The name the server's lines are recorded under; the client shows its own word for it. */
     static final String SERVER_NAME = "Server";
+
+    /**
+     * Says to everyone that the server is up, or going down, as a line of
+     * the server's own: an announcement like a join, filed under OOC
+     * &amp; Discord, where the bridge's embed for the same news is linked
+     * to it. Said where somebody can hear it later — on a dedicated
+     * server, or where the bridge posts the server's events — and not in
+     * a single-player world, whose OOC tab it would only fill.
+     */
+    public static void announceServer(MinecraftServer server,
+                                      boolean started) {
+        if (server == null || server.getConfigurationManager() == null
+                || !(server.isDedicatedServer() || (LostTalesConfig.discordServerEvents
+                        && LostTalesDiscordBridge.getInstance().isPosting()))) {
+            return;
+        }
+        try {
+            server.getConfigurationManager().sendChatMsg(
+                    new ChatComponentTranslation(started
+                            ? ChatSystemLineClassifier.SERVER_STARTED_KEY
+                            : ChatSystemLineClassifier.SERVER_STOPPING_KEY));
+        } catch (RuntimeException failed) {
+            logOnce("announce", failed);
+        }
+    }
 
     /**
      * The id of the line that announced {@code account}'s arrival, no
@@ -315,12 +350,9 @@ public final class LostTalesServerBroadcastHook {
     /**
      * Every online player the line names, whole, as the identity they
      * are playing — the name and colour their own Global line would be
-     * signed with — so a replay names them as the live line did.
-     */
-    /**
-     * The listed players a line names. The player a join line announces
-     * is not listed yet when it goes out; their login replay names them
-     * on it ({@link ChatHistory#namePlayer}).
+     * signed with — so a replay names them as the live line did. The
+     * player a join line announces is not listed yet when it goes out;
+     * their login replay names them on it ({@link ChatHistory#namePlayer}).
      */
     private static List<ChatNamedPlayer> namedPlayers(String text,
                                                       List<EntityPlayerMP> online) {
@@ -374,8 +406,9 @@ public final class LostTalesServerBroadcastHook {
 
     /**
      * The player as a line names them: their account, the identity they
-     * are playing right now, and the colour that identity wears in
-     * Global — what a replay shows in place of the account's name.
+     * are playing right now with its skin, and the colour that identity
+     * wears in Global — what a replay shows in place of the account's
+     * name, and what a card about them shows once they have gone.
      */
     public static ChatNamedPlayer namedPlayer(EntityPlayerMP player) {
         String account = accountOf(player);
@@ -389,7 +422,10 @@ public final class LostTalesServerBroadcastHook {
                 LostTalesChatPresentationResolver.resolve(player, character);
         int roles = ChatAccountRoleResolver.resolve(player,
                 character == null ? null : character.getCharacterId());
-        return new ChatNamedPlayer(account, identityName,
+        return new ChatNamedPlayer(player.getUniqueID(), account,
+                character == null ? null : character.getCharacterId(),
+                identityName,
+                character == null ? "" : character.getSkinId(),
                 ChatRolePresentation.nameColor(ChatChannel.ALL, roles,
                         character == null, presentation.nameColor));
     }

@@ -39,6 +39,13 @@ public final class ChatWindow {
      * go.
      */
     private ScreenFill fill = ScreenFill.NONE;
+    /**
+     * Whether the window's timestamp area is driven out, so the words
+     * stand at the window's edge with neither avatars nor hover times.
+     */
+    private boolean areaHidden;
+    /** Whether the window's member list is put away. */
+    private boolean membersHidden;
 
     /**
      * The parts of the screen a window can fill, as a desktop window
@@ -178,6 +185,10 @@ public final class ChatWindow {
     /** Whether the window fills the whole screen rather than its own box. */
     public boolean isFullscreen() { return this.fill == ScreenFill.FULL; }
 
+    public boolean isAreaHidden() { return this.areaHidden; }
+
+    public boolean isMembersHidden() { return this.membersHidden; }
+
     /** Tabs in row order, including channels currently unavailable. */
     public List<ChatTab> getTabs() {
         return Collections.unmodifiableList(this.tabs);
@@ -226,6 +237,10 @@ public final class ChatWindow {
     void setFill(ScreenFill fill) {
         this.fill = fill == null ? ScreenFill.NONE : fill;
     }
+
+    void setAreaHidden(boolean hidden) { this.areaHidden = hidden; }
+
+    void setMembersHidden(boolean hidden) { this.membersHidden = hidden; }
 
     void setOffsets(double offsetX, double offsetY) {
         this.offsetX = offsetX;

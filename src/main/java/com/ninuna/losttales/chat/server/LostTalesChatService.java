@@ -792,6 +792,7 @@ public final class LostTalesChatService {
         // still bound to the copy's Discord channel.
         ChatChannel saidIn = ChatHistory.channelOf(messageId);
         String saidToFaction = ChatHistory.factionScopeOf(messageId);
+        boolean announcement = ChatHistory.isServerLine(messageId);
         Set<UUID> recipients = ChatHistory.remove(messageId,
                 remover.getUniqueID());
         boolean fromDiscord = false;
@@ -830,7 +831,7 @@ public final class LostTalesChatService {
         // in-game moderation only, and Discord's moderators keep theirs.
         if (!fromDiscord) {
             LostTalesDiscordBridge.getInstance().relayDelete(messageId,
-                    saidIn, saidToFaction);
+                    saidIn, saidToFaction, announcement);
         }
     }
 

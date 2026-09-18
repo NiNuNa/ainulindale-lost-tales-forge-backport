@@ -2,6 +2,7 @@ package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
+import com.ninuna.losttales.chat.ChatRoleSource;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -56,6 +57,37 @@ public final class ChatAccountRoleResolverTest {
 
     private static Set<UUID> setOf(UUID... ids) {
         return new HashSet<UUID>(Arrays.asList(ids));
+    }
+
+    /**
+     * An account whose player is not here holds what its assignments
+     * give it, and a role an operator level grants only while it is an
+     * operator of at least that level — never as a non-operator, even
+     * for level zero, as vanilla answers a player who is here.
+     */
+    @Test
+    public void anAbsentAccountHoldsItsAssignmentsAndItsOperatorLevel() {
+        ChatAccountRole staff = ChatAccountRole.custom("staff", "Staff", "", "",
+                0x112233, true, 10, Arrays.asList(ChatRoleSource.opLevel(2)));
+        ChatAccountRole anyOperator = ChatAccountRole.custom("op0", "Op", "", "",
+                0x223344, true, 20, Arrays.asList(ChatRoleSource.opLevel(0)));
+        Map<String, Set<UUID>> characterMembers = new LinkedHashMap<String, Set<UUID>>();
+        characterMembers.put("staff", setOf(ALDRIC));
+        ChatRoleCatalog catalog = ChatRoleCatalog.of(Arrays.asList(staff, anyOperator),
+                Collections.<String, Set<UUID>>emptyMap(), characterMembers);
+        int staffBit = catalog.byId("staff").bit();
+        int anyBit = catalog.byId("op0").bit();
+        assertEquals(staffBit | anyBit,
+                ChatAccountRoleResolver.absentMask(catalog, ACCOUNT, null, 2));
+        assertEquals(anyBit,
+                ChatAccountRoleResolver.absentMask(catalog, ACCOUNT, null, 1));
+        assertEquals(0, ChatAccountRoleResolver.absentMask(catalog, ACCOUNT, null,
+                ChatAccountRoleResolver.NOT_OPERATOR));
+        // The character's own assignment, and only with the character.
+        assertEquals(staffBit, ChatAccountRoleResolver.absentMask(catalog,
+                ACCOUNT, ALDRIC, ChatAccountRoleResolver.NOT_OPERATOR));
+        assertEquals(0, ChatAccountRoleResolver.absentMask(catalog, ACCOUNT,
+                BEREN, ChatAccountRoleResolver.NOT_OPERATOR));
     }
 
     /** An account's role is worn by every identity it plays. */

@@ -141,6 +141,16 @@ public final class ChatPresenceService {
         return identities;
     }
 
+    /**
+     * Whether everyone else is shown this identity of the account, as
+     * they were last told: it is in use, and not Invisible.
+     */
+    public static synchronized boolean isShown(UUID account,
+                                               ChatPresenceIdentity identity) {
+        Map<ChatPresenceIdentity, ChatPresence> shown = SHOWN.get(account);
+        return shown != null && shown.containsKey(identity);
+    }
+
     /** A player who left is offline everywhere, to everyone still here. */
     public static synchronized void forget(UUID account) {
         if (account == null) {

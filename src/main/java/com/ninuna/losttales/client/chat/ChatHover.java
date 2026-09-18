@@ -49,8 +49,11 @@ final class ChatHover {
         RESIZE,
         /** A tab, a tab's control, an end control or the grip. */
         TAB_ROW,
-        /** The search bar in a window's tool strip: its field, chevrons or cross. */
-        SEARCH_BAR,
+        /**
+         * A window's tool strip: the area's chevron, the member list's
+         * button, or the message search's well and its controls.
+         */
+        TOOL_STRIP,
         /** The bare stretch of a tab row. */
         STRIP,
         /** The bar strip of a window other than the one typed in. */
@@ -73,10 +76,9 @@ final class ChatHover {
         SCROLLBAR,
         /** A run of a line. */
         LINE,
-        /**
-         * A window's lines where no run stands, its timestamp column
-         * included; a stamp there reads out its whole date.
-         */
+        /** A window's member list: a member's row, or the list around them. */
+        MEMBER_LIST,
+        /** A window's lines where no run stands, its timestamp area included. */
         WINDOW
     }
 
@@ -88,8 +90,8 @@ final class ChatHover {
     ChatWindowFrame frame;
     ChatChannelTabBar.Row row;
     ChatChannelTabBar.Hit tabHit;
-    /** On the search bar, which of its parts; null anywhere else. */
-    ChatSearchBar.Part searchPart;
+    /** On a tool strip, which of its controls; null anywhere else. */
+    ChatToolStrip.Part stripPart;
     /** Whether the pointer is on the grip's own glyph. */
     boolean overGrip;
     ChatPickerPanel picker;
@@ -104,6 +106,8 @@ final class ChatHover {
     ChatWindowGestures.ResizeTarget resize;
     LostTalesChatOverlayRenderer.Hit line;
     LostTalesChatHoverCard.Found person;
+    /** On a member list, the member whose row it is; null on the list around them. */
+    com.ninuna.losttales.network.packet.LostTalesChatMembersPacket.Member member;
     /**
      * Whether a press on the line or the window does something: a run
      * that answers a click, a person, a window it brings forward, or a
@@ -123,7 +127,7 @@ final class ChatHover {
     boolean isOnRowOf(ChatWindowFrame frame) {
         return frame != null && this.frame == frame
                 && (this.kind == Kind.TAB_ROW || this.kind == Kind.STRIP
-                        || this.kind == Kind.SEARCH_BAR);
+                        || this.kind == Kind.TOOL_STRIP);
     }
 
     /** Whether a press here does something: what earns the hand. */
@@ -150,12 +154,13 @@ final class ChatHover {
                 // A strip moves its window only while the window is not
                 // locked; a locked one is inert.
                 return this.window != null && !this.window.isLocked();
-            case SEARCH_BAR:
-                // The chevrons and the cross act; the field takes the
-                // caret without a hand.
-                return this.searchPart != null
-                        && this.searchPart != ChatSearchBar.Part.FIELD;
+            case TOOL_STRIP:
+                // Every control acts; the field takes the caret without
+                // a hand.
+                return this.stripPart != null
+                        && this.stripPart != ChatToolStrip.Part.FIELD;
             case LINE:
+            case MEMBER_LIST:
             case WINDOW:
                 return this.acts;
             default:
