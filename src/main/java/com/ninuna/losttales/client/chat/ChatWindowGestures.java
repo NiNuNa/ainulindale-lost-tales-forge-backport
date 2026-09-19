@@ -3,22 +3,25 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
-import com.ninuna.losttales.gui.style.LostTalesColors;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 
 /**
  * The press-to-drag state machines of the chat screen: a tab carried
  * along its row, torn off into a window of its own and docked into
- * another; a window moved by its strip, its grip or its messages and
- * snapped against a neighbour; a window resized by an edge or a
- * corner; a scrollbar's thumb carried. The screen arms them from its
+ * another; a window moved by its strip, its grip, its messages or its
+ * tabs, snapped against a neighbour or into a part of the screen; a
+ * window resized by an edge or a corner; a member list resized by its
+ * edge; a scrollbar's thumb carried. The screen arms them from its
  * presses, feeds them the pointer every frame and every mouse event,
  * and asks them what is being dragged; they move the layout live and
- * write it down once, on release.
+ * write it down once, on release. A carried window's landing is shown
+ * as it is found: the neighbour's edge lit, the snap bar at the top of
+ * the screen, and the preview pane in the part of the screen it fills.
  */
 final class ChatWindowGestures {
     /** Where the screen's row description comes from. */
@@ -56,14 +59,20 @@ final class ChatWindowGestures {
     /** How far above or below a row's band a carried run may still be
      *  offered to it. */
     static final int DOCK_BAND_SLACK = 7;
+    /**
+     * How long the pointer rests pressed against a screen edge, past the
+     * strip, before the tabs come out that way: a row standing against
+     * the edge cannot be pulled the whole pull toward it, since the
+     * pointer goes no further, and the rest tells a pull from a hand that
+     * only brushed the edge while sliding a tab along.
+     */
+    static final long EDGE_TEAR_NANOS = 150L * 1000000L;
     /** Horizontal slack around a row that still counts as dropping on it. */
     private static final int DOCK_SLACK = 24;
     /** How far outside its edge a window still answers to a resize. */
     static final int RESIZE_BORDER = 4;
     /** How far along an edge from a corner still counts as that corner. */
     static final int RESIZE_CORNER = 12;
-    private static final int LINK_HIGHLIGHT_RGB =
-            LostTalesColors.rgb(LostTalesColors.HONEY);
     /**
      * How near a screen edge the pointer must come, in GUI pixels, for a
      * dragged window to snap to it: a band along the edge rather than
@@ -72,10 +81,17 @@ final class ChatWindowGestures {
      */
     static final double SNAP_REACH = 16.0D;
     /**
-     * The share of an edge at either end that snaps to the corner's
-     * quarter of the screen rather than the edge's half or the whole.
+     * The share of a side edge at either end that snaps to the corner's
+     * quarter of the screen rather than the edge's half.
      */
     static final double SNAP_CORNER_SHARE = 0.2D;
+    /**
+     * The share of the top and bottom edges at either end that snaps to
+     * the corner's quarter: one column of the twelve the parts of the
+     * screen are laid on, the corner itself, as on the desktop, so the
+     * top edge beside it is free for the thirds.
+     */
+    static final double SNAP_EDGE_CORNER_SHARE = 1.0D / 12.0D;
 
     private final RowSource rows;
     private final ChatTabActions tabActions;
@@ -88,13 +104,20 @@ final class ChatWindowGestures {
     private TabDrag tabDrag;
     private WindowDrag windowDrag;
     private WindowResize windowResize;
+    private FillResize fillResize;
+    private MembersResize membersResize;
     private ScrollbarDrag scrollbarDrag;
+    private final ChatSnapPreview snapPreview = new ChatSnapPreview();
+    private final ChatSnapLayouts.Bar snapBar = new ChatSnapLayouts.Bar();
+    /** What a window let go in a zone of a layout offers the other windows. */
+    private final ChatSnapAssist snapAssist;
 
     ChatWindowGestures(RowSource rows, ChatTabActions tabActions,
-                       ChatInputBar bar) {
+                       ChatInputBar bar, ChatSnapAssist snapAssist) {
         this.rows = rows;
         this.tabActions = tabActions;
         this.bar = bar;
+        this.snapAssist = snapAssist;
     }
 
     /** Called from {@code initGui}, which also runs on every resize. */
@@ -111,7 +134,14 @@ final class ChatWindowGestures {
     boolean isDragging() {
         return (this.tabDrag != null && this.tabDrag.active)
                 || (this.windowDrag != null && this.windowDrag.active)
-                || (this.windowResize != null && this.windowResize.active);
+                || (this.windowResize != null && this.windowResize.active)
+                || this.fillResize != null
+                || this.membersResize != null;
+    }
+
+    /** Whether a member list's edge is being dragged. */
+    boolean isResizingMembers() {
+        return this.membersResize != null;
     }
 
     /** Whether a live window drag is carrying this window. */
@@ -122,8 +152,10 @@ final class ChatWindowGestures {
 
     /** Whether a live resize is reshaping this window. */
     boolean isResizingWindow(String windowId) {
-        return this.windowResize != null && this.windowResize.active
-                && windowId.equals(this.windowResize.windowId);
+        return (this.windowResize != null && this.windowResize.active
+                && windowId.equals(this.windowResize.windowId))
+                || (this.fillResize != null
+                        && this.fillResize.ids.contains(windowId));
     }
 
     /** The live tab drag, or null while no tab is being carried. */
@@ -137,6 +169,9 @@ final class ChatWindowGestures {
      * pressed control keeps its look.
      */
     ResizeEdge armedResizeEdge() {
+        if (this.fillResize != null) {
+            return this.fillResize.edge;
+        }
         return this.windowResize == null ? null : this.windowResize.edge;
     }
 
@@ -154,6 +189,10 @@ final class ChatWindowGestures {
                 this.windowResize != null && this.windowResize.active);
         if (this.windowResize != null && this.windowResize.active) {
             updateResize();
+        } else if (this.fillResize != null) {
+            updateFillResize();
+        } else if (this.membersResize != null) {
+            updateMembersResize();
         } else if (this.windowDrag != null && this.windowDrag.active) {
             moveDraggedWindow(mouseX, mouseY);
         } else if (this.tabDrag != null && this.tabDrag.active) {
@@ -180,19 +219,18 @@ final class ChatWindowGestures {
     }
 
     /**
-     * The edge a drag is about to link to, lit along its whole length:
-     * the target's frame on that side, both of its pixels, from corner
-     * to corner, where the frame is drawn — so the light lies in the gap
-     * the two windows will keep, over the frame it stands for, and never
-     * on either window's own pixels.
+     * The edge a carried window is about to link to, lit along its whole
+     * length: the target's frame on that side, both of its pixels, from
+     * corner to corner, where the frame is drawn — so the light lies in
+     * the gap the two windows will keep, over the frame it stands for,
+     * and never on either window's own pixels.
      */
     void drawLinkHighlight() {
-        if (this.windowDrag == null || !this.windowDrag.active
-                || this.windowDrag.snapTargetId == null) {
+        Landing landing = activeLanding();
+        if (landing == null || landing.snapTargetId == null) {
             return;
         }
-        ChatWindowFrame target = ChatWindowFrame.find(
-                this.windowDrag.snapTargetId);
+        ChatWindowFrame target = ChatWindowFrame.find(landing.snapTargetId);
         if (target == null || !target.drawn) {
             return;
         }
@@ -201,8 +239,9 @@ final class ChatWindowGestures {
         float right = left + (float)(target.boxRight - target.boxLeft);
         float top = (float)(target.boxTop + target.motionY);
         float bottom = (float)(target.boxBottom + target.motionY);
-        int colour = LostTalesChatVisualStyle.argb(LINK_HIGHLIGHT_RGB, 0xFF);
-        switch (this.windowDrag.snapSide) {
+        int colour = LostTalesChatVisualStyle.argb(
+                LostTalesChatVisualStyle.LANDING_RGB, 0xFF);
+        switch (landing.snapSide) {
             case ABOVE:
                 LostTalesChatOverlayRenderer.fillRect(left - ring, top - ring,
                         right + ring, top, colour);
@@ -219,6 +258,29 @@ final class ChatWindowGestures {
                 LostTalesChatOverlayRenderer.fillRect(right, top - ring,
                         right + ring, bottom + ring, colour);
         }
+    }
+
+    /** The pane showing where a carried window goes, for the screen to draw under it. */
+    ChatSnapPreview snapPreview() {
+        return this.snapPreview;
+    }
+
+    /** Draws the snap bar where its motion has brought it, at {@code opacity}. */
+    void drawSnapBar(float opacity) {
+        this.snapBar.draw(this.mc, this.screenWidth, this.screenHeight,
+                opacity);
+    }
+
+    /** Where the window being carried right now would land, or null while none is. */
+    private Landing activeLanding() {
+        if (this.windowDrag != null && this.windowDrag.active) {
+            return this.windowDrag.landing;
+        }
+        if (this.tabDrag != null && this.tabDrag.active
+                && this.tabDrag.detachedWindowId != null) {
+            return this.tabDrag.landing;
+        }
+        return null;
     }
 
     /* ---- Mouse events ---- */
@@ -240,6 +302,14 @@ final class ChatWindowGestures {
             // Live from the press: an edge follows the pointer from the
             // first pixel, with no travel to overcome first.
             updateResize();
+            return true;
+        }
+        if (this.fillResize != null) {
+            updateFillResize();
+            return true;
+        }
+        if (this.membersResize != null) {
+            updateMembersResize();
             return true;
         }
         if (this.windowDrag != null) {
@@ -289,22 +359,31 @@ final class ChatWindowGestures {
             this.windowResize = null;
             if (resize.moved()) {
                 commitResize(resize);
+            } else {
+                this.snapPreview.release(false);
             }
+        }
+        if (this.fillResize != null) {
+            // Where the edge was left is written down, once.
+            boolean moved = this.fillResize.moved;
+            this.fillResize = null;
+            if (moved) {
+                ChatWindowLayout.persist();
+            }
+        }
+        if (this.membersResize != null) {
+            // The width the edge was left at is written down, once.
+            this.membersResize = null;
+            ChatWindowLayout.persist();
         }
         WindowDrag click = null;
         if (this.windowDrag != null) {
             WindowDrag drag = this.windowDrag;
             this.windowDrag = null;
             if (drag.active) {
-                // Let go in a screen edge's zone, the window keeps the
-                // part of the screen it was already showing, from where
-                // it was dropped. Touching another window only shows
-                // what it would stick to; locking it is what sticks it.
-                if (drag.screenFill != ChatWindow.ScreenFill.NONE) {
-                    ChatWindowLayout.setFill(drag.windowId, drag.screenFill,
-                            false);
-                }
-                previewFill(drag.windowId, ChatWindow.ScreenFill.NONE);
+                // Touching another window only shows what it would stick
+                // to; locking it is what sticks it.
+                land(drag.windowId, drag.landing);
                 ChatWindowLayout.persist();
             } else {
                 click = drag;
@@ -314,7 +393,7 @@ final class ChatWindowGestures {
             TabDrag drag = this.tabDrag;
             this.tabDrag = null;
             if (drag.active) {
-                dropTab();
+                dropTab(drag);
             } else if (drag.collapsesOnRelease) {
                 // Pressed and released without travelling: the press
                 // was a pick after all, so the group gives way to it.
@@ -326,9 +405,10 @@ final class ChatWindowGestures {
 
     /** Ends every drag where it stands: Escape, or the screen closing. */
     void cancelDrags() {
-        if (this.windowDrag != null) {
-            previewFill(this.windowDrag.windowId, ChatWindow.ScreenFill.NONE);
-        }
+        // Nothing carried lands anywhere: the preview goes back into its
+        // window and the snap bar goes up.
+        this.snapPreview.release(false);
+        this.snapBar.hide();
         if (this.tabDrag != null && this.tabDrag.active) {
             // The tabs are already where the drag left them — in a row
             // they slid into, or in a window of their own — so ending
@@ -339,6 +419,12 @@ final class ChatWindowGestures {
         }
         this.tabDrag = null;
         this.scrollbarDrag = null;
+        if (this.membersResize != null) {
+            // Escape means "as it was": the list takes back its width.
+            ChatWindowLayout.setMembersWidth(this.membersResize.windowId,
+                    this.membersResize.storedWidth, false);
+            this.membersResize = null;
+        }
         if (this.windowResize != null) {
             WindowResize resize = this.windowResize;
             this.windowResize = null;
@@ -347,6 +433,14 @@ final class ChatWindowGestures {
                 // dimensions give way to the stored ones, and nothing
                 // is written.
                 restoreResize(resize);
+            }
+        }
+        if (this.fillResize != null) {
+            // Every part the edge moved takes back its edges.
+            FillResize resize = this.fillResize;
+            this.fillResize = null;
+            for (int index = 0; index < resize.ids.size(); index++) {
+                holdFill(resize.ids.get(index), resize.starts.get(index));
             }
         }
         if (this.windowDrag != null) {
@@ -511,6 +605,12 @@ final class ChatWindowGestures {
         double bottom;
         /** Message lines the box asks for, fractions included. */
         double lines;
+        /**
+         * The column the window fills if it is let go now — its top edge
+         * at the top of the screen or its bottom edge at the bottom — or
+         * none.
+         */
+        ChatWindow.ScreenFill column = ChatWindow.ScreenFill.NONE;
 
         WindowResize(String windowId, ResizeEdge edge, double left,
                      double right, double top, double bottom, double grabX,
@@ -582,13 +682,15 @@ final class ChatWindowGestures {
                 return null;
             }
             ChatWindow window = ChatWindowLayout.window(frame.windowId);
-            // A window filling the screen, or gliding to or from it, has
-            // the screen's size or a passing one, not its own to change.
-            if (window == null || window.isLocked()
-                    || outOfItsOwnBox(window)) {
+            if (window == null || window.isLocked()) {
                 continue;
             }
-            ResizeEdge edge = edgeAt(frame, mouseX, mouseY);
+            // A window filling a part of the screen answers only on the
+            // edges it has inside the screen, and only once it stands
+            // there: the rest are the screen's.
+            ResizeEdge edge = outOfItsOwnBox(window)
+                    ? filledEdgeAt(frame, window, mouseX, mouseY)
+                    : edgeAt(frame, mouseX, mouseY);
             if (edge != null) {
                 return new ResizeTarget(frame, edge);
             }
@@ -656,6 +758,36 @@ final class ChatWindowGestures {
         return onTop ? ResizeEdge.TOP : ResizeEdge.BOTTOM;
     }
 
+    /**
+     * The inner edge of a window filling a part of the screen a point
+     * lies on, or null: a side, never a corner, of a part standing where
+     * it goes, and only a side that lies inside the screen rather than
+     * on its border.
+     */
+    static ResizeEdge filledEdgeAt(ChatWindowFrame frame, ChatWindow window,
+                                   double mouseX, double mouseY) {
+        ChatWindow.ScreenFill fill = window.getFill();
+        if (fill == ChatWindow.ScreenFill.NONE || frame.isFillGliding()) {
+            return null;
+        }
+        ResizeEdge edge = edgeAt(frame, mouseX, mouseY);
+        if (edge == null) {
+            return null;
+        }
+        switch (edge) {
+            case LEFT:
+                return fill.leftShare() > 0.0D ? edge : null;
+            case RIGHT:
+                return fill.rightShare() < 1.0D ? edge : null;
+            case TOP:
+                return fill.topShare() > 0.0D ? edge : null;
+            case BOTTOM:
+                return fill.bottomShare() < 1.0D ? edge : null;
+            default:
+                return null;
+        }
+    }
+
     /** The pointer an edge is shown with: across it, or along its corner. */
     static LostTalesMapCursor.Pose cursorPose(ResizeEdge edge) {
         switch (edge) {
@@ -686,6 +818,10 @@ final class ChatWindowGestures {
         ChatWindowLayout.raise(frame.windowId);
         this.tabActions.selectWindow(window);
         this.bar.closePickers();
+        if (outOfItsOwnBox(window)) {
+            armFillResize(target.edge, window);
+            return;
+        }
         double left = frame.drawnLeft();
         double right = left + (frame.boxRight - frame.boxLeft);
         double top = frame.boxTop + frame.motionY;
@@ -763,6 +899,20 @@ final class ChatWindowGestures {
                 resize.bottom = resize.startTop + height;
             }
         }
+        // The top edge carried to the top of the screen, or the bottom
+        // edge to its bottom, stretches the window to the screen's whole
+        // height in its own column when it is let go, as a desktop
+        // window's does; the frosted pane shows it until then.
+        double rawY = ChatWindowPlacement.preciseMouseY(this.mc,
+                this.screenHeight);
+        boolean reaching = resize.edge == ResizeEdge.TOP
+                ? rawY < SNAP_REACH
+                : resize.edge == ResizeEdge.BOTTOM
+                        && rawY > this.screenHeight - SNAP_REACH;
+        resize.column = reaching ? ChatWindowPlacement.columnFill(
+                resize.startLeft, resize.startRight, this.screenWidth)
+                : ChatWindow.ScreenFill.NONE;
+        this.snapPreview.aim(resize.windowId, resize.column);
         applyLiveResize(resize, window);
     }
 
@@ -822,18 +972,30 @@ final class ChatWindowGestures {
         ChatWindowLayout.setPosition(resize.windowId,
                 ChatWindowPlacement.windowPercentX(window, resize.left,
                         this.mc, this.screenWidth),
-                ChatWindowPlacement.windowPercentY(baseline, this.mc,
+                ChatWindowPlacement.windowPercentY(window, baseline, this.mc,
                         this.screenHeight), false);
         this.bar.updateInputBounds();
     }
 
-    /** Writes the dimensions the drag ends on down, once. */
+    /**
+     * Writes the dimensions the drag ends on down, once. Let go stretched
+     * to the screen's height, the window keeps the box it had before the
+     * drag as its own and fills its column instead.
+     */
     private void commitResize(WindowResize resize) {
         ChatWindow window = ChatWindowLayout.window(resize.windowId);
         if (window == null) {
+            this.snapPreview.release(false);
             return;
         }
-        applyLiveResize(resize, window);
+        boolean column = resize.column != ChatWindow.ScreenFill.NONE;
+        if (column) {
+            restoreResize(resize);
+            ChatWindowLayout.setFill(resize.windowId, resize.column, false);
+        } else {
+            applyLiveResize(resize, window);
+        }
+        this.snapPreview.release(column);
         ChatWindowLayout.persist();
     }
 
@@ -852,7 +1014,236 @@ final class ChatWindowGestures {
         this.bar.updateInputBounds();
     }
 
+    /* ---- Resizing a part of the screen ---- */
+
+    /** How close two parts' edges lie to be one edge, in shares of the screen. */
+    private static final double LINE_TOLERANCE = 1.0E-4D;
+
+    /**
+     * An inner edge of a window filling a part of the screen being
+     * dragged, as a snapped desktop window's is: the edge follows the
+     * pointer, and every window filling a part that meets it along that
+     * edge gives way with it, so the two stay a window gap apart and
+     * share the screen between them. The parts become the player's own;
+     * Escape puts every one of them back.
+     */
+    private static final class FillResize {
+        final ResizeEdge edge;
+        /** The pointer's offset from the edge's line at the press, in pixels. */
+        final double grab;
+        /** Every window the edge moves, the dragged one first. */
+        final List<String> ids = new ArrayList<String>();
+        /** The part each filled at the press. */
+        final List<ChatWindow.ScreenFill> starts =
+                new ArrayList<ChatWindow.ScreenFill>();
+        /** Whether the line is each part's right or bottom side, not its left or top. */
+        final List<Boolean> farSides = new ArrayList<Boolean>();
+        boolean moved;
+
+        FillResize(ResizeEdge edge, double grab) {
+            this.edge = edge;
+            this.grab = grab;
+        }
+
+        void add(String id, ChatWindow.ScreenFill start, boolean farSide) {
+            this.ids.add(id);
+            this.starts.add(start);
+            this.farSides.add(Boolean.valueOf(farSide));
+        }
+    }
+
+    /**
+     * Takes hold of an inner edge of the part a window fills, and of the
+     * same edge of every part meeting it there.
+     */
+    private void armFillResize(ResizeEdge edge, ChatWindow window) {
+        ChatWindow.ScreenFill fill = window.getFill();
+        boolean across = edge == ResizeEdge.LEFT || edge == ResizeEdge.RIGHT;
+        boolean far = edge == ResizeEdge.RIGHT || edge == ResizeEdge.BOTTOM;
+        double line = lineOf(fill, across, far);
+        double size = across ? this.screenWidth : this.screenHeight;
+        double pointer = across
+                ? ChatWindowPlacement.preciseMouseX(this.mc, this.screenWidth)
+                : ChatWindowPlacement.preciseMouseY(this.mc, this.screenHeight);
+        FillResize resize = new FillResize(edge, pointer - line * size);
+        resize.add(window.getId(), fill, far);
+        for (ChatWindow other : ChatWindowLayout.windows()) {
+            ChatWindow.ScreenFill theirs = other.getFill();
+            if (other == window || other.isLocked()
+                    || theirs == ChatWindow.ScreenFill.NONE
+                    || Math.abs(lineOf(theirs, across, !far) - line)
+                            > LINE_TOLERANCE) {
+                continue;
+            }
+            boolean alongside = across
+                    ? theirs.topShare() < fill.bottomShare()
+                            && theirs.bottomShare() > fill.topShare()
+                    : theirs.leftShare() < fill.rightShare()
+                            && theirs.rightShare() > fill.leftShare();
+            if (alongside) {
+                resize.add(other.getId(), theirs, !far);
+            }
+        }
+        this.fillResize = resize;
+    }
+
+    /** A part's side: its left or right edge across, its top or bottom one down. */
+    private static double lineOf(ChatWindow.ScreenFill fill, boolean across,
+                                 boolean far) {
+        if (across) {
+            return far ? fill.rightShare() : fill.leftShare();
+        }
+        return far ? fill.bottomShare() : fill.topShare();
+    }
+
+    /**
+     * Follows the pointer with the edge: every part it moves keeps room
+     * for the smallest window, and the line stops where one of them
+     * would be left with less.
+     */
+    private void updateFillResize() {
+        FillResize resize = this.fillResize;
+        boolean across = resize.edge == ResizeEdge.LEFT
+                || resize.edge == ResizeEdge.RIGHT;
+        double size = across ? this.screenWidth : this.screenHeight;
+        if (size <= 0.0D) {
+            return;
+        }
+        double pointer = across
+                ? ChatWindowPlacement.preciseMouseX(this.mc, this.screenWidth)
+                : ChatWindowPlacement.preciseMouseY(this.mc, this.screenHeight);
+        double room = (across ? ChatWindowPlacement.minBoxWidth(this.mc)
+                : ChatWindowPlacement.minHeight(this.mc))
+                + 2.0D * ChatWindowPlacement.EDGE_MARGIN;
+        double least = room / size;
+        double low = 0.0D;
+        double high = 1.0D;
+        for (int index = 0; index < resize.ids.size(); index++) {
+            ChatWindow.ScreenFill start = resize.starts.get(index);
+            if (resize.farSides.get(index).booleanValue()) {
+                low = Math.max(low, lineOf(start, across, false) + least);
+            } else {
+                high = Math.min(high, lineOf(start, across, true) - least);
+            }
+        }
+        if (low > high) {
+            return;
+        }
+        double line = Math.max(low, Math.min(high,
+                (pointer - resize.grab) / size));
+        for (int index = 0; index < resize.ids.size(); index++) {
+            ChatWindow.ScreenFill start = resize.starts.get(index);
+            boolean farSide = resize.farSides.get(index).booleanValue();
+            ChatWindow.ScreenFill moved = across
+                    ? ChatWindow.ScreenFill.free(
+                            farSide ? start.leftShare() : line,
+                            start.topShare(),
+                            farSide ? line : start.rightShare(),
+                            start.bottomShare())
+                    : ChatWindow.ScreenFill.free(start.leftShare(),
+                            farSide ? start.topShare() : line,
+                            start.rightShare(),
+                            farSide ? line : start.bottomShare());
+            holdFill(resize.ids.get(index), moved);
+        }
+        resize.moved = true;
+        this.bar.updateInputBounds();
+    }
+
+    /** Stands a window in a part at once, unpersisted, with no glide. */
+    private static void holdFill(String windowId, ChatWindow.ScreenFill fill) {
+        ChatWindowLayout.setFill(windowId, fill, false);
+        ChatWindowFrame frame = ChatWindowFrame.find(windowId);
+        if (frame != null) {
+            frame.holdFill(fill);
+        }
+    }
+
+    /* ---- Resizing a member list ---- */
+
+    /**
+     * A window's member list being resized by its left edge: the list
+     * grows as the edge is carried left and narrows as it goes right,
+     * between its heads alone and a third of the window, and the words
+     * beside it reflow live. The width is written into the layout without
+     * persisting while the drag runs, once on release, and Escape puts
+     * the stored width back.
+     */
+    private static final class MembersResize {
+        final String windowId;
+        /** How far right of the list's edge the pointer took hold of it. */
+        final double grabOffset;
+        /** The width the window had stored, for Escape. */
+        final double storedWidth;
+
+        MembersResize(String windowId, double grabOffset, double storedWidth) {
+            this.windowId = windowId;
+            this.grabOffset = grabOffset;
+            this.storedWidth = storedWidth;
+        }
+    }
+
+    /** Takes hold of a window's member list by its edge; live at once. */
+    void armMembersResize(ChatWindowFrame frame, ChatWindow window) {
+        if (frame == null || window == null || window.isLocked()) {
+            return;
+        }
+        ChatWindowLayout.raise(window.getId());
+        this.tabActions.selectWindow(window);
+        this.bar.closePickers();
+        this.membersResize = new MembersResize(window.getId(),
+                ChatWindowPlacement.preciseMouseX(this.mc, this.screenWidth)
+                        - frame.members.screenLeft,
+                window.getMembersWidth());
+    }
+
+    /**
+     * Follows the pointer with the list's edge: the list is as wide as
+     * from where the edge is now to the window's right edge, bounded as
+     * the list lays itself out.
+     */
+    private void updateMembersResize() {
+        MembersResize resize = this.membersResize;
+        ChatWindowFrame frame = ChatWindowFrame.find(resize.windowId);
+        ChatWindow window = ChatWindowLayout.window(resize.windowId);
+        if (frame == null || window == null || window.isLocked()
+                || frame.scale <= 0.0F) {
+            this.membersResize = null;
+            return;
+        }
+        double edge = ChatWindowPlacement.preciseMouseX(this.mc,
+                this.screenWidth) - resize.grabOffset;
+        float width = ChatMemberList.clampWidth(
+                (float)((frame.members.screenRight - edge) / frame.scale),
+                frame.members.minWidth, frame.members.maxWidth);
+        ChatWindowLayout.setMembersWidth(resize.windowId, width, false);
+    }
+
     /* ---- Moving a window ---- */
+
+    /**
+     * Where a carried window lands when the button comes up: the
+     * neighbour whose edge it has snapped to, and the part of the screen
+     * it fills. One rides every carry, whether the window was taken by
+     * its strip or carried out of a row by its tabs.
+     */
+    static final class Landing {
+        /** Window whose edge the carried one is snapped to right now, or null. */
+        String snapTargetId;
+        /** Which side of that target the carried window sits on. */
+        ChatWindow.LinkSide snapSide = ChatWindow.LinkSide.BELOW;
+        /**
+         * The part of the screen the window fills on release — the
+         * pointer is in a screen edge's zone, a corner's, or a layout's
+         * on the snap bar — or none.
+         */
+        ChatWindow.ScreenFill screenFill = ChatWindow.ScreenFill.NONE;
+        /** The layout that part is a zone of, which snap assist offers the rest of; null for none. */
+        ChatWindow.ScreenFill[] layout;
+        /** The other windows a suggestion sends to their zones with it, each with its zone. */
+        Map<String, ChatWindow.ScreenFill> companions =
+                Collections.<String, ChatWindow.ScreenFill>emptyMap();
+    }
 
     /**
      * A window being moved. From the grip the drag is live at once; from
@@ -869,18 +1260,11 @@ final class ChatWindowGestures {
         final int pressX;
         final int pressY;
         boolean active;
-        /** Window whose edge the drag is snapped to right now, or null. */
-        String snapTargetId;
-        /** Which side of that target the dragged window sits on. */
-        ChatWindow.LinkSide snapSide = ChatWindow.LinkSide.BELOW;
-        /**
-         * The part of the screen the window snaps to on release — the
-         * pointer is against a screen edge or in a corner — or none.
-         */
-        ChatWindow.ScreenFill screenFill = ChatWindow.ScreenFill.NONE;
+        final Landing landing = new Landing();
         /**
          * Whether the hold was taken afresh in the window's own box, as
-         * it is once for a window carried out of the screen it filled.
+         * it is once for a window carried out of the part of the screen
+         * it filled.
          */
         boolean rebased;
 
@@ -912,15 +1296,17 @@ final class ChatWindowGestures {
     }
 
     /**
-     * Keeps the dragged window's percent position under the pointer,
-     * from the raw mouse so the motion is as fine as the display. A
-     * window filling the screen stays put until the pointer has really
-     * travelled, and then gives the screen back under it.
+     * Keeps the dragged window under the pointer, from the raw mouse so
+     * the motion is as fine as the display. A window filling a part of
+     * the screen stays put until the pointer has really travelled, and
+     * then gives the screen back under it.
      */
     private void moveDraggedWindow(int mouseX, int mouseY) {
         ChatWindow window = ChatWindowLayout.window(this.windowDrag.windowId);
         if (window == null || window.isLocked()) {
             this.windowDrag = null;
+            this.snapPreview.release(false);
+            this.snapBar.hide();
             return;
         }
         if (!this.windowDrag.rebased && outOfItsOwnBox(window)) {
@@ -932,101 +1318,162 @@ final class ChatWindowGestures {
             }
             holdInOwnBox(window);
         }
-        ChatWindowPlacement.Anchor anchor = ChatWindowPlacement.constrainWindow(
-                window, this.mc,
+        carry(window, this.windowDrag.landing,
                 ChatWindowPlacement.preciseMouseX(this.mc, this.screenWidth)
                         - this.windowDrag.grabOffsetX,
                 ChatWindowPlacement.preciseMouseY(this.mc, this.screenHeight)
-                        - this.windowDrag.grabOffsetY,
-                this.screenWidth, this.screenHeight);
+                        - this.windowDrag.grabOffsetY);
+    }
+
+    /**
+     * Carries a window to where the pointer asks for it — its left edge
+     * at {@code x}, its baseline at {@code baseline} — the same whether it
+     * was taken by its strip or carried out of a row by its tabs: windows
+     * stuck together move as one piece; a window alone sticks to a
+     * neighbour's edge it comes near; and with the pointer in a snap
+     * zone — a screen edge, a corner, a layout on the snap bar — the
+     * preview shows the part of the screen the window fills when the
+     * button comes up, which outranks sticking to a neighbour. The
+     * window itself goes on following the pointer at its own size.
+     */
+    private void carry(ChatWindow window, Landing landing, double x,
+                       double baseline) {
+        ChatWindowPlacement.Anchor anchor = ChatWindowPlacement.constrainWindow(
+                window, this.mc, x, baseline, this.screenWidth,
+                this.screenHeight);
         List<ChatWindow> group = ChatWindowLayout.linkedGroup(window);
         if (group.size() > 1) {
-            // Stuck windows move as one piece: every one of them takes
-            // the same step the dragged one took, in both directions, so
-            // the group keeps its shape whichever way it is carried. The
-            // step is measured between resting boxes, all read before any
-            // of them moves; a resting box is also where a window that
-            // has just given the screen back is going.
-            List<ChatWindowPlacement.Box> resting =
-                    new ArrayList<ChatWindowPlacement.Box>(group.size());
-            for (int index = 0; index < group.size(); index++) {
-                resting.add(ChatWindowPlacement.restingBounds(
-                        group.get(index), this.mc, this.screenWidth,
-                        this.screenHeight));
-            }
-            int dragged = group.indexOf(window);
-            ChatWindowPlacement.Box origin = dragged >= 0
-                    ? resting.get(dragged)
-                    : ChatWindowPlacement.restingBounds(window, this.mc,
-                            this.screenWidth, this.screenHeight);
-            double deltaX = anchor.x - origin.x;
-            double deltaY = anchor.baseline - origin.baseline();
-            for (int index = 0; index < group.size(); index++) {
-                ChatWindow member = group.get(index);
-                ChatWindowPlacement.Box at = resting.get(index);
-                ChatWindowPlacement.Anchor moved =
-                        ChatWindowPlacement.constrainWindow(member, this.mc,
-                                at.x + deltaX, at.baseline() + deltaY,
-                                this.screenWidth, this.screenHeight);
-                ChatWindowLayout.setPosition(member.getId(),
-                        ChatWindowPlacement.windowPercentX(member, moved.x,
-                                this.mc, this.screenWidth),
-                        ChatWindowPlacement.windowPercentY(moved.baseline,
-                                this.mc, this.screenHeight), false);
-            }
+            moveGroup(window, group, anchor);
+            landing.snapTargetId = null;
+            landing.screenFill = ChatWindow.ScreenFill.NONE;
+            this.snapBar.hide();
+            this.snapPreview.aim(window.getId(), ChatWindow.ScreenFill.NONE);
             return;
         }
-        ChatWindowPlacement.Anchor snapped = snapToNeighbour(window, anchor);
+        ChatWindowPlacement.Anchor snapped = snapToNeighbour(window, anchor,
+                landing);
         ChatWindowLayout.setPosition(window.getId(),
                 ChatWindowPlacement.windowPercentX(window, snapped.x, this.mc,
                         this.screenWidth),
-                ChatWindowPlacement.windowPercentY(snapped.baseline, this.mc,
-                        this.screenHeight), false);
-        // In a screen edge's zone the window shows the part of the
-        // screen it would take on release — it glides there and back
-        // under the pointer as the zone is entered and left — which
-        // outranks sticking to a neighbour. The window's own box goes on
-        // following the pointer underneath, and the hold on it is not
-        // taken afresh for a box the drag itself moved it out of.
-        this.windowDrag.screenFill = snapZoneAt(
-                ChatWindowPlacement.preciseMouseX(this.mc, this.screenWidth),
-                ChatWindowPlacement.preciseMouseY(this.mc, this.screenHeight),
-                this.screenWidth, this.screenHeight);
-        if (this.windowDrag.screenFill != ChatWindow.ScreenFill.NONE) {
-            this.windowDrag.snapTargetId = null;
-            this.windowDrag.rebased = true;
+                ChatWindowPlacement.windowPercentY(window, snapped.baseline,
+                        this.mc, this.screenHeight), false);
+        double pointerX = ChatWindowPlacement.preciseMouseX(this.mc,
+                this.screenWidth);
+        double pointerY = ChatWindowPlacement.preciseMouseY(this.mc,
+                this.screenHeight);
+        // On the snap bar its zones decide, and its padding lands the
+        // window nowhere; anywhere else the screen's edges and corners.
+        ChatWindow.ScreenFill onBar = this.snapBar.follow(this.mc,
+                window.getId(), pointerX, pointerY, this.screenWidth,
+                this.screenHeight);
+        landing.screenFill = onBar != null ? onBar
+                : snapZoneAt(pointerX, pointerY, this.screenWidth,
+                        this.screenHeight, ChatSnapLayouts.offersThirds(
+                                this.mc, this.screenWidth, this.screenHeight));
+        landing.layout = onBar != null ? this.snapBar.litLayout()
+                : ChatSnapLayouts.layoutFor(landing.screenFill);
+        landing.companions = onBar != null ? this.snapBar.litCompanions()
+                : Collections.<String, ChatWindow.ScreenFill>emptyMap();
+        if (landing.screenFill != ChatWindow.ScreenFill.NONE) {
+            landing.snapTargetId = null;
         }
-        previewFill(window.getId(), this.windowDrag.screenFill);
+        this.snapPreview.aim(window.getId(), landing.screenFill,
+                landing.companions);
     }
 
-    /** Has the window's frame show {@code fill} for the drag, or nothing. */
-    private static void previewFill(String windowId,
-                                    ChatWindow.ScreenFill fill) {
-        ChatWindowFrame frame = ChatWindowFrame.find(windowId);
-        if (frame != null) {
-            frame.dragPreview = fill == null ? ChatWindow.ScreenFill.NONE : fill;
+    /**
+     * Ends a carry: a window let go in a snap zone fills that part of
+     * the screen — gliding into it from where it was dropped, which stays
+     * its own box to come back to — and the preview and the snap bar go.
+     * Let go on a suggestion, the suggestion's other windows go to their
+     * zones with it; otherwise the rest of the zone's layout is offered
+     * to the other windows.
+     */
+    private void land(String windowId, Landing landing) {
+        boolean fills = landing.screenFill != ChatWindow.ScreenFill.NONE;
+        if (fills) {
+            for (Map.Entry<String, ChatWindow.ScreenFill> companion
+                    : landing.companions.entrySet()) {
+                ChatWindow other = ChatWindowLayout.window(companion.getKey());
+                if (other != null && !other.isLocked()) {
+                    ChatWindowLayout.raise(other.getId());
+                    ChatWindowLayout.setFill(other.getId(),
+                            companion.getValue(), true);
+                }
+            }
+            ChatWindowLayout.raise(windowId);
+            ChatWindowLayout.setFill(windowId, landing.screenFill, false);
+            if (landing.companions.isEmpty()) {
+                this.snapAssist.offer(windowId, landing.layout,
+                        landing.screenFill);
+            }
+        }
+        this.snapPreview.release(fills);
+        this.snapBar.hide();
+    }
+
+    /**
+     * Moves stuck windows as one piece: every one of them takes the same
+     * step the carried one took, in both directions, so the group keeps
+     * its shape whichever way it is carried. The step is measured between
+     * resting boxes, all read before any of them moves; a resting box is
+     * also where a window that has just given the screen back is going.
+     */
+    private void moveGroup(ChatWindow window, List<ChatWindow> group,
+                           ChatWindowPlacement.Anchor anchor) {
+        List<ChatWindowPlacement.Box> resting =
+                new ArrayList<ChatWindowPlacement.Box>(group.size());
+        for (int index = 0; index < group.size(); index++) {
+            resting.add(ChatWindowPlacement.restingBounds(group.get(index),
+                    this.mc, this.screenWidth, this.screenHeight));
+        }
+        int carried = group.indexOf(window);
+        ChatWindowPlacement.Box origin = carried >= 0 ? resting.get(carried)
+                : ChatWindowPlacement.restingBounds(window, this.mc,
+                        this.screenWidth, this.screenHeight);
+        double deltaX = anchor.x - origin.x;
+        double deltaY = anchor.baseline - origin.baseline();
+        for (int index = 0; index < group.size(); index++) {
+            ChatWindow member = group.get(index);
+            ChatWindowPlacement.Box at = resting.get(index);
+            ChatWindowPlacement.Anchor moved =
+                    ChatWindowPlacement.constrainWindow(member, this.mc,
+                            at.x + deltaX, at.baseline() + deltaY,
+                            this.screenWidth, this.screenHeight);
+            ChatWindowLayout.setPosition(member.getId(),
+                    ChatWindowPlacement.windowPercentX(member, moved.x,
+                            this.mc, this.screenWidth),
+                    ChatWindowPlacement.windowPercentY(member,
+                            moved.baseline, this.mc, this.screenHeight),
+                    false);
         }
     }
 
     /**
      * The part of the screen a window dragged with the pointer at
-     * ({@code x}, {@code y}) snaps to, as a desktop window snaps: the
-     * whole screen from the top edge, a half from a side edge, a
-     * quarter from a corner — the end of an edge nearest the corner,
-     * {@link #SNAP_CORNER_SHARE} of its length. The bottom edge snaps
-     * only at its corners; none anywhere else.
+     * ({@code x}, {@code y}) snaps to, as a desktop window snaps: a half
+     * from a side edge, a quarter from a corner — the end of a side edge
+     * nearest the corner, {@link #SNAP_CORNER_SHARE} of its length, or
+     * the end of the top or bottom edge, {@link #SNAP_EDGE_CORNER_SHARE}
+     * of its length — and from the top edge between the corners the
+     * whole screen, or, on a screen wide enough to offer the thirds
+     * ({@code thirds}), the left or the right third from the edge's own
+     * left or right third, as Windows 11 snaps on a large screen (Nils,
+     * 2026-09-19). The bottom edge snaps only at its corners; none
+     * anywhere else.
      */
     static ChatWindow.ScreenFill snapZoneAt(double x, double y,
                                             int screenWidth,
-                                            int screenHeight) {
+                                            int screenHeight,
+                                            boolean thirds) {
         boolean atLeft = x < SNAP_REACH;
         boolean atRight = x > screenWidth - SNAP_REACH;
         boolean atTop = y < SNAP_REACH;
         boolean atBottom = y > screenHeight - SNAP_REACH;
         boolean nearTop = y < screenHeight * SNAP_CORNER_SHARE;
         boolean nearBottom = y > screenHeight * (1.0D - SNAP_CORNER_SHARE);
-        boolean nearLeft = x < screenWidth * SNAP_CORNER_SHARE;
-        boolean nearRight = x > screenWidth * (1.0D - SNAP_CORNER_SHARE);
+        boolean nearLeft = x < screenWidth * SNAP_EDGE_CORNER_SHARE;
+        boolean nearRight = x > screenWidth * (1.0D - SNAP_EDGE_CORNER_SHARE);
         if (atLeft || atRight) {
             if (nearTop) {
                 return atLeft ? ChatWindow.ScreenFill.TOP_LEFT
@@ -1040,9 +1487,17 @@ final class ChatWindowGestures {
                     : ChatWindow.ScreenFill.RIGHT;
         }
         if (atTop) {
-            return nearLeft ? ChatWindow.ScreenFill.TOP_LEFT
-                    : nearRight ? ChatWindow.ScreenFill.TOP_RIGHT
-                    : ChatWindow.ScreenFill.FULL;
+            if (nearLeft || nearRight) {
+                return nearLeft ? ChatWindow.ScreenFill.TOP_LEFT
+                        : ChatWindow.ScreenFill.TOP_RIGHT;
+            }
+            if (thirds && x < screenWidth / 3.0D) {
+                return ChatWindow.ScreenFill.LEFT_THIRD;
+            }
+            if (thirds && x >= screenWidth * 2.0D / 3.0D) {
+                return ChatWindow.ScreenFill.RIGHT_THIRD;
+            }
+            return ChatWindow.ScreenFill.FULL;
         }
         if (atBottom) {
             return nearLeft ? ChatWindow.ScreenFill.BOTTOM_LEFT
@@ -1099,20 +1554,21 @@ final class ChatWindowGestures {
     }
 
     /**
-     * Snaps the dragged window to another window's top or bottom edge
-     * when it comes within a few pixels of it, a window gap apart, and
-     * remembers that edge so the release links the two; the snapped
-     * baseline is returned.
+     * Snaps the carried window to another window's edge when it comes
+     * within a few pixels of it, a window gap apart, and remembers that
+     * edge in {@code landing} so it can be lit and a lock can link the
+     * two; the snapped place is returned.
      */
     private ChatWindowPlacement.Anchor snapToNeighbour(ChatWindow window,
-                                   ChatWindowPlacement.Anchor anchor) {
+                                   ChatWindowPlacement.Anchor anchor,
+                                   Landing landing) {
         int margin = ChatWindowPlacement.WINDOW_GAP;
         int width = ChatWindowPlacement.windowWidth(window, this.mc);
         double height = ChatWindowPlacement.currentHeight(window, this.mc);
         int barHeight = ChatWindowPlacement.barHeight(this.mc);
         double top = anchor.baseline - (height - barHeight);
         double bottom = anchor.baseline + barHeight;
-        this.windowDrag.snapTargetId = null;
+        landing.snapTargetId = null;
         double best = Double.MAX_VALUE;
         double baseline = anchor.baseline;
         double x = anchor.x;
@@ -1135,16 +1591,16 @@ final class ChatWindowGestures {
                     best = aboveGap;
                     baseline = frame.boxTop - margin - barHeight;
                     x = anchor.x;
-                    this.windowDrag.snapTargetId = other.getId();
-                    this.windowDrag.snapSide = ChatWindow.LinkSide.ABOVE;
+                    landing.snapTargetId = other.getId();
+                    landing.snapSide = ChatWindow.LinkSide.ABOVE;
                 }
                 double belowGap = Math.abs(top - (frame.boxBottom + margin));
                 if (belowGap <= ChatTabActions.LINK_SNAP && belowGap < best) {
                     best = belowGap;
                     baseline = frame.boxBottom + margin + (height - barHeight);
                     x = anchor.x;
-                    this.windowDrag.snapTargetId = other.getId();
-                    this.windowDrag.snapSide = ChatWindow.LinkSide.BELOW;
+                    landing.snapTargetId = other.getId();
+                    landing.snapSide = ChatWindow.LinkSide.BELOW;
                 }
             }
             // A side snap wants the two windows level with one another,
@@ -1163,8 +1619,8 @@ final class ChatWindowGestures {
                 // baseline it already has is the level it keeps.
                 x = frame.boxLeft - margin - width;
                 baseline = anchor.baseline;
-                this.windowDrag.snapTargetId = other.getId();
-                this.windowDrag.snapSide = ChatWindow.LinkSide.LEFT;
+                landing.snapTargetId = other.getId();
+                landing.snapSide = ChatWindow.LinkSide.LEFT;
             }
             double rightGap = Math.abs(
                     anchor.x - (frame.boxRight + margin));
@@ -1172,8 +1628,8 @@ final class ChatWindowGestures {
                 best = rightGap;
                 x = frame.boxRight + margin;
                 baseline = anchor.baseline;
-                this.windowDrag.snapTargetId = other.getId();
-                this.windowDrag.snapSide = ChatWindow.LinkSide.RIGHT;
+                landing.snapTargetId = other.getId();
+                landing.snapSide = ChatWindow.LinkSide.RIGHT;
             }
         }
         return ChatWindowPlacement.constrainWindow(window, this.mc, x,
@@ -1236,9 +1692,13 @@ final class ChatWindowGestures {
         String detachedWindowId;
         /** Where the pointer is, so the row can lean the tab toward it. */
         int pointerX;
+        /** Since when the pointer has been pressed against a screen edge past the strip; 0 while not. */
+        long againstEdgeSince;
         /** Window row the tab would dock into at the current pointer. */
         String targetWindowId;
         int targetIndex = -1;
+        /** Where the window the tabs were torn off into lands, as any carried window does. */
+        final Landing landing = new Landing();
 
         TabDrag(ChatTab tab, List<ChatTab> group, String sourceWindowId,
                 int pressX, int pressY, int grabOffsetX,
@@ -1463,11 +1923,11 @@ final class ChatWindowGestures {
         // there with nothing happening.
         ChatWindow detached = ChatWindowLayout.window(drag.detachedWindowId);
         if (detached != null) {
-            carryWindow(drag, detached, mouseX, mouseY);
+            carryWindow(drag, detached);
             return;
         }
         if (hasLeftItsRow(drag, mouseX, mouseY)) {
-            tearOff(drag, mouseX, mouseY);
+            tearOff(drag);
             return;
         }
         // Still in its row, wherever the pointer has wandered: a tab on
@@ -1494,6 +1954,9 @@ final class ChatWindowGestures {
             return false;
         }
         drag.detachedWindowId = null;
+        // The window the tabs rode in is gone, and its landing with it.
+        this.snapPreview.reset();
+        this.snapBar.hide();
         ChatWindowLayout.raise(targetWindowId);
         ChatTabSelection.selectAll(targetWindowId, drag.group);
         this.tabActions.selectChannel(drag.tab);
@@ -1577,8 +2040,25 @@ final class ChatWindowGestures {
         if (row == null) {
             return true;
         }
-        return pulledBeyond(stripOverhang(row, mouseX),
-                bandOverhang(row, mouseY), DETACH_DISTANCE);
+        int dx = stripOverhang(row, mouseX);
+        int dy = bandOverhang(row, mouseY);
+        if (pulledBeyond(dx, dy, DETACH_DISTANCE)) {
+            return true;
+        }
+        // Against a screen edge the pull stops short however far the
+        // hand goes, so resting there past the strip is pull enough.
+        boolean againstEdge = (dy > 0 && (mouseY <= 0
+                || mouseY >= this.screenHeight - 1))
+                || (dx > 0 && (mouseX <= 0 || mouseX >= this.screenWidth - 1));
+        long now = System.nanoTime();
+        if (!againstEdge) {
+            drag.againstEdgeSince = 0L;
+            return false;
+        }
+        if (drag.againstEdgeSince == 0L) {
+            drag.againstEdgeSince = now;
+        }
+        return now - drag.againstEdgeSince >= EDGE_TEAR_NANOS;
     }
 
     /**
@@ -1586,62 +2066,61 @@ final class ChatWindowGestures {
      * its row lands under the pointer. Refused at the window cap, where
      * the tabs stay in their row and the drag goes on as a ghost.
      */
-    private void tearOff(TabDrag drag, int mouseX, int mouseY) {
+    private void tearOff(TabDrag drag) {
         // Placed for the window it is about to become, which is as tall
         // and as wide as the one it is leaving. Measuring it as a window
         // of the smallest possible size — which is what asking for no
         // window at all answers — put it a whole window's height out for
         // the one frame before the carry corrected it.
         ChatWindow source = ChatWindowLayout.windowOf(drag.tab);
-        ChatWindowPlacement.Anchor anchor = carriedAnchor(source, drag,
-                mouseX, mouseY);
+        ChatWindowPlacement.Anchor anchor = carriedAnchor(source, drag);
         ChatWindow window = ChatWindowLayout.detach(drag.group,
                 ChatWindowPlacement.windowPercentX(source, anchor.x, this.mc,
                         this.screenWidth),
-                ChatWindowPlacement.windowPercentY(anchor.baseline, this.mc,
-                        this.screenHeight));
+                ChatWindowPlacement.windowPercentY(source, anchor.baseline,
+                        this.mc, this.screenHeight));
         if (window == null) {
             return;
         }
         drag.leftRowId = source == null ? drag.sourceWindowId
                 : source.getId();
         drag.detachedWindowId = window.getId();
+        // It appears under the pointer on a quick fade rather than in a
+        // frame.
+        ChatWindowFrame.of(window).beginAppearing();
         ChatWindowLayout.raise(window.getId());
         ChatTabSelection.selectAll(window.getId(), drag.group);
         this.tabActions.selectChannel(drag.tab);
     }
 
     /**
-     * Keeps a torn-off window's row under the pointer as it moves. A
-     * window filling a part of the screen gives it back the moment it is
-     * carried, taking its own size again with the tab still under the
-     * hand.
+     * Keeps a torn-off window's row under the pointer as it moves, and
+     * carries it as a window taken by its strip is carried — sticking to
+     * a neighbour, snapping into a part of the screen. A window filling a
+     * part of the screen gives it back the moment it is carried, taking
+     * its own size again with the tab still under the hand.
      */
-    private void carryWindow(TabDrag drag, ChatWindow window, int mouseX,
-                             int mouseY) {
+    private void carryWindow(TabDrag drag, ChatWindow window) {
         if (window.getFill() != ChatWindow.ScreenFill.NONE) {
             ChatWindowLayout.setFill(window.getId(),
                     ChatWindow.ScreenFill.NONE, false);
         }
-        ChatWindowPlacement.Anchor anchor = carriedAnchor(window, drag,
-                mouseX, mouseY);
-        ChatWindowLayout.setPosition(window.getId(),
-                ChatWindowPlacement.windowPercentX(window, anchor.x, this.mc,
-                        this.screenWidth),
-                ChatWindowPlacement.windowPercentY(anchor.baseline, this.mc,
-                        this.screenHeight), false);
+        ChatWindowPlacement.Anchor anchor = carriedAnchor(window, drag);
+        carry(window, drag.landing, anchor.x, anchor.baseline);
     }
 
     /**
      * Where a window carrying the dragged tabs sits: its row under the
-     * pointer, held where the tab was taken hold of, and kept on screen.
+     * pointer's exact position, as a window taken by its strip follows
+     * it, held where the tab was taken hold of, and kept on screen.
      */
     private ChatWindowPlacement.Anchor carriedAnchor(ChatWindow window,
-                                                     TabDrag drag,
-                                                     int mouseX, int mouseY) {
-        int rowTop = mouseY - drag.grabOffsetY;
+                                                     TabDrag drag) {
+        double rowTop = ChatWindowPlacement.preciseMouseY(this.mc,
+                this.screenHeight) - drag.grabOffsetY;
         return ChatWindowPlacement.constrainWindow(window, this.mc,
-                mouseX - drag.grabOffsetInWindowX,
+                ChatWindowPlacement.preciseMouseX(this.mc, this.screenWidth)
+                        - drag.grabOffsetInWindowX,
                 ChatWindowPlacement.baselineForRowTop(window, this.mc,
                         rowTop),
                 this.screenWidth, this.screenHeight);
@@ -1649,9 +2128,10 @@ final class ChatWindowGestures {
 
     /**
      * Releases a dragged tab. The tabs have been where they are all
-     * along — in a row they slid into, or in a window of their own —
-     * so letting go decides nothing and moves nothing: only the resting
-     * layout is written.
+     * along — in a row they slid into, or in a window of their own — so
+     * letting go moves no tab: a window of their own let go in a snap
+     * zone fills it, as one dropped by its strip does, and the layout is
+     * written.
      *
      * <p>The drag is deliberately <em>not</em> asked once more here. It
      * has already run for every frame and every pointer event of the
@@ -1660,7 +2140,10 @@ final class ChatWindowGestures {
      * pointer happened to be near, taking back a window the player could
      * plainly see they had just pulled out.</p>
      */
-    private static void dropTab() {
+    private void dropTab(TabDrag drag) {
+        if (drag.detachedWindowId != null) {
+            land(drag.detachedWindowId, drag.landing);
+        }
         ChatWindowLayout.persist();
     }
 }

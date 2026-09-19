@@ -317,7 +317,7 @@ final class ChatInputField extends GuiTextField {
                     .isMentionCharacter(visible.charAt(at - 1));
             int color = opensWord && end > at + 1
                     ? ChatMentionColors.colorOf(
-                            visible.substring(at + 1, end), channel)
+                            visible.substring(at + 1, end))
                     : -1;
             if (color >= 0) {
                 for (int index = at; index < end; index++) {
@@ -344,7 +344,7 @@ final class ChatInputField extends GuiTextField {
             }
             String run = visible.substring(start, end);
             LostTalesChatVisualStyle.drawColored(this.font, run, cursor, y,
-                    colors[start], 255);
+                    colors[start], ChatInputBar.faded(255));
             cursor += this.font.getStringWidth(run);
             start = end;
         }
@@ -689,7 +689,7 @@ final class ChatInputField extends GuiTextField {
                     + text.substring(start, end);
             LostTalesChatVisualStyle.drawColored(this.font, run, cursor, y,
                     ChatInputStyles.colorOf(style, colors[start - colorsBase]),
-                    255);
+                    ChatInputBar.faded(255));
             cursor += rawWidth(text, start, end);
             start = end;
         }
@@ -739,11 +739,11 @@ final class ChatInputField extends GuiTextField {
                     ChatInlineIcons.boxLeft(x, ChatInlineIcons.SLOT_WIDTH),
                     ChatInlineIcons.boxTop(y, ChatInlineIcons.SLOT_WIDTH),
                     ChatInlineIcons.contentSize(ChatInlineIcons.SLOT_WIDTH),
-                    255);
+                    ChatInputBar.faded(255));
             return x + preview.width;
         }
         LostTalesChatVisualStyle.drawColored(this.font, "[", x, y,
-                preview.rgb, 255);
+                preview.rgb, ChatInputBar.faded(255));
         x += this.font.getStringWidth("[");
         int slot = slotWidth(preview.kind);
         float boxX = ChatInlineIcons.boxLeft(x, slot);
@@ -751,15 +751,16 @@ final class ChatInputField extends GuiTextField {
         float size = ChatInlineIcons.contentSize(slot);
         if (preview.kind == ChatShareKind.ITEM) {
             ChatInlineIcons.drawItem(minecraft, preview.stack, boxX, boxY,
-                    size, 255);
+                    size, ChatInputBar.faded(255));
         } else {
             ChatInlineIcons.drawMarker(minecraft, preview.markerIcon,
-                    preview.iconRgb, boxX, boxY, size, 255);
+                    preview.iconRgb, boxX, boxY, size,
+                    ChatInputBar.faded(255));
         }
         x += slot;
         String tail = " " + preview.name + "]";
         LostTalesChatVisualStyle.drawColored(this.font, tail, x, y,
-                preview.rgb, 255);
+                preview.rgb, ChatInputBar.faded(255));
         return x + this.font.getStringWidth(tail);
     }
 

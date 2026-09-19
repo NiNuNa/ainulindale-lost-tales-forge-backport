@@ -2179,7 +2179,7 @@ public final class LostTalesChatPresentation {
             String actor = event.getActor();
             if (actor.length() > 0 && !isServerActor(actor)) {
                 line.appendSibling(actorMention(localMentionNames(minecraft),
-                        actor, mentioned));
+                        actor, event.getActorIdentity(), mentioned));
                 line.appendSibling(text(" ", null, false));
             }
             line.appendSibling(text(asSentence(event.getText()),
@@ -2223,24 +2223,28 @@ public final class LostTalesChatPresentation {
      * whenever the entry is shown: the actor is an account by the
      * server's word, so an entry about a player long offline names them
      * as it did when it was new. A name this client can place reads as
-     * {@link #asMentionName} shows it; one it cannot place keeps the
-     * account's name, in its primary role's colour where this client
-     * knows the roles and the shared accent until it does, which the
-     * marker upgrades once they are known. The Server stays plain.
+     * {@link #asMentionName} shows it; one it cannot place reads as the
+     * server recorded it with the entry ({@code recorded}), in the colour
+     * the account's name wore and opening its card and menu; failing
+     * that, the account's name in its primary role's colour where this
+     * client knows the roles and the shared accent until it does, which
+     * the marker upgrades once they are known. The Server stays plain.
      */
     static IChatComponent actorMention(List<String> localNames,
-                                       String actor, boolean[] mentioned) {
+                                       String actor, ChatNamedPlayer recorded,
+                                       boolean[] mentioned) {
         String account = actor == null ? "" : actor.trim();
         if (account.length() == 0 || isServerActor(account)) {
             return text(account, null, false);
         }
         IChatComponent placed = asMentionName(account,
                 ChatChannel.SERVER_CONSOLE, localNames, mentioned,
-                Collections.<ChatNamedPlayer>emptyList());
+                recorded == null ? Collections.<ChatNamedPlayer>emptyList()
+                        : Collections.singletonList(recorded));
         if (placed != null) {
             return placed;
         }
-        int color = ChatMentionColors.accountColorOf(account);
+        int color = ChatMentionColors.PLAYER_RGB;
         return ChatMentionMarker.apply(text("@" + account,
                 nearestFormatting(color), false), color, account, null);
     }
@@ -2273,7 +2277,7 @@ public final class LostTalesChatPresentation {
                                                 ChatConsoleEvent event,
                                                 boolean[] mentioned) {
         IChatComponent actor = actorMention(localMentionNames(minecraft),
-                event.getActor(), mentioned);
+                event.getActor(), event.getActorIdentity(), mentioned);
         IChatComponent command = codeRun(event.getText(), true);
         ChatTab typedIn = ChatTab.fromId(event.getContext());
         if (typedIn == null) {
@@ -2891,9 +2895,10 @@ public final class LostTalesChatPresentation {
             if (local) {
                 localMentioned[0] = true;
             }
+            int recordedColor = ChatMentionColors.PLAYER_RGB;
             ChatComponentText piece = text("@" + recorded.getIdentityName(),
-                    nearestFormatting(recorded.getNameColor()), false);
-            return ChatMentionMarker.apply(piece, recorded.getNameColor(),
+                    nearestFormatting(recordedColor), false);
+            return ChatMentionMarker.apply(piece, recordedColor,
                     recorded.getAccount(), recorded);
         }
         if (!local && account == null) {
@@ -2901,16 +2906,14 @@ public final class LostTalesChatPresentation {
         }
         // Every channel signs a line with the sender's active
         // role-playing character by default; a system line naming the
-        // account shows the same identity when the client knows it —
-        // the character's name, in the colour the mention resolution
-        // below gives every mention of that identity, so an achievement
-        // names its player exactly as their lines do.
+        // account shows the same identity when the client knows it — the
+        // character's name — as the mention it is, in the mention colour.
         String shown = characterName != null ? characterName : text;
-        int color = ChatMentionColors.colorOf(text, channel);
+        int color = ChatMentionColors.colorOf(text);
         if (color < 0) {
             // One of this client's own names the public caches cannot
-            // place; the shared accent stands in.
-            color = LostTalesColors.rgb(LostTalesColors.HONEY);
+            // place: a mention all the same.
+            color = ChatMentionColors.PLAYER_RGB;
         }
         if (local) {
             localMentioned[0] = true;
@@ -3494,8 +3497,7 @@ public final class LostTalesChatPresentation {
             boolean opensWord = at == 0 || !ChatMentionColors
                     .isMentionCharacter(text.charAt(at - 1));
             int color = opensWord && end > at + 1
-                    ? ChatMentionColors.colorOf(
-                            text.substring(at + 1, end), channel)
+                    ? ChatMentionColors.colorOf(text.substring(at + 1, end))
                     : -1;
             // The player as the server recorded them with the line: a
             // name this client cannot place any more is coloured by it,
@@ -3506,7 +3508,7 @@ public final class LostTalesChatPresentation {
                     : null;
             if (color < 0 && recorded != null
                     && LostTalesConfig.enableChatPings) {
-                color = recordedMentionColor(recorded, channel);
+                color = ChatMentionColors.PLAYER_RGB;
             }
             if (color >= 0) {
                 if (at > literalStart) {
@@ -3548,21 +3550,6 @@ public final class LostTalesChatPresentation {
                     text.substring(literalStart)),
                     EnumChatFormatting.WHITE, false));
         }
-    }
-
-    /**
-     * The colour a recorded mention is drawn in, by the rule a live one
-     * follows: out of character, or for a player who wore the account,
-     * the account's own; in character, the colour of the identity the
-     * player was playing when the line was said.
-     */
-    private static int recordedMentionColor(ChatNamedPlayer recorded,
-                                            ChatChannel channel) {
-        boolean character = !recorded.getIdentityName()
-                .equalsIgnoreCase(recorded.getAccount());
-        return ChatRolePresentation.showsRoles(channel) || !character
-                ? ChatMentionColors.accountColorOf(recorded.getAccount())
-                : recorded.getNameColor();
     }
 
     /** Palette stand-ins for vanilla rarity colours. */

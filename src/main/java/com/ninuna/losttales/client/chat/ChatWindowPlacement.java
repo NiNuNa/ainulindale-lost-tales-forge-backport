@@ -67,13 +67,19 @@ public final class ChatWindowPlacement {
     static final int WINDOW_GAP = HudPlacementLayout.SCREEN_MARGIN
             + 2 * FRAME_WIDTH;
     /**
-     * The least of a window that stays on screen when it is pushed past
-     * a side of the screen: a stretch of its strip wide enough to take
-     * hold of again, as a desktop window keeps its title bar reachable.
-     * Above, the strip never leaves the screen at all; below, the whole
-     * strip stays in view ({@link ChatChannelTabBar#ROW_HEIGHT}).
+     * How much of a window stays on screen however far it is pushed past
+     * the screen's left, right or bottom edge: a twentieth of its width
+     * or height, so it may go ninety-five hundredths of the way out, and
+     * never less than {@link #MIN_HOLD}. The top edge holds the whole
+     * window instead: its tab strip never leaves the screen, as a desktop
+     * keeps a window's title bar in reach.
      */
-    public static final int EDGE_HOLD = 40;
+    public static final double HOLD_SHARE = 0.05D;
+    /**
+     * The least of a window that stays on screen past an edge, in GUI
+     * pixels: a stretch the pointer can still take hold of.
+     */
+    public static final int MIN_HOLD = 8;
     /**
      * The tool strip between the tab row's rule and the history: the
      * window's room for the controls that read its history, a band of
@@ -435,11 +441,9 @@ public final class ChatWindowPlacement {
                                 - gap - barHeight
                         : baseline[t] + barHeight + gap + room[i]
                                 + HISTORY_TOP_MARGIN + row;
-                double ceiling = EDGE_MARGIN + room[i] + HISTORY_TOP_MARGIN
-                        + row;
-                wanted = Math.max(ceiling, Math.min(maxBaseline(
+                wanted = holdBaseline(wanted,
                         row + HISTORY_TOP_MARGIN + room[i] + barHeight,
-                        barHeight, screenHeight, EDGE_MARGIN), wanted));
+                        barHeight, screenHeight);
                 if (wanted != baseline[i]) {
                     baseline[i] = wanted;
                     moved = true;
@@ -481,9 +485,9 @@ public final class ChatWindowPlacement {
             height = heightForRoom(room, minecraft);
         }
         int barHeight = barHeight(minecraft);
-        double baseline = keepOnScreen(baselineFor(window.getOffsetY(),
-                minecraft, screenHeight), height, barHeight, screenHeight,
-                EDGE_MARGIN);
+        double baseline = holdBaseline(baselineFor(window.getOffsetY(),
+                height, minecraft, screenHeight), height, barHeight,
+                screenHeight);
         return new Box(holdOnScreen(position(window.getOffsetX(),
                 screenWidth, width, EDGE_MARGIN), width, screenWidth),
                 baseline - (height - barHeight), width, height, barHeight,
@@ -543,6 +547,22 @@ public final class ChatWindowPlacement {
     }
 
     /**
+     * The part of the screen a window standing between {@code left} and
+     * {@code right} fills when it is stretched to the screen's whole
+     * height in its own column, as a desktop window's top edge carried to
+     * the top of the screen stretches it: its own width, with room for
+     * the frame round it as every part keeps.
+     */
+    static ChatWindow.ScreenFill columnFill(double left, double right,
+                                            int screenWidth) {
+        if (screenWidth <= 0) {
+            return ChatWindow.ScreenFill.NONE;
+        }
+        return ChatWindow.ScreenFill.free((left - EDGE_MARGIN) / screenWidth,
+                0.0D, (right + EDGE_MARGIN) / screenWidth, 1.0D);
+    }
+
+    /**
      * The box a window fills a part of the screen with: that part of the
      * screen with room for the frame round it, so two windows filling
      * neighbouring parts stand a window gap apart, its lines laid out to its
@@ -596,53 +616,52 @@ public final class ChatWindowPlacement {
     }
 
     /**
-     * Pushes a baseline down when the box above it would cross the top
-     * margin, and up when its strip would leave the screen below, so
-     * the strip is always in reach: a window may hang below the screen
-     * with everything but its strip out of view, never above it.
+     * Keeps the closed feed's box whole on the screen: pushed down where
+     * it would cross the top margin, up where it would leave the screen
+     * below. The feed is placed in the HUD editor and never hangs off.
      */
     static double keepOnScreen(double baseline, double height, int barHeight,
                                int screenHeight) {
-        return keepOnScreen(baseline, height, barHeight, screenHeight,
-                HudPlacementLayout.SCREEN_MARGIN);
-    }
-
-    /** As above, the box kept {@code margin} inside the screen. */
-    static double keepOnScreen(double baseline, double height, int barHeight,
-                               int screenHeight, int margin) {
+        int margin = HudPlacementLayout.SCREEN_MARGIN;
         double minBaseline = margin + height - barHeight;
         double maxBaseline = Math.max(minBaseline,
-                maxBaseline(height, barHeight, screenHeight, margin));
+                screenHeight - margin - barHeight);
         return Math.max(minBaseline, Math.min(maxBaseline, baseline));
     }
 
     /**
-     * The lowest baseline a box {@code height} tall may take: its strip
-     * whole on the screen above the bottom margin.
+     * A window's baseline held on the screen: its tab strip never above
+     * the top margin — a window grown past the top is pushed down rather
+     * than off — and below, {@link #hold} of the box still in view.
      */
-    static double maxBaseline(double height, int barHeight, int screenHeight) {
-        return maxBaseline(height, barHeight, screenHeight,
-                HudPlacementLayout.SCREEN_MARGIN);
-    }
-
-    /** As above, {@code margin} above the screen's bottom. */
-    static double maxBaseline(double height, int barHeight, int screenHeight,
-                              int margin) {
-        return screenHeight - margin - ChatChannelTabBar.ROW_HEIGHT + height
-                - barHeight;
+    static double holdBaseline(double baseline, double height, int barHeight,
+                               int screenHeight) {
+        double minBaseline = EDGE_MARGIN + height - barHeight;
+        double maxBaseline = Math.max(minBaseline,
+                screenHeight - hold(height) + height - barHeight);
+        return Math.max(minBaseline, Math.min(maxBaseline, baseline));
     }
 
     /**
-     * A left edge held so that {@link #EDGE_HOLD} of a box {@code width}
-     * wide stays on the screen: past either side by the rest of the
-     * width at most, and never past the margins for a box narrower than
-     * the hold.
+     * A left edge held so that {@link #hold} of a box {@code width} wide
+     * stays on the screen past either side, and a box that fits kept
+     * inside the margins.
      */
     static double holdOnScreen(double x, int width, int screenWidth) {
-        int margin = EDGE_MARGIN;
-        double minX = Math.min(margin, margin + EDGE_HOLD - width);
-        double maxX = Math.max(margin, screenWidth - margin - EDGE_HOLD);
+        double hold = hold(width);
+        double minX = Math.min(EDGE_MARGIN, hold - width);
+        double maxX = Math.max(EDGE_MARGIN, screenWidth - hold);
         return Math.max(minX, Math.min(maxX, x));
+    }
+
+    /**
+     * How much of a box {@code size} long stays on screen past an edge:
+     * {@link #HOLD_SHARE} of it, at least {@link #MIN_HOLD}, never more
+     * than the box.
+     */
+    static double hold(double size) {
+        return Math.min(Math.max(0.0D, size),
+                Math.max(MIN_HOLD, size * HOLD_SHARE));
     }
 
     public static double windowPercentX(double x, Minecraft minecraft,
@@ -660,20 +679,51 @@ public final class ChatWindowPlacement {
 
     /**
      * The baseline for a percent: 0 puts the smallest box against the
-     * top margin, 100 puts the bar against the bottom margin.
+     * top margin, 100 puts the bar against the bottom margin, and past
+     * 100 the window hangs below the screen by that many hundredths of
+     * its own {@code height}, as it hangs past a side by a share of its
+     * width. Nothing goes above the top: there the strip stays.
      */
-    public static double baselineFor(double percent, Minecraft minecraft,
-                                     int screenHeight) {
+    public static double baselineFor(double percent, double height,
+                                     Minecraft minecraft, int screenHeight) {
         int minHeight = minHeight(minecraft);
-        return position(percent, screenHeight, minHeight, EDGE_MARGIN)
-                + minHeight - barHeight(minecraft);
+        double bounded = Math.max(0.0D,
+                ChatWindowLayout.clampWindowPercent(percent));
+        double above = minHeight - barHeight(minecraft);
+        if (bounded > 100.0D) {
+            return position(100.0D, screenHeight, minHeight, EDGE_MARGIN)
+                    + above + Math.max(0.0D, height)
+                    * (bounded - 100.0D) / 100.0D;
+        }
+        return position(bounded, screenHeight, minHeight, EDGE_MARGIN)
+                + above;
     }
 
-    public static double windowPercentY(double baseline, Minecraft minecraft,
+    /** The inverse of {@link #baselineFor}, for a box {@code height} tall. */
+    public static double windowPercentY(double baseline, double height,
+                                        Minecraft minecraft,
                                         int screenHeight) {
+        double lowest = baselineFor(100.0D, height, minecraft, screenHeight);
+        if (baseline > lowest && height > 0.0D) {
+            return ChatWindowLayout.clampWindowPercent(
+                    100.0D + (baseline - lowest) * 100.0D / height);
+        }
         int minHeight = minHeight(minecraft);
-        return percent(baseline - (minHeight - barHeight(minecraft)),
-                screenHeight, minHeight, EDGE_MARGIN);
+        return Math.max(0.0D, percent(baseline
+                - (minHeight - barHeight(minecraft)), screenHeight,
+                minHeight, EDGE_MARGIN));
+    }
+
+    /**
+     * As above for a window at the height it shows now; {@code window}
+     * null means a window about to be created, at its smallest.
+     */
+    public static double windowPercentY(ChatWindow window, double baseline,
+                                        Minecraft minecraft,
+                                        int screenHeight) {
+        return windowPercentY(baseline, window == null
+                ? minHeight(minecraft) : currentHeight(window, minecraft),
+                minecraft, screenHeight);
     }
 
     /**
@@ -695,10 +745,11 @@ public final class ChatWindowPlacement {
     }
 
     /**
-     * Keeps a window's requested position on screen: the whole box as it
-     * currently shows stays inside the margins. Other windows do not
-     * hold it; windows may overlap. {@code window} null means a window
-     * about to be created, at its smallest.
+     * Keeps a window's requested position on screen: its strip under the
+     * top margin, and {@link #hold} of it in view past the other three
+     * edges. Other windows do not hold it; windows may overlap.
+     * {@code window} null means a window about to be created, at its
+     * smallest.
      */
     public static Anchor constrainWindow(ChatWindow window,
                                          Minecraft minecraft,
@@ -708,8 +759,8 @@ public final class ChatWindowPlacement {
         double height = window == null ? minHeight(minecraft)
                 : currentHeight(window, minecraft);
         return new Anchor(holdOnScreen(x, width, screenWidth),
-                keepOnScreen(baseline, height, barHeight(minecraft),
-                        screenHeight, EDGE_MARGIN));
+                holdBaseline(baseline, height, barHeight(minecraft),
+                        screenHeight));
     }
 
     /** The share of the screen the closed feed may fill at most. */

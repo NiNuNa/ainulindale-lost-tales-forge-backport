@@ -9,7 +9,8 @@ import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
  *
  * <p>The screen finds it once per frame from the top of what is drawn
  * down, in the order a press is handled: the card a click opened, the
- * open menu, the completion lists, the open picker, a window's edge,
+ * open menu, the snap layouts, the completion lists, the open picker, a
+ * window's edge,
  * the tab rows, the bar's controls, anything else painted above the
  * lines, a window's own controls, the runs of the lines, and the window
  * itself. Only the control found sees the pointer. Everything under it
@@ -33,6 +34,10 @@ final class ChatHover {
         MENU_ENTRY,
         /** The open menu's own panel: a header, a display row, padding. */
         MENU,
+        /** The snap layouts under a fullscreen control: a zone, or the panel round them. */
+        SNAP_LAYOUT,
+        /** A card of snap assist, offering a window for an empty zone. */
+        SNAP_ASSIST,
         /** The {@code +} the empty state offers. */
         EMPTY_PLUS,
         /** A row of an open completion list. */
@@ -50,7 +55,7 @@ final class ChatHover {
         /** A tab, a tab's control, an end control or the grip. */
         TAB_ROW,
         /**
-         * A window's tool strip: the area's chevron, the member list's
+         * A window's tool strip: the area's button, the member list's
          * button, or the message search's well and its controls.
          */
         TOOL_STRIP,
@@ -78,6 +83,8 @@ final class ChatHover {
         LINE,
         /** A window's member list: a member's row, or the list around them. */
         MEMBER_LIST,
+        /** A window's member list's left edge, which resizes the list. */
+        MEMBER_LIST_EDGE,
         /** A window's lines where no run stands, its timestamp area included. */
         WINDOW
     }
@@ -98,6 +105,10 @@ final class ChatHover {
     ChatPickerPanel.Entry pickerEntry;
     ChatInputCompletion.Slot suggestion;
     int toolbarKind = -1;
+    /** On the snap layouts, which zone of the panel; -1 on the panel round them. */
+    int snapZone = -1;
+    /** On snap assist, the card under the pointer. */
+    ChatSnapAssist.Card assistCard;
     /**
      * On a window's lines, the chat line id of the message whose
      * delivery mark is under the pointer; 0 anywhere else.
@@ -159,6 +170,10 @@ final class ChatHover {
                 // a hand.
                 return this.stripPart != null
                         && this.stripPart != ChatToolStrip.Part.FIELD;
+            case SNAP_LAYOUT:
+                return this.snapZone >= 0;
+            case SNAP_ASSIST:
+                return this.assistCard != null;
             case LINE:
             case MEMBER_LIST:
             case WINDOW:
@@ -172,6 +187,9 @@ final class ChatHover {
     LostTalesMapCursor.Pose pose() {
         if (this.kind == Kind.RESIZE && this.resize != null) {
             return ChatWindowGestures.cursorPose(this.resize.edge);
+        }
+        if (this.kind == Kind.MEMBER_LIST_EDGE) {
+            return LostTalesMapCursor.Pose.RESIZE_HORIZONTAL;
         }
         return acts() ? LostTalesMapCursor.Pose.HAND
                 : LostTalesMapCursor.Pose.ARROW;

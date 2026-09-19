@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
+import com.ninuna.losttales.chat.ChatStatusLine;
 import com.ninuna.losttales.client.character.LostTalesClientAccount;
 import com.ninuna.losttales.config.LostTalesConfigFiles;
 import java.io.BufferedReader;
@@ -22,14 +23,16 @@ import java.util.UUID;
 
 /**
  * The status this account last chose for each of its identities on each
- * server, kept between sessions, so a character left on Do Not Disturb or
- * Invisible is still so on the next visit. Online is the resting state
- * and is kept as no line.
+ * server, and the status line it set for each, kept between sessions,
+ * so a character left on Do Not Disturb or Invisible is still so on the
+ * next visit and still says what it said. Online is the resting state
+ * and is kept as no line, and so is no status line.
  *
  * <p>A choice is the chooser's own, so it lives with the client's other
  * preferences: one file per account under the client folder, a line per
- * server and identity, written as the choice is made. Bounded, the
- * choices touched longest ago going first.</p>
+ * server and identity — its status, or its status line after the word
+ * {@code line} — written as the choice is made. Bounded, the choices
+ * touched longest ago going first.</p>
  */
 public final class ClientChatPresenceChoices {
     /** The folder under the client's, one file per account. */
@@ -46,6 +49,11 @@ public final class ClientChatPresenceChoices {
      */
     private static final LinkedHashMap<String, ChatPresence> CHOICES =
             new LinkedHashMap<String, ChatPresence>(32, 0.75F, true);
+    /** The status lines, kept the same way. */
+    private static final LinkedHashMap<String, String> LINES =
+            new LinkedHashMap<String, String>(32, 0.75F, true);
+    /** What a status line's record says in place of a status. */
+    private static final String LINE_WORD = "line";
 
     private ClientChatPresenceChoices() {}
 
@@ -65,6 +73,7 @@ public final class ClientChatPresenceChoices {
                 : new File(new File(configDirectory, FOLDER),
                         accountId.toString() + ".txt");
         CHOICES.clear();
+        LINES.clear();
         List<String> lines = readLines(storeFile);
         if (lines != null) {
             load(lines);
@@ -92,6 +101,48 @@ public final class ClientChatPresenceChoices {
         return found;
     }
 
+    /** The status lines kept for one server, by identity. */
+    static synchronized Map<ChatPresenceIdentity, String> linesForPlace(
+            String serverKey) {
+        Map<ChatPresenceIdentity, String> found =
+                new LinkedHashMap<ChatPresenceIdentity, String>();
+        if (!isUsableKey(serverKey)) {
+            return found;
+        }
+        String prefix = serverKey + SEPARATOR;
+        for (Map.Entry<String, String> entry : LINES.entrySet()) {
+            if (entry.getKey().startsWith(prefix)) {
+                ChatPresenceIdentity identity = ChatPresenceIdentity.fromText(
+                        entry.getKey().substring(prefix.length()));
+                if (identity != null) {
+                    found.put(identity, entry.getValue());
+                }
+            }
+        }
+        return found;
+    }
+
+    /**
+     * Keeps a status line for one identity on one server, cleaned, and
+     * writes the file; an empty one is forgotten.
+     */
+    static synchronized void rememberLine(String serverKey,
+                                          ChatPresenceIdentity identity,
+                                          String line) {
+        if (!isUsableKey(serverKey) || identity == null) {
+            return;
+        }
+        String key = serverKey + SEPARATOR + identity.toText();
+        String cleaned = ChatStatusLine.clean(line);
+        if (cleaned.length() == 0) {
+            LINES.remove(key);
+        } else {
+            LINES.put(key, cleaned);
+            trim();
+        }
+        save();
+    }
+
     /** Keeps a choice for one identity on one server, and writes the file. */
     static synchronized void remember(String serverKey,
                                       ChatPresenceIdentity identity,
@@ -113,9 +164,14 @@ public final class ClientChatPresenceChoices {
     /** The file's lines: one choice each, oldest touched first. */
     static synchronized List<String> describe() {
         List<String> lines = new ArrayList<String>(CHOICES.size() + 1);
-        lines.add("# Lost Tales chat statuses: server, identity, status.");
+        lines.add("# Lost Tales chat statuses: server, identity, status;"
+                + " or server, identity, line, status line.");
         for (Map.Entry<String, ChatPresence> choice : CHOICES.entrySet()) {
             lines.add(choice.getKey() + SEPARATOR + choice.getValue().getId());
+        }
+        for (Map.Entry<String, String> line : LINES.entrySet()) {
+            lines.add(line.getKey() + SEPARATOR + LINE_WORD + SEPARATOR
+                    + line.getValue());
         }
         return lines;
     }
@@ -128,6 +184,18 @@ public final class ClientChatPresenceChoices {
                 continue;
             }
             String[] parts = line.split(String.valueOf(SEPARATOR));
+            if (parts.length == 4 && LINE_WORD.equals(parts[2])
+                    && isUsableKey(parts[0])) {
+                ChatPresenceIdentity identity =
+                        ChatPresenceIdentity.fromText(parts[1]);
+                String status = ChatStatusLine.clean(parts[3]);
+                if (identity != null && status.length() > 0) {
+                    LINES.put(parts[0] + SEPARATOR + identity.toText(),
+                            status);
+                    trim();
+                }
+                continue;
+            }
             if (parts.length != 3 || !isUsableKey(parts[0])) {
                 continue;
             }
@@ -145,6 +213,7 @@ public final class ClientChatPresenceChoices {
     /** Forgets every choice without touching the file; for tests. */
     static synchronized void clear() {
         CHOICES.clear();
+        LINES.clear();
     }
 
     private static boolean isUsableKey(String serverKey) {
@@ -155,6 +224,11 @@ public final class ClientChatPresenceChoices {
     private static void trim() {
         while (CHOICES.size() > MAX_CHOICES) {
             Iterator<String> oldest = CHOICES.keySet().iterator();
+            oldest.next();
+            oldest.remove();
+        }
+        while (LINES.size() > MAX_CHOICES) {
+            Iterator<String> oldest = LINES.keySet().iterator();
             oldest.next();
             oldest.remove();
         }

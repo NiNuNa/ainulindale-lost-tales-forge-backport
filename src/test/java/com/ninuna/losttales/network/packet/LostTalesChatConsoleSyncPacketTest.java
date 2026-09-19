@@ -1,15 +1,18 @@
 package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.chat.ChatConsoleEvent;
+import com.ninuna.losttales.chat.ChatNamedPlayer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /** Console entries cross whole, in order, and a bad one refuses the batch. */
@@ -55,10 +58,40 @@ public final class LostTalesChatConsoleSyncPacketTest {
         LostTalesPacketCodec.writeUtf8String(buffer, "Steve", 256);
         LostTalesPacketCodec.writeUtf8String(buffer, "/gamemode 1", 2048);
         LostTalesPacketCodec.writeUtf8String(buffer, "all\u0001", 2048);
+        buffer.writeBoolean(false);
         LostTalesChatConsoleSyncPacket decoded = new LostTalesChatConsoleSyncPacket();
         decoded.fromBytes(buffer);
         assertTrue(decoded.isMalformed());
         assertTrue(decoded.getEvents().isEmpty());
+    }
+
+    /**
+     * An entry carries its actor's account as the server knew it, by its
+     * id, so the client can open their card after they have gone; a
+     * record naming another account is dropped.
+     */
+    @Test
+    public void theActorsAccountCrossesWithTheEntry() {
+        UUID steve = UUID.randomUUID();
+        ChatConsoleEvent command = new ChatConsoleEvent(10L, 5000L,
+                ChatConsoleEvent.Kind.COMMAND, ChatConsoleEvent.Severity.INFO,
+                "Steve", "/gamemode 1", "",
+                ChatNamedPlayer.account(steve, "Steve"));
+        assertEquals(steve, command.getActorIdentity().getPlayerId());
+        ByteBuf buffer = Unpooled.buffer();
+        new LostTalesChatConsoleSyncPacket(Arrays.asList(command))
+                .toBytes(buffer);
+        LostTalesChatConsoleSyncPacket decoded = new LostTalesChatConsoleSyncPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        ChatNamedPlayer actor = decoded.getEvents().get(0).getActorIdentity();
+        assertEquals(steve, actor.getPlayerId());
+        assertEquals("Steve", actor.getAccount());
+        assertNull(new ChatConsoleEvent(11L, 5000L,
+                ChatConsoleEvent.Kind.COMMAND, ChatConsoleEvent.Severity.INFO,
+                "Alex", "/gamemode 1", "",
+                ChatNamedPlayer.account(steve, "Steve"))
+                .getActorIdentity());
     }
 
     @Test

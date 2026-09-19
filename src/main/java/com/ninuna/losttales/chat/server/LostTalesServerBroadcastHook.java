@@ -10,7 +10,6 @@ import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatReplyReference;
-import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.ChatSystemLineClassifier;
 import com.ninuna.losttales.chat.ChatTabIds;
 import com.ninuna.losttales.compat.discord.DiscordGameEventRelay;
@@ -405,10 +404,10 @@ public final class LostTalesServerBroadcastHook {
     }
 
     /**
-     * The player as a line names them: their account, the identity they
-     * are playing right now with its skin, and the colour that identity
-     * wears in Global — what a replay shows in place of the account's
-     * name, and what a card about them shows once they have gone.
+     * The player as a line names them: their account, and the identity
+     * they are playing right now with its skin — what a replay shows in
+     * place of the account's name, and what a card about them shows once
+     * they have gone.
      */
     public static ChatNamedPlayer namedPlayer(EntityPlayerMP player) {
         String account = accountOf(player);
@@ -418,16 +417,18 @@ public final class LostTalesServerBroadcastHook {
                 ? identity.getCharacter() : null;
         String identityName = character == null ? account
                 : PlayableIdentity.displayName(character, account);
-        LostTalesChatPresentationResolver.Presentation presentation =
-                LostTalesChatPresentationResolver.resolve(player, character);
-        int roles = ChatAccountRoleResolver.resolve(player,
-                character == null ? null : character.getCharacterId());
         return new ChatNamedPlayer(player.getUniqueID(), account,
                 character == null ? null : character.getCharacterId(),
                 identityName,
-                character == null ? "" : character.getSkinId(),
-                ChatRolePresentation.nameColor(ChatChannel.ALL, roles,
-                        character == null, presentation.nameColor));
+                character == null ? "" : character.getSkinId());
+    }
+
+    /**
+     * The player's account as an out-of-character line names it: how the
+     * Server Console names whoever did what it records.
+     */
+    public static ChatNamedPlayer namedAccount(EntityPlayerMP player) {
+        return ChatNamedPlayer.account(player.getUniqueID(), accountOf(player));
     }
 
     private static String accountOf(EntityPlayerMP player) {

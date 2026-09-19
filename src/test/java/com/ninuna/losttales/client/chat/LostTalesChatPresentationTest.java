@@ -722,29 +722,50 @@ public final class LostTalesChatPresentationTest {
         boolean[] mentioned = new boolean[1];
         IChatComponent actor = LostTalesChatPresentation.actorMention(
                 java.util.Collections.<String>emptyList(), "Player531",
-                mentioned);
+                null, mentioned);
         assertEquals("@Player531", actor.getUnformattedTextForChat());
         ChatMentionMarker.Data marker = ChatMentionMarker.decode(actor);
         assertNotNull(marker);
         assertEquals("Player531", marker.account);
         assertFalse(mentioned[0]);
         IChatComponent own = LostTalesChatPresentation.actorMention(
-                java.util.Arrays.asList("Player531"), "Player531",
+                java.util.Arrays.asList("Player531"), "Player531", null,
                 mentioned);
         assertEquals("@Player531", own.getUnformattedTextForChat());
         assertTrue(mentioned[0]);
         IChatComponent server = LostTalesChatPresentation.actorMention(
-                java.util.Collections.<String>emptyList(), "Server",
+                java.util.Collections.<String>emptyList(), "Server", null,
                 new boolean[1]);
         assertEquals("Server", server.getUnformattedTextForChat());
         assertNull(ChatMentionMarker.decode(server));
     }
 
     /**
+     * An entry about a player long gone still names them as the server
+     * recorded them: the mention carries their account's id, so it opens
+     * their card and menu, and wears the one colour every mention of a
+     * player wears, whatever roles they hold.
+     */
+    @Test
+    public void aRecordedActorKeepsTheirCardInTheMentionColour() {
+        UUID id = UUID.randomUUID();
+        IChatComponent operator = LostTalesChatPresentation.actorMention(
+                java.util.Collections.<String>emptyList(), "Player843",
+                com.ninuna.losttales.chat.ChatNamedPlayer.account(id,
+                        "Player843"), new boolean[1]);
+        ChatMentionMarker.Data marker = ChatMentionMarker.decode(operator);
+        assertNotNull(marker);
+        assertNotNull(marker.recorded);
+        assertEquals(id, marker.recorded.getPlayerId());
+        assertEquals(ChatMentionColors.PLAYER_RGB, marker.color);
+        assertEquals(LostTalesColors.rgb(LostTalesColors.HONEY),
+                ChatMentionColors.PLAYER_RGB);
+    }
+
+    /**
      * A mention keeps reading as one after its player has gone: a name
      * this client cannot place is placed by the players the server
-     * recorded the message as naming, in the colour a live mention of
-     * them takes — in character, the identity they were playing — and a
+     * recorded the message as naming, in the one mention colour, and a
      * name nobody recorded stays text.
      */
     @Test
@@ -764,8 +785,7 @@ public final class LostTalesChatPresentationTest {
                                             .ChatNamedPlayer(player,
                                                     "Player531", character,
                                                     "Aragorn",
-                                                    "human/male/3",
-                                                    0x2F6FB0)));
+                                                    "human/male/3")));
             IChatComponent aragorn = null;
             IChatComponent nobody = null;
             for (IChatComponent part : bodyOf(LostTalesChatPresentation.build(
@@ -782,18 +802,20 @@ public final class LostTalesChatPresentationTest {
             ChatMentionMarker.Data marker = ChatMentionMarker.decode(aragorn);
             assertNotNull(marker);
             assertEquals("Player531", marker.account);
-            assertEquals(0x2F6FB0, marker.color);
+            assertEquals(ChatMentionColors.PLAYER_RGB, marker.color);
             // Its card is the player as the line recorded them: the
-            // character, its head and its name, in the mention's colour.
+            // character, its head and its name, named as a live card
+            // names a player.
             LostTalesChatHoverCard.Target card =
                     LostTalesChatHoverCard.recordedTarget(null,
-                            marker.recorded, marker.color);
+                            marker.recorded);
             assertEquals(player, card.playerId);
             assertEquals(character, card.characterId);
             assertEquals("human/male/3", card.skinId);
             assertEquals("Aragorn", card.identityName);
             assertEquals("Player531", card.accountName);
-            assertEquals(0x2F6FB0, card.nameColor);
+            assertEquals(LostTalesColors.rgb(LostTalesColors.HUD_LABEL),
+                    card.nameColor);
             assertNotNull(nobody);
             assertNull(ChatMentionMarker.decode(nobody));
         } finally {

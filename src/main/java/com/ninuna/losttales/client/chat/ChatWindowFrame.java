@@ -53,6 +53,11 @@ final class ChatWindowFrame {
      * measure the stack through this.
      */
     final ChatStackRows rows = new ChatStackRows();
+    /**
+     * How the rows of {@link #rows} move when its lines are laid out
+     * again: each glides from where it was drawn to its new place.
+     */
+    final ChatRowGlide glide = new ChatRowGlide();
     /** The view's line list drawn last; the bands index into it. */
     List<ChatLine> lines = Collections.emptyList();
     /**
@@ -118,6 +123,23 @@ final class ChatWindowFrame {
     /** Opening motion the window was drawn with this frame. */
     float motionX;
     float motionY;
+    /** The timestamp area driving in and out: 1 while it stands whole. */
+    private final LostTalesUiTransition areaMotion = new LostTalesUiTransition();
+    /**
+     * A window made from tabs carried out of their row fades in as it
+     * appears under the pointer, on one quick beat; every other window
+     * stands whole from the start.
+     */
+    private final LostTalesUiTransition appearMotion =
+            new LostTalesUiTransition();
+    private boolean appearing;
+    /** How much of its opacity the window showed when last drawn. */
+    private float shown = 1.0F;
+    /** How long a window made from carried tabs takes to fade in. */
+    private static final int APPEAR_MILLIS = 150;
+    /** The member list coming out and going away: 1 while it stands whole. */
+    private final LostTalesUiTransition membersMotion =
+            new LostTalesUiTransition();
     /**
      * How far the window has come along its glide to the part of the
      * screen it fills, or back to its own box, eased from the moment it
@@ -126,11 +148,6 @@ final class ChatWindowFrame {
      * null for the window's own box) to what it is bound for
      * ({@link #fillLegTo}, none for the window's own box).
      */
-    /** The timestamp area driving in and out: 1 while it stands whole. */
-    private final LostTalesUiTransition areaMotion = new LostTalesUiTransition();
-    /** The member list coming out and going away: 1 while it stands whole. */
-    private final LostTalesUiTransition membersMotion =
-            new LostTalesUiTransition();
     private final LostTalesUiTransition fillMotion =
             new LostTalesUiTransition();
     /** Whether {@link #fillMotion} has been advanced at all yet. */
@@ -140,14 +157,6 @@ final class ChatWindowFrame {
     private ChatWindow.ScreenFill fillLegTo = ChatWindow.ScreenFill.NONE;
     /** The box the window was last laid in ({@link #begin}). */
     private ChatWindowPlacement.Box placed;
-    /**
-     * The part of the screen a drag in progress would snap the window
-     * to on release, shown by the window itself: it takes that part
-     * while the pointer is in the edge's zone and comes back under the
-     * pointer when it leaves, on the same glide, and is filled for good
-     * only when the button comes up.
-     */
-    ChatWindow.ScreenFill dragPreview = ChatWindow.ScreenFill.NONE;
     /**
      * How long the row still counts a finished glide as gliding. The
      * frame a glide settles on moves the edges its last step, and the
@@ -424,6 +433,7 @@ final class ChatWindowFrame {
         FEED.dividerSourceSize = 0;
         FEED.dividerSourceLineId = 0;
         FEED.rows.reset((List<ChatLine>)null, -1);
+        FEED.glide.clear();
     }
 
     /**
@@ -532,9 +542,8 @@ final class ChatWindowFrame {
      * pixels stands by the one centring rule.
      */
     static double floorToDisplayPixels(double position) {
-        int factor = displayScaleFactor();
-        return factor <= 1 ? Math.floor(position + 1.0E-6D)
-                : Math.floor(position * factor + 1.0E-6D) / (double)factor;
+        return LostTalesDisplayPixels.floor(position,
+                Math.max(1, displayScaleFactor()));
     }
 
     /** Display pixels per GUI pixel ({@link LostTalesDisplayPixels#scaleFactor}). */
@@ -556,11 +565,11 @@ final class ChatWindowFrame {
     void advanceFill(ChatWindow.ScreenFill fill) {
         long now = System.nanoTime();
         ChatWindow.ScreenFill wanted = fill == null
-                || fill == ChatWindow.ScreenFill.NONE ? this.dragPreview : fill;
+                ? ChatWindow.ScreenFill.NONE : fill;
         if (this.fillSeen && !this.fillMotion.isSettled()) {
             this.fillGlideNanos = now;
         }
-        if (this.fillSeen && wanted != this.fillLegTo) {
+        if (this.fillSeen && !wanted.equals(this.fillLegTo)) {
             this.fillLegFromFill = this.fillLegTo;
             this.fillLegFrom = this.placed;
             this.fillLegTo = wanted;
@@ -601,6 +610,43 @@ final class ChatWindowFrame {
                 && membersFit, duration, LostTalesUiEasing.SMOOTH);
     }
 
+    /**
+     * Starts the window's fade in: a window just made from tabs carried
+     * out of their row, or moved into a window of their own.
+     */
+    void beginAppearing() {
+        this.appearMotion.settle(false);
+        this.appearing = true;
+    }
+
+    /**
+     * How much of its opacity the window shows this frame: all of it,
+     * but for a window still fading in. Asked once a frame, before the
+     * window is drawn.
+     */
+    float appearShare() {
+        if (!this.appearing) {
+            this.shown = 1.0F;
+            return 1.0F;
+        }
+        float share = this.appearMotion.advance(System.nanoTime(), true,
+                LostTalesConfig.enableChatAnimations ? APPEAR_MILLIS : 0,
+                LostTalesUiEasing.EASE_OUT);
+        if (this.appearMotion.isSettled()) {
+            this.appearing = false;
+        }
+        this.shown = Math.max(0.0F, Math.min(1.0F, share));
+        return this.shown;
+    }
+
+    /**
+     * The share {@link #appearShare} last gave: what the window's input
+     * bar, drawn after the window, fades in by.
+     */
+    float shownShare() {
+        return this.shown;
+    }
+
     /** How far the timestamp area stands in the window, 0..1. */
     float areaShare() {
         return this.areaMotion.clamped();
@@ -624,6 +670,18 @@ final class ChatWindowFrame {
     /** What the running leg is bound for; none for the window's own box. */
     ChatWindow.ScreenFill fillLegTo() {
         return this.fillLegTo;
+    }
+
+    /**
+     * Stands the window in {@code fill} at once, with no glide: a part
+     * whose edge the player is dragging follows the pointer rigidly.
+     */
+    void holdFill(ChatWindow.ScreenFill fill) {
+        this.fillLegTo = fill == null ? ChatWindow.ScreenFill.NONE : fill;
+        this.fillLegFrom = null;
+        this.fillLegFromFill = ChatWindow.ScreenFill.NONE;
+        this.fillSeen = true;
+        this.fillMotion.settle(true);
     }
 
     /** How far along its leg the window has come, 0..1. */
@@ -849,6 +907,8 @@ final class ChatWindowFrame {
         if (!this.rows.describes(this.lines, size, this.dividerLineIndex,
                 open)) {
             this.rows.reset(this.lines, this.dividerLineIndex, open);
+            this.glide.relaid(this.lines, this.rows, this.dividerLineIndex,
+                    System.nanoTime());
         }
     }
 

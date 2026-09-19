@@ -93,12 +93,12 @@ public final class ChatConsoleStreamTest {
                 ChatConsoleStream.describeCommand("losttales",
                         new String[] {"chat", "mute", "Bob", "15m", "spam"}));
         // A private message keeps whom it went to, never what it said.
-        assertEquals("/msg Bob …",
+        assertEquals("/msg Bob ...",
                 ChatConsoleStream.describeCommand("msg", new String[] {"Bob", "the", "key"}));
         assertEquals("/tell Bob",
                 ChatConsoleStream.describeCommand("Tell", new String[] {"Bob"}));
         // A config change keeps the key, never the value.
-        assertEquals("/losttales config set discord botToken …",
+        assertEquals("/losttales config set discord botToken ...",
                 ChatConsoleStream.describeCommand("losttales", new String[] {
                         "config", "set", "discord", "botToken", "abc.def.ghi"}));
         assertEquals("/losttales config get discord botToken",
@@ -109,7 +109,7 @@ public final class ChatConsoleStreamTest {
                 "discord", "bind", "ooc", "BIDIRECTIONAL",
                 "channel=123456789012345678",
                 "webhook=https://discord.com/api/webhooks/1/secret"});
-        assertEquals("/losttales discord bind ooc BIDIRECTIONAL channel=… webhook=…", bind);
+        assertEquals("/losttales discord bind ooc BIDIRECTIONAL channel=... webhook=...", bind);
         assertFalse(bind.contains("secret"));
         assertEquals("/say", ChatConsoleStream.describeCommand("say", null));
         // Cut to a line.
@@ -119,7 +119,7 @@ public final class ChatConsoleStreamTest {
         }
         String cut = ChatConsoleStream.describeCommand("say", new String[] {long_.toString()});
         assertTrue(cut.length() <= 256);
-        assertTrue(cut.endsWith("…"));
+        assertTrue(cut.endsWith("..."));
     }
 
     /** The save's events come back in order under their own ids, once each. */

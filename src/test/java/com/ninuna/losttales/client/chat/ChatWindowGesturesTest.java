@@ -36,37 +36,69 @@ public final class ChatWindowGesturesTest {
 
     /**
      * Where a dragged window snaps to: the whole screen from the top
-     * edge, a half from a side, a quarter from the end of an edge
-     * nearest a corner, nothing from the bottom edge's middle or from
+     * edge, a half from a side, a quarter from the end of a side edge
+     * nearest a corner or from the corner itself along the top and
+     * bottom edges, nothing from the bottom edge's middle or from
      * anywhere clear of the edges.
      */
     @Test
     public void theScreenEdgesSnapAWindowToTheirHalvesAndCorners() {
         assertEquals(ChatWindow.ScreenFill.FULL,
-                ChatWindowGestures.snapZoneAt(500.0D, 0.5D, 1000, 600));
+                ChatWindowGestures.snapZoneAt(500.0D, 0.5D, 1000, 600, false));
         assertEquals(ChatWindow.ScreenFill.LEFT,
-                ChatWindowGestures.snapZoneAt(0.0D, 300.0D, 1000, 600));
+                ChatWindowGestures.snapZoneAt(0.0D, 300.0D, 1000, 600, false));
         assertEquals(ChatWindow.ScreenFill.RIGHT,
-                ChatWindowGestures.snapZoneAt(999.5D, 300.0D, 1000, 600));
+                ChatWindowGestures.snapZoneAt(999.5D, 300.0D, 1000, 600, false));
         assertEquals(ChatWindow.ScreenFill.TOP_LEFT,
-                ChatWindowGestures.snapZoneAt(1.0D, 50.0D, 1000, 600));
+                ChatWindowGestures.snapZoneAt(1.0D, 50.0D, 1000, 600, false));
         assertEquals(ChatWindow.ScreenFill.TOP_LEFT,
-                ChatWindowGestures.snapZoneAt(100.0D, 1.0D, 1000, 600));
+                ChatWindowGestures.snapZoneAt(60.0D, 1.0D, 1000, 600, false));
         assertEquals(ChatWindow.ScreenFill.TOP_RIGHT,
-                ChatWindowGestures.snapZoneAt(999.0D, 100.0D, 1000, 600));
+                ChatWindowGestures.snapZoneAt(999.0D, 100.0D, 1000, 600, false));
         assertEquals(ChatWindow.ScreenFill.BOTTOM_LEFT,
-                ChatWindowGestures.snapZoneAt(0.0D, 550.0D, 1000, 600));
+                ChatWindowGestures.snapZoneAt(0.0D, 550.0D, 1000, 600, false));
         assertEquals(ChatWindow.ScreenFill.BOTTOM_RIGHT,
-                ChatWindowGestures.snapZoneAt(900.0D, 599.5D, 1000, 600));
+                ChatWindowGestures.snapZoneAt(950.0D, 599.5D, 1000, 600, false));
+        // Past the corner along the top edge a screen without the thirds
+        // fills the whole screen.
+        assertEquals(ChatWindow.ScreenFill.FULL,
+                ChatWindowGestures.snapZoneAt(100.0D, 1.0D, 1000, 600, false));
         // The bottom edge's middle, and anywhere inside, snap nowhere.
         assertEquals(ChatWindow.ScreenFill.NONE,
-                ChatWindowGestures.snapZoneAt(500.0D, 599.5D, 1000, 600));
+                ChatWindowGestures.snapZoneAt(500.0D, 599.5D, 1000, 600, false));
+        assertEquals(ChatWindow.ScreenFill.NONE,
+                ChatWindowGestures.snapZoneAt(900.0D, 599.5D, 1000, 600, false));
         assertEquals(ChatWindow.ScreenFill.LEFT,
-                ChatWindowGestures.snapZoneAt(14.0D, 300.0D, 1000, 600));
+                ChatWindowGestures.snapZoneAt(14.0D, 300.0D, 1000, 600, false));
         assertEquals(ChatWindow.ScreenFill.NONE,
-                ChatWindowGestures.snapZoneAt(18.0D, 300.0D, 1000, 600));
+                ChatWindowGestures.snapZoneAt(18.0D, 300.0D, 1000, 600, false));
         assertEquals(ChatWindow.ScreenFill.NONE,
-                ChatWindowGestures.snapZoneAt(500.0D, 300.0D, 1000, 600));
+                ChatWindowGestures.snapZoneAt(500.0D, 300.0D, 1000, 600, false));
+    }
+
+    /**
+     * On a screen wide enough to offer the thirds, the top edge snaps to
+     * them as Windows 11 does on a large screen: its left third to the
+     * left third, its right third to the right, the corners still to
+     * their quarters and the middle to the whole screen.
+     */
+    @Test
+    public void aLargeScreensTopEdgeSnapsToTheThirds() {
+        assertEquals(ChatWindow.ScreenFill.TOP_LEFT,
+                ChatWindowGestures.snapZoneAt(60.0D, 1.0D, 1000, 600, true));
+        assertEquals(ChatWindow.ScreenFill.LEFT_THIRD,
+                ChatWindowGestures.snapZoneAt(190.0D, 1.0D, 1000, 600, true));
+        assertEquals(ChatWindow.ScreenFill.LEFT_THIRD,
+                ChatWindowGestures.snapZoneAt(332.0D, 1.0D, 1000, 600, true));
+        assertEquals(ChatWindow.ScreenFill.FULL,
+                ChatWindowGestures.snapZoneAt(500.0D, 1.0D, 1000, 600, true));
+        assertEquals(ChatWindow.ScreenFill.RIGHT_THIRD,
+                ChatWindowGestures.snapZoneAt(700.0D, 1.0D, 1000, 600, true));
+        assertEquals(ChatWindow.ScreenFill.TOP_RIGHT,
+                ChatWindowGestures.snapZoneAt(940.0D, 1.0D, 1000, 600, true));
+        // The side edges keep their halves and quarters.
+        assertEquals(ChatWindow.ScreenFill.LEFT,
+                ChatWindowGestures.snapZoneAt(0.0D, 300.0D, 1000, 600, true));
     }
 
     @Test

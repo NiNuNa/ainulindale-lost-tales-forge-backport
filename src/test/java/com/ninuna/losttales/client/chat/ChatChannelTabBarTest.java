@@ -1,21 +1,25 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
+import java.awt.image.BufferedImage;
+import java.io.InputStream;
+import javax.imageio.ImageIO;
 import org.junit.Test;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /**
  * The row's way of fitting too many tabs: every tab is one width, the
  * default while the row holds them all at it and a narrower one they
- * all share once it does not; each tab decides for itself which
- * controls its drawn width holds, the tab in front keeping its cross
- * at the cost of its icon; and the seams are laid down from the exact
- * running total so a row settling into new widths never steps back
- * and forth.
+ * all share once it does not; every tab gives its buttons up together
+ * at fixed shares of the full width, the tab in front keeping its cross
+ * and cutting its icon and name before it; each tab travels on a glide
+ * of its own, tabs set going together meeting all along it; and a tab's
+ * buttons ride its edge at every GUI scale.
  */
 public final class ChatChannelTabBarTest {
 
@@ -183,179 +187,239 @@ public final class ChatChannelTabBarTest {
 
 
     /**
-     * A tab behind the one in front gives its controls up in stages as
-     * its room shrinks, and its name takes the room they leave: the cog
-     * goes the moment the whole name no longer fits beside both, the
-     * cross once less than half the name would show beside it.
+     * Every tab gives its buttons up at fixed shares of the full width,
+     * all tabs at once since they share one width: the draft mark under
+     * two thirds, the cog under a half, the cross under a third.
      */
     @Test
-    public void controlsGiveWayInStagesAsTheRoomShrinks() {
-        int name = 40;
-        // Room for the whole name and both controls: everything shows.
-        ChatChannelTabBar.TabControls full =
-                ChatChannelTabBar.controlsFor(name, name + 2 * CONTROL, true, false, 0);
-        assertTrue(full.cog);
-        assertTrue(full.close);
-        assertEquals(name, full.labelRoom);
-        // One pixel less: the cog goes at once, and the name keeps the
-        // whole of what is left beside the cross.
-        ChatChannelTabBar.TabControls cut =
-                ChatChannelTabBar.controlsFor(name, name + 2 * CONTROL - 1, true, false, 0);
-        assertFalse(cut.cog);
-        assertTrue(cut.close);
-        assertEquals(name + CONTROL - 1, Math.min(name, cut.labelRoom) + CONTROL - 1
-                + (cut.labelRoom - name));
-        assertEquals(name, cut.labelRoom);
-        // The cross stays while at least half the name shows beside it.
-        ChatChannelTabBar.TabControls half =
-                ChatChannelTabBar.controlsFor(name, name / 2 + CONTROL, true, false, 0);
-        assertFalse(half.cog);
-        assertTrue(half.close);
-        assertEquals(name / 2, half.labelRoom);
-        // Less than half: the cross goes too and the name has the room.
-        ChatChannelTabBar.TabControls bare =
-                ChatChannelTabBar.controlsFor(name, name / 2 + CONTROL - 1, true, false, 0);
-        assertFalse(bare.cog);
-        assertFalse(bare.close);
-        assertEquals(name / 2 + CONTROL - 1, bare.labelRoom);
-        // No room at all: an icon alone.
-        ChatChannelTabBar.TabControls none =
-                ChatChannelTabBar.controlsFor(name, 0, true, false, 0);
-        assertFalse(none.cog);
-        assertFalse(none.close);
-        assertEquals(0, none.labelRoom);
-        assertEquals(0, ChatChannelTabBar.controlsFor(name, -7, true, false, 0).labelRoom);
-        // The name is never given more than it is wide.
-        assertEquals(name, ChatChannelTabBar.controlsFor(name, 500, true, false, 0).labelRoom);
-    }
-
-    /** Where no cross is offered, the cog is the only control to give up. */
-    @Test
-    public void withoutACrossOnlyTheCogGivesWay() {
-        int name = 30;
-        ChatChannelTabBar.TabControls full =
-                ChatChannelTabBar.controlsFor(name, name + CONTROL, false, false, 0);
-        assertTrue(full.cog);
-        assertFalse(full.close);
-        assertEquals(name, full.labelRoom);
-        ChatChannelTabBar.TabControls cut =
-                ChatChannelTabBar.controlsFor(name, name + CONTROL - 1, false, false, 0);
-        assertFalse(cut.cog);
-        assertFalse(cut.close);
-        assertEquals(name, cut.labelRoom);
-        assertEquals(12, ChatChannelTabBar.controlsFor(name, 12, false, false, 0).labelRoom);
+    public void buttonsGoAtFixedSharesOfTheFullWidth() {
+        double full = ChatChannelTabBar.DEFAULT_TAB_WIDTH;
+        assertTrue(ChatChannelTabBar.draftStands(full * 2.0D / 3.0D));
+        assertFalse(ChatChannelTabBar.draftStands(full * 2.0D / 3.0D - 0.01D));
+        assertTrue(ChatChannelTabBar.cogStands(full / 2.0D));
+        assertFalse(ChatChannelTabBar.cogStands(full / 2.0D - 0.01D));
+        assertTrue(ChatChannelTabBar.closeStands(full / 3.0D));
+        assertFalse(ChatChannelTabBar.closeStands(full / 3.0D - 0.01D));
+        // In that order, so a narrowing row never shows a cog without
+        // a cross beside it.
+        assertTrue(ChatChannelTabBar.DRAFT_SHARE > ChatChannelTabBar.COG_SHARE);
+        assertTrue(ChatChannelTabBar.COG_SHARE > ChatChannelTabBar.CLOSE_SHARE);
     }
 
     /**
-     * The tab in front never loses its cross: it gives up its cog like
-     * any tab, and where another tab would give up the cross it keeps
-     * it beside its icon and lets the name shrink between them to
-     * nothing; the icon goes last, only when the room past it can no
-     * longer hold the cross, which then stands alone.
+     * A button fading out hands its room to the name as it goes: the
+     * name's room grows smoothly with the fade, never in a step, and is
+     * never more than the name is wide.
      */
     @Test
-    public void theTabInFrontKeepsItsCrossAndGivesUpItsIconLast() {
-        int name = 40;
+    public void aFadingButtonHandsItsRoomToTheName() {
         int icon = 13;
-        ChatChannelTabBar.TabControls full = ChatChannelTabBar.controlsFor(
-                name, name + 2 * CONTROL, true, true, icon);
-        assertTrue(full.cog);
-        assertTrue(full.close);
-        assertTrue(full.icon);
-        assertEquals(name, full.labelRoom);
-        // One pixel less: the cog goes, the cross and the icon stay, as
-        // on any tab.
-        ChatChannelTabBar.TabControls cut = ChatChannelTabBar.controlsFor(
-                name, name + 2 * CONTROL - 1, true, true, icon);
-        assertFalse(cut.cog);
-        assertTrue(cut.close);
-        assertTrue(cut.icon);
-        assertEquals(name, cut.labelRoom);
-        // Less than half the name beside the cross: another tab would
-        // drop the cross; the tab in front keeps both the cross and the
-        // icon, and the name has what stands between them.
-        ChatChannelTabBar.TabControls narrow = ChatChannelTabBar.controlsFor(
-                name, name / 2 + CONTROL - 1, true, true, icon);
-        assertFalse(narrow.cog);
-        assertTrue(narrow.close);
-        assertTrue(narrow.icon);
-        assertEquals(name / 2 - 1, narrow.labelRoom);
-        // Exactly the cross's room past the icon: the two stand together
-        // and the name is gone; the cross keeps its place at the right.
-        ChatChannelTabBar.TabControls pair = ChatChannelTabBar.controlsFor(
-                name, CONTROL, true, true, icon);
-        assertTrue(pair.close);
-        assertTrue(pair.icon);
-        assertEquals(0, pair.labelRoom);
-        int tabWidth = ChatChannelTabBar.PADDING_X * 2 + 10;
-        assertEquals(100 + tabWidth - ChatChannelTabBar.PADDING_X
-                - ChatChannelTabBar.CONTROL_SIZE,
-                ChatChannelTabBar.closeLeft(pair, 100, tabWidth));
-        // One pixel less: the icon gives its room to the cross, which
-        // stands alone, centred where a tab behind stands its icon.
-        ChatChannelTabBar.TabControls bare = ChatChannelTabBar.controlsFor(
-                name, CONTROL - 1, true, true, icon);
-        assertTrue(bare.close);
-        assertFalse(bare.icon);
-        assertEquals(0, bare.labelRoom);
-        assertEquals(100 + (tabWidth - ChatChannelTabBar.CONTROL_SIZE) / 2,
-                ChatChannelTabBar.closeLeft(bare, 100, tabWidth));
-        assertEquals(100 + (tabWidth - ChatChannelTabBar.CONTROL_SIZE) / 2.0D,
-                ChatChannelTabBar.closeLeftExact(bare, 100, tabWidth), 0.0D);
-        assertEquals(100 + tabWidth - ChatChannelTabBar.PADDING_X
-                - ChatChannelTabBar.CONTROL_SIZE,
-                ChatChannelTabBar.closeLeftExact(narrow, 100, tabWidth),
-                0.0D);
-        // A tab with no icon has nothing to give up: once its name is
-        // gone its cross stands alone at once.
-        ChatChannelTabBar.TabControls plain = ChatChannelTabBar.controlsFor(
-                name, CONTROL, true, true, 0);
-        assertTrue(plain.close);
-        assertFalse(plain.icon);
-        assertEquals(0, plain.labelRoom);
-        assertEquals(100 + (tabWidth - ChatChannelTabBar.CONTROL_SIZE) / 2,
-                ChatChannelTabBar.closeLeft(plain, 100, tabWidth));
-        // Without a cross to keep, the tab in front gives way like the rest.
-        ChatChannelTabBar.TabControls unclosable = ChatChannelTabBar.controlsFor(
-                name, name + CONTROL - 1, false, true, icon);
-        assertFalse(unclosable.cog);
-        assertFalse(unclosable.close);
-        assertTrue(unclosable.icon);
-        assertEquals(name, unclosable.labelRoom);
+        int name = 80;
+        ChatChannelTabBar.TabRoom both = ChatChannelTabBar.roomFor(100.0D,
+                icon, name, 0.0D, 1.0F, 1.0F);
+        assertEquals(100 - ChatChannelTabBar.PADDING_X
+                - ChatChannelTabBar.CONTROL_SIZE, both.closeLeft, EPSILON);
+        assertEquals(both.closeLeft - CONTROL, both.cogLeft, EPSILON);
+        assertEquals(100 - ChatChannelTabBar.PADDING_X - 2 * CONTROL,
+                both.contentRight, EPSILON);
+        assertEquals(both.contentRight - ChatChannelTabBar.PADDING_X - icon,
+                both.labelRoom, EPSILON);
+        double previous = both.labelRoom;
+        for (float cog = 0.9F; cog >= 0.0F; cog -= 0.1F) {
+            ChatChannelTabBar.TabRoom fading = ChatChannelTabBar.roomFor(
+                    100.0D, icon, name, 0.0D, 1.0F, cog);
+            assertTrue(fading.labelRoom > previous);
+            assertTrue(fading.labelRoom - previous <= CONTROL * 0.1D + EPSILON);
+            previous = fading.labelRoom;
+        }
+        // A short name never takes more than it is wide.
+        assertEquals(12.0D, ChatChannelTabBar.roomFor(100.0D, icon, 12, 0.0D,
+                0.0F, 0.0F).labelRoom, EPSILON);
+        // Counters stand between the name and the buttons.
+        assertEquals(both.labelRoom - 20.0D, ChatChannelTabBar.roomFor(100.0D,
+                icon, name, 20.0D, 1.0F, 1.0F).labelRoom, EPSILON);
     }
 
     /**
-     * The name's exact room follows the stage the whole pixels chose:
-     * what lies past the controls that stand, fractions included, never
-     * more than the name and never below nothing.
+     * The tab in front keeps its cross against its right padding however
+     * narrow it is; its icon and name are cut before the cross like any
+     * name, so at the narrowest the cross stands where the icon was.
      */
     @Test
-    public void theNamesExactRoomFollowsTheTabsEdge() {
-        int name = 40;
-        ChatChannelTabBar.TabControls full = ChatChannelTabBar.controlsFor(
-                name, name + 2 * CONTROL, true, false, 0);
-        assertEquals(name, ChatChannelTabBar.labelRoomExact(full, name,
-                name + 2 * CONTROL + 0.4D), 0.0D);
-        // Half a pixel short of the whole name beside both controls: the
-        // stage still shows both, and the name is cut by the half.
-        assertEquals(name - 0.5D, ChatChannelTabBar.labelRoomExact(full, name,
-                name + 2 * CONTROL - 0.5D), 1.0E-9D);
-        ChatChannelTabBar.TabControls cut = ChatChannelTabBar.controlsFor(
-                name, name / 2 + CONTROL, true, false, 0);
-        assertEquals(name / 2 + 0.25D, ChatChannelTabBar.labelRoomExact(cut,
-                name, name / 2 + CONTROL + 0.25D), 1.0E-9D);
-        // A name the stage has already dropped has no room at all, and
-        // a name with no controls beside it has the whole room.
-        ChatChannelTabBar.TabControls bare = ChatChannelTabBar.controlsFor(
-                name, 0, true, true, 13);
-        assertEquals(0.0D, ChatChannelTabBar.labelRoomExact(bare, name, 3.7D),
-                0.0D);
-        ChatChannelTabBar.TabControls behind = ChatChannelTabBar.controlsFor(
-                name, 12, true, false, 0);
-        assertEquals(12.6D, ChatChannelTabBar.labelRoomExact(behind, name,
-                12.6D), 1.0E-9D);
-        assertEquals(name, ChatChannelTabBar.labelRoomExact(behind, name,
-                80.0D), 0.0D);
+    public void theTabInFrontCutsItsIconBeforeItsCross() {
+        int width = ChatChannelTabBar.PADDING_X * 2 + 10;
+        ChatChannelTabBar.TabRoom narrow = ChatChannelTabBar.roomFor(width,
+                13, 40, 0.0D, 1.0F, 0.0F);
+        assertEquals(width - ChatChannelTabBar.PADDING_X
+                - ChatChannelTabBar.CONTROL_SIZE, narrow.closeLeft, EPSILON);
+        assertEquals(narrow.closeLeft - ChatChannelTabBar.CONTROL_GAP,
+                narrow.contentRight, EPSILON);
+        assertEquals(0.0D, narrow.labelRoom, EPSILON);
+        // Without a cross the cog stands at the right padding instead.
+        ChatChannelTabBar.TabRoom cogOnly = ChatChannelTabBar.roomFor(100.0D,
+                0, 30, 0.0D, 0.0F, 1.0F);
+        assertEquals(cogOnly.closeLeft, cogOnly.cogLeft, EPSILON);
+    }
+
+    /**
+     * The whole row travels on one glide: every edge the same share of
+     * the way from where it set out to where it is bound. Tabs that meet
+     * at both ends therefore meet all along it — a tab joining between
+     * two others included, since it sets out a seam short of nothing
+     * where the tab before it ends — so no seam opens, shuts or steps.
+     */
+    @Test
+    public void tabsThatMeetAtBothEndsMeetAllAlongTheGlide() {
+        double gap = ChatChannelTabBar.TAB_GAP;
+        ChatChannelTabBar.Tab first = tab(0.0D, 50.0D, 0.0D, 33.0D);
+        ChatChannelTabBar.Tab joining = tab(50.0D + gap, -gap,
+                33.0D + gap, 33.0D);
+        ChatChannelTabBar.Tab last = tab(50.0D + gap, 50.0D,
+                66.0D + 2.0D * gap, 33.0D);
+        for (float share = 0.0F; share <= 1.0F; share += 0.05F) {
+            ChatChannelTabBar.glide(first, share, 1.0D / 3.0D);
+            ChatChannelTabBar.glide(joining, share, 1.0D / 3.0D);
+            ChatChannelTabBar.glide(last, share, 1.0D / 3.0D);
+            assertEquals(first.leftExact + first.widthExact + gap,
+                    joining.leftExact, EPSILON);
+            assertEquals(joining.leftExact + joining.widthExact + gap,
+                    last.leftExact, 1.0E-5D);
+            // Laid on display pixels, the edges still meet exactly.
+            assertEquals(first.drawnLeftOffset + first.drawnWidthSnapped + gap,
+                    joining.drawnLeftOffset, 1.0E-4D);
+            if (joining.widthExact >= 0.0D) {
+                assertEquals(joining.drawnLeftOffset
+                                + joining.drawnWidthSnapped + gap,
+                        last.drawnLeftOffset, 1.0E-4D);
+            }
+        }
+    }
+
+    /**
+     * A tab's buttons ride its right edge exactly at every GUI scale. At
+     * scale three a third of a GUI pixel has no exact float, and a cross
+     * laid on the display pixel at or before its place dropped a pixel
+     * against the tab's edge on some frames and not others; every place
+     * of the edge, as the row lays it on display pixels, keeps its cross
+     * the same distance in.
+     */
+    @Test
+    public void theButtonsRideTheTabsEdgeAtEveryScale() {
+        for (int factor = 1; factor <= 4; factor++) {
+            double step = 1.0D / factor;
+            for (int index = 0; index < 3000; index++) {
+                ChatChannelTabBar.Tab tab = tab(0.0D, 0.0D, 0.0D, 0.0D);
+                tab.standAt(31.0D + index * 0.1373D,
+                        60.0D + (index % 97) * 0.2111D, step);
+                float left = 212 + tab.drawnLeftOffset;
+                float width = tab.drawnWidthSnapped;
+                ChatChannelTabBar.TabRoom room = ChatChannelTabBar.roomFor(
+                        width, 13, 40, 0.0D, 1.0F, 1.0F);
+                double edge = left + width;
+                assertEquals(edge - ChatChannelTabBar.PADDING_X
+                        - ChatChannelTabBar.CONTROL_SIZE,
+                        ChatChannelTabBar.snappedLeft(left + room.closeLeft,
+                                step), 1.0E-4D);
+                assertEquals(edge - ChatChannelTabBar.PADDING_X
+                        - ChatChannelTabBar.CONTROL_SIZE - CONTROL,
+                        ChatChannelTabBar.snappedLeft(left + room.cogLeft,
+                                step), 1.0E-4D);
+            }
+        }
+    }
+
+    /**
+     * A button holds its whole room for as long as any of it shows: going,
+     * its ink fades first and its room goes after; coming, its room comes
+     * first and its ink after. The name therefore never runs under a
+     * button, and both halves together make one smooth beat.
+     */
+    @Test
+    public void aButtonHoldsItsRoomWhileAnyOfItShows() {
+        for (float fade = 0.0F; fade <= 1.0F; fade += 0.01F) {
+            if (ChatChannelTabBar.inkPhase(fade) > 0.0F) {
+                assertEquals(1.0F, ChatChannelTabBar.roomPhase(fade), 0.0F);
+            }
+        }
+        assertEquals(0.0F, ChatChannelTabBar.roomPhase(0.0F), 0.0F);
+        assertEquals(0.5F, ChatChannelTabBar.roomPhase(0.25F), 1.0E-6F);
+        assertEquals(0.0F, ChatChannelTabBar.inkPhase(0.5F), 0.0F);
+        assertEquals(0.5F, ChatChannelTabBar.inkPhase(0.75F), 1.0E-6F);
+        assertEquals(1.0F, ChatChannelTabBar.inkPhase(1.0F), 0.0F);
+    }
+
+    /**
+     * A tab growing in lays its contents out at the width it is bound for,
+     * and one shrinking away at the width it had as it began to go, so its
+     * moving edge cuts them rather than squeezing them together; settled,
+     * a tab lays them out at the width it is drawn at.
+     */
+    @Test
+    public void aTabOpeningOrClosingKeepsItsContentsWhereTheyStand() {
+        ChatChannelTabBar.Tab tab = tab(0.0D, -1.0D, 0.0D, 90.0D);
+        tab.joining = true;
+        assertEquals(90.0D, tab.laidWidth(12.0D), EPSILON);
+        tab.joining = false;
+        assertEquals(12.0D, tab.laidWidth(12.0D), EPSILON);
+        tab.leavingWidth = 75.0D;
+        assertEquals(75.0D, tab.laidWidth(20.0D), EPSILON);
+    }
+
+    /**
+     * A tab set out again leaves from where it is drawn, on a glide of its
+     * own that starts over; one carried on into a new layout keeps the
+     * glide it was on, so a tab the row does not move is never slowed.
+     */
+    @Test
+    public void aTabKeepsItsGlideUnlessItsOwnTargetMoves() {
+        ChatChannelTabBar.Tab tab = tab(0.0D, 60.0D, 100.0D, 60.0D);
+        tab.leg.settle(false);
+        long start = 1000000000L;
+        float early = tab.leg.advance(start, true, 180,
+                com.ninuna.losttales.client.gui.animation.LostTalesUiEasing
+                        .EASE_OUT);
+        float halfway = tab.leg.advance(start + 90L * 1000000L, true, 180,
+                com.ninuna.losttales.client.gui.animation.LostTalesUiEasing
+                        .EASE_OUT);
+        assertEquals(0.0F, early, 1.0E-6F);
+        // Fast away: past three quarters of the way at half the time.
+        assertTrue(halfway > 0.8F);
+        ChatChannelTabBar.Tab relaid = tab(0.0D, 0.0D, 100.0D, 60.0D);
+        relaid.carryOn(tab);
+        assertTrue(relaid.leg == tab.leg);
+        ChatChannelTabBar.glide(relaid, halfway, 1.0D / 3.0D);
+        relaid.setOut();
+        assertEquals(relaid.leftExact, relaid.fromLeft, EPSILON);
+        assertEquals(0.0F, relaid.leg.value(), 0.0F);
+    }
+
+    /**
+     * A tab's mentions are the count tile, as wide as the tile, with a
+     * {@code +} after the nine for more than it counts.
+     */
+    @Test
+    public void aTabsMentionsAreItsCountTile() {
+        assertEquals(0, ChatChannelTabBar.pingBadgeWidth(null, 0));
+        assertEquals(com.ninuna.losttales.gui.style.LostTalesUiSheet.COUNT_3
+                        .getWidth(),
+                ChatChannelTabBar.pingBadgeWidth(null, 3));
+        assertEquals(com.ninuna.losttales.gui.style.LostTalesUiSheet.COUNT_9,
+                com.ninuna.losttales.gui.style.LostTalesUiSheet.countTile(42));
+        assertEquals(com.ninuna.losttales.gui.style.LostTalesUiSheet.COUNT_1,
+                com.ninuna.losttales.gui.style.LostTalesUiSheet.countTile(1));
+    }
+
+    /** A tab standing at {@code fromLeft}, bound for {@code toLeft}. */
+    private static ChatChannelTabBar.Tab tab(double fromLeft, double fromWidth,
+                                            double toLeft, double toWidth) {
+        ChatChannelTabBar.Tab tab = new ChatChannelTabBar.Tab(
+                ChatTab.of(com.ninuna.losttales.chat.ChatChannel.ALL), 0, null,
+                "Global", 30, 30, 0, 0, "", 0, false, 0, (int)toWidth, -1,
+                -1, -1, false);
+        tab.standAt(fromLeft, fromWidth, 1.0D / 3.0D);
+        tab.toLeft = toLeft;
+        tab.exactWidth = toWidth;
+        return tab;
     }
 
     /**
@@ -371,64 +435,87 @@ public final class ChatChannelTabBarTest {
     }
 
     /**
-     * Seams laid on display pixels from the exact running total move
-     * one way while the widths exchange room on one curve: what keeps
-     * a row from stepping back and forth as it settles after the
-     * selection moves. Rounding each width apart made every seam past
-     * the changed tabs wobble by a pixel or two.
+     * A tab rising off the row stretches along one seam row of its
+     * border pieces, so every piece must hold plain side line there —
+     * the rows either side of the seam the same texels as the seam — or
+     * the stretch would show as a smear.
      */
     @Test
-    public void seamsMoveOneWayWhileWidthsExchangeRoom() {
-        double step = 1.0D / 3.0D;
-        // The selection moves from the first tab to the second: the old
-        // front tab gives up its room, the new one takes it, and the
-        // others are capped afresh — 213 pixels before and after.
-        double[] widths = { 58.0D, 31.0D, 31.0D, 31.0D, 31.0D, 31.0D };
-        double[] targets = { 31.0D, 58.0D, 30.0D, 30.0D, 31.0D, 33.0D };
-        double[] previous = ChatChannelTabBar.placeSeams(widths, 1.0D, step, 9.0D);
-        int[] direction = new int[previous.length];
-        for (int frame = 0; frame < 120; frame++) {
-            for (int index = 0; index < widths.length; index++) {
-                widths[index] = LostTalesChatMotion.approach(widths[index],
-                        targets[index], 1.0D / 144.0D, 0.10D);
-            }
-            double[] seams = ChatChannelTabBar.placeSeams(widths, 1.0D, step, 9.0D);
-            for (int index = 0; index < seams.length; index++) {
-                double delta = seams[index] - previous[index];
-                if (Math.abs(delta) > EPSILON) {
-                    int sign = delta > 0.0D ? 1 : -1;
-                    assertTrue("seam " + index + " turned back at frame " + frame,
-                            direction[index] == 0 || direction[index] == sign);
-                    direction[index] = sign;
+    public void everyTabPieceStretchesOnPlainSideLine() throws Exception {
+        BufferedImage sheet = readSheet();
+        LostTalesUiSheet[] pieces = {LostTalesUiSheet.TAB_LEFT,
+                LostTalesUiSheet.TAB_RIGHT, LostTalesUiSheet.TAB_HOVER_LEFT,
+                LostTalesUiSheet.TAB_HOVER_RIGHT,
+                LostTalesUiSheet.TAB_SELECTED_LEFT,
+                LostTalesUiSheet.TAB_SELECTED_RIGHT,
+                LostTalesUiSheet.TAB_LIFTED_LEFT,
+                LostTalesUiSheet.TAB_LIFTED_RIGHT};
+        int seam = ChatChannelTabBar.LIFT_SEAM_ROW;
+        for (LostTalesUiSheet piece : pieces) {
+            for (int row = seam - 1; row <= seam + 1; row++) {
+                for (int x = 0; x < piece.getWidth(); x++) {
+                    assertEquals(piece + " is not plain side line at row "
+                                    + row + ", column " + x,
+                            texel(sheet, piece, x, seam),
+                            texel(sheet, piece, x, row));
                 }
-                // Every seam is on a display pixel.
-                assertEquals(seams[index], Math.round(seams[index] / step) * step,
-                        EPSILON);
             }
-            // The row's end stays put: the widths only exchange room.
-            assertEquals(previous[previous.length - 1], seams[seams.length - 1],
-                    EPSILON);
-            previous = seams;
         }
     }
 
-    /** Two tabs of one exact width are drawn at most a display pixel apart. */
+    /**
+     * The lifted pair is the selected pair a row taller, the extra row
+     * one more of the side line at the seam: without it, the two draw
+     * the same ink on the same texels, so the one crosses to the other
+     * in colour alone while the tab rises.
+     */
     @Test
-    public void equalTabsDifferByAtMostADisplayPixel() {
-        double step = 1.0D / 3.0D;
-        for (double width = 20.0D; width < 24.0D; width += 0.01D) {
-            double[] seams = ChatChannelTabBar.placeSeams(
-                    new double[] { width, width, width }, 1.0D, step, 9.0D);
-            double first = seams[1] - seams[0];
-            double second = seams[2] - seams[1];
-            double third = seams[3] - seams[2];
-            assertTrue(Math.abs(first - second) <= step + EPSILON);
-            assertTrue(Math.abs(second - third) <= step + EPSILON);
-            assertTrue(Math.abs(first - third) <= step + EPSILON);
+    public void theLiftedPairIsTheSelectedShapeARowTallerAtTheSeam()
+            throws Exception {
+        BufferedImage sheet = readSheet();
+        LostTalesUiSheet[][] pairs = {
+                {LostTalesUiSheet.TAB_SELECTED_LEFT,
+                        LostTalesUiSheet.TAB_LIFTED_LEFT},
+                {LostTalesUiSheet.TAB_SELECTED_RIGHT,
+                        LostTalesUiSheet.TAB_LIFTED_RIGHT}};
+        int seam = ChatChannelTabBar.LIFT_SEAM_ROW;
+        for (LostTalesUiSheet[] pair : pairs) {
+            LostTalesUiSheet selected = pair[0];
+            LostTalesUiSheet lifted = pair[1];
+            assertEquals(selected.getWidth(), lifted.getWidth());
+            assertEquals(selected.getHeight() + 1, lifted.getHeight());
+            for (int row = 0; row < selected.getHeight(); row++) {
+                int liftedRow = row < seam ? row : row + 1;
+                for (int x = 0; x < selected.getWidth(); x++) {
+                    assertEquals(lifted + " and " + selected
+                                    + " differ in shape at row " + row
+                                    + ", column " + x,
+                            isInk(texel(sheet, selected, x, row)),
+                            isInk(texel(sheet, lifted, x, liftedRow)));
+                }
+            }
         }
-        // Whole widths at a whole step land exactly.
-        assertArrayEquals(new double[] { 9.0D, 40.0D, 71.0D },
-                ChatChannelTabBar.placeSeams(new double[] { 30.0D, 30.0D }, 1.0D, 1.0D, 9.0D),
-                EPSILON);
     }
+
+    private static int texel(BufferedImage sheet, LostTalesUiSheet piece,
+                             int x, int y) {
+        return sheet.getRGB(piece.getTextureU() + x, piece.getTextureV() + y);
+    }
+
+    private static boolean isInk(int argb) {
+        return (argb >>> 24) >= Math.floor(
+                LostTalesUiSheet.INK_THRESHOLD * 255.0F);
+    }
+
+    private static BufferedImage readSheet() throws Exception {
+        InputStream stream = ChatChannelTabBarTest.class.getResourceAsStream(
+                "/assets/losttales/" + LostTalesUiSheet.TEXTURE_PATH);
+        assertNotNull("Chat icon sheet is missing", stream);
+        try {
+            return ImageIO.read(stream);
+        } finally {
+            stream.close();
+        }
+    }
+
 }

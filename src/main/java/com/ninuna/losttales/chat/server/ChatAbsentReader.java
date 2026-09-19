@@ -19,19 +19,34 @@ import net.minecraft.server.management.UserListOpsEntry;
  * from them ({@link ChatAccountRoleResolver#absentMask}). Everything is
  * read from the server's own lists and the role catalogue, never from
  * Mojang, and each answer is worked out once. Server thread.
+ *
+ * <p>A world played on the game's own server has operators its list does
+ * not name: the owner of a single-player world that allows commands,
+ * and everyone while an open world allows them to all. Absent, such an
+ * account is an operator still where the history says it spoke in the
+ * Operator channel, which only an operator can
+ * ({@code spokeAsOperator}); a dedicated server has no such operators,
+ * and its list alone answers.</p>
  */
 final class ChatAbsentReader implements ChatChannelPolicy.Reader {
     private final MinecraftServer server;
     private final GameProfile profile;
+    private final boolean spokeAsOperator;
     private boolean levelRead;
     private int opLevel;
     private boolean rolesRead;
     private int accountRoles;
 
-    /** {@code profile} names the account by its id and its last known name. */
-    ChatAbsentReader(MinecraftServer server, GameProfile profile) {
+    /**
+     * {@code profile} names the account by its id and its last known
+     * name; {@code spokeAsOperator} whether a kept line of the Operator
+     * channel was said by it.
+     */
+    ChatAbsentReader(MinecraftServer server, GameProfile profile,
+                     boolean spokeAsOperator) {
         this.server = server;
         this.profile = profile;
+        this.spokeAsOperator = spokeAsOperator;
     }
 
     /** Whether the server would let the account in: not banned, and whitelisted where that is asked. */
@@ -96,6 +111,9 @@ final class ChatAbsentReader implements ChatChannelPolicy.Reader {
                             .func_152683_b(this.profile);
                     this.opLevel = entry != null ? entry.func_152644_a()
                             : this.server.getOpPermissionLevel();
+                } else if (this.spokeAsOperator
+                        && !this.server.isDedicatedServer()) {
+                    this.opLevel = this.server.getOpPermissionLevel();
                 }
             } catch (RuntimeException unreadable) {
                 this.opLevel = ChatAccountRoleResolver.NOT_OPERATOR;

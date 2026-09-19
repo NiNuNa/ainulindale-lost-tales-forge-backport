@@ -6,6 +6,7 @@ import com.ninuna.losttales.client.skin.LostTalesAccountSkins;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
+import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.minecraft.MinecraftProfileTexture;
 import java.util.Map;
@@ -261,6 +262,7 @@ public final class LostTalesCharacterHeadIconRenderer {
                     8.0F * unit, 8.0F * unit,
                     8.0F * unit, 8.0F * unit,
                     imageWidth, imageHeight);
+            LostTalesUiFlatLayers.nextLayer();
             if (drawFeatures && imageHeight >= imageWidth) {
                 // As on a player's head: the headwear stands off the
                 // face by growing about their shared centre.
@@ -536,6 +538,9 @@ public final class LostTalesCharacterHeadIconRenderer {
                     layout.getFaceX(), layout.getFaceY(),
                     layout.getFaceSize(), layout.getFaceSize(),
                     64.0F, layout.getImageHeight());
+            // Whatever the face wears stands over it: a translucent head
+            // is one picture, not a face showing through its hat.
+            LostTalesUiFlatLayers.nextLayer();
 
             if (drawFeatures && (layout.getOverlayKind()
                     == CharacterHeadIconLayout.OverlayKind.MINECRAFT

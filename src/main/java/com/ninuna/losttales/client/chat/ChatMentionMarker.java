@@ -141,7 +141,7 @@ final class ChatMentionMarker {
             UUID characterId = fields[1].length() == 0 ? null
                     : UUID.fromString(fields[1]);
             return new ChatNamedPlayer(playerId, account, characterId,
-                    fields[3], fields[2], 0);
+                    fields[3], fields[2]);
         } catch (IllegalArgumentException malformed) {
             return null;
         }

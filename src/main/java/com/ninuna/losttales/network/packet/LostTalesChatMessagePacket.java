@@ -148,7 +148,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
                     + 4 + ChatNamedPlayer.MAX_ACCOUNT_BYTES
                     + IDENTITY_ID_TAIL_BYTES
                     + 4 + ChatNamedPlayer.MAX_IDENTITY_BYTES
-                    + 4 + ChatNamedPlayer.MAX_SKIN_ID_BYTES + 4)
+                    + 4 + ChatNamedPlayer.MAX_SKIN_ID_BYTES)
             // The reactions on the line as this reader is shown them.
             + LostTalesChatReactionCodec.MAX_BYTES;
     private static final int MAX_CHANNEL_BYTES = 16;
@@ -667,7 +667,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
                             buffer, ChatNamedPlayer.MAX_SKIN_ID_BYTES);
                     ChatNamedPlayer player = new ChatNamedPlayer(namedId,
                             namedAccount, namedCharacter, namedIdentity,
-                            namedSkin, buffer.readInt());
+                            namedSkin);
                     if (!player.isValid()) {
                         throw new LostTalesPacketCodec.DecodeException(
                                 "a named player without an account");
@@ -878,7 +878,6 @@ public final class LostTalesChatMessagePacket implements IMessage {
                     ChatNamedPlayer.MAX_IDENTITY_BYTES);
             LostTalesPacketCodec.writeUtf8String(buffer, player.getSkinId(),
                     ChatNamedPlayer.MAX_SKIN_ID_BYTES);
-            buffer.writeInt(player.getNameColor());
         }
         LostTalesChatReactionCodec.write(buffer, this.reactions);
         LostTalesPacketCodec.writeUtf8String(buffer, this.tabId, MAX_TAB_ID_BYTES);

@@ -97,17 +97,35 @@ public class LostTalesUiTextField extends GuiTextField {
 
     /**
      * Writes one run in the mod's ink: the words a pixel down and right
-     * in the shadow tone first, then the words themselves over them.
+     * in the shadow tone first, then the words themselves over them —
+     * one picture while they fade, so the shadow never shows through
+     * their strokes.
      */
-    public void drawShadowedText(String text, int x, int y, int rgb,
-                                 int alpha) {
-        int shadow = LostTalesUiInk.shadowAlpha(alpha);
-        if (shadow >= LostTalesUiInk.MIN_VISIBLE_ALPHA) {
-            this.font.drawString(text, x + LostTalesUiInk.SHADOW_OFFSET,
-                    y + LostTalesUiInk.SHADOW_OFFSET,
-                    LostTalesUiInk.argb(LostTalesUiInk.SHADOW, shadow));
+    public void drawShadowedText(final String text, final int x,
+                                 final int y, final int rgb,
+                                 final int alpha) {
+        LostTalesUiFlatLayers.Layers layers = new LostTalesUiFlatLayers.Layers() {
+            @Override
+            public void draw() {
+                int shadow = LostTalesUiInk.shadowAlpha(alpha);
+                if (shadow >= LostTalesUiInk.MIN_VISIBLE_ALPHA) {
+                    font.drawString(text, x + LostTalesUiInk.SHADOW_OFFSET,
+                            y + LostTalesUiInk.SHADOW_OFFSET,
+                            LostTalesUiInk.argb(LostTalesUiInk.SHADOW, shadow));
+                    LostTalesUiFlatLayers.nextLayer();
+                }
+                font.drawString(text, x, y, LostTalesUiInk.argb(rgb, alpha));
+            }
+        };
+        if (alpha >= 255 || LostTalesUiFlatLayers.isActive()) {
+            layers.draw();
+            return;
         }
-        this.font.drawString(text, x, y, LostTalesUiInk.argb(rgb, alpha));
+        LostTalesUiFlatLayers.draw(alpha, x, y,
+                x + this.font.getStringWidth(text)
+                        + LostTalesUiInk.SHADOW_OFFSET,
+                y + this.font.FONT_HEIGHT + LostTalesUiInk.SHADOW_OFFSET,
+                layers);
     }
 
     /** The placeholder shown while the field is empty and unfocused. */

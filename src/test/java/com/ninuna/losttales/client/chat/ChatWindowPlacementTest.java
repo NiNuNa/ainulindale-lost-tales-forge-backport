@@ -131,11 +131,9 @@ public final class ChatWindowPlacementTest {
      * given one line of its own is 39 + 2 + 12 + (12 + 25) = 90 tall
      * with 12 + 25 = 37 of it below the baseline. The screen margin is
      * zero, and a window keeps two pixels inside the screen for its
-     * frame.
-     * A window may hang
-     * off either side as long as forty pixels of it stay on screen, and
-     * below as long as its strip does; it never rises above the top.
-     * Other windows never hold it.
+     * frame. A window may hang off either side and off the bottom as
+     * long as a twentieth of it stays on screen, eight pixels at least;
+     * its strip never rises above the top. Other windows never hold it.
      */
     @Test
     public void theScreenHoldsOnlyAStripsWorthOfAWindow() {
@@ -149,19 +147,18 @@ public final class ChatWindowPlacementTest {
                 dragged, null, -50.0D, -50.0D, 1000, 600);
         assertEquals(-50.0D, anchor.x, 0.0001D);
         assertEquals(55.0D, anchor.baseline, 0.0001D);
-        // Far past the left edge: held where forty pixels remain past the
-        // frame's two pixels (2 + 40 - 160 = -118).
+        // Far past the left edge: held where eight pixels remain, a
+        // twentieth of 160 (8 - 160 = -152).
         anchor = ChatWindowPlacement.constrainWindow(dragged, null, -500.0D,
                 300.0D, 1000, 600);
-        assertEquals(-118.0D, anchor.x, 0.0001D);
-        // Far past the bottom-right: forty pixels remain on the right
-        // (x 1000 - 2 - 40 = 958), and the strip stays on screen below
-        // (the box top at 600 - 2 - 22 = 576, so the baseline at
-        // 576 + 90 - 37 = 629).
+        assertEquals(-152.0D, anchor.x, 0.0001D);
+        // Far past the bottom-right: eight pixels remain on the right
+        // (x 1000 - 8 = 992) and eight below (the box top at 592, so the
+        // baseline at 592 + 90 - 37 = 645).
         anchor = ChatWindowPlacement.constrainWindow(dragged, null, 2000.0D,
                 2000.0D, 1000, 600);
-        assertEquals(958.0D, anchor.x, 0.0001D);
-        assertEquals(629.0D, anchor.baseline, 0.0001D);
+        assertEquals(992.0D, anchor.x, 0.0001D);
+        assertEquals(645.0D, anchor.baseline, 0.0001D);
         // A stored overhang is a share of the window: -25 percent stands
         // a quarter of the window past the frame's two pixels on any
         // screen.
@@ -171,10 +168,10 @@ public final class ChatWindowPlacementTest {
         assertEquals(-38.0D, ChatWindowPlacement.windowBounds(dragged, null,
                 500, 600).x, 0.0001D);
         // Past what the screen holds, the stored value is kept and the
-        // box held: -90 percent asks for 2 - 144 = -142, and gets -118.
-        ChatWindowLayout.setPosition(dragged.getId(), -90.0D, 0.0D, false);
-        assertEquals(-90.0D, dragged.getOffsetX(), 0.0D);
-        assertEquals(-118.0D, ChatWindowPlacement.windowBounds(dragged, null,
+        // box held: -100 percent asks for 2 - 160 = -158, and gets -152.
+        ChatWindowLayout.setPosition(dragged.getId(), -100.0D, 0.0D, false);
+        assertEquals(-100.0D, dragged.getOffsetX(), 0.0D);
+        assertEquals(-152.0D, ChatWindowPlacement.windowBounds(dragged, null,
                 1000, 600).x, 0.0001D);
         // Anywhere inside is fine, another window there or not: the
         // console window may be dropped right onto the conversation one.
@@ -425,18 +422,48 @@ public final class ChatWindowPlacementTest {
     @Test
     public void aWindowGrowingPastTheTopIsPushedDownNotOff() {
         // A 60px-tall box (24 of it below the baseline) anchored near the
-        // top: the baseline moves down until the top sits on the edge.
-        assertEquals(36.0D, ChatWindowPlacement.keepOnScreen(20.0D, 60, 24,
+        // top: the baseline moves down until the top sits on the margin,
+        // the strip whole on screen.
+        assertEquals(38.0D, ChatWindowPlacement.holdBaseline(20.0D, 60, 24,
                 300), 0.0001D);
         // Plenty of room: untouched.
-        assertEquals(150.0D, ChatWindowPlacement.keepOnScreen(150.0D, 60, 24,
+        assertEquals(150.0D, ChatWindowPlacement.holdBaseline(150.0D, 60, 24,
                 300), 0.0001D);
-        // Below, only the strip is held on screen: the box top may go
-        // down to 300 - 22 = 278, a baseline of 278 + 60 - 24 = 314.
-        assertEquals(314.0D, ChatWindowPlacement.keepOnScreen(400.0D, 60, 24,
+        // A box taller than the screen keeps its top on the margin.
+        assertEquals(378.0D, ChatWindowPlacement.holdBaseline(10.0D, 400, 24,
                 300), 0.0001D);
-        // A box taller than the screen keeps its top on the edge.
-        assertEquals(376.0D, ChatWindowPlacement.keepOnScreen(10.0D, 400, 24,
+    }
+
+    /**
+     * Past the left, right and bottom edges a window may go ninety-five
+     * hundredths of the way out: a twentieth of it stays in view, and
+     * never less than a stretch the pointer can take hold of.
+     */
+    @Test
+    public void aWindowMayGoNinetyFivePercentPastThreeEdges() {
+        // Below: a 400px box keeps 20px in view, its top at 280.
+        assertEquals(280.0D + 376.0D, ChatWindowPlacement.holdBaseline(
+                2000.0D, 400, 24, 300), 0.0001D);
+        // A small box keeps the least hold, 8px: its top at 292.
+        assertEquals(292.0D + 36.0D, ChatWindowPlacement.holdBaseline(
+                2000.0D, 60, 24, 300), 0.0001D);
+        // Past the left edge a 300px box keeps 15px in view.
+        assertEquals(-285.0D, ChatWindowPlacement.holdOnScreen(-1000.0D, 300,
+                640), 0.0001D);
+        // Past the right edge too.
+        assertEquals(625.0D, ChatWindowPlacement.holdOnScreen(1000.0D, 300,
+                640), 0.0001D);
+        // A box that fits stays where it was put.
+        assertEquals(100.0D, ChatWindowPlacement.holdOnScreen(100.0D, 300,
+                640), 0.0001D);
+    }
+
+    @Test
+    public void theFeedStaysWholeOnScreen() {
+        // A 60px feed whose baseline is its bottom: never below the screen.
+        assertEquals(300.0D, ChatWindowPlacement.keepOnScreen(400.0D, 60, 0,
+                300), 0.0001D);
+        assertEquals(60.0D, ChatWindowPlacement.keepOnScreen(20.0D, 60, 0,
                 300), 0.0001D);
     }
 }

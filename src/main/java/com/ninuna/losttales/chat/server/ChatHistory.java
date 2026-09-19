@@ -107,6 +107,21 @@ public final class ChatHistory {
         return new ArrayList<Entry>(ENTRIES.values());
     }
 
+    /** Every account a kept line of the channel was said by. */
+    static synchronized Set<UUID> authorsIn(ChatChannel channel) {
+        Set<UUID> authors = new HashSet<UUID>();
+        if (channel == null) {
+            return authors;
+        }
+        for (Entry entry : ENTRIES.values()) {
+            if (entry.authorId != null
+                    && channel.getId().equals(entry.channelId)) {
+                authors.add(entry.authorId);
+            }
+        }
+        return authors;
+    }
+
     /**
      * Takes the save's kept lines back as the live history, oldest first
      * and within the bounds, and moves the id allocator past the newest

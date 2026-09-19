@@ -382,6 +382,34 @@ final class ChatInputBar {
                 ChatPickerPanel.BUTTON_SIZE, ChatPickerPanel.BUTTON_SIZE);
     }
 
+    /**
+     * How much of its opacity the bar being drawn shows: all of it, but
+     * for the bar of a window still fading in — one just made from tabs
+     * carried out of their row — which fades in with its window. Set
+     * round one bar's drawing and put back after it
+     * ({@link #beginFade}, {@link #endFade}).
+     */
+    private static float fadeShare = 1.0F;
+
+    /** Draws what follows at {@code share} of the bar's opacity, until {@link #endFade}. */
+    static void beginFade(float share) {
+        fadeShare = Math.max(0.0F, Math.min(1.0F, share));
+    }
+
+    static void endFade() {
+        fadeShare = 1.0F;
+    }
+
+    /** {@code alpha} at the share of it the bar being drawn shows. */
+    static int faded(int alpha) {
+        return Math.round(alpha * fadeShare);
+    }
+
+    /** An opacity at the share of it the bar being drawn shows. */
+    static float fadedShare(float opacity) {
+        return opacity * fadeShare;
+    }
+
     /** The bars' entrance from below, timed from the screen's opening. */
     float entranceOffset() {
         if (!LostTalesConfig.enableChatAnimations) {
@@ -536,7 +564,7 @@ final class ChatInputBar {
         int wellBottom = wellTop + CONTENT_HEIGHT;
         int barBottom = this.top + ChatWindowPlacement.INPUT_HEIGHT;
         int frameTop = indicatorFrameTop();
-        float opacity = LostTalesChatVisualStyle.chatOpacity(this.mc);
+        float opacity = fadedShare(LostTalesChatVisualStyle.chatOpacity(this.mc));
         int surface = LostTalesChatVisualStyle.surfaceArgb(opacity);
         // Up to the indicator's frame plain; the indicator's frame, then
         // up to the divider around the character button's frame where
@@ -589,10 +617,10 @@ final class ChatInputBar {
         // brightest corner closed as a lit framed button's is, rounded and
         // shaded over the two edges' ends.
         LostTalesChatOverlayRenderer.drawBarBottomEdge(this.left, barRight,
-                barBottom, 255);
+                barBottom, faded(255));
         LostTalesUiFramedButton.drawCornerInk(LostTalesUiSheet.FRAME_LIT_BOTTOM_LEFT,
                 this.left - ring, barBottom + ring - LostTalesUiFramedButton.CORNER,
-                255);
+                faded(255));
     }
 
     /**
@@ -603,7 +631,8 @@ final class ChatInputBar {
      * only the active window's bar is typed in. Nothing here answers
      * the pointer beyond the strip itself; a press on it moves the
      * input to this window. Drawn where the live bar's geometry would
-     * put it, which is borrowed for the draw and given back.
+     * put it, which is borrowed for the draw and given back. It fades in
+     * with a window that is still appearing.
      */
     void drawRestingBar(ChatWindowFrame frame, ChatWindow window) {
         ChatTab tab = ChatWindowFrame.activeTab(window,
@@ -611,6 +640,15 @@ final class ChatInputBar {
         if (tab == null || frame == null || !frame.drawn) {
             return;
         }
+        beginFade(frame.shownShare());
+        try {
+            drawRestingBar(frame, tab);
+        } finally {
+            endFade();
+        }
+    }
+
+    private void drawRestingBar(ChatWindowFrame frame, ChatTab tab) {
         int liveLeft = this.left;
         int liveTop = this.top;
         int liveRight = this.right;
@@ -635,7 +673,7 @@ final class ChatInputBar {
             int toggleLeft = toolbarToggleLeft(barRight);
             this.toolbarToggle.drawSettled(ChatWindowLayout.isToolbarCollapsed(),
                     toggleLeft, barControlTop() + 1, ChatPickerPanel.BUTTON_SIZE,
-                    ChatPickerPanel.BUTTON_SIZE, 255);
+                    ChatPickerPanel.BUTTON_SIZE, faded(255));
             for (ChatPickerPanel picker : this.pickers) {
                 if (isPickerShown(picker)) {
                     picker.drawRestingButton(barRight, pickerAnchor());
@@ -676,13 +714,13 @@ final class ChatInputBar {
                     ChatInputStyles.prefixOf(ChatMarkdown.Span.CODE) + command,
                     x, barTextTop(), ChatInputStyles.colorOf(
                             ChatMarkdown.Span.CODE,
-                            LostTalesChatVisualStyle.IVORY), 255);
+                            LostTalesChatVisualStyle.IVORY), faded(255));
             x += this.font.getStringWidth(command);
         }
         if (code < shown.length()) {
             LostTalesChatVisualStyle.drawColored(this.font,
                     shown.substring(code), x, barTextTop(),
-                    LostTalesChatVisualStyle.IVORY, 255);
+                    LostTalesChatVisualStyle.IVORY, faded(255));
         }
     }
 
@@ -723,7 +761,7 @@ final class ChatInputBar {
         String hint = LostTalesSkyrimUiStyle.trimToWidth(this.font,
                 StatCollector.translateToLocal(key), line.fieldRight - x);
         LostTalesChatVisualStyle.drawColored(this.font, "§o" + hint, x,
-                barTextTop(), LostTalesChatVisualStyle.asideRgb(), 255);
+                barTextTop(), LostTalesChatVisualStyle.asideRgb(), faded(255));
     }
 
     /**
@@ -740,7 +778,7 @@ final class ChatInputBar {
         LostTalesChatOverlayRenderer.drawLeftEdgeSegment(
                 barLeft - ChatWindowPlacement.FRAME_EDGE_WIDTH, barTop,
                 barBottom, barBottom, (float)(frame.boxBottom - frame.boxTop)
-                        + ChatWindowPlacement.FRAME_EDGE_WIDTH, 255);
+                        + ChatWindowPlacement.FRAME_EDGE_WIDTH, faded(255));
     }
 
     /**
@@ -758,7 +796,7 @@ final class ChatInputBar {
                 + ChatWindowPlacement.FRAME_EDGE_WIDTH;
         float barBottom = barTop + ChatWindowPlacement.INPUT_HEIGHT;
         LostTalesChatOverlayRenderer.drawRightEdgeSegment(barRight, barTop,
-                barBottom, barBottom - rampSpan, rampSpan, 255);
+                barBottom, barBottom - rampSpan, rampSpan, faded(255));
     }
 
     /**
@@ -783,7 +821,7 @@ final class ChatInputBar {
         try {
             this.toolbarToggle.draw(toggleLeft, barControlTop(),
                     ChatPickerPanel.BUTTON_SIZE, ChatPickerPanel.BUTTON_SIZE,
-                    255);
+                    faded(255));
         } finally {
             LostTalesUiButton.endPose();
         }
@@ -853,7 +891,7 @@ final class ChatInputBar {
         LostTalesUiFramedButton.drawSurface(fit.frameLeft, frameTop, frameWidth,
                 LostTalesUiFramedButton.HEIGHT, lit,
                 Math.round(LostTalesChatVisualStyle.INSET_ALPHA
-                        * LostTalesChatVisualStyle.chatOpacity(this.mc)));
+                        * fadedShare(LostTalesChatVisualStyle.chatOpacity(this.mc))));
         int textTop = barTextTop();
         if (fit.iconLeft >= 0) {
             // The icon's box stands in the frame's middle, the inset
@@ -861,13 +899,13 @@ final class ChatInputBar {
             // above the box's.
             LostTalesChatVisualStyle.beginContent();
             ChatChannelIcons.draw(this.mc, fit.channel, fit.iconLeft,
-                    frameTop + LostTalesUiFramedButton.INSET, 255);
+                    frameTop + LostTalesUiFramedButton.INSET, faded(255));
         }
         if (fit.labelRoom > 0) {
             drawIndicatorLabel(fit, textTop, lit, marquee);
         }
         LostTalesUiFramedButton.drawInk(fit.frameLeft, frameTop, frameWidth,
-                LostTalesUiFramedButton.HEIGHT, lit, 255);
+                LostTalesUiFramedButton.HEIGHT, lit, faded(255));
     }
 
     /**
@@ -888,14 +926,14 @@ final class ChatInputBar {
                 LostTalesChatVisualStyle.IVORY, lit);
         if (fit.labelRoom >= fit.labelWidth) {
             LostTalesChatVisualStyle.drawColored(this.font, text,
-                    fit.labelLeft, textTop, color, 255);
+                    fit.labelLeft, textTop, color, faded(255));
             return;
         }
         if (!marquee) {
             // A resting bar's cut name simply ends where its room does.
             LostTalesChatVisualStyle.drawColored(this.font,
                     this.font.trimStringToWidth(text, fit.labelRoom),
-                    fit.labelLeft, textTop, color, 255);
+                    fit.labelLeft, textTop, color, faded(255));
             return;
         }
         // A cut name thins out into the edge it is cut at, as far as
@@ -906,7 +944,7 @@ final class ChatInputBar {
                 ChatChannelTabBar.displayStep());
         float depth = LostTalesChatOverlayRenderer.sideFadeDepth(fit.labelRoom);
         LostTalesChatOverlayRenderer.drawFadingText(this.mc, this.font, text,
-                fit.labelLeft, (float)-offset, textTop, color, 255,
+                fit.labelLeft, (float)-offset, textTop, color, faded(255),
                 fit.labelLeft + this.fractionX,
                 fit.labelLeft + fit.labelRoom + this.fractionX, Double.NaN,
                 depth,
@@ -1115,9 +1153,10 @@ final class ChatInputBar {
         ChatInlineIcons.drawEmoji(this.mc, ChatHeadMarker.NARRATOR_MARK,
                 headX + LostTalesChatVisualStyle.SHADOW_OFFSET,
                 headY + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                CHARACTER_HEAD_SIZE, LostTalesChatVisualStyle.shadowAlpha(255), true);
+                CHARACTER_HEAD_SIZE,
+                LostTalesChatVisualStyle.shadowAlpha(faded(255)), true);
         ChatInlineIcons.drawEmoji(this.mc, ChatHeadMarker.NARRATOR_MARK,
-                headX, headY, CHARACTER_HEAD_SIZE, 255, false);
+                headX, headY, CHARACTER_HEAD_SIZE, faded(255), false);
     }
 
     /**
@@ -1137,7 +1176,7 @@ final class ChatInputBar {
         LostTalesUiFramedButton.drawSurface(left, top, CHARACTER_BUTTON_SIZE,
                 CHARACTER_BUTTON_SIZE, lit,
                 Math.round(LostTalesChatVisualStyle.INSET_ALPHA
-                        * LostTalesChatVisualStyle.chatOpacity(this.mc)));
+                        * fadedShare(LostTalesChatVisualStyle.chatOpacity(this.mc))));
         ClientChatIdentities.Identity shown =
                 ClientChatIdentities.effectiveFor(tab);
         UUID self = this.mc.thePlayer == null ? null
@@ -1179,24 +1218,24 @@ final class ChatInputBar {
                         if (account) {
                             LostTalesCharacterHeadIconRenderer.drawAccountHead(
                                     this.mc, self, headX, headY,
-                                    CHARACTER_HEAD_SIZE, 1.0F, 1.0F);
+                                    CHARACTER_HEAD_SIZE, 1.0F, fadedShare(1.0F));
                         } else {
                             LostTalesCharacterHeadIconRenderer.drawSnapshotHead(
                                     this.mc, self, shown.skinId, headX, headY,
-                                    CHARACTER_HEAD_SIZE, 1.0F, 1.0F);
+                                    CHARACTER_HEAD_SIZE, 1.0F, fadedShare(1.0F));
                         }
                     } finally {
                         ChatPresenceMark.endHeadCut();
                     }
                     ChatPresenceMark.draw(headX, headY, CHARACTER_HEAD_SIZE,
-                            presence, 255);
+                            presence, faded(255));
                 }
             } finally {
                 LostTalesUiButton.endPose();
             }
         }
         LostTalesUiFramedButton.drawInk(left, top, CHARACTER_BUTTON_SIZE,
-                CHARACTER_BUTTON_SIZE, lit, 255);
+                CHARACTER_BUTTON_SIZE, lit, faded(255));
     }
 
     /**
@@ -1214,14 +1253,14 @@ final class ChatInputBar {
                         x + LostTalesChatVisualStyle.SHADOW_OFFSET,
                         y + LostTalesChatVisualStyle.SHADOW_OFFSET,
                         CHARACTER_HEAD_SIZE, 1.0F, 1.0F, 1.0F,
-                        LostTalesChatVisualStyle.SHADOW_OPACITY);
+                        fadedShare(LostTalesChatVisualStyle.SHADOW_OPACITY));
             } else {
                 LostTalesCharacterHeadIconRenderer.drawTintedSnapshotHeadBase(
                         this.mc, self, skinId,
                         x + LostTalesChatVisualStyle.SHADOW_OFFSET,
                         y + LostTalesChatVisualStyle.SHADOW_OFFSET,
                         CHARACTER_HEAD_SIZE, 1.0F, 1.0F, 1.0F,
-                        LostTalesChatVisualStyle.SHADOW_OPACITY);
+                        fadedShare(LostTalesChatVisualStyle.SHADOW_OPACITY));
             }
         } finally {
             LostTalesSilhouetteRenderState.end();
@@ -1288,7 +1327,7 @@ final class ChatInputBar {
         LostTalesChatVisualStyle.drawDivider(x,
                 barControlTop() + (ChatPickerPanel.BUTTON_SIZE
                         - BAR_DIVIDER_HEIGHT) / 2,
-                BAR_DIVIDER_HEIGHT, LostTalesChatVisualStyle.DIVIDER_ALPHA);
+                BAR_DIVIDER_HEIGHT, faded(LostTalesChatVisualStyle.DIVIDER_ALPHA));
     }
 
     /**
@@ -1320,7 +1359,7 @@ final class ChatInputBar {
         int y = barControlTop() + (ChatPickerPanel.BUTTON_SIZE
                 - LostTalesUiSheet.SEND.getHeight()) / 2;
         LostTalesUiButton.drawGlyph(LostTalesUiSheet.SEND,
-                LostTalesUiSheet.SEND_HOVER, motion, x, y, 255);
+                LostTalesUiSheet.SEND_HOVER, motion, x, y, faded(255));
     }
 
     /** {@code 37/256} for a message, {@code 0/256} for none yet; nothing for a command. */
@@ -1388,7 +1427,7 @@ final class ChatInputBar {
                     0.0F);
             GL11.glScalef(scale, scale, 1.0F);
             LostTalesChatVisualStyle.drawColored(this.font, text,
-                    0, 0, full ? COUNTER_FULL_RGB : COUNTER_RGB, 255);
+                    0, 0, full ? COUNTER_FULL_RGB : COUNTER_RGB, faded(255));
         } finally {
             GL11.glPopMatrix();
         }

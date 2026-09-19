@@ -2,6 +2,7 @@ package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
+import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.Arrays;
@@ -56,7 +57,8 @@ public final class ChatHistoryNbtCodecTest {
         long command = ChatMessageIdAllocator.next();
         ChatConsoleStream.record(new ChatConsoleEvent(command, 5L,
                 ChatConsoleEvent.Kind.COMMAND, ChatConsoleEvent.Severity.INFO,
-                "Steve", "/tp Alex", "all"));
+                "Steve", "/tp Alex", "all",
+                ChatNamedPlayer.account(BOB, "Steve")));
         long warning = ChatMessageIdAllocator.next();
         ChatConsoleStream.record(new ChatConsoleEvent(warning, 6L,
                 ChatConsoleEvent.Kind.WARNING, ChatConsoleEvent.Severity.WARNING,
@@ -77,8 +79,12 @@ public final class ChatHistoryNbtCodecTest {
         assertEquals("Steve", first.getActor());
         assertEquals("/tp Alex", first.getText());
         assertEquals("all", first.getContext());
+        // The actor as the server knew them, so an old entry's mention
+        // still opens their card.
+        assertEquals(BOB, first.getActorIdentity().getPlayerId());
         assertEquals(warning, result.getConsoleEvents().get(1).getId());
         assertEquals("", result.getConsoleEvents().get(1).getActor());
+        assertNull(result.getConsoleEvents().get(1).getActorIdentity());
 
         // Restored into a clean stream, the console replays them in order,
         // and the allocator has moved past the newest.

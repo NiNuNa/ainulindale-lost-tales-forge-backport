@@ -61,6 +61,14 @@ public final class ChatConsoleEvent {
     private final Severity severity;
     /** Who did it: an account name, {@code Server} for the console, empty for nobody. */
     private final String actor;
+    /**
+     * The actor's account as the server knew it when the entry was made
+     * — its id and the colour its name wears out of character — or null
+     * for the Server, for nobody, and for an account that was not on
+     * the server. What lets an entry's mention open the actor's card and
+     * menu, in the colour their name wears, long after they have gone.
+     */
+    private final ChatNamedPlayer actorIdentity;
     private final String text;
     /**
      * For a command, the id of the tab the actor typed it in, as their
@@ -77,6 +85,16 @@ public final class ChatConsoleEvent {
     public ChatConsoleEvent(long id, long timestampMillis, Kind kind,
                             Severity severity, String actor, String text,
                             String context) {
+        this(id, timestampMillis, kind, severity, actor, text, context, null);
+    }
+
+    /**
+     * As above with the actor's account as the server knew it; an
+     * identity naming another account than {@code actor} is dropped.
+     */
+    public ChatConsoleEvent(long id, long timestampMillis, Kind kind,
+                            Severity severity, String actor, String text,
+                            String context, ChatNamedPlayer actorIdentity) {
         if (kind == null || severity == null) {
             throw new IllegalArgumentException("a console event has a kind and a severity");
         }
@@ -85,6 +103,11 @@ public final class ChatConsoleEvent {
         this.kind = kind;
         this.severity = severity;
         this.actor = clip(actor, MAX_ACTOR_LENGTH);
+        this.actorIdentity = actorIdentity != null
+                && actorIdentity.getPlayerId() != null
+                && this.actor.length() > 0
+                && actorIdentity.getAccount().equalsIgnoreCase(this.actor)
+                ? actorIdentity : null;
         this.text = clip(text, MAX_TEXT_LENGTH);
         if (this.text.length() == 0) {
             throw new IllegalArgumentException("a console event says something");
@@ -116,6 +139,8 @@ public final class ChatConsoleEvent {
     public Kind getKind() { return this.kind; }
     public Severity getSeverity() { return this.severity; }
     public String getActor() { return this.actor; }
+    /** The actor's account as the server knew it, or null; see {@link #actorIdentity}. */
+    public ChatNamedPlayer getActorIdentity() { return this.actorIdentity; }
     public String getText() { return this.text; }
     /** The tab a command was typed in, or empty; see {@link #context}. */
     public String getContext() { return this.context; }

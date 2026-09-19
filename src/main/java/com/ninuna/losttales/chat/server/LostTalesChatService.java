@@ -12,6 +12,7 @@ import com.ninuna.losttales.chat.ChatFormattingCodes;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatMessageOrigin;
 import com.ninuna.losttales.chat.ChatMessageValidator;
+import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.ChatRecipientRule;
@@ -537,16 +538,16 @@ public final class LostTalesChatService {
                 || text.trim().length() == 0) {
             return;
         }
+        MinecraftServer server = MinecraftServer.getServer();
         ChatConsoleEvent event;
         try {
             event = new ChatConsoleEvent(ChatMessageIdAllocator.next(),
                     System.currentTimeMillis(), kind, severity, actor, text,
-                    context);
+                    context, actorIdentity(server, actor));
         } catch (IllegalArgumentException refused) {
             return;
         }
         ChatConsoleStream.record(event);
-        MinecraftServer server = MinecraftServer.getServer();
         if (server == null || server.getConfigurationManager() == null
                 || server.getConfigurationManager().playerEntityList == null) {
             return;
@@ -560,6 +561,32 @@ public final class LostTalesChatService {
                 LostTalesNetworkHandler.CHANNEL.sendTo(packet, player);
             }
         }
+    }
+
+    /**
+     * The account a console entry names as its actor, as the server
+     * knows it right now: an actor does what the entry records while
+     * they are on the server, so they are found among those online.
+     * Null for the Server, for nobody, and for a name nobody online
+     * carries.
+     */
+    private static ChatNamedPlayer actorIdentity(MinecraftServer server,
+                                                 String actor) {
+        String account = actor == null ? "" : actor.trim();
+        if (server == null || account.length() == 0
+                || server.getConfigurationManager() == null
+                || server.getConfigurationManager().playerEntityList == null) {
+            return null;
+        }
+        @SuppressWarnings("unchecked")
+        List<EntityPlayerMP> online = server.getConfigurationManager().playerEntityList;
+        for (EntityPlayerMP player : online) {
+            if (player != null && player.getGameProfile() != null
+                    && account.equalsIgnoreCase(player.getGameProfile().getName())) {
+                return LostTalesServerBroadcastHook.namedAccount(player);
+            }
+        }
+        return null;
     }
 
     /**

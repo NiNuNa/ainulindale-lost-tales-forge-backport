@@ -34,8 +34,14 @@ public final class LostTalesChatPresencePacketTest {
         // The default character's id is the account's own, and it is
         // still an identity of its own.
         choices.put(ChatPresenceIdentity.character(STEVE), ChatPresence.AWAY);
+        Map<ChatPresenceIdentity, String> lines =
+                new LinkedHashMap<ChatPresenceIdentity, String>();
+        lines.put(ChatPresenceIdentity.character(ALDRIC), "Out  hunting \u00a7corcs ");
+        // An identity may have a line and no choice of status.
+        lines.put(ChatPresenceIdentity.character(ALEX), "Brewing");
+        lines.put(ChatPresenceIdentity.ACCOUNT, "   ");
         ByteBuf wire = Unpooled.buffer();
-        new LostTalesChatPresencePacket(true, choices).toBytes(wire);
+        new LostTalesChatPresencePacket(true, choices, lines).toBytes(wire);
         LostTalesChatPresencePacket decoded = new LostTalesChatPresencePacket();
         decoded.fromBytes(wire);
         assertFalse(decoded.isMalformed());
@@ -43,13 +49,19 @@ public final class LostTalesChatPresencePacketTest {
         assertEquals(choices, decoded.getChoices());
         assertEquals(ChatPresenceIdentity.ACCOUNT,
                 decoded.getChoices().keySet().iterator().next());
+        // Lines travel cleaned, and an empty one not at all.
+        assertEquals(2, decoded.getLines().size());
+        assertEquals("Out hunting orcs",
+                decoded.getLines().get(ChatPresenceIdentity.character(ALDRIC)));
+        assertEquals("Brewing",
+                decoded.getLines().get(ChatPresenceIdentity.character(ALEX)));
     }
 
     @Test
     public void offlineIsNeverSentAsAChoice() {
         LostTalesChatPresencePacket packet = new LostTalesChatPresencePacket(
                 false, Collections.singletonMap(ChatPresenceIdentity.ACCOUNT,
-                        ChatPresence.OFFLINE));
+                        ChatPresence.OFFLINE), null);
         assertTrue(packet.getChoices().isEmpty());
     }
 
@@ -72,9 +84,29 @@ public final class LostTalesChatPresencePacketTest {
         // More than a payload may carry.
         assertBadStatement(Unpooled.buffer().writeByte(0)
                 .writeByte(LostTalesChatPresencePacket.MAX_CHOICES + 1));
+        // An empty line.
+        assertBadStatement(Unpooled.buffer().writeByte(0).writeByte(0)
+                .writeByte(1)
+                .writeByte(LostTalesChatPresencePacket.KIND_ACCOUNT)
+                .writeByte(0));
+        // One identity's line twice.
+        assertBadStatement(Unpooled.buffer().writeByte(0).writeByte(0)
+                .writeByte(2)
+                .writeByte(LostTalesChatPresencePacket.KIND_ACCOUNT)
+                .writeByte(1).writeByte('a')
+                .writeByte(LostTalesChatPresencePacket.KIND_ACCOUNT)
+                .writeByte(1).writeByte('b'));
+        // A line longer than a line may be.
+        ByteBuf long_ = Unpooled.buffer().writeByte(0).writeByte(0)
+                .writeByte(1)
+                .writeByte(LostTalesChatPresencePacket.KIND_ACCOUNT);
+        int over = com.ninuna.losttales.chat.ChatStatusLine.MAX_BYTES + 1;
+        long_.writeByte(0x80 | (over & 0x7F)).writeByte(over >>> 7);
+        long_.writeBytes(new byte[over]);
+        assertBadStatement(long_);
         // Something after the end.
         assertBadStatement(Unpooled.buffer().writeByte(0).writeByte(0)
-                .writeByte(0));
+                .writeByte(0).writeByte(0));
     }
 
     @Test
@@ -88,13 +120,63 @@ public final class LostTalesChatPresencePacketTest {
         accounts.put(STEVE, steve);
         // An account showing nothing: it left, or hides everywhere.
         accounts.put(ALEX, Collections.<ChatPresenceIdentity, ChatPresence>emptyMap());
+        Map<ChatPresenceIdentity, String> steveLines =
+                new LinkedHashMap<ChatPresenceIdentity, String>();
+        steveLines.put(ChatPresenceIdentity.character(ALDRIC), "Out hunting");
+        // A line of an identity not shown is not told.
+        steveLines.put(ChatPresenceIdentity.character(ALEX), "Hidden");
         ByteBuf wire = Unpooled.buffer();
-        new LostTalesChatPresenceSyncPacket(accounts).toBytes(wire);
+        new LostTalesChatPresenceSyncPacket(accounts,
+                Collections.singletonMap(STEVE, steveLines)).toBytes(wire);
         LostTalesChatPresenceSyncPacket decoded = new LostTalesChatPresenceSyncPacket();
         decoded.fromBytes(wire);
         assertFalse(decoded.isMalformed());
         assertEquals(accounts, decoded.getAccounts());
         assertEquals(STEVE, decoded.getAccounts().keySet().iterator().next());
+        assertEquals(Collections.singletonMap(
+                        ChatPresenceIdentity.character(ALDRIC), "Out hunting"),
+                decoded.getLines().get(STEVE));
+        assertTrue(decoded.getLines().get(ALEX).isEmpty());
+    }
+
+    /** A full batch stays inside what one payload may carry. */
+    @Test
+    public void aFullBatchFitsOnePayload() {
+        StringBuilder widest = new StringBuilder();
+        for (int index = 0;
+                index < com.ninuna.losttales.chat.ChatStatusLine.MAX_CHARACTERS;
+                index++) {
+            widest.append('\u2603');
+        }
+        Map<UUID, Map<ChatPresenceIdentity, ChatPresence>> accounts =
+                new LinkedHashMap<UUID, Map<ChatPresenceIdentity, ChatPresence>>();
+        Map<UUID, Map<ChatPresenceIdentity, String>> lines =
+                new LinkedHashMap<UUID, Map<ChatPresenceIdentity, String>>();
+        for (int account = 0;
+                account < LostTalesChatPresenceSyncPacket.MAX_ACCOUNTS;
+                account++) {
+            Map<ChatPresenceIdentity, ChatPresence> shown =
+                    new LinkedHashMap<ChatPresenceIdentity, ChatPresence>();
+            Map<ChatPresenceIdentity, String> said =
+                    new LinkedHashMap<ChatPresenceIdentity, String>();
+            for (int identity = 0;
+                    identity < LostTalesChatPresenceSyncPacket.MAX_SHOWN;
+                    identity++) {
+                ChatPresenceIdentity who = ChatPresenceIdentity.character(
+                        new UUID(account, identity));
+                shown.put(who, ChatPresence.ONLINE);
+                said.put(who, widest.toString());
+            }
+            UUID id = new UUID(account, 99L);
+            accounts.put(id, shown);
+            lines.put(id, said);
+        }
+        ByteBuf wire = Unpooled.buffer();
+        new LostTalesChatPresenceSyncPacket(accounts, lines).toBytes(wire);
+        assertTrue(wire.readableBytes() < 32767);
+        LostTalesChatPresenceSyncPacket decoded = new LostTalesChatPresenceSyncPacket();
+        decoded.fromBytes(wire);
+        assertFalse(decoded.isMalformed());
     }
 
     @Test
@@ -104,7 +186,7 @@ public final class LostTalesChatPresencePacketTest {
         shown.put(ChatPresenceIdentity.ACCOUNT, ChatPresence.INVISIBLE);
         shown.put(ChatPresenceIdentity.character(ALDRIC), ChatPresence.OFFLINE);
         LostTalesChatPresenceSyncPacket packet = new LostTalesChatPresenceSyncPacket(
-                Collections.singletonMap(STEVE, shown));
+                Collections.singletonMap(STEVE, shown), null);
         assertTrue(packet.getAccounts().get(STEVE).isEmpty());
     }
 
@@ -121,8 +203,10 @@ public final class LostTalesChatPresencePacketTest {
         assertBadSync(invisible);
         ByteBuf repeated = Unpooled.buffer().writeShort(1);
         writeAccount(repeated, STEVE, 2);
-        repeated.writeByte(LostTalesChatPresencePacket.KIND_ACCOUNT).writeByte(0);
-        repeated.writeByte(LostTalesChatPresencePacket.KIND_ACCOUNT).writeByte(1);
+        repeated.writeByte(LostTalesChatPresencePacket.KIND_ACCOUNT)
+                .writeByte(ChatPresence.ONLINE.code()).writeByte(0);
+        repeated.writeByte(LostTalesChatPresencePacket.KIND_ACCOUNT)
+                .writeByte(ChatPresence.AWAY.code()).writeByte(0);
         assertBadSync(repeated);
         ByteBuf crowded = Unpooled.buffer().writeShort(1);
         writeAccount(crowded, STEVE, LostTalesChatPresenceSyncPacket.MAX_SHOWN + 1);

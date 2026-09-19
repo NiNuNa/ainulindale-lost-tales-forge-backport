@@ -1,7 +1,9 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
+import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.chat.ChatDeliveryMark;
@@ -348,11 +350,15 @@ final class LostTalesChatOverlayRenderer {
                 screenWidth);
         // The timestamp area and the member list glide in and out before
         // anything reads their width: the lines are laid out against it.
-        // The list stands while the words keep their least room beside it.
+        // The list takes the width its edge was dragged to, within a third
+        // of the window, and stands while the words keep their least room
+        // beside it.
+        float windowChatWidth = chatWidth / chat.func_146244_h() + 6.0F;
+        ChatMemberList.measure(frame.members, window, windowChatWidth);
         frame.advancePanels(window, view != null
-                && ChatMemberList.fits(chatWidth / chat.func_146244_h()
-                        + 6.0F - ChatTimestampColumn.of(frame,
-                                minecraft.fontRenderer).messageX()));
+                && ChatMemberList.fits(windowChatWidth - ChatTimestampColumn
+                        .of(frame, minecraft.fontRenderer).messageX(),
+                        frame.members.width));
         // The unread divider opens a run of its own under it while it
         // stands, so the window lays its lines out knowing where it is.
         Integer unread = view == null ? null
@@ -937,7 +943,16 @@ final class LostTalesChatOverlayRenderer {
         ChatStackRows rows = frame.rows;
         if (!rows.describes(lines, totalLineCount, dividerIndex, open)) {
             rows.reset(lines, dividerIndex, open);
+            frame.glide.relaid(lines, rows, dividerIndex, System.nanoTime());
         }
+        // A row carried to a new layout glides there while the view
+        // reads the newest line. Scrolled away, the scroll holds the line
+        // being read in place, and the rows are set down at once.
+        ChatRowGlide glide = frame.glide;
+        if (scrollLines > 0.0D) {
+            glide.halt();
+        }
+        glide.advance(System.nanoTime(), stackPixelsPerUnit());
         int scrollRow = Math.min(scrollPosition, totalRowCount);
         // Pixels of stack under the baseline, and the slide's share of
         // the row the offset is inside.
@@ -991,13 +1006,24 @@ final class LostTalesChatOverlayRenderer {
         // the stack is offset — the head-room band above the room and
         // the slide included, so the row the slide reveals is drawn and
         // clipped where the room ends.
-        int lastRow = Math.min(totalRowCount - 1, rows.lastRowBelow(
-                stackBase + roomUnscaled
-                        + ChatWindowPlacement.HISTORY_TOP_MARGIN / scale
-                        + Math.max(0.0F, offset)));
-        // Height of the rows the loop is about to draw.
-        float plannedHeight = lastRow < scrollRow ? 0.0F
-                : rows.top(lastRow + 1) - stackBase;
+        float roomTop = stackBase + roomUnscaled
+                + ChatWindowPlacement.HISTORY_TOP_MARGIN / scale
+                + Math.max(0.0F, offset);
+        int placedRow = Math.min(totalRowCount - 1,
+                rows.lastRowBelow(roomTop));
+        // A row gliding up to a place above the room is drawn until it
+        // has left it.
+        int lastRow = Math.min(totalRowCount - 1,
+                rows.lastRowBelow(roomTop + glide.deepestDrop()));
+        // Height of the rows placed in the room.
+        float plannedHeight = placedRow < scrollRow ? 0.0F
+                : rows.top(placedRow + 1) - stackBase;
+        // How far the topmost of them is drawn above its place: the
+        // hatch over the rows the history does not reach follows it.
+        float topLift = placedRow < 0 ? 0.0F
+                : glide.lift(ChatStackRows.isDividerRow(placedRow,
+                        dividerIndex) ? dividerIndex
+                        : lineOfRow(placedRow, dividerIndex));
         // The window's rules are where content ends: everything the
         // stack draws is cut on the top rule and on the bottom rule, and
         // nowhere earlier, so a glyph's descender or shadow below the
@@ -1079,8 +1105,8 @@ final class LostTalesChatOverlayRenderer {
         // jump-to-present button — are placed before anything is drawn,
         // so the panel, the lines and the shades can leave them holes.
         ToolbarPlace toolbar = open ? placeToolbar(minecraft, lines,
-                firstLine, lastRow, dividerIndex, rows, stackBase, opacity,
-                opening) : null;
+                firstLine, lastRow, dividerIndex, rows, glide, stackBase,
+                opacity, opening) : null;
         int[] toolbarKinds = toolbar == null ? new int[0]
                 : offeredToolbar(toolbar.chatLineId);
         // Clear of the scrollbar's track at the panel's right edge.
@@ -1105,7 +1131,7 @@ final class LostTalesChatOverlayRenderer {
         if (open) {
             // The reaction chips are framed buttons too, in the stack.
             placeChipHoles(holes, minecraft, font, lines, firstLine,
-                    lastRow, dividerIndex, rows, stackBase, opacity,
+                    lastRow, dividerIndex, rows, glide, stackBase, opacity,
                     opening, alignment, unscaledWidth, offset);
         }
 
@@ -1155,7 +1181,7 @@ final class LostTalesChatOverlayRenderer {
                 // panel. An empty view's invitation stands on the row
                 // the newest message would take, and that row is a
                 // message's row: the hatch keeps the same gap above it.
-                float hatchedHeight = plannedHeight
+                float hatchedHeight = plannedHeight + topLift
                         + (totalLineCount <= 0 ? LINE_HEIGHT : 0.0F);
                 if (totalHeight < roomUnscaled - 0.01F) {
                     LostTalesUiSheet.EMPTY_HATCH.drawTiledFadingFromMiddle(
@@ -1190,8 +1216,11 @@ final class LostTalesChatOverlayRenderer {
                 // cut flush on its glyphs. A window with empty rows has no
                 // line at its top, and neither has one whose topmost row
                 // is the divider's, so nothing there is extended.
-                int topmostIndex = ChatStackRows.isDividerRow(lastRow,
-                        dividerIndex) ? -1 : lineOfRow(lastRow, dividerIndex);
+                int topmostIndex = ChatStackRows.isDividerRow(placedRow,
+                        dividerIndex) ? -1 : lineOfRow(placedRow, dividerIndex);
+                // The lift the stack's matrix carries: each row's own,
+                // put on as the walk reaches it.
+                float appliedLift = 0.0F;
                 for (int lineIndex = firstLine;
                      lineIndex < lines.size(); lineIndex++) {
                     int rowIndex = rowOfLine(lineIndex, dividerIndex);
@@ -1224,12 +1253,20 @@ final class LostTalesChatOverlayRenderer {
                     fade = Math.max(0.0D,
                             Math.min(1.0D, fade * 10.0D));
                     fade *= fade;
-                    int alpha = lineAlpha(open ? 255 : (int)(255.0D * fade),
-                            line, opacity, opening);
+                    int alpha = Math.round(lineAlpha(
+                            open ? 255 : (int)(255.0D * fade), line, opacity,
+                            opening) * glide.shown(lineIndex));
                     eligibleHeight += rowHeight;
                     // The row's bottom edge, measured up the stack from
                     // the row the scroll rests on.
                     int y = -(rows.top(rowIndex) - Math.round(stackBase));
+                    // A row gliding to a new layout is drawn on its way
+                    // there, everything of it moved together.
+                    float lift = glide.lift(lineIndex);
+                    if (lift != appliedLift) {
+                        GL11.glTranslatef(0.0F, appliedLift - lift, 0.0F);
+                        appliedLift = lift;
+                    }
                     float entry = alignment.slide(entrySlide(line));
                     // A reply's quote and a message's reaction chips are
                     // the chat's small text and the row a message names
@@ -1250,10 +1287,10 @@ final class LostTalesChatOverlayRenderer {
                         // part of it that survives the clip, so hit testing
                         // answers for exactly what is on screen.
                         float bandTop = Math.max(clipTop, originY
-                                + stackOffset + (y - rowHeight) * scale
+                                + stackOffset + (y - lift - rowHeight) * scale
                                 - headroom);
                         float bandBottom = Math.min(clipBottom,
-                                originY + stackOffset + y * scale);
+                                originY + stackOffset + (y - lift) * scale);
                         // It ends where the panel does: the text origin
                         // stands past the window's columns, so the chat
                         // width measured from there would reach past the
@@ -1401,8 +1438,8 @@ final class LostTalesChatOverlayRenderer {
                                         panelRight, y,
                                         alignment.bandWeights(),
                                         originX + entry * scale,
-                                        originY + stackOffset, scale,
-                                        alpha / 255.0F);
+                                        originY + stackOffset - lift * scale,
+                                        scale, alpha / 255.0F);
                     }
                     if (!open) {
                         // The colour the open window's panel would wear
@@ -1544,12 +1581,15 @@ final class LostTalesChatOverlayRenderer {
                                 panelRight - entry - rowShift,
                                 originX + (entry + rowShift) * scale,
                                 originY + stackOffset
-                                        + (y - TEXT_OFFSET) * scale,
+                                        + (y - lift - TEXT_OFFSET) * scale,
                                 scale, clipTop, clipBottom);
                     }
                     GL11.glPopMatrix();
                     GL11.glPopMatrix();
                     GL11.glDisable(GL11.GL_ALPHA_TEST);
+                }
+                if (appliedLift != 0.0F) {
+                    GL11.glTranslatef(0.0F, appliedLift, 0.0F);
                 }
                 if (open && columns.shows()) {
                     // The avatars, over every row they stand beside, so
@@ -1560,7 +1600,7 @@ final class LostTalesChatOverlayRenderer {
                             Double.NaN, clipTop, clipBottom, true);
                     try {
                         drawAvatars(minecraft, frame, lines, firstLine,
-                                lastRow, dividerIndex, rows, stackBase,
+                                lastRow, dividerIndex, rows, glide, stackBase,
                                 opacity, opening, columns, panelLeft,
                                 originX, originY + stackOffset, scale,
                                 clipTop, clipBottom, areaClipLeft);
@@ -1846,14 +1886,57 @@ final class LostTalesChatOverlayRenderer {
     }
 
     /** As above, cut at {@code clipTop} as well; either may be NaN. */
-    static void drawFadingText(Minecraft minecraft, FontRenderer font,
-                               String text, int x, float fraction, int y,
-                               int rgb, int alpha, double clipLeft,
-                               double clipRight, double clipTop,
-                               double clipBottom, float depth,
+    static void drawFadingText(Minecraft minecraft, final FontRenderer font,
+                               final String text, final int x,
+                               final float fraction, final int y,
+                               final int rgb, final int alpha,
+                               double clipLeft, double clipRight,
+                               double clipTop, double clipBottom, float depth,
                                float leftStrength, float rightStrength) {
-        if (clipRight <= clipLeft
-                || alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+        if (alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+            return;
+        }
+        drawFading(minecraft, clipLeft, clipRight, clipTop, clipBottom, depth,
+                leftStrength, rightStrength, new FadingPainter() {
+                    @Override
+                    public void paint(float share) {
+                        int sliceAlpha = Math.round(alpha * share);
+                        if (sliceAlpha < LostTalesChatVisualStyle
+                                .MIN_VISIBLE_ALPHA) {
+                            return;
+                        }
+                        GL11.glPushMatrix();
+                        try {
+                            GL11.glTranslatef(fraction, 0.0F, 0.0F);
+                            LostTalesChatVisualStyle.drawColored(font, text,
+                                    x, y, rgb, sliceAlpha);
+                        } finally {
+                            GL11.glPopMatrix();
+                        }
+                    }
+                });
+    }
+
+    /** Something drawn once per slice of a fading cut, at a share of its opacity. */
+    interface FadingPainter {
+        void paint(float share);
+    }
+
+    /**
+     * Whatever {@code painter} draws — words, an icon — between two clip
+     * edges, thinning out into either edge over {@code depth} pixels as
+     * far as {@code leftStrength} and {@code rightStrength} say (0..1,
+     * how far it has gone past that edge): the stretch at a fading edge
+     * is drawn in one-pixel slices at falling opacity, so the thing
+     * itself fades rather than a wash being laid over it, and the fade
+     * is seamless over whatever surface it stands on. The clip edges are
+     * in screen space; either vertical one may be NaN.
+     */
+    static void drawFading(Minecraft minecraft, double clipLeft,
+                           double clipRight, double clipTop,
+                           double clipBottom, float depth, float leftStrength,
+                           float rightStrength, FadingPainter painter) {
+        if (clipRight <= clipLeft) {
             return;
         }
         double leftZone = leftStrength > 0.0F ? Math.min(depth,
@@ -1871,16 +1954,15 @@ final class LostTalesChatOverlayRenderer {
                 clipLeft + leftSlices / (double)factor);
         double rightStart = ChatWindowFrame.snapToDisplayPixels(
                 clipRight - rightSlices / (double)factor);
-        drawTextSlice(minecraft, font, text, x, fraction, y, rgb, alpha,
-                leftEnd, rightStart, clipTop, clipBottom);
+        drawSlice(minecraft, painter, 1.0F, leftEnd, rightStart, clipTop,
+                clipBottom);
         for (int slice = 0; slice < leftSlices; slice++) {
             // A slice's opacity is read at its middle: none at the very
-            // edge for words fully gone past it, the whole at the zone's
-            // inner end.
+            // edge for what has fully gone past it, the whole at the
+            // zone's inner end.
             float share = 1.0F - leftStrength
                     * (1.0F - (slice + 0.5F) / leftSlices);
-            drawTextSlice(minecraft, font, text, x, fraction, y, rgb,
-                    Math.round(alpha * share),
+            drawSlice(minecraft, painter, share,
                     ChatWindowFrame.snapToDisplayPixels(
                             leftEnd - (leftSlices - slice) / (double)factor),
                     ChatWindowFrame.snapToDisplayPixels(
@@ -1890,8 +1972,7 @@ final class LostTalesChatOverlayRenderer {
         for (int slice = 0; slice < rightSlices; slice++) {
             float share = 1.0F - rightStrength
                     * (1.0F - (slice + 0.5F) / rightSlices);
-            drawTextSlice(minecraft, font, text, x, fraction, y, rgb,
-                    Math.round(alpha * share),
+            drawSlice(minecraft, painter, share,
                     ChatWindowFrame.snapToDisplayPixels(
                             rightStart + (rightSlices - slice - 1) / (double)factor),
                     ChatWindowFrame.snapToDisplayPixels(
@@ -1900,27 +1981,18 @@ final class LostTalesChatOverlayRenderer {
         }
     }
 
-    /** The words once, cut to one stretch of screen. */
-    private static void drawTextSlice(Minecraft minecraft, FontRenderer font,
-                                      String text, int x, float fraction,
-                                      int y, int rgb, int alpha,
-                                      double clipLeft, double clipRight,
-                                      double clipTop, double clipBottom) {
-        if (clipRight <= clipLeft
-                || alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+    /** What the painter draws, once, cut to one stretch of screen. */
+    private static void drawSlice(Minecraft minecraft, FadingPainter painter,
+                                  float share, double clipLeft,
+                                  double clipRight, double clipTop,
+                                  double clipBottom) {
+        if (clipRight <= clipLeft || share <= 0.0F) {
             return;
         }
         boolean clipped = beginClip(minecraft, clipLeft, clipRight,
                 clipTop, clipBottom, true);
         try {
-            GL11.glPushMatrix();
-            try {
-                GL11.glTranslatef(fraction, 0.0F, 0.0F);
-                LostTalesChatVisualStyle.drawColored(font, text, x, y, rgb,
-                        alpha);
-            } finally {
-                GL11.glPopMatrix();
-            }
+            painter.paint(share);
         } finally {
             endVerticalClip(clipped);
         }
@@ -2793,6 +2865,7 @@ final class LostTalesChatOverlayRenderer {
                                              int firstLine, int lastRow,
                                              int dividerIndex,
                                              ChatStackRows rows,
+                                             ChatRowGlide glide,
                                              float stackBase, float opacity,
                                              LostTalesGuiAnimationSample opening) {
         ToolbarPlace place = null;
@@ -2821,7 +2894,8 @@ final class LostTalesChatOverlayRenderer {
             // message's topmost.
             int rowBottom = -(rows.top(rowIndex) - Math.round(stackBase));
             place = new ToolbarPlace(toolbarTop(rowBottom,
-                    rows.height(rowIndex)), line.getChatLineID());
+                    rows.height(rowIndex)) - glide.lift(lineIndex),
+                    line.getChatLineID());
         }
         return place;
     }
@@ -2850,7 +2924,8 @@ final class LostTalesChatOverlayRenderer {
                                        FontRenderer font,
                                        List<ChatLine> lines, int firstLine,
                                        int lastRow, int dividerIndex,
-                                       ChatStackRows rows, float stackBase,
+                                       ChatStackRows rows,
+                                       ChatRowGlide glide, float stackBase,
                                        float opacity,
                                        LostTalesGuiAnimationSample opening,
                                        ChatFeedAlignment alignment,
@@ -2882,7 +2957,7 @@ final class LostTalesChatOverlayRenderer {
             int rowBottom = -(rows.top(rowIndex) - Math.round(stackBase));
             float chipTop = reactionTextTop(rowBottom, rows.height(rowIndex),
                     rowScale) - ChatReactionMarker.TEXT_DROP * rowScale
-                    + offset;
+                    + offset - glide.lift(lineIndex);
             float rowLeft = alignment.slide(entrySlide(line))
                     + feedRowShift(font, row, alignment, areaWidth, pivot,
                             rowScale)
@@ -3522,11 +3597,7 @@ final class LostTalesChatOverlayRenderer {
      * before it: above it for a y, left of it for an x.
      */
     static float floorToStackPixel(float at) {
-        float pixelsPerUnit = stackPixelsPerUnit();
-        // A hair of slack, so a place a float's error leaves just short
-        // of a whole display pixel stays on it.
-        return (float)Math.floor(at * pixelsPerUnit + 1.0E-3F)
-                / pixelsPerUnit;
+        return (float)LostTalesDisplayPixels.floor(at, stackPixelsPerUnit());
     }
 
     /** Display pixels per unit of the message stack: the GUI scale times the chat's. */
@@ -4254,15 +4325,27 @@ final class LostTalesChatOverlayRenderer {
      * {@code y}, with the chat's one shadow under it: one texel to one
      * pixel beside a name, as large as the avatar in the timestamp area.
      */
-    private static void drawHeadMark(Minecraft minecraft, ChatEmoji mark,
-                                     float x, float y, float size,
-                                     int alpha) {
-        ChatEmojiRenderer.drawShadow(minecraft, mark,
-                x + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                y + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                size, LostTalesChatVisualStyle.SHADOW,
-                Math.round(alpha * LostTalesChatVisualStyle.SHADOW_OPACITY));
-        ChatEmojiRenderer.draw(minecraft, mark, x, y, size, alpha);
+    private static void drawHeadMark(final Minecraft minecraft,
+                                     final ChatEmoji mark, final float x,
+                                     final float y, final float size,
+                                     final int alpha) {
+        LostTalesUiFlatLayers.draw(alpha, x, y,
+                x + size + LostTalesChatVisualStyle.SHADOW_OFFSET,
+                y + size + LostTalesChatVisualStyle.SHADOW_OFFSET,
+                new LostTalesUiFlatLayers.Layers() {
+                    @Override
+                    public void draw() {
+                        ChatEmojiRenderer.drawShadow(minecraft, mark,
+                                x + LostTalesChatVisualStyle.SHADOW_OFFSET,
+                                y + LostTalesChatVisualStyle.SHADOW_OFFSET,
+                                size, LostTalesChatVisualStyle.SHADOW,
+                                Math.round(alpha * LostTalesChatVisualStyle
+                                        .SHADOW_OPACITY));
+                        LostTalesUiFlatLayers.nextLayer();
+                        ChatEmojiRenderer.draw(minecraft, mark, x, y, size,
+                                alpha);
+                    }
+                });
     }
 
     /**
@@ -4271,11 +4354,28 @@ final class LostTalesChatOverlayRenderer {
      * sphere in the corner the face gives up for it; an NPC has no
      * account to have one, and neither has the server, the client or the
      * bridge. What the row's small head and an open window's avatar are
-     * both drawn by.
+     * both drawn by. A head drawn translucent is one picture
+     * ({@link LostTalesUiFlatLayers}): the hat does not show the face
+     * through it, nor the face its shadow.
      */
-    static void drawFace(Minecraft minecraft,
-                         ChatHeadMarker.Data marker, float x, float y,
-                         float size, int alpha) {
+    static void drawFace(final Minecraft minecraft,
+                         final ChatHeadMarker.Data marker, final float x,
+                         final float y, final float size, final int alpha) {
+        float reach = size * 0.125F;
+        LostTalesUiFlatLayers.draw(alpha, x - reach, y - reach,
+                x + size + reach + ChatPresenceMark.OVERHANG_X + 1,
+                y + size + reach + ChatPresenceMark.OVERHANG_Y + 1,
+                new LostTalesUiFlatLayers.Layers() {
+                    @Override
+                    public void draw() {
+                        drawFaceLayers(minecraft, marker, x, y, size, alpha);
+                    }
+                });
+    }
+
+    private static void drawFaceLayers(Minecraft minecraft,
+                                       ChatHeadMarker.Data marker, float x,
+                                       float y, float size, int alpha) {
         float opacity = alpha / 255.0F;
         boolean wearsPresence = ChatPresenceMark.wears(marker);
         if (wearsPresence) {
@@ -4289,6 +4389,7 @@ final class LostTalesChatOverlayRenderer {
                 ChatPresenceMark.endHeadCut();
             }
         }
+        LostTalesUiFlatLayers.nextLayer();
         if (wearsPresence) {
             ChatPresenceMark.beginHeadCut(x, y, size);
         }
@@ -4310,6 +4411,7 @@ final class LostTalesChatOverlayRenderer {
             }
         }
         if (wearsPresence) {
+            LostTalesUiFlatLayers.nextLayer();
             ChatPresenceMark.draw(x, y, size,
                     ChatPresenceMark.presenceOf(marker), alpha);
         }
@@ -4365,8 +4467,8 @@ final class LostTalesChatOverlayRenderer {
                                     ChatWindowFrame frame,
                                     List<ChatLine> lines, int firstLine,
                                     int lastRow, int dividerIndex,
-                                    ChatStackRows rows, float stackBase,
-                                    float opacity,
+                                    ChatStackRows rows, ChatRowGlide glide,
+                                    float stackBase, float opacity,
                                     LostTalesGuiAnimationSample opening,
                                     ChatTimestampColumn columns,
                                     float panelLeft, float originX,
@@ -4391,14 +4493,15 @@ final class LostTalesChatOverlayRenderer {
             if (avatar == null || rowIndex <= 0) {
                 continue;
             }
-            int alpha = lineAlpha(255, line, opacity, opening);
+            int alpha = Math.round(lineAlpha(255, line, opacity, opening)
+                    * glide.shown(lineIndex));
             if (alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
                 continue;
             }
             int rowBottom = -(rows.top(rowIndex) - Math.round(stackBase));
             int rowHeight = rows.height(rowIndex);
-            int top = ChatAvatar.top(rowBottom - rowHeight, rowHeight,
-                    rows.height(rowIndex - 1));
+            float top = ChatAvatar.top(rowBottom - rowHeight, rowHeight,
+                    rows.height(rowIndex - 1)) - glide.lift(lineIndex);
             ChatEmoji mark = avatar.mark();
             if (mark != null) {
                 drawHeadMark(minecraft, mark, left + markInset,

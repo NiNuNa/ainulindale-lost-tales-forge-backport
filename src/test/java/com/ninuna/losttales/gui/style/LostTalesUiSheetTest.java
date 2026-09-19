@@ -132,6 +132,8 @@ public final class LostTalesUiSheetTest {
             assertInkOrPreview(sheet, LostTalesUiSheet.TAB_HOVER_RIGHT);
             assertInkOrPreview(sheet, LostTalesUiSheet.TAB_SELECTED_LEFT);
             assertInkOrPreview(sheet, LostTalesUiSheet.TAB_SELECTED_RIGHT);
+            assertInkOrPreview(sheet, LostTalesUiSheet.TAB_LIFTED_LEFT);
+            assertInkOrPreview(sheet, LostTalesUiSheet.TAB_LIFTED_RIGHT);
             // A framed button's corners are cut the same way.
             assertInkOrPreview(sheet, LostTalesUiSheet.FRAME_TOP_LEFT);
             assertInkOrPreview(sheet, LostTalesUiSheet.FRAME_TOP_RIGHT);
@@ -218,6 +220,8 @@ public final class LostTalesUiSheetTest {
         assertSameSize(LostTalesUiSheet.CHEVRON_1, LostTalesUiSheet.CHEVRON_5);
         assertSameSize(LostTalesUiSheet.CHEVRON_2, LostTalesUiSheet.CHEVRON_4);
         assertSameSize(LostTalesUiSheet.SEARCH, LostTalesUiSheet.SEARCH_HOVER);
+        assertSameSize(LostTalesUiSheet.MEMBERS, LostTalesUiSheet.MEMBERS_HOVER);
+        assertSameSize(LostTalesUiSheet.AREA, LostTalesUiSheet.AREA_HOVER);
         assertSameSize(LostTalesUiSheet.SPEECH_BUBBLE,
                 LostTalesUiSheet.SPEECH_BUBBLE_HOVER);
         assertSameSize(LostTalesUiSheet.SEND, LostTalesUiSheet.SEND_HOVER);

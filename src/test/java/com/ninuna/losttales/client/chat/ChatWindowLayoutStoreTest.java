@@ -80,7 +80,10 @@ public final class ChatWindowLayoutStoreTest {
                 "window w3 locked=false x=0.00 y=50.00 fill=top_right"
                         + " active=ooc tabs=ooc",
                 "window w4 locked=false x=0.00 y=60.00 fill=sideways"
-                        + " active=party tabs=party"));
+                        + " active=party tabs=party",
+                "window w5 locked=false x=0.00 y=70.00"
+                        + " fill=free:0.25000,0.00000,0.75000,1.00000"
+                        + " active=faction tabs=faction"));
         ChatWindow first = ChatWindowLayout.window("w1");
         assertTrue(first.isFullscreen());
         assertEquals(ChatWindow.ScreenFill.FULL, first.getFill());
@@ -98,6 +101,11 @@ public final class ChatWindowLayoutStoreTest {
         assertFalse(described.get(2).contains("fill"));
         assertTrue(described.get(3).contains(" fill=top_right"));
         assertFalse(described.get(4).contains("fill"));
+        // A part the player shaped keeps its edges.
+        assertEquals(ChatWindow.ScreenFill.free(0.25D, 0.0D, 0.75D, 1.0D),
+                ChatWindowLayout.window("w5").getFill());
+        assertTrue(described.get(5).contains(
+                " fill=free:0.25000,0.00000,0.75000,1.00000"));
         ChatWindowLayoutStore.load(described);
         assertEquals(described, ChatWindowLayoutStore.describe());
     }

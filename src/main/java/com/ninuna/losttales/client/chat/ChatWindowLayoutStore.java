@@ -35,7 +35,7 @@ import java.util.UUID;
  *
  * <pre>
  * window w1 locked=false x=0.00 y=0.00 active=console tabs=console,admin
- * window w2 locked=true x=62.50 y=100.00 lines=12.40 width=320 fill=full area=hidden members=hidden active=all tabs=all,ooc,party link=w1:above
+ * window w2 locked=true x=62.50 y=100.00 lines=12.40 width=320 fill=full area=hidden members=hidden members_width=90.00 active=all tabs=all,ooc,party link=w1:above
  * feed x=0.00 y=100.00
  * toolbar collapsed=false
  * closed faction
@@ -245,6 +245,7 @@ public final class ChatWindowLayoutStore {
         ChatWindow.ScreenFill fill = ChatWindow.ScreenFill.NONE;
         boolean areaHidden = false;
         boolean membersHidden = false;
+        double membersWidth = 0.0D;
         for (int index = 2; index < parts.length; index++) {
             String part = parts[index];
             int equals = part.indexOf('=');
@@ -288,11 +289,23 @@ public final class ChatWindowLayoutStore {
                 areaHidden = HIDDEN.equalsIgnoreCase(value);
             } else if ("members".equals(key)) {
                 membersHidden = HIDDEN.equalsIgnoreCase(value);
+            } else if ("members_width".equals(key)) {
+                membersWidth = parseMembersWidth(value);
             }
         }
         return new ChatWindowLayout.WindowSpec(id, tabs, active, locked,
                 offsetX, offsetY, linkTarget, linkSide, maxLines, width,
-                fill, areaHidden, membersHidden);
+                fill, areaHidden, membersHidden, membersWidth);
+    }
+
+    /** A stored member list width; anything unreadable keeps the list's own. */
+    private static double parseMembersWidth(String value) {
+        try {
+            return ChatWindowLayout.clampMembersWidth(
+                    Double.parseDouble(value.trim()));
+        } catch (NumberFormatException ignored) {
+            return 0.0D;
+        }
     }
 
     /** A stored chat width; anything unreadable follows the slider. */
@@ -352,6 +365,10 @@ public final class ChatWindowLayoutStore {
             }
             if (spec.membersHidden) {
                 line.append(" members=").append(HIDDEN);
+            }
+            if (spec.membersWidth > 0.0D) {
+                line.append(" members_width=")
+                        .append(formatLines(spec.membersWidth));
             }
             if (spec.activeTab != null) {
                 line.append(" active=").append(spec.activeTab.id());

@@ -51,6 +51,39 @@ public final class ClientChatPresenceChoicesTest {
         assertEquals(1, ClientChatPresenceChoices.describe().size());
     }
 
+    /**
+     * A status line is kept per server and identity, cleaned, apart from
+     * the status, and an empty one is forgotten; the file keeps it.
+     */
+    @Test
+    public void aStatusLineIsKeptBesideTheStatus() {
+        ClientChatPresenceChoices.initialize(null, null);
+        ClientChatPresenceChoices.rememberLine("server",
+                ChatPresenceIdentity.character(ALDRIC), "  Out \u00a7chunting ");
+        ClientChatPresenceChoices.rememberLine("server",
+                ChatPresenceIdentity.ACCOUNT, "Brewing");
+        ClientChatPresenceChoices.rememberLine("server",
+                ChatPresenceIdentity.ACCOUNT, "");
+        Map<ChatPresenceIdentity, String> here =
+                ClientChatPresenceChoices.linesForPlace("server");
+        assertEquals(1, here.size());
+        assertEquals("Out hunting",
+                here.get(ChatPresenceIdentity.character(ALDRIC)));
+        assertTrue(ClientChatPresenceChoices.forPlace("server").isEmpty());
+        List<String> lines = ClientChatPresenceChoices.describe();
+        ClientChatPresenceChoices.clear();
+        ClientChatPresenceChoices.load(lines);
+        assertEquals("Out hunting", ClientChatPresenceChoices
+                .linesForPlace("server")
+                .get(ChatPresenceIdentity.character(ALDRIC)));
+        ClientChatPresenceChoices.clear();
+        ClientChatPresenceChoices.load(Arrays.asList(
+                "server\taccount\tline\t   ",
+                "server\tnobody\tline\tHello",
+                "server\taccount\tnote\tHello"));
+        assertTrue(ClientChatPresenceChoices.linesForPlace("server").isEmpty());
+    }
+
     @Test
     public void theFileRoundTripsAndSkipsWhatItCannotRead() {
         ClientChatPresenceChoices.initialize(null, null);

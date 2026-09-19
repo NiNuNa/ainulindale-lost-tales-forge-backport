@@ -489,9 +489,15 @@ public final class ClientChatChannelState {
 
     /**
      * A conversation is named in the colour the other party speaks in —
-     * an NPC's honey, a player's own name colour — so the tab, its icon
-     * and its lines read as one. Every other tab takes its channel's
-     * colour.
+     * an NPC's faction colour, a player's own name colour — so the tab,
+     * its icon and its lines read as one. The colour their last line wore
+     * is the surest; before they have said anything this session a
+     * player's conversation takes the colour their name wears in
+     * character — the faction's of the character it is with, as the
+     * client knows it, or the plain ivory of an account — never a colour
+     * of the channel's own (Nils, 2026-09-19: "Whispers should be the
+     * colour of the person that you are talking to"). Every other tab
+     * takes its channel's colour.
      */
     public static synchronized int displayColor(ChatTab tab) {
         if (tab == null) {
@@ -501,7 +507,42 @@ public final class ClientChatChannelState {
         if (partner != null) {
             return partner.intValue();
         }
+        if (tab.isWhisper() && !tab.isNpc()) {
+            return partnerNameColor(tab);
+        }
         return displayColor(tab.getChannel());
+    }
+
+    /**
+     * The colour a player's name wears in character, for the identity a
+     * conversation is with: the faction colour of that character where
+     * the client holds its appearance — by its id, or else by its name
+     * among the partner's — and the chat's plain ivory for an account, or
+     * for a character the client cannot place.
+     */
+    private static int partnerNameColor(ChatTab tab) {
+        int plain = com.ninuna.losttales.chat.ChatRolePresentation
+                .unassignedColor();
+        UUID characterId = PARTNER_CHARACTER_IDS.get(ChatTab.row(tab));
+        String identity = tab.getPartnerIdentity();
+        for (CharacterAppearance appearance
+                : ClientCharacterAppearanceCache.snapshot().values()) {
+            if (appearance == null || !appearance.hasCharacter()) {
+                continue;
+            }
+            boolean same = characterId != null
+                    ? characterId.equals(appearance.getCharacterId())
+                    : tab.getPartner().equalsIgnoreCase(
+                            appearance.getAccountName())
+                            && identity != null
+                            && identity.equalsIgnoreCase(
+                                    appearance.getCharacterName());
+            if (same) {
+                return LotrFactionColors.forFactionId(
+                        appearance.getStartingFactionId(), plain);
+            }
+        }
+        return plain;
     }
 
     /**

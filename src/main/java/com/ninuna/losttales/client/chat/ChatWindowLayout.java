@@ -969,7 +969,7 @@ public final class ChatWindowLayout {
         ChatWindow window = window(windowId);
         ChatWindow.ScreenFill wanted = fill == null
                 ? ChatWindow.ScreenFill.NONE : fill;
-        if (window == null || window.getFill() == wanted) {
+        if (window == null || window.getFill().equals(wanted)) {
             return false;
         }
         window.setFill(wanted);
@@ -1008,6 +1008,37 @@ public final class ChatWindowLayout {
         window.setMembersHidden(hidden);
         changed();
         return true;
+    }
+
+    /**
+     * Gives a window's member list the width its edge was dragged to, in
+     * the chat's pixels, written to the file when {@code persist} says so
+     * — once, as the drag ends.
+     */
+    public static synchronized boolean setMembersWidth(String windowId,
+                                                       double width,
+                                                       boolean persist) {
+        ChatWindow window = window(windowId);
+        if (window == null) {
+            return false;
+        }
+        window.setMembersWidth(clampMembersWidth(width));
+        if (persist) {
+            changed();
+        }
+        return true;
+    }
+
+    /**
+     * A member list's stored width: zero for the list's own, anything
+     * else bounded as a chat width is. Where it really stops is the
+     * window it stands in.
+     */
+    static double clampMembersWidth(double width) {
+        if (Double.isNaN(width) || Double.isInfinite(width) || width <= 0.0D) {
+            return 0.0D;
+        }
+        return Math.min(MAX_CHAT_WIDTH, width);
     }
 
     /** Brings a tab to the front of its own window; not a layout change. */
@@ -1415,6 +1446,7 @@ public final class ChatWindowLayout {
                 window.setFill(spec.fill);
                 window.setAreaHidden(spec.areaHidden);
                 window.setMembersHidden(spec.membersHidden);
+                window.setMembersWidth(spec.membersWidth);
                 window.setMaxLines(clampWindowLines(spec.maxLines));
                 window.setWidth(clampChatWidth(spec.width));
                 window.setActiveTab(spec.activeTab);
@@ -1503,7 +1535,8 @@ public final class ChatWindowLayout {
                     window.getOffsetY(), window.getLinkTarget(),
                     window.getLinkSide(), window.getMaxLines(),
                     window.getWidth(), window.getFill(),
-                    window.isAreaHidden(), window.isMembersHidden()));
+                    window.isAreaHidden(), window.isMembersHidden(),
+                    window.getMembersWidth()));
         }
         return result;
     }
@@ -1566,7 +1599,7 @@ public final class ChatWindowLayout {
                 clampWindowPercent(ChatWindowPlacement.windowPercentX(
                         created, corner.x, minecraft, screenWidth)),
                 clampWindowPercent(ChatWindowPlacement.windowPercentY(
-                        baseline, minecraft, screenHeight)));
+                        created, baseline, minecraft, screenHeight)));
     }
 
     /** The running client, or null headlessly or before it exists. */
@@ -1682,6 +1715,8 @@ public final class ChatWindowLayout {
         final boolean areaHidden;
         /** Whether the window's member list is put away. */
         final boolean membersHidden;
+        /** The member list's chosen width in the chat's pixels; 0 for its own. */
+        final double membersWidth;
 
         WindowSpec(String id, List<?> tabs, Object activeTab,
                    boolean locked, double offsetX, double offsetY) {
@@ -1724,14 +1759,15 @@ public final class ChatWindowLayout {
                    String linkTarget, ChatWindow.LinkSide linkSide,
                    double maxLines, int width, ChatWindow.ScreenFill fill) {
             this(id, tabs, activeTab, locked, offsetX, offsetY, linkTarget,
-                    linkSide, maxLines, width, fill, false, false);
+                    linkSide, maxLines, width, fill, false, false, 0);
         }
 
         WindowSpec(String id, List<?> tabs, Object activeTab,
                    boolean locked, double offsetX, double offsetY,
                    String linkTarget, ChatWindow.LinkSide linkSide,
                    double maxLines, int width, ChatWindow.ScreenFill fill,
-                   boolean areaHidden, boolean membersHidden) {
+                   boolean areaHidden, boolean membersHidden,
+                   double membersWidth) {
             this.id = id;
             List<ChatTab> converted = new ArrayList<ChatTab>();
             if (tabs != null) {
@@ -1756,6 +1792,7 @@ public final class ChatWindowLayout {
             this.fill = fill == null ? ChatWindow.ScreenFill.NONE : fill;
             this.areaHidden = areaHidden;
             this.membersHidden = membersHidden;
+            this.membersWidth = clampMembersWidth(membersWidth);
         }
 
         private static ChatTab toTab(Object value) {

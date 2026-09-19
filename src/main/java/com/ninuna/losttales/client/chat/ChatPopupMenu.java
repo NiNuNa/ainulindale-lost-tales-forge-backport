@@ -19,18 +19,21 @@ import net.minecraft.client.gui.Gui;
 import net.minecraft.util.StatCollector;
 
 /**
- * A small vertical list of actions anchored above a control — the
- * channel settings behind a tab's cog, the closed channels and open-able
- * conversations behind the {@code +}. One instance serves the whole chat
- * screen: opening it for another purpose replaces the previous list.
- * Entries are plain ids the screen interprets; the menu only lays them
- * out, draws them, hit tests them and registers its rectangle so nothing
- * under it reacts. A list may carry <em>header</em> rows — a section
- * label over a hairline, never clickable — and a list taller than
+ * A small vertical list of actions opened from a control or the pointer —
+ * the channel settings behind a tab's cog, the closed channels and
+ * open-able conversations behind the {@code +}, a message's or a
+ * person's actions. One instance serves the whole chat screen: opening
+ * it for another purpose replaces the previous list. Entries are plain
+ * ids the screen interprets; the menu only lays them out, draws them,
+ * hit tests them and registers its rectangle so nothing under it reacts.
+ * A list may carry <em>header</em> rows — a section label over a
+ * hairline, never clickable — and a list taller than
  * {@link #MAX_VISIBLE_ROWS} shows that many rows and scrolls by the
  * wheel, a honey hairline on an edge saying more lies past it. The list
- * opens upward from its anchor, above the strip whose control opened it,
- * so it never lies over the history it belongs to.
+ * opens <em>inwards</em> ({@link Anchor}): from the tab strip down into
+ * its window, from the input bar up into it, from the pointer toward the
+ * window's middle — so a window at the screen's edge, or filling the
+ * screen, still shows its menus at full size.
  *
  * <p>A list may also be <em>searchable</em>: a field above its rows that
  * takes what is typed while it is open. The menu holds the text and
@@ -55,8 +58,7 @@ final class ChatPopupMenu {
      * Room the search field's magnifier takes before what is typed: the
      * glyph and the gap an icon keeps from its label in these lists.
      */
-    private static final int SEARCH_ICON_RUN =
-            LostTalesUiSheet.SEARCH_LARGE.getWidth() + ChatChannelIcons.GAP;
+
 
     /** Width of the upright colour bar before a channel's name, and its gap. */
     private static final int SWATCH_WIDTH = 1;
@@ -98,6 +100,8 @@ final class ChatPopupMenu {
         LostTalesUiSheet litSprite;
         /** Whether the row is the one chosen, which keeps its sprite lit. */
         boolean chosen;
+        /** Whether the label's emoji shortcodes are drawn as their sprites. */
+        boolean emojis;
         /**
          * The colour the label is drawn in; -1 for the menu's ivory. An
          * operator's action wears the Operator channel's crimson, so a
@@ -119,6 +123,12 @@ final class ChatPopupMenu {
         /** The same entry showing its colour as a chip; a palette row. */
         Entry asChip() {
             this.chip = true;
+            return this;
+        }
+
+        /** The same entry drawing its label's emojis, as a status line's row does. */
+        Entry withEmojis() {
+            this.emojis = true;
             return this;
         }
 
@@ -171,6 +181,68 @@ final class ChatPopupMenu {
 
     }
 
+    /**
+     * Where a menu opens: the box it hangs from — a control's footprint,
+     * or the pointer's point — and which way it grows from it. A menu
+     * opens toward the middle of the window it belongs to: below a
+     * control in the window's upper half, above one in its lower half,
+     * lining up with the box's left edge in the window's left half and
+     * its right edge in the right half. Only when that side of the screen
+     * has less room than the other does it turn round.
+     */
+    static final class Anchor {
+        /** Clear space between a menu and the box it hangs from. */
+        static final int GAP = 2;
+        final int left;
+        final int top;
+        final int right;
+        final int bottom;
+        /** Whether the menu opens below the box rather than above it. */
+        final boolean below;
+        /** Whether the menu's right edge lines up with the box's, growing leftward. */
+        final boolean fromRight;
+
+        Anchor(int left, int top, int right, int bottom, boolean below,
+               boolean fromRight) {
+            this.left = left;
+            this.top = top;
+            this.right = Math.max(left, right);
+            this.bottom = Math.max(top, bottom);
+            this.below = below;
+            this.fromRight = fromRight;
+        }
+
+        /**
+         * A menu opening from a box toward the middle of the window
+         * spanning {@code windowLeft}..{@code windowRight} and
+         * {@code windowTop}..{@code windowBottom}.
+         */
+        static Anchor inward(int left, int top, int right, int bottom,
+                             double windowLeft, double windowTop,
+                             double windowRight, double windowBottom) {
+            double middleX = (windowLeft + windowRight) / 2.0D;
+            double middleY = (windowTop + windowBottom) / 2.0D;
+            return new Anchor(left, top, right, bottom,
+                    (top + bottom) / 2.0D < middleY,
+                    (left + right) / 2.0D > middleX);
+        }
+
+        /** A menu opening from a box toward the middle of a window's frame. */
+        static Anchor inward(int left, int top, int right, int bottom,
+                             ChatWindowFrame frame, int screenWidth,
+                             int screenHeight) {
+            if (frame == null || !frame.drawn) {
+                return inward(left, top, right, bottom, 0.0D, 0.0D,
+                        screenWidth, screenHeight);
+            }
+            double windowLeft = frame.drawnLeft();
+            return inward(left, top, right, bottom, windowLeft,
+                    frame.boxTop + frame.motionY,
+                    windowLeft + (frame.boxRight - frame.boxLeft),
+                    frame.boxBottom + frame.motionY);
+        }
+    }
+
     /** The head a row wears: an account's, or a character skin's. */
     static final class ChatHeadOwner {
         final java.util.UUID owner;
@@ -185,6 +257,8 @@ final class ChatPopupMenu {
     private String kind = "";
     private ChatTab channel;
     private List<Entry> entries = Collections.emptyList();
+    /** Where the open list hangs from; a re-open in place keeps it. */
+    private Anchor anchor;
     private int x;
     private int y;
     private int width;
@@ -213,6 +287,8 @@ final class ChatPopupMenu {
     private int fieldHeight;
     /** What the empty field reads while nothing has been typed. */
     private String filterPrompt = "";
+    /** The icon the field opens with: the magnifier for a search. */
+    private LostTalesUiSheet fieldIcon = LostTalesUiSheet.SEARCH_LARGE;
     /** The keys of the shortcut shown beside it, or empty for none. */
     private int[] filterHint = NO_KEYS;
     private long filterNanos;
@@ -266,6 +342,27 @@ final class ChatPopupMenu {
         return false;
     }
 
+    /**
+     * Puts {@code text} in the open list's field, as far as the field
+     * holds, as if it had been typed: what a field for editing something
+     * opens with.
+     */
+    void setFilter(String text) {
+        if (this.filter == null) {
+            return;
+        }
+        this.filter.setLength(0);
+        String kept = text == null ? "" : text;
+        this.filter.append(kept.length() > MAX_FILTER_LENGTH
+                ? kept.substring(0, MAX_FILTER_LENGTH) : kept);
+        this.filterNanos = System.nanoTime();
+    }
+
+    /** Where the open list hangs from, for a list opened in its place. */
+    Anchor anchor() {
+        return this.anchor;
+    }
+
     String kind() {
         return this.kind;
     }
@@ -275,16 +372,15 @@ final class ChatPopupMenu {
     }
 
     /**
-     * Opens the list with its left edge at {@code anchorX} and its
-     * bottom edge at {@code anchorBottom} — it grows upward — shifted
-     * to stay inside the screen. The scroll survives a re-open in place
+     * Opens the list from its {@code anchor}, shifted to stay inside the
+     * screen. The scroll survives a re-open in place
      * ({@link #replaceEntries}), clamped to the new list.
      */
     void open(String kind, ChatTab channel, List<Entry> entries,
-              FontRenderer font, int anchorX, int anchorBottom,
-              int screenWidth, int screenHeight) {
-        open(kind, channel, entries, font, anchorX, anchorBottom,
-                screenWidth, screenHeight, null, null);
+              FontRenderer font, Anchor anchor, int screenWidth,
+              int screenHeight) {
+        open(kind, channel, entries, font, anchor, screenWidth, screenHeight,
+                null, null);
     }
 
     /**
@@ -297,13 +393,29 @@ final class ChatPopupMenu {
      * the menu next opens somewhere else.
      */
     void open(String kind, ChatTab channel, List<Entry> entries,
-              FontRenderer font, int anchorX, int anchorBottom,
-              int screenWidth, int screenHeight, String searchPrompt,
-              int[] searchHint) {
-        if (entries == null || entries.isEmpty() || font == null) {
+              FontRenderer font, Anchor anchor, int screenWidth,
+              int screenHeight, String searchPrompt, int[] searchHint) {
+        open(kind, channel, entries, font, anchor, screenWidth, screenHeight,
+                searchPrompt, searchHint, LostTalesUiSheet.SEARCH_LARGE);
+    }
+
+    /**
+     * As above, the field opening with {@code fieldIcon} in place of the
+     * magnifier: a field that is typed into to say something rather than
+     * to find it.
+     */
+    void open(String kind, ChatTab channel, List<Entry> entries,
+              FontRenderer font, Anchor anchor, int screenWidth,
+              int screenHeight, String searchPrompt, int[] searchHint,
+              LostTalesUiSheet fieldIcon) {
+        if (entries == null || entries.isEmpty() || font == null
+                || anchor == null) {
             close();
             return;
         }
+        this.fieldIcon = fieldIcon == null ? LostTalesUiSheet.SEARCH_LARGE
+                : fieldIcon;
+        this.anchor = anchor;
         boolean samePlace = !this.kind.equals("") && this.kind.equals(kind);
         if (searchPrompt == null) {
             this.filter = null;
@@ -331,7 +443,9 @@ final class ChatPopupMenu {
         boolean chips = false;
         boolean icons = false;
         for (Entry entry : this.entries) {
-            widest = Math.max(widest, font.getStringWidth(entry.label));
+            widest = Math.max(widest, entry.emojis
+                    ? ChatInlineText.width(font, entry.label, "")
+                    : font.getStringWidth(entry.label));
             swatches |= entry.color >= 0;
             chips |= entry.color >= 0 && entry.chip;
             icons |= entry.icon != null || entry.head != null
@@ -345,23 +459,30 @@ final class ChatPopupMenu {
         if (this.filter != null) {
             // The field's prompt and the shortcut beside it are content
             // too: a list narrower than they are would cut them off.
-            widest = Math.max(widest, SEARCH_ICON_RUN
+            widest = Math.max(widest, fieldIconRun()
                     + ChatInputField.CARET_WIDTH + 1
                     + font.getStringWidth(this.filterPrompt)
                     + SWATCH_GAP + hintWidth(Minecraft.getMinecraft()));
         }
         this.width = Math.max(MIN_WIDTH,
                 this.labelX + widest + PADDING_X);
-        // As many rows as the cap and the room above the anchor allow.
-        int roomRows = (anchorBottom - 2 - PADDING_Y * 2 - this.fieldHeight)
-                / ROW_HEIGHT;
-        this.visibleRows = Math.max(1, Math.min(this.entries.size(),
-                Math.min(MAX_VISIBLE_ROWS, roomRows)));
+        // As many rows as the cap and the room on the anchor's side
+        // allow; the other side only when it holds more of them.
+        int wanted = Math.min(this.entries.size(), MAX_VISIBLE_ROWS);
+        int roomBelow = rowsIn(screenHeight - anchor.bottom - Anchor.GAP);
+        int roomAbove = rowsIn(anchor.top - Anchor.GAP);
+        boolean below = anchor.below
+                ? roomBelow >= wanted || roomBelow >= roomAbove
+                : !(roomAbove >= wanted || roomAbove >= roomBelow);
+        this.visibleRows = Math.max(1, Math.min(wanted,
+                below ? roomBelow : roomAbove));
         this.height = PADDING_Y * 2 + this.fieldHeight
                 + ROW_HEIGHT * this.visibleRows;
-        this.x = Math.max(0, Math.min(screenWidth - this.width, anchorX));
-        this.y = Math.max(0, Math.min(screenHeight - this.height,
-                anchorBottom - this.height));
+        this.x = Math.max(0, Math.min(screenWidth - this.width,
+                anchor.fromRight ? anchor.right - this.width : anchor.left));
+        this.y = Math.max(0, Math.min(screenHeight - this.height, below
+                ? anchor.bottom + Anchor.GAP
+                : anchor.top - Anchor.GAP - this.height));
         this.scrollRows = clampScroll(keptScroll);
         if (!samePlace) {
             // A fresh opening starts where it is asked; only wheel turns
@@ -372,6 +493,17 @@ final class ChatPopupMenu {
         }
     }
 
+    /** The field's icon and the gap after it. */
+    private int fieldIconRun() {
+        return this.fieldIcon.getWidth() + ChatChannelIcons.GAP;
+    }
+
+    /** How many rows a list has room for in {@code pixels} of height. */
+    private int rowsIn(int pixels) {
+        return Math.max(0, (pixels - PADDING_Y * 2 - this.fieldHeight)
+                / ROW_HEIGHT);
+    }
+
     /**
      * Swaps the entries of the open menu in place — after something
      * changed what a row should say, or who the rows are — keeping the
@@ -379,8 +511,8 @@ final class ChatPopupMenu {
      */
     void replaceEntries(List<Entry> entries, FontRenderer font,
                         int screenWidth, int screenHeight) {
-        open(this.kind, this.channel, entries, font, this.x,
-                this.y + this.height, screenWidth, screenHeight,
+        open(this.kind, this.channel, entries, font, this.anchor,
+                screenWidth, screenHeight,
                 this.filter == null ? null : this.filterPrompt,
                 this.filterHint);
     }
@@ -416,6 +548,7 @@ final class ChatPopupMenu {
         this.entries = Collections.emptyList();
         this.kind = "";
         this.channel = null;
+        this.anchor = null;
         this.scrollRows = 0.0D;
         this.renderedScrollRows = 0.0D;
         this.visibleRows = 0;
@@ -445,12 +578,12 @@ final class ChatPopupMenu {
                 LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT);
         String typed = this.filter.toString();
         int quiet = LostTalesColors.rgb(LostTalesColors.SAND);
-        // The magnifier stands on the capitals of what is typed beside
-        // it, as every icon in a chat row does.
-        LostTalesUiSheet.SEARCH_LARGE.drawWithShadow(this.x + PADDING_X,
+        // The icon stands on the capitals of what is typed beside it,
+        // as every icon in a chat row does.
+        this.fieldIcon.drawWithShadow(this.x + PADDING_X,
                 textY + LostTalesChatOverlayRenderer.centredBoxTop(
-                        LostTalesUiSheet.SEARCH_LARGE.getHeight()), 255);
-        int textX = this.x + PADDING_X + SEARCH_ICON_RUN;
+                        this.fieldIcon.getHeight()), 255);
+        int textX = this.x + PADDING_X + fieldIconRun();
         if (typed.length() == 0) {
             // A pixel clear of the caret waiting at the field's start.
             LostTalesChatVisualStyle.drawColored(font,
@@ -728,9 +861,15 @@ final class ChatPopupMenu {
                         ClientChatChannelState.displayColor(entry.icon),
                         labelFade(entry, entry == hovered, elapsed));
             }
-            LostTalesChatVisualStyle.drawColored(font,
-                    entry.dim ? "§o" + entry.label : entry.label,
-                    this.x + this.labelX, rowY + 2, labelRgb, 255);
+            if (entry.emojis) {
+                ChatInlineText.draw(Minecraft.getMinecraft(), font,
+                        entry.label, entry.dim ? "§o" : "",
+                        this.x + this.labelX, rowY + 2, labelRgb, 255);
+            } else {
+                LostTalesChatVisualStyle.drawColored(font,
+                        entry.dim ? "§o" + entry.label : entry.label,
+                        this.x + this.labelX, rowY + 2, labelRgb, 255);
+            }
             rowY += ROW_HEIGHT;
         }
         } finally {

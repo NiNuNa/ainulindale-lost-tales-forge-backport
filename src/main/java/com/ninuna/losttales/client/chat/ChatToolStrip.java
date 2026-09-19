@@ -3,7 +3,6 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.client.gui.animation.LostTalesUiEasing;
 import com.ninuna.losttales.client.gui.animation.LostTalesUiTransition;
 import com.ninuna.losttales.config.LostTalesConfig;
-import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
@@ -16,10 +15,13 @@ import org.lwjgl.input.Mouse;
 /**
  * A window's tool strip under its tab row: the controls that read the
  * window rather than pick a tab. At its left, under the tab search, the
- * chevron that drives the timestamp area out of the window and back in;
- * at its right the message search, a short well naming what it searches
- * — {@code Search Global} — with its magnifier at the well's right end;
- * and past the well, at the strip's right end, the member list's button.
+ * timestamp area's button — a person, for the heads the area holds —
+ * which drives the area out of the window and back in; at its right the
+ * message search, a short well
+ * naming what it searches — {@code Search Global} — with its magnifier
+ * at the well's right end; and past the well, at the strip's right end,
+ * the member list's button, two people. Each of the two panel buttons
+ * rests lit while its panel is out.
  * While a search stands in a well, the count of its matches and the
  * chevrons walking them stand before the well, and the magnifier has
  * crossed over to the cross that clears it.
@@ -69,33 +71,11 @@ final class ChatToolStrip {
     private static final int SLACK = 2;
     private static final int MAX_QUERY = 64;
     private static final String WIDEST_COUNT = "999/999";
-    private static final LostTalesUiSheet[] AREA_FRAMES = {
-            LostTalesUiSheet.TOGGLE_1, LostTalesUiSheet.TOGGLE_2,
-            LostTalesUiSheet.TOGGLE_3, LostTalesUiSheet.TOGGLE_4,
-            LostTalesUiSheet.TOGGLE_5};
-    private static final LostTalesUiSheet[] AREA_FRAMES_HOVER = {
-            LostTalesUiSheet.TOGGLE_1_HOVER, LostTalesUiSheet.TOGGLE_2_HOVER,
-            LostTalesUiSheet.TOGGLE_3_HOVER, LostTalesUiSheet.TOGGLE_4_HOVER,
-            LostTalesUiSheet.TOGGLE_5_HOVER};
-    /** The widest of the area chevron's frames, its box's width. */
-    private static final int AREA_GLYPH_WIDTH = widest(AREA_FRAMES);
-    /** The chevron's frames are all this tall. */
-    private static final int AREA_GLYPH_HEIGHT =
-            LostTalesUiSheet.TOGGLE_1.getHeight();
-    /**
-     * The member list's button: two people side by side, drawn from its
-     * own pixels until the sheet carries artwork for it. {@code H} is a
-     * highlight, {@code M} the glyph's middle tone and {@code S} its
-     * shaded side, lit as the sheet's glyphs are.
-     */
-    static final String[] MEMBERS_GLYPH = {
-            ".HM...HM.",
-            ".MS...MS.",
-            ".........",
-            "HMMS.HMMS",
-            "MMSS.MMSS"};
-    static final int MEMBERS_GLYPH_WIDTH = MEMBERS_GLYPH[0].length();
-    static final int MEMBERS_GLYPH_HEIGHT = MEMBERS_GLYPH.length;
+    private static final int AREA_WIDTH = LostTalesUiSheet.AREA.getWidth();
+    private static final int AREA_HEIGHT = LostTalesUiSheet.AREA.getHeight();
+    private static final int MEMBERS_WIDTH = LostTalesUiSheet.MEMBERS.getWidth();
+    private static final int MEMBERS_HEIGHT =
+            LostTalesUiSheet.MEMBERS.getHeight();
 
     /** Where one window's strip stands this frame, in its row's space. */
     static final class Layout {
@@ -122,8 +102,8 @@ final class ChatToolStrip {
     /** One window's strip: where its controls stand, and their motions. */
     static final class State {
         Layout layout;
-        final ChatIconFlipbook areaChevron =
-                new ChatIconFlipbook(AREA_FRAMES, AREA_FRAMES_HOVER);
+        final LostTalesUiButtonMotion areaMotion =
+                new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
         final LostTalesUiButtonMotion membersMotion =
                 new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
         /** The magnifier turns on its handle; the cross it becomes answers like a switch. */
@@ -212,7 +192,7 @@ final class ChatToolStrip {
     }
 
     /**
-     * Where everything on a strip stands: the area's chevron centred
+     * Where everything on a strip stands: the area's button centred
      * under the tab search, the member list's button {@link #EDGE_MARGIN}
      * in from the strip's right end, and the well before it, as wide as
      * {@link #WELL_WIDTH} where the strip has the room. {@code walking}
@@ -229,10 +209,10 @@ final class ChatToolStrip {
         laid.wellBottom = laid.wellTop + WELL_HEIGHT;
         laid.textTop = laid.wellTop + 2;
         laid.areaX = searchButtonLeft
-                + Math.floorDiv(searchButtonSize - AREA_GLYPH_WIDTH, 2);
-        laid.membersX = stripRight - EDGE_MARGIN - MEMBERS_GLYPH_WIDTH;
+                + Math.floorDiv(searchButtonSize - AREA_WIDTH, 2);
+        laid.membersX = stripRight - EDGE_MARGIN - MEMBERS_WIDTH;
         laid.wellRight = laid.membersX - END_GAP;
-        int floor = laid.areaX + AREA_GLYPH_WIDTH + END_GAP;
+        int floor = laid.areaX + AREA_WIDTH + END_GAP;
         int walkWidth = countWidth + GAP
                 + LostTalesUiSheet.CHEVRON_5.getWidth() + GAP
                 + LostTalesUiSheet.CHEVRON_1.getWidth() + GAP;
@@ -251,14 +231,6 @@ final class ChatToolStrip {
         return laid;
     }
 
-    private static int widest(LostTalesUiSheet[] frames) {
-        int widest = 0;
-        for (LostTalesUiSheet frame : frames) {
-            widest = Math.max(widest, frame.getWidth());
-        }
-        return widest;
-    }
-
     /**
      * Draws a window's strip as laid out by {@link #prepare}, inside the
      * row's own matrix; {@code under} is the part the pointer is on, if
@@ -274,22 +246,24 @@ final class ChatToolStrip {
         long now = System.nanoTime();
         boolean animate = LostTalesConfig.enableChatAnimations;
         int ink = Math.round(255.0F * alphaScale);
-        // The area's chevron points the way the area will go: left while
-        // it stands, to drive it out; right once it is out.
-        state.areaChevron.advance(!window.isAreaHidden(),
-                under == Part.AREA_TOGGLE);
-        state.areaChevron.draw(laid.areaX, glyphTop(laid, AREA_GLYPH_HEIGHT),
-                AREA_GLYPH_WIDTH, AREA_GLYPH_HEIGHT, ink);
-        state.membersMotion.advance(now, under == Part.MEMBERS_TOGGLE, animate);
-        LostTalesUiButton.beginPose(state.membersMotion, laid.membersX,
-                glyphTop(laid, MEMBERS_GLYPH_HEIGHT), MEMBERS_GLYPH_WIDTH,
-                MEMBERS_GLYPH_HEIGHT);
-        try {
-            drawMembersGlyph(laid.membersX, glyphTop(laid, MEMBERS_GLYPH_HEIGHT),
-                    state.membersMotion.lit(), ink);
-        } finally {
-            LostTalesUiButton.endPose();
-        }
+        // Each panel's button rests lit while its panel is out, as a
+        // messenger's member-list button does, and lifts under the
+        // pointer either way.
+        state.areaMotion.advance(now, !window.isAreaHidden()
+                        || under == Part.AREA_TOGGLE,
+                under == Part.AREA_TOGGLE,
+                under == Part.AREA_TOGGLE && Mouse.isButtonDown(0), animate);
+        LostTalesUiButton.drawGlyph(LostTalesUiSheet.AREA,
+                LostTalesUiSheet.AREA_HOVER, state.areaMotion, laid.areaX,
+                glyphTop(laid, AREA_HEIGHT), ink);
+        state.membersMotion.advance(now, !window.isMembersHidden()
+                        || under == Part.MEMBERS_TOGGLE,
+                under == Part.MEMBERS_TOGGLE,
+                under == Part.MEMBERS_TOGGLE && Mouse.isButtonDown(0),
+                animate);
+        LostTalesUiButton.drawGlyph(LostTalesUiSheet.MEMBERS,
+                LostTalesUiSheet.MEMBERS_HOVER, state.membersMotion,
+                laid.membersX, glyphTop(laid, MEMBERS_HEIGHT), ink);
         if (!laid.hasWell) {
             return;
         }
@@ -396,47 +370,6 @@ final class ChatToolStrip {
                 glyphTop(laid, resting.getHeight()), alpha);
     }
 
-    /**
-     * The member list's button from its own pixels, over the chat's one
-     * shadow, crossing to its lit tones as far as {@code lit} says.
-     */
-    static void drawMembersGlyph(float x, float y, float lit, int alpha) {
-        int shadow = LostTalesChatVisualStyle.shadowAlpha(alpha);
-        if (shadow > 0) {
-            drawGlyphTones(x + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                    y + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                    LostTalesChatVisualStyle.SHADOW, LostTalesChatVisualStyle.SHADOW,
-                    LostTalesChatVisualStyle.SHADOW, shadow);
-        }
-        drawGlyphTones(x, y, LostTalesColors.rgb(LostTalesColors.IVORY),
-                LostTalesColors.rgb(LostTalesColors.SAND),
-                LostTalesColors.rgb(LostTalesColors.ROSE_BEIGE), alpha);
-        int over = Math.round(alpha * Math.max(0.0F, Math.min(1.0F, lit)));
-        if (over >= LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
-            drawGlyphTones(x, y, LostTalesColors.rgb(LostTalesColors.IVORY),
-                    LostTalesColors.rgb(LostTalesColors.HONEY),
-                    LostTalesColors.rgb(LostTalesColors.APRICOT), over);
-        }
-    }
-
-    /** The glyph's pixels in its three tones, one quad to a pixel. */
-    private static void drawGlyphTones(float x, float y, int highlight,
-                                       int middle, int shade, int alpha) {
-        for (int row = 0; row < MEMBERS_GLYPH_HEIGHT; row++) {
-            String pixels = MEMBERS_GLYPH[row];
-            for (int column = 0; column < pixels.length(); column++) {
-                char tone = pixels.charAt(column);
-                int rgb = tone == 'H' ? highlight : tone == 'M' ? middle
-                        : tone == 'S' ? shade : -1;
-                if (rgb >= 0) {
-                    LostTalesChatOverlayRenderer.fillRect(x + column, y + row,
-                            x + column + 1, y + row + 1,
-                            LostTalesChatVisualStyle.argb(rgb, alpha));
-                }
-            }
-        }
-    }
-
     /** A glyph's top: centred on the well's capitals, the odd pixel up. */
     private static int glyphTop(Layout laid, int height) {
         return laid.textTop + LostTalesChatOverlayRenderer.centredBoxTop(height);
@@ -456,12 +389,12 @@ final class ChatToolStrip {
         }
         double x = mouseX - row.fractionX;
         double y = mouseY - row.fractionY;
-        if (glyphBox(laid, laid.areaX, AREA_GLYPH_WIDTH, AREA_GLYPH_HEIGHT)
+        if (glyphBox(laid, laid.areaX, AREA_WIDTH, AREA_HEIGHT)
                 .contains(x, y)) {
             return Part.AREA_TOGGLE;
         }
-        if (glyphBox(laid, laid.membersX, MEMBERS_GLYPH_WIDTH,
-                MEMBERS_GLYPH_HEIGHT).contains(x, y)) {
+        if (glyphBox(laid, laid.membersX, MEMBERS_WIDTH, MEMBERS_HEIGHT)
+                .contains(x, y)) {
             return Part.MEMBERS_TOGGLE;
         }
         if (!laid.hasWell) {

@@ -94,7 +94,7 @@ public final class ChatSpeechBubbles {
             return;
         }
         if (spoken.length() > MAX_CHARACTERS) {
-            spoken = spoken.substring(0, MAX_CHARACTERS - 1) + "…";
+            spoken = spoken.substring(0, MAX_CHARACTERS - 3) + "...";
         }
         Speech speech = SPOKEN.remove(speaker);
         if (speech == null) {

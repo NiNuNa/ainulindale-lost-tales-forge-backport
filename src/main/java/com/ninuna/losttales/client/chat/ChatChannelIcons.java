@@ -4,6 +4,7 @@ import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelIconSpec;
+import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import cpw.mods.fml.common.FMLLog;
@@ -11,6 +12,7 @@ import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.compat.lotr.LotrFactionBannerResolver;
+import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -231,72 +233,46 @@ final class ChatChannelIcons {
                 return;
             }
         } else if (tab.isNpc()) {
-            String portrait = npcPortrait(tab);
+            final String portrait = npcPortrait(tab);
             if (portrait != null) {
-                if (shadow > 0) {
-                    LostTalesSilhouetteRenderState.begin(
-                            LostTalesChatVisualStyle.SHADOW);
-                    try {
-                        LostTalesCharacterHeadIconRenderer.drawTintedNpcHeadBase(
-                                minecraft, portrait,
-                                x + inset + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                                y + inset + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                                HEAD_SIZE, 1.0F, 1.0F, 1.0F, shadow / 255.0F);
-                    } finally {
-                        LostTalesSilhouetteRenderState.end();
-                    }
-                }
-                LostTalesCharacterHeadIconRenderer.drawNpcHead(minecraft,
-                        portrait, x + inset, y + inset, HEAD_SIZE, 1.0F,
-                        alpha / 255.0F);
+                final float headX = x + inset;
+                final float headY = y + inset;
+                // A head fading with its window is one picture.
+                LostTalesUiFlatLayers.draw(alpha, x, y, x + SIZE + 1,
+                        y + SIZE + 1, new LostTalesUiFlatLayers.Layers() {
+                            @Override
+                            public void draw() {
+                                drawNpcIcon(minecraft, portrait, headX, headY,
+                                        shadow, alpha);
+                            }
+                        });
                 return;
             }
         } else if (tab.isWhisper()) {
-            UUID partner = partnerId(minecraft, tab.getPartner());
+            final UUID partner = partnerId(minecraft, tab.getPartner());
             if (partner != null) {
                 // The head and its sphere are one icon, so the icon that
                 // is centred in the slot is the pair, not the face: the
                 // face sits left of centre and the sphere fills the rest.
-                float headX = x + (SIZE - HEAD_SIZE
+                final float headX = x + (SIZE - HEAD_SIZE
                         - ChatPresenceMark.OVERHANG_X) / 2.0F;
-                float headY = y + (float)Math.floor((SIZE - HEAD_SIZE
+                final float headY = y + (float)Math.floor((SIZE - HEAD_SIZE
                         - ChatPresenceMark.OVERHANG_Y) / 2.0F);
                 // A conversation's tab wears the other player's head, so
                 // it wears the status of the identity the conversation is
                 // with, in the corner the head gives up for it. An NPC's
                 // tab above has no account and so no status.
-                if (shadow > 0) {
-                    ChatPresenceMark.beginShadowCut(headX, headY, HEAD_SIZE);
-                    LostTalesSilhouetteRenderState.begin(
-                            LostTalesChatVisualStyle.SHADOW);
-                    try {
-                        LostTalesCharacterHeadIconRenderer
-                                .drawTintedAccountHeadBase(minecraft, partner,
-                                        headX + LostTalesChatVisualStyle
-                                                .SHADOW_OFFSET,
-                                        headY + LostTalesChatVisualStyle
-                                                .SHADOW_OFFSET,
-                                        HEAD_SIZE, 1.0F, 1.0F, 1.0F,
-                                        shadow / 255.0F);
-                    } finally {
-                        LostTalesSilhouetteRenderState.end();
-                        ChatPresenceMark.endHeadCut();
-                    }
-                }
-                ChatPresenceMark.beginHeadCut(headX, headY, HEAD_SIZE);
-                try {
-                    LostTalesCharacterHeadIconRenderer.drawAccountHead(
-                            minecraft, partner, headX, headY, HEAD_SIZE,
-                            1.0F, alpha / 255.0F);
-                } finally {
-                    ChatPresenceMark.endHeadCut();
-                }
-                ChatPresenceMark.draw(headX, headY, HEAD_SIZE,
-                        ClientChatPresence.presenceOf(partner,
-                                ChatPresenceIdentity.character(
-                                        ClientChatChannelState
-                                                .partnerCharacterIdOf(tab))),
-                        alpha);
+                final ChatPresence presence = ClientChatPresence.presenceOf(
+                        partner, ChatPresenceIdentity.character(
+                                ClientChatChannelState.partnerCharacterIdOf(tab)));
+                LostTalesUiFlatLayers.draw(alpha, x, y, x + SIZE + 1,
+                        y + SIZE + 1, new LostTalesUiFlatLayers.Layers() {
+                            @Override
+                            public void draw() {
+                                drawPartnerIcon(minecraft, partner, presence,
+                                        headX, headY, shadow, alpha);
+                            }
+                        });
                 return;
             }
         }
@@ -304,6 +280,62 @@ final class ChatChannelIcons {
         if (icon != null) {
             ChatInlineIcons.drawEmoji(minecraft, icon, x, y, SIZE, alpha);
         }
+    }
+
+    /** An NPC conversation's portrait over its shadow. */
+    private static void drawNpcIcon(Minecraft minecraft, String portrait,
+                                    float headX, float headY, int shadow,
+                                    int alpha) {
+        if (shadow > 0) {
+            LostTalesSilhouetteRenderState.begin(
+                    LostTalesChatVisualStyle.SHADOW);
+            try {
+                LostTalesCharacterHeadIconRenderer.drawTintedNpcHeadBase(
+                        minecraft, portrait,
+                        headX + LostTalesChatVisualStyle.SHADOW_OFFSET,
+                        headY + LostTalesChatVisualStyle.SHADOW_OFFSET,
+                        HEAD_SIZE, 1.0F, 1.0F, 1.0F, shadow / 255.0F);
+            } finally {
+                LostTalesSilhouetteRenderState.end();
+            }
+            LostTalesUiFlatLayers.nextLayer();
+        }
+        LostTalesCharacterHeadIconRenderer.drawNpcHead(minecraft, portrait,
+                headX, headY, HEAD_SIZE, 1.0F, alpha / 255.0F);
+    }
+
+    /**
+     * A conversation partner's head over its shadow, with the sphere of
+     * the identity the conversation is with in the corner it gives up.
+     */
+    private static void drawPartnerIcon(Minecraft minecraft, UUID partner,
+                                        ChatPresence presence, float headX,
+                                        float headY, int shadow, int alpha) {
+        if (shadow > 0) {
+            ChatPresenceMark.beginShadowCut(headX, headY, HEAD_SIZE);
+            LostTalesSilhouetteRenderState.begin(
+                    LostTalesChatVisualStyle.SHADOW);
+            try {
+                LostTalesCharacterHeadIconRenderer.drawTintedAccountHeadBase(
+                        minecraft, partner,
+                        headX + LostTalesChatVisualStyle.SHADOW_OFFSET,
+                        headY + LostTalesChatVisualStyle.SHADOW_OFFSET,
+                        HEAD_SIZE, 1.0F, 1.0F, 1.0F, shadow / 255.0F);
+            } finally {
+                LostTalesSilhouetteRenderState.end();
+                ChatPresenceMark.endHeadCut();
+            }
+            LostTalesUiFlatLayers.nextLayer();
+        }
+        ChatPresenceMark.beginHeadCut(headX, headY, HEAD_SIZE);
+        try {
+            LostTalesCharacterHeadIconRenderer.drawAccountHead(minecraft,
+                    partner, headX, headY, HEAD_SIZE, 1.0F, alpha / 255.0F);
+        } finally {
+            ChatPresenceMark.endHeadCut();
+        }
+        LostTalesUiFlatLayers.nextLayer();
+        ChatPresenceMark.draw(headX, headY, HEAD_SIZE, presence, alpha);
     }
 
     /**

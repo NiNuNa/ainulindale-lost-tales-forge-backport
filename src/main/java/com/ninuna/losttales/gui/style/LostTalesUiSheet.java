@@ -107,6 +107,26 @@ public enum LostTalesUiSheet {
     PRESENCE_AWAY(70, 24, 5, 5),
     PRESENCE_BUSY(76, 24, 5, 5),
     /**
+     * The member list's button: two people, one standing before the
+     * other, with its lit cell to the right.
+     */
+    MEMBERS(82, 24, 7, 5),
+    MEMBERS_HOVER(90, 24, 7, 5),
+    /**
+     * A tab's count of unread mentions, one to nine, each an ivory
+     * figure on a crimson tile as tall as the capitals, as a messenger's
+     * mention badge is.
+     */
+    COUNT_1(52, 30, 5, 7),
+    COUNT_2(58, 30, 5, 7),
+    COUNT_3(64, 30, 5, 7),
+    COUNT_4(70, 30, 5, 7),
+    COUNT_5(76, 30, 5, 7),
+    COUNT_6(82, 30, 5, 7),
+    COUNT_7(88, 30, 5, 7),
+    COUNT_8(94, 30, 5, 7),
+    COUNT_9(100, 30, 5, 7),
+    /**
      * The magnifier a search field opens with, in two sizes: eight
      * pixels for a field one chat row tall, ten for one as tall as the
      * key icons it carries. Only the small one has lit artwork, which
@@ -151,6 +171,12 @@ public enum LostTalesUiSheet {
     TOGGLE_4_HOVER(85, 11, 2, 5),
     TOGGLE_5_HOVER(88, 11, 3, 5),
     /**
+     * The timestamp area's button: one person, for the heads the area
+     * holds, with its lit cell to the right.
+     */
+    AREA(92, 11, 4, 5),
+    AREA_HOVER(97, 11, 4, 5),
+    /**
      * A tab's two border pieces. Each carries the corner it turns at the
      * top, the line that runs down the tab's side, and the tab's own
      * interior tone behind them, so a tab is these two with a line
@@ -165,6 +191,16 @@ public enum LostTalesUiSheet {
     TAB_HOVER_RIGHT(15, 59, 4, 19),
     TAB_SELECTED_LEFT(20, 58, 5, 20),
     TAB_SELECTED_RIGHT(26, 58, 5, 20),
+    /**
+     * The selected pair as the hand lifts it off the row: a row taller
+     * at the top, its feet on the same row, its contours warmed through
+     * honey and apricot to coral at the feet. The extra row is one more
+     * of the plain side line both pairs run down, so a tab rising
+     * stretches along that run from the one shape to the other and its
+     * feet never leave the rule.
+     */
+    TAB_LIFTED_LEFT(32, 57, 5, 21),
+    TAB_LIFTED_RIGHT(38, 57, 5, 21),
     /**
      * The hatch laid over message rows the history does not reach: a
      * 45° line every eight texels. The pattern's period divides the
@@ -277,6 +313,9 @@ public enum LostTalesUiSheet {
     public static void drawWithShadow(int u, int v, int width, int height,
                                float x, float y, int alpha) {
         drawShadow(u, v, width, height, x, y, alpha);
+        // The sprite stands over its shadow, so a translucent picture
+        // does not show the one through the other.
+        LostTalesUiFlatLayers.nextLayer();
         draw(u, v, width, height, x, y, alpha);
     }
 
@@ -377,6 +416,13 @@ public enum LostTalesUiSheet {
         }
         float ramp = 1.0F - Math.abs(y - middle) / half;
         return Math.round(alpha * Math.max(0.0F, Math.min(1.0F, ramp)));
+    }
+
+    /** The count tile for {@code count}, one to nine; the nine past it. */
+    public static LostTalesUiSheet countTile(int count) {
+        LostTalesUiSheet[] tiles = {COUNT_1, COUNT_2, COUNT_3, COUNT_4,
+                COUNT_5, COUNT_6, COUNT_7, COUNT_8, COUNT_9};
+        return tiles[Math.max(1, Math.min(tiles.length, count)) - 1];
     }
 
     /** The sprite at its own size, 1:1, at the given opacity. */

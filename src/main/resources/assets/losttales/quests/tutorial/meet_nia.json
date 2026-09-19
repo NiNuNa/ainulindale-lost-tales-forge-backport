@@ -9,11 +9,11 @@
     "entity": "Nia,losttalesnia,losttalesentitynia"
   },
   "dialogue": {
-    "offer": "The storm cracked my roof beam, and I've not a stick of wood left. Four sturdy ones would set it right — could you find them for me?",
+    "offer": "The storm cracked my roof beam, and I've not a stick of wood left. Four sturdy ones would set it right - could you find them for me?",
     "more": "Any dry stick will do. The copse east of the well is thick with fallen branches.",
     "accept": "I'll fetch them.",
     "decline": "Not just now.",
-    "progress": "Still looking? Four will do it — no more than that.",
+    "progress": "Still looking? Four will do it - no more than that.",
     "handIn": "Oh, bless you. That's the roof safe before the next rain.",
     "handOver": "Here are your sticks.",
     "leave": "Take care, Nia."

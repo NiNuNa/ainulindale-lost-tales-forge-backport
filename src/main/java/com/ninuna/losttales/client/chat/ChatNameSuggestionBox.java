@@ -176,16 +176,12 @@ final class ChatNameSuggestionBox {
     }
 
     /**
-     * The colour a row's name is drawn in: the same resolution a mention
-     * of that name gets in a line of the selected channel — a role its
-     * own, an account its primary role's, a character its faction's —
-     * so the list reads exactly as the sent line will; ivory only for a
-     * name nothing resolves.
+     * The colour a row's name is drawn in: a role its own, every player
+     * ivory. The mention the row inserts wears the mention colour, as
+     * every mention does.
      */
     private static int rowColor(ChatMentionCandidate candidate) {
-        int color = ChatMentionColors.colorOf(candidate,
-                ClientChatChannelState.getSelectedChannel());
-        return color >= 0 ? color : LostTalesChatVisualStyle.IVORY;
+        return ChatMentionColors.rowColorOf(candidate);
     }
 
     /**

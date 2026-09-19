@@ -35,9 +35,11 @@ public final class ChatChannel {
     public static final ChatChannel ALL = register("all", "Global", ChatPresentationMode.IN_CHARACTER,
             ChatRecipientRule.GLOBAL, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.FERN_GREEN), true);
+    // Orchid, the palette's pink, so the two open channels never share
+    // a family: Global is green.
     public static final ChatChannel PROXIMITY = register("proximity", "Proximity", ChatPresentationMode.IN_CHARACTER,
             ChatRecipientRule.PROXIMITY, ChatChannelAccess.NONE,
-            LostTalesColors.rgb(LostTalesColors.MEADOW_GREEN), true);
+            LostTalesColors.rgb(LostTalesColors.ORCHID), true);
     // Presentation shows the member's own party colour; this seafoam is
     // only the fallback outside a party.
     public static final ChatChannel PARTY = register("party", "Party", ChatPresentationMode.IN_CHARACTER,
@@ -80,17 +82,20 @@ public final class ChatChannel {
      * its readers have over it. Held by the {@code chat.console.read}
      * capability rather than by a channel gate, and never bridged.
      */
+    // The two consoles wear one grey: they are one kind of place.
     public static final ChatChannel SERVER_CONSOLE = register("server_console", "Server Console", ChatPresentationMode.OUT_OF_CHARACTER,
             ChatRecipientRule.CONSOLE_READERS, ChatChannelAccess.NONE,
-            LostTalesColors.rgb(LostTalesColors.TEAL), false);
+            LostTalesColors.rgb(LostTalesColors.ROSE_GRAY), false);
     /**
      * A private conversation between two players, in character. Not a tab of its own:
      * every whisper partner is one tab on this channel, and the client
      * keeps them apart by the partner's name.
      */
+    // A conversation wears the colour of the person it is with; this
+    // plain ivory is only what one with nobody known behind it reads in.
     public static final ChatChannel WHISPER = register("whisper", "Whisper", ChatPresentationMode.IN_CHARACTER,
             ChatRecipientRule.WHISPER, ChatChannelAccess.NONE,
-            LostTalesColors.rgb(LostTalesColors.APRICOT), false);
+            LostTalesColors.rgb(LostTalesColors.HUD_LABEL), false);
 
     /** Tab, indicator, and cycle order for the built-in channels: the two
      *  global ones bracket the scoped role-play ones, then Party, staff,

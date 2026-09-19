@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatTabIds;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -229,6 +230,18 @@ public final class ChatTab {
     public boolean isWhisper() { return this.channel == ChatChannel.WHISPER; }
     /** Whether the partner is an NPC rather than a player. */
     public boolean isNpc() { return this.npc; }
+
+    /**
+     * The id an NPC's lines in this conversation are signed with, one for
+     * its name as its tab is; null for any other tab. The creature cannot
+     * give one: a client of this game version makes a new random id up for
+     * a creature every time it comes into view, so its lines would stop
+     * running on, and its card lose its faction, after every return.
+     */
+    public UUID npcSpeakerId() {
+        return this.npc ? UUID.nameUUIDFromBytes(
+                id().getBytes(StandardCharsets.UTF_8)) : null;
+    }
 
     /**
      * Stable id: the channel id, {@code channel|own:<character id>} for a

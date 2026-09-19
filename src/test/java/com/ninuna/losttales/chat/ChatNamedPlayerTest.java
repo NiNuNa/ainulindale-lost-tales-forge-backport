@@ -26,9 +26,9 @@ public final class ChatNamedPlayerTest {
     @Test
     public void anEntryIsFoundByAccountWhateverTheCase() {
         ChatNamedPlayer sam = new ChatNamedPlayer(UUID.randomUUID(), "Sam",
-                UUID.randomUUID(), "Samwise", "hobbit/male/1", 0x123456);
+                UUID.randomUUID(), "Samwise", "hobbit/male/1");
         ChatNamedPlayer frodo = new ChatNamedPlayer(UUID.randomUUID(), "Frodo",
-                null, "", "", 0);
+                null, "", "");
         assertEquals(sam, ChatNamedPlayer.find(Arrays.asList(frodo, sam), "sam"));
         assertEquals("a line the server writes names the character",
                 sam, ChatNamedPlayer.find(Arrays.asList(frodo, sam), "samwise"));
@@ -36,8 +36,7 @@ public final class ChatNamedPlayerTest {
                 Arrays.asList(frodo, sam), "Frodo").getIdentityName());
         assertNull(ChatNamedPlayer.find(Arrays.asList(frodo, sam), "Merry"));
         assertNull(ChatNamedPlayer.find(null, "Sam"));
-        assertFalse(new ChatNamedPlayer(null, "", null, "x", "", 0).isValid());
-        assertEquals(0x123456, sam.getNameColor());
+        assertFalse(new ChatNamedPlayer(null, "", null, "x", "").isValid());
     }
 
     /**
@@ -50,12 +49,12 @@ public final class ChatNamedPlayerTest {
         UUID account = UUID.randomUUID();
         UUID character = UUID.randomUUID();
         ChatNamedPlayer sam = new ChatNamedPlayer(account, "Sam", character,
-                "Samwise", "hobbit/male/1", 0);
+                "Samwise", "hobbit/male/1");
         assertEquals(account, sam.getPlayerId());
         assertEquals(character, sam.getCharacterId());
         assertEquals("hobbit/male/1", sam.getSkinId());
         ChatNamedPlayer asAccount = new ChatNamedPlayer(account, "Sam", null,
-                "", "hobbit/male/1", 0);
+                "", "hobbit/male/1");
         assertNull(asAccount.getCharacterId());
         assertEquals("an account wears its own skin", "", asAccount.getSkinId());
         assertEquals("Sam", asAccount.getIdentityName());

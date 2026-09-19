@@ -357,11 +357,13 @@ final class ChatTabActions {
                 frame.tabRowBottom() + DETACH_DROP
                         + ChatWindowPlacement.lineHeight(this.mc),
                 screenWidth, screenHeight);
-        if (ChatWindowLayout.detach(channel,
+        ChatWindow detached = ChatWindowLayout.detach(channel,
                 ChatWindowPlacement.windowPercentX(anchor.x, this.mc,
                         screenWidth),
-                ChatWindowPlacement.windowPercentY(anchor.baseline, this.mc,
-                        screenHeight)) != null) {
+                ChatWindowPlacement.windowPercentY(null, anchor.baseline,
+                        this.mc, screenHeight));
+        if (detached != null) {
+            ChatWindowFrame.of(detached).beginAppearing();
             selectChannel(channel);
         }
     }

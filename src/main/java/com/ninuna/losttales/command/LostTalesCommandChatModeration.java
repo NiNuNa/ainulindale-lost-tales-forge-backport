@@ -181,12 +181,12 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
             line.append(EnumChatFormatting.GRAY);
             line.append(mute.getAccountName().length() > 0
                     ? mute.getAccountName() : mute.getAccountId().toString());
-            line.append(" — ");
+            line.append(" - ");
             line.append(mute.isPermanent() ? "permanent"
                     : ChatMuteDurations.formatRemaining(
                             mute.getExpiresAtMillis() - now) + " left");
             if (mute.getReason().length() > 0) {
-                line.append(" — ").append(mute.getReason());
+                line.append(" - ").append(mute.getReason());
             }
             if (mute.getMutedByName().length() > 0) {
                 line.append(" (by ").append(mute.getMutedByName()).append(")");

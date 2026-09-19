@@ -186,8 +186,36 @@ public final class ChatGroupRunsTest {
     }
 
     /**
+     * The feed keeps the one eight-minute run every view keeps: a
+     * speaker talking on inside the fade gets their name back eight
+     * minutes after the run's first message, as in a window.
+     */
+    @Test
+    public void aFeedRunEndsEightMinutesAfterItsHeadAsAWindowRunDoes() {
+        long step = ChatGroupRuns.FEED_RUN_MILLIS / 2L;
+        int lines = (int)(8L * 60L * 1000L / step) + 2;
+        int[] oldestFirst = new int[lines];
+        boolean[] expected = new boolean[lines];
+        for (int index = 0; index < lines; index++) {
+            oldestFirst[index] = index + 1;
+            remember(index + 1, ChatChannel.ALL, ALICE, "Alice",
+                    START + index * step);
+            expected[index] = true;
+        }
+        // Newest first: the last line, one step past eight minutes,
+        // opens a run of its own, as the first did.
+        expected[0] = false;
+        expected[lines - 1] = false;
+        assertArrayEquals(expected,
+                ChatGroupRuns.continuationsInFeed(newestFirst(oldestFirst)));
+        assertArrayEquals(expected,
+                ChatGroupRuns.continuationsOf(newestFirst(oldestFirst)));
+    }
+
+    /**
      * Only silence long enough for the whole group to fade ends a run
-     * there; the next message then opens one of its own, with a name.
+     * there sooner; the next message then opens one of its own, with a
+     * name.
      */
     @Test
     public void aFeedRunEndsOnceItsGroupHasFaded() {

@@ -1,15 +1,9 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatAccountRole;
-import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMentionCandidate;
-import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
-import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
-import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
-import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
-import com.ninuna.losttales.compat.lotr.LotrFactionColors;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import java.util.Locale;
@@ -22,13 +16,13 @@ import net.minecraft.client.gui.GuiPlayerInfo;
  *
  * <p>Only the mention itself is coloured, never the words around it: a
  * line reads as ordinary text with the names in it standing out, the way
- * a mention does anywhere else. A mention wears the colour of the
- * identity it names, exactly as that identity signs its own lines: a
- * role its own colour, an account its primary role's, and a mention that
- * names a character — by the character's name, or by the account on a
- * channel whose lines are signed in character — the character's faction
- * colour. Only when none of that can be resolved does the shared mention
- * honey stand in, so a mention is never invisible.</p>
+ * a mention does anywhere else. A mention of a player wears the one
+ * mention colour, the palette's honey, whoever it names — an account or a
+ * character, with a role or without — and a mention of a role wears that
+ * role's own colour exactly (Nils, 2026-09-19): what marks a mention is
+ * its colour, never the colour of the identity it reaches. The completion
+ * rows say it the same way: a role in its colour, every player in ivory
+ * ({@link #rowColorOf}).</p>
  *
  * <p>Resolution is local and at display time: each client asks its own
  * player list and appearance cache, exactly as it asks its own names when
@@ -39,9 +33,8 @@ import net.minecraft.client.gui.GuiPlayerInfo;
  * wherever it appears.</p>
  */
 final class ChatMentionColors {
-    /** The stand-in accent when no identity colour can be resolved. */
-    private static final int PLAYER_RGB =
-            LostTalesColors.rgb(LostTalesColors.HONEY);
+    /** The one colour a mention of a player is drawn in. */
+    static final int PLAYER_RGB = LostTalesColors.rgb(LostTalesColors.HONEY);
 
     private ChatMentionColors() {}
 
@@ -51,108 +44,34 @@ final class ChatMentionColors {
     }
 
     /**
-     * The colour a mention of an account this client cannot place is
-     * drawn in: its primary role's colour where its roles are known, the
-     * shared accent until they are.
-     */
-    static int accountColorOf(String account) {
-        int roleColor = roleColorFor(account);
-        return roleColor >= 0 ? roleColor : PLAYER_RGB;
-    }
-
-    /**
      * The colour the named mention is drawn in, or -1 when the name
-     * reaches nobody and the text stays as it was typed. Roles answer
-     * in every channel: an operator is worth calling wherever the call
-     * is made.
+     * reaches nobody and the text stays as it was typed: a role's own
+     * colour, and the one mention colour for any player. Roles answer in
+     * every channel: an operator is worth calling wherever the call is
+     * made.
      */
-    static int colorOf(String name, ChatChannel channel) {
+    static int colorOf(String name) {
         if (!LostTalesConfig.enableChatPings || name == null
                 || name.length() == 0) {
             return -1;
         }
-        for (ChatAccountRole role : ChatAccountRole.mentionable()) {
-            if (name.equalsIgnoreCase(role.getDisplayName())) {
-                return role.getColor();
-            }
+        ChatAccountRole role = roleFor(name);
+        if (role != null) {
+            return role.getColor();
         }
-        String account = accountFor(name);
-        if (account == null) {
-            return -1;
-        }
-        int roleColor = roleColorFor(account);
-        int accountColor = roleColor >= 0 ? roleColor : PLAYER_RGB;
-        // The same rule a sender's own name follows on the channel: out
-        // of character the primary role colours the name, in character
-        // the character's faction does — with the account's colour
-        // standing in when this client knows no character for the name.
-        return ChatRolePresentation.showsRoles(channel)
-                ? accountColor : characterColorFor(account, accountColor);
+        return accountFor(name) == null ? -1 : PLAYER_RGB;
     }
 
     /**
-     * The colour a completion row is drawn in: a role its own; a player
-     * the same colour {@link #colorOf(String, ChatChannel)} gives their
-     * name on the channel, except that in character the faction is read
-     * from the synced appearance the candidate's ids name, so two
-     * characters of one name, or a name the appearance store has not
-     * indexed, still colour right. -1 when nothing resolves.
+     * The colour a completion row names its candidate in: a role its own
+     * colour, and every player ivory, as a mention of any player is one
+     * colour whoever it names (Nils, 2026-09-19: "for pings only roles
+     * have colours").
      */
-    static int colorOf(ChatMentionCandidate candidate, ChatChannel channel) {
-        if (candidate == null) {
-            return -1;
-        }
-        if (candidate.isRole()) {
-            return candidate.getRoleColor();
-        }
-        if (!LostTalesConfig.enableChatPings
-                || ChatRolePresentation.showsRoles(channel)
-                || candidate.getCharacterId().length() == 0) {
-            return colorOf(candidate.getDisplayName(), channel);
-        }
-        CharacterAppearance appearance = appearanceOf(candidate);
-        if (appearance == null) {
-            return colorOf(candidate.getDisplayName(), channel);
-        }
-        int roleColor = roleColorFor(candidate.getAccountName(),
-                appearance.getCharacterId());
-        return LotrFactionColors.forFactionId(appearance.getStartingFactionId(),
-                roleColor >= 0 ? roleColor : PLAYER_RGB);
-    }
-
-    /**
-     * The synced appearance the candidate's ids name — the account's,
-     * while it still wears the candidate's character — or null.
-     */
-    private static CharacterAppearance appearanceOf(ChatMentionCandidate candidate) {
-        UUID accountId;
-        try {
-            accountId = UUID.fromString(candidate.getAccountId());
-        } catch (IllegalArgumentException notAnId) {
-            return null;
-        }
-        CharacterAppearance appearance = ClientCharacterAppearanceCache.get(accountId);
-        return appearance != null && appearance.hasCharacter()
-                && appearance.getCharacterId() != null
-                && candidate.getCharacterId().equalsIgnoreCase(
-                        appearance.getCharacterId().toString())
-                ? appearance : null;
-    }
-
-    /**
-     * The account's primary role colour, or -1 for none; see
-     * {@link #rolesFor}.
-     */
-    private static int roleColorFor(String account) {
-        ChatAccountRole primary = ChatAccountRole.primary(rolesFor(account));
-        return primary.isNone() ? -1 : primary.getColor();
-    }
-
-    /** A character identity's primary role colour, or -1 for none. */
-    private static int roleColorFor(String account, UUID characterId) {
-        ChatAccountRole primary = ChatAccountRole.primary(
-                rolesFor(account, characterId));
-        return primary.isNone() ? -1 : primary.getColor();
+    static int rowColorOf(ChatMentionCandidate candidate) {
+        return candidate != null && candidate.isRole()
+                ? candidate.getRoleColor()
+                : LostTalesColors.rgb(LostTalesColors.IVORY);
     }
 
     /**
@@ -164,7 +83,7 @@ final class ChatMentionColors {
      * answers, so a role holder is coloured before they have said
      * anything. The roster comes first because it is the server's
      * current word, while a remembered line may be an evening old. The
-     * mention colours and the player card both read this.
+     * completion rows and the player card both read this.
      */
     static int rolesFor(String account) {
         if (account == null || account.trim().length() == 0) {
@@ -229,28 +148,6 @@ final class ChatMentionColors {
     }
 
     /**
-     * The colour a mention marker is drawn with right now: its baked
-     * colour, upgraded from the shared fallback once the roles behind
-     * the name are known — a line built moments before the access
-     * roster or the holder's first line arrived would otherwise keep
-     * honey forever. Cheap map lookups only, since the renderer asks
-     * every frame; the character-colour half of the resolution stays
-     * baked.
-     */
-    static Integer liveMentionColor(ChatMentionMarker.Data mention) {
-        if (mention == null) {
-            return null;
-        }
-        if (mention.color == PLAYER_RGB && mention.role() == null) {
-            int role = roleColorFor(mention.account);
-            if (role >= 0) {
-                return Integer.valueOf(role);
-            }
-        }
-        return Integer.valueOf(mention.color);
-    }
-
-    /**
      * The mentionable role the name addresses, or null — in every
      * channel, the same rule {@link #colorOf} colours them by.
      */
@@ -279,42 +176,6 @@ final class ChatMentionColors {
     private static String normalized(String name) {
         String trimmed = name == null ? "" : name.trim();
         return trimmed.length() == 0 ? null : trimmed;
-    }
-
-    /**
-     * The colour the account's active role-playing character signs its
-     * lines with — its starting faction's, exactly as the server
-     * resolves it for the character's own messages — or {@code fallback}
-     * when this client knows no active character or no faction for the
-     * account. A system line shown under the character's name wears
-     * this, so the mention and the character's own lines read alike.
-     */
-    private static int characterColorFor(String account, int fallback) {
-        Minecraft minecraft = Minecraft.getMinecraft();
-        if (account == null || account.length() == 0) {
-            return fallback;
-        }
-        if (minecraft != null && minecraft.thePlayer != null
-                && account.equalsIgnoreCase(
-                        minecraft.thePlayer.getCommandSenderName())) {
-            CharacterRosterSnapshot snapshot =
-                    ClientCharacterRosterCache.getSnapshot();
-            CharacterSummary active = snapshot == null
-                    ? null : snapshot.getActiveCharacter();
-            return active == null ? fallback
-                    : LotrFactionColors.forFactionId(
-                            active.getStartingFactionId(), fallback);
-        }
-        for (CharacterAppearance appearance
-                : ClientCharacterAppearanceCache.snapshot().values()) {
-            if (appearance != null && appearance.hasCharacter()
-                    && account.equalsIgnoreCase(
-                            appearance.getAccountName())) {
-                return LotrFactionColors.forFactionId(
-                        appearance.getStartingFactionId(), fallback);
-            }
-        }
-        return fallback;
     }
 
     /**

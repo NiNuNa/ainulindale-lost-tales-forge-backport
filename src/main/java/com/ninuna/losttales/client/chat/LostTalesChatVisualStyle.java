@@ -8,6 +8,7 @@ import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
@@ -51,6 +52,12 @@ final class LostTalesChatVisualStyle {
     /** Alpha-free surface tones for what animates its own opacity. */
     static final int SURFACE_RGB = LostTalesUiInk.SURFACE_RGB;
     static final int SURFACE_HIGHLIGHT_RGB = LostTalesUiInk.SURFACE_HIGHLIGHT_RGB;
+    /**
+     * Where a carried window will land, lit: the edge of the window it
+     * sticks to, and the zone of a snap layout it fills. Honey, the
+     * palette's yellow.
+     */
+    static final int LANDING_RGB = LostTalesColors.rgb(LostTalesColors.HONEY);
     /**
      * The one opacity of everything that opens over the chat — the
      * menus, the completion lists, the pickers and their tips, the
@@ -589,22 +596,48 @@ final class LostTalesChatVisualStyle {
                 * (rowPixels - words));
     }
 
-    static void drawFormatted(FontRenderer font, IChatComponent line,
-                              ChatHeadMarker.Data metadata,
-                              int x, int y, int alpha, boolean chatOpen) {
+    static void drawFormatted(final FontRenderer font,
+                              final IChatComponent line,
+                              final ChatHeadMarker.Data metadata,
+                              final int x, final int y, final int alpha,
+                              final boolean chatOpen) {
         if (font == null || line == null || alpha < MIN_VISIBLE_ALPHA) {
             return;
         }
         beginContent();
-        int shadow = shadowAlpha(alpha);
-        if (shadow > 0) {
-            drawComponentPass(font, line, metadata,
-                    x + SHADOW_OFFSET, y + SHADOW_OFFSET, shadow, true,
-                    chatOpen);
+        final int shadow = shadowAlpha(alpha);
+        LostTalesUiFlatLayers.Layers layers = new LostTalesUiFlatLayers.Layers() {
+            @Override
+            public void draw() {
+                if (shadow > 0) {
+                    drawComponentPass(font, line, metadata,
+                            x + SHADOW_OFFSET, y + SHADOW_OFFSET, shadow, true,
+                            chatOpen);
+                    // The line stands over its shadow, so a line fading
+                    // does not show the shadow through its strokes.
+                    LostTalesUiFlatLayers.nextLayer();
+                }
+                drawComponentPass(font, line, metadata, x, y, alpha, false,
+                        chatOpen);
+            }
+        };
+        if (alpha >= 255 || LostTalesUiFlatLayers.isActive()) {
+            layers.draw();
+            return;
         }
-        drawComponentPass(font, line, metadata, x, y, alpha, false,
-                chatOpen);
+        // A fading line fades as one picture with its shadow. The bounds
+        // reach past the words for the icons a line carries, which stand
+        // a little taller than the capitals and may be wider than the
+        // room their placeholders declare.
+        LostTalesUiFlatLayers.draw(alpha, x - LINE_PICTURE_MARGIN,
+                y - LINE_PICTURE_MARGIN,
+                x + font.getStringWidth(line.getFormattedText())
+                        + 3 * LINE_PICTURE_MARGIN,
+                y + font.FONT_HEIGHT + LINE_PICTURE_MARGIN, layers);
     }
+
+    /** How far past a line's words its icons may stand, in the line's units. */
+    private static final int LINE_PICTURE_MARGIN = 4;
 
     static void drawPlain(FontRenderer font, String text,
                           int x, int y, int alpha) {
@@ -718,18 +751,42 @@ final class LostTalesChatVisualStyle {
      * pixel away, which is what every other shadow in the chat does.
      * A scale of one is the plain case.
      */
-    static void drawColored(FontRenderer font, String text,
-                            int x, int y, int rgb, int alpha, float scale) {
+    static void drawColored(final FontRenderer font, final String text,
+                            final int x, final int y, final int rgb,
+                            final int alpha, float scale) {
         if (font == null || text == null || alpha < MIN_VISIBLE_ALPHA) {
             return;
         }
         beginContent();
-        int shadow = shadowAlpha(alpha);
+        final int shadow = shadowAlpha(alpha);
+        final int offset = scale <= 0.0F ? SHADOW_OFFSET
+                : Math.max(1, Math.round(SHADOW_OFFSET / scale));
+        if (alpha >= 255 || LostTalesUiFlatLayers.isActive()) {
+            drawColoredLayers(font, text, x, y, rgb, alpha, shadow, offset);
+            return;
+        }
+        // Words fading fade as one picture with their shadow, so the
+        // shadow never shows through their strokes.
+        LostTalesUiFlatLayers.draw(alpha, x, y,
+                x + font.getStringWidth(text) + offset,
+                y + font.FONT_HEIGHT + offset,
+                new LostTalesUiFlatLayers.Layers() {
+                    @Override
+                    public void draw() {
+                        drawColoredLayers(font, text, x, y, rgb, alpha,
+                                shadow, offset);
+                    }
+                });
+    }
+
+    /** The shadow, then the words standing over it as the next layer. */
+    private static void drawColoredLayers(FontRenderer font, String text,
+                                          int x, int y, int rgb, int alpha,
+                                          int shadow, int offset) {
         if (shadow > 0) {
-            int offset = scale <= 0.0F ? SHADOW_OFFSET
-                    : Math.max(1, Math.round(SHADOW_OFFSET / scale));
             font.drawString(text, x + offset, y + offset,
                     argb(SHADOW, shadow));
+            LostTalesUiFlatLayers.nextLayer();
         }
         font.drawString(text, x, y, argb(rgb, alpha));
     }
@@ -1143,11 +1200,10 @@ final class LostTalesChatVisualStyle {
                     explicitColor = ChatBodyMarker.decode(part);
                 }
                 if (explicitColor == null) {
-                    // A mention re-resolves as it is drawn, so one built
-                    // before this client learned the roles behind the name
-                    // catches up instead of keeping the fallback forever.
-                    explicitColor = ChatMentionColors.liveMentionColor(
-                            ChatMentionMarker.decode(part));
+                    ChatMentionMarker.Data mention =
+                            ChatMentionMarker.decode(part);
+                    explicitColor = mention == null ? null
+                            : Integer.valueOf(mention.color);
                 }
                 if (explicitColor == null) {
                     explicitColor = ChatTitleMarker.colorOf(part);

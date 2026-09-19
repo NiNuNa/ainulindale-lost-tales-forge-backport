@@ -347,13 +347,13 @@ public final class LostTalesCharacterRosterGui extends GuiScreen
                     x, y + 2, LostTalesSkyrimUiStyle.TEXT_MUTED);
             return;
         }
-        String lineOne = character.getName() + "  •  "
-                + ClientCharacterDisplayNames.race(character.getRaceId()) + "  •  "
-                + ClientCharacterDisplayNames.gender(character.getGenderId()) + "  •  "
+        String lineOne = character.getName() + "  ·  "
+                + ClientCharacterDisplayNames.race(character.getRaceId()) + "  ·  "
+                + ClientCharacterDisplayNames.gender(character.getGenderId()) + "  ·  "
                 + I18n.format("gui.losttales.character.age_value",
                 Integer.valueOf(character.getAge()));
         String lineTwo = ClientCharacterDisplayNames.faction(
-                character.getStartingFactionId()) + "  •  "
+                character.getStartingFactionId()) + "  ·  "
                 + I18n.format("gui.losttales.character.level_short",
                 Integer.valueOf(character.getRoleplayLevel()));
         this.fontRendererObj.drawStringWithShadow(
@@ -400,7 +400,7 @@ public final class LostTalesCharacterRosterGui extends GuiScreen
                 active ? LostTalesSkyrimUiStyle.GOLD : LostTalesSkyrimUiStyle.TEXT_BRIGHT);
         String details = character == null
                 ? ClientCharacterDisplayNames.race(CharacterRaceRegistry.HUMAN)
-                : ClientCharacterDisplayNames.race(character.getRaceId()) + "  •  "
+                : ClientCharacterDisplayNames.race(character.getRaceId()) + "  ·  "
                         + I18n.format("gui.losttales.character.level_short",
                         Integer.valueOf(character.getRoleplayLevel()));
         this.fontRendererObj.drawStringWithShadow(

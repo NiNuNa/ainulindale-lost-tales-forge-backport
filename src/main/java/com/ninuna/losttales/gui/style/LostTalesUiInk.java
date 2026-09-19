@@ -86,9 +86,8 @@ public final class LostTalesUiInk {
      */
     public static float centredStart(float box, float ink,
                                      float pixelsPerUnit) {
-        float perUnit = Math.max(0.0001F, pixelsPerUnit);
-        return (float)Math.floor((box - ink) / 2.0F * perUnit + 1.0E-4F)
-                / perUnit;
+        return (float)LostTalesDisplayPixels.floor((box - ink) / 2.0F,
+                Math.max(0.0001F, pixelsPerUnit));
     }
 
     /**

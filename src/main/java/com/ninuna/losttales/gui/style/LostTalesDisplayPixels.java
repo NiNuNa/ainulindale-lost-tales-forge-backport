@@ -30,8 +30,32 @@ public final class LostTalesDisplayPixels {
      * the point moves.
      */
     static final double TIE_BREAK = 1.0D / 16.0D;
+    /**
+     * How far short of a whole display pixel a place may fall and still
+     * count as standing on it. A place meant to stand on a pixel often
+     * arrives a float's error short of it — a third of a GUI pixel has no
+     * exact float — and laid on the pixel at or before it without this
+     * slack it drops a whole display pixel on some frames and not on
+     * others: a tab's cross stepped against its tab's edge at GUI scale
+     * three. A thousandth of a pixel is far past a float's error at any
+     * GUI size and far below anything the eye or the rasterizer sees.
+     */
+    public static final double TOLERANCE = 1.0E-3D;
 
     private LostTalesDisplayPixels() {}
+
+    /**
+     * {@code position}, in units {@code perUnit} display pixels each, laid
+     * on the whole display pixel at or before it — the one a place centred
+     * between two pixels takes by the centring rule — a place within
+     * {@link #TOLERANCE} of the next pixel counting as on that one.
+     */
+    public static double floor(double position, double perUnit) {
+        if (perUnit <= 0.0D) {
+            return position;
+        }
+        return Math.floor(position * perUnit + TOLERANCE) / perUnit;
+    }
 
     /**
      * Display pixels per GUI pixel. It is asked several times for every

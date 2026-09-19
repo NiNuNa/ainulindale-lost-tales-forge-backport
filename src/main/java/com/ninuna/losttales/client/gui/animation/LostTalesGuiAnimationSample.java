@@ -46,6 +46,21 @@ public final class LostTalesGuiAnimationSample {
     public float getScaleX() { return this.scaleX; }
     public float getScaleY() { return this.scaleY; }
 
+    /**
+     * The same sample with its opacity taken down to {@code factor} of
+     * itself: one element of a screen fading on its own inside the
+     * screen's motion, which carries it otherwise unchanged.
+     */
+    public LostTalesGuiAnimationSample withOpacity(float factor) {
+        float share = LostTalesGuiEasing.clamp(factor);
+        if (share >= 1.0F) {
+            return this;
+        }
+        return new LostTalesGuiAnimationSample(this.progress,
+                this.easedProgress, this.opacity * share, this.translationX,
+                this.translationY, this.scaleX, this.scaleY);
+    }
+
     public int inverseMouseX(int mouseX, int screenWidth) {
         float center = screenWidth * 0.5F;
         return Math.round(center

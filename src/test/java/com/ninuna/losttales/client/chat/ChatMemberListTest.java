@@ -92,10 +92,35 @@ public final class ChatMemberListTest {
 
     @Test
     public void theListStandsWhereTheWordsKeepTheirRoom() {
-        assertTrue(ChatMemberList.fits(ChatMemberList.WIDTH
-                + ChatMemberList.MIN_MESSAGE_WIDTH));
-        assertFalse(ChatMemberList.fits(ChatMemberList.WIDTH
-                + ChatMemberList.MIN_MESSAGE_WIDTH - 1));
+        float width = ChatMemberList.DEFAULT_WIDTH;
+        assertTrue(ChatMemberList.fits(width
+                + ChatMemberList.MIN_MESSAGE_WIDTH, width));
+        assertFalse(ChatMemberList.fits(width
+                + ChatMemberList.MIN_MESSAGE_WIDTH - 1, width));
+    }
+
+    /**
+     * The list takes the width its edge was dragged to, within a third of
+     * its window and never narrower than its heads; a window that chose
+     * none keeps the list's own.
+     */
+    @Test
+    public void theListsWidthIsBoundedByItsHeadsAndAThirdOfTheWindow() {
+        ChatMemberList.State state = new ChatMemberList.State();
+        ChatMemberList.measure(state, null, 600.0F);
+        assertEquals(ChatMemberList.DEFAULT_WIDTH, state.width, 0.001F);
+        assertEquals(200.0F, state.maxWidth, 0.001F);
+        ChatWindow window = new ChatWindow("w");
+        window.setMembersWidth(150.5D);
+        ChatMemberList.measure(state, window, 600.0F);
+        assertEquals(150.5F, state.width, 0.001F);
+        // A narrower window holds the list to a third of itself.
+        ChatMemberList.measure(state, window, 300.0F);
+        assertEquals(100.0F, state.width, 0.001F);
+        // Dragged past its heads, it stops at them.
+        window.setMembersWidth(1.0D);
+        ChatMemberList.measure(state, window, 600.0F);
+        assertEquals(ChatMemberList.minWidth(), state.width, 0.001F);
     }
 
     @Test

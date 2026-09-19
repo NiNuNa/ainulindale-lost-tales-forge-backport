@@ -1,6 +1,9 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatEpithet;
+import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
 import java.nio.charset.Charset;
@@ -47,11 +50,22 @@ import org.lwjgl.opengl.GL11;
  * <p>The list comes out and goes away with the button at the tool strip's
  * right end, sliding in from the window's right edge while the words give
  * it their room; a window too narrow to keep {@link #MIN_MESSAGE_WIDTH}
- * for its words keeps its list away.</p>
+ * for its words keeps its list away. Its left edge is a handle: dragged,
+ * the list grows to a third of the window or narrows to its heads alone,
+ * and a name its row cuts short slides along while the pointer rests on
+ * it, as a tab's does.</p>
  */
 final class ChatMemberList {
-    /** The list's width in the chat's pixels, its separator included. */
-    static final int WIDTH = 100;
+    /** The list's own width in the chat's pixels, its separator included. */
+    static final int DEFAULT_WIDTH = 100;
+    /** The most of its window's width a list may take. */
+    static final float MAX_SHARE = 1.0F / 3.0F;
+    /**
+     * How far into the list its edge answers as a handle, in GUI pixels,
+     * from the separator in: the history's scrollbar answers up to the
+     * separator from the other side.
+     */
+    static final float EDGE_HANDLE = 4.0F;
     /** The least room the words keep beside a list; narrower, the list stays away. */
     static final int MIN_MESSAGE_WIDTH = 160;
     /** A member's row, in the list's units: the avatar-sized head and three clear rows above and below. */
@@ -92,8 +106,23 @@ final class ChatMemberList {
         }
     }
 
-    /** One window's list: where it is scrolled to, and what the pointer is on. */
+    /** One window's list: its width, where it is scrolled to, and what the pointer is on. */
     static final class State {
+        /**
+         * How wide the list stands in its window this frame, in the
+         * chat's pixels, and how wide it may be dragged: what the window
+         * asked for, bounded by its heads and a third of the window.
+         */
+        float width = DEFAULT_WIDTH;
+        float minWidth;
+        float maxWidth = DEFAULT_WIDTH;
+        /** Whether the rows have room for any of a name this frame. */
+        boolean namesShown = true;
+        /** How long the pointer has rested on {@link #hovered}, for its name's slide. */
+        double hoverSeconds;
+        /** How far the rested-on row's name and title have slid, in the list's units. */
+        float nameSlide;
+        float titleSlide;
         /** The answer and the tab the rows were laid out for; they are laid out again for others. */
         ClientChatMembers.Answer laidFor;
         ChatTab laidTab;
@@ -133,12 +162,43 @@ final class ChatMemberList {
 
     /** How much of the list stands in the window, in the chat's pixels. */
     static float drawnWidth(ChatWindowFrame frame) {
-        return frame == null ? 0.0F : WIDTH * frame.membersShare();
+        return frame == null ? 0.0F
+                : frame.members.width * frame.membersShare();
     }
 
-    /** Whether a window whose words have {@code messageWidth} pixels keeps room for a list. */
-    static boolean fits(float messageWidth) {
-        return messageWidth - WIDTH >= MIN_MESSAGE_WIDTH;
+    /**
+     * Whether a window whose words have {@code messageWidth} pixels keeps
+     * room for a list {@code width} wide.
+     */
+    static boolean fits(float messageWidth, float width) {
+        return messageWidth - width >= MIN_MESSAGE_WIDTH;
+    }
+
+    /**
+     * Lays the list's width out for a window {@code windowWidth} of the
+     * chat's pixels wide: the width the player dragged it to, or its own,
+     * never past a third of the window nor narrower than its heads.
+     */
+    static void measure(State state, ChatWindow window, float windowWidth) {
+        state.minWidth = minWidth();
+        state.maxWidth = Math.max(state.minWidth, windowWidth * MAX_SHARE);
+        double chosen = window == null ? 0.0D : window.getMembersWidth();
+        state.width = clampWidth(chosen > 0.0D ? (float)chosen
+                : DEFAULT_WIDTH, state.minWidth, state.maxWidth);
+    }
+
+    /** A width between the list's least and most. */
+    static float clampWidth(float width, float least, float most) {
+        return Math.max(least, Math.min(most, width));
+    }
+
+    /**
+     * The narrowest a list may be, in the chat's pixels: its separator,
+     * and its heads with their spheres, clear space either side.
+     */
+    static float minWidth() {
+        return ChatTimestampColumn.SEPARATOR_WIDTH
+                + (INSET + ChatAvatar.ICON_WIDTH + INSET) * unit();
     }
 
     /** The chat's pixels to one of the list's units: the chat's small text. */
@@ -350,6 +410,16 @@ final class ChatMemberList {
     }
 
     /**
+     * Whether a screen point is on the list's left edge, the handle that
+     * resizes it: the separator and a few pixels in from it, where the
+     * list stood last frame.
+     */
+    static boolean edgeContains(State state, double x, double y) {
+        return contains(state, x, y)
+                && x < state.screenLeft + EDGE_HANDLE;
+    }
+
+    /**
      * A member's head: whose it is and what it is drawn with, wearing the
      * status of the identity the list shows, as a message's avatar does —
      * Offline for an absent member, whose character may be one the player
@@ -411,8 +481,17 @@ final class ChatMemberList {
         double elapsed = state.hoverNanos == 0L ? 0.0D
                 : (now - state.hoverNanos) / 1.0E9D;
         state.hoverNanos = now;
+        if (state.hovered != null && state.hovered != state.lit) {
+            // Another row under the pointer: its name starts from home.
+            state.hoverSeconds = 0.0D;
+            state.nameSlide = 0.0F;
+            state.titleSlide = 0.0F;
+        }
         if (state.hovered != null) {
             state.lit = state.hovered;
+            state.hoverSeconds += elapsed;
+        } else {
+            state.hoverSeconds = 0.0D;
         }
         state.hoverFade = LostTalesChatVisualStyle.hoverFade(state.hoverFade,
                 state.hovered != null, elapsed);
@@ -427,7 +506,8 @@ final class ChatMemberList {
         // list slides.
         float rowsLeft = LostTalesChatOverlayRenderer.floorToStackPixel(
                 left + ChatTimestampColumn.SEPARATOR_WIDTH);
-        float roomRight = (left + WIDTH - rowsLeft) / unit - RIGHT_GAP;
+        float roomRight = (left + state.width - rowsLeft) / unit - RIGHT_GAP;
+        state.namesShown = roomRight > INSET + ChatAvatar.ICON_WIDTH + NAME_GAP;
         float rowsOriginX = originX + rowsLeft * scale;
         boolean clipped = LostTalesChatOverlayRenderer.beginClip(minecraft,
                 state.screenLeft, state.screenRight, clipTop, clipBottom,
@@ -459,9 +539,9 @@ final class ChatMemberList {
                                     LostTalesChatVisualStyle.selectedLineRgb(),
                                     lit));
                 }
-                drawMember(minecraft, font, row.member, rowsLeft, rowTop, unit,
-                        roomRight, rowsOriginX, scale, clipTop, clipBottom,
-                        rowAlpha(row.member, alpha, lit));
+                drawMember(minecraft, font, state, row.member, rowsLeft,
+                        rowTop, unit, roomRight, rowsOriginX, scale, clipTop,
+                        clipBottom, rowAlpha(row.member, alpha, lit), elapsed);
                 float boxTop = Math.max(clipTop, originY + rowTop * scale);
                 float boxBottom = Math.min(clipBottom, originY + rowBottom * scale);
                 if (boxBottom > boxTop) {
@@ -497,7 +577,7 @@ final class ChatMemberList {
                     LostTalesUiInk.centredStart(HEADER_HEIGHT,
                             LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT),
                     LostTalesChatVisualStyle.asideRgb(), alpha, roomRight,
-                    rowsOriginX, scale * unit, clipTop, clipBottom);
+                    0.0F, rowsOriginX, scale * unit, clipTop, clipBottom);
         } finally {
             GL11.glPopMatrix();
         }
@@ -505,53 +585,211 @@ final class ChatMemberList {
 
     /**
      * One member's row, in the list's units: the head and its sphere, the
-     * name — and the title under it where the member carries one — the
-     * two centred together on the row, the odd pixel up, each sinking into
-     * the list's edge where it is cut.
+     * name with its title after it as a line of theirs carries it — {@code
+     * Aldric, the Gondor Farmer}, the title in its own colour — and under
+     * them the identity's status line in italics in the chat's aside
+     * tone, its emojis drawn, the two lines centred together on the row,
+     * the odd pixel up, each sinking into the list's edge where it is cut.
+     * A row drawn faint is one picture faded ({@link LostTalesUiFlatLayers}):
+     * no layer of it — the hat, the face, a shadow — shows through the one
+     * above it.
      */
-    private static void drawMember(Minecraft minecraft, FontRenderer font,
-                                   LostTalesChatMembersPacket.Member member,
+    private static void drawMember(final Minecraft minecraft,
+                                   final FontRenderer font, State state,
+                                   final LostTalesChatMembersPacket.Member member,
                                    float rowsLeft, float rowTop, float unit,
-                                   float roomRight, float rowsOriginX,
-                                   float scale, float clipTop,
-                                   float clipBottom, int alpha) {
-        int capitals = LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT;
-        boolean titled = member.getTitle().length() > 0;
-        int nameTop = LostTalesUiInk.centredStart(ROW_HEIGHT,
-                titled ? capitals + TITLE_GAP + capitals : capitals);
-        int textLeft = INSET + ChatAvatar.ICON_WIDTH + NAME_GAP;
-        float unitScale = scale * unit;
+                                   final float roomRight,
+                                   final float rowsOriginX, float scale,
+                                   final float clipTop, final float clipBottom,
+                                   final int alpha, double elapsed) {
+        final int capitals = LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT;
+        final List<Part> nameLine = new ArrayList<Part>(2);
+        nameLine.add(new Part(member.getName(), "", member.getNameColor()));
+        if (member.getTitle().length() > 0) {
+            nameLine.add(new Part(ChatEpithet.translate(
+                    "chat.losttales.title.suffix", ", the %s",
+                    ChatEpithet.epithet(member.getGroupName(),
+                            member.getTitle())), "", member.getTitleColor()));
+        }
+        String statusLine = ClientChatProfanity.filter(
+                ClientChatPresence.lineOf(member.getPlayerId(),
+                        member.getCharacterId() == null
+                                ? ChatPresenceIdentity.ACCOUNT
+                                : ChatPresenceIdentity.character(
+                                        member.getCharacterId())));
+        final List<Part> statusRun = statusLine.length() == 0
+                ? Collections.<Part>emptyList()
+                : Collections.singletonList(new Part(statusLine, "\u00a7o",
+                        LostTalesChatVisualStyle.asideRgb()));
+        final boolean said = !statusRun.isEmpty();
+        final int nameTop = LostTalesUiInk.centredStart(ROW_HEIGHT,
+                said ? capitals + TITLE_GAP + capitals : capitals);
+        final int textLeft = INSET + ChatAvatar.ICON_WIDTH + NAME_GAP;
+        final float unitScale = scale * unit;
+        // A line cut short slides along while the pointer rests on its
+        // row, as a cut tab name does, and glides home after; one row at
+        // a time, the one last lit, and every other stays home.
+        boolean lit = member == state.lit;
+        boolean rested = member == state.hovered;
+        final float nameSlide = lit ? slide(state, rested, true,
+                width(font, nameLine), roomRight - textLeft,
+                unitScale, elapsed) : 0.0F;
+        final float statusSlide = lit && said ? slide(state, rested, false,
+                width(font, statusRun), roomRight - textLeft,
+                unitScale, elapsed) : 0.0F;
         GL11.glPushMatrix();
         try {
             GL11.glTranslatef(rowsLeft, rowTop, 0.0F);
             GL11.glScalef(unit, unit, 1.0F);
-            LostTalesChatOverlayRenderer.drawFace(minecraft, headOf(member),
-                    INSET, LostTalesUiInk.centredStart(ROW_HEIGHT,
-                            ChatAvatar.SIZE), ChatAvatar.SIZE, alpha);
-            drawCutText(minecraft, font, member.getName(), textLeft, nameTop,
-                    member.getNameColor(), alpha, roomRight, rowsOriginX,
-                    unitScale, clipTop, clipBottom);
-            if (titled) {
-                drawCutText(minecraft, font, member.getTitle(), textLeft,
-                        nameTop + capitals + TITLE_GAP, member.getTitleColor(),
-                        alpha, roomRight, rowsOriginX, unitScale, clipTop,
-                        clipBottom);
-            }
+            LostTalesUiFlatLayers.draw(alpha, 0.0F, 0.0F, roomRight
+                    + RIGHT_GAP, ROW_HEIGHT, new LostTalesUiFlatLayers.Layers() {
+                        @Override
+                        public void draw() {
+                            LostTalesChatOverlayRenderer.drawFace(minecraft,
+                                    headOf(member), INSET,
+                                    LostTalesUiInk.centredStart(ROW_HEIGHT,
+                                            ChatAvatar.SIZE),
+                                    ChatAvatar.SIZE, alpha);
+                            LostTalesUiFlatLayers.nextLayer();
+                            drawCutParts(minecraft, font, nameLine,
+                                    textLeft, nameTop, alpha, roomRight,
+                                    nameSlide, rowsOriginX, unitScale,
+                                    clipTop, clipBottom);
+                            if (said) {
+                                LostTalesUiFlatLayers.nextLayer();
+                                drawCutParts(minecraft, font, statusRun,
+                                        textLeft, nameTop + capitals
+                                                + TITLE_GAP, alpha,
+                                        roomRight, statusSlide, rowsOriginX,
+                                        unitScale, clipTop, clipBottom);
+                            }
+                        }
+                    });
         } finally {
             GL11.glPopMatrix();
         }
     }
 
     /**
-     * Words from {@code x} that sink into the edge at {@code right} where
-     * they are cut, as a cut tab name does; {@code originX} and
-     * {@code scale} carry the words' space onto the screen, and the words
-     * stay between the history's rules.
+     * How far a row's name ({@code name}) or title has slid, in the list's
+     * units: along while the pointer rests on the row and the words run
+     * past their {@code room}, by the tab's own marquee, home again after
+     * — laid on a display pixel, so the glyphs stay on theirs.
      */
+    private static float slide(State state, boolean rested, boolean name,
+                               int width, float room, float unitScale,
+                               double elapsed) {
+        int overflow = (int)Math.ceil(width - room);
+        float current = name ? state.nameSlide : state.titleSlide;
+        float next;
+        if (rested && overflow > 0 && room > 0.0F
+                && LostTalesConfig.enableChatAnimations) {
+            next = (float)ChatChannelTabBar.marqueeOffset(state.hoverSeconds,
+                    overflow);
+        } else {
+            next = ChatChannelTabBar.eased(current, 0.0F, elapsed);
+        }
+        if (name) {
+            state.nameSlide = next;
+        } else {
+            state.titleSlide = next;
+        }
+        double step = ChatChannelTabBar.displayStep() / unitScale;
+        return (float)ChatChannelTabBar.snapped(next, step);
+    }
+
+    /**
+     * Words from {@code x} that sink into the edge at {@code right} where
+     * they are cut, as a cut tab name does, slid {@code slide} units left
+     * — sinking into the left edge too as far as they have gone past it;
+     * {@code originX} and {@code scale} carry the words' space onto the
+     * screen, and the words stay between the history's rules.
+     */
+    /** One piece of a row's line: its words, a formatting code ahead of them, their colour. */
+    private static final class Part {
+        final String text;
+        final String style;
+        final int rgb;
+
+        Part(String text, String style, int rgb) {
+            this.text = text == null ? "" : text;
+            this.style = style;
+            this.rgb = rgb;
+        }
+    }
+
+    /** A line's drawn width, its emojis in their slots. */
+    private static int width(FontRenderer font, List<Part> parts) {
+        int width = 0;
+        for (Part part : parts) {
+            width += ChatInlineText.width(font, part.text, part.style);
+        }
+        return width;
+    }
+
+    /**
+     * A line of pieces, each in its own colour and its emojis drawn, from
+     * {@code x}, cut at {@code right} and sinking into that edge — and
+     * into the left one as far as it has slid past it — as a cut tab name
+     * does.
+     */
+    private static void drawCutParts(final Minecraft minecraft,
+                                     final FontRenderer font,
+                                     final List<Part> parts, final int x,
+                                     final int y, final int alpha,
+                                     float right, final float slide,
+                                     float originX, float scale,
+                                     float clipTop, float clipBottom) {
+        int width = width(font, parts);
+        float room = right - x;
+        if (room <= 0.0F) {
+            return;
+        }
+        if (width <= room) {
+            drawParts(minecraft, font, parts, x, y, alpha);
+            return;
+        }
+        float depth = LostTalesChatOverlayRenderer.sideFadeDepth(room * scale);
+        LostTalesChatOverlayRenderer.drawFading(minecraft, originX + x * scale,
+                originX + right * scale, clipTop, clipBottom, depth,
+                LostTalesChatOverlayRenderer.sideFadeStrength(slide * scale,
+                        depth),
+                LostTalesChatOverlayRenderer.sideFadeStrength(
+                        (width - slide - room) * scale, depth),
+                new LostTalesChatOverlayRenderer.FadingPainter() {
+                    @Override
+                    public void paint(float share) {
+                        int sliceAlpha = Math.round(alpha * share);
+                        if (sliceAlpha < LostTalesChatVisualStyle
+                                .MIN_VISIBLE_ALPHA) {
+                            return;
+                        }
+                        GL11.glPushMatrix();
+                        try {
+                            GL11.glTranslatef(-slide, 0.0F, 0.0F);
+                            drawParts(minecraft, font, parts, x, y,
+                                    sliceAlpha);
+                        } finally {
+                            GL11.glPopMatrix();
+                        }
+                    }
+                });
+    }
+
+    private static void drawParts(Minecraft minecraft, FontRenderer font,
+                                  List<Part> parts, int x, int y, int alpha) {
+        int cursor = x;
+        for (Part part : parts) {
+            ChatInlineText.draw(minecraft, font, part.text, part.style, cursor,
+                    y, part.rgb, alpha);
+            cursor += ChatInlineText.width(font, part.text, part.style);
+        }
+    }
+
     private static void drawCutText(Minecraft minecraft, FontRenderer font,
                                     String text, int x, int y, int rgb,
-                                    int alpha, float right, float originX,
-                                    float scale, float clipTop,
+                                    int alpha, float right, float slide,
+                                    float originX, float scale, float clipTop,
                                     float clipBottom) {
         int width = font.getStringWidth(text);
         float room = right - x;
@@ -564,9 +802,11 @@ final class ChatMemberList {
         }
         float depth = LostTalesChatOverlayRenderer.sideFadeDepth(room * scale);
         LostTalesChatOverlayRenderer.drawFadingText(minecraft, font, text, x,
-                0.0F, y, rgb, alpha, originX + x * scale,
-                originX + right * scale, clipTop, clipBottom, depth, 0.0F,
+                -slide, y, rgb, alpha, originX + x * scale,
+                originX + right * scale, clipTop, clipBottom, depth,
+                LostTalesChatOverlayRenderer.sideFadeStrength(slide * scale,
+                        depth),
                 LostTalesChatOverlayRenderer.sideFadeStrength(
-                        (width - room) * scale, depth));
+                        (width - slide - room) * scale, depth));
     }
 }

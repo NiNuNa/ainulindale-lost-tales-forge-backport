@@ -19,24 +19,18 @@ import net.minecraft.util.IChatComponent;
  * sender identity each message was signed with and the grouped form of
  * its line, and every view walks the sequence it actually shows.</p>
  *
- * <p>How long a run stays open is the view's too, and so is what the
- * span is measured from, because the views do not keep a message for
- * the same length of time.</p>
+ * <p>Every view holds a run for the same time: eight minutes from the
+ * message that <em>opened</em> it ({@link #GROUP_WINDOW_MILLIS}), so one
+ * speaker cannot extend a single run all evening, wherever it is
+ * read.</p>
  *
- * <p>A window is a scrollable log: its runs hold for as long as a
- * conversation reads as one, measured from the message that
- * <em>opened</em> the run ({@link #continuationsOf(int[])},
- * {@link #GROUP_WINDOW_MILLIS}), so one speaker cannot extend a single
- * run all evening.</p>
- *
- * <p>The closed feed drops a run when it fades, and it fades a whole
- * run at once on the clock of its newest message. A run there
- * therefore continues while the group is still on screen, which is
- * exactly while the message <em>before</em> this one is still within
- * the fade ({@link #continuationsInFeed}, {@link #FEED_RUN_MILLIS}) —
- * the group's clock is that message's arrival right up until this one
- * joins it. Nothing but silence long enough for the whole group to go,
- * or another voice, starts a new run there.</p>
+ * <p>The closed feed also drops a run when it fades, and it fades a
+ * whole run at once on the clock of its newest message. A message there
+ * can only continue a group still on screen, which is exactly while the
+ * message <em>before</em> it is within the fade
+ * ({@link #continuationsInFeed}, {@link #FEED_RUN_MILLIS}); after longer
+ * silence it would stand headless under nothing, so it opens a run with
+ * its name.</p>
  *
  * <p>A message with no entry here — a system line, an adopted stray, a
  * line printed straight into vanilla's chat — has no identity to
@@ -46,17 +40,18 @@ import net.minecraft.util.IChatComponent;
  */
 final class ChatGroupRuns {
     /**
-     * How long a sender keeps their run in a window: a message from the
-     * same identity in the same tab no later than this after the one that
-     * opened the run drops the repeated head and name. Eight minutes, as
-     * Discord ends a group eight minutes after its first message.
+     * How long a sender keeps their run, in every view: a message from
+     * the same identity in the same tab no later than this after the one
+     * that opened the run drops the repeated head and name. Eight
+     * minutes, as Discord ends a group eight minutes after its first
+     * message.
      */
     private static final long GROUP_WINDOW_MILLIS = 8L * 60L * 1000L;
     /**
      * How long the closed feed keeps a line on screen, in milliseconds:
      * the fade the renderer draws, in the units a message's timestamp is
-     * in. A message this long after the one before it finds the whole
-     * group gone and opens one of its own.
+     * in. A message there this long after the one before it finds the
+     * whole group gone and opens one of its own.
      */
     static final long FEED_RUN_MILLIS =
             LostTalesChatOverlayRenderer.FEED_FADE_TICKS * 1000L / 20L;
@@ -138,7 +133,7 @@ final class ChatGroupRuns {
      * window — a run holds while the sender keeps talking.
      */
     static synchronized boolean[] continuationsOf(int[] lineIdsNewestFirst) {
-        return walk(lineIdsNewestFirst, GROUP_WINDOW_MILLIS, true, null);
+        return walk(lineIdsNewestFirst, Long.MAX_VALUE, null);
     }
 
     /**
@@ -149,42 +144,42 @@ final class ChatGroupRuns {
      */
     static synchronized boolean[] continuationsOf(int[] lineIdsNewestFirst,
                                                   boolean[] opensRun) {
-        return walk(lineIdsNewestFirst, GROUP_WINDOW_MILLIS, true, opensRun);
+        return walk(lineIdsNewestFirst, Long.MAX_VALUE, opensRun);
     }
 
     /**
-     * As above for the closed feed, where the span is measured from the
-     * message before rather than from the run's head: the group is on
-     * screen for as long as that one is, so anything arriving inside
-     * the fade joins it however long the run has been going.
+     * As above for the closed feed, where a message also needs the one
+     * before it still on screen: the group fades with its newest line,
+     * and a message after it has gone would stand headless.
      */
     static synchronized boolean[] continuationsInFeed(
             int[] lineIdsNewestFirst) {
-        return walk(lineIdsNewestFirst, FEED_RUN_MILLIS, false, null);
+        return walk(lineIdsNewestFirst, FEED_RUN_MILLIS, null);
     }
 
     /**
      * The one walk, oldest first, carrying the message before this one —
-     * which decides whether it is the same voice, and, unless the span
-     * is measured {@code fromHead}, whether the run is still open — and
-     * the message that opened the run. A message {@code opensRun} marks
-     * opens a run of its own.
+     * which decides whether it is the same voice, and whether it lies
+     * within {@code previousSpanMillis} — and the message that opened the
+     * run, which the run's eight minutes are measured from. A message
+     * {@code opensRun} marks opens a run of its own.
      */
-    private static boolean[] walk(int[] lineIds, long spanMillis,
-                                  boolean fromHead, boolean[] opensRun) {
+    private static boolean[] walk(int[] lineIds, long previousSpanMillis,
+                                  boolean[] opensRun) {
         boolean[] grouped = new boolean[lineIds == null ? 0 : lineIds.length];
         Entry previous = null;
         Entry runHead = null;
         for (int index = grouped.length - 1; index >= 0; index--) {
             Entry entry = of(lineIds[index]);
-            Entry against = fromHead ? runHead : previous;
             boolean opens = opensRun != null && index < opensRun.length
                     && opensRun[index];
             grouped[index] = !opens && entry != null && entry.groupable
                     && sameVoice(previous, entry)
-                    && against != null
-                    && entry.timestampMillis - against.timestampMillis
-                            <= spanMillis;
+                    && runHead != null
+                    && entry.timestampMillis - runHead.timestampMillis
+                            <= GROUP_WINDOW_MILLIS
+                    && entry.timestampMillis - previous.timestampMillis
+                            <= previousSpanMillis;
             if (!grouped[index]) {
                 runHead = entry;
             }

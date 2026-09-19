@@ -588,6 +588,27 @@ public final class ChatHistoryTest {
                 GONDOR, ChatMessageIds.NONE).isEmpty());
     }
 
+    /* ---- who spoke where ---- */
+
+    @Test
+    public void theOperatorChannelsVoicesAreTheAccountsThatSpokeInIt() {
+        // Only an operator can post in the Operator channel, so its kept
+        // lines name operators the world's own server does not list.
+        record(ChatChannel.ADMIN, ALICE, "restarting at nine",
+                Arrays.asList(ALICE), ChatHistory.Audience.readers());
+        record(ChatChannel.ADMIN, ALICE, "back up",
+                Arrays.asList(ALICE), ChatHistory.Audience.readers());
+        record(ChatChannel.OOC, BOB, "lag?", Arrays.asList(ALICE, BOB),
+                ChatHistory.Audience.everyone());
+
+        Set<UUID> voices = ChatHistory.authorsIn(ChatChannel.ADMIN);
+        assertEquals(Collections.singleton(ALICE), voices);
+        assertEquals(Collections.singleton(BOB),
+                ChatHistory.authorsIn(ChatChannel.OOC));
+        assertTrue(ChatHistory.authorsIn(ChatChannel.PARTY).isEmpty());
+        assertTrue(ChatHistory.authorsIn(null).isEmpty());
+    }
+
     /* ---- helpers ---- */
 
     private static ChatHistory.Requester requester(UUID account) {
@@ -878,17 +899,17 @@ public final class ChatHistoryTest {
                 "Server", null, line, Collections.singletonList(BOB),
                 ChatHistory.Audience.everyone());
         ChatNamedPlayer asAccount = new ChatNamedPlayer(ALICE, "alice", null,
-                "alice", "", 0x123456);
+                "alice", "");
         ChatHistory.namePlayer(id, asAccount);
         ChatHistory.namePlayer(id, new ChatNamedPlayer(ALICE, "alice",
-                UUID.randomUUID(), "Aldric", "human/male/1", 0xABCDEF));
+                UUID.randomUUID(), "Aldric", "human/male/1"));
         List<LostTalesChatMessagePacket> replay = ChatHistory.replayFor(
                 requester(CAROL), ChatMessageIds.NONE);
         assertEquals(1, replay.size());
         List<ChatNamedPlayer> named = replay.get(0).getNamedPlayers();
         assertEquals(1, named.size());
         assertEquals("Aldric", named.get(0).getIdentityName());
-        assertEquals(0xABCDEF, named.get(0).getNameColor());
+        assertEquals("human/male/1", named.get(0).getSkinId());
         long own = record(ChatChannel.ALL, ALICE, "hello", Arrays.asList(BOB),
                 ChatHistory.Audience.everyone());
         ChatHistory.namePlayer(own, asAccount);

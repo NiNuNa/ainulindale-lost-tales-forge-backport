@@ -63,6 +63,30 @@ public final class ChatPresenceServiceTest {
                 .containsKey(CAROL));
     }
 
+    /**
+     * Everyone is told the lines of the identities they are shown, and
+     * no other: an identity not in use, or Invisible, keeps its line to
+     * itself. A line is kept cleaned, and an empty one not at all.
+     */
+    @Test
+    public void onlyAShownIdentityTellsItsLine() {
+        Map<ChatPresenceIdentity, String> set =
+                new HashMap<ChatPresenceIdentity, String>();
+        set.put(ALDRIC, "  Out hunting ");
+        set.put(BERIC, "Hiding");
+        set.put(CAROL, "Not here");
+        set.put(ChatPresenceIdentity.ACCOUNT, " ");
+        Map<ChatPresenceIdentity, String> kept = ChatPresenceService.cleaned(set);
+        assertEquals(3, kept.size());
+        assertEquals("Out hunting", kept.get(ALDRIC));
+        Map<ChatPresenceIdentity, ChatPresence> shown =
+                ChatPresenceService.shown(Collections.singletonMap(BERIC,
+                        ChatPresence.INVISIBLE), false, IN_USE);
+        Map<ChatPresenceIdentity, String> told =
+                ChatPresenceService.shownLines(shown, kept);
+        assertEquals(Collections.singletonMap(ALDRIC, "Out hunting"), told);
+    }
+
     @Test
     public void invisibleShowsNothingAtAll() {
         Map<ChatPresenceIdentity, ChatPresence> chosen =

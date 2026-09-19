@@ -155,8 +155,9 @@ public final class LostTalesNpcChatHook {
                     nameColor, plain);
             ResourceLocation texture =
                     EntityRenderTextureAccess.resolveEntityTexture(speaker);
-            LostTalesChatPresentation.receiveNpcSpeech(ChatTab.npc(name),
-                    speaker.getUniqueID(), name,
+            ChatTab tab = ChatTab.npc(name);
+            LostTalesChatPresentation.receiveNpcSpeech(tab,
+                    tab.npcSpeakerId(), name,
                     texture == null ? "" : texture.toString(), plain,
                     nameColor, faction == null ? "" : faction);
         } catch (Throwable throwable) {
@@ -189,8 +190,12 @@ public final class LostTalesNpcChatHook {
         // NPC's own faction colour like a role-playing character's line.
         ResourceLocation texture =
                 EntityRenderTextureAccess.resolveEntityTexture(npc);
-        return LostTalesChatPresentation.receiveNpcSpeech(
-                ChatTab.npc(name), npc.getUniqueID(), name,
+        // Signed as the conversation, not as the creature: the bubble
+        // above keeps the creature's own id, which is what finds it in
+        // the world this moment.
+        ChatTab tab = ChatTab.npc(name);
+        return LostTalesChatPresentation.receiveNpcSpeech(tab,
+                tab.npcSpeakerId(), name,
                 texture == null ? "" : texture.toString(), speech,
                 nameColor(npc), factionName(npc));
     }

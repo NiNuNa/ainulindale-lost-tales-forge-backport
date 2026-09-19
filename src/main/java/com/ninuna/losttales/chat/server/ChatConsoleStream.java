@@ -33,7 +33,8 @@ public final class ChatConsoleStream {
     /** The most a joining staff member is shown. */
     public static final int MAX_REPLAY = 200;
     private static final int MAX_COMMAND_LENGTH = 256;
-    private static final String ELIDED = "…";
+    /** Three full stops rather than an ellipsis: the chat's font has no glyph for one. */
+    private static final String ELIDED = "...";
 
     private static final LinkedHashMap<Long, ChatConsoleEvent> EVENTS =
             new LinkedHashMap<Long, ChatConsoleEvent>();

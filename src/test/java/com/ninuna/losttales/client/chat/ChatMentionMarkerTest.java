@@ -19,7 +19,7 @@ public final class ChatMentionMarkerTest {
         UUID account = UUID.randomUUID();
         UUID character = UUID.randomUUID();
         ChatNamedPlayer recorded = new ChatNamedPlayer(account, "Steve",
-                character, "Aldric, the Gondor Farmer", "human/male/2", 0x4A90D9);
+                character, "Aldric, the Gondor Farmer", "human/male/2");
         ChatMentionMarker.Data data = ChatMentionMarker.decode(
                 ChatMentionMarker.apply(new ChatComponentText("@Aldric"),
                         0xAB597D, "Steve", recorded));
@@ -39,7 +39,7 @@ public final class ChatMentionMarkerTest {
         ChatMentionMarker.Data asAccount = ChatMentionMarker.decode(
                 ChatMentionMarker.apply(new ChatComponentText("@Steve"),
                         0x123456, "Steve", new ChatNamedPlayer(account,
-                                "Steve", null, "", "", 0)));
+                                "Steve", null, "", "")));
         assertEquals("Steve", asAccount.account);
         assertNull(asAccount.recorded.getCharacterId());
         assertEquals("Steve", asAccount.recorded.getIdentityName());

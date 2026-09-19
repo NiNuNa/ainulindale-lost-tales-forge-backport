@@ -45,6 +45,8 @@ final class ChatScreenMenus {
     static final String POPUP_RESTORE = "restore";
     static final String POPUP_WINDOW = "window";
     static final String POPUP_SEARCH = "search";
+    /** The status line's field, opened from the head button's menu. */
+    static final String POPUP_STATUS_LINE = "status_line";
     /** Marks a search row that jumps to a tab already open. */
     private static final String ENTRY_OPEN_PREFIX = "open:";
     /** The keys the search panel's field names as its own shortcut. */
@@ -75,6 +77,11 @@ final class ChatScreenMenus {
     private static final String ENTRY_PINGS = "pings";
     private static final String ENTRY_HIDE = "hide";
     private static final String ENTRY_DETACH = "detach";
+    private static final String ENTRY_MARK_READ = "mark_read";
+    private static final String ENTRY_STATUS_LINE = "characters:status_line";
+    private static final String ENTRY_STATUS_LINE_KEEP = "status_line:keep";
+    private static final String ENTRY_STATUS_LINE_CLEAR = "status_line:clear";
+    private static final String ENTRY_JUMP_UNREAD = "jump_unread";
     private static final String ENTRY_WINDOW_UNSTICK = "window_unstick";
     private static final String ENTRY_WINDOW_RESET = "window_reset";
     /** The window menu's colour rows, each opening the palette for one surface. */
@@ -134,6 +141,8 @@ final class ChatScreenMenus {
      * so the rows stay the same while the menu is up.
      */
     private boolean charactersStatusOnly;
+    /** The identity the status line's field is open for. */
+    private ChatPresenceIdentity statusLineIdentity;
     /** The sender's account, when the line still has its packet; else null. */
     private UUID menuMessageSenderId;
     private String menuMessageText = "";
@@ -144,8 +153,7 @@ final class ChatScreenMenus {
     /** Window the open window-settings menu belongs to, or null. */
     private String settingsWindowId;
     /** Where that menu was opened, so the palette opens in its place. */
-    private int settingsAnchorX;
-    private int settingsAnchorBottom;
+    private ChatPopupMenu.Anchor settingsAnchor;
     /** Which surface the open palette menu recolours: a colour row's id. */
     private String colorRole;
     private long restoreRefreshedNanos;
@@ -230,6 +238,15 @@ final class ChatScreenMenus {
      * the key went into it.
      */
     boolean handleKeyTyped(char typedChar, int keyCode) {
+        if (POPUP_STATUS_LINE.equals(this.popup.kind()) && this.popup.isOpen()
+                && (keyCode == org.lwjgl.input.Keyboard.KEY_RETURN
+                        || keyCode == org.lwjgl.input.Keyboard.KEY_NUMPADENTER)) {
+            // Enter keeps what is in the field, as the first row does.
+            ClientChatPresence.setLine(this.statusLineIdentity,
+                    this.popup.filter());
+            this.popup.close();
+            return true;
+        }
         if (!this.popup.isSearchable()
                 || !this.popup.handleKeyTyped(typedChar, keyCode)) {
             return false;
@@ -261,16 +278,30 @@ final class ChatScreenMenus {
 
     /**
      * The tab's menu — behind the cog, and under a right-click on the
-     * tab — four entries, each its own independent preference or
-     * action: Mute Channel (out of the feed), Mute Mentions (cue
-     * silent), Hide Channel (stays closed when messaged), and Move to
-     * its own Window. Closing is the cross on the tab and nothing else:
-     * a row that only repeats the button beside it is a second way to
-     * lose a tab by accident.
+     * tab — each entry its own independent preference or action. While
+     * the tab holds anything unread it opens as a messenger's channel
+     * menu does, with Mark as Read (the counters and the divider gone at
+     * once) and Jump to First Unread (the tab brought forward and its
+     * history taken to where the unread run begins). Then Mute Channel
+     * (out of the feed), Mute Mentions (cue silent), Hide Channel (stays
+     * closed when messaged), and Move to its own Window. Closing is the
+     * cross on the tab and nothing else: a row that only repeats the
+     * button beside it is a second way to lose a tab by accident.
      */
-    void openSettingsPopup(ChatTab channel, int anchorX, int anchorBottom) {
+    void openSettingsPopup(ChatTab channel, ChatPopupMenu.Anchor anchor) {
         List<ChatPopupMenu.Entry> entries =
-                new ArrayList<ChatPopupMenu.Entry>(4);
+                new ArrayList<ChatPopupMenu.Entry>(6);
+        if (ClientChatChannelViews.hasUnread(channel)
+                || ClientChatChannelViews.unreadDividerLine(channel) != null) {
+            entries.add(new ChatPopupMenu.Entry(ENTRY_MARK_READ,
+                    StatCollector.translateToLocal(
+                            "gui.losttales.chat.tab.mark_read")));
+        }
+        if (ClientChatChannelViews.unreadDividerLine(channel) != null) {
+            entries.add(new ChatPopupMenu.Entry(ENTRY_JUMP_UNREAD,
+                    StatCollector.translateToLocal(
+                            "gui.losttales.chat.tab.jump_unread")));
+        }
         entries.add(new ChatPopupMenu.Entry(ENTRY_MUTE,
                 StatCollector.translateToLocal(
                         ChatWindowLayout.isMuted(channel)
@@ -298,8 +329,7 @@ final class ChatScreenMenus {
                             "gui.losttales.chat.tab.detach")));
         }
         this.popup.open(POPUP_SETTINGS, channel, entries, this.font,
-                anchorX - 4, anchorBottom, this.screenWidth,
-                this.screenHeight);
+                anchor, this.screenWidth, this.screenHeight);
     }
 
     /**
@@ -318,13 +348,12 @@ final class ChatScreenMenus {
      * colour it stands for and opening the palette to change it — a
      * client preference, so every window shows the choice at once.
      */
-    void openWindowPopup(ChatWindow window, int anchorX, int anchorBottom) {
+    void openWindowPopup(ChatWindow window, ChatPopupMenu.Anchor anchor) {
         if (window == null) {
             return;
         }
         this.settingsWindowId = window.getId();
-        this.settingsAnchorX = anchorX;
-        this.settingsAnchorBottom = anchorBottom;
+        this.settingsAnchor = anchor;
         List<ChatPopupMenu.Entry> entries =
                 new ArrayList<ChatPopupMenu.Entry>(5);
         if (window.isLinked()) {
@@ -345,9 +374,8 @@ final class ChatScreenMenus {
                 "gui.losttales.chat.window.color.selected_mention"));
         entries.add(colorRow(ENTRY_WINDOW_COLOR_REPLY,
                 "gui.losttales.chat.window.color.reply"));
-        this.popup.open(POPUP_WINDOW, null, entries, this.font,
-                anchorX - 4, anchorBottom, this.screenWidth,
-                this.screenHeight);
+        this.popup.open(POPUP_WINDOW, null, entries, this.font, anchor,
+                this.screenWidth, this.screenHeight);
     }
 
     /** One of the window menu's colour rows, chipped in the colour it comes to now. */
@@ -423,8 +451,7 @@ final class ChatScreenMenus {
             entries.add(entry);
         }
         this.popup.open(POPUP_COLOR, null, entries, this.font,
-                this.settingsAnchorX - 4, this.settingsAnchorBottom,
-                this.screenWidth, this.screenHeight);
+                this.settingsAnchor, this.screenWidth, this.screenHeight);
     }
 
     /** A palette entry's name as the language file gives it. */
@@ -463,33 +490,28 @@ final class ChatScreenMenus {
     /**
      * The tab search panel: every tab that is open, then the channels
      * and conversations that are not, narrowed by what is typed into
-     * the field above them. Anchored over the window's own search
-     * control, or — when the keyboard opened it — over the window being
-     * typed in, else over the empty state's own {@code +} when nothing
-     * is open ({@code emptyPlusX} and {@code emptyPlusBottom} name it,
-     * or are negative).
+     * the field above them. Hung from the window's own search control,
+     * or — when the keyboard opened it ({@code anchor} null) — from the
+     * row of the window being typed in, else from the empty state's own
+     * {@code +} when nothing is open ({@code emptyPlus}, or null).
      */
-    void openSearchPanel(ChatWindow window, int anchorX, int anchorBottom,
-                         int emptyPlusX, int emptyPlusBottom) {
-        int x = anchorX;
-        int bottom = anchorBottom;
-        if (x < 0 || bottom < 0) {
+    void openSearchPanel(ChatWindow window, ChatPopupMenu.Anchor anchor,
+                         ChatPopupMenu.Anchor emptyPlus) {
+        ChatPopupMenu.Anchor at = anchor;
+        if (at == null) {
             ChatWindowFrame frame = window == null ? null
                     : ChatWindowFrame.find(window.getId());
             if (frame != null && frame.drawn) {
-                x = (int)Math.floor(frame.drawnLeft()) + 2;
-                bottom = ChatChannelTabBar.rowTop(
-                        (int)Math.floor(frame.tabRowBottom())) - 2;
-            } else if (emptyPlusX >= 0 && emptyPlusBottom >= 0) {
-                x = emptyPlusX;
-                bottom = emptyPlusBottom;
+                at = rowAnchor(frame);
+            } else if (emptyPlus != null) {
+                at = emptyPlus;
             } else {
                 return;
             }
         }
         this.restoreWindowId = window == null ? null : window.getId();
         this.popup.open(POPUP_SEARCH, null, searchEntries(""), this.font,
-                x - 4, bottom, this.screenWidth, this.screenHeight,
+                at, this.screenWidth, this.screenHeight,
                 StatCollector.translateToLocal(
                         "gui.losttales.chat.search.prompt"),
                 SEARCH_SHORTCUT_KEYS);
@@ -596,18 +618,17 @@ final class ChatScreenMenus {
     }
 
     /**
-     * The {@code +} menu opened from the keyboard: over the row of the
-     * window being typed in, or over the empty state's own {@code +}
-     * ({@code emptyPlusX}, {@code emptyPlusBottom}, negative while
-     * something is open). Nothing happens when there is nothing left to
-     * open.
+     * The {@code +} menu opened from the keyboard: from the row of the
+     * window being typed in, or from the empty state's own {@code +}
+     * ({@code emptyPlus}, null while something is open). Nothing happens
+     * when there is nothing left to open.
      */
-    void openChannelMenu(int emptyPlusX, int emptyPlusBottom) {
+    void openChannelMenu(ChatPopupMenu.Anchor emptyPlus) {
         if (restoreEntries().isEmpty()) {
             return;
         }
-        if (emptyPlusX >= 0 && emptyPlusBottom >= 0) {
-            openRestorePopup(null, emptyPlusX, emptyPlusBottom);
+        if (emptyPlus != null) {
+            openRestorePopup(null, emptyPlus);
             return;
         }
         ChatWindow window = ChatWindowLayout.windowOf(
@@ -617,21 +638,51 @@ final class ChatScreenMenus {
         if (window == null || frame == null || !frame.drawn) {
             return;
         }
-        openRestorePopup(window.getId(),
-                (int)Math.floor(frame.drawnLeft()) + 2,
-                ChatChannelTabBar.rowTop(
-                        (int)Math.floor(frame.tabRowBottom())) - 2);
+        openRestorePopup(window.getId(), rowAnchor(frame));
     }
 
     /**
-     * The {@code +} menu over a window's row, or over the empty state's
-     * own {@code +} when {@code windowId} is null.
+     * The {@code +} menu hung from a window's row, or from the empty
+     * state's own {@code +} when {@code windowId} is null.
      */
-    void openRestorePopup(String windowId, int anchorX, int anchorBottom) {
+    void openRestorePopup(String windowId, ChatPopupMenu.Anchor anchor) {
         this.restoreWindowId = windowId;
         this.restoreRefreshedNanos = System.nanoTime();
         this.popup.open(POPUP_RESTORE, null, restoreEntries(), this.font,
-                anchorX - 4, anchorBottom, this.screenWidth,
+                anchor, this.screenWidth, this.screenHeight);
+    }
+
+    /**
+     * Where a menu opened from a control on a window's tab row hangs: the
+     * row's band at {@code x}, where the pointer is on the control, and
+     * toward the window's middle, which is under the row.
+     */
+    ChatPopupMenu.Anchor stripAnchor(ChatWindowFrame frame,
+                                     ChatChannelTabBar.Row row, int x) {
+        return ChatPopupMenu.Anchor.inward(x - 4,
+                ChatChannelTabBar.rowTop(row.rowBottom), x + 4, row.rowBottom,
+                frame, this.screenWidth, this.screenHeight);
+    }
+
+    /**
+     * Where a menu the keyboard opened for a window hangs: the left end
+     * of the window's tab row, where the row's first controls stand.
+     */
+    private ChatPopupMenu.Anchor rowAnchor(ChatWindowFrame frame) {
+        int left = (int)Math.floor(frame.drawnLeft()) + 2;
+        int rowBottom = (int)Math.floor(frame.tabRowBottom());
+        return ChatPopupMenu.Anchor.inward(left,
+                ChatChannelTabBar.rowTop(rowBottom), left + 8, rowBottom,
+                frame, this.screenWidth, this.screenHeight);
+    }
+
+    /**
+     * Where a menu opened over the lines hangs: the pointer, toward the
+     * middle of the window it is in.
+     */
+    private ChatPopupMenu.Anchor pointerAnchor(int mouseX, int mouseY) {
+        return ChatPopupMenu.Anchor.inward(mouseX, mouseY, mouseX, mouseY,
+                ChatWindowFrame.drawnAt(mouseX, mouseY), this.screenWidth,
                 this.screenHeight);
     }
 
@@ -897,8 +948,8 @@ final class ChatScreenMenus {
                     .withLabelColor(OPERATOR_ACTION_COLOR));
         }
         this.popup.open(POPUP_MESSAGE, ClientChatChannelViews.tabOf(chatLineId),
-                entries, this.font, mouseX, mouseY, this.screenWidth,
-                this.screenHeight);
+                entries, this.font, pointerAnchor(mouseX, mouseY),
+                this.screenWidth, this.screenHeight);
         return true;
     }
 
@@ -1011,24 +1062,25 @@ final class ChatScreenMenus {
                             person.accountName))
                     .withLabelColor(OPERATOR_ACTION_COLOR));
         }
-        this.popup.open(POPUP_PLAYER, null, entries, this.font, mouseX,
-                mouseY, this.screenWidth, this.screenHeight);
+        this.popup.open(POPUP_PLAYER, null, entries, this.font,
+                pointerAnchor(mouseX, mouseY), this.screenWidth,
+                this.screenHeight);
         return true;
     }
 
     /**
-     * The character selection menu, anchored above its button, with a
-     * search field over its rows that narrows them as it is typed into.
-     * On an account channel, which always speaks as the account, the
-     * menu is the status rows alone: nothing there chooses an identity,
-     * so it carries no roster and no search field either.
+     * The character selection menu, hung from its button, with a search
+     * field over its rows that narrows them as it is typed into. On an
+     * account channel, which always speaks as the account, the menu is
+     * the status rows alone: nothing there chooses an identity, so it
+     * carries no roster and no search field either.
      */
-    void openCharacterSelectionMenu(int anchorX, int anchorBottom,
+    void openCharacterSelectionMenu(ChatPopupMenu.Anchor anchor,
                                     boolean statusOnly) {
         this.charactersStatusOnly = statusOnly;
         this.popup.open(POPUP_CHARACTERS, null, characterSelectionEntries(""),
-                this.font, anchorX, anchorBottom, this.screenWidth,
-                this.screenHeight, statusOnly ? null
+                this.font, anchor, this.screenWidth, this.screenHeight,
+                statusOnly ? null
                         : StatCollector.translateToLocal(
                                 "gui.losttales.chat.character_selection.search"),
                 null);
@@ -1092,10 +1144,41 @@ final class ChatScreenMenus {
     }
 
     /**
+     * The status line's field, in place of the menu that asked for it,
+     * for the identity the selected tab speaks as: what it says of itself
+     * now, to be typed over. Enter or the first row keeps what the field
+     * holds, the second clears the line, and Escape leaves it as it was.
+     */
+    private boolean openStatusLineField() {
+        ChatPopupMenu.Anchor anchor = this.popup.anchor();
+        this.statusLineIdentity = ClientChatPresence.speakerOf(
+                ClientChatChannelState.getSelected());
+        String current = ClientChatPresence.chosenLine(this.statusLineIdentity);
+        List<ChatPopupMenu.Entry> entries =
+                new ArrayList<ChatPopupMenu.Entry>(2);
+        entries.add(new ChatPopupMenu.Entry(ENTRY_STATUS_LINE_KEEP,
+                StatCollector.translateToLocal(
+                        "gui.losttales.chat.status_line.keep")));
+        if (current.length() > 0) {
+            entries.add(new ChatPopupMenu.Entry(ENTRY_STATUS_LINE_CLEAR,
+                    StatCollector.translateToLocal(
+                            "gui.losttales.chat.status_line.clear")));
+        }
+        this.popup.open(POPUP_STATUS_LINE, null, entries, this.font, anchor,
+                this.screenWidth, this.screenHeight,
+                StatCollector.translateToLocal(
+                        "gui.losttales.chat.status_line.prompt"),
+                null, LostTalesUiSheet.SPEECH_BUBBLE);
+        this.popup.setFilter(current);
+        return this.popup.isOpen();
+    }
+
+    /**
      * The statuses to choose from for the identity the selected tab
      * speaks as — the chat identity on a roleplaying tab, the account on
      * any other — each with the sphere it shows, lighting to the ivory
-     * one under the pointer, and the one chosen for it marked.
+     * one under the pointer, and the one chosen for it marked; and under
+     * them the identity's status line, in italics, or the way to set one.
      */
     private static List<ChatPopupMenu.Entry> statusRows() {
         ChatPresenceIdentity speaker = ClientChatPresence.speakerOf(
@@ -1113,6 +1196,14 @@ final class ChatScreenMenus {
                     .withSprite(ChatPresenceMark.sphereOf(presence),
                             LostTalesUiSheet.PRESENCE_SELECTED, false));
         }
+        String line = ClientChatPresence.chosenLine(speaker);
+        rows.add(new ChatPopupMenu.Entry(ENTRY_STATUS_LINE,
+                line.length() == 0 ? StatCollector.translateToLocal(
+                        "gui.losttales.chat.status_line.set") : line,
+                line.length() > 0, -1, null)
+                .withEmojis()
+                .withSprite(LostTalesUiSheet.SPEECH_BUBBLE,
+                        LostTalesUiSheet.SPEECH_BUBBLE_HOVER, false));
         return rows;
     }
 
@@ -1429,7 +1520,19 @@ final class ChatScreenMenus {
             return false;
         }
         if (POPUP_CHARACTERS.equals(this.popup.kind())) {
+            if (ENTRY_STATUS_LINE.equals(entry.id)) {
+                return openStatusLineField();
+            }
             handleCharacterSelectionEntry(entry);
+            return false;
+        }
+        if (POPUP_STATUS_LINE.equals(this.popup.kind())) {
+            if (ENTRY_STATUS_LINE_KEEP.equals(entry.id)) {
+                ClientChatPresence.setLine(this.statusLineIdentity,
+                        this.popup.filter());
+            } else if (ENTRY_STATUS_LINE_CLEAR.equals(entry.id)) {
+                ClientChatPresence.setLine(this.statusLineIdentity, "");
+            }
             return false;
         }
         if (POPUP_SETTINGS.equals(this.popup.kind())) {
@@ -1449,6 +1552,18 @@ final class ChatScreenMenus {
             } else if (ENTRY_DETACH.equals(entry.id)) {
                 this.tabActions.detachChannel(channel, this.screenWidth,
                         this.screenHeight);
+            } else if (ENTRY_MARK_READ.equals(entry.id)) {
+                ClientChatChannelViews.markViewed(channel);
+                ClientChatChannelViews.dismissDivider(channel);
+            } else if (ENTRY_JUMP_UNREAD.equals(entry.id)) {
+                Integer first = ClientChatChannelViews.unreadDividerLine(
+                        channel);
+                this.tabActions.jumpToTab(channel);
+                if (first != null) {
+                    // The rows exist once the tab has been drawn; the
+                    // next draw lands on the run's first line.
+                    LostTalesChatPresentation.requestJump(first.intValue());
+                }
             }
         } else if (POPUP_SEARCH.equals(this.popup.kind())) {
             if (entry.id.startsWith(ENTRY_OPEN_PREFIX)) {

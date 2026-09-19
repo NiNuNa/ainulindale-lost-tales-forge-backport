@@ -317,7 +317,8 @@ abstract class ChatPickerPanel {
         LostTalesUiSheet glyph = buttonGlyph();
         LostTalesUiSheet.drawPairWithShadow(glyph, buttonGlyphLit(), 0.0F,
                 left + (BUTTON_SIZE - glyph.getWidth()) / 2,
-                top + (BUTTON_SIZE - glyph.getHeight()) / 2, 255);
+                top + (BUTTON_SIZE - glyph.getHeight()) / 2,
+                ChatInputBar.faded(255));
     }
 
     /** The glyph's place inside the button's square, centred in it. */
@@ -346,7 +347,7 @@ abstract class ChatPickerPanel {
         LostTalesUiSheet glyph = buttonGlyph();
         LostTalesUiButton.drawGlyph(glyph, buttonGlyphLit(),
                 this.buttonMotion, glyphLeft(left, glyph),
-                glyphTop(top, glyph), 255);
+                glyphTop(top, glyph), ChatInputBar.faded(255));
         regions.add(left, top, left + BUTTON_SIZE, top + BUTTON_SIZE);
     }
 

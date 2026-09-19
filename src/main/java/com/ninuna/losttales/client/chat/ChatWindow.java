@@ -46,73 +46,259 @@ public final class ChatWindow {
     private boolean areaHidden;
     /** Whether the window's member list is put away. */
     private boolean membersHidden;
+    /**
+     * How wide the player made the window's member list, in the chat's
+     * pixels and fractions of one, so its edge follows the pointer
+     * smoothly; 0 while it keeps the list's own width.
+     */
+    private double membersWidth;
 
     /**
-     * The parts of the screen a window can fill, as a desktop window
-     * snaps to the edge it is dragged to: the whole screen from the
-     * top edge, a half from a side, a quarter from a corner. Each is a
-     * box of screen halves — its left and top in halves, and how many
-     * halves across and down it spans.
+     * A part of the screen a window can fill, as a desktop window snaps:
+     * the whole screen from the top edge, a half from a side, a quarter
+     * from a corner, and the zones of the snap layouts — thirds, two
+     * thirds, and a half between two quarter columns. Each named part is
+     * a box on a grid twelve columns across and two rows down: its first
+     * column and row, and how many of each it spans.
+     *
+     * <p>A part can also be free: its edges anywhere, in shares of the
+     * screen. A window filling a part has edges of its own there once
+     * the player drags one — two windows sharing an edge move it
+     * together — and a window stretched to the screen's full height in
+     * its own column fills one too. There is one instance of each named
+     * part, so they compare by identity; free parts compare by their
+     * edges.</p>
      */
-    public enum ScreenFill {
-        NONE("none", 0, 0, 0, 0),
-        FULL("full", 0, 0, 2, 2),
-        LEFT("left", 0, 0, 1, 2),
-        RIGHT("right", 1, 0, 1, 2),
-        TOP_LEFT("top_left", 0, 0, 1, 1),
-        TOP_RIGHT("top_right", 1, 0, 1, 1),
-        BOTTOM_LEFT("bottom_left", 0, 1, 1, 1),
-        BOTTOM_RIGHT("bottom_right", 1, 1, 1, 1);
+    public static final class ScreenFill {
+        /** The grid the named parts are laid on: columns across, rows down. */
+        public static final int COLUMNS = 12;
+        public static final int ROWS = 2;
+        private static final List<ScreenFill> NAMED = new ArrayList<ScreenFill>();
+        /** How a free part is written: its four edges after this. */
+        private static final String FREE_PREFIX = "free:";
 
+        public static final ScreenFill NONE = named("none", 0, 0, 0, 0);
+        public static final ScreenFill FULL = named("full", 0, 0, 12, 2);
+        public static final ScreenFill LEFT = named("left", 0, 0, 6, 2);
+        public static final ScreenFill RIGHT = named("right", 6, 0, 6, 2);
+        public static final ScreenFill TOP_LEFT = named("top_left", 0, 0, 6, 1);
+        public static final ScreenFill TOP_RIGHT = named("top_right", 6, 0, 6, 1);
+        public static final ScreenFill BOTTOM_LEFT =
+                named("bottom_left", 0, 1, 6, 1);
+        public static final ScreenFill BOTTOM_RIGHT =
+                named("bottom_right", 6, 1, 6, 1);
+        public static final ScreenFill LEFT_TWO_THIRDS =
+                named("left_two_thirds", 0, 0, 8, 2);
+        public static final ScreenFill RIGHT_TWO_THIRDS =
+                named("right_two_thirds", 4, 0, 8, 2);
+        public static final ScreenFill LEFT_THIRD =
+                named("left_third", 0, 0, 4, 2);
+        public static final ScreenFill CENTRE_THIRD =
+                named("centre_third", 4, 0, 4, 2);
+        public static final ScreenFill RIGHT_THIRD =
+                named("right_third", 8, 0, 4, 2);
+        public static final ScreenFill LEFT_QUARTER =
+                named("left_quarter", 0, 0, 3, 2);
+        public static final ScreenFill CENTRE_HALF =
+                named("centre_half", 3, 0, 6, 2);
+        public static final ScreenFill RIGHT_QUARTER =
+                named("right_quarter", 9, 0, 3, 2);
+
+        /** The named part's id; empty for a free one. */
         private final String id;
-        private final int halfLeft;
-        private final int halfTop;
-        private final int halvesAcross;
-        private final int halvesDown;
+        private final int column;
+        private final int row;
+        private final int columns;
+        private final int rows;
+        /** The edges, in shares of the screen's width and height. */
+        private final double left;
+        private final double top;
+        private final double right;
+        private final double bottom;
 
-        ScreenFill(String id, int halfLeft, int halfTop, int halvesAcross,
-                   int halvesDown) {
+        private ScreenFill(String id, int column, int row, int columns,
+                           int rows, double left, double top, double right,
+                           double bottom) {
             this.id = id;
-            this.halfLeft = halfLeft;
-            this.halfTop = halfTop;
-            this.halvesAcross = halvesAcross;
-            this.halvesDown = halvesDown;
+            this.column = column;
+            this.row = row;
+            this.columns = columns;
+            this.rows = rows;
+            this.left = left;
+            this.top = top;
+            this.right = right;
+            this.bottom = bottom;
         }
 
-        public String id() { return this.id; }
+        private static ScreenFill named(String id, int column, int row,
+                                        int columns, int rows) {
+            ScreenFill fill = new ScreenFill(id, column, row, columns, rows,
+                    column / (double)COLUMNS, row / (double)ROWS,
+                    (column + columns) / (double)COLUMNS,
+                    (row + rows) / (double)ROWS);
+            NAMED.add(fill);
+            return fill;
+        }
 
-        /** The fill's left edge on a screen {@code screenWidth} wide. */
+        /**
+         * A free part with its edges where they are asked for, in shares
+         * of the screen, kept on it and in order.
+         */
+        public static ScreenFill free(double left, double top, double right,
+                                      double bottom) {
+            double l = clampShare(Math.min(left, right));
+            double r = clampShare(Math.max(left, right));
+            double t = clampShare(Math.min(top, bottom));
+            double b = clampShare(Math.max(top, bottom));
+            return new ScreenFill("", (int)Math.round(l * COLUMNS),
+                    (int)Math.round(t * ROWS),
+                    (int)Math.round((r - l) * COLUMNS),
+                    (int)Math.round((b - t) * ROWS), l, t, r, b);
+        }
+
+        private static double clampShare(double share) {
+            return Double.isNaN(share) ? 0.0D
+                    : Math.max(0.0D, Math.min(1.0D, share));
+        }
+
+        /** Whether the part's edges are the player's rather than a named part's. */
+        public boolean isFree() { return this.id.length() == 0; }
+
+        /** What the layout file calls the part. */
+        public String id() {
+            if (!isFree()) {
+                return this.id;
+            }
+            return FREE_PREFIX + share(this.left) + "," + share(this.top)
+                    + "," + share(this.right) + "," + share(this.bottom);
+        }
+
+        private static String share(double value) {
+            return String.format(java.util.Locale.ROOT, "%.5f", value);
+        }
+
+        /** The part's first column on the grid; a free part's nearest. */
+        public int column() { return this.column; }
+
+        /** The part's first row on the grid; a free part's nearest. */
+        public int row() { return this.row; }
+
+        /** How many of the grid's columns the part spans; a free part's nearest. */
+        public int columns() { return this.columns; }
+
+        /** How many of the grid's rows the part spans; a free part's nearest. */
+        public int rows() { return this.rows; }
+
+        /** The part's edges, in shares of the screen. */
+        public double leftShare() { return this.left; }
+        public double topShare() { return this.top; }
+        public double rightShare() { return this.right; }
+        public double bottomShare() { return this.bottom; }
+
+        /** The part's left edge on a screen {@code screenWidth} wide. */
         public int left(int screenWidth) {
-            return this.halfLeft == 0 ? 0 : screenWidth / 2;
+            return isFree() ? shareEdge(this.left, screenWidth)
+                    : edge(this.column, COLUMNS, screenWidth);
         }
 
-        /** The fill's width on a screen {@code screenWidth} wide. */
+        /**
+         * The part's width on a screen {@code screenWidth} wide. Two
+         * parts side by side share the edge between them to the pixel.
+         */
         public int width(int screenWidth) {
-            return this.halvesAcross == 2 ? screenWidth
-                    : this.halfLeft == 0 ? screenWidth / 2
-                    : screenWidth - screenWidth / 2;
+            int right = isFree() ? shareEdge(this.right, screenWidth)
+                    : edge(this.column + this.columns, COLUMNS, screenWidth);
+            return right - left(screenWidth);
         }
 
-        /** The fill's top edge on a screen {@code screenHeight} tall. */
+        /** The part's top edge on a screen {@code screenHeight} tall. */
         public int top(int screenHeight) {
-            return this.halfTop == 0 ? 0 : screenHeight / 2;
+            return isFree() ? shareEdge(this.top, screenHeight)
+                    : edge(this.row, ROWS, screenHeight);
         }
 
-        /** The fill's height on a screen {@code screenHeight} tall. */
+        /** The part's height on a screen {@code screenHeight} tall. */
         public int height(int screenHeight) {
-            return this.halvesDown == 2 ? screenHeight
-                    : this.halfTop == 0 ? screenHeight / 2
-                    : screenHeight - screenHeight / 2;
+            int bottom = isFree() ? shareEdge(this.bottom, screenHeight)
+                    : edge(this.row + this.rows, ROWS, screenHeight);
+            return bottom - top(screenHeight);
         }
 
-        /** The fill of that name; none for anything else. */
+        /** Where grid line {@code line} of {@code lines} falls on {@code size}. */
+        private static int edge(int line, int lines, int size) {
+            return (int)((long)size * line / lines);
+        }
+
+        /**
+         * Where a free edge falls on {@code size}: the pixel a grid line
+         * at the same share falls on, so a free part matches a named one
+         * beside it, and the same for both parts sharing it. The share is
+         * a double, so a third of the screen lands a hair short of its
+         * pixel; the tolerance puts it back on it.
+         */
+        private static int shareEdge(double share, int size) {
+            return (int)Math.floor(share * size + 1.0E-6D);
+        }
+
+        /** The part of that name, a free part as written, or none. */
         public static ScreenFill fromId(String id) {
-            for (ScreenFill fill : values()) {
+            if (id == null) {
+                return NONE;
+            }
+            for (ScreenFill fill : NAMED) {
                 if (fill.id.equalsIgnoreCase(id)) {
                     return fill;
                 }
             }
+            if (id.regionMatches(true, 0, FREE_PREFIX, 0,
+                    FREE_PREFIX.length())) {
+                String[] edges = id.substring(FREE_PREFIX.length()).split(",");
+                if (edges.length == 4) {
+                    try {
+                        ScreenFill fill = free(Double.parseDouble(edges[0]),
+                                Double.parseDouble(edges[1]),
+                                Double.parseDouble(edges[2]),
+                                Double.parseDouble(edges[3]));
+                        if (fill.right > fill.left && fill.bottom > fill.top) {
+                            return fill;
+                        }
+                    } catch (NumberFormatException unreadable) {
+                        // Not a part: the window keeps its own box.
+                    }
+                }
+            }
             return NONE;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) {
+                return true;
+            }
+            if (!(other instanceof ScreenFill)) {
+                return false;
+            }
+            ScreenFill that = (ScreenFill)other;
+            return isFree() && that.isFree()
+                    && this.left == that.left && this.top == that.top
+                    && this.right == that.right && this.bottom == that.bottom;
+        }
+
+        @Override
+        public int hashCode() {
+            if (!isFree()) {
+                return this.id.hashCode();
+            }
+            long bits = Double.doubleToLongBits(this.left)
+                    ^ Double.doubleToLongBits(this.top) * 31L
+                    ^ Double.doubleToLongBits(this.right) * 961L
+                    ^ Double.doubleToLongBits(this.bottom) * 29791L;
+            return (int)(bits ^ (bits >>> 32));
+        }
+
+        @Override
+        public String toString() {
+            return id();
         }
     }
 
@@ -189,6 +375,9 @@ public final class ChatWindow {
 
     public boolean isMembersHidden() { return this.membersHidden; }
 
+    /** The member list's width the player chose, in the chat's pixels; 0 for none. */
+    public double getMembersWidth() { return this.membersWidth; }
+
     /** Tabs in row order, including channels currently unavailable. */
     public List<ChatTab> getTabs() {
         return Collections.unmodifiableList(this.tabs);
@@ -241,6 +430,10 @@ public final class ChatWindow {
     void setAreaHidden(boolean hidden) { this.areaHidden = hidden; }
 
     void setMembersHidden(boolean hidden) { this.membersHidden = hidden; }
+
+    void setMembersWidth(double width) {
+        this.membersWidth = Math.max(0.0D, width);
+    }
 
     void setOffsets(double offsetX, double offsetY) {
         this.offsetX = offsetX;

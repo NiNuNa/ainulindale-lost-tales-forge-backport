@@ -3,6 +3,7 @@ package com.ninuna.losttales.chat.server;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatMessageIds;
+import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import cpw.mods.fml.common.FMLLog;
@@ -96,6 +97,8 @@ public final class ChatHistoryNbtCodec {
     private static final String TAG_EVENT_KIND = "Kind";
     private static final String TAG_EVENT_SEVERITY = "Severity";
     private static final String TAG_EVENT_ACTOR = "Actor";
+    /** The actor's account id and its out-of-character colour; absent for none. */
+    private static final String TAG_EVENT_ACTOR_ID = "ActorId";
     private static final String TAG_EVENT_TEXT = "Text";
     private static final String TAG_EVENT_CONTEXT = "Context";
     static final int MAX_CONSOLE_EVENTS = ChatConsoleStream.MAX_EVENTS;
@@ -173,6 +176,10 @@ public final class ChatHistoryNbtCodec {
             tag.setString(TAG_EVENT_ACTOR, event.getActor());
             tag.setString(TAG_EVENT_TEXT, event.getText());
             tag.setString(TAG_EVENT_CONTEXT, event.getContext());
+            if (event.getActorIdentity() != null) {
+                writeUuid(tag, TAG_EVENT_ACTOR_ID,
+                        event.getActorIdentity().getPlayerId());
+            }
             list.appendTag(tag);
         }
         return list;
@@ -212,8 +219,11 @@ public final class ChatHistoryNbtCodec {
             failureReason[0] = "invalid_event";
             return null;
         }
+        UUID actorId = readUuid(raw, TAG_EVENT_ACTOR_ID);
+        ChatNamedPlayer actorIdentity = actorId == null ? null
+                : ChatNamedPlayer.account(actorId, actor);
         return new ChatConsoleEvent(id, raw.getLong(TAG_EVENT_TIMESTAMP),
-                kind, severity, actor, text, context);
+                kind, severity, actor, text, context, actorIdentity);
     }
 
     private static ChatConsoleEvent.Kind kindOf(String name) {

@@ -6,17 +6,17 @@ import java.util.UUID;
 
 /**
  * A player a line names, as the server knew them when the line was
- * said: the account and its id, the identity it was playing — the
- * character's id and skin, or none for the account — and the colour
- * that identity's name is drawn in.
+ * said: the account and its id, and the identity it was playing — the
+ * character's id and skin, or none for the account.
  *
  * <p>A live client turns an account name inside an achievement, a join
  * or a death into the player's character the way every line of theirs
  * is signed, from the appearances the server syncs for everyone
  * online. A line replayed from the history names players who may be
  * long gone, so the server records the answer beside the line, and the
- * replay reads it from there: the name and colour to draw, and the head
- * and names a card about them shows.</p>
+ * replay reads it from there: the name to draw, and the head and names
+ * a card about them shows. A mention of a player wears the one mention
+ * colour whoever it names, so the record carries no colour.</p>
  */
 public final class ChatNamedPlayer {
     /** The most players one line names; a death names two. */
@@ -31,15 +31,13 @@ public final class ChatNamedPlayer {
     private final UUID characterId;
     private final String identityName;
     private final String skinId;
-    private final int nameColor;
 
     /**
      * {@code characterId} is null, and {@code skinId} empty, for a player
      * who was playing as the account.
      */
     public ChatNamedPlayer(UUID playerId, String account, UUID characterId,
-                           String identityName, String skinId,
-                           int nameColor) {
+                           String identityName, String skinId) {
         this.playerId = playerId;
         this.account = account == null ? "" : account.trim();
         this.characterId = characterId;
@@ -47,7 +45,11 @@ public final class ChatNamedPlayer {
         this.identityName = identity.length() == 0 ? this.account : identity;
         this.skinId = characterId == null || skinId == null ? ""
                 : skinId.trim();
-        this.nameColor = nameColor & 0xFFFFFF;
+    }
+
+    /** The account as an out-of-character line names it: itself, with no character. */
+    public static ChatNamedPlayer account(UUID playerId, String account) {
+        return new ChatNamedPlayer(playerId, account, null, account, "");
     }
 
     /** The account's id; null only where nobody could name it. */
@@ -72,10 +74,6 @@ public final class ChatNamedPlayer {
     /** The character's skin snapshot; empty for the account's own skin. */
     public String getSkinId() {
         return this.skinId;
-    }
-
-    public int getNameColor() {
-        return this.nameColor;
     }
 
     /** Whether the entry names anybody at all. */
@@ -151,8 +149,7 @@ public final class ChatNamedPlayer {
                 && this.account.equals(that.account)
                 && same(this.characterId, that.characterId)
                 && this.identityName.equals(that.identityName)
-                && this.skinId.equals(that.skinId)
-                && this.nameColor == that.nameColor;
+                && this.skinId.equals(that.skinId);
     }
 
     private static boolean same(UUID one, UUID other) {
@@ -166,8 +163,7 @@ public final class ChatNamedPlayer {
         hash = hash * 31 + (this.characterId == null ? 0
                 : this.characterId.hashCode());
         hash = hash * 31 + this.identityName.hashCode();
-        hash = hash * 31 + this.skinId.hashCode();
-        return hash * 31 + this.nameColor;
+        return hash * 31 + this.skinId.hashCode();
     }
 
     @Override

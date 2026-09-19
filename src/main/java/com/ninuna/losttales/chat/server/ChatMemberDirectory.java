@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -31,6 +32,8 @@ import java.util.Set;
 import java.util.UUID;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.World;
+import net.minecraft.world.storage.IPlayerFileData;
 
 /**
  * Who a conversation is shown to, as a window's member list lists them:
@@ -357,9 +360,12 @@ public final class ChatMemberDirectory {
     }
 
     /**
-     * Every identity of the world's rosters that may read the channel:
-     * each character, of {@code factionId} where one is named, on an
-     * in-character channel; each account on an out-of-character one.
+     * Every identity that has been in the world and may read the channel:
+     * each character of the world's rosters, of {@code factionId} where
+     * one is named, on an in-character channel; on an out-of-character one
+     * each account the world keeps a roster or a player file for, so an
+     * operator who never made a character still stands among the
+     * operators. An account the server knows no name for is left out.
      */
     private static List<Absentee> readAbsentees(MinecraftServer server,
                                                 EntityPlayerMP viewer,
@@ -372,16 +378,31 @@ public final class ChatMemberDirectory {
         } catch (RuntimeException unreadable) {
             return Collections.emptyList();
         }
-        ChatChannelGates gates = ChatChannelGates.current();
-        List<Absentee> absent = new ArrayList<Absentee>();
+        Map<UUID, CharacterRoster> known =
+                new LinkedHashMap<UUID, CharacterRoster>();
         for (CharacterRoster roster : rosters) {
-            UUID owner = roster == null ? null : roster.getOwnerId();
-            String account = owner == null ? "" : accountName(server, owner, roster);
+            if (roster != null && roster.getOwnerId() != null) {
+                known.put(roster.getOwnerId(), roster);
+            }
+        }
+        for (UUID account : playerFileIds(viewer.worldObj)) {
+            if (!known.containsKey(account)) {
+                known.put(account, null);
+            }
+        }
+        ChatChannelGates gates = ChatChannelGates.current();
+        Set<UUID> operatorVoices = ChatHistory.authorsIn(ChatChannel.ADMIN);
+        List<Absentee> absent = new ArrayList<Absentee>();
+        for (Map.Entry<UUID, CharacterRoster> entry : known.entrySet()) {
+            UUID owner = entry.getKey();
+            CharacterRoster roster = entry.getValue();
+            String account = accountName(server, owner, roster);
             if (account.length() == 0) {
                 continue;
             }
             ChatAbsentReader reader = new ChatAbsentReader(server,
-                    new GameProfile(owner, account));
+                    new GameProfile(owner, account),
+                    operatorVoices.contains(owner));
             if (!reader.mayJoin()) {
                 continue;
             }
@@ -392,6 +413,9 @@ public final class ChatMemberDirectory {
                             accountMember(channel, owner, account,
                                     reader.accountRoles())));
                 }
+                continue;
+            }
+            if (roster == null) {
                 continue;
             }
             for (RoleplayCharacter character : roster.getCharacters()) {
@@ -409,6 +433,34 @@ public final class ChatMemberDirectory {
         }
         Collections.sort(absent, BY_NAME);
         return absent;
+    }
+
+    /**
+     * Every account the world keeps a player file for, by its id: everyone
+     * who has played in it, whether or not they ever made a character.
+     * None where the files cannot be listed.
+     */
+    private static List<UUID> playerFileIds(World world) {
+        List<UUID> ids = new ArrayList<UUID>();
+        try {
+            IPlayerFileData files = world == null ? null
+                    : world.getSaveHandler().getSaveHandler();
+            String[] names = files == null ? null : files.getAvailablePlayerDat();
+            if (names == null) {
+                return ids;
+            }
+            for (String name : names) {
+                try {
+                    ids.add(UUID.fromString(name));
+                } catch (IllegalArgumentException notAPlayerFile) {
+                    // A temporary file beside the players', or one a tool
+                    // left there: nobody's.
+                }
+            }
+        } catch (RuntimeException unreadable) {
+            ids.clear();
+        }
+        return ids;
     }
 
     /**
@@ -431,7 +483,7 @@ public final class ChatMemberDirectory {
             CharacterRoster roster = rosterOf(viewer, owner);
             String account = accountName(server, owner, roster);
             if (account.length() == 0 || !new ChatAbsentReader(server,
-                    new GameProfile(owner, account)).mayJoin()) {
+                    new GameProfile(owner, account), false).mayJoin()) {
                 continue;
             }
             RoleplayCharacter character = roster == null ? null

@@ -4,6 +4,7 @@ import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.server.CharacterActiveResolver;
 import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
+import com.ninuna.losttales.chat.ChatStatusLine;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatPresenceSyncPacket;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
@@ -22,12 +23,14 @@ import net.minecraft.server.MinecraftServer;
 
 /**
  * Everyone's presence as the server holds it. A player's client states
- * the status it chose for each of its identities and whether anybody is
- * at its keyboard; the server decides which identities show at all —
- * the ones in use: the account, the character played and the character
- * spoken as — and tells everyone what each of them shows, as it changes,
- * and all of it to a player who joins. Every other identity reads as
- * Offline, and so does one whose choice is Invisible.
+ * the status it chose for each of its identities, the status line it
+ * set for each ({@link ChatStatusLine}), and whether anybody is at its
+ * keyboard; the server decides which identities show at all — the ones
+ * in use: the account, the character played and the character spoken
+ * as — and tells everyone what each of them shows, with its line, as it
+ * changes, and all of it to a player who joins. Every other identity
+ * reads as Offline, and so does one whose choice is Invisible; neither
+ * tells its line.
  *
  * <p>Nothing of a player shows until their client has stated its
  * presence, so a player who hides never shows for a moment as they join.
@@ -46,6 +49,12 @@ public final class ChatPresenceService {
     /** What everyone was last told of each player who has stated a presence. */
     private static final Map<UUID, Map<ChatPresenceIdentity, ChatPresence>> SHOWN =
             new LinkedHashMap<UUID, Map<ChatPresenceIdentity, ChatPresence>>();
+    /** The status lines each player set, by identity, cleaned. */
+    private static final Map<UUID, Map<ChatPresenceIdentity, String>> LINES =
+            new HashMap<UUID, Map<ChatPresenceIdentity, String>>();
+    /** The lines everyone was last told, of the identities shown. */
+    private static final Map<UUID, Map<ChatPresenceIdentity, String>> SHOWN_LINES =
+            new HashMap<UUID, Map<ChatPresenceIdentity, String>>();
     private static int ticks;
 
     /** Registered on the event bus for the once-a-second look. */
@@ -53,11 +62,12 @@ public final class ChatPresenceService {
 
     /**
      * A player's client states its whole presence: the status chosen for
-     * each identity, and whether it is idle. Everyone is told what that
-     * changes.
+     * each identity, the line set for each, and whether it is idle.
+     * Everyone is told what that changes.
      */
     public static synchronized void state(EntityPlayerMP player,
                                           Map<ChatPresenceIdentity, ChatPresence> choices,
+                                          Map<ChatPresenceIdentity, String> lines,
                                           boolean idle) {
         if (player == null) {
             return;
@@ -66,6 +76,7 @@ public final class ChatPresenceService {
         CHOSEN.put(account, choices == null
                 ? new HashMap<ChatPresenceIdentity, ChatPresence>()
                 : new HashMap<ChatPresenceIdentity, ChatPresence>(choices));
+        LINES.put(account, cleaned(lines));
         if (idle) {
             IDLE.add(account);
         } else {
@@ -90,12 +101,51 @@ public final class ChatPresenceService {
         }
         Map<ChatPresenceIdentity, ChatPresence> shown = shown(chosen,
                 IDLE.contains(account), inUse(player));
-        if (!shown.equals(SHOWN.get(account))) {
+        Map<ChatPresenceIdentity, String> lines = shownLines(shown,
+                LINES.get(account));
+        if (!shown.equals(SHOWN.get(account))
+                || !lines.equals(SHOWN_LINES.get(account))) {
             SHOWN.put(account, shown);
+            SHOWN_LINES.put(account, lines);
             LostTalesNetworkHandler.CHANNEL.sendToAll(
                     new LostTalesChatPresenceSyncPacket(
-                            Collections.singletonMap(account, shown)));
+                            Collections.singletonMap(account, shown),
+                            Collections.singletonMap(account, lines)));
         }
+    }
+
+    /** A player's lines as they are kept: cleaned, the empty ones gone. */
+    static Map<ChatPresenceIdentity, String> cleaned(
+            Map<ChatPresenceIdentity, String> lines) {
+        Map<ChatPresenceIdentity, String> kept =
+                new HashMap<ChatPresenceIdentity, String>();
+        if (lines != null) {
+            for (Map.Entry<ChatPresenceIdentity, String> entry
+                    : lines.entrySet()) {
+                String line = ChatStatusLine.clean(entry.getValue());
+                if (entry.getKey() != null && line.length() > 0) {
+                    kept.put(entry.getKey(), line);
+                }
+            }
+        }
+        return kept;
+    }
+
+    /** The lines of the identities everyone is shown, and of no other. */
+    static Map<ChatPresenceIdentity, String> shownLines(
+            Map<ChatPresenceIdentity, ChatPresence> shown,
+            Map<ChatPresenceIdentity, String> lines) {
+        Map<ChatPresenceIdentity, String> told =
+                new LinkedHashMap<ChatPresenceIdentity, String>();
+        if (lines != null) {
+            for (ChatPresenceIdentity identity : shown.keySet()) {
+                String line = lines.get(identity);
+                if (line != null) {
+                    told.put(identity, line);
+                }
+            }
+        }
+        return told;
     }
 
     /**
@@ -158,11 +208,14 @@ public final class ChatPresenceService {
         }
         CHOSEN.remove(account);
         IDLE.remove(account);
+        LINES.remove(account);
+        SHOWN_LINES.remove(account);
         if (SHOWN.remove(account) != null) {
             LostTalesNetworkHandler.CHANNEL.sendToAll(
                     new LostTalesChatPresenceSyncPacket(Collections.singletonMap(
                             account,
-                            Collections.<ChatPresenceIdentity, ChatPresence>emptyMap())));
+                            Collections.<ChatPresenceIdentity, ChatPresence>emptyMap()),
+                            null));
         }
     }
 
@@ -178,13 +231,15 @@ public final class ChatPresenceService {
             batch.put(entry.getKey(), entry.getValue());
             if (batch.size() == LostTalesChatPresenceSyncPacket.MAX_ACCOUNTS) {
                 LostTalesNetworkHandler.CHANNEL.sendTo(
-                        new LostTalesChatPresenceSyncPacket(batch), joiner);
+                        new LostTalesChatPresenceSyncPacket(batch, SHOWN_LINES),
+                        joiner);
                 batch = new LinkedHashMap<UUID, Map<ChatPresenceIdentity, ChatPresence>>();
             }
         }
         if (!batch.isEmpty()) {
             LostTalesNetworkHandler.CHANNEL.sendTo(
-                    new LostTalesChatPresenceSyncPacket(batch), joiner);
+                    new LostTalesChatPresenceSyncPacket(batch, SHOWN_LINES),
+                    joiner);
         }
     }
 
@@ -210,6 +265,8 @@ public final class ChatPresenceService {
         CHOSEN.clear();
         IDLE.clear();
         SHOWN.clear();
+        LINES.clear();
+        SHOWN_LINES.clear();
         ticks = 0;
     }
 }

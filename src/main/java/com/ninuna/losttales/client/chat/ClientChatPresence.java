@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
+import com.ninuna.losttales.chat.ChatStatusLine;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatPresencePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatPresenceSyncPacket;
@@ -16,11 +17,12 @@ import org.lwjgl.input.Mouse;
 
 /**
  * Presence as this client knows it: what the server says each account's
- * identities show, and what this player chose for each of its own. A
- * choice is made in the head button's menu — for the character spoken as
- * on a roleplaying tab, for the account on the others — remembered for
- * the server it was made on ({@link ClientChatPresenceChoices}) and told
- * to the server, which decides what everyone else sees of it. Whether
+ * identities show, with their status lines, and what this player chose
+ * and set for each of its own. A choice is made in the head button's
+ * menu — for the character spoken as on a roleplaying tab, for the
+ * account on the others — remembered for the server it was made on
+ * ({@link ClientChatPresenceChoices}) and told to the server, which
+ * decides what everyone else sees of it; a status line alike. Whether
  * anybody is at the keyboard is sampled once a tick ({@link ChatAutoAway})
  * and told as it changes. Do Not Disturb holds the mention cue silent in
  * the tabs that speak as the identity it was chosen for; mentions still
@@ -33,6 +35,12 @@ public final class ClientChatPresence {
     /** This player's own choices on the server it is on; Online is no entry. */
     private static final Map<ChatPresenceIdentity, ChatPresence> CHOSEN =
             new LinkedHashMap<ChatPresenceIdentity, ChatPresence>();
+    /** The status lines the server says each shown identity has. */
+    private static final Map<UUID, Map<ChatPresenceIdentity, String>> SHOWN_LINES =
+            new HashMap<UUID, Map<ChatPresenceIdentity, String>>();
+    /** This player's own status lines on the server it is on; none is no entry. */
+    private static final Map<ChatPresenceIdentity, String> CHOSEN_LINES =
+            new LinkedHashMap<ChatPresenceIdentity, String>();
     private static String serverKey = "";
     /** Whether the choices still wait to be told to the server just joined. */
     private static boolean statePending;
@@ -58,8 +66,11 @@ public final class ClientChatPresence {
     public static synchronized void beginSession(String key) {
         SHOWN.clear();
         CHOSEN.clear();
+        SHOWN_LINES.clear();
+        CHOSEN_LINES.clear();
         serverKey = key == null ? "" : key;
         CHOSEN.putAll(ClientChatPresenceChoices.forPlace(serverKey));
+        CHOSEN_LINES.putAll(ClientChatPresenceChoices.linesForPlace(serverKey));
         statePending = true;
         idle = false;
         sampled = false;
@@ -73,14 +84,61 @@ public final class ClientChatPresence {
         }
         for (Map.Entry<UUID, Map<ChatPresenceIdentity, ChatPresence>> account
                 : packet.getAccounts().entrySet()) {
+            Map<ChatPresenceIdentity, String> lines =
+                    packet.getLines().get(account.getKey());
             if (account.getValue().isEmpty()) {
                 SHOWN.remove(account.getKey());
+                SHOWN_LINES.remove(account.getKey());
             } else {
                 SHOWN.put(account.getKey(),
                         new HashMap<ChatPresenceIdentity, ChatPresence>(
                                 account.getValue()));
+                SHOWN_LINES.put(account.getKey(), lines == null
+                        ? new HashMap<ChatPresenceIdentity, String>()
+                        : new HashMap<ChatPresenceIdentity, String>(lines));
             }
         }
+    }
+
+    /**
+     * The status line an identity of an account shows, cleaned; empty for
+     * none, and for an identity the server says nothing of.
+     */
+    public static synchronized String lineOf(UUID account,
+                                             ChatPresenceIdentity identity) {
+        Map<ChatPresenceIdentity, String> lines =
+                account == null ? null : SHOWN_LINES.get(account);
+        String line = lines == null || identity == null ? null
+                : lines.get(identity);
+        return line == null ? "" : ChatStatusLine.clean(line);
+    }
+
+    /** The status line this player set for one of its identities; empty for none. */
+    public static synchronized String chosenLine(ChatPresenceIdentity identity) {
+        String line = identity == null ? null : CHOSEN_LINES.get(identity);
+        return line == null ? "" : line;
+    }
+
+    /**
+     * Sets the status line of one of this player's identities: remembered
+     * for this server and told to the server. An empty line clears it.
+     */
+    public static void setLine(ChatPresenceIdentity identity, String line) {
+        if (identity == null) {
+            return;
+        }
+        String cleaned = ChatStatusLine.clean(line);
+        String key;
+        synchronized (ClientChatPresence.class) {
+            if (cleaned.length() == 0) {
+                CHOSEN_LINES.remove(identity);
+            } else {
+                CHOSEN_LINES.put(identity, cleaned);
+            }
+            key = serverKey;
+        }
+        ClientChatPresenceChoices.rememberLine(key, identity, cleaned);
+        send();
     }
 
     /**
@@ -229,7 +287,8 @@ public final class ClientChatPresence {
         LostTalesChatPresencePacket packet;
         synchronized (ClientChatPresence.class) {
             packet = new LostTalesChatPresencePacket(idle,
-                    new LinkedHashMap<ChatPresenceIdentity, ChatPresence>(CHOSEN));
+                    new LinkedHashMap<ChatPresenceIdentity, ChatPresence>(CHOSEN),
+                    new LinkedHashMap<ChatPresenceIdentity, String>(CHOSEN_LINES));
         }
         LostTalesNetworkHandler.CHANNEL.sendToServer(packet);
     }
@@ -238,6 +297,8 @@ public final class ClientChatPresence {
     public static synchronized void clear() {
         SHOWN.clear();
         CHOSEN.clear();
+        SHOWN_LINES.clear();
+        CHOSEN_LINES.clear();
         serverKey = "";
         statePending = false;
         idle = false;

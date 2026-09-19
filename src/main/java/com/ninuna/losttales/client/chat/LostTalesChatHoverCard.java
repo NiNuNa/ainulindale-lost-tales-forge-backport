@@ -37,6 +37,8 @@ import org.lwjgl.opengl.GL11;
  * that happens not to exist.
  */
 final class LostTalesChatHoverCard {
+    /** A status line reads in italics. */
+    private static final String STATUS_STYLE = "\u00a7o";
     /**
      * The card a click opened, standing where it was opened until a
      * click elsewhere, Escape or the screen closing takes it down; null
@@ -161,6 +163,13 @@ final class LostTalesChatHoverCard {
         if (title.length() > 0) {
             lines.add(title);
         }
+        // What the identity says of itself, as it says it, under its name.
+        String statusLine = ClientChatProfanity.filter(target.statusLine());
+        int statusRow = -1;
+        if (statusLine.length() > 0) {
+            statusRow = lines.size();
+            lines.add(statusLine);
+        }
         // The Server's card says what it is answering: the command the
         // line under the pointer was the answer to, as inline code.
         int commandRow = addDetail(lines, COMMAND_LABEL_KEY, target.note)
@@ -209,8 +218,9 @@ final class LostTalesChatHoverCard {
 
         int contentWidth = font.getStringWidth(name + suffix);
         for (int index = 0; index < lines.size(); index++) {
-            contentWidth = Math.max(contentWidth,
-                    font.getStringWidth(lines.get(index)));
+            contentWidth = Math.max(contentWidth, index == statusRow
+                    ? ChatInlineText.width(font, lines.get(index), STATUS_STYLE)
+                    : font.getStringWidth(lines.get(index)));
         }
         if (description.length() > 0) {
             contentWidth = Math.max(contentWidth, Math.min(
@@ -261,6 +271,14 @@ final class LostTalesChatHoverCard {
                 if (index == 0 && title.length() > 0) {
                     LostTalesChatVisualStyle.drawPlain(font, line,
                             textX, textY, 255);
+                } else if (index == statusRow) {
+                    // What the identity says of itself, as it says it:
+                    // italic words and their emojis.
+                    ChatInlineText.draw(minecraft, font,
+                            ChatInlineText.trimToWidth(font, lines.get(index),
+                                    STATUS_STYLE, textWidth),
+                            STATUS_STYLE, textX, textY,
+                            LostTalesChatVisualStyle.asideRgb(), 255);
                 } else if (index == commandRow) {
                     drawCommandDetail(font, target.note, textX, textY,
                             textWidth);
@@ -649,9 +667,10 @@ final class LostTalesChatHoverCard {
     /**
      * Card target for a mentioned player: whoever this client can place
      * under the account now, and otherwise the player as the line
-     * recorded them — the identity they were playing, its head and the
-     * mention's colour — so a mention in an older line still opens its
-     * card after the player has gone. Null when neither names anybody.
+     * recorded them — the identity they were playing and its head — so a
+     * mention in an older line still opens its card after the player has
+     * gone, named as a live mention's card names them. Null when neither
+     * names anybody.
      */
     static Target targetForMention(Minecraft minecraft,
                                    ChatMentionMarker.Data mention) {
@@ -660,7 +679,7 @@ final class LostTalesChatHoverCard {
                 || mention.recorded.getPlayerId() == null) {
             return placed;
         }
-        return recordedTarget(minecraft, mention.recorded, mention.color);
+        return recordedTarget(minecraft, mention.recorded);
     }
 
     /**
@@ -685,9 +704,9 @@ final class LostTalesChatHoverCard {
                 member.getTitle(), member.getAccount(), member.getNameColor());
     }
 
-    /** The card of a player as a line recorded them, in {@code color}. */
+    /** The card of a player as a line recorded them. */
     static Target recordedTarget(Minecraft minecraft,
-                                 ChatNamedPlayer recorded, int color) {
+                                 ChatNamedPlayer recorded) {
         boolean accountIdentity = recorded.getCharacterId() == null;
         if (accountIdentity && minecraft != null) {
             LostTalesCharacterHeadIconRenderer.rememberAccountSkin(
@@ -695,7 +714,8 @@ final class LostTalesChatHoverCard {
         }
         return new Target(recorded.getPlayerId(), accountIdentity,
                 recorded.getCharacterId(), recorded.getSkinId(),
-                recorded.getIdentityName(), "", recorded.getAccount(), color);
+                recorded.getIdentityName(), "", recorded.getAccount(),
+                LostTalesColors.rgb(LostTalesColors.HUD_LABEL));
     }
 
     /**
@@ -1028,6 +1048,19 @@ final class LostTalesChatHoverCard {
         static Target forRole(ChatAccountRole role) {
             return new Target(null, false, false, null, "", "", "", "",
                     role.getColor(), role, "");
+        }
+
+        /**
+         * The status line of the identity the card is about; empty where
+         * there is none, or no identity to have one.
+         */
+        String statusLine() {
+            if (presence() == null) {
+                return "";
+            }
+            return ClientChatPresence.lineOf(this.playerId,
+                    this.accountIdentity ? ChatPresenceIdentity.ACCOUNT
+                            : ChatPresenceIdentity.character(this.characterId));
         }
 
         /**
