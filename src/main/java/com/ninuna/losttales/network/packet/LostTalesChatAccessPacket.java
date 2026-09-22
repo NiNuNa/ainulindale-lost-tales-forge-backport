@@ -63,7 +63,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
     private static final int MAX_ROLE_TEXT_BYTES = ChatAccountRole.MAX_TEXT_LENGTH * 4;
     private static final int MAX_ROLE_DESCRIPTION_BYTES =
             ChatAccountRole.MAX_DESCRIPTION_LENGTH * 4;
-    private static final int MAX_ROLE_BYTES = MAX_ROLE_ID_BYTES + 4 * MAX_ROLE_TEXT_BYTES
+    private static final int MAX_ROLE_BYTES = MAX_ROLE_ID_BYTES + 2 * MAX_ROLE_TEXT_BYTES
             + MAX_ROLE_DESCRIPTION_BYTES + 32;
     /** A channel id is bounded as the send packet bounds the same field. */
     private static final int MAX_CHANNEL_ID_BYTES = 16;
@@ -80,6 +80,10 @@ public final class LostTalesChatAccessPacket implements IMessage {
     private static final int MAX_ENUM_NAME_BYTES = 32;
     /** More own characters than a roster could hold is a broken payload. */
     private static final int MAX_OWN_CHARACTERS = 32;
+    /** The most channels a statement names as linked to Discord. */
+    public static final int MAX_DISCORD_LINKS = 64;
+    /** A link key's longest: {@code faction:} and a faction's id. */
+    private static final int MAX_DISCORD_LINK_BYTES = 96;
     /** The Proximity radius's own upper bound in the server's config. */
     public static final int MAX_PROXIMITY_RADIUS = 512;
 
@@ -96,7 +100,8 @@ public final class LostTalesChatAccessPacket implements IMessage {
             + 1 + ChatChannelIconCatalog.MAX_ICONS
                     * (MAX_CHANNEL_ID_BYTES + MAX_CHANNEL_ICON_BYTES + 4)
             + 2 + ChatProfanityWords.MAX_WORDS
-                    * (ChatProfanityWords.MAX_ENTRY_BYTES + 2);
+                    * (ChatProfanityWords.MAX_ENTRY_BYTES + 2)
+            + 1 + MAX_DISCORD_LINKS * (MAX_DISCORD_LINK_BYTES + 2);
     /**
      * Every channel this build knows, by id: what a payload written
      * without a channel answer reads as, and what a client falls back to.
@@ -161,6 +166,12 @@ public final class LostTalesChatAccessPacket implements IMessage {
             Collections.emptyMap();
     /** The words the server adds to the chat's profanity list. */
     private ChatProfanityWords profanityWords = ChatProfanityWords.NONE;
+    /**
+     * The game channels linked to Discord now, by their link key: a
+     * channel's id, or {@code faction:<id>} for one faction's chat. What
+     * the tabs' Discord mark reads.
+     */
+    private List<String> discordLinks = Collections.emptyList();
     private boolean malformed;
 
     public LostTalesChatAccessPacket() {}
@@ -513,6 +524,23 @@ public final class LostTalesChatAccessPacket implements IMessage {
                 throw new LostTalesPacketCodec.DecodeException(
                         "invalid profanity word");
             }
+            // The channels linked to Discord, each a key the tabs can
+            // match and nothing else.
+            int linkCount = buffer.readUnsignedByte();
+            if (linkCount > MAX_DISCORD_LINKS) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "too many Discord links");
+            }
+            List<String> links = new ArrayList<String>(linkCount);
+            for (int index = 0; index < linkCount; index++) {
+                String key = LostTalesPacketCodec.readUtf8String(buffer,
+                        MAX_DISCORD_LINK_BYTES);
+                if (!isLinkKey(key) || links.contains(key)) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "invalid Discord link");
+                }
+                links.add(key);
+            }
             LostTalesPacketCodec.requireFinished(buffer);
             int knownMask = known.knownMask();
             List<RoleHolder> stated = new ArrayList<RoleHolder>(holderCount);
@@ -549,6 +577,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.definedChannels = Collections.unmodifiableList(defined);
             this.channelIcons = Collections.unmodifiableMap(icons);
             this.profanityWords = words;
+            this.discordLinks = Collections.unmodifiableList(links);
         } catch (RuntimeException exception) {
             this.malformed = true;
             this.adminAccess = false;
@@ -567,6 +596,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.proximityRadius = 0;
             this.channelIcons = Collections.emptyMap();
             this.profanityWords = ChatProfanityWords.NONE;
+            this.discordLinks = Collections.emptyList();
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -635,9 +665,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
         String id = LostTalesPacketCodec.readUtf8String(buffer, MAX_ROLE_ID_BYTES);
         int bitIndex = buffer.readUnsignedByte();
         String nameKey = LostTalesPacketCodec.readUtf8String(buffer, MAX_ROLE_TEXT_BYTES);
-        String tagKey = LostTalesPacketCodec.readUtf8String(buffer, MAX_ROLE_TEXT_BYTES);
         String name = LostTalesPacketCodec.readUtf8String(buffer, MAX_ROLE_TEXT_BYTES);
-        String tag = LostTalesPacketCodec.readUtf8String(buffer, MAX_ROLE_TEXT_BYTES);
         String description = LostTalesPacketCodec.readUtf8String(buffer,
                 MAX_ROLE_DESCRIPTION_BYTES);
         int color = buffer.readInt();
@@ -647,8 +675,8 @@ public final class LostTalesChatAccessPacket implements IMessage {
         if (id.length() == 0 || bitIndex >= ChatRoleCatalog.MAX_ROLES) {
             throw new LostTalesPacketCodec.DecodeException("invalid role");
         }
-        return ChatAccountRole.fromWire(id, bitIndex, nameKey, tagKey, name, tag,
-                description, color, mentionable, locked, rank);
+        return ChatAccountRole.fromWire(id, bitIndex, nameKey, name, description, color,
+                mentionable, locked, rank);
     }
 
     @Override
@@ -671,9 +699,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
             LostTalesPacketCodec.writeUtf8String(buffer, role.getId(), MAX_ROLE_ID_BYTES);
             buffer.writeByte(Integer.numberOfTrailingZeros(role.bit()));
             LostTalesPacketCodec.writeUtf8String(buffer, role.getNameKey(), MAX_ROLE_TEXT_BYTES);
-            LostTalesPacketCodec.writeUtf8String(buffer, role.getTagKey(), MAX_ROLE_TEXT_BYTES);
             LostTalesPacketCodec.writeUtf8String(buffer, role.getName(), MAX_ROLE_TEXT_BYTES);
-            LostTalesPacketCodec.writeUtf8String(buffer, role.getTag(), MAX_ROLE_TEXT_BYTES);
             LostTalesPacketCodec.writeUtf8String(buffer, role.getDescription(),
                     MAX_ROLE_DESCRIPTION_BYTES);
             buffer.writeInt(role.getColor());
@@ -745,6 +771,41 @@ public final class LostTalesChatAccessPacket implements IMessage {
             LostTalesPacketCodec.writeUtf8String(buffer, entry,
                     ChatProfanityWords.MAX_ENTRY_BYTES);
         }
+        // Last, the channels linked to Discord.
+        buffer.writeByte(this.discordLinks.size());
+        for (String key : this.discordLinks) {
+            LostTalesPacketCodec.writeUtf8String(buffer, key,
+                    MAX_DISCORD_LINK_BYTES);
+        }
+    }
+
+    /**
+     * The same statement naming the game channels linked to Discord:
+     * each a channel's id or {@code faction:<id>}, at most
+     * {@link #MAX_DISCORD_LINKS}, a key that is none of these left out.
+     */
+    public LostTalesChatAccessPacket withDiscordLinks(List<String> keys) {
+        List<String> kept = new ArrayList<String>();
+        if (keys != null) {
+            for (String key : keys) {
+                if (isLinkKey(key) && !kept.contains(key)
+                        && kept.size() < MAX_DISCORD_LINKS) {
+                    kept.add(key);
+                }
+            }
+        }
+        this.discordLinks = Collections.unmodifiableList(kept);
+        return this;
+    }
+
+    /** The game channels linked to Discord, by link key. */
+    public List<String> getDiscordLinks() { return this.discordLinks; }
+
+    /** A link key: a channel's id, or {@code faction:} and a faction's id. */
+    static boolean isLinkKey(String key) {
+        return key != null && key.length() > 0
+                && key.length() <= MAX_DISCORD_LINK_BYTES
+                && key.matches("[a-z0-9_]+(?::[a-z0-9_.:-]+)?");
     }
 
     public boolean hasAdminAccess() { return this.adminAccess; }

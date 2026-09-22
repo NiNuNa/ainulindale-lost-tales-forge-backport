@@ -17,21 +17,49 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * The bot's slash commands: what they are, as Discord is told when the
- * gateway session is ready, and what they answer. {@code /online} lists
- * who is playing and as whom, {@code /who} describes one player or
- * character, {@code /server} says how the server is doing. The answers
+ * The bot's slash commands: what they are, as Discord is told for each
+ * server the bot is in, and what they answer. {@code /online} lists who
+ * is playing and as whom, {@code /who} describes one player or
+ * character, {@code /server} says how the server is doing. {@code /link}
+ * pairs the channel it is used in with a game channel by a code an
+ * operator asked for in the game, and {@code /unlink} takes the channel's
+ * link away; both are offered only to members who may manage webhooks,
+ * and the bridge checks that permission again itself. The answers
  * are built on the server thread from the same identity resolution the
  * chat uses, and formatted here so the wording can be checked without
- * a server; a reply is ephemeral, so the channel stays clean.
+ * a server; a reply is ephemeral, so the channel stays clean. They are
+ * answered only in a Discord channel linked to the game: a Discord
+ * server that merely has the bot in it learns nothing of who plays.
  */
 public final class DiscordSlashCommands {
 
     public static final String ONLINE = "online";
     public static final String WHO = "who";
     public static final String SERVER = "server";
+    public static final String LINK = "link";
+    public static final String UNLINK = "unlink";
+    /** The option {@code /link} takes the code in. */
+    public static final String CODE = "code";
+    /** Manage Webhooks as Discord writes a permission: the bitfield in decimal. */
+    private static final String MANAGE_WEBHOOKS_PERMISSION =
+            String.valueOf(1L << DiscordJson.Interaction.MANAGE_WEBHOOKS);
+
+    public static final String LINK_NEEDS_SERVER =
+            "Use this in a channel of your Discord server.";
+    public static final String LINK_NEEDS_PERMISSION =
+            "You need the Manage Webhooks permission in this channel.";
+    public static final String LINK_UNKNOWN_CODE =
+            "That code is unknown or has run out. Ask for a new one in the game"
+                    + " with `/losttales discord link <channel>`.";
+    public static final String LINK_BOT_NEEDS_PERMISSION =
+            "I need the Manage Webhooks permission in this channel to link it.";
+    public static final String LINK_NOT_SAVED =
+            "The link could not be saved on the game server. Ask for a new code.";
     /** Discord's own bound on a message's content. */
     private static final int MAX_CONTENT_LENGTH = 2000;
+    /** The answer in a Discord channel that is not linked to the game. */
+    public static final String NOT_LINKED =
+            "This channel is not linked to the game.";
 
     private DiscordSlashCommands() {}
 
@@ -42,15 +70,12 @@ public final class DiscordSlashCommands {
         public final String character;
         public final String race;
         public final String faction;
-        public final int level;
 
-        public Player(String account, String character, String race, String faction,
-                      int level) {
+        public Player(String account, String character, String race, String faction) {
             this.account = account == null ? "" : account;
             this.character = character == null ? "" : character;
             this.race = race == null ? "" : race;
             this.faction = faction == null ? "" : faction;
-            this.level = level;
         }
     }
 
@@ -69,7 +94,54 @@ public final class DiscordSlashCommands {
         who.add("options", options);
         commands.add(who);
         commands.add(command(SERVER, "How the server is doing"));
+        JsonObject link = command(LINK, "Link this channel to a game channel");
+        JsonObject code = new JsonObject();
+        code.addProperty("type", Integer.valueOf(3));
+        code.addProperty("name", CODE);
+        code.addProperty("description", "The code the game gave you");
+        code.addProperty("required", Boolean.TRUE);
+        JsonArray linkOptions = new JsonArray();
+        linkOptions.add(code);
+        link.add("options", linkOptions);
+        link.addProperty("default_member_permissions", MANAGE_WEBHOOKS_PERMISSION);
+        commands.add(link);
+        JsonObject unlink = command(UNLINK, "Take this channel's link to the game away");
+        unlink.addProperty("default_member_permissions", MANAGE_WEBHOOKS_PERMISSION);
+        commands.add(unlink);
         return commands.toString();
+    }
+
+    /** This channel is linked to another game channel already. */
+    public static String linkTaken(String gameChannel) {
+        return bound("This channel is already linked to **" + escape(gameChannel)
+                + "**. A Discord channel holds one game channel: use `/unlink` first.");
+    }
+
+    /** This channel is linked to the very game channel asked for. */
+    public static String linkAlready(String gameChannel) {
+        return bound("This channel is already linked to **" + escape(gameChannel) + "**.");
+    }
+
+    /** Discord would not make the webhook; {@code status} 0 for no answer. */
+    public static String linkFailed(int status) {
+        return status > 0
+                ? "Discord did not make the webhook (HTTP " + status + "). Ask for a new code."
+                : "Discord could not be reached. Ask for a new code.";
+    }
+
+    /** The link stands, and which way lines cross it. */
+    public static String linked(String gameChannel, DiscordBridgeDirection direction) {
+        String crossing = direction == DiscordBridgeDirection.GAME_TO_DISCORD
+                ? "Lines from the game come here."
+                : direction == DiscordBridgeDirection.DISCORD_TO_GAME
+                        ? "Messages here go to the game."
+                        : "Messages cross both ways.";
+        return bound("Linked to **" + escape(gameChannel) + "**. " + crossing);
+    }
+
+    /** The link is gone. */
+    public static String unlinked(String gameChannel) {
+        return bound("Unlinked from **" + escape(gameChannel) + "**.");
     }
 
     private static JsonObject command(String name, String description) {
@@ -157,9 +229,6 @@ public final class DiscordSlashCommands {
         if (player.faction.length() > 0) {
             details.add("of " + player.faction);
         }
-        if (player.level > 0) {
-            details.add("level " + player.level);
-        }
         if (!details.isEmpty()) {
             text.append(": ");
             for (int index = 0; index < details.size(); index++) {
@@ -223,14 +292,13 @@ public final class DiscordSlashCommands {
             RoleplayCharacter character = resolution.isAvailable()
                     ? resolution.getCharacter() : null;
             if (character == null) {
-                players.add(new Player(player.getCommandSenderName(), "", "", "", 0));
+                players.add(new Player(player.getCommandSenderName(), "", "", ""));
                 continue;
             }
             String faction = LotrCharacterAdapter.getInstance()
                     .getFactionDisplayName(character.getStartingFactionId());
             players.add(new Player(player.getCommandSenderName(), character.getName(),
-                    raceName(character.getRaceId()), faction == null ? "" : faction,
-                    character.getRoleplayLevel()));
+                    raceName(character.getRaceId()), faction == null ? "" : faction));
         }
         return players;
     }

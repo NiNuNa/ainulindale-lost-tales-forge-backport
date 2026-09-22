@@ -102,6 +102,9 @@ public final class ClientChatChannelState {
     private static java.util.Set<String> readableChannels = DEFAULT_READABLE;
     private static java.util.Set<String> sendableChannels = DEFAULT_SENDABLE;
     /** Server-stated muted senders; filled for operators only. */
+    /** The channels linked to Discord, by link key, as the server said. */
+    private static final java.util.Set<String> DISCORD_LINKS =
+            new java.util.HashSet<String>();
     private static final java.util.Set<UUID> MUTED_SENDERS =
             new java.util.HashSet<UUID>();
     /**
@@ -753,6 +756,34 @@ public final class ClientChatChannelState {
         ChatChannelIcons.install(icons);
     }
 
+    /**
+     * Replaces the server's statement of which channels are linked to
+     * Discord, by link key: a channel's id, or {@code faction:<id>}.
+     */
+    public static synchronized void setDiscordLinks(java.util.Collection<String> keys) {
+        DISCORD_LINKS.clear();
+        if (keys != null) {
+            DISCORD_LINKS.addAll(keys);
+        }
+    }
+
+    /**
+     * Whether what is said in a tab crosses to Discord: its channel is
+     * linked, and for Faction chat the faction the tab shows now.
+     */
+    public static synchronized boolean isLinkedToDiscord(ChatTab tab) {
+        if (tab == null || tab.getChannel() == null || DISCORD_LINKS.isEmpty()) {
+            return false;
+        }
+        ChatChannel channel = tab.getChannel();
+        if (channel == ChatChannel.FACTION) {
+            String faction = scopeKeyRead(channel);
+            return faction.length() > 0 && DISCORD_LINKS.contains(
+                    "faction:" + faction.toLowerCase(java.util.Locale.ROOT));
+        }
+        return DISCORD_LINKS.contains(channel.getId());
+    }
+
     /** The server's Proximity radius in blocks; zero until it says. */
     public static synchronized int getProximityRadius() {
         return proximityRadius;
@@ -1051,6 +1082,7 @@ public final class ClientChatChannelState {
         MUTED_SENDERS.clear();
         DRAFTS.clear();
         SENT_HISTORY.clear();
+        DISCORD_LINKS.clear();
     }
 
     /** The shared chat identity's faction or server-confirmed party. */

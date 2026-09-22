@@ -414,9 +414,8 @@ public class LostTalesCommonProxy {
         LostTalesQuestRegistry.clearRuntimeQuests();
         LostTalesServerBroadcastHook.clear();
         DiscordGameEventRelay.clear();
+        LostTalesDiscordBridge.getInstance().resetSession();
         ChatMemberDirectory.clear();
-        LostTalesChatService.console(ChatConsoleEvent.Kind.SERVER,
-                ChatConsoleEvent.Severity.INFO, "Server", "Server started");
         ChatAuditLog.onServerStarting();
         LostTalesMobAggroEventHandler.clearAll();
         LotrRaceProfileAdapter.getInstance().clear();
@@ -460,33 +459,32 @@ public class LostTalesCommonProxy {
     }
 
     /**
-     * The server accepts players from here on: the OOC line saying so,
-     * which the bridge's embed is linked to, and the bridge's clock.
+     * The server accepts players from here on: the Server Console's
+     * entry saying so, and the bridge's clock. The server's coming and
+     * going is said in the Server Console alone; Discord reads it in the
+     * linked channels' topics.
      */
     public void onServerStarted(FMLServerStartedEvent event) {
         if (CharacterRoomWorldType.isRoomServer(MinecraftServer.getServer())) {
             return;
         }
-        LostTalesServerBroadcastHook.announceServer(MinecraftServer.getServer(),
-                true);
+        LostTalesChatService.console(ChatConsoleEvent.Kind.SERVER,
+                ChatConsoleEvent.Severity.INFO, "Server", "Server started");
         LostTalesDiscordBridge.getInstance().onServerStarted();
     }
 
     public void onServerStopping(FMLServerStoppingEvent event) {
-        // The Console's entry for the stop, the pair of the one the start
-        // records: shown to its readers still online, and kept by the
-        // history's snapshot below, so the Console shows it when the
+        // The Server Console's entry for the stop, the pair of the one the
+        // start records: shown to its readers still online, and kept by
+        // the history's snapshot below, so the Console shows it when the
         // server is next up. First, before the ids are reset below.
-        LostTalesChatService.console(ChatConsoleEvent.Kind.SERVER,
-                ChatConsoleEvent.Severity.INFO, "Server", "Server stopped");
-        // The OOC line saying the server is going down, kept by the same
-        // snapshot, and the bridge's farewell linked to it; then the
-        // offline topic. All are queued before the stop, which gives the
-        // worker a bounded moment to send them.
         if (!CharacterRoomWorldType.isRoomServer(MinecraftServer.getServer())) {
-            LostTalesServerBroadcastHook.announceServer(
-                    MinecraftServer.getServer(), false);
+            LostTalesChatService.console(ChatConsoleEvent.Kind.SERVER,
+                    ChatConsoleEvent.Severity.INFO, "Server",
+                    "Server shutting down");
         }
+        // The offline topic, queued before the stop, which gives the
+        // worker a bounded moment to send it.
         LostTalesDiscordBridge.getInstance().onServerStopping();
         LostTalesDiscordBridge.getInstance().stop();
         // Once the bridge has stopped adding to them, the links go to the
@@ -529,6 +527,7 @@ public class LostTalesCommonProxy {
         LostTalesQuestRegistry.clearRuntimeQuests();
         LostTalesServerBroadcastHook.clear();
         DiscordGameEventRelay.clear();
+        LostTalesDiscordBridge.getInstance().resetSession();
         ChatMemberDirectory.clear();
         ChatAuditLog.onServerStopping();
         LostTalesMobAggroEventHandler.clearAll();

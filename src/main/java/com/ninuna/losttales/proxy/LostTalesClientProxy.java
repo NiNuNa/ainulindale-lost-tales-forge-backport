@@ -115,6 +115,7 @@ import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatPresenceSyncPacket;
 import com.ninuna.losttales.client.chat.ClientChatMembers;
 import com.ninuna.losttales.client.chat.ClientChatPresence;
+import com.ninuna.losttales.client.motion.Motions;
 import cpw.mods.fml.client.registry.ClientRegistry;
 import cpw.mods.fml.client.registry.RenderingRegistry;
 import cpw.mods.fml.common.FMLCommonHandler;
@@ -153,6 +154,8 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         ClientChatPresenceChoices.initialize(clientFolder);
         LostTalesClientMapMarkerUsageStore.initialize(clientFolder);
         CharacterTemplateStore.initialize(clientFolder);
+        // The Motion Lab's tuning, read over the mod's own motion files.
+        Motions.initialize(clientFolder);
         LostTalesThirdPersonConfig.load(
                 event.getModConfigurationDirectory());
         ThirdPersonCameraRuntime.resetSession();
@@ -185,6 +188,8 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         verifyRaceTransformers();
         ((IReloadableResourceManager) Minecraft.getMinecraft().getResourceManager()).registerReloadListener(clientEventHandler);
         ((IReloadableResourceManager) Minecraft.getMinecraft().getResourceManager()).registerReloadListener(guiAnimationHandler);
+        // Every motion is read again with the resources, F3+T included.
+        ((IReloadableResourceManager) Minecraft.getMinecraft().getResourceManager()).registerReloadListener(Motions.RELOADER);
 
         ClientRegistry.bindTileEntitySpecialRenderer(LostTalesTileEntityUrn.class, new LostTalesTileEntityRendererUrn());
         ClientRegistry.bindTileEntitySpecialRenderer(LostTalesTileEntityStatue.class, new LostTalesTileEntityRendererStatue());
@@ -580,6 +585,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
             ClientChatChannelState.setProximityRadius(
                     packet.getProximityRadius());
             ClientChatChannelState.setChannelIcons(packet.getChannelIcons());
+            ClientChatChannelState.setDiscordLinks(packet.getDiscordLinks());
             // The words the server adds to the profanity list, over the
             // bundled ones, for as long as this server is the place.
             ChatProfanityCatalog.installServerWords(packet.getProfanityWords());

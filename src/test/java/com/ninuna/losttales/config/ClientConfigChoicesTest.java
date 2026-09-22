@@ -36,10 +36,6 @@ public final class ClientConfigChoicesTest {
             assertArrayEquals(LostTalesColors.paletteNames(),
                     client.get(colour).getValidValues());
         }
-        assertArrayEquals(new String[] {"BACK", "CUBIC", "SMOOTH"},
-                client.get("guiAnimationEasingStyle").getValidValues());
-        assertArrayEquals(new String[] {"DOWN", "UP", "LEFT", "RIGHT", "NONE"},
-                client.get("guiAnimationDirection").getValidValues());
         assertArrayEquals(new String[] {"wide", "slim"},
                 client.get("devSkinOverrideBodyType").getValidValues());
         // A sound can be any sound, so it keeps its box.

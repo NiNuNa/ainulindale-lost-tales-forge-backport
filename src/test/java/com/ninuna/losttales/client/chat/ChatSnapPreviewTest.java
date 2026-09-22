@@ -37,13 +37,13 @@ public final class ChatSnapPreviewTest {
 
     @Before
     public void setUp() {
-        this.animations = LostTalesConfig.enableChatAnimations;
-        LostTalesConfig.enableChatAnimations = false;
+        this.animations = LostTalesConfig.animations;
+        LostTalesConfig.animations = false;
     }
 
     @After
     public void tearDown() {
-        LostTalesConfig.enableChatAnimations = this.animations;
+        LostTalesConfig.animations = this.animations;
     }
 
     /** Aimed at a zone, the pane stands in it, whole, the window's own box aside. */

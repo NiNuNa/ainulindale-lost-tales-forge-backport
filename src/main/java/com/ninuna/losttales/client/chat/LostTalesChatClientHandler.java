@@ -22,7 +22,8 @@ import net.minecraftforge.common.MinecraftForge;
 
 /**
  * Installs the channel-aware input, the narrow CHAT-only render pass, and
- * the routing of server-visible vanilla lines into the Global channel.
+ * the routing of the server's own lines into the channels
+ * {@link com.ninuna.losttales.chat.ChatSystemLineClassifier} names for them.
  */
 public final class LostTalesChatClientHandler {
     private static final Field DEFAULT_INPUT = resolveDefaultInputField();

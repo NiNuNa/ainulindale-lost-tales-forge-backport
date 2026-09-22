@@ -1,6 +1,5 @@
 package com.ninuna.losttales.client.gui;
 
-import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesButtonStyle;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
@@ -62,8 +61,7 @@ public class LostTalesButton extends GuiButton {
         boolean answers = this.enabled && this.field_146123_n;
         this.motion.advance(System.nanoTime(), highlighted,
                 answers || this.selected,
-                answers && org.lwjgl.input.Mouse.isButtonDown(0),
-                LostTalesConfig.enableGuiAnimations);
+                answers && org.lwjgl.input.Mouse.isButtonDown(0));
         LostTalesButtonStyle.drawFrame(minecraft, this.xPosition, this.yPosition,
                 this.width, this.height, highlighted);
         this.mouseDragged(minecraft, mouseX, mouseY);

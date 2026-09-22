@@ -1,0 +1,7 @@
+{
+  "inventory.item.slide": {
+    "about": "An item stack sliding from one slot to another.",
+    "duration": 140,
+    "curve": "back_out"
+  }
+}

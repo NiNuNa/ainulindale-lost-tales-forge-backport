@@ -1,18 +1,21 @@
 package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiEasing;
-import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.client.motion.MotionIds;
+import com.ninuna.losttales.client.motion.Motions;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import java.util.Map;
 import java.util.WeakHashMap;
 import org.lwjgl.opengl.GL11;
 
-/** Independent, fixed-screen entrance shared by every map popup. */
+/**
+ * Independent, fixed-screen entrance shared by every map popup: from its
+ * motion's {@code travel} pixels below and {@code start_scale} of its
+ * size, into place ({@link MotionIds#MAP_POPUP_OPEN}).
+ */
 @SideOnly(Side.CLIENT)
 final class LostTalesMapPopupAnimation {
-    private static final float TRAVEL_PIXELS = 14.0F;
-    private static final float START_SCALE = 0.985F;
     private static final float GUI_MODELVIEW_Z = -2000.0F;
     private static final Map<Object, Long> STARTS =
             new WeakHashMap<Object, Long>();
@@ -82,7 +85,8 @@ final class LostTalesMapPopupAnimation {
     }
 
     private static Sample sample(Object popup) {
-        if (!LostTalesConfig.enableGuiAnimations || popup == null) {
+        long duration = Motions.travelNanos(MotionIds.MAP_POPUP_OPEN);
+        if (duration <= 0L || popup == null) {
             return Sample.SETTLED;
         }
         long now = System.nanoTime();
@@ -94,18 +98,15 @@ final class LostTalesMapPopupAnimation {
             }
             started = known.longValue();
         }
-        int durationMillis = Math.max(60,
-                LostTalesConfig.guiAnimationDurationMillis);
-        float travel = TRAVEL_PIXELS;
-        if (LostTalesConfig.reducedGuiMotion) {
-            durationMillis = Math.min(durationMillis, 90);
-            travel = 5.0F;
-        }
+        float travel = Motions.param(MotionIds.MAP_POPUP_OPEN, "travel",
+                14.0F);
+        float startScale = Math.max(0.5F, Math.min(2.0F, Motions.param(
+                MotionIds.MAP_POPUP_OPEN, "start_scale", 1.0F)));
         float progress = LostTalesGuiEasing.clamp(
-                (now - started) / (durationMillis * 1000000.0F));
-        float eased = LostTalesGuiEasing.easeOutCubic(progress);
+                (now - started) / (float)duration);
+        float eased = Motions.curve(MotionIds.MAP_POPUP_OPEN).apply(progress);
         return new Sample(progress, eased, travel * (1.0F - eased),
-                START_SCALE + (1.0F - START_SCALE) * eased);
+                startScale + (1.0F - startScale) * eased);
     }
 
     private static final class Sample {

@@ -2,7 +2,6 @@ package com.ninuna.losttales.gui.screen;
 
 import com.ninuna.losttales.client.gui.LostTalesPointerInteractable;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimations;
-import com.ninuna.losttales.client.gui.animation.LostTalesGuiEasing;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.screen.quest.QuestDialogueLayout;
 import com.ninuna.losttales.gui.screen.quest.QuestDialogueModel;
@@ -12,6 +11,8 @@ import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesQuestActionPacket;
+import com.ninuna.losttales.client.motion.Motions;
+import com.ninuna.losttales.client.motion.MotionIds;
 import java.util.List;
 import net.minecraft.client.gui.GuiScreen;
 import org.lwjgl.input.Keyboard;
@@ -145,18 +146,9 @@ public class LostTalesQuestDialogueGui extends GuiScreen
         double elapsed = this.lastFrameNanos == 0L ? 0.0D
                 : (now - this.lastFrameNanos) / 1000000000.0D;
         this.lastFrameNanos = now;
-        this.chosenShown = motionWanted()
-                ? LostTalesGuiEasing.approach(this.chosenShown, this.chosen,
-                        elapsed, GLIDE_SECONDS)
-                : this.chosen;
-    }
-
-    /** Seconds the column takes to bring the next reply to the middle. */
-    private static final double GLIDE_SECONDS = 0.08D;
-
-    private static boolean motionWanted() {
-        return LostTalesConfig.enableGuiAnimations
-                && !LostTalesConfig.reducedGuiMotion;
+        this.chosenShown = Motions.followTravel(
+                MotionIds.SCREEN_DIALOGUE_GLIDE, this.chosenShown,
+                this.chosen, elapsed);
     }
 
     private QuestDialogueLayout layout() {

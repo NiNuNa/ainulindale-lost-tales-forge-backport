@@ -8,13 +8,15 @@ import com.ninuna.losttales.chat.ChatMessageOrigin;
 /**
  * The one rule for what may leave the game: a line a player typed, in a
  * channel that may be bridged and that everyone in the game may read. A
- * line the bridge itself carried in is never sent back out, whatever
- * channel it landed in, so a message can never go round; a private
- * channel is refused here before any binding is asked, so no
- * configuration can carry it; and a channel whose read side asks for a
- * role is refused too, since Discord has no roles of ours to hold — what
- * only role holders may read in the game is not published outside it,
- * and nothing unauthenticated is spoken into it.
+ * line the bridge itself carried in does not go out this way: the bridge
+ * carries it on to the other Discord channels of its game channel itself,
+ * never back into the one it came from, and never reads a post of its
+ * own webhooks, so a message can never go round; a private channel is
+ * refused here before any binding is asked, so no configuration can carry
+ * it; and a channel whose read side asks for a role is refused too, since
+ * Discord has no roles of ours to hold — what only role holders may read
+ * in the game is not published outside it, and nothing unauthenticated is
+ * spoken into it.
  */
 public final class DiscordBridgePolicy {
 

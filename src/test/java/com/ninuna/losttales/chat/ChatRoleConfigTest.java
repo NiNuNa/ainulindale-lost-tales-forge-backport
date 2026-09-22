@@ -49,7 +49,7 @@ public final class ChatRoleConfigTest {
     public void rolesMembersAndSourcesAreRead() {
         ChatRoleCatalog catalog = ChatRoleConfig.parse(new String[] {
                 "# comment",
-                "moderator=name:Moderator;tag:[Mod];color:#A94B54;mention:true;rank:15;op:1;"
+                "moderator=name:Moderator;color:#A94B54;mention:true;rank:15;op:1;"
                         + "faction:GONDOR@gondor.knight;desc:Keeps the peace.",
                 "builder=color:112233;mention:false",
         }, new String[] {
@@ -59,7 +59,6 @@ public final class ChatRoleConfigTest {
         ChatAccountRole moderator = catalog.byId("moderator");
         assertNotNull(moderator);
         assertEquals("Moderator", moderator.getName());
-        assertEquals("[Mod]", moderator.getTag());
         assertEquals(0xA94B54, moderator.getColor());
         assertTrue(moderator.isMentionable());
         assertEquals(15, moderator.getRank());
@@ -71,7 +70,6 @@ public final class ChatRoleConfigTest {
         assertEquals("gondor.knight", moderator.getSources().get(1).getRank());
         ChatAccountRole builder = catalog.byId("builder");
         assertEquals("builder", builder.getDisplayName());
-        assertEquals("[builder]", builder.getDisplayTag());
         assertFalse(builder.isMentionable());
         assertEquals(0x112233, builder.getColor());
         assertEquals(new HashSet<UUID>(Arrays.asList(STEVE, ALEX)),
@@ -95,7 +93,6 @@ public final class ChatRoleConfigTest {
         ChatAccountRole operator = catalog.byId(ChatRoleFixtures.OPERATOR_ID);
         assertNotNull(operator);
         assertEquals("Operator", operator.getDisplayName());
-        assertEquals("[Operator]", operator.getDisplayTag());
         assertEquals(0xA94B54, operator.getColor());
         assertEquals(10, operator.getRank());
         assertEquals(2, operator.bit());
@@ -108,7 +105,7 @@ public final class ChatRoleConfigTest {
         assertTrue(warnings.isEmpty());
         // Restyled, regranted, given another source: the file's word holds.
         ChatRoleCatalog restyled = ChatRoleConfig.parse(new String[] {
-                "operator=name:Staff;tag:[Staff];color:00FF00;op:4;grant:chat.moderate",
+                "operator=name:Staff;color:00FF00;op:4;grant:chat.moderate",
         }, null, collect);
         ChatAccountRole staff = restyled.byId(ChatRoleFixtures.OPERATOR_ID);
         assertEquals("Staff", staff.getDisplayName());
@@ -274,12 +271,12 @@ public final class ChatRoleConfigTest {
 
     @Test
     public void rolesAndMembersWriteThemselvesBackAndRoundTrip() {
-        ChatAccountRole moderator = ChatAccountRole.custom("moderator", "Moderator", "[Mod]",
+        ChatAccountRole moderator = ChatAccountRole.custom("moderator", "Moderator",
                 "Keeps the peace.", 0xA94B54, true, 15,
                 Arrays.asList(ChatRoleSource.opLevel(1),
                         ChatRoleSource.factionRank("gondor", "Gondor.Knight")));
         String entry = ChatRoleConfig.formatRole(moderator);
-        assertEquals("moderator=name:Moderator;tag:[Mod];color:A94B54;mention:true;rank:15;"
+        assertEquals("moderator=name:Moderator;color:A94B54;mention:true;rank:15;"
                 + "op:1;faction:GONDOR@gondor.knight;desc:Keeps the peace.", entry);
         ChatAccountRole again = ChatRoleConfig.parse(new String[] {entry}, null, collect)
                 .byId("moderator");

@@ -223,34 +223,34 @@ public final class ClientChatChannelStateTest {
     public void theFeedShowsClosedChannelsUntilTheyAreMuted() {
         ChatTab ooc = ChatTab.of(ChatChannel.OOC);
         ChatTab faction = ChatTab.of(ChatChannel.FACTION, "lotr:gondor");
-        assertTrue(ChatWindowFrame.feedFilter().accepts(ooc));
+        assertTrue(ChatLineFilter.of(ChatWindowFrame.feedTabs()).accepts(ooc));
         assertTrue(ChatWindowLayout.close(ChatChannel.OOC));
-        assertTrue(ChatWindowFrame.feedFilter().accepts(ooc));
+        assertTrue(ChatLineFilter.of(ChatWindowFrame.feedTabs()).accepts(ooc));
         ChatWindowLayout.setMuted(ChatChannel.OOC, true);
-        assertFalse(ChatWindowFrame.feedFilter().accepts(ooc));
+        assertFalse(ChatLineFilter.of(ChatWindowFrame.feedTabs()).accepts(ooc));
         assertTrue(ChatWindowLayout.restore(ChatChannel.OOC));
-        assertFalse(ChatWindowFrame.feedFilter().accepts(ooc));
+        assertFalse(ChatLineFilter.of(ChatWindowFrame.feedTabs()).accepts(ooc));
         ChatWindowLayout.setMuted(ChatChannel.OOC, false);
-        assertTrue(ChatWindowFrame.feedFilter().accepts(ooc));
+        assertTrue(ChatLineFilter.of(ChatWindowFrame.feedTabs()).accepts(ooc));
         // A channel the player cannot see is not in the feed, open or not.
-        assertFalse(ChatWindowFrame.feedFilter().accepts(faction));
+        assertFalse(ChatLineFilter.of(ChatWindowFrame.feedTabs()).accepts(faction));
         acceptRoster("lotr:gondor");
-        assertTrue(ChatWindowFrame.feedFilter().accepts(faction));
+        assertTrue(ChatLineFilter.of(ChatWindowFrame.feedTabs()).accepts(faction));
         assertTrue(ChatWindowLayout.close(ChatChannel.FACTION));
-        assertTrue(ChatWindowFrame.feedFilter().accepts(faction));
+        assertTrue(ChatLineFilter.of(ChatWindowFrame.feedTabs()).accepts(faction));
         // Untracked lines ride with the console wherever, or whether, it
         // is placed.
-        assertTrue(ChatWindowFrame.feedFilter().accepts(null));
+        assertTrue(ChatLineFilter.of(ChatWindowFrame.feedTabs()).accepts(null));
         assertTrue(ChatWindowLayout.close(ChatChannel.CONSOLE));
-        assertTrue(ChatWindowFrame.feedFilter().accepts(null));
+        assertTrue(ChatLineFilter.of(ChatWindowFrame.feedTabs()).accepts(null));
         // Conversations are read from their open tabs only.
         ChatTab whisper = ChatWindowLayout.openWhisper("Bilbo", null);
-        assertTrue(ChatWindowFrame.feedFilter().accepts(whisper));
+        assertTrue(ChatLineFilter.of(ChatWindowFrame.feedTabs()).accepts(whisper));
         ChatWindowLayout.setMuted(whisper, true);
-        assertFalse(ChatWindowFrame.feedFilter().accepts(whisper));
+        assertFalse(ChatLineFilter.of(ChatWindowFrame.feedTabs()).accepts(whisper));
         // Muting mentions alone never touches the feed.
         ChatWindowLayout.setPingsMuted(ooc, true);
-        assertTrue(ChatWindowFrame.feedFilter().accepts(ooc));
+        assertTrue(ChatLineFilter.of(ChatWindowFrame.feedTabs()).accepts(ooc));
     }
 
     /**

@@ -1,11 +1,10 @@
 package com.ninuna.losttales.client.chat;
 
-import com.ninuna.losttales.client.gui.animation.LostTalesUiEasing;
-import com.ninuna.losttales.client.gui.animation.LostTalesUiTransition;
-import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.client.motion.MotionIds;
+import com.ninuna.losttales.client.motion.MotionTransition;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -591,12 +590,6 @@ final class ChatSnapLayouts {
                 right - 1.0F, bottom, argb);
     }
 
-    /** The chat's motion duration, or none while the chat's animations are off. */
-    private static int duration() {
-        return LostTalesConfig.enableChatAnimations
-                ? Math.max(1, LostTalesConfig.chatAnimationDurationMillis) : 0;
-    }
-
     /**
      * The snap bar: every layout the screen has room for in one row at
      * the top of the screen, dropping in while a window is carried within
@@ -616,7 +609,8 @@ final class ChatSnapLayouts {
         /** The bar's clearing from the top of the screen. */
         static final int TOP_MARGIN = 2;
 
-        private final LostTalesUiTransition shown = new LostTalesUiTransition();
+        private final MotionTransition shown =
+                new MotionTransition(MotionIds.CHAT_SNAP_LAYOUTS, true);
         private boolean wanted;
         private Panel panel;
         /** The zone the pointer was last on, or -1. */
@@ -706,8 +700,7 @@ final class ChatSnapLayouts {
                            List<ChatWindow.ScreenFill[]> layouts,
                            int screenWidth, int screenHeight) {
             float share = this.shown.advance(System.nanoTime(),
-                    this.wanted && !layouts.isEmpty(), duration(),
-                    LostTalesUiEasing.SMOOTH);
+                    this.wanted && !layouts.isEmpty());
             if (layouts.isEmpty() || (!this.wanted && share <= 0.0F)) {
                 this.panel = null;
                 return;
@@ -739,7 +732,8 @@ final class ChatSnapLayouts {
         /** Layouts in a row of the panel. */
         static final int COLUMNS = 3;
 
-        private final LostTalesUiTransition shown = new LostTalesUiTransition();
+        private final MotionTransition shown =
+                new MotionTransition(MotionIds.CHAT_SNAP_LAYOUTS);
         /** The window the panel belongs to while it is open or going. */
         private String windowId;
         private boolean open;
@@ -911,8 +905,7 @@ final class ChatSnapLayouts {
          */
         void draw(Minecraft minecraft, ChatPointerRegions regions, int lit,
                   float opacity) {
-            float share = this.shown.advance(System.nanoTime(), this.open,
-                    duration(), LostTalesUiEasing.SMOOTH);
+            float share = this.shown.advance(System.nanoTime(), this.open);
             if (this.panel == null) {
                 return;
             }

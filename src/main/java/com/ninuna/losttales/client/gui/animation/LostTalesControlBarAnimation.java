@@ -1,13 +1,16 @@
 package com.ninuna.losttales.client.gui.animation;
 
-import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.client.motion.MotionIds;
+import com.ninuna.losttales.client.motion.Motions;
 import net.minecraft.client.gui.GuiScreen;
 import org.lwjgl.opengl.GL11;
 
-/** Secondary, slightly delayed entrance shared by bottom control strips. */
+/**
+ * Secondary, slightly delayed entrance shared by bottom control strips:
+ * after its motion's {@code delay} the strip rises its {@code travel}
+ * pixels into place ({@link MotionIds#SCREEN_CONTROL_BAR}).
+ */
 public final class LostTalesControlBarAnimation {
-    private static final float DELAY_FRACTION = 0.14F;
-    private static final float TRAVEL_PIXELS = 24.0F;
     private static final float GUI_MODELVIEW_Z = -2000.0F;
     private static Object currentScreen;
     private static long startedNanos;
@@ -54,23 +57,21 @@ public final class LostTalesControlBarAnimation {
             // screen instance after this animation handler observed it.
             onScreenOpened(screen);
         }
-        if (!LostTalesConfig.enableGuiAnimations
-                || LostTalesConfig.reducedGuiMotion
-                || screen == null || screen != currentScreen) {
+        long duration = Motions.travelNanos(MotionIds.SCREEN_CONTROL_BAR);
+        if (duration <= 0L || screen == null || screen != currentScreen) {
             return 0.0F;
         }
-        long duration = Math.max(10,
-                LostTalesConfig.guiAnimationDurationMillis) * 1000000L;
+        long delay = Motions.scaledNanos(Math.round(Motions.param(
+                MotionIds.SCREEN_CONTROL_BAR, "delay", 0.0F)));
         float progress = LostTalesGuiEasing.clamp(
-                (System.nanoTime() - startedNanos) / (float)duration);
+                (System.nanoTime() - startedNanos - delay) / (float)duration);
         return offsetForProgress(progress);
     }
 
+    /** How far below its place the strip stands {@code progress} of the way through its rise. */
     static float offsetForProgress(float progress) {
-        float local = LostTalesGuiEasing.clamp(
-                (progress - DELAY_FRACTION)
-                        / (1.0F - DELAY_FRACTION));
-        return TRAVEL_PIXELS
-                * (1.0F - LostTalesGuiEasing.subtleBackOut(local));
+        return Motions.param(MotionIds.SCREEN_CONTROL_BAR, "travel", 24.0F)
+                * (1.0F - Motions.curve(MotionIds.SCREEN_CONTROL_BAR)
+                        .apply(progress));
     }
 }

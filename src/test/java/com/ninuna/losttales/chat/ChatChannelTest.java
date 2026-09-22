@@ -46,13 +46,13 @@ public final class ChatChannelTest {
         assertEquals(null, ChatChannel.fromId(null));
     }
 
-    /** OOC &amp; Discord is one channel under the id {@code ooc}; the bare word Discord names nothing. */
+    /** OOC is one channel under the id {@code ooc}; the bare word Discord names nothing. */
     @Test
     public void oocAndDiscordIsOneChannel() {
         assertEquals(null, ChatChannel.fromId("discord"));
         assertEquals(ChatChannel.OOC, ChatChannel.fromId(" OOC "));
         assertEquals("ooc", ChatChannel.OOC.getId());
-        assertEquals("OOC & Discord", ChatChannel.OOC.getDisplayName());
+        assertEquals("OOC", ChatChannel.OOC.getDisplayName());
         assertEquals(ChatRecipientRule.SELF,
                 ChatChannel.CONSOLE.getRecipientRule());
         assertEquals(ChatRecipientRule.CONSOLE_READERS,
@@ -85,7 +85,7 @@ public final class ChatChannelTest {
                 ChatChannel.PARTY.getAccess());
         assertEquals(ChatChannelAccess.NONE,
                 ChatChannel.ADMIN.getAccess());
-        // OOC & Discord is a room everyone is in, bridged or not; the
+        // OOC is a room everyone is in, bridged or not; the
         // bridge is the server's configuration and never a gate.
         assertEquals(ChatRecipientRule.GLOBAL,
                 ChatChannel.OOC.getRecipientRule());

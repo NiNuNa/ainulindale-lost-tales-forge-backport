@@ -32,14 +32,14 @@ public final class ChatSnapLayoutsTest {
 
     @Before
     public void setUp() {
-        this.animations = LostTalesConfig.enableChatAnimations;
+        this.animations = LostTalesConfig.animations;
         // Motion off: every transition stands where it is bound.
-        LostTalesConfig.enableChatAnimations = false;
+        LostTalesConfig.animations = false;
     }
 
     @After
     public void tearDown() {
-        LostTalesConfig.enableChatAnimations = this.animations;
+        LostTalesConfig.animations = this.animations;
     }
 
     /**

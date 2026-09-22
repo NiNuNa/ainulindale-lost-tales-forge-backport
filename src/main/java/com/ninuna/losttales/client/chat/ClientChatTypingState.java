@@ -138,7 +138,9 @@ public final class ClientChatTypingState {
         return false;
     }
 
+    /** Forgets every typist, and the feed's typing row goes with them. */
     public static synchronized void clear() {
         TYPING.clear();
+        ChatFeedTyping.clear();
     }
 }

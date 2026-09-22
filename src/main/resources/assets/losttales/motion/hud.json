@@ -1,0 +1,7 @@
+{
+  "hud.chat.hide": {
+    "about": "The HUD fading out as one layer while the chat is open, and back in once it closes.",
+    "duration": 180,
+    "curve": "ease_in_out"
+  }
+}

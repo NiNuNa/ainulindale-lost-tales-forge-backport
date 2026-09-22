@@ -47,7 +47,7 @@ public final class DiscordMessageLinkRewriterTest {
         assertEquals(1757522000000L, known.askedId);
         assertEquals("https://discord.com/channels/9/8/30",
                 DiscordMessageLinkRewriter.outbound(
-                        "#OOC&Discord/1757522000000", known));
+                        "#OOC/1757522000000", known));
     }
 
     @Test

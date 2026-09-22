@@ -1,6 +1,7 @@
 package com.ninuna.losttales.gui.hud.compass;
 
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiEasing;
+import com.ninuna.losttales.client.motion.Motions;
 
 /**
  * Frame-rate-independent motion for the compass height chevrons.
@@ -13,6 +14,10 @@ import com.ninuna.losttales.client.gui.animation.LostTalesGuiEasing;
  * cue rather than visual noise. The second escalation arrow follows a moment
  * later and collapses softly when the marker returns to the first height
  * tier.</p>
+ *
+ * <p>It is timed by hand rather than by a motion file and keeps to the
+ * motion settings: it plays at the speed in force, and with the Animations
+ * switch off or motion reduced the chevrons simply stand.</p>
  */
 final class LostTalesCompassHeightIndicatorAnimation {
     static final long ENTER_NANOS = 280_000_000L;
@@ -61,8 +66,12 @@ final class LostTalesCompassHeightIndicatorAnimation {
             this.tierChangedNanos = nowNanos;
         }
 
-        long markerAge = elapsed(this.markerStartedNanos, nowNanos);
-        long tierAge = elapsed(this.tierChangedNanos, nowNanos);
+        if (!Motions.flourishes()) {
+            Pose still = stillPose();
+            return new Frame(still, this.tier >= 2 ? still : null);
+        }
+        long markerAge = Motions.paced(elapsed(this.markerStartedNanos, nowNanos));
+        long tierAge = Motions.paced(elapsed(this.tierChangedNanos, nowNanos));
         boolean secondaryExiting = this.tier == 1
                 && this.previousTier == 2 && tierAge < EXIT_NANOS;
         boolean showSecondary = this.tier >= 2 || secondaryExiting;
@@ -81,8 +90,9 @@ final class LostTalesCompassHeightIndicatorAnimation {
         } else {
             long secondaryStarted = this.previousTier == 1
                     ? this.tierChangedNanos : this.markerStartedNanos;
-            secondaryEntryAge = delayedElapsed(
-                    secondaryStarted, nowNanos, SECONDARY_DELAY_NANOS);
+            secondaryEntryAge = delayed(
+                    Motions.paced(elapsed(secondaryStarted, nowNanos)),
+                    SECONDARY_DELAY_NANOS);
         }
         Pose secondary = sample(secondaryEntryAge, markerAge,
                 direction, 1, arrowCount, exitProgress);
@@ -163,9 +173,13 @@ final class LostTalesCompassHeightIndicatorAnimation {
         return smoothStep(1.0F - distance / 0.15F);
     }
 
-    private static long delayedElapsed(long earlier, long later, long delay) {
-        long value = elapsed(earlier, later);
-        return value <= delay ? 0L : value - delay;
+    private static long delayed(long age, long delay) {
+        return age <= delay ? 0L : age - delay;
+    }
+
+    /** A chevron with nothing moving: settled, between two pulses. */
+    static Pose stillPose() {
+        return new Pose(0.0F, 1.0F, 1.0F, 0.82F, 1.0F, 0.0F);
     }
 
     private static long elapsed(long earlier, long later) {

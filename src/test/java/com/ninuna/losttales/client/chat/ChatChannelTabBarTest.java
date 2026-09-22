@@ -375,12 +375,11 @@ public final class ChatChannelTabBarTest {
         ChatChannelTabBar.Tab tab = tab(0.0D, 60.0D, 100.0D, 60.0D);
         tab.leg.settle(false);
         long start = 1000000000L;
-        float early = tab.leg.advance(start, true, 180,
-                com.ninuna.losttales.client.gui.animation.LostTalesUiEasing
-                        .EASE_OUT);
-        float halfway = tab.leg.advance(start + 90L * 1000000L, true, 180,
-                com.ninuna.losttales.client.gui.animation.LostTalesUiEasing
-                        .EASE_OUT);
+        long half = com.ninuna.losttales.client.motion.Motions.nanos(
+                com.ninuna.losttales.client.motion.MotionIds.CHAT_TAB_MOVE)
+                / 2L;
+        float early = tab.leg.advance(start, true);
+        float halfway = tab.leg.advance(start + half, true);
         assertEquals(0.0F, early, 1.0E-6F);
         // Fast away: past three quarters of the way at half the time.
         assertTrue(halfway > 0.8F);
@@ -414,8 +413,8 @@ public final class ChatChannelTabBarTest {
                                             double toLeft, double toWidth) {
         ChatChannelTabBar.Tab tab = new ChatChannelTabBar.Tab(
                 ChatTab.of(com.ninuna.losttales.chat.ChatChannel.ALL), 0, null,
-                "Global", 30, 30, 0, 0, "", 0, false, 0, (int)toWidth, -1,
-                -1, -1, false);
+                "Global", 30, 30, 0, 0, "", 0, false, false, 0, (int)toWidth,
+                -1, -1, -1, false);
         tab.standAt(fromLeft, fromWidth, 1.0D / 3.0D);
         tab.toLeft = toLeft;
         tab.exactWidth = toWidth;

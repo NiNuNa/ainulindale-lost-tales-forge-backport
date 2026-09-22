@@ -474,6 +474,73 @@ public final class CharacterService {
         return CharacterOperationResult.success(changed, roster, character);
     }
 
+    /**
+     * A character's description and age, which its player may change at
+     * any time; everything else creation settled stays as it is. A lore
+     * character's are refused: its record passes from player to player,
+     * and what one player wrote would be read as the next one's.
+     */
+    public synchronized CharacterOperationResult updateProfile(
+            EntityPlayerMP player, long expectedRosterRevision, UUID characterId,
+            String requestedDescription, int requestedAge) {
+        CharacterValidationResult playerValidation = validateServerPlayer(player);
+        if (!playerValidation.isValid()) {
+            return CharacterOperationResult.failure(playerValidation.getErrorId(), null);
+        }
+        CharacterValidationResult managementValidation =
+                CharacterValidator.validatePlayerCanManage(player);
+        if (!managementValidation.isValid()) {
+            CharacterErrorId error = managementValidation.getErrorId();
+            if (error == CharacterErrorId.PLAYER_DEAD
+                    || error == CharacterErrorId.PLAYER_SLEEPING) {
+                error = CharacterErrorId.PROFILE_UPDATE_NOT_ALLOWED;
+            }
+            return CharacterOperationResult.failure(error, null);
+        }
+
+        CharacterWorldData data = getData(player);
+        if (data == null) {
+            return CharacterOperationResult.failure(CharacterErrorId.INTERNAL_ERROR, null);
+        }
+        if (data.isReadOnlyForNewerVersion()) {
+            return CharacterOperationResult.failure(CharacterErrorId.STORAGE_READ_ONLY, null);
+        }
+        CharacterRoster roster = data.getOrCreateRoster(player.getUniqueID());
+        CharacterValidationResult reference = CharacterValidator.validateCharacterReference(
+                roster, characterId, expectedRosterRevision);
+        if (!reference.isValid()) {
+            return CharacterOperationResult.failure(reference.getErrorId(), roster);
+        }
+        CharacterErrorId lore = refuseLoreCharacter(player, characterId,
+                CharacterErrorId.LORE_CHARACTER_CANNOT_EDIT);
+        if (lore != CharacterErrorId.NONE) {
+            return CharacterOperationResult.failure(lore, roster);
+        }
+        String description = CharacterValidator.normalizeDescription(
+                requestedDescription);
+        CharacterValidationResult profile = CharacterValidator.validateProfile(
+                description, requestedAge);
+        if (!profile.isValid()) {
+            return CharacterOperationResult.failure(profile.getErrorId(), roster);
+        }
+
+        RoleplayCharacter current = roster.getCharacter(characterId);
+        if (current.getAge() == requestedAge
+                && current.getDescription().equals(description)) {
+            return CharacterOperationResult.success(false, roster, current);
+        }
+        RoleplayCharacter updated = RoleplayCharacter.builder(current)
+                .description(description)
+                .age(requestedAge)
+                .build();
+        if (!roster.replaceCharacter(updated)) {
+            return CharacterOperationResult.failure(CharacterErrorId.INTERNAL_ERROR, roster);
+        }
+        roster.incrementRevision();
+        data.saveRoster(roster);
+        return CharacterOperationResult.success(true, roster, updated);
+    }
+
     public synchronized CharacterOperationResult deleteCharacter(
             EntityPlayerMP player, long expectedRosterRevision, UUID characterId) {
         CharacterValidationResult playerValidation = validateServerPlayer(player);
@@ -519,27 +586,37 @@ public final class CharacterService {
             return CharacterOperationResult.failure(
                     CharacterErrorId.DELETE_DEFAULT_CHARACTER, roster);
         }
+        CharacterErrorId lore = refuseLoreCharacter(player, characterId,
+                CharacterErrorId.LORE_CHARACTER_CANNOT_DELETE);
+        if (lore != CharacterErrorId.NONE) {
+            return CharacterOperationResult.failure(lore, roster);
+        }
+        return CharacterDeletionService.getInstance().delete(
+                player, data, roster, character);
+    }
+
+    /**
+     * {@code refusal} when the character is a lore character's record,
+     * and {@link CharacterErrorId#NONE} when it is not. An ownership index
+     * that cannot be read cannot prove it is not, so it refuses too until
+     * an administrator repairs the index.
+     */
+    private static CharacterErrorId refuseLoreCharacter(EntityPlayerMP player,
+                                                        UUID characterId,
+                                                        CharacterErrorId refusal) {
         try {
             LoreCharacterOwnershipWorldData loreOwnership =
                     LoreCharacterOwnershipStorage.get(player.worldObj);
             if (loreOwnership.isReadOnly()) {
-                // A corrupt ownership index cannot prove that this identity is
-                // deletable, so fail closed until an administrator repairs it.
-                return CharacterOperationResult.failure(
-                        CharacterErrorId.LORE_CHARACTER_OWNERSHIP_STORAGE_READ_ONLY,
-                        roster);
+                return CharacterErrorId.LORE_CHARACTER_OWNERSHIP_STORAGE_READ_ONLY;
             }
-            if (loreOwnership.getRecordByCharacterId(characterId) != null) {
-                return CharacterOperationResult.failure(
-                        CharacterErrorId.LORE_CHARACTER_CANNOT_DELETE, roster);
-            }
+            return loreOwnership.getRecordByCharacterId(characterId) != null
+                    ? refusal : CharacterErrorId.NONE;
         } catch (RuntimeException exception) {
-            return CharacterOperationResult.failure(
-                    CharacterErrorId.LORE_CHARACTER_OWNERSHIP_STORAGE_READ_ONLY,
-                    roster);
+            FMLLog.warning("[%s] Lore character ownership could not be read for character %s: %s",
+                    LostTalesMetaData.MOD_ID, characterId, exception.toString());
+            return CharacterErrorId.LORE_CHARACTER_OWNERSHIP_STORAGE_READ_ONLY;
         }
-        return CharacterDeletionService.getInstance().delete(
-                player, data, roster, character);
     }
 
     private CharacterValidationResult validateServerPlayer(EntityPlayerMP player) {

@@ -17,19 +17,19 @@ import net.minecraft.util.IChatComponent;
 
 /**
  * Where the game's announcements become the bridge's notices, each
- * linked to the game's own line announcing the same thing. Every
+ * linked to the game's own line announcing the same thing and posted to
+ * the Discord channels linked to that line's channel alone: an
+ * achievement or a death to Global's, a join or a leave to OOC's. Every
  * announcement passes the server's broadcast seam
  * ({@code ServerConfigurationManager.sendChatMsg}, patched by the
  * coremod), where the chat gives the line its message id: the death
- * messages, the vanilla and LOTR achievement announcements, and the
- * server's own lines for starting and stopping are posted from there,
- * by the same translation keys the client files them under OOC &amp;
- * Discord with. Joins and leaves are posted from FML's login and logout
- * events, which follow their broadcast on the same tick and carry the
- * player — the join line goes out before the server lists the player —
- * so the line's id waits here for its event. Everything else that
- * crosses the seam — a {@code /say}, another mod's broadcast — is left
- * alone.
+ * messages and the vanilla and LOTR achievement announcements are posted
+ * from there, by the same translation keys the client files them with.
+ * Joins and leaves are posted from FML's login and logout events, which
+ * follow their broadcast on the same tick and carry the player — the
+ * join line goes out before the server lists the player — so the line's
+ * id waits here for its event. Everything else that crosses the seam — a
+ * {@code /say}, another mod's broadcast — is left alone.
  *
  * <p>A broadcast is taken as it was sent: the death message is vanilla's
  * (or LOTR's, or another mod's) and already names the character where
@@ -69,7 +69,9 @@ public final class DiscordGameEventRelay {
                 player.getCommandSenderName(),
                 DiscordAvatarUrl.forPlayer(player)),
                 takeLine(ChatSystemLineClassifier.Kind.JOIN,
-                        player.getCommandSenderName()));
+                        player.getCommandSenderName()),
+                ChatSystemLineClassifier.channelOf(
+                        ChatSystemLineClassifier.Kind.JOIN));
         bridge.requestStatusRefresh();
     }
 
@@ -84,7 +86,9 @@ public final class DiscordGameEventRelay {
                 player.getCommandSenderName(),
                 DiscordAvatarUrl.forPlayer(player)),
                 takeLine(ChatSystemLineClassifier.Kind.LEAVE,
-                        player.getCommandSenderName()));
+                        player.getCommandSenderName()),
+                ChatSystemLineClassifier.channelOf(
+                        ChatSystemLineClassifier.Kind.LEAVE));
         // The player is still on the list while this fires; the count
         // is taken on the next tick, when they are gone.
         bridge.requestStatusRefresh();
@@ -109,18 +113,11 @@ public final class DiscordGameEventRelay {
             case LEAVE:
                 noteLine(kind, subjectAccountName(message), messageId);
                 return;
-            case SERVER_STARTED:
-                bridge.announce(DiscordServerNotices.serverStarted(),
-                        messageId);
-                return;
-            case SERVER_STOPPING:
-                bridge.announce(DiscordServerNotices.serverStopping(),
-                        messageId);
-                return;
             default:
                 DiscordNotice notice = noticeFor(message);
                 if (notice != null) {
-                    bridge.announce(notice, messageId);
+                    bridge.announce(notice, messageId,
+                            ChatSystemLineClassifier.channelOf(kind));
                 }
         }
     }

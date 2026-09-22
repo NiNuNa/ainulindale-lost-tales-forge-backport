@@ -11,11 +11,11 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * A role an account line can show ahead of the sender's name on the
- * account-identity channels — OOC, Operator, Console, whispers, Discord
- * — and that a channel can be gated by. A role is a presentation fact
- * the server states when it builds the line: which roles, and what
- * colour they and the name take, live here and nowhere else.
+ * A role an account holds on the account-identity channels — OOC,
+ * Operator, Console, whispers, Discord — which colours the sender's name
+ * there, can be mentioned, and can gate a channel. A role is a
+ * presentation fact the server states when it builds the line: which
+ * roles, and what colour the name takes, live here and nowhere else.
  *
  * <p>One role is built in: the Lost Tales Team mark, a vanity role held
  * by the accounts the code recognises and by nobody else. Every other
@@ -25,8 +25,7 @@ import java.util.Set;
  * force are the {@link ChatRoleCatalog}; the wire form of a set of them
  * is a bit set, one bit per role in the catalogue's order, so a role can
  * be added without disturbing the layout. Precedence — which role
- * colours the name, which tag comes first — is the catalogue's order,
- * by rank. Rank is presentation only: what a role lets its holders
+ * colours the name — is the catalogue's order, by rank. Rank is presentation only: what a role lets its holders
  * <em>do</em> is the permissions the config grants it, read by
  * {@code LostTalesPermissions} against the permissions in force and
  * never sent to a client.</p>
@@ -38,10 +37,9 @@ public final class ChatAccountRole {
     public static final int MAX_TEXT_LENGTH = 64;
     public static final int MAX_DESCRIPTION_LENGTH = 256;
 
-    /** The absence of a role; never tagged, never a bit. */
-    public static final ChatAccountRole NONE = new ChatAccountRole("", -1, "", "", "",
-            "", "", 0, false, true, Integer.MAX_VALUE, Collections.<ChatRoleSource>emptyList(),
-            null);
+    /** The absence of a role; never a bit. */
+    public static final ChatAccountRole NONE = new ChatAccountRole("", -1, "", "", "", 0,
+            false, true, Integer.MAX_VALUE, Collections.<ChatRoleSource>emptyList(), null);
     /**
      * A member of the Lost Tales team, recognised by account id in the
      * code and by nothing else. A vanity mark: it names nobody the server
@@ -49,15 +47,13 @@ public final class ChatAccountRole {
      * config or command edits or assigns it.
      */
     public static final ChatAccountRole TEAM = new ChatAccountRole(TEAM_ID, 0,
-            "chat.losttales.role.team", "chat.losttales.tag.team", "", "", "",
+            "chat.losttales.role.team", "", "",
             LostTalesColors.rgb(LostTalesColors.MULBERRY), false, true, 0,
             Collections.<ChatRoleSource>emptyList(), null);
     private final String id;
     private final int bitIndex;
     private final String nameKey;
-    private final String tagKey;
     private final String name;
-    private final String tag;
     private final String description;
     private final int color;
     private final boolean mentionable;
@@ -66,17 +62,14 @@ public final class ChatAccountRole {
     private final List<ChatRoleSource> sources;
     private final Set<String> grants;
 
-    ChatAccountRole(String id, int bitIndex, String nameKey, String tagKey,
-                    String name, String tag, String description, int color,
-                    boolean mentionable, boolean locked, int rank,
-                    List<ChatRoleSource> sources,
+    ChatAccountRole(String id, int bitIndex, String nameKey, String name,
+                    String description, int color, boolean mentionable,
+                    boolean locked, int rank, List<ChatRoleSource> sources,
                     Set<String> grants) {
         this.id = id == null ? "" : id.trim().toLowerCase(Locale.ROOT);
         this.bitIndex = bitIndex;
         this.nameKey = nameKey == null ? "" : nameKey;
-        this.tagKey = tagKey == null ? "" : tagKey;
         this.name = clip(name, MAX_TEXT_LENGTH);
-        this.tag = clip(tag, MAX_TEXT_LENGTH);
         this.description = clip(description, MAX_DESCRIPTION_LENGTH);
         this.color = color & 0xFFFFFF;
         this.mentionable = mentionable;
@@ -89,33 +82,32 @@ public final class ChatAccountRole {
 
     /** The same role at another bit, which is the catalogue's to give. */
     ChatAccountRole withBit(int bitIndex) {
-        return new ChatAccountRole(this.id, bitIndex, this.nameKey, this.tagKey, this.name,
-                this.tag, this.description, this.color, this.mentionable, this.locked,
-                this.rank, this.sources, this.grants);
+        return new ChatAccountRole(this.id, bitIndex, this.nameKey, this.name,
+                this.description, this.color, this.mentionable, this.locked, this.rank,
+                this.sources, this.grants);
     }
 
     /** The same role with another look; what an edit of a built-in changes. */
-    public ChatAccountRole withLook(String name, String tag, String description, int color,
+    public ChatAccountRole withLook(String name, String description, int color,
                                     boolean mentionable, int rank) {
-        return new ChatAccountRole(this.id, this.bitIndex, this.nameKey, this.tagKey, name,
-                tag, description, color, mentionable, this.locked, rank, this.sources,
-                this.grants);
+        return new ChatAccountRole(this.id, this.bitIndex, this.nameKey, name, description,
+                color, mentionable, this.locked, rank, this.sources, this.grants);
     }
 
     /** A config-defined role that grants nothing, before the catalogue gives it a bit. */
-    public static ChatAccountRole custom(String id, String name, String tag, String description,
+    public static ChatAccountRole custom(String id, String name, String description,
                                          int color, boolean mentionable, int rank,
                                          List<ChatRoleSource> sources) {
-        return custom(id, name, tag, description, color, mentionable, rank, sources, null);
+        return custom(id, name, description, color, mentionable, rank, sources, null);
     }
 
     /** A config-defined role with its grants, before the catalogue gives it a bit. */
-    public static ChatAccountRole custom(String id, String name, String tag, String description,
+    public static ChatAccountRole custom(String id, String name, String description,
                                          int color, boolean mentionable, int rank,
                                          List<ChatRoleSource> sources,
                                          Set<String> grants) {
-        return new ChatAccountRole(id, -1, "", "", name, tag, description, color,
-                mentionable, false, rank, sources, grants);
+        return new ChatAccountRole(id, -1, "", name, description, color, mentionable,
+                false, rank, sources, grants);
     }
 
     /**
@@ -123,11 +115,10 @@ public final class ChatAccountRole {
      * wire carries no grants: what a role allows is the server's alone.
      */
     public static ChatAccountRole fromWire(String id, int bitIndex, String nameKey,
-                                           String tagKey, String name, String tag,
-                                           String description, int color,
+                                           String name, String description, int color,
                                            boolean mentionable, boolean locked, int rank) {
-        return new ChatAccountRole(id, bitIndex, nameKey, tagKey, name, tag, description,
-                color, mentionable, locked, rank, null, null);
+        return new ChatAccountRole(id, bitIndex, nameKey, name, description, color,
+                mentionable, locked, rank, null, null);
     }
 
     public String getId() {
@@ -163,14 +154,9 @@ public final class ChatAccountRole {
         return this.locked;
     }
 
-    /** Precedence: lower comes first, colours the name and is tagged first. */
+    /** Precedence: lower comes first and colours the name. */
     public int getRank() {
         return this.rank;
-    }
-
-    /** Language key of the bracketed tag; empty for a config role. */
-    public String getTagKey() {
-        return this.tagKey;
     }
 
     /** Language key of the plain role name; empty for a config role. */
@@ -181,10 +167,6 @@ public final class ChatAccountRole {
     /** The literal name a config role was given; empty for a built-in. */
     public String getName() {
         return this.name;
-    }
-
-    public String getTag() {
-        return this.tag;
     }
 
     /** The literal description; empty for a built-in, whose key describes it. */
@@ -220,17 +202,6 @@ public final class ChatAccountRole {
         return this.nameKey.length() == 0 ? "" : StatCollector.translateToLocal(this.nameKey);
     }
 
-    /** The bracketed tag as shown ahead of the sender's name. */
-    public String getDisplayTag() {
-        if (this.tag.length() > 0) {
-            return this.tag;
-        }
-        if (this.tagKey.length() > 0) {
-            return StatCollector.translateToLocal(this.tagKey);
-        }
-        return this.name.length() > 0 ? "[" + this.name + "]" : "";
-    }
-
     /** The description as shown on the role's card; empty for none. */
     public String getDisplayDescription() {
         if (this.description.length() > 0) {
@@ -244,7 +215,7 @@ public final class ChatAccountRole {
         return translated.equals(key) ? "" : translated;
     }
 
-    /** The role's RGB: its tag and, when primary, the sender's name. */
+    /** The role's RGB: the sender's name where it is primary, and a mention of it. */
     public int getColor() {
         return this.color;
     }

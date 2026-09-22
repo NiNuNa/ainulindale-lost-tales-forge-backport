@@ -6,10 +6,10 @@ import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
+import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatDeliveryMark;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
-import com.ninuna.losttales.client.gui.animation.LostTalesUiEasing;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiRegionBlur;
 import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
@@ -25,6 +25,8 @@ import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiNewChat;
 import net.minecraft.client.gui.ScaledResolution;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.client.motion.Motions;
+import com.ninuna.losttales.client.motion.MotionIds;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.IChatComponent;
@@ -204,6 +206,10 @@ final class LostTalesChatOverlayRenderer {
      * {@link ChatGroupRuns}.
      */
     static final int FEED_FADE_TICKS = 200;
+    /** Between the speech bubble and the words of the feed's typing row. */
+    private static final int FEED_TYPING_BUBBLE_GAP = 3;
+    /** Between two conversations on the feed's typing row. */
+    private static final int FEED_TYPING_SEGMENT_GAP = 8;
     /**
      * The opacity of the hatch laid over message rows the history does
      * not reach yet, at the middle of the hatched region: a third, since
@@ -509,7 +515,12 @@ final class LostTalesChatOverlayRenderer {
             ChatWindowFrame.of(windows.get(index)).drawn = false;
         }
         ChatWindowFrame frame = ChatWindowFrame.feed();
-        ChatLineFilter filter = ChatWindowFrame.feedFilter();
+        List<ChatTab> feedTabs = ChatWindowFrame.feedTabs();
+        ChatLineFilter filter = ChatLineFilter.of(feedTabs);
+        // Someone typing into a conversation the feed carries raises
+        // the lines a row, and the typing row comes up under them.
+        float typingShare = ChatFeedTyping.advance(
+                ChatFeedTyping.segments(feedTabs), System.nanoTime());
         List<ChatLine> own = ChatWindowLines.forFeed(minecraft, chat, filter);
         List<ChatLine> lines = own != null ? own
                 : ClientChatChannelViews.visibleLines(drawn, filter);
@@ -518,14 +529,15 @@ final class LostTalesChatOverlayRenderer {
         frame.resolveDividerRow(lines, null);
         frame.resolveRows();
         // The frame is captured and blurred only while the feed has a
-        // line still on screen; the rest of the time gameplay pays
-        // nothing for the feed's blur.
+        // line or its typing row on screen; the rest of the time
+        // gameplay pays nothing for the feed's blur.
         if (LostTalesConfig.enableChatBackgroundBlur
                 && LostTalesConfig.enableGuiBackgroundBlur
-                && !lines.isEmpty() && lines.get(0) != null
-                && minecraft.ingameGUI.getUpdateCounter()
-                        - lines.get(0).getUpdatedCounter()
-                                < FEED_FADE_TICKS) {
+                && (typingShare > 0.0F || !lines.isEmpty()
+                        && lines.get(0) != null
+                        && minecraft.ingameGUI.getUpdateCounter()
+                                - lines.get(0).getUpdatedCounter()
+                                        < FEED_FADE_TICKS)) {
             LostTalesGuiRegionBlur.getInstance().capture(minecraft,
                     partialTicks, (float)LostTalesConfig.guiBlurStrength);
         }
@@ -538,13 +550,115 @@ final class LostTalesChatOverlayRenderer {
         // its lines begin the edge gap from its edge and wear the small
         // head beside the name.
         ChatTimestampColumn columns = ChatTimestampColumn.feed();
+        float originX = (float)ChatWindowFrame.snapToDisplayPixels(
+                frame.drawnLeft() + columns.messageX() * scale);
+        float baseline = (float)frame.drawnBaseline();
+        // The lines stand raised by the typing row's share of a row, on
+        // whole display pixels as the stack always moves.
+        float lift = snapToDisplayPixels(minecraft,
+                typingShare * LINE_HEIGHT * scale);
+        int chatWidth = ChatWindowPlacement.chatWidth(minecraft);
         drawWindow(minecraft, chat, frame, filter, lines, 0.0D,
-                (float)frame.room,
-                (float)ChatWindowFrame.snapToDisplayPixels(
-                        frame.drawnLeft() + columns.messageX() * scale),
-                (float)frame.drawnBaseline(), false,
-                LostTalesGuiAnimationSample.SETTLED,
-                ChatWindowPlacement.chatWidth(minecraft), columns);
+                (float)frame.room, originX, baseline - lift, false,
+                LostTalesGuiAnimationSample.SETTLED, chatWidth, columns);
+        if (typingShare > 0.0F) {
+            drawFeedTyping(minecraft, ChatFeedTyping.shown(), originX,
+                    baseline, lift, scale, chatWidth, columns);
+        }
+    }
+
+    /**
+     * The closed feed's typing row, under its newest line: each
+     * conversation someone is typing into, named as the feed names a
+     * line's channel, then the speech bubble where a line's head would
+     * stand and the typing line's words and dots. A conversation that
+     * does not fit whole is left out, and the first is cut to fit. It
+     * wears a band and a blur of its own, as every feed line does, and
+     * rises with the lines from the feed's bottom edge, cut there, so it
+     * never lies over the line above it.
+     */
+    private static void drawFeedTyping(Minecraft minecraft,
+                                       List<ChatFeedTyping.Segment> segments,
+                                       float originX, float baseline,
+                                       float lift, float scale,
+                                       int chatWidth,
+                                       ChatTimestampColumn columns) {
+        FontRenderer font = minecraft.fontRenderer;
+        int alpha = Math.round(255.0F
+                * LostTalesChatVisualStyle.chatOpacity(minecraft));
+        if (segments.isEmpty() || font == null
+                || alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+            return;
+        }
+        ChatFeedAlignment alignment = ChatFeedAlignment.current();
+        int room = MathHelper.ceiling_float_int(chatWidth / scale);
+        float panelLeft = -columns.messageX();
+        float panelRight = panelLeft + room + 6.0F;
+        LostTalesUiSheet bubble = LostTalesUiSheet.SPEECH_BUBBLE;
+        // Each conversation's prefix and words, as far as the row holds.
+        List<String> prefixes = new ArrayList<String>();
+        List<String> words = new ArrayList<String>();
+        int used = 0;
+        for (ChatFeedTyping.Segment segment : segments) {
+            String prefix = (segment.tab.isWhisper()
+                    ? ChatChannel.WHISPER.getDisplayName()
+                    : ClientChatChannelState.displayName(segment.tab)) + ": ";
+            String said = ChatTypingLine.words(segment.names);
+            int width = font.getStringWidth(prefix) + bubble.getWidth()
+                    + FEED_TYPING_BUBBLE_GAP + ChatTypingLine.width(font, said);
+            int gap = prefixes.isEmpty() ? 0 : FEED_TYPING_SEGMENT_GAP;
+            if (!prefixes.isEmpty() && used + gap + width > room) {
+                break;
+            }
+            prefixes.add(prefix);
+            words.add(said);
+            used += gap + width;
+        }
+        // The row's bottom edge, a row under the lines' raised baseline.
+        float rowBottom = baseline - lift + LINE_HEIGHT * scale;
+        boolean clipped = beginVerticalClip(minecraft,
+                baseline - LINE_HEIGHT * scale, baseline, true);
+        GL11.glPushMatrix();
+        try {
+            GL11.glTranslatef(originX, rowBottom, 0.0F);
+            GL11.glScalef(scale, scale, 1.0F);
+            LostTalesGuiRegionBlur.getInstance().drawFadedRegionInTransform(
+                    panelLeft, -LINE_HEIGHT, panelRight, 0.0F,
+                    alignment.bandWeights(), originX, rowBottom, scale,
+                    alpha / 255.0F);
+            drawChatBackdrop(panelLeft, -LINE_HEIGHT, panelRight, 0.0F,
+                    alpha / 2, LostTalesChatVisualStyle.backdropRgb(),
+                    alignment.bandWeights());
+            GL11.glEnable(GL11.GL_BLEND);
+            // The row stands against the feed's edge by its ink, as a
+            // line does; its last dot has one column of spacing after it.
+            int start = Math.round(floorToStackPixel(alignment.rowShift(room,
+                    0.0F, Math.min(used, room) - 1.0F)));
+            int x = start;
+            int y = -TEXT_OFFSET;
+            long now = System.nanoTime();
+            for (int index = 0; index < prefixes.size(); index++) {
+                if (index > 0) {
+                    x += FEED_TYPING_SEGMENT_GAP;
+                }
+                ChatTab tab = segments.get(index).tab;
+                LostTalesChatVisualStyle.drawColored(font,
+                        prefixes.get(index), x, y,
+                        ClientChatChannelState.displayColor(tab), alpha);
+                x += font.getStringWidth(prefixes.get(index));
+                bubble.drawWithShadow(x, y + centredBoxTop(bubble.getHeight()),
+                        alpha);
+                x += bubble.getWidth() + FEED_TYPING_BUBBLE_GAP;
+                // Only a first conversation longer than the row is cut.
+                x += ChatTypingLine.draw(font, words.get(index), x, y,
+                        used > room ? room - (x - start) : Integer.MAX_VALUE,
+                        alpha, now);
+            }
+        } finally {
+            GL11.glPopMatrix();
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+            endVerticalClip(clipped);
+        }
     }
 
     static List<ChatLine> getDrawnLines(GuiNewChat chat)
@@ -633,8 +747,19 @@ final class LostTalesChatOverlayRenderer {
                     || lines.get(band.viewIndex) == null) {
                 return null;
             }
-            IChatComponent lineRoot =
-                    lines.get(band.viewIndex).func_151461_a();
+            ChatLine hitLine = lines.get(band.viewIndex);
+            IChatComponent lineRoot = hitLine.func_151461_a();
+            // The words of a message under the pointer stand where its
+            // motion has carried them, and answer there.
+            float localX = band.localX;
+            if (ChatLayoutMarker.isBodyRow(lineRoot)
+                    && !ChatReactionMarker.isReactionRow(lineRoot)) {
+                ChatRowMotion motion = ChatLineHover.rowMotion(
+                        hitLine.getChatLineID(), System.nanoTime());
+                if (motion != null) {
+                    localX -= motion.endX();
+                }
+            }
             int cursor = 0;
             int index = -1;
             for (Object value : lineRoot) {
@@ -649,7 +774,7 @@ final class LostTalesChatOverlayRenderer {
                 int start = cursor;
                 cursor += LostTalesChatVisualStyle.partWidth(
                         minecraft.fontRenderer, part, true);
-                if (band.localX < cursor) {
+                if (localX < cursor) {
                     return new Hit(part, lineRoot, index, band, start,
                             cursor - start);
                 }
@@ -1554,8 +1679,16 @@ final class LostTalesChatOverlayRenderer {
                         GL11.glScalef(rowScale, rowScale, 1.0F);
                     }
                     ChatHeadMarker.Data marker = findMarker(component);
+                    // A message under the pointer moves its words and
+                    // their chevron; its name row, its quote and its
+                    // reactions stay where they are.
+                    ChatRowMotion rowMotion = open && !reactionRow
+                            && ChatLayoutMarker.isBodyRow(component)
+                            ? ChatLineHover.rowMotion(line.getChatLineID(),
+                                    System.nanoTime())
+                            : null;
                     LostTalesChatVisualStyle.drawFormatted(font,
-                            component, marker, 0, 0, alpha, open);
+                            component, marker, 0, 0, alpha, open, rowMotion);
                     drawHead(minecraft, font, component,
                             HEAD_TOP_OFFSET, alpha, open);
                     if (open && ChatLayoutMarker.isHeaderRow(component)) {
@@ -1576,13 +1709,20 @@ final class LostTalesChatOverlayRenderer {
                         // not posted yet, or could not post, says so after
                         // the message's lowest row of words.
                         markedLineId = line.getChatLineID();
+                        // The mark rides the end of the words it follows.
+                        float wordsShift = rowMotion == null ? 0.0F
+                                : rowMotion.endX();
+                        GL11.glPushMatrix();
+                        GL11.glTranslatef(wordsShift, 0.0F, 0.0F);
                         drawDeliveryMark(frame, font, component,
                                 markedLineId, alpha,
-                                panelRight - entry - rowShift,
-                                originX + (entry + rowShift) * scale,
+                                panelRight - entry - rowShift - wordsShift,
+                                originX + (entry + rowShift + wordsShift)
+                                        * scale,
                                 originY + stackOffset
                                         + (y - lift - TEXT_OFFSET) * scale,
                                 scale, clipTop, clipBottom);
+                        GL11.glPopMatrix();
                     }
                     GL11.glPopMatrix();
                     GL11.glPopMatrix();
@@ -2337,7 +2477,6 @@ final class LostTalesChatOverlayRenderer {
     /** Shortest the thumb may get, however long the history is. */
     private static final float SCROLLBAR_MIN_THUMB = 8.0F;
     /** How long the bar takes to fade in and out. */
-    private static final double SCROLLBAR_FADE_SECONDS = 0.12D;
 
     /**
      * The window's scrollbar, measured in the stack's own (unscaled)
@@ -2366,11 +2505,9 @@ final class LostTalesChatOverlayRenderer {
         double elapsed = frame.scrollbarNanos == 0L ? 0.0D
                 : (now - frame.scrollbarNanos) / 1.0E9D;
         frame.scrollbarNanos = now;
-        frame.scrollbarProgress = LostTalesConfig.enableChatAnimations
-                ? (float)LostTalesChatMotion.approach(wanted,
-                        frame.scrollbarWanted ? 1.0D : 0.0D, elapsed,
-                        SCROLLBAR_FADE_SECONDS)
-                : (frame.scrollbarWanted ? 1.0F : 0.0F);
+        frame.scrollbarProgress = (float)Motions.follow(
+                MotionIds.CHAT_SCROLLBAR_FADE, wanted,
+                frame.scrollbarWanted ? 1.0D : 0.0D, elapsed);
         int alpha = Math.round(255.0F * opacity * frame.scrollbarProgress);
         if (contentHeight <= room + 0.01F || contentHeight <= 0.0F
                 || alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
@@ -2436,12 +2573,7 @@ final class LostTalesChatOverlayRenderer {
     private static boolean advanceJumpButton(ChatWindowFrame frame,
                                              double scrollLines) {
         boolean wanted = frame.view != null && scrollLines > 0.5D;
-        float progress = frame.jumpMotion.advance(System.nanoTime(), wanted,
-                LostTalesConfig.enableChatAnimations
-                        ? Math.max(1, LostTalesConfig
-                                .chatAnimationDurationMillis)
-                        : 0,
-                LostTalesUiEasing.SMOOTH);
+        float progress = frame.jumpMotion.advance(System.nanoTime(), wanted);
         return progress > 0.02F;
     }
 
@@ -2478,8 +2610,7 @@ final class LostTalesChatOverlayRenderer {
         if (alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
             return;
         }
-        frame.jumpButtonMotion.advance(System.nanoTime(), frame.jumpHovered,
-                LostTalesConfig.enableChatAnimations);
+        frame.jumpButtonMotion.advance(System.nanoTime(), frame.jumpHovered);
         float jumpLit = frame.jumpButtonMotion.lit();
         LostTalesUiFramedButton.drawSurface(left, top, width, JUMP_BUTTON_HEIGHT,
                 jumpLit, Math.round(alpha
@@ -4561,7 +4692,8 @@ final class LostTalesChatOverlayRenderer {
      */
     private static float entryDisplacement(ChatLineFilter filter,
                                            int scrollPosition) {
-        if (!LostTalesConfig.enableChatAnimations || scrollPosition != 0) {
+        long duration = Motions.travelNanos(MotionIds.CHAT_LINE_APPEAR);
+        if (duration <= 0L || scrollPosition != 0) {
             return 0.0F;
         }
         long started = LostTalesChatPresentation.getLastMessageNanos();
@@ -4572,8 +4704,6 @@ final class LostTalesChatOverlayRenderer {
         if (filter != null && !filter.accepts(lastTab)) {
             return 0.0F;
         }
-        long duration = Math.max(1,
-                LostTalesConfig.chatAnimationDurationMillis) * 1000000L;
         float progress = Math.min(1.0F,
                 (System.nanoTime() - started) / (float)duration);
         return LostTalesChatMotion.message(progress).stackOffsetY;
@@ -4581,7 +4711,8 @@ final class LostTalesChatOverlayRenderer {
 
     /** Horizontal entry offset for lines of the newest message only. */
     private static float entrySlide(ChatLine line) {
-        if (!LostTalesConfig.enableChatAnimations || line == null
+        long duration = Motions.travelNanos(MotionIds.CHAT_LINE_APPEAR);
+        if (duration <= 0L || line == null
                 || !LostTalesChatPresentation.isLastMessage(
                         line.getChatLineID())) {
             return 0.0F;
@@ -4590,15 +4721,18 @@ final class LostTalesChatOverlayRenderer {
         if (started <= 0L) {
             return 0.0F;
         }
-        long duration = Math.max(1,
-                LostTalesConfig.chatAnimationDurationMillis) * 1000000L;
         return LostTalesChatMotion.message(
                 (System.nanoTime() - started) / (float)duration)
                 .slideOffsetX;
     }
 
+    /**
+     * The newest message's fade in: part of its entrance, and all that is
+     * left of it under reduced motion.
+     */
     private static float entryOpacity(ChatLine line) {
-        if (!LostTalesConfig.enableChatAnimations || line == null
+        long duration = Motions.nanos(MotionIds.CHAT_LINE_APPEAR);
+        if (duration <= 0L || line == null
                 || !LostTalesChatPresentation.isLastMessage(
                         line.getChatLineID())) {
             return 1.0F;
@@ -4607,8 +4741,6 @@ final class LostTalesChatOverlayRenderer {
         if (started <= 0L) {
             return 1.0F;
         }
-        long duration = Math.max(1,
-                LostTalesConfig.chatAnimationDurationMillis) * 1000000L;
         return LostTalesChatMotion.message(
                 (System.nanoTime() - started) / (float)duration).opacity;
     }

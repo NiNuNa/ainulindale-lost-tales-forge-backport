@@ -4,9 +4,6 @@ import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
-import com.ninuna.losttales.client.gui.animation.LostTalesUiEasing;
-import com.ninuna.losttales.client.gui.animation.LostTalesUiTransition;
-import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -17,6 +14,9 @@ import java.util.Set;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import com.ninuna.losttales.client.gui.tooltip.LostTalesTooltipSmoothing;
+import com.ninuna.losttales.client.motion.Motions;
+import com.ninuna.losttales.client.motion.MotionIds;
+import com.ninuna.losttales.client.motion.MotionTransition;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.util.StatCollector;
@@ -78,8 +78,8 @@ abstract class ChatPickerPanel {
      * from nothing, so a button clicked twice quickly never makes the
      * panel collapse and grow again.
      */
-    private final LostTalesUiTransition openness =
-            new LostTalesUiTransition();
+    private final MotionTransition openness =
+            new MotionTransition(MotionIds.CHAT_PICKER_OPEN);
     private ChatInputField searchField;
     private int buttonIndex;
     private Entry hoveredEntry;
@@ -171,15 +171,13 @@ abstract class ChatPickerPanel {
         long now = System.nanoTime();
         double elapsed = (now - this.scrollNanos) / 1.0E9D;
         this.scrollNanos = now;
-        if (!LostTalesConfig.enableChatAnimations
-                || Math.abs(this.scroll - this.renderedScroll)
-                        <= SCROLL_SNAP_PIXELS) {
+        if (Math.abs(this.scroll - this.renderedScroll)
+                <= SCROLL_SNAP_PIXELS) {
             this.renderedScroll = this.scroll;
             return;
         }
-        this.renderedScroll = LostTalesChatMotion.approach(
-                this.renderedScroll, this.scroll, elapsed,
-                LostTalesChatMotion.SCROLL_EASE_SECONDS);
+        this.renderedScroll = Motions.followTravel(MotionIds.CHAT_SCROLL,
+                this.renderedScroll, this.scroll, elapsed);
     }
 
     /** Button left edge; {@code anchorRight} is the input bar's right edge. */
@@ -338,8 +336,7 @@ abstract class ChatPickerPanel {
                 screenHeight);
         boolean lifted = this.targetOpen || inside;
         this.buttonMotion.advance(System.nanoTime(), lifted, lifted,
-                inside && org.lwjgl.input.Mouse.isButtonDown(0),
-                LostTalesConfig.enableChatAnimations);
+                inside && org.lwjgl.input.Mouse.isButtonDown(0));
         // A bare glyph with the shared shadow, centred in the button's
         // square; hover and open states lift it rather than painting a
         // backdrop, and the glyph crosses to its lit artwork rather than
@@ -457,8 +454,7 @@ abstract class ChatPickerPanel {
                 LostTalesChatVisualStyle.argb(
                         LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB,
                         Math.min(alpha, 0xA0)));
-        this.magnifierMotion.advance(System.nanoTime(), lit, false, false,
-                LostTalesConfig.enableChatAnimations);
+        this.magnifierMotion.advance(System.nanoTime(), lit, false, false);
         // The magnifier stands on the capitals of what is typed beside
         // it, as every icon in a chat row does. It is not a button of
         // its own, so it lights with the field and never travels.
@@ -683,12 +679,7 @@ abstract class ChatPickerPanel {
     }
 
     private float openProgress() {
-        return this.openness.advance(System.nanoTime(), this.targetOpen,
-                LostTalesConfig.enableChatAnimations
-                        ? Math.max(1, LostTalesConfig
-                                .chatSelectorAnimationDurationMillis)
-                        : 0,
-                LostTalesUiEasing.SETTLE);
+        return this.openness.advance(System.nanoTime(), this.targetOpen);
     }
 
     int panelWidth() {

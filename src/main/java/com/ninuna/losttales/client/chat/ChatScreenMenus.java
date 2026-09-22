@@ -4,6 +4,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelSuggester;
 import com.ninuna.losttales.chat.ChatMessageIds;
+import com.ninuna.losttales.client.input.LostTalesKeyPress;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
@@ -79,6 +80,8 @@ final class ChatScreenMenus {
     private static final String ENTRY_DETACH = "detach";
     private static final String ENTRY_MARK_READ = "mark_read";
     private static final String ENTRY_STATUS_LINE = "characters:status_line";
+    /** The start of a character's row id in the characters menu. */
+    private static final String ENTRY_CHARACTER_PREFIX = "characters:char:";
     private static final String ENTRY_STATUS_LINE_KEEP = "status_line:keep";
     private static final String ENTRY_STATUS_LINE_CLEAR = "status_line:clear";
     private static final String ENTRY_JUMP_UNREAD = "jump_unread";
@@ -234,25 +237,56 @@ final class ChatScreenMenus {
     }
 
     /**
-     * A searchable list takes plain typing while it is open; true when
-     * the key went into it.
+     * A list that is typed into takes the keys while it is open: what is
+     * typed goes into its field, Enter takes the first row the typing
+     * found, and no key reaches the chat bar the list covers. Only the
+     * chat's own Ctrl shortcuts reach past it. True when the list took
+     * the key.
      */
-    boolean handleKeyTyped(char typedChar, int keyCode) {
-        if (POPUP_STATUS_LINE.equals(this.popup.kind()) && this.popup.isOpen()
-                && (keyCode == org.lwjgl.input.Keyboard.KEY_RETURN
-                        || keyCode == org.lwjgl.input.Keyboard.KEY_NUMPADENTER)) {
-            // Enter keeps what is in the field, as the first row does.
-            ClientChatPresence.setLine(this.statusLineIdentity,
-                    this.popup.filter());
-            this.popup.close();
-            return true;
-        }
-        if (!this.popup.isSearchable()
-                || !this.popup.handleKeyTyped(typedChar, keyCode)) {
+    boolean handleKeyTyped(LostTalesKeyPress press) {
+        if (!this.popup.isOpen() || !this.popup.isSearchable()) {
             return false;
         }
-        refreshSearchPanel();
+        if (press.is(Keyboard.KEY_RETURN)
+                || press.is(Keyboard.KEY_NUMPADENTER)) {
+            ChatPopupMenu.Entry found = firstFound();
+            if (found != null && !handlePopupEntry(found)) {
+                this.popup.close();
+            }
+            return true;
+        }
+        if (press.command && !ChatPopupMenu.isFieldCommand(press)) {
+            return false;
+        }
+        if (this.popup.handleKeyTyped(press)) {
+            refreshSearchPanel();
+        }
         return true;
+    }
+
+    /**
+     * The row Enter takes: in the status line's field its first row,
+     * which keeps what the field holds; elsewhere the first row the
+     * typing found, and none while nothing is typed. The rows typing
+     * does not narrow, the Narrator's and the statuses, are never
+     * taken.
+     */
+    private ChatPopupMenu.Entry firstFound() {
+        String kind = this.popup.kind();
+        boolean statusLine = POPUP_STATUS_LINE.equals(kind);
+        if (!statusLine && this.popup.filter().length() == 0) {
+            return null;
+        }
+        for (ChatPopupMenu.Entry entry : this.popup.entries()) {
+            if (entry.header || entry.passive) {
+                continue;
+            }
+            if (statusLine || POPUP_SEARCH.equals(kind)
+                    || entry.id.startsWith(ENTRY_CHARACTER_PREFIX)) {
+                return entry;
+            }
+        }
+        return null;
     }
 
     /** An entry acts and closes the menu; an outside press continues behind it. */
@@ -1215,7 +1249,7 @@ final class ChatScreenMenus {
         for (ClientChatIdentities.Identity identity : identities) {
             if (matchesFilter(identity.name, filter)) {
                 rows.add(characterEntry(
-                        "characters:char:" + identity.characterId,
+                        ENTRY_CHARACTER_PREFIX + identity.characterId,
                         identity, self));
             }
         }
@@ -1251,13 +1285,13 @@ final class ChatScreenMenus {
             }
             return;
         }
-        if (!entry.id.startsWith("characters:char:")) {
+        if (!entry.id.startsWith(ENTRY_CHARACTER_PREFIX)) {
             return;
         }
         UUID characterId;
         try {
             characterId = UUID.fromString(
-                    entry.id.substring("characters:char:".length()));
+                    entry.id.substring(ENTRY_CHARACTER_PREFIX.length()));
         } catch (IllegalArgumentException ignored) {
             return;
         }

@@ -5,9 +5,11 @@ import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.client.input.LostTalesInputBinding;
 import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
+import com.ninuna.losttales.client.input.LostTalesKeyPress;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
-import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.client.motion.Motions;
+import com.ninuna.losttales.client.motion.MotionIds;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -16,7 +18,10 @@ import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.util.ChatAllowedCharacters;
 import net.minecraft.util.StatCollector;
+import org.lwjgl.input.Keyboard;
 
 /**
  * A small vertical list of actions opened from a control or the pointer —
@@ -317,29 +322,60 @@ final class ChatPopupMenu {
     }
 
     /**
-     * Offers a keystroke to the field. Answers whether it was taken:
-     * printable characters and Backspace are, and nothing else, so the
-     * shortcuts that walk and close the menu still reach the screen.
+     * Offers a press to the field and answers whether it changed what
+     * the field holds: a typed character while there is room, Backspace
+     * (with Ctrl, back to the start of the word) and Ctrl+V.
      */
-    boolean handleKeyTyped(char typedChar, int keyCode) {
+    boolean handleKeyTyped(LostTalesKeyPress press) {
         if (this.filter == null) {
             return false;
         }
-        if (keyCode == org.lwjgl.input.Keyboard.KEY_BACK) {
-            if (this.filter.length() > 0) {
-                this.filter.setLength(this.filter.length() - 1);
-                this.filterNanos = System.nanoTime();
+        if (press.is(Keyboard.KEY_BACK)) {
+            if (this.filter.length() == 0) {
+                return false;
             }
-            return true;
-        }
-        if (net.minecraft.util.ChatAllowedCharacters
-                .isAllowedCharacter(typedChar)
-                && this.filter.length() < MAX_FILTER_LENGTH) {
-            this.filter.append(typedChar);
+            this.filter.setLength(press.command ? wordStart(this.filter)
+                    : this.filter.length() - 1);
             this.filterNanos = System.nanoTime();
             return true;
         }
-        return false;
+        String typed = press.types ? String.valueOf(press.character)
+                : press.isCommand(Keyboard.KEY_V)
+                        ? GuiScreen.getClipboardString() : "";
+        String kept = ChatAllowedCharacters.filerAllowedCharacters(typed);
+        int room = MAX_FILTER_LENGTH - this.filter.length();
+        if (kept.length() == 0 || room <= 0) {
+            return false;
+        }
+        this.filter.append(kept.length() > room ? kept.substring(0, room)
+                : kept);
+        this.filterNanos = System.nanoTime();
+        return true;
+    }
+
+    /**
+     * The Ctrl presses a field keeps from the screen behind it, so none
+     * of them edits the chat bar the list covers: Backspace and Delete,
+     * and the clipboard's and selection's letters. Ctrl+Shift+A is the
+     * chat's own and passes.
+     */
+    static boolean isFieldCommand(LostTalesKeyPress press) {
+        return press.is(Keyboard.KEY_BACK) || press.is(Keyboard.KEY_DELETE)
+                || press.is(Keyboard.KEY_C) || press.is(Keyboard.KEY_V)
+                || press.is(Keyboard.KEY_X)
+                || press.is(Keyboard.KEY_A) && !press.shift;
+    }
+
+    /** Where the last word of {@code text} starts, the spaces after it counted in. */
+    static int wordStart(CharSequence text) {
+        int at = text.length();
+        while (at > 0 && text.charAt(at - 1) == ' ') {
+            at--;
+        }
+        while (at > 0 && text.charAt(at - 1) != ' ') {
+            at--;
+        }
+        return at;
     }
 
     /**
@@ -361,6 +397,11 @@ final class ChatPopupMenu {
     /** Where the open list hangs from, for a list opened in its place. */
     Anchor anchor() {
         return this.anchor;
+    }
+
+    /** The open list's rows, top first. */
+    List<Entry> entries() {
+        return Collections.unmodifiableList(this.entries);
     }
 
     String kind() {
@@ -656,15 +697,12 @@ final class ChatPopupMenu {
         long now = System.nanoTime();
         double elapsed = (now - this.scrollNanos) / 1.0E9D;
         this.scrollNanos = now;
-        if (!LostTalesConfig.enableChatAnimations
-                || Math.abs(this.scrollRows - this.renderedScrollRows)
-                        <= 0.01D) {
+        if (Math.abs(this.scrollRows - this.renderedScrollRows) <= 0.01D) {
             this.renderedScrollRows = this.scrollRows;
             return;
         }
-        this.renderedScrollRows = LostTalesChatMotion.approach(
-                this.renderedScrollRows, this.scrollRows, elapsed,
-                LostTalesChatMotion.SCROLL_EASE_SECONDS);
+        this.renderedScrollRows = Motions.followTravel(MotionIds.CHAT_SCROLL,
+                this.renderedScrollRows, this.scrollRows, elapsed);
     }
 
     /**

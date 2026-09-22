@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.mapmarker;
 
+import com.ninuna.losttales.client.motion.Motions;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import java.util.Arrays;
@@ -227,7 +228,9 @@ public final class LostTalesMapDecorationRenderer {
      * comes back on a long, slow swell of its own — a full run out and back
      * takes about two and a half minutes of world time. Deterministic, worked
      * out from the world clock, costing nothing to remember and identical on
-     * every client.</p>
+     * every client. Like the clouds' sway it is a loop that runs while
+     * nothing happens, so the Animations switch and reduced motion moor the
+     * ship where it stands.</p>
      */
     private static final float SHIP_DRIFT_RADIANS_PER_TICK = 0.0021F;
     private static final float TWO_PI = (float)(Math.PI * 2.0D);
@@ -400,7 +403,7 @@ public final class LostTalesMapDecorationRenderer {
             int viewportYMin, int viewportYMax) {
         boolean mirror = LostTalesMapDecorationPlacement.siteMirror(
                 cellX, cellY, kind.channel);
-        if (kind.drift > 0.0F) {
+        if (kind.drift > 0.0F && Motions.flourishes()) {
             // The sail is out: how far it has run this tick, and which way it
             // is pointing while it does.
             float heading = LostTalesLotrMapAtmosphere.cellNoise(

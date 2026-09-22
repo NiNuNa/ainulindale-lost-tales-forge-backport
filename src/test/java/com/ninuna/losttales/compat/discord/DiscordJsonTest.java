@@ -110,7 +110,7 @@ public final class DiscordJsonTest {
 
         // No picture, no icon field; the colour is never negative.
         JsonObject plain = new JsonParser().parse(DiscordJson.webhookEmbedBody(
-                DiscordServerNotices.serverStarted())).getAsJsonObject();
+                DiscordServerNotices.playerJoined("Steve", ""))).getAsJsonObject();
         JsonObject plainEmbed = plain.getAsJsonArray("embeds").get(0)
                 .getAsJsonObject();
         assertFalse(plainEmbed.getAsJsonObject("author").has("icon_url"));

@@ -7,17 +7,14 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
  * The words, colours and icons of the bridge's own posts, and the words
  * of the channel topic: short, one line each, and the same every time,
  * so a Discord reader learns them at a glance. Each kind of notice has a
- * fixed icon and a fixed edge colour from the mod's own palette — greens
- * for the server coming up and a player arriving, reds for going down
- * and leaving, a subdued plum for a death, honey for an achievement — so
- * a glance at the channel says what happened before the words are read.
- * Notice text renders as plain text and can ping nobody; the topic is
- * bounded at Discord's own limit.
+ * fixed icon and a fixed edge colour from the mod's own palette — green
+ * for a player arriving, salmon for leaving, a subdued plum for a death,
+ * honey for an achievement — so a glance at the channel says what
+ * happened before the words are read. Whether the server is up is the
+ * topic's to say, never a post's. Notice text renders as plain text and
+ * can ping nobody; the topic is bounded at Discord's own limit.
  */
 public final class DiscordServerNotices {
-    /** Green and red circles, as Discord draws them. */
-    private static final String ONLINE = "🟢";
-    private static final String OFFLINE = "🔴";
     private static final String JOINED = "✅";
     private static final String LEFT = "👋";
     private static final String DIED = "💀";
@@ -26,18 +23,6 @@ public final class DiscordServerNotices {
     /** Discord caps a channel topic at 1024 characters; ours is far shorter. */
     private static final int MAX_TOPIC_LENGTH = 1024;
     private DiscordServerNotices() {}
-
-    public static DiscordNotice serverStarted() {
-        return new DiscordNotice(DiscordNotice.Kind.SERVER_STARTED,
-                ONLINE + " Server started", "",
-                LostTalesColors.rgb(LostTalesColors.FERN_GREEN));
-    }
-
-    public static DiscordNotice serverStopping() {
-        return new DiscordNotice(DiscordNotice.Kind.SERVER_STOPPING,
-                OFFLINE + " Server shutting down", "",
-                LostTalesColors.rgb(LostTalesColors.CRIMSON));
-    }
 
     /** {@code ✅ Name joined the game}, with the account's head. */
     public static DiscordNotice playerJoined(String name, String iconUrl) {

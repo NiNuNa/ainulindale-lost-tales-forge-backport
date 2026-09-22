@@ -9,12 +9,14 @@ import com.ninuna.losttales.client.character.ClientCharacterDisplayNames;
 import com.ninuna.losttales.client.character.ClientCharacterNetwork;
 import com.ninuna.losttales.client.character.ClientCharacterRaceAttributes;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
+import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.character.registry.CharacterRaceGameplayProfile;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.gui.screen.character.LostTalesCharacterCapeGui;
+import com.ninuna.losttales.gui.screen.character.LostTalesCharacterProfileEditGui;
 import com.ninuna.losttales.gui.screen.character.LostTalesCharacterProfileRouterGui;
 import com.ninuna.losttales.gui.screen.character.LostTalesCharacterRosterGui;
 import com.ninuna.losttales.gui.screen.party.LostTalesPartyManagementGui;
@@ -53,6 +55,12 @@ public class LostTalesCharacterInfoGui extends GuiScreen
     private static final int BUTTON_BACK = 2;
     private static final int BUTTON_CAPE = 3;
     private static final int BUTTON_PARTY = 4;
+    private static final int BUTTON_EDIT = 5;
+    /** The action row starts right of Back, with a gap between them. */
+    private static final int ACTION_ROW_LEFT = 88;
+    private static final int ACTION_COUNT = 4;
+    private static final int ACTION_GAP = 6;
+    private static final int ACTION_WIDTH_MAX = 112;
 
     private final GuiScreen parent;
     private int modelPanelX;
@@ -77,28 +85,36 @@ public class LostTalesCharacterInfoGui extends GuiScreen
         if (this.mc != null) {
             LostTalesClientQuestDefinitionStore.ensureLoaded(this.mc.getResourceManager());
         }
-        int actionGap = 6;
-        int actionWidth = Math.max(64, Math.min(112,
-                (this.width - 104 - actionGap * 2) / 3));
+        // The row fills the room right of Back and never runs into it; a
+        // label too long for its button is shortened.
+        int actionWidth = Math.min(ACTION_WIDTH_MAX,
+                (this.width - 8 - ACTION_ROW_LEFT - ACTION_GAP * (ACTION_COUNT - 1))
+                        / ACTION_COUNT);
         int actionStart = this.width - 8
-                - actionWidth * 3 - actionGap * 2;
-        this.buttonList.add(new GuiButton(BUTTON_PARTY, actionStart,
-                this.height - 28, actionWidth, 20,
-                I18n.format("gui.losttales.party.button")));
-        this.buttonList.add(new GuiButton(BUTTON_CAPE,
-                actionStart + actionWidth + actionGap,
-                this.height - 28, actionWidth, 20,
-                I18n.format("gui.losttales.character.cape.button")));
-        this.buttonList.add(new GuiButton(BUTTON_MANAGE,
-                actionStart + (actionWidth + actionGap) * 2,
-                this.height - 28, actionWidth, 20,
-                I18n.format("gui.losttales.character.manage")));
+                - actionWidth * ACTION_COUNT - ACTION_GAP * (ACTION_COUNT - 1);
+        addAction(BUTTON_PARTY, 0, actionStart, actionWidth,
+                "gui.losttales.party.button");
+        addAction(BUTTON_EDIT, 1, actionStart, actionWidth,
+                "gui.losttales.character.profile_edit.button");
+        addAction(BUTTON_CAPE, 2, actionStart, actionWidth,
+                "gui.losttales.character.cape.button");
+        addAction(BUTTON_MANAGE, 3, actionStart, actionWidth,
+                "gui.losttales.character.manage");
         this.buttonList.add(new GuiButton(BUTTON_BACK, 8,
                 this.height - 28, 72, 20, I18n.format("gui.back")));
         if (ClientCharacterRosterCache.getState() == ClientCharacterRosterCache.SyncState.UNKNOWN
                 || ClientCharacterRosterCache.getState() == ClientCharacterRosterCache.SyncState.ERROR) {
             this.rosterRequestId = ClientCharacterNetwork.requestRoster();
         }
+    }
+
+    private void addAction(int id, int index, int actionStart, int actionWidth,
+                           String labelKey) {
+        this.buttonList.add(new GuiButton(id,
+                actionStart + (actionWidth + ACTION_GAP) * index,
+                this.height - 28, actionWidth, 20,
+                LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj,
+                        I18n.format(labelKey), actionWidth - 6)));
     }
 
     @Override
@@ -109,7 +125,7 @@ public class LostTalesCharacterInfoGui extends GuiScreen
             if (snapshot == null) {
                 this.mc.displayGuiScreen(new LostTalesCharacterProfileRouterGui(this.parent));
             }
-            updateCapeButton(snapshot);
+            updateActionButtons(snapshot);
         } else if (state == ClientCharacterRosterCache.SyncState.ERROR
                 && (this.rosterRequestId == 0
                 || !ClientCharacterRosterCache.isRequestPending(this.rosterRequestId))) {
@@ -173,14 +189,31 @@ public class LostTalesCharacterInfoGui extends GuiScreen
                 LostTalesSkyrimUiStyle.HUD_LABEL);
     }
 
-    /** Cape settings belong to the identity being played, the account included. */
-    private void updateCapeButton(CharacterRosterSnapshot snapshot) {
+    /**
+     * Cape settings belong to the identity being played, the account
+     * included. The description and age belong to a character record, so
+     * editing them waits until the world has made one, and a lore
+     * character's are its story's.
+     */
+    private void updateActionButtons(CharacterRosterSnapshot snapshot) {
+        CharacterSummary active = editableCharacter(snapshot);
         for (Object object : this.buttonList) {
             GuiButton button = (GuiButton) object;
             if (button.id == BUTTON_CAPE) {
                 button.enabled = snapshot != null;
+            } else if (button.id == BUTTON_EDIT) {
+                button.enabled = active != null;
             }
         }
+    }
+
+    /** The character being played when its profile may be edited, else null. */
+    private static CharacterSummary editableCharacter(CharacterRosterSnapshot snapshot) {
+        CharacterSummary active = snapshot == null ? null : snapshot.getActiveCharacter();
+        return active == null
+                || ClientLoreCharacterCache.findOwnedCharacter(
+                        active.getCharacterId()) != null
+                ? null : active;
     }
 
     private void drawCharacterPanel(int x, int y, int width, int height) {
@@ -210,8 +243,6 @@ public class LostTalesCharacterInfoGui extends GuiScreen
         }
         lineY = drawLabelValue(I18n.format("gui.losttales.character.name"),
                 character.getName(), x, lineY, width);
-        lineY = drawLabelValue(I18n.format("gui.losttales.character.level"),
-                String.valueOf(character.getRoleplayLevel()), x, lineY, width);
         lineY = drawLabelValue(I18n.format("gui.losttales.character.race"),
                 ClientCharacterDisplayNames.race(character.getRaceId()), x, lineY, width);
         lineY = drawLabelValue(I18n.format("gui.losttales.character.gender"),
@@ -503,6 +534,15 @@ public class LostTalesCharacterInfoGui extends GuiScreen
         }
         if (button.id == BUTTON_CAPE) {
             this.mc.displayGuiScreen(new LostTalesCharacterCapeGui(this));
+            return;
+        }
+        if (button.id == BUTTON_EDIT) {
+            CharacterSummary active = editableCharacter(
+                    ClientCharacterRosterCache.getSnapshot());
+            if (active != null) {
+                this.mc.displayGuiScreen(new LostTalesCharacterProfileEditGui(
+                        this, active.getCharacterId()));
+            }
             return;
         }
         if (button.id == BUTTON_MANAGE) {

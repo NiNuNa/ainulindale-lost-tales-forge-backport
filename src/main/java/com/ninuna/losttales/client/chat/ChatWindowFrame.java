@@ -4,9 +4,8 @@ import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.chat.ChatChannel;
-import com.ninuna.losttales.client.gui.animation.LostTalesUiEasing;
-import com.ninuna.losttales.client.gui.animation.LostTalesUiTransition;
-import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.client.motion.MotionIds;
+import com.ninuna.losttales.client.motion.MotionTransition;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -124,22 +123,21 @@ final class ChatWindowFrame {
     float motionX;
     float motionY;
     /** The timestamp area driving in and out: 1 while it stands whole. */
-    private final LostTalesUiTransition areaMotion = new LostTalesUiTransition();
+    private final MotionTransition areaMotion =
+            new MotionTransition(MotionIds.CHAT_WINDOW_AREA, true);
     /**
      * A window made from tabs carried out of their row fades in as it
      * appears under the pointer, on one quick beat; every other window
      * stands whole from the start.
      */
-    private final LostTalesUiTransition appearMotion =
-            new LostTalesUiTransition();
+    private final MotionTransition appearMotion =
+            new MotionTransition(MotionIds.CHAT_WINDOW_APPEAR);
     private boolean appearing;
     /** How much of its opacity the window showed when last drawn. */
     private float shown = 1.0F;
-    /** How long a window made from carried tabs takes to fade in. */
-    private static final int APPEAR_MILLIS = 150;
     /** The member list coming out and going away: 1 while it stands whole. */
-    private final LostTalesUiTransition membersMotion =
-            new LostTalesUiTransition();
+    private final MotionTransition membersMotion =
+            new MotionTransition(MotionIds.CHAT_WINDOW_MEMBERS, true);
     /**
      * How far the window has come along its glide to the part of the
      * screen it fills, or back to its own box, eased from the moment it
@@ -148,8 +146,8 @@ final class ChatWindowFrame {
      * null for the window's own box) to what it is bound for
      * ({@link #fillLegTo}, none for the window's own box).
      */
-    private final LostTalesUiTransition fillMotion =
-            new LostTalesUiTransition();
+    private final MotionTransition fillMotion =
+            new MotionTransition(MotionIds.CHAT_WINDOW_FILL, true);
     /** Whether {@link #fillMotion} has been advanced at all yet. */
     private boolean fillSeen;
     private ChatWindowPlacement.Box fillLegFrom;
@@ -185,11 +183,11 @@ final class ChatWindowFrame {
     float jumpPillRight;
     float jumpPillBottom;
     /**
-     * The button's fly-in from below the rule, eased over the chat's
-     * animation duration like every other glide, so it arrives rather
-     * than creeping to a stop.
+     * The button's fly-in from below the rule, eased on its motion like
+     * every other glide, so it arrives rather than creeping to a stop.
      */
-    final LostTalesUiTransition jumpMotion = new LostTalesUiTransition();
+    final MotionTransition jumpMotion =
+            new MotionTransition(MotionIds.CHAT_JUMP_SHOW, true);
     /**
      * The hovered message's toolbar as drawn this frame, in screen GUI
      * pixels; width zero while none was drawn. Recorded from the draw
@@ -280,8 +278,7 @@ final class ChatWindowFrame {
             return this.toolbarMotions[0];
         }
         boolean on = kind == this.hoveredToolbarKind;
-        this.toolbarMotions[kind].advance(nowNanos, on,
-                LostTalesConfig.enableChatAnimations);
+        this.toolbarMotions[kind].advance(nowNanos, on);
         return this.toolbarMotions[kind];
     }
 
@@ -437,14 +434,15 @@ final class ChatWindowFrame {
     }
 
     /**
-     * The feed's filter: every channel the player can see and has not
-     * muted or hidden from the feed, whether or not it has a tab —
-     * closing a tab hides the tab, not the channel's messages — plus
-     * every open conversation tab under the same preferences.
-     * Conversations are read from their open tabs only: a closed one is
-     * hidden until its next message reopens it.
+     * The conversations the closed feed carries, in its order: every
+     * channel the player can see and has not muted or hidden from the
+     * feed, in presentation order, whether or not it has a tab — closing
+     * a tab hides the tab, not the channel's messages — then every open
+     * conversation tab under the same preferences. Conversations are read
+     * from their open tabs only: a closed one is hidden until its next
+     * message reopens it.
      */
-    static ChatLineFilter feedFilter() {
+    static List<ChatTab> feedTabs() {
         List<ChatTab> audible = new ArrayList<ChatTab>();
         for (ChatChannel channel : ChatChannel.presentationOrder()) {
             ChatTab tab = ChatTab.of(channel);
@@ -467,7 +465,7 @@ final class ChatWindowFrame {
                 }
             }
         }
-        return ChatLineFilter.of(audible);
+        return audible;
     }
 
     /** The window's tabs the local player can currently see. */
@@ -578,12 +576,7 @@ final class ChatWindowFrame {
             this.fillLegTo = wanted;
         }
         this.fillSeen = true;
-        this.fillMotion.advance(now, true,
-                LostTalesConfig.enableChatAnimations
-                        ? Math.max(1, LostTalesConfig
-                                .chatAnimationDurationMillis)
-                        : 0,
-                LostTalesUiEasing.SMOOTH);
+        this.fillMotion.advance(now, true);
         if (this.fillLegTo == ChatWindow.ScreenFill.NONE
                 && this.fillMotion.isSettled()) {
             this.fillLegFrom = null;
@@ -602,12 +595,9 @@ final class ChatWindowFrame {
             return;
         }
         long now = System.nanoTime();
-        int duration = LostTalesConfig.enableChatAnimations
-                ? Math.max(1, LostTalesConfig.chatAnimationDurationMillis) : 0;
-        this.areaMotion.advance(now, !window.isAreaHidden(), duration,
-                LostTalesUiEasing.SMOOTH);
+        this.areaMotion.advance(now, !window.isAreaHidden());
         this.membersMotion.advance(now, !window.isMembersHidden()
-                && membersFit, duration, LostTalesUiEasing.SMOOTH);
+                && membersFit);
     }
 
     /**
@@ -629,9 +619,7 @@ final class ChatWindowFrame {
             this.shown = 1.0F;
             return 1.0F;
         }
-        float share = this.appearMotion.advance(System.nanoTime(), true,
-                LostTalesConfig.enableChatAnimations ? APPEAR_MILLIS : 0,
-                LostTalesUiEasing.EASE_OUT);
+        float share = this.appearMotion.advance(System.nanoTime(), true);
         if (this.appearMotion.isSettled()) {
             this.appearing = false;
         }

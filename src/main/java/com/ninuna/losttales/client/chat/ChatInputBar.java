@@ -14,6 +14,8 @@ import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRende
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.client.motion.Motions;
+import com.ninuna.losttales.client.motion.MotionIds;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
@@ -412,12 +414,10 @@ final class ChatInputBar {
 
     /** The bars' entrance from below, timed from the screen's opening. */
     float entranceOffset() {
-        if (!LostTalesConfig.enableChatAnimations) {
+        long duration = Motions.travelNanos(MotionIds.CHAT_BAR_APPEAR);
+        if (duration <= 0L) {
             return 0.0F;
         }
-        long duration = Math.max(1,
-                LostTalesConfig.chatInputAnimationDurationMillis)
-                * 1000000L;
         float progress = Math.max(0.0F, Math.min(1.0F,
                 (System.nanoTime() - this.entranceNanos)
                         / (float)duration));
@@ -512,8 +512,7 @@ final class ChatInputBar {
             this.noticeNanos = 0L;
             return;
         }
-        float opacity = LostTalesConfig.enableChatAnimations
-                ? noticeOpacity(ageMillis) : 1.0F;
+        float opacity = Motions.enabled() ? noticeOpacity(ageMillis) : 1.0F;
         int alpha = Math.max(LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA,
                 Math.min(255, Math.round(255.0F * opacity)));
         int popupWidth = this.font.getStringWidth(this.noticeText) + 10;
@@ -813,8 +812,7 @@ final class ChatInputBar {
         boolean hovered = isInsideToolbarToggle(mouseX, mouseY, barRight);
         int toggleLeft = toolbarToggleLeft(barRight);
         this.toolbarToggle.advance(collapsed, hovered);
-        this.toolbarToggleMotion.advance(System.nanoTime(), hovered,
-                LostTalesConfig.enableChatAnimations);
+        this.toolbarToggleMotion.advance(System.nanoTime(), hovered);
         LostTalesUiButton.beginPose(this.toolbarToggleMotion, toggleLeft,
                 barControlTop(), ChatPickerPanel.BUTTON_SIZE,
                 ChatPickerPanel.BUTTON_SIZE);
@@ -863,7 +861,7 @@ final class ChatInputBar {
         // name and glides home once it leaves, as a tab's does.
         int overflow = fit.labelWidth - fit.labelRoom;
         if (hovered && overflow > 0 && fit.labelRoom > 0
-                && LostTalesConfig.enableChatAnimations) {
+                && Motions.enabled()) {
             this.indicatorHoverSeconds += elapsed;
             this.indicatorMarquee = (float)ChatChannelTabBar.marqueeOffset(
                     this.indicatorHoverSeconds, overflow);
@@ -1126,8 +1124,7 @@ final class ChatInputBar {
         }
         boolean hovered = isInsideCharacterButton(mouseX, mouseY);
         this.characterMotion.advance(System.nanoTime(), hovered || menuOpen,
-                hovered, hovered && Mouse.isButtonDown(0),
-                LostTalesConfig.enableChatAnimations);
+                hovered, hovered && Mouse.isButtonDown(0));
         drawCharacterButton(tab, this.characterMotion);
         this.regions.add(characterButtonLeft(), characterButtonTop(),
                 characterButtonRight(),
@@ -1339,8 +1336,7 @@ final class ChatInputBar {
         int buttonLeft = sendButtonLeft(barRight);
         int controlTop = barControlTop();
         boolean hovered = isInsideSendButton(mouseX, mouseY, barRight);
-        this.sendMotion.advance(System.nanoTime(), hovered,
-                LostTalesConfig.enableChatAnimations);
+        this.sendMotion.advance(System.nanoTime(), hovered);
         drawSendGlyph(barRight, this.sendMotion);
         this.regions.add(buttonLeft, controlTop,
                 buttonLeft + ChatPickerPanel.BUTTON_SIZE,

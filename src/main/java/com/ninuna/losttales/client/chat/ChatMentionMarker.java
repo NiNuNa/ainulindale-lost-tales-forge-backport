@@ -170,9 +170,9 @@ final class ChatMentionMarker {
 
         /**
          * The targeted role, or null for an account mention. Every real
-         * role answers, not only the mentionable ones: a worn-only tag
-         * like {@code [Developer]} carries the marker for its card even
-         * though nothing can address it.
+         * role answers, not only the mentionable ones: a worn-only role
+         * like the Lost Tales Team mark carries the marker for its card
+         * even though nothing can address it.
          */
         ChatAccountRole role() {
             if (!this.account.startsWith(ROLE_TARGET_PREFIX)) {

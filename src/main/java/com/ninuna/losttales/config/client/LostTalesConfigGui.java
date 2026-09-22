@@ -2,6 +2,7 @@ package com.ninuna.losttales.config.client;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.camera.CameraPresetFileStore;
+import com.ninuna.losttales.client.motion.MotionLabScreen;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.screen.LostTalesHudPlacementGui;
 import cpw.mods.fml.client.config.DummyConfigElement;
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.Set;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.util.StatCollector;
 import net.minecraftforge.common.config.ConfigElement;
 import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.common.config.Property;
@@ -31,6 +33,7 @@ import net.minecraftforge.common.config.Property;
  */
 public class LostTalesConfigGui extends GuiConfig {
     private static final int BUTTON_HUD_PLACEMENT = 62100;
+    private static final int BUTTON_MOTION_LAB = 62101;
 
     public LostTalesConfigGui(GuiScreen parentScreen) {
         super(
@@ -49,12 +52,18 @@ public class LostTalesConfigGui extends GuiConfig {
         this.buttonList.add(new GuiButton(BUTTON_HUD_PLACEMENT,
                 Math.max(4, this.width - 154), 8, 150, 20,
                 "HUD Placement Editor"));
+        this.buttonList.add(new GuiButton(BUTTON_MOTION_LAB, 4, 8, 100, 20,
+                StatCollector.translateToLocal("gui.losttales.motionlab.open")));
     }
 
     @Override
     protected void actionPerformed(GuiButton button) {
         if (button != null && button.id == BUTTON_HUD_PLACEMENT) {
             this.mc.displayGuiScreen(new LostTalesHudPlacementGui(this));
+            return;
+        }
+        if (button != null && button.id == BUTTON_MOTION_LAB) {
+            this.mc.displayGuiScreen(new MotionLabScreen(this));
             return;
         }
         super.actionPerformed(button);
@@ -134,23 +143,16 @@ public class LostTalesConfigGui extends GuiConfig {
                 "chatQuoteSize", "chatFeedQuoteSize", "hideHudWhileChatting",
                 "chatHistoryLines",
                 "sendChatTypingStatus", "showChatTypingIndicators",
-                "enableNpcChatStyling", "showChatSpeechBubbles",
-                "enableChatAnimations", "chatAnimationDurationMillis",
-                "chatInputAnimationDurationMillis",
-                "chatSelectorAnimationDurationMillis")));
-        elements.add(group("guiAnimation",
-                "losttales.config.category.client.guiAnimation",
-                pick(client, "enableGuiAnimations",
-                        "guiAnimationDurationMillis", "guiAnimationScale",
-                        "guiAnimationEasingStyle",
-                        "guiAnimationDirection", "reducedGuiMotion",
-                        "enableGuiBackground", "guiBackgroundOpacity",
-                        "guiBackgroundFadeTimeMillis", "guiAlwaysBlur",
-                        "enableGuiBackgroundBlur", "guiBlurStrength")));
-        elements.add(group("inventoryAnimation",
-                "losttales.config.category.client.inventoryAnimation",
-                pick(client, "enableSmoothInventoryMovement",
-                        "smoothInventoryAnimationDurationMillis")));
+                "enableNpcChatStyling", "showChatSpeechBubbles")));
+        elements.add(group("motion",
+                "losttales.config.category.client.motion",
+                pick(client, "animations", "animationSpeed",
+                        "reducedMotion")));
+        elements.add(group("guiBackground",
+                "losttales.config.category.client.guiBackground",
+                pick(client, "enableGuiBackground", "guiBackgroundOpacity",
+                        "guiAlwaysBlur", "enableGuiBackgroundBlur",
+                        "guiBlurStrength")));
         List<IConfigElement> leftovers = leftovers(client, elements);
         if (!leftovers.isEmpty()) {
             elements.add(group("other", "losttales.config.category.client.other", leftovers));

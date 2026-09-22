@@ -7,9 +7,9 @@ import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
-import com.ninuna.losttales.client.gui.animation.LostTalesUiEasing;
-import com.ninuna.losttales.client.gui.animation.LostTalesUiTransition;
-import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.client.motion.MotionIds;
+import com.ninuna.losttales.client.motion.MotionTransition;
+import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -169,13 +169,6 @@ final class ChatChannelTabBar {
     static final double DRAFT_SHARE = 2.0D / 3.0D;
     static final double COG_SHARE = 1.0D / 2.0D;
     static final double CLOSE_SHARE = 1.0D / 3.0D;
-    /**
-     * How long a button takes to go or come as the row's width crosses
-     * its share: its ink fades in one half of it and its room glides in
-     * the other, so the room is there before the button shows and stays
-     * until it has gone ({@link #roomPhase}, {@link #inkPhase}).
-     */
-    private static final int BUTTON_FADE_MILLIS = 240;
     /** How far a carried tab rises off the row, and how long it takes to. */
     private static final float LIFT_PIXELS = 1.0F;
     /**
@@ -214,6 +207,11 @@ final class ChatChannelTabBar {
      */
     private static final int DRAFT_WIDTH =
             LostTalesUiSheet.DRAFT.getWidth();
+    /**
+     * The Discord mark after a tab's counters while its channel is linked
+     * to Discord: it goes and comes with the counters.
+     */
+    private static final int DISCORD_MARK_WIDTH = ChatDiscordMark.WIDTH;
     /** Hit square of a control inside the selected tab. */
     static final int CONTROL_SIZE = 7;
     static final int CONTROL_GAP = 2;
@@ -259,8 +257,6 @@ final class ChatChannelTabBar {
      * point it swapped at, which undoes it about where it was made.
      */
     private static final int SWAP_UNDO = 4;
-    /** How long a name slid along by its marquee takes to glide home. */
-    private static final double SLIDE_SECONDS = 0.10D;
     /**
      * The hover marquee that shows a cut name whole: it waits for the
      * pointer to rest, slides the name left about three letters a second
@@ -383,6 +379,8 @@ final class ChatChannelTabBar {
             new HashMap<ChatTab, Integer>();
     private final Map<ChatTab, Integer> cachedOther =
             new HashMap<ChatTab, Integer>();
+    private final Map<ChatTab, Boolean> cachedDiscord =
+            new HashMap<ChatTab, Boolean>();
     private final Map<ChatTab, Boolean> cachedDraft =
             new HashMap<ChatTab, Boolean>();
     private final Map<ChatTab, Boolean> cachedMuted =
@@ -495,13 +493,24 @@ final class ChatChannelTabBar {
     private double sharedFrom = DEFAULT_TAB_WIDTH;
     private double sharedTo = DEFAULT_TAB_WIDTH;
     private double sharedDrawn = DEFAULT_TAB_WIDTH;
-    private final LostTalesUiTransition sharedLeg = new LostTalesUiTransition();
-    /** How far every tab shows each of the buttons it gives up by width. */
-    private final LostTalesUiTransition draftShown = new LostTalesUiTransition();
-    private final LostTalesUiTransition cogShown = new LostTalesUiTransition();
-    private final LostTalesUiTransition closeShown = new LostTalesUiTransition();
+    private final MotionTransition sharedLeg =
+            new MotionTransition(MotionIds.CHAT_TAB_MOVE, true);
+    /**
+     * How far every tab shows each of the buttons it gives up by width,
+     * each going or coming as the row's width crosses its share: its ink
+     * fades in one half of the transition and its room glides in the
+     * other, so the room is there before the button shows and stays until
+     * it has gone ({@link #roomPhase}, {@link #inkPhase}).
+     */
+    private final MotionTransition draftShown =
+            new MotionTransition(MotionIds.CHAT_TAB_CONTROLS);
+    private final MotionTransition cogShown =
+            new MotionTransition(MotionIds.CHAT_TAB_CONTROLS);
+    private final MotionTransition closeShown =
+            new MotionTransition(MotionIds.CHAT_TAB_CONTROLS);
     /** How far the row shows its counters, which go all together. */
-    private final LostTalesUiTransition countersShown = new LostTalesUiTransition();
+    private final MotionTransition countersShown =
+            new MotionTransition(MotionIds.CHAT_TAB_CONTROLS);
     /** Whether the row's width holds every tab's counters. */
     private boolean countersFit = true;
     /**
@@ -1416,8 +1425,7 @@ final class ChatChannelTabBar {
             boolean labelHovered = hovered != null
                     && hovered.kind == HitKind.TAB
                     && tab.tab.equals(hovered.tab);
-            if (labelHovered && overflow > 0
-                    && LostTalesConfig.enableChatAnimations) {
+            if (labelHovered && overflow > 0 && Motions.enabled()) {
                 tab.hoverSeconds += this.frameElapsed;
                 tab.marqueeOffset = (float)marqueeOffset(tab.hoverSeconds,
                         overflow);
@@ -1691,7 +1699,7 @@ final class ChatChannelTabBar {
         int counterAlpha = Math.round(textAlpha * countersShare);
         int draftAlpha = Math.round(textAlpha * draftShare);
         boolean counters = (tab.pingCount > 0
-                || tab.otherText.length() > 0)
+                || tab.otherText.length() > 0 || tab.discord)
                 && counterAlpha >= LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA;
         boolean draft = draftAlpha >= LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA;
         if (!counters && !draft) {
@@ -1724,6 +1732,15 @@ final class ChatChannelTabBar {
                             textX, textY, UNREAD_COUNTER_RGB, counterAlpha);
                 }
                 textX += tab.otherWidth;
+            }
+            if (tab.discord) {
+                textX += COUNTER_GAP;
+                if (counters) {
+                    // On the capitals, a row below their top, as the draft
+                    // mark stands.
+                    ChatDiscordMark.draw(textX, textY + 1, counterAlpha);
+                }
+                textX += DISCORD_MARK_WIDTH;
             }
             if (draft) {
                 textX += COUNTER_GAP;
@@ -2151,9 +2168,8 @@ final class ChatChannelTabBar {
         this.frameNanos = now;
         measureRun(tabs, row);
         List<ChatTab> carried = carriedTabs(tabs, row);
-        boolean immediate = !LostTalesConfig.enableChatAnimations
-                || row.resizing || row.gliding;
-        int duration = Math.max(1, LostTalesConfig.chatAnimationDurationMillis);
+        boolean immediate = !Motions.enabled() || row.resizing
+                || row.gliding;
         double step = displayStep();
         boolean landed = false;
         for (int index = 0; index < tabs.size(); index++) {
@@ -2170,20 +2186,20 @@ final class ChatChannelTabBar {
                 }
                 landed = true;
             }
-            place(tab, row, held, immediate, now, duration, step);
+            place(tab, row, held, immediate, now, step);
             advanceBeats(tab, held, elapsed);
         }
         // The tool strip fades on the tab's own beat, so the two stay one.
         if (landed) {
             this.toolGlow = 1.0F;
         }
-        this.toolGlow = LostTalesConfig.enableChatAnimations
+        this.toolGlow = Motions.enabled()
                 ? Math.max(0.0F, this.toolGlow - (float)(elapsed / GLOW_SECONDS))
                 : 0.0F;
         this.carriedLastFrame = carried;
         for (int index = this.leavingTabs.size() - 1; index >= 0; index--) {
             Tab tab = this.leavingTabs.get(index);
-            place(tab, row, false, immediate, now, duration, step);
+            place(tab, row, false, immediate, now, step);
             advanceBeats(tab, false, elapsed);
             if (tab.leg.isSettled()) {
                 // Shrunk to nothing: the closed tab is gone.
@@ -2194,8 +2210,7 @@ final class ChatChannelTabBar {
             this.sharedLeg.settle(true);
         }
         this.sharedDrawn = this.sharedFrom + (this.sharedTo - this.sharedFrom)
-                * this.sharedLeg.advance(now, true, duration,
-                        LostTalesUiEasing.EASE_OUT);
+                * this.sharedLeg.advance(now, true);
         advanceButtons(now);
         // Last, so the controls after the tabs stand where the tabs have
         // just been drawn to.
@@ -2209,7 +2224,7 @@ final class ChatChannelTabBar {
      * meet share an edge exactly.
      */
     private void place(Tab tab, Row row, boolean carried, boolean immediate,
-                       long now, int duration, double step) {
+                       long now, double step) {
         if (carried) {
             tab.leftExact = drawnRunLeft(row) + tab.runOffset - row.left;
             tab.widthExact = tab.exactWidth;
@@ -2219,8 +2234,7 @@ final class ChatChannelTabBar {
         if (immediate) {
             tab.leg.settle(true);
         }
-        glide(tab, tab.leg.advance(now, true, duration,
-                LostTalesUiEasing.EASE_OUT), step);
+        glide(tab, tab.leg.advance(now, true), step);
         if (tab.leg.isSettled()) {
             tab.joining = false;
         }
@@ -2253,11 +2267,11 @@ final class ChatChannelTabBar {
      */
     private static void advanceBeats(Tab tab, boolean carried,
                                      double elapsed) {
-        float rise = LostTalesConfig.enableChatAnimations
+        float rise = Motions.enabled()
                 ? (float)(elapsed / LIFT_SECONDS) : 1.0F;
         tab.lift = carried ? Math.min(1.0F, tab.lift + rise)
                 : Math.max(0.0F, tab.lift - rise);
-        tab.glow = LostTalesConfig.enableChatAnimations
+        tab.glow = Motions.enabled()
                 ? Math.max(0.0F, tab.glow - (float)(elapsed / GLOW_SECONDS))
                 : 0.0F;
     }
@@ -2269,16 +2283,10 @@ final class ChatChannelTabBar {
      * hold them.
      */
     private void advanceButtons(long now) {
-        int duration = LostTalesConfig.enableChatAnimations
-                ? BUTTON_FADE_MILLIS : 0;
-        this.draftShown.advance(now, draftStands(this.sharedDrawn), duration,
-                LostTalesUiEasing.SMOOTH);
-        this.cogShown.advance(now, cogStands(this.sharedDrawn), duration,
-                LostTalesUiEasing.SMOOTH);
-        this.closeShown.advance(now, closeStands(this.sharedDrawn), duration,
-                LostTalesUiEasing.SMOOTH);
-        this.countersShown.advance(now, this.countersFit, duration,
-                LostTalesUiEasing.SMOOTH);
+        this.draftShown.advance(now, draftStands(this.sharedDrawn));
+        this.cogShown.advance(now, cogStands(this.sharedDrawn));
+        this.closeShown.advance(now, closeStands(this.sharedDrawn));
+        this.countersShown.advance(now, this.countersFit);
     }
 
     /**
@@ -2328,7 +2336,8 @@ final class ChatChannelTabBar {
     private static double drawnCountersWidth(Tab tab, float countersShare,
                                              float draftShare) {
         double counters = (tab.pingWidth > 0 ? COUNTER_GAP + tab.pingWidth
-                : 0) + (tab.otherWidth > 0 ? COUNTER_GAP + tab.otherWidth : 0);
+                : 0) + (tab.otherWidth > 0 ? COUNTER_GAP + tab.otherWidth : 0)
+                + (tab.discord ? COUNTER_GAP + DISCORD_MARK_WIDTH : 0);
         return counters * countersShare
                 + (tab.draft ? (COUNTER_GAP + DRAFT_WIDTH) * draftShare : 0.0D);
     }
@@ -2470,8 +2479,8 @@ final class ChatChannelTabBar {
 
     /** One step toward {@code target}, arriving rather than creeping. */
     static float eased(float current, float target, double elapsed) {
-        float value = (float)LostTalesChatMotion.approach(current, target,
-                elapsed, SLIDE_SECONDS);
+        float value = (float)Motions.followTravel(MotionIds.CHAT_MARQUEE_RETURN,
+                current, target, elapsed);
         // Inside one display pixel there is nothing left to draw, and
         // an exponential tail spends longer and longer covering it — the
         // last steps arriving further and further apart, which reads as
@@ -2966,16 +2975,14 @@ final class ChatChannelTabBar {
                                   HitKind kind, boolean litByState) {
         boolean on = hovered != null && hovered.kind == kind;
         motion.advance(this.frameNanos, on || litByState, on,
-                on && Mouse.isButtonDown(0),
-                LostTalesConfig.enableChatAnimations);
+                on && Mouse.isButtonDown(0));
         return motion;
     }
 
     /** One step of a control of a single tab, by what the row is hovering. */
     private LostTalesUiButtonMotion step(LostTalesUiButtonMotion motion,
                                          Hit hovered, Tab tab, HitKind kind) {
-        motion.advance(this.frameNanos, onControl(hovered, tab, kind),
-                LostTalesConfig.enableChatAnimations);
+        motion.advance(this.frameNanos, onControl(hovered, tab, kind));
         return motion;
     }
 
@@ -3099,6 +3106,7 @@ final class ChatChannelTabBar {
                     pingBadgeWidth(font, count(this.cachedPings, channel)),
                     font.getStringWidth(ClientChatChannelViews.counterText(
                             count(this.cachedOther, channel))),
+                    isTrue(this.cachedDiscord.get(channel)),
                     draft != null && draft.booleanValue());
         }
         int selectedIndex = 0;
@@ -3181,6 +3189,7 @@ final class ChatChannelTabBar {
             Boolean cachedDraftMark = this.cachedDraft.get(channel);
             boolean draft = cachedDraftMark != null
                     && cachedDraftMark.booleanValue();
+            boolean discord = isTrue(this.cachedDiscord.get(channel));
             // The buttons the tab shows once settled, for the hit test,
             // which answers for the places the tabs settle in: those the
             // width the row gives its tabs holds, the tab in front's
@@ -3190,7 +3199,7 @@ final class ChatChannelTabBar {
             float cogShare = cogStands(width) ? 1.0F : 0.0F;
             boolean draftShown = draft && countersFit && draftStands(width);
             int settledCounters = countersFit ? countersWidth(pingWidth,
-                    otherWidth, draftShown) : 0;
+                    otherWidth, discord, draftShown) : 0;
             TabRoom settled = roomFor(tabWidth, iconWidth(channel), labelWidth,
                     settledCounters, closeShare, cogShare);
             int closeX = closeShare > 0.0F
@@ -3199,12 +3208,13 @@ final class ChatChannelTabBar {
                     ? x + (int)Math.floor(settled.cogLeft) : -1;
             int draftX = draftShown ? draftLeft(x, icon != null,
                     (int)Math.floor(settled.labelRoom), pingWidth,
-                    otherWidth) : -1;
+                    otherWidth, discord) : -1;
             Boolean muted = this.cachedMuted.get(channel);
             Tab built = new Tab(channel, index, icon, label, labelWidth,
                     (int)Math.floor(settled.labelRoom), pingCount, pingWidth,
-                    otherText, otherWidth, draft, x, tabWidth, settingsX,
-                    closeX, draftX, muted != null && muted.booleanValue());
+                    otherText, otherWidth, discord, draft, x, tabWidth,
+                    settingsX, closeX, draftX,
+                    muted != null && muted.booleanValue());
             built.toLeft = cursor - row.left;
             built.exactWidth = width;
             Tab was = find(this.cachedTabs, channel);
@@ -3428,7 +3438,7 @@ final class ChatChannelTabBar {
      * Whole pixels, for the hit test.
      */
     static int draftLeft(int tabLeft, boolean iconShown, int labelRoom,
-                         int pingWidth, int otherWidth) {
+                         int pingWidth, int otherWidth, boolean discord) {
         int x = tabLeft + PADDING_X
                 + (iconShown ? ChatChannelIcons.SIZE + ChatChannelIcons.GAP
                         : 0)
@@ -3438,6 +3448,9 @@ final class ChatChannelTabBar {
         }
         if (otherWidth > 0) {
             x += COUNTER_GAP + otherWidth;
+        }
+        if (discord) {
+            x += COUNTER_GAP + DISCORD_MARK_WIDTH;
         }
         return x + COUNTER_GAP;
     }
@@ -3583,6 +3596,7 @@ final class ChatChannelTabBar {
                                 ClientChatChannelViews.unreadPingCount(tab)),
                         font.getStringWidth(ClientChatChannelViews.counterText(
                                 ClientChatChannelViews.unreadOtherCount(tab))),
+                        ClientChatChannelState.isLinkedToDiscord(tab),
                         hasDraft(tab));
     }
 
@@ -3652,20 +3666,25 @@ final class ChatChannelTabBar {
             int other = ClientChatChannelViews.unreadOtherCount(tab);
             boolean muted = ChatWindowLayout.isMuted(tab);
             boolean draft = hasDraft(tab);
+            boolean discord = ClientChatChannelState.isLinkedToDiscord(tab);
             Boolean cachedMute = this.cachedMuted.get(tab);
             Boolean cachedDraftMark = this.cachedDraft.get(tab);
+            Boolean cachedDiscordMark = this.cachedDiscord.get(tab);
             if (!label.equals(this.cachedLabels.get(tab))
                     || pings != count(this.cachedPings, tab)
                     || other != count(this.cachedOther, tab)
                     || cachedMute == null
                     || muted != cachedMute.booleanValue()
                     || cachedDraftMark == null
-                    || draft != cachedDraftMark.booleanValue()) {
+                    || draft != cachedDraftMark.booleanValue()
+                    || cachedDiscordMark == null
+                    || discord != cachedDiscordMark.booleanValue()) {
                 this.cachedLabels.put(tab, label);
                 this.cachedPings.put(tab, Integer.valueOf(pings));
                 this.cachedOther.put(tab, Integer.valueOf(other));
                 this.cachedMuted.put(tab, Boolean.valueOf(muted));
                 this.cachedDraft.put(tab, Boolean.valueOf(draft));
+                this.cachedDiscord.put(tab, Boolean.valueOf(discord));
                 current = false;
             }
         }
@@ -3673,10 +3692,15 @@ final class ChatChannelTabBar {
     }
 
     private static int countersWidth(int pingWidth, int otherWidth,
-                                     boolean draft) {
+                                     boolean discord, boolean draft) {
         return (pingWidth > 0 ? COUNTER_GAP + pingWidth : 0)
                 + (otherWidth > 0 ? COUNTER_GAP + otherWidth : 0)
+                + (discord ? COUNTER_GAP + DISCORD_MARK_WIDTH : 0)
                 + (draft ? COUNTER_GAP + DRAFT_WIDTH : 0);
+    }
+
+    private static boolean isTrue(Boolean value) {
+        return value != null && value.booleanValue();
     }
 
     /**
@@ -3764,6 +3788,8 @@ final class ChatChannelTabBar {
         /** {@code [x]} other unread lines, or empty. */
         final String otherText;
         final int otherWidth;
+        /** Whether the tab's channel is linked to Discord and wears the mark. */
+        final boolean discord;
         /** Whether the tab holds unsent text and is not being typed in. */
         final boolean draft;
         /** Resting left edge before the row's horizontal motion. */
@@ -3796,7 +3822,8 @@ final class ChatChannelTabBar {
          * 0 where it set out and 1 arrived; set going afresh only when
          * the row gives it another place or width.
          */
-        LostTalesUiTransition leg = new LostTalesUiTransition();
+        MotionTransition leg = new MotionTransition(MotionIds.CHAT_TAB_MOVE,
+                true);
         /** Whether the tab is still growing in from nothing after it opened. */
         boolean joining;
         /** The width a closed tab had as it began to shrink away; 0 while the row holds it. */
@@ -3833,12 +3860,14 @@ final class ChatChannelTabBar {
         final int closeX;
         /** Resting left edge of the draft mark once settled, or -1. */
         final int draftX;
+        /** Whether the tab's lines are kept out of the closed feed. */
         final boolean muted;
 
         Tab(ChatTab tab, int rowIndex, ChatEmoji icon, String label,
             int labelWidth, int labelRoom, int pingCount, int pingWidth,
-            String otherText, int otherWidth, boolean draft, int x, int width,
-            int settingsX, int closeX, int draftX, boolean muted) {
+            String otherText, int otherWidth, boolean discord, boolean draft,
+            int x, int width, int settingsX, int closeX, int draftX,
+            boolean muted) {
             this.tab = tab;
             this.rowIndex = rowIndex;
             this.icon = icon;
@@ -3849,6 +3878,7 @@ final class ChatChannelTabBar {
             this.pingWidth = pingWidth;
             this.otherText = otherText;
             this.otherWidth = otherWidth;
+            this.discord = discord;
             this.draft = draft;
             this.x = x;
             this.width = width;

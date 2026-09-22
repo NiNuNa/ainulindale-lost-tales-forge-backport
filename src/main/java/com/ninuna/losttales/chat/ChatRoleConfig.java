@@ -23,11 +23,11 @@ import java.util.regex.Pattern;
  * <p>{@code roles.definitions} in {@code server/roles.cfg}, one role per
  * entry:</p>
  * <pre>
- * operator=name:Operator;tag:[Operator];color:A94B54;mention:true;rank:10;op:2
- * moderator=name:Moderator;tag:[Mod];color:A94B54;mention:true;rank:15;op:1;faction:GONDOR@gondor.knight;grant:chat.moderate;desc:Keeps the peace.
+ * operator=name:Operator;color:A94B54;mention:true;rank:10;op:2
+ * moderator=name:Moderator;color:A94B54;mention:true;rank:15;op:1;faction:GONDOR@gondor.knight;grant:chat.moderate;desc:Keeps the peace.
  * </pre>
  * Options are optional and case-insensitive; a role without a name is
- * named by its id, one without a tag wears its name in brackets. The
+ * named by its id. The
  * operator entry is seeded into a fresh file ({@link #DEFAULT_OPERATOR_ENTRY})
  * and is a role like any other from then on: restyle it, regrant it,
  * or delete it. The team entry is refused: the team mark is the code's
@@ -75,7 +75,7 @@ public final class ChatRoleConfig {
      * knows no operator role — and the file's to change once written.
      */
     public static final String DEFAULT_OPERATOR_ENTRY =
-            "operator=name:Operator;tag:[Operator];color:A94B54;mention:true;rank:10;op:2"
+            "operator=name:Operator;color:A94B54;mention:true;rank:10;op:2"
             + ";desc:Runs the server day to day.";
     /** The gate a fresh file starts with: the Operator channel for the operator role. */
     public static final String DEFAULT_ADMIN_GATE = ChatChannel.ADMIN.getId()
@@ -139,7 +139,6 @@ public final class ChatRoleConfig {
                                           LostTalesPermissionCatalog permissions,
                                           Warnings out) {
         String name = first(options, "name");
-        String tag = first(options, "tag");
         String description = first(options, "desc");
         int color = LostTalesColorsDefault.ROLE;
         String colorOption = first(options, "color");
@@ -201,7 +200,7 @@ public final class ChatRoleConfig {
             grants.add(granted);
         }
         warnIfGrantsFollowAFaction(id, sources, grants, out);
-        return ChatAccountRole.custom(id, name.length() == 0 ? id : name, tag, description,
+        return ChatAccountRole.custom(id, name.length() == 0 ? id : name, description,
                 color, mentionable, rank, sources, grants);
     }
 
@@ -365,8 +364,9 @@ public final class ChatRoleConfig {
      * the server routes it — {@code global}, {@code proximity} or
      * {@code operators}; the rules that need something the config cannot
      * describe (a party, a faction, a whisper, a private console) are
-     * refused. {@code ooc} makes it an out-of-character channel, which
-     * is what decides whether roles are tagged on its lines.
+     * refused. {@code ooc} makes it an out-of-character channel: its
+     * lines are said as the account, the name in the colour of the
+     * account's highest role ({@link ChatPresentationMode}).
      *
      * <p>An entry naming a built-in channel's id is refused rather than
      * replacing it: the code's own channels are not a config's to
@@ -631,9 +631,6 @@ public final class ChatRoleConfig {
         StringBuilder entry = new StringBuilder(role.getId());
         entry.append("=name:").append(role.getName().length() == 0
                 ? role.getDisplayName() : role.getName());
-        if (role.getTag().length() > 0) {
-            entry.append(";tag:").append(role.getTag());
-        }
         entry.append(";color:").append(String.format("%06X", role.getColor()));
         entry.append(";mention:").append(role.isMentionable());
         entry.append(";rank:").append(role.getRank());

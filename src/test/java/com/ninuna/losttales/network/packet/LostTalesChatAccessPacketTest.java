@@ -140,11 +140,11 @@ public final class LostTalesChatAccessPacketTest {
     /** The catalogue the server sends is what the masks are read against. */
     @Test
     public void theCatalogueAndTheGatesRoundTrip() {
-        ChatAccountRole moderator = ChatAccountRole.custom("moderator", "Moderator", "[Mod]",
+        ChatAccountRole moderator = ChatAccountRole.custom("moderator", "Moderator",
                 "Keeps the peace.", 0xA94B54, true, 15,
                 Collections.singletonList(ChatRoleSource.opLevel(1)));
         ChatRoleCatalog catalog = ChatRoleCatalog.of(Arrays.asList(
-                ChatRoleFixtures.OPERATOR.withLook("Staff", "[Staff]", "", 0x00FF00, true, 10),
+                ChatRoleFixtures.OPERATOR.withLook("Staff", "", 0x00FF00, true, 10),
                 moderator), null, null);
         int held = catalog.byId("moderator").bit() | ChatRoleFixtures.OPERATOR.bit();
         List<String> readable = Arrays.asList(
@@ -162,7 +162,7 @@ public final class LostTalesChatAccessPacketTest {
         assertEquals(3, roles.size());
         ChatRoleCatalog read = ChatRoleCatalog.fromWire(roles);
         assertEquals("Moderator", read.byId("moderator").getDisplayName());
-        assertEquals("[Mod]", read.byId("moderator").getDisplayTag());
+        assertEquals("Moderator", read.byId("moderator").getDisplayName());
         assertEquals("Keeps the peace.", read.byId("moderator").getDisplayDescription());
         assertEquals(4, read.byId("moderator").bit());
         assertEquals("Staff", read.byId("operator").getDisplayName());

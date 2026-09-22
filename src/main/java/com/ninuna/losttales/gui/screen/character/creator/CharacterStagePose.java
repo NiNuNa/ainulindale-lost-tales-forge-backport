@@ -1,6 +1,7 @@
 package com.ninuna.losttales.gui.screen.character.creator;
 
 import com.ninuna.losttales.client.camera.CameraMath;
+import com.ninuna.losttales.client.motion.Motions;
 
 /**
  * How the character on the creator's stage is framed, and how it answers
@@ -161,11 +162,14 @@ public final class CharacterStagePose {
 
     /**
      * Eases what is shown toward what was asked for, by the time since the
-     * last call. The first call, and any call after {@link #reset}, shows
-     * what was asked for at once rather than easing from nothing.
+     * last call, at the motion speed in force. The first call, any call
+     * after {@link #reset}, and every call while motion is off or reduced
+     * shows what was asked for at once rather than easing toward it: the
+     * camera's moves are travel.
      */
     public void advance(long nowNanos) {
-        if (this.lastAdvanceNanos == 0L) {
+        if (this.lastAdvanceNanos == 0L || !Motions.enabled()
+                || Motions.reduced()) {
             this.lastAdvanceNanos = nowNanos;
             snap();
             return;
@@ -175,7 +179,7 @@ public final class CharacterStagePose {
         if (seconds <= 0.0F) {
             return;
         }
-        seconds = Math.min(seconds, MAX_STEP_SECONDS);
+        seconds = Math.min(seconds, MAX_STEP_SECONDS) * (float)Motions.speed();
         float handling = 1.0F - (float)Math.exp(-HANDLING_RESPONSE * seconds);
         float zooming = 1.0F - (float)Math.exp(-ZOOM_RESPONSE * seconds);
         float shot = 1.0F - (float)Math.exp(-SHOT_RESPONSE * seconds);

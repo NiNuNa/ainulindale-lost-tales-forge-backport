@@ -30,15 +30,9 @@ import java.util.List;
  * the pair again brings everything back. Bindings are matched by their
  * game channel and their Discord channel, never by id: an id's ordinal
  * moves when the config is reordered. A Discord member's own line is a
- * copy in the channel it was read from.
- *
- * <p>One kind of message belongs to no single game channel's bindings:
- * the server's announcements — a join, a leave, a death, an achievement,
- * the server starting or stopping — which the bridge posts to every
- * Discord channel it posts into. Every binding is theirs, so a reaction
- * on any of those embeds is a reaction on the line, and the line's own
- * reactions reach every embed, whichever game channel each Discord
- * channel holds.</p>
+ * copy in the channel it was read from. The server's announcements are
+ * lines of their channel like any other — a join of OOC, a death of
+ * Global — and their embeds live in that channel's Discord channels.
  */
 final class DiscordCopyLiveness {
     /** How a copy's destination names the Discord channel it is in. */
@@ -63,13 +57,6 @@ final class DiscordCopyLiveness {
 
         /** The faction a Faction line was said to; empty for any other. */
         String factionScopeOf(long messageId);
-
-        /**
-         * Whether the message is one of the server's announcements, which
-         * belong to every binding. A line of the server's own reaches
-         * Discord as nothing else.
-         */
-        boolean isAnnouncement(long messageId);
     }
 
     /**
@@ -104,27 +91,14 @@ final class DiscordCopyLiveness {
                           String factionScope, String discordChannelId,
                           String webhookUrl, Crossing crossing,
                           Webhooks webhooks) {
-        return isLive(bindings, channel, factionScope, false,
-                discordChannelId, webhookUrl, crossing, webhooks);
-    }
-
-    /**
-     * As above, for an {@code announcement}, which every binding owns
-     * whatever its channel says.
-     */
-    static boolean isLive(DiscordChannelBindings bindings, ChatChannel channel,
-                          String factionScope, boolean announcement,
-                          String discordChannelId, String webhookUrl,
-                          Crossing crossing, Webhooks webhooks) {
-        if (bindings == null || (channel == null && !announcement)
-                || crossing == null) {
+        if (bindings == null || channel == null || crossing == null) {
             return false;
         }
         String copyChannel = discordChannelId == null ? "" : discordChannelId;
         String copyWebhook = webhookUrl == null ? "" : webhookUrl;
         Webhooks known = webhooks == null ? NO_WEBHOOKS : webhooks;
-        for (DiscordChannelBinding binding : owners(bindings, channel,
-                factionScope, announcement)) {
+        for (DiscordChannelBinding binding : bindings.forGame(channel,
+                factionScope)) {
             if (crossing == Crossing.FROM_DISCORD) {
                 if (binding.readsFromDiscord() && copyChannel.length() > 0
                         && copyChannel.equals(binding.getDiscordChannelId())) {
@@ -139,24 +113,11 @@ final class DiscordCopyLiveness {
 
     /** The same, for a copy the links hold. */
     static boolean isLive(DiscordChannelBindings bindings, ChatChannel channel,
-                          String factionScope, boolean announcement,
-                          DiscordMessageLinks.Copy copy, Crossing crossing,
-                          Webhooks webhooks) {
+                          String factionScope, DiscordMessageLinks.Copy copy,
+                          Crossing crossing, Webhooks webhooks) {
         return copy != null && isLive(bindings, channel, factionScope,
-                announcement, channelIdOf(copy.destination), copy.webhookUrl,
-                crossing, webhooks);
-    }
-
-    /**
-     * The bindings a message's copies answer to: those of its own game
-     * channel, and every binding for an announcement.
-     */
-    static List<DiscordChannelBinding> owners(DiscordChannelBindings bindings,
-                                              ChatChannel channel,
-                                              String factionScope,
-                                              boolean announcement) {
-        return announcement ? bindings.all()
-                : bindings.forGame(channel, factionScope);
+                channelIdOf(copy.destination), copy.webhookUrl, crossing,
+                webhooks);
     }
 
     /**
@@ -168,16 +129,15 @@ final class DiscordCopyLiveness {
                                                      long messageId,
                                                      ChatChannel channel,
                                                      String factionScope,
-                                                     boolean announcement,
                                                      Crossing crossing,
                                                      Webhooks webhooks) {
-        if (links == null || (channel == null && !announcement)) {
+        if (links == null || channel == null) {
             return Collections.emptyList();
         }
         List<DiscordMessageLinks.Copy> live = new ArrayList<DiscordMessageLinks.Copy>(2);
         for (DiscordMessageLinks.Copy copy : links.copiesOf(messageId)) {
-            if (isLive(bindings, channel, factionScope, announcement, copy,
-                    crossing, webhooks)) {
+            if (isLive(bindings, channel, factionScope, copy, crossing,
+                    webhooks)) {
                 live.add(copy);
             }
         }
@@ -202,8 +162,8 @@ final class DiscordCopyLiveness {
             return ChatMessageIds.NONE;
         }
         return isLive(bindings, places.channelOf(target),
-                places.factionScopeOf(target), places.isAnnouncement(target),
-                discordChannelId, "", Crossing.FROM_DISCORD, NO_WEBHOOKS)
+                places.factionScopeOf(target), discordChannelId, "",
+                Crossing.FROM_DISCORD, NO_WEBHOOKS)
                 ? target : ChatMessageIds.NONE;
     }
 
@@ -258,7 +218,7 @@ final class DiscordCopyLiveness {
         }
         List<DiscordMessageLinks.Copy> live = liveCopies(links, bindings, messageId,
                 places.channelOf(messageId), places.factionScopeOf(messageId),
-                places.isAnnouncement(messageId), Crossing.TO_DISCORD, webhooks);
+                Crossing.TO_DISCORD, webhooks);
         if (live.isEmpty()) {
             return null;
         }
@@ -281,18 +241,16 @@ final class DiscordCopyLiveness {
      */
     static String correctionWebhook(DiscordChannelBindings bindings,
                                     ChatChannel channel, String factionScope,
-                                    boolean announcement,
                                     DiscordMessageLinks.Copy copy,
                                     Webhooks webhooks) {
-        if (bindings == null || (channel == null && !announcement)
-                || copy == null
+        if (bindings == null || channel == null || copy == null
                 || (copy.bindingId.length() == 0 && copy.webhookUrl.length() == 0)) {
             return "";
         }
         String copyChannel = channelIdOf(copy.destination);
         Webhooks known = webhooks == null ? NO_WEBHOOKS : webhooks;
-        for (DiscordChannelBinding binding : owners(bindings, channel,
-                factionScope, announcement)) {
+        for (DiscordChannelBinding binding : bindings.forGame(channel,
+                factionScope)) {
             if (!postsInto(binding, copyChannel, copy.webhookUrl, known)) {
                 continue;
             }

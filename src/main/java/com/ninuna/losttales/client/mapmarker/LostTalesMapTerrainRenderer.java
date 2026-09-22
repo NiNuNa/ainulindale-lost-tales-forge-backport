@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.world.map.waypoint.LostTalesMapCoordinateHelper;
+import com.ninuna.losttales.client.motion.Motions;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
@@ -39,7 +40,8 @@ public final class LostTalesMapTerrainRenderer {
     static final float FULL_DETAIL_BLOCK_PIXELS = 10.0F;
     static final float MEDIUM_DETAIL_BLOCK_PIXELS = 5.5F;
     static final float FINE_DETAIL_BLOCK_PIXELS = 0.75F;
-    static final long MESH_FADE_NANOS = 250000000L;
+    /** How long a new mesh takes to fade in at speed 1, as a motion fade. */
+    static final int MESH_FADE_MILLIS = 250;
     private static final float LOG_TWO = (float)Math.log(2.0D);
     private static final int FALLBACK_SURFACE_COLOR = 0x777777;
     private static final float EAST_FACE_SHADE = 0.58F;
@@ -719,10 +721,11 @@ public final class LostTalesMapTerrainRenderer {
         if (age <= 0L) {
             return 0.0F;
         }
-        if (age >= MESH_FADE_NANOS) {
+        long fadeNanos = Motions.beatNanos(MESH_FADE_MILLIS);
+        if (age >= fadeNanos) {
             return 1.0F;
         }
-        float progress = age / (float)MESH_FADE_NANOS;
+        float progress = age / (float)fadeNanos;
         return progress * progress * (3.0F - 2.0F * progress);
     }
 

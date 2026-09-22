@@ -1,11 +1,10 @@
 package com.ninuna.losttales.client.chat;
 
-import com.ninuna.losttales.client.gui.animation.LostTalesUiEasing;
-import com.ninuna.losttales.client.gui.animation.LostTalesUiTransition;
-import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.client.motion.MotionIds;
+import com.ninuna.losttales.client.motion.MotionTransition;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -33,7 +32,8 @@ final class ChatSnapAssist {
     /** Clear pixels the cards keep from the pane's sides. */
     static final int PANE_PADDING = 8;
 
-    private final LostTalesUiTransition shown = new LostTalesUiTransition();
+    private final MotionTransition shown =
+            new MotionTransition(MotionIds.CHAT_SNAP_ASSIST);
     private boolean open;
     /** The window whose landing opened the offer. */
     private String snappedId;
@@ -170,10 +170,7 @@ final class ChatSnapAssist {
      */
     void layOut(Minecraft minecraft, FontRenderer font, int screenWidth,
                 int screenHeight) {
-        float share = this.shown.advance(System.nanoTime(), this.open,
-                LostTalesConfig.enableChatAnimations
-                        ? Math.max(1, LostTalesConfig.chatAnimationDurationMillis)
-                        : 0, LostTalesUiEasing.SMOOTH);
+        float share = this.shown.advance(System.nanoTime(), this.open);
         if (!this.open && share <= 0.0F) {
             this.panes = Collections.emptyList();
             this.zones.clear();

@@ -185,14 +185,11 @@ public final class CharacterValidator {
         }
 
         String description = normalizeDescription(requestedDescription);
-        if (!isValidDescription(description)) {
+        CharacterValidationResult profile = validateProfile(description,
+                requestedAge);
+        if (!profile.isValid()) {
             return CharacterAppearanceValidationResult.failure(
-                    CharacterErrorId.INVALID_DESCRIPTION);
-        }
-
-        if (requestedAge < MIN_AGE || requestedAge > MAX_AGE) {
-            return CharacterAppearanceValidationResult.failure(
-                    CharacterErrorId.INVALID_AGE);
+                    profile.getErrorId());
         }
 
         return CharacterAppearanceValidationResult.success(
@@ -314,6 +311,23 @@ public final class CharacterValidator {
             return CharacterValidationResult.success();
         }
         return validateCharacterReference(roster, target.getCharacterId(), expectedRevision);
+    }
+
+    /**
+     * What a character says about itself: a description as stored (see
+     * {@link #normalizeDescription}) and an age. Creation and a later
+     * edit hold both to these bounds.
+     */
+    public static CharacterValidationResult validateProfile(String description,
+                                                            int age) {
+        if (!isValidDescription(description)) {
+            return CharacterValidationResult.failure(
+                    CharacterErrorId.INVALID_DESCRIPTION);
+        }
+        if (age < MIN_AGE || age > MAX_AGE) {
+            return CharacterValidationResult.failure(CharacterErrorId.INVALID_AGE);
+        }
+        return CharacterValidationResult.success();
     }
 
     public static CharacterValidationResult validateCharacterReference(

@@ -13,6 +13,8 @@ import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.common.config.Property;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -49,17 +51,23 @@ public final class LostTalesServerConfigService {
         }
         return ServerConfigSnapshot.fromConfiguration(config,
                 ServerConfigSnapshot.EXCLUDED_CATEGORIES,
+                ServerConfigSnapshot.COMMAND_KEYS,
                 ServerConfigSnapshot.SECRET_KEYS);
     }
 
-    /** Why a category is not on the settings surface, for a refused change. */
-    private static String refusalReason(String category) {
-        String name = category == null ? "" : category.toLowerCase(Locale.ROOT);
+    /** Why a key is not on the settings surface, for a refused change. */
+    private static String refusalReason(ServerConfigChange change) {
+        String name = change.getCategory() == null ? ""
+                : change.getCategory().toLowerCase(Locale.ROOT);
         if (ServerConfigSnapshot.CLIENT_CATEGORIES.contains(name)) {
             return "a client setting, not the server's";
         }
         if (ServerConfigSnapshot.AUTHORIZATION_CATEGORIES.contains(name)) {
             return "decides what players may do; edit it with /losttales role";
+        }
+        if (ServerConfigSnapshot.COMMAND_KEYS.contains(
+                change.qualifiedName().toLowerCase(Locale.ROOT))) {
+            return "the Discord links; make them with /losttales discord link";
         }
         return "no such key";
     }
@@ -68,17 +76,44 @@ public final class LostTalesServerConfigService {
      * Validates and writes the changes, then reloads. A secret left empty
      * is kept as it is. A change naming a client key is refused: the
      * server's file is not the place for it. So is one naming the roles or
-     * the channel gates, which are the role command's to edit.
+     * the channel gates, which are the role command's to edit, or the
+     * Discord links, which are the Discord command's.
      */
     public static ServerConfigApplyResult apply(List<ServerConfigChange> changes) {
+        return applyOwned(changes, Collections.<String>emptySet(),
+                Collections.<String>emptySet());
+    }
+
+    /**
+     * As {@link #apply}, for a command writing a part of the file the
+     * settings surface leaves alone and that command owns: the role
+     * command the roles and the channel gates ({@code ownedCategories}),
+     * the Discord command the links ({@code ownedKeys}, as
+     * {@code category.key}). Nothing else is opened: a client category
+     * stays refused whatever is asked.
+     */
+    public static ServerConfigApplyResult applyOwned(List<ServerConfigChange> changes,
+                                                     Set<String> ownedCategories,
+                                                     Set<String> ownedKeys) {
         Configuration config = openFile();
         if (config == null) {
             return ServerConfigApplyResult.refusedOutright(
                     "The server has no config file loaded.");
         }
+        Set<String> excludedCategories = new HashSet<String>(
+                ServerConfigSnapshot.EXCLUDED_CATEGORIES);
+        for (String owned : ownedCategories) {
+            String name = owned.toLowerCase(Locale.ROOT);
+            if (ServerConfigSnapshot.AUTHORIZATION_CATEGORIES.contains(name)) {
+                excludedCategories.remove(name);
+            }
+        }
+        Set<String> excludedKeys = new HashSet<String>(ServerConfigSnapshot.COMMAND_KEYS);
+        for (String owned : ownedKeys) {
+            excludedKeys.remove(owned.toLowerCase(Locale.ROOT));
+        }
         List<ServerConfigEntry> entries = ServerConfigSnapshot.fromConfiguration(config,
-                ServerConfigSnapshot.EXCLUDED_CATEGORIES,
-                ServerConfigSnapshot.SECRET_KEYS);
+                excludedCategories, excludedKeys, ServerConfigSnapshot.SECRET_KEYS);
         List<String> applied = new ArrayList<String>();
         List<ServerConfigApplyResult.Refusal> refused =
                 new ArrayList<ServerConfigApplyResult.Refusal>();
@@ -88,7 +123,7 @@ public final class LostTalesServerConfigService {
                     change.getCategory(), change.getKey());
             if (entry == null) {
                 refused.add(new ServerConfigApplyResult.Refusal(change.qualifiedName(),
-                        refusalReason(change.getCategory())));
+                        refusalReason(change)));
                 continue;
             }
             if (entry.isSecret() && !change.isList() && change.getValue().length() == 0) {
@@ -142,9 +177,12 @@ public final class LostTalesServerConfigService {
             LostTalesDiscordBridge.getInstance().start();
             restarted.add("Discord bridge");
         }
+        // The chat access names the channels linked to Discord, so the
+        // bridge's category sends it again too.
         if (categories.contains(LostTalesConfig.CATEGORY_CHAT)
                 || categories.contains(LostTalesConfig.CATEGORY_ROLES)
-                || categories.contains(LostTalesConfig.CATEGORY_CHANNELS)) {
+                || categories.contains(LostTalesConfig.CATEGORY_CHANNELS)
+                || categories.contains(LostTalesConfig.CATEGORY_DISCORD)) {
             LostTalesChatService.sendAccessToAll(null);
             restarted.add("chat access");
         }

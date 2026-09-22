@@ -44,6 +44,27 @@ public final class ChatEpithet {
     }
 
     /**
+     * The words a title follows a name with: {@code , the Gondor Farmer}
+     * for a character's LOTR title, {@code , of The Shire} for a Discord
+     * member's Discord server.
+     */
+    public static String titleSuffix(boolean discordMember, String epithet) {
+        return discordMember
+                ? translate("chat.losttales.title.discord", ", of %s", epithet)
+                : translate("chat.losttales.title.suffix", ", the %s", epithet);
+    }
+
+    /**
+     * {@code Nils, of The Shire}: a Discord member titled by their
+     * Discord server, or the bare name while the server is not known.
+     */
+    public static String discordName(String name, String guildName) {
+        String plain = name == null ? "" : name.trim();
+        String guild = guildName == null ? "" : guildName.trim();
+        return guild.length() == 0 ? plain : plain + titleSuffix(true, guild);
+    }
+
+    /**
      * A localized format with an English fallback, so the line is still
      * right when the language file does not carry the key.
      */

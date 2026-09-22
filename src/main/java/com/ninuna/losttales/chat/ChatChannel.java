@@ -53,11 +53,11 @@ public final class ChatChannel {
             LostTalesColors.rgb(LostTalesColors.HONEY), true,
             ChatChannelScope.FACTION);
     /**
-     * Out-of-character conversation, and the channel the Discord bridge
-     * carries by default: out of character, everyone online reads it,
-     * and it is there whether or not the server bridges anything.
+     * Out-of-character conversation: everyone online reads it, speaking
+     * as their account. Like any channel that allows it, it may be linked
+     * to Discord channels, and its tab then wears the Discord mark.
      */
-    public static final ChatChannel OOC = register("ooc", "OOC & Discord", ChatPresentationMode.OUT_OF_CHARACTER,
+    public static final ChatChannel OOC = register("ooc", "OOC", ChatPresentationMode.OUT_OF_CHARACTER,
             ChatRecipientRule.GLOBAL, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.STEEL_BLUE), true);
     /** Staff channel: operators only, out of character; the wire id stays. */

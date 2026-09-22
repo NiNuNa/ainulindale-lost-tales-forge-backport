@@ -4,6 +4,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import com.ninuna.losttales.client.motion.MotionTestSettings;
+import com.ninuna.losttales.config.LostTalesConfig;
 import org.junit.Test;
 
 public final class LostTalesMapTerrainRendererTest {
@@ -119,6 +121,18 @@ public final class LostTalesMapTerrainRendererTest {
     }
 
     @Test
+    public void withMotionOffANewMeshIsThereAtOnce() {
+        MotionTestSettings settings = MotionTestSettings.reset();
+        try {
+            LostTalesConfig.animations = false;
+            assertEquals(1.0F, LostTalesMapTerrainRenderer
+                    .meshAvailabilityAlpha(1000L, 1001L), 0.0F);
+        } finally {
+            settings.restore();
+        }
+    }
+
+    @Test
     public void newlyPreparedMeshesFadeWithoutOvershoot() {
         long start = 1000000000L;
         assertEquals(0.0F,
@@ -127,12 +141,13 @@ public final class LostTalesMapTerrainRendererTest {
         assertEquals(0.5F,
                 LostTalesMapTerrainRenderer.meshAvailabilityAlpha(
                         start,
-                        start + LostTalesMapTerrainRenderer.MESH_FADE_NANOS
-                                / 2L), 0.0001F);
+                        start + LostTalesMapTerrainRenderer.MESH_FADE_MILLIS
+                                * 1000000L / 2L), 0.0001F);
         assertEquals(1.0F,
                 LostTalesMapTerrainRenderer.meshAvailabilityAlpha(
                         start,
-                        start + LostTalesMapTerrainRenderer.MESH_FADE_NANOS),
+                        start + LostTalesMapTerrainRenderer.MESH_FADE_MILLIS
+                                * 1000000L),
                 0.0F);
     }
 }

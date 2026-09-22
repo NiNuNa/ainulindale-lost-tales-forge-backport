@@ -1,12 +1,11 @@
 package com.ninuna.losttales.client.chat;
 
-import com.ninuna.losttales.client.gui.animation.LostTalesUiEasing;
-import com.ninuna.losttales.client.gui.animation.LostTalesUiTransition;
-import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
+import com.ninuna.losttales.client.motion.MotionIds;
+import com.ninuna.losttales.client.motion.MotionTransition;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.util.StatCollector;
@@ -114,7 +113,8 @@ final class ChatToolStrip {
         final LostTalesUiButtonMotion nextMotion =
                 new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
         /** The magnifier crossing over to the cross as a search stands in the well. */
-        final LostTalesUiTransition clearing = new LostTalesUiTransition();
+        final MotionTransition clearing =
+                new MotionTransition(MotionIds.CHAT_SEARCH_CLEAR);
     }
 
     private ChatInputField field;
@@ -244,7 +244,6 @@ final class ChatToolStrip {
             return;
         }
         long now = System.nanoTime();
-        boolean animate = LostTalesConfig.enableChatAnimations;
         int ink = Math.round(255.0F * alphaScale);
         // Each panel's button rests lit while its panel is out, as a
         // messenger's member-list button does, and lifts under the
@@ -252,15 +251,14 @@ final class ChatToolStrip {
         state.areaMotion.advance(now, !window.isAreaHidden()
                         || under == Part.AREA_TOGGLE,
                 under == Part.AREA_TOGGLE,
-                under == Part.AREA_TOGGLE && Mouse.isButtonDown(0), animate);
+                under == Part.AREA_TOGGLE && Mouse.isButtonDown(0));
         LostTalesUiButton.drawGlyph(LostTalesUiSheet.AREA,
                 LostTalesUiSheet.AREA_HOVER, state.areaMotion, laid.areaX,
                 glyphTop(laid, AREA_HEIGHT), ink);
         state.membersMotion.advance(now, !window.isMembersHidden()
                         || under == Part.MEMBERS_TOGGLE,
                 under == Part.MEMBERS_TOGGLE,
-                under == Part.MEMBERS_TOGGLE && Mouse.isButtonDown(0),
-                animate);
+                under == Part.MEMBERS_TOGGLE && Mouse.isButtonDown(0));
         LostTalesUiButton.drawGlyph(LostTalesUiSheet.MEMBERS,
                 LostTalesUiSheet.MEMBERS_HOVER, state.membersMotion,
                 laid.membersX, glyphTop(laid, MEMBERS_HEIGHT), ink);
@@ -298,10 +296,8 @@ final class ChatToolStrip {
                 onWell || (searching && this.field != null
                         && this.field.isFocused()),
                 under == Part.ICON,
-                under == Part.ICON && Mouse.isButtonDown(0), animate);
-        float cleared = state.clearing.advance(now, typed,
-                animate ? Math.max(1, LostTalesConfig.chatAnimationDurationMillis)
-                        : 0, LostTalesUiEasing.SMOOTH);
+                under == Part.ICON && Mouse.isButtonDown(0));
+        float cleared = state.clearing.advance(now, typed);
         cleared = Math.max(0.0F, Math.min(1.0F, cleared));
         drawIcon(state, laid, LostTalesUiSheet.SEARCH,
                 LostTalesUiSheet.SEARCH_HOVER, Math.round(ink * (1.0F - cleared)));
@@ -317,8 +313,8 @@ final class ChatToolStrip {
                 ChatSearch.matchCount() == 0
                         ? LostTalesChatVisualStyle.asideRgb()
                         : LostTalesChatVisualStyle.IVORY, ink);
-        state.previousMotion.advance(now, under == Part.PREVIOUS, animate);
-        state.nextMotion.advance(now, under == Part.NEXT, animate);
+        state.previousMotion.advance(now, under == Part.PREVIOUS);
+        state.nextMotion.advance(now, under == Part.NEXT);
         LostTalesUiButton.drawGlyph(LostTalesUiSheet.CHEVRON_5,
                 LostTalesUiSheet.CHEVRON_5_HOVER, state.previousMotion,
                 laid.previousX, glyphTop(laid, LostTalesUiSheet.CHEVRON_5

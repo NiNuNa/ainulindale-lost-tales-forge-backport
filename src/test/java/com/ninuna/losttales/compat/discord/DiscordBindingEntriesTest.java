@@ -9,51 +9,64 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-/** The bind and unbind commands edit the bindings list one key at a time. */
+/**
+ * Linking adds an entry for each Discord channel a game channel goes to;
+ * unlinking takes entries away by game channel or by Discord channel, and
+ * says which webhooks went with them.
+ */
 public final class DiscordBindingEntriesTest {
 
+    private static final String HOOK_ALL = "https://discord.com/api/webhooks/1/abc";
+    private static final String HOOK_OOC = "https://discord.com/api/webhooks/2/def";
     private static final String[] ENTRIES = {
-            "# a comment",
+            "# a comment naming channel=5",
             "ooc=DISABLED;channel=;webhook=",
-            "all=GAME_TO_DISCORD;webhook=https://discord.com/api/webhooks/1/abc",
+            "all=GAME_TO_DISCORD;channel=7;webhook=" + HOOK_ALL,
     };
 
+    /**
+     * A link is one more entry; the empty placeholder of the same game
+     * channel goes, and a comment stays where it was.
+     */
     @Test
-    public void aBindReplacesTheKeysEntryAndKeepsWhatItLeftBlank() {
-        List<String> edited = DiscordBindingEntries.upsert(ENTRIES, "ALL",
-                DiscordBridgeDirection.BIDIRECTIONAL, "123456789012345678", "");
-        assertEquals(3, edited.size());
-        assertEquals("# a comment", edited.get(0));
-        assertEquals("ooc=DISABLED;channel=;webhook=", edited.get(1));
-        assertEquals("all=BIDIRECTIONAL;channel=123456789012345678"
-                + ";webhook=https://discord.com/api/webhooks/1/abc", edited.get(2));
+    public void aLinkAddsItsEntryInPlaceOfAPlaceholder() {
+        List<String> linked = DiscordBindingEntries.link(ENTRIES, "ooc",
+                DiscordBridgeDirection.BIDIRECTIONAL, "5", HOOK_OOC);
+        assertEquals(Arrays.asList(ENTRIES[0], ENTRIES[2],
+                "ooc=BIDIRECTIONAL;channel=5;webhook=" + HOOK_OOC), linked);
+    }
+
+    /** A game channel links to a second Discord channel beside its first. */
+    @Test
+    public void aGameChannelLinksToManyDiscordChannels() {
+        List<String> linked = DiscordBindingEntries.link(ENTRIES, "all",
+                DiscordBridgeDirection.GAME_TO_DISCORD, "8", HOOK_OOC);
+        assertEquals(4, linked.size());
+        assertEquals(ENTRIES[2], linked.get(2));
+        assertEquals("all=GAME_TO_DISCORD;channel=8;webhook=" + HOOK_OOC, linked.get(3));
     }
 
     @Test
-    public void aBindOfANewKeyAppendsAndAnUnbindRemoves() {
-        List<String> added = DiscordBindingEntries.upsert(ENTRIES, "faction:lotr.gondor",
-                DiscordBridgeDirection.DISCORD_TO_GAME, "5", "https://x");
-        assertEquals(4, added.size());
-        assertEquals("faction:lotr.gondor=DISCORD_TO_GAME;channel=5;webhook=https://x",
-                added.get(3));
+    public void anUnlinkTakesAGameChannelsOrADiscordChannelsEntriesAway() {
+        List<String> byKey = DiscordBindingEntries.removeKey(ENTRIES, "ooc");
+        assertEquals(Arrays.asList(ENTRIES[0], ENTRIES[2]), byKey);
+        List<String> byChannel = DiscordBindingEntries.removeChannel(ENTRIES, "7");
+        assertEquals(Arrays.asList(ENTRIES[0], ENTRIES[1]), byChannel);
+        assertEquals("a comment is no link", Arrays.asList(ENTRIES),
+                DiscordBindingEntries.removeChannel(ENTRIES, "5"));
+        assertEquals(Arrays.asList(HOOK_ALL),
+                DiscordBindingEntries.webhooksRemoved(ENTRIES, byChannel));
+        assertTrue(DiscordBindingEntries.webhooksRemoved(ENTRIES, byKey).isEmpty());
         assertTrue(DiscordBindingEntries.contains(ENTRIES, "ooc"));
         assertFalse(DiscordBindingEntries.contains(ENTRIES, "party"));
-        List<String> removed = DiscordBindingEntries.remove(ENTRIES, "ooc");
-        assertEquals(Arrays.asList(ENTRIES[0], ENTRIES[2]), removed);
     }
 
     @Test
     public void keysAndOptionsAreReadOffAnEntry() {
         assertEquals("all", DiscordBindingEntries.keyOf(ENTRIES[2]));
         assertEquals("", DiscordBindingEntries.keyOf(ENTRIES[0]));
-        assertEquals("https://discord.com/api/webhooks/1/abc",
-                DiscordBindingEntries.optionOf(ENTRIES[2], "webhook"));
-        assertEquals("", DiscordBindingEntries.optionOf(ENTRIES[2], "channel"));
-        assertEquals("(set)", redactedWebhook(ENTRIES[2]));
-    }
-
-    private static String redactedWebhook(String entry) {
-        String redacted = com.ninuna.losttales.command.LostTalesCommandDiscord.redact(entry);
-        return DiscordBindingEntries.optionOf(redacted, "webhook");
+        assertEquals(HOOK_ALL, DiscordBindingEntries.optionOf(ENTRIES[2], "webhook"));
+        assertEquals("7", DiscordBindingEntries.optionOf(ENTRIES[2], "channel"));
+        assertEquals("", DiscordBindingEntries.optionOf(ENTRIES[1], "channel"));
     }
 }

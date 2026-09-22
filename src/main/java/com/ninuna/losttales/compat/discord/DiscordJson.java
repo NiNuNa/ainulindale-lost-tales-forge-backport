@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.emoji.ChatForeignEmoji;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -54,19 +55,25 @@ public final class DiscordJson {
         public final String editedTimestamp;
         /** The channel the message is in; empty when the listing did not say. */
         public final String channelId;
+        /**
+         * The author's own picture on Discord's image host, or empty for
+         * an author who has none of their own.
+         */
+        public final String authorAvatarUrl;
 
         Message(String id, String authorId, String authorName, boolean bot,
                 String content, Map<String, String> mentionNames,
                 String referencedMessageId, String editedTimestamp) {
             this(id, authorId, authorName, bot, content, mentionNames,
-                    referencedMessageId, editedTimestamp, "");
+                    referencedMessageId, editedTimestamp, "", "");
         }
 
         Message(String id, String authorId, String authorName, boolean bot,
                 String content, Map<String, String> mentionNames,
                 String referencedMessageId, String editedTimestamp,
-                String channelId) {
+                String channelId, String authorAvatarUrl) {
             this.channelId = channelId == null ? "" : channelId;
+            this.authorAvatarUrl = authorAvatarUrl == null ? "" : authorAvatarUrl;
             this.id = id;
             this.authorId = authorId;
             this.authorName = authorName;
@@ -150,7 +157,23 @@ public final class DiscordJson {
                 Collections.unmodifiableMap(mentions),
                 referencedMessageId(object),
                 string(object, "edited_timestamp"),
-                string(object, "channel_id"));
+                string(object, "channel_id"),
+                author == null ? "" : avatarUrl(string(author, "id"),
+                        string(author, "avatar")));
+    }
+
+    /**
+     * A member's picture, 64 pixels, from their id and the hash of their
+     * avatar; empty when either is not what Discord writes, so nothing
+     * but Discord's own image host is ever named.
+     */
+    static String avatarUrl(String userId, String avatarHash) {
+        if (userId == null || !userId.matches("\\d{1,24}") || avatarHash == null
+                || !avatarHash.matches("(?:a_)?[0-9a-f]{1,64}")) {
+            return "";
+        }
+        return "https://cdn.discordapp.com/avatars/" + userId + "/" + avatarHash
+                + ".png?size=64";
     }
 
     /** One message object as the gateway delivers it, or null for anything else. */
@@ -163,6 +186,11 @@ public final class DiscordJson {
      * it: what to answer, and the id and token the answer goes back by.
      */
     public static final class Interaction {
+        /** Manage Webhooks, the permission a link and an unlink ask for. */
+        public static final int MANAGE_WEBHOOKS = 29;
+        /** Administrator, which holds every other permission. */
+        public static final int ADMINISTRATOR = 3;
+
         public final String id;
         public final String token;
         public final String applicationId;
@@ -172,10 +200,16 @@ public final class DiscordJson {
         public final String channelId;
         public final String guildId;
         public final String userName;
+        /**
+         * What the member who used the command may do in the channel, as
+         * Discord works it out with the channel's own overwrites: a
+         * bitfield written as a decimal number; empty outside a server.
+         */
+        public final String memberPermissions;
 
         Interaction(String id, String token, String applicationId, String name,
                     Map<String, String> options, String channelId, String guildId,
-                    String userName) {
+                    String userName, String memberPermissions) {
             this.id = id;
             this.token = token;
             this.applicationId = applicationId;
@@ -184,6 +218,26 @@ public final class DiscordJson {
             this.channelId = channelId;
             this.guildId = guildId;
             this.userName = userName;
+            this.memberPermissions = memberPermissions == null ? "" : memberPermissions;
+        }
+
+        /**
+         * Whether the member holds the permission of that bit in the
+         * channel, or is an administrator; false when Discord said
+         * nothing, or said it in a form that is no bitfield.
+         */
+        public boolean memberMay(int bit) {
+            if (this.memberPermissions.length() == 0
+                    || this.memberPermissions.length() > 40) {
+                return false;
+            }
+            try {
+                BigInteger bits = new BigInteger(this.memberPermissions);
+                return bits.signum() >= 0
+                        && (bits.testBit(bit) || bits.testBit(ADMINISTRATOR));
+            } catch (NumberFormatException notABitfield) {
+                return false;
+            }
         }
     }
 
@@ -224,14 +278,19 @@ public final class DiscordJson {
         }
         JsonObject user = object.has("user") && object.get("user").isJsonObject()
                 ? object.getAsJsonObject("user") : null;
-        if (user == null && object.has("member") && object.get("member").isJsonObject()) {
+        String permissions = "";
+        if (object.has("member") && object.get("member").isJsonObject()) {
             JsonObject member = object.getAsJsonObject("member");
-            user = member.has("user") && member.get("user").isJsonObject()
-                    ? member.getAsJsonObject("user") : null;
+            permissions = string(member, "permissions");
+            if (user == null) {
+                user = member.has("user") && member.get("user").isJsonObject()
+                        ? member.getAsJsonObject("user") : null;
+            }
         }
         return new Interaction(id, token, string(object, "application_id"), name,
                 Collections.unmodifiableMap(options), string(object, "channel_id"),
-                string(object, "guild_id"), user == null ? "" : displayName(user));
+                string(object, "guild_id"), user == null ? "" : displayName(user),
+                permissions);
     }
 
     /** The gateway URL {@code GET /gateway/bot} answers with; empty for anything else. */
@@ -578,6 +637,37 @@ public final class DiscordJson {
     }
 
     /** The mention block that lets a post ping nobody. */
+    /** A field of a gateway event as text; empty when it is missing or no value. */
+    static String stringOf(JsonObject object, String key) {
+        return object == null ? "" : string(object, key);
+    }
+
+    /** The body of a webhook made for the bridge: its name, as members see it. */
+    public static String createWebhookBody(String name) {
+        JsonObject body = new JsonObject();
+        body.addProperty("name", name == null ? "" : name);
+        return body.toString();
+    }
+
+    /**
+     * The address of a webhook Discord just made, from its id and token;
+     * empty when the reply holds no such pair.
+     */
+    public static String parseCreatedWebhookUrl(String json) {
+        JsonObject object = parseObject(json);
+        if (object == null) {
+            return "";
+        }
+        String id = string(object, "id");
+        String token = string(object, "token");
+        if (id.length() == 0 || id.length() > 24 || token.length() == 0
+                || token.length() > 128 || !id.matches("\\d+")
+                || !token.matches("[A-Za-z0-9_-]+")) {
+            return "";
+        }
+        return "https://discord.com/api/webhooks/" + id + "/" + token;
+    }
+
     private static JsonObject noMentions() {
         JsonObject allowedMentions = new JsonObject();
         allowedMentions.add("parse", new JsonArray());

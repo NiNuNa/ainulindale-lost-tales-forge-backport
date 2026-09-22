@@ -138,7 +138,11 @@ public final class DiscordChannelBindingsTest {
         assertNull(bindings.byId(null));
     }
 
-    /** A Discord line belongs to one conversation: the second reader is refused. */
+    /**
+     * A Discord channel holds one conversation: a second game channel
+     * naming it is refused outright, whether it would read it or post
+     * into it.
+     */
     @Test
     public void aDiscordChannelFeedsOneGameChannelOnly() {
         Collected warnings = new Collected();
@@ -150,14 +154,72 @@ public final class DiscordChannelBindingsTest {
         assertTrue(warnings.messages.toString(), warnings.messages.isEmpty());
         assertEquals(2, warnings.refusals.size());
         assertTrue(warnings.refusals.get(0),
-                warnings.refusals.get(0).contains("'all' reads Discord channel 111")
-                        && warnings.refusals.get(0).contains("'ooc' reads already"));
+                warnings.refusals.get(0).contains("'all' names Discord channel 111")
+                        && warnings.refusals.get(0).contains("'ooc' has already"));
         assertEquals(Arrays.asList(bindings.byId("ooc")), bindings.reading());
         assertEquals(DiscordBridgeDirection.DISABLED,
                 bindings.byId("all").getDirection());
-        assertEquals("the refused entry keeps posting",
-                DiscordBridgeDirection.GAME_TO_DISCORD,
+        assertEquals(DiscordBridgeDirection.DISABLED,
                 bindings.byId("admin").getDirection());
+        assertEquals(Arrays.asList("ooc"), idsOf(bindings.destinations()));
+    }
+
+    /**
+     * A game channel that only posts into a Discord channel still has it:
+     * another game channel may not read it afterwards, nor post into it
+     * before.
+     */
+    @Test
+    public void postingIntoADiscordChannelOwnsItToo() {
+        Collected warnings = new Collected();
+        DiscordChannelBindings bindings = DiscordChannelBindings.parse(new String[] {
+                "ooc=GAME_TO_DISCORD;channel=222;webhook=" + WEBHOOK,
+                "all=DISCORD_TO_GAME;channel=222",
+        }, true, warnings);
+        assertEquals(1, warnings.refusals.size());
+        assertEquals(DiscordBridgeDirection.DISABLED,
+                bindings.byId("all").getDirection());
+        assertTrue(bindings.reading().isEmpty());
+        assertEquals("ooc", bindings.ownerOfChannel("222"));
+    }
+
+    /**
+     * The bridge sends the game's lines wherever a webhook points, so a
+     * webhook must be a Discord webhook's address; any other is dropped
+     * with a warning that does not repeat it.
+     */
+    @Test
+    public void aWebhookMustBeADiscordWebhook() {
+        assertTrue(DiscordChannelBindings.isDiscordWebhook(WEBHOOK));
+        assertTrue(DiscordChannelBindings.isDiscordWebhook(
+                "https://discordapp.com/api/webhooks/123/a_B-c"));
+        assertTrue(DiscordChannelBindings.isDiscordWebhook(
+                "https://canary.discord.com/api/v10/webhooks/123/abc"));
+        assertFalse(DiscordChannelBindings.isDiscordWebhook(
+                "http://discord.com/api/webhooks/123/abc"));
+        assertFalse(DiscordChannelBindings.isDiscordWebhook(
+                "https://discord.com.example.org/api/webhooks/123/abc"));
+        assertFalse(DiscordChannelBindings.isDiscordWebhook(
+                "https://example.org/api/webhooks/123/abc"));
+        assertFalse(DiscordChannelBindings.isDiscordWebhook(
+                "https://discord.com/api/webhooks/123/abc?wait=true"));
+        assertFalse(DiscordChannelBindings.isDiscordWebhook(
+                "https://discord.com/api/webhooks/123"));
+        assertFalse(DiscordChannelBindings.isDiscordWebhook(null));
+
+        Collected warnings = new Collected();
+        DiscordChannelBindings bindings = DiscordChannelBindings.parse(new String[] {
+                "ooc=BIDIRECTIONAL;channel=111;webhook=https://example.org/hook/secret",
+        }, true, warnings);
+        assertEquals(DiscordBridgeDirection.DISCORD_TO_GAME,
+                bindings.byId("ooc").getDirection());
+        assertEquals("", bindings.byId("ooc").getWebhookUrl());
+        // The address dropped, and then posting with nowhere to post: two
+        // faults, two warnings, neither repeating the address.
+        assertEquals(2, warnings.messages.size());
+        for (String message : warnings.messages) {
+            assertFalse(message, message.contains("secret"));
+        }
     }
 
     @Test
@@ -178,19 +240,27 @@ public final class DiscordChannelBindingsTest {
         assertTrue(warnings.refusals.isEmpty());
     }
 
+    /**
+     * Each faction's talk is a conversation of its own: a Faction link
+     * names its faction, and one that names none — every faction into
+     * one Discord channel — is refused.
+     */
     @Test
-    public void aFactionLineFindsItsOwnBindingsBeforeTheChannelsOwn() {
+    public void aFactionLineFindsOnlyItsOwnFactionsBindings() {
+        Collected warnings = new Collected();
         DiscordChannelBindings bindings = DiscordChannelBindings.parse(new String[] {
                 "faction=GAME_TO_DISCORD;webhook=" + WEBHOOK,
                 "faction:lotr:gondor=GAME_TO_DISCORD;webhook=" + WEBHOOK + "2",
                 "faction:lotr:gondor=GAME_TO_DISCORD;webhook=" + WEBHOOK + "3",
-        }, false, null);
+        }, false, warnings);
+        assertEquals(1, warnings.messages.size());
+        assertTrue(warnings.messages.get(0), warnings.messages.get(0).contains(
+                "names no faction"));
+        assertNull(bindings.byId("faction"));
         assertEquals(Arrays.asList("faction:lotr:gondor", "faction:lotr:gondor#2"),
                 idsOf(bindings.forGame(ChatChannel.FACTION, "LOTR:Gondor")));
-        assertEquals(Arrays.asList("faction"),
-                idsOf(bindings.forGame(ChatChannel.FACTION, "lotr:rohan")));
-        assertEquals(Arrays.asList("faction"),
-                idsOf(bindings.forGame(ChatChannel.FACTION, "")));
+        assertTrue(bindings.forGame(ChatChannel.FACTION, "lotr:rohan").isEmpty());
+        assertTrue(bindings.forGame(ChatChannel.FACTION, "").isEmpty());
         assertTrue(bindings.forGame(ChatChannel.OOC, "").isEmpty());
         assertTrue(bindings.forGame(null, "").isEmpty());
     }
@@ -254,10 +324,9 @@ public final class DiscordChannelBindingsTest {
         assertEquals("proximity has nowhere on Discord to read from",
                 DiscordBridgeDirection.GAME_TO_DISCORD,
                 bindings.byId("proximity").getDirection());
-        assertEquals("the faction channel reads only per faction",
-                DiscordBridgeDirection.GAME_TO_DISCORD,
-                bindings.byId("faction").getDirection());
-        assertEquals("the faction channel never read 333, so Operator may",
+        assertNull("the faction channel is linked per faction only",
+                bindings.byId("faction"));
+        assertEquals("the refused faction entry owns nothing, so Operator may read 333",
                 DiscordBridgeDirection.DISCORD_TO_GAME,
                 bindings.byId("admin").getDirection());
         assertEquals(4, warnings.messages.size());

@@ -3,9 +3,36 @@ package com.ninuna.losttales.gui.hud.compass;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import com.ninuna.losttales.client.motion.MotionTestSettings;
+import com.ninuna.losttales.config.LostTalesConfig;
 import org.junit.Test;
 
 public final class LostTalesCompassHeightIndicatorAnimationTest {
+    @Test
+    public void stilledMotionLeavesTheChevronsStanding() {
+        MotionTestSettings settings = MotionTestSettings.reset();
+        try {
+            LostTalesConfig.animations = false;
+            LostTalesCompassHeightIndicatorAnimation animation =
+                    new LostTalesCompassHeightIndicatorAnimation();
+            LostTalesCompassHeightIndicatorAnimation.Frame frame =
+                    animation.frame("marker", -1, 2, 1L);
+            assertEquals(2, frame.getArrowCount());
+            for (int index = 0; index < 2; index++) {
+                LostTalesCompassHeightIndicatorAnimation.Pose pose =
+                        frame.getPose(index);
+                assertEquals(0.0F, pose.getOffsetY(), 0.0F);
+                assertEquals(1.0F, pose.getScaleX(), 0.0F);
+                assertEquals(1.0F, pose.getScaleY(), 0.0F);
+                assertEquals(1.0F, pose.getAlpha(), 0.0F);
+            }
+            assertEquals(1, animation.frame("marker", -1, 1, 2L)
+                    .getArrowCount());
+        } finally {
+            settings.restore();
+        }
+    }
+
     @Test
     public void entranceAnticipatesThenSettlesWithSquashAndStretch() {
         LostTalesCompassHeightIndicatorAnimation animation =

@@ -93,7 +93,7 @@ public final class LostTalesDiscordBridgeIntakeTest {
             // Removals fill the intake to one place short.
             for (int index = 1; index < LostTalesDiscordBridge.MAX_QUEUED_OUTBOUND;
                     index++) {
-                bridge.relayDelete(index, ChatChannel.OOC, "", false);
+                bridge.relayDelete(index, ChatChannel.OOC, "");
             }
             bridge.relayToDiscord(ChatChannel.OOC, "", "Aragorn", "", "two posts",
                     5000L, null, null);

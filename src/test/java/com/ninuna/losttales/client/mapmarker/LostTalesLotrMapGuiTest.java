@@ -1,5 +1,7 @@
 package com.ninuna.losttales.client.mapmarker;
 
+import com.ninuna.losttales.client.motion.MotionTestSettings;
+import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.core.LostTalesClassTransformer;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertEquals;
@@ -81,6 +83,29 @@ public final class LostTalesLotrMapGuiTest {
             zoom = next;
         }
         assertEquals(4.0F, zoom, 0.001F);
+    }
+
+    @Test
+    public void theZoomGlideFollowsTheMotionSettings() {
+        MotionTestSettings settings = MotionTestSettings.reset();
+        try {
+            // Twice as fast, one tick covers what two cover at speed 1.
+            float twoTicks = LostTalesLotrMapGui.advanceSmoothZoom(
+                    LostTalesLotrMapGui.advanceSmoothZoom(3.0F, 4.0F), 4.0F);
+            LostTalesConfig.animationSpeed = 2.0D;
+            assertEquals(twoTicks,
+                    LostTalesLotrMapGui.advanceSmoothZoom(3.0F, 4.0F), 0.0001F);
+            // Reduced motion and motion off both land the zoom at once.
+            LostTalesConfig.reducedMotion = true;
+            assertEquals(4.0F, LostTalesLotrMapGui.advanceSmoothZoom(3.0F, 4.0F),
+                    0.0F);
+            LostTalesConfig.reducedMotion = false;
+            LostTalesConfig.animations = false;
+            assertEquals(4.0F, LostTalesLotrMapGui.advanceSmoothZoom(3.0F, 4.0F),
+                    0.0F);
+        } finally {
+            settings.restore();
+        }
     }
 
     @Test

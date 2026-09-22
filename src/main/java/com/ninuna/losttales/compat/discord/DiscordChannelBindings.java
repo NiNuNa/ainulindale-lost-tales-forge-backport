@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Every game channel bound to a Discord channel, read once from the
@@ -28,23 +29,26 @@ import java.util.Set;
  * </pre>
  *
  * The part before {@code =} names the channel by its wire id, the
- * Faction channel with the faction after a colon; then the direction,
- * then {@code channel} (the Discord channel the bot reads) and
- * {@code webhook} (where the bridge posts) in any order. A game channel
- * may be bound as often as it has Discord channels to go to — each
- * entry is one destination, and a line goes to every one that posts —
- * while a Discord channel belongs to one game channel only, whichever
- * way lines cross it: the second game channel to name a webhook or a
- * channel id already named is refused that webhook's posting or that
- * channel's reads, since a Discord channel holds one conversation, and
+ * Faction channel always with the faction after a colon; then the
+ * direction, then {@code channel} (the Discord channel the bot reads)
+ * and {@code webhook} (where the bridge posts) in any order. A game
+ * channel may be bound as often as it has Discord channels to go to —
+ * each entry is one destination, and a line goes to every one that
+ * posts — while a Discord channel belongs to one game channel only,
+ * whichever way lines cross it: the second game channel to name a
+ * Discord channel another already reads or posts into is refused
+ * outright, and the second to name a webhook another posts through is
+ * refused that posting, since a Discord channel holds one conversation;
  * a game channel naming one webhook twice posts through it once. The
  * Discord channels of every guild the bot is in look alike here: a
  * channel id and a webhook name their channel on their own, whichever
- * guild holds it. An entry that asks for something it cannot have is
- * trimmed to what it can, with one warning each, and an entry for a
- * private channel is refused outright: the channel's own word on
- * whether it may be bridged is final. A fresh file offers OOC &amp;
- * Discord and Global as entries switched off.
+ * guild holds it. A webhook must be a Discord webhook address, since
+ * the bridge sends the game's lines wherever it points. An entry that
+ * asks for something it cannot have is trimmed to what it can, with one
+ * warning each, and an entry for a private channel is refused outright:
+ * the channel's own word on whether it may be bridged is final. A fresh
+ * file holds no link: links are made with a pairing code
+ * ({@link DiscordLinkCodes}).
  */
 public final class DiscordChannelBindings {
     public static final DiscordChannelBindings EMPTY =
@@ -53,6 +57,14 @@ public final class DiscordChannelBindings {
     private static final char ENTRY_SEPARATOR = ';';
     private static final String CHANNEL_KEY = "channel";
     private static final String WEBHOOK_KEY = "webhook";
+    /**
+     * A Discord webhook's address: Discord's own host (the canary and
+     * test builds' too), an optional API version, the webhook's id and
+     * its token, nothing after.
+     */
+    private static final Pattern DISCORD_WEBHOOK = Pattern.compile(
+            "https://(?:(?:canary|ptb)\\.)?discord(?:app)?\\.com/api(?:/v\\d{1,2})?"
+                    + "/webhooks/\\d{1,24}/[A-Za-z0-9_-]{1,128}");
 
     /**
      * Where the parser's findings go; the bridge logs them, tests
@@ -188,6 +200,13 @@ public final class DiscordChannelBindings {
                     + " takes a scope; ignored");
             return null;
         }
+        if (scope.length() == 0 && channel == ChatChannel.FACTION) {
+            // Every faction's talk in one Discord channel would be several
+            // conversations in one place.
+            warn(warnings, "Discord binding for the faction channel names no"
+                    + " faction; name one as faction:<faction id>; ignored");
+            return null;
+        }
         DiscordBridgeDirection direction = DiscordBridgeDirection.parse(
                 parts.length == 0 ? "" : parts[0]);
         if (direction == null) {
@@ -223,6 +242,13 @@ public final class DiscordChannelBindings {
                     + "' has a channel id that is not a number; reading it is off");
             discordChannel = "";
         }
+        if (webhook.length() > 0 && !isDiscordWebhook(webhook)) {
+            // Never repeated in the log: an address is as good as a
+            // password to whoever reads it.
+            warn(warnings, "Discord binding '" + target + "' has a webhook that is"
+                    + " not a Discord webhook address; posting is off");
+            webhook = "";
+        }
         return new DiscordChannelBinding(channel, scope, discordChannel, webhook,
                 direction);
     }
@@ -231,8 +257,9 @@ public final class DiscordChannelBindings {
      * Trims every binding to what it can do, drops an entry of a game
      * channel that names a webhook or a Discord channel the same game
      * channel names already, and refuses a second game channel a
-     * Discord channel another has: its posting through a webhook the
-     * other posts through, its reads of a channel the other reads. A
+     * Discord channel another has: the whole entry when it names a
+     * Discord channel another game channel reads or posts into, its
+     * posting when it posts through a webhook another posts through. A
      * Discord channel belongs to one game channel.
      */
     private static DiscordChannelBindings validated(List<DiscordChannelBinding> parsed,
@@ -240,7 +267,7 @@ public final class DiscordChannelBindings {
                                                     Warnings warnings) {
         ArrayList<DiscordChannelBinding> kept = new ArrayList<DiscordChannelBinding>();
         Set<String> seen = new HashSet<String>();
-        Map<String, String> readers = new HashMap<String, String>();
+        Map<String, String> owners = new HashMap<String, String>();
         Map<String, String> posters = new HashMap<String, String>();
         Map<String, Integer> ordinals = new HashMap<String, Integer>();
         for (int index = 0; index < parsed.size(); index++) {
@@ -300,19 +327,21 @@ public final class DiscordChannelBindings {
                     warn(warnings, "Discord binding '" + id + "' " + why
                             + "; reading is off");
                     direction = direction.withoutReads();
+                }
+            }
+            String discordChannel = binding.getDiscordChannelId();
+            if (discordChannel.length() > 0 && (direction.readsFromDiscord()
+                    || (direction.sendsToDiscord()
+                            && binding.getWebhookUrl().length() > 0))) {
+                String owner = owners.get(discordChannel);
+                if (owner != null && !owner.equals(key)) {
+                    refuse(warnings, "Discord binding '" + id + "' names Discord"
+                            + " channel " + discordChannel + ", which '" + owner
+                            + "' has already: a Discord channel belongs to one"
+                            + " game channel; '" + id + "' is off");
+                    direction = DiscordBridgeDirection.DISABLED;
                 } else {
-                    String reader = readers.get(binding.getDiscordChannelId());
-                    if (reader != null) {
-                        refuse(warnings, "Discord binding '" + id
-                                + "' reads Discord channel "
-                                + binding.getDiscordChannelId() + ", which '"
-                                + reader + "' reads already: a Discord channel"
-                                + " belongs to one game channel; reading is off"
-                                + " for '" + id + "'");
-                        direction = direction.withoutReads();
-                    } else {
-                        readers.put(binding.getDiscordChannelId(), id);
-                    }
+                    owners.put(discordChannel, key);
                 }
             }
             kept.add(binding.withDirection(direction));
@@ -341,8 +370,15 @@ public final class DiscordChannelBindings {
         return "";
     }
 
-    private static boolean isSnowflake(String value) {
-        if (value.length() == 0 || value.length() > 24) {
+    /** Whether the text is a Discord webhook's address and nothing else. */
+    static boolean isDiscordWebhook(String url) {
+        return url != null && url.length() <= 256
+                && DISCORD_WEBHOOK.matcher(url).matches();
+    }
+
+    /** Whether the text is a Discord id: a number of at most 24 digits. */
+    static boolean isSnowflake(String value) {
+        if (value == null || value.length() == 0 || value.length() > 24) {
             return false;
         }
         for (int index = 0; index < value.length(); index++) {
@@ -372,23 +408,19 @@ public final class DiscordChannelBindings {
     }
 
     /**
-     * The bindings a game line goes out through, in config order: the
-     * Faction channel's bindings for the sender's faction, else the
-     * channel's own, else none. Faction ids compare case-insensitively.
+     * The bindings a game line goes out through, in config order: for the
+     * Faction channel, those of the line's own faction, compared
+     * case-insensitively; for any other, the channel's own; else none.
      */
     public List<DiscordChannelBinding> forGame(ChatChannel channel, String factionId) {
         if (channel == null) {
             return Collections.emptyList();
         }
-        if (channel == ChatChannel.FACTION && factionId != null
-                && factionId.trim().length() > 0) {
-            List<DiscordChannelBinding> scoped = this.byKey.get(DiscordChannelBinding.keyOf(
-                    channel, factionId.trim().toLowerCase(Locale.ROOT)));
-            if (scoped != null) {
-                return scoped;
-            }
-        }
-        List<DiscordChannelBinding> own = this.byKey.get(channel.getId());
+        String key = channel != ChatChannel.FACTION ? channel.getId()
+                : factionId == null || factionId.trim().length() == 0 ? null
+                : DiscordChannelBinding.keyOf(channel,
+                        factionId.trim().toLowerCase(Locale.ROOT));
+        List<DiscordChannelBinding> own = key == null ? null : this.byKey.get(key);
         return own == null ? Collections.<DiscordChannelBinding>emptyList() : own;
     }
 

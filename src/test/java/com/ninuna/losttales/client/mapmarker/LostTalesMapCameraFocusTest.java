@@ -3,6 +3,8 @@ package com.ninuna.losttales.client.mapmarker;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import com.ninuna.losttales.client.motion.MotionTestSettings;
+import com.ninuna.losttales.config.LostTalesConfig;
 import org.junit.Test;
 
 public final class LostTalesMapCameraFocusTest {
@@ -56,6 +58,26 @@ public final class LostTalesMapCameraFocusTest {
         // movement below its floor either.
         assertEquals(LostTalesMapCameraFocus.MIN_DURATION_NANOS,
                 LostTalesMapCameraFocus.durationFor(-10.0F));
+    }
+
+    @Test
+    public void theGlideFollowsTheMotionSettings() {
+        MotionTestSettings settings = MotionTestSettings.reset();
+        try {
+            long full = LostTalesMapCameraFocus.durationFor(30.0F);
+            assertEquals(full, LostTalesMapCameraFocus.glideNanos(30.0F));
+            LostTalesConfig.animationSpeed = 2.0D;
+            assertEquals(Math.round(full / 2.0D),
+                    LostTalesMapCameraFocus.glideNanos(30.0F));
+            // Reduced motion and motion off both jump the camera.
+            LostTalesConfig.reducedMotion = true;
+            assertEquals(0L, LostTalesMapCameraFocus.glideNanos(30.0F));
+            LostTalesConfig.reducedMotion = false;
+            LostTalesConfig.animations = false;
+            assertEquals(0L, LostTalesMapCameraFocus.glideNanos(30.0F));
+        } finally {
+            settings.restore();
+        }
     }
 
     @Test

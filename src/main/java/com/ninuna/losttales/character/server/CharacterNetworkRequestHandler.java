@@ -113,6 +113,26 @@ public final class CharacterNetworkRequestHandler {
         });
     }
 
+    public static void handleProfileUpdateRequest(final EntityPlayerMP player,
+                                                  final int requestId,
+                                                  final long expectedRosterRevision,
+                                                  final UUID characterId,
+                                                  final String description,
+                                                  final int age) {
+        execute(player, requestId, CharacterOperationType.PROFILE_UPDATE,
+                new Operation() {
+                    @Override
+                    public CharacterOperationResult run() {
+                        return CharacterService.getInstance().updateProfile(
+                                player,
+                                expectedRosterRevision,
+                                characterId,
+                                description,
+                                age);
+                    }
+                });
+    }
+
     public static void handleLoreClaimRequest(
             final EntityPlayerMP player,
             final int requestId,
@@ -182,7 +202,7 @@ public final class CharacterNetworkRequestHandler {
                 // Once the coordinator commits, synchronization is best-effort.
                 // Never report a contradictory failure for an already committed
                 // switch; a later roster request can safely repair stale clients.
-                if (operationType != CharacterOperationType.CAPE_UPDATE) {
+                if (touchesGameplay(operationType)) {
                     CharacterRaceGameplayHandler.apply(player);
                 }
                 CharacterAppearanceSyncManager.broadcastPlayer(
@@ -191,7 +211,7 @@ public final class CharacterNetworkRequestHandler {
                         || operationType == CharacterOperationType.LORE_RELEASE) {
                     LoreCharacterSyncManager.broadcast(player);
                 }
-                if (operationType != CharacterOperationType.CAPE_UPDATE) {
+                if (touchesGameplay(operationType)) {
                     PartySyncManager.sendState(
                             player, PartySyncManager.UNSOLICITED_REQUEST_ID);
                     PartySyncManager.sendStateToAudience(
@@ -225,6 +245,16 @@ public final class CharacterNetworkRequestHandler {
                     player == null ? "unknown" : player.getUniqueID(),
                     responseFailure.toString());
         }
+    }
+
+    /**
+     * Whether the race's gameplay and the party state are brought up to
+     * date after an operation. A cape, a description and an age touch
+     * neither.
+     */
+    private static boolean touchesGameplay(CharacterOperationType operationType) {
+        return operationType != CharacterOperationType.CAPE_UPDATE
+                && operationType != CharacterOperationType.PROFILE_UPDATE;
     }
 
     private interface Operation {

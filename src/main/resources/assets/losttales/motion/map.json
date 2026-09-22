@@ -1,0 +1,8 @@
+{
+  "map.popup.open": {
+    "about": "A popup on the map coming up: from travel pixels below and start_scale of its size, into place.",
+    "duration": 220,
+    "curve": "ease_out",
+    "params": { "travel": 14, "start_scale": 0.985 }
+  }
+}

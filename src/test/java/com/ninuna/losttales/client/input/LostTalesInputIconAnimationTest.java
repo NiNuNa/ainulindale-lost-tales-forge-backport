@@ -3,10 +3,40 @@ package com.ninuna.losttales.client.input;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import com.ninuna.losttales.client.motion.MotionTestSettings;
+import com.ninuna.losttales.config.LostTalesConfig;
 import org.junit.Test;
 import org.lwjgl.input.Keyboard;
 
 public final class LostTalesInputIconAnimationTest {
+    @Test
+    public void stilledMotionDrawsAKeyUpOrDownAndNothingMore() {
+        MotionTestSettings settings = MotionTestSettings.reset();
+        try {
+            LostTalesConfig.reducedMotion = true;
+            LostTalesInputIconAnimation animation =
+                    new LostTalesInputIconAnimation();
+            LostTalesInputIconAnimation.Pose held =
+                    animation.pose(true, 20_000_000L, Keyboard.KEY_LEFT);
+            assertEquals(LostTalesInputIconAnimation.PRESSED_FRAME,
+                    held.getFrame());
+            assertEquals(0.0F, held.getOffsetX(), 0.0F);
+            assertEquals(0.0F, held.getOffsetY(), 0.0F);
+            assertEquals(1.0F, held.getScaleX(), 0.0F);
+            assertEquals(1.0F, held.getScaleY(), 0.0F);
+            LostTalesInputIconAnimation.Pose released =
+                    animation.pose(false, 30_000_000L, Keyboard.KEY_LEFT);
+            assertEquals(LostTalesInputIconAnimation.IDLE_FRAME,
+                    released.getFrame());
+            assertEquals(0.0F, released.getRotationDegrees(), 0.0F);
+            // No breath at rest either.
+            assertEquals(0.0F, animation.pose(false, 1_300_000_000L,
+                    Keyboard.KEY_A).getOffsetY(), 0.0F);
+        } finally {
+            settings.restore();
+        }
+    }
+
     @Test
     public void pressJumpsStraightToThirdFrameAndHoldsThere() {
         LostTalesInputIconAnimation animation =

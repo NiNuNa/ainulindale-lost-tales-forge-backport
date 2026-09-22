@@ -6,12 +6,12 @@ import com.ninuna.losttales.client.gui.LostTalesPointerInteractable;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimations;
 import com.ninuna.losttales.client.gui.controlbar.LostTalesControlBar;
 import com.ninuna.losttales.client.gui.controlbar.LostTalesControlBar.Hint;
+import com.ninuna.losttales.client.input.LostTalesKeyPress;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.quest.ClientQuestCatalog;
 import com.ninuna.losttales.client.quest.ClientQuestEntry;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
-import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderHelper;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
@@ -27,9 +27,6 @@ import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiTextField;
-import com.ninuna.losttales.client.gui.animation.LostTalesGuiEasing;
-import com.ninuna.losttales.client.gui.animation.LostTalesUiEasing;
-import com.ninuna.losttales.client.gui.animation.LostTalesUiTransition;
 import java.util.HashMap;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesQuestActionPacket;
@@ -40,6 +37,9 @@ import com.ninuna.losttales.quest.LostTalesQuestObjectiveTextHelper;
 import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
 import com.ninuna.losttales.quest.progress.LostTalesQuestHistoryEntry;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
+import com.ninuna.losttales.client.motion.Motions;
+import com.ninuna.losttales.client.motion.MotionIds;
+import com.ninuna.losttales.client.motion.MotionTransition;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -80,11 +80,6 @@ public class LostTalesQuestJournalGui extends GuiScreen
     /** What the pointer is on: asked once a frame, read by every draw. */
     private enum Hovered { NOTHING, FILTER, CATEGORY, QUEST, ACTION, SEARCH }
 
-    /** How long a fold, a glide or the search opening takes. */
-    private static final int MOTION_MILLIS = 140;
-    /** Seconds a scroll takes to reach where it was sent. */
-    private static final double SCROLL_EASE_SECONDS = 0.09D;
-
     /** The filters, in the order their buttons stand. */
     private static final QuestFilter[] FILTERS = QuestFilter.values();
 
@@ -120,15 +115,16 @@ public class LostTalesQuestJournalGui extends GuiScreen
     private QuestFilter visibleFilter;
     private String visibleQuery = "";
     private long frameCounter;
-    private final LostTalesUiTransition searchOpen = new LostTalesUiTransition();
+    private final MotionTransition searchOpen =
+            new MotionTransition(MotionIds.SCREEN_JOURNAL_FOLD, true);
     private boolean searching;
     /**
      * How far each category is unfolded, one transition each: a row's
      * height is its full height times this, so a category opens and
      * closes by growing rather than appearing.
      */
-    private final Map<String, LostTalesUiTransition> categoryOpen =
-            new HashMap<String, LostTalesUiTransition>();
+    private final Map<String, MotionTransition> categoryOpen =
+            new HashMap<String, MotionTransition>();
     /**
      * How far the search has opened as it was last drawn: the field
      * answers to a press on the box it is actually drawn in, not on the
@@ -197,27 +193,16 @@ public class LostTalesQuestJournalGui extends GuiScreen
         double elapsed = this.lastFrameNanos == 0L ? 0.0D
                 : (now - this.lastFrameNanos) / 1000000000.0D;
         this.lastFrameNanos = now;
-        if (!motionWanted()) {
-            this.listShown = this.listScroll;
-            this.detailShown = this.detailScroll;
-            this.selectionShown = selectionTarget();
-            return;
-        }
-        this.listShown = LostTalesGuiEasing.approach(this.listShown,
-                this.listScroll, elapsed, SCROLL_EASE_SECONDS);
-        this.detailShown = LostTalesGuiEasing.approach(this.detailShown,
-                this.detailScroll, elapsed, SCROLL_EASE_SECONDS);
+        String glide = MotionIds.SCREEN_JOURNAL_SCROLL;
+        this.listShown = Motions.followTravel(glide, this.listShown,
+                this.listScroll, elapsed);
+        this.detailShown = Motions.followTravel(glide, this.detailShown,
+                this.detailScroll, elapsed);
         double target = selectionTarget();
         this.selectionShown = Double.isNaN(this.selectionShown)
                 || Double.isNaN(target) ? target
-                : LostTalesGuiEasing.approach(this.selectionShown, target,
-                        elapsed, SCROLL_EASE_SECONDS);
-    }
-
-    /** Whether the player wants motion at all; the chat's own setting. */
-    private static boolean motionWanted() {
-        return LostTalesConfig.enableGuiAnimations
-                && !LostTalesConfig.reducedGuiMotion;
+                : Motions.followTravel(glide, this.selectionShown, target,
+                        elapsed);
     }
 
     /**
@@ -242,19 +227,15 @@ public class LostTalesQuestJournalGui extends GuiScreen
      * the list never jumps under the pointer.
      */
     private float categoryOpenShare(String category) {
-        LostTalesUiTransition transition = this.categoryOpen.get(category);
+        MotionTransition transition = this.categoryOpen.get(category);
         if (transition == null) {
-            transition = new LostTalesUiTransition();
+            transition = new MotionTransition(MotionIds.SCREEN_JOURNAL_FOLD,
+                    true);
             transition.settle(!this.collapsedCategories.contains(category));
             this.categoryOpen.put(category, transition);
         }
-        boolean open = !this.collapsedCategories.contains(category);
-        if (!motionWanted()) {
-            transition.settle(open);
-            return open ? 1.0F : 0.0F;
-        }
-        return transition.advance(System.nanoTime(), open, MOTION_MILLIS,
-                LostTalesUiEasing.SETTLE);
+        return transition.advance(System.nanoTime(),
+                !this.collapsedCategories.contains(category));
     }
 
     /** The screen's own geometry, worked out fresh every frame. */
@@ -306,10 +287,8 @@ public class LostTalesQuestJournalGui extends GuiScreen
                 QuestJournalLayout.MARGIN, textTop(header),
                 LostTalesColors.rgb(LostTalesColors.TEXT_BRIGHT));
 
-        float open = motionWanted()
-                ? this.searchOpen.advance(System.nanoTime(), this.searching,
-                        MOTION_MILLIS, LostTalesUiEasing.SETTLE)
-                : this.searching ? 1.0F : 0.0F;
+        float open = this.searchOpen.advance(System.nanoTime(),
+                this.searching);
         this.searchShown = open;
         drawSearchControl(layout, open);
         if (open < 1.0F) {
@@ -352,7 +331,7 @@ public class LostTalesQuestJournalGui extends GuiScreen
         boolean hovered = this.hovered == Hovered.SEARCH;
         this.searchMotion.advance(System.nanoTime(),
                 this.searching || hovered, hovered,
-                hovered && Mouse.isButtonDown(0), motionWanted());
+                hovered && Mouse.isButtonDown(0));
         float lit = this.searchMotion.lit();
         LostTalesUiFramedButton.drawSurface((float)button.left,
                 (float)button.top, (float)button.width, (float)button.height,
@@ -455,7 +434,7 @@ public class LostTalesQuestJournalGui extends GuiScreen
         }
         LostTalesUiButtonMotion motion = labelMotion(label);
         motion.advance(System.nanoTime(), selected || hovered, hovered,
-                hovered && Mouse.isButtonDown(0), motionWanted());
+                hovered && Mouse.isButtonDown(0));
         float lit = motion.lit();
         // The frame stands still; only what it holds moves, so a row of
         // buttons keeps its shape while one of them answers.
@@ -605,7 +584,7 @@ public class LostTalesQuestJournalGui extends GuiScreen
 
         LostTalesSkyrimUiStyle.beginContent();
         LostTalesUiButtonMotion motion = categoryMotion(label);
-        motion.advance(System.nanoTime(), lit, motionWanted());
+        motion.advance(System.nanoTime(), lit);
         LostTalesUiSheet resting = collapsed
                 ? LostTalesUiSheet.PLUS : LostTalesUiSheet.MINUS;
         LostTalesUiSheet marked = collapsed
@@ -1817,6 +1796,7 @@ public class LostTalesQuestJournalGui extends GuiScreen
         // A field taking the keys answers first, so a letter types
         // rather than reaching a shortcut; Escape closes the search
         // before it closes the screen.
+        LostTalesKeyPress press = LostTalesKeyPress.read(typedChar, keyCode);
         if (this.searching && this.searchField != null
                 && this.searchField.isFocused()) {
             if (keyCode == Keyboard.KEY_ESCAPE) {
@@ -1842,8 +1822,12 @@ public class LostTalesQuestJournalGui extends GuiScreen
                 clampSelectionAndScroll();
                 return;
             }
+            if (press.types) {
+                // A character the field refused goes no further.
+                return;
+            }
         }
-        if (keyCode == Keyboard.KEY_F && isCtrlKeyDown()) {
+        if (press.isCommand(Keyboard.KEY_F)) {
             if (!this.searching) {
                 toggleSearch();
             } else if (this.searchField != null) {

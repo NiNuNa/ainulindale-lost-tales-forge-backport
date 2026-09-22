@@ -38,7 +38,7 @@ public final class LostTalesPermissionsTest {
     }
 
     private static ChatAccountRole role(String id, int rank, String... granted) {
-        return ChatAccountRole.custom(id, id, "", "", 0xA94B54, true, rank, null,
+        return ChatAccountRole.custom(id, id, "", 0xA94B54, true, rank, null,
                 grants(granted));
     }
 
@@ -221,8 +221,8 @@ public final class LostTalesPermissionsTest {
     @Test
     public void grantsNeverReachTheWire() {
         ChatRoleCatalog fromWire = ChatRoleCatalog.fromWire(
-                Arrays.asList(ChatAccountRole.fromWire("moderator", 1, "", "",
-                        "Moderator", "", "", 0xA94B54, true, false, 15)));
+                Arrays.asList(ChatAccountRole.fromWire("moderator", 1, "",
+                        "Moderator", "", 0xA94B54, true, false, 15)));
         assertTrue(fromWire.byId("moderator").getGrants().isEmpty());
         assertFalse(LostTalesPermissions.isGranted(
                 fromWire.byId("moderator").bit(),

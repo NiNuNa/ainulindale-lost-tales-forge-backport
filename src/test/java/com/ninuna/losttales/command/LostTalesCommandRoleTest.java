@@ -9,12 +9,12 @@ public final class LostTalesCommandRoleTest {
 
     @Test
     public void anOptionIsReplacedInPlaceOrAppended() {
-        String entry = "moderator=name:Moderator;tag:[Mod];color:A94B54";
-        assertEquals("moderator=name:Moderator;tag:[Staff];color:A94B54",
-                LostTalesCommandRole.replaceOption(entry, "TAG", "[Staff]"));
-        assertEquals("moderator=name:Moderator;tag:[Mod];color:A94B54;rank:5",
+        String entry = "moderator=name:Moderator;color:A94B54";
+        assertEquals("moderator=name:Staff;color:A94B54",
+                LostTalesCommandRole.replaceOption(entry, "NAME", "Staff"));
+        assertEquals("moderator=name:Moderator;color:A94B54;rank:5",
                 LostTalesCommandRole.replaceOption(entry, "rank", "5"));
-        assertEquals("moderator=name:Moderator;tag:[Mod];color:A94B54;op:1",
+        assertEquals("moderator=name:Moderator;color:A94B54;op:1",
                 LostTalesCommandRole.replaceOption(entry, "op", "1"));
     }
 

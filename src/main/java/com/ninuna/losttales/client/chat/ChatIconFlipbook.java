@@ -1,9 +1,8 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
-import com.ninuna.losttales.client.gui.animation.LostTalesUiEasing;
-import com.ninuna.losttales.client.gui.animation.LostTalesUiTransition;
-import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.client.motion.MotionIds;
+import com.ninuna.losttales.client.motion.MotionTransition;
 
 /**
  * A control whose sheet holds its motion as a run of frames: the
@@ -11,7 +10,7 @@ import com.ninuna.losttales.config.LostTalesConfig;
  * turned through a right angle, and both play their run between an open
  * and a closed state while they crossfade to their lit artwork and back.
  *
- * <p>The frame is picked from a {@link LostTalesUiTransition}, so a
+ * <p>The frame is picked from a {@link MotionTransition}, so a
  * control flipped back before its run has finished travels on from the
  * frame it is showing instead of jumping to the far end and walking
  * back. Both runs are authored with their end frames mirrored and each
@@ -21,7 +20,8 @@ import com.ninuna.losttales.config.LostTalesConfig;
 final class ChatIconFlipbook {
     private final LostTalesUiSheet[] frames;
     private final LostTalesUiSheet[] hoverFrames;
-    private final LostTalesUiTransition flip = new LostTalesUiTransition();
+    private final MotionTransition flip =
+            new MotionTransition(MotionIds.CHAT_ICON_FLIP);
     private float hoverFade;
     private long hoverNanos;
 
@@ -39,12 +39,7 @@ final class ChatIconFlipbook {
      */
     void advance(boolean on, boolean lit) {
         long now = System.nanoTime();
-        this.flip.advance(now, on,
-                LostTalesConfig.enableChatAnimations
-                        ? Math.max(1, LostTalesConfig
-                                .chatAnimationDurationMillis)
-                        : 0,
-                LostTalesUiEasing.SMOOTH);
+        this.flip.advance(now, on);
         double elapsed = this.hoverNanos == 0L ? 0.0D
                 : (now - this.hoverNanos) / 1.0E9D;
         this.hoverNanos = now;

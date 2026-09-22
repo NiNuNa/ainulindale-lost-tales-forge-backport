@@ -7,6 +7,7 @@ import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.character.CharacterCapeUpdateRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterCreateRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterDeleteRequestPacket;
+import com.ninuna.losttales.network.packet.character.CharacterProfileUpdateRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterRosterRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterSelectRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterTemplateAdoptRequestPacket;
@@ -115,6 +116,28 @@ public final class ClientCharacterNetwork {
                                 characterId,
                                 showMinecraftCape,
                                 cosmeticCapeId));
+            }
+        });
+    }
+
+    public static int updateProfile(final long expectedRosterRevision,
+                                    final UUID characterId,
+                                    final String description,
+                                    final int age) {
+        if (expectedRosterRevision < 0L || characterId == null) {
+            throw new IllegalArgumentException("revision and character must be valid");
+        }
+        final int requestId = nextRequestId();
+        return send(requestId, CharacterOperationType.PROFILE_UPDATE, new Runnable() {
+            @Override
+            public void run() {
+                LostTalesNetworkHandler.CHANNEL.sendToServer(
+                        new CharacterProfileUpdateRequestPacket(
+                                requestId,
+                                expectedRosterRevision,
+                                characterId,
+                                description,
+                                age));
             }
         });
     }

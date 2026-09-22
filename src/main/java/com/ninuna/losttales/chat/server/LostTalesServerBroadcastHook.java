@@ -9,12 +9,11 @@ import com.ninuna.losttales.chat.ChatMentions;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
+import com.ninuna.losttales.chat.ChatPresentationMode;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatSystemLineClassifier;
 import com.ninuna.losttales.chat.ChatTabIds;
 import com.ninuna.losttales.compat.discord.DiscordGameEventRelay;
-import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
-import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import cpw.mods.fml.common.FMLLog;
@@ -36,24 +35,25 @@ import net.minecraft.util.IChatComponent;
 
 /**
  * Where every server-wide line passes on its way out — an achievement,
- * a death, a join or a leave, the server starting or stopping,
- * {@code /say} — patched by the coremod into the head of
- * {@code ServerConfigurationManager.sendChatMsg}, and where every line
- * sent to one player passes, patched into the head of
- * {@code EntityPlayerMP.addChatMessage}. Two things happen to a
- * server-wide line here: a line that will land in a shared channel —
- * an announcement in OOC &amp; Discord, anything else everyone sees in
- * Global — is given a message id of the server's own, carried as an
- * empty run on the component and recorded in the chat history under the
- * Server's name, so a reply to it on any client names the same message
- * and a click on the quote finds it; and the Discord relay is told,
- * with that id, so the embed it posts is linked to the line. A line
- * sent to one player that answers a command they typed is recorded the
- * same way, for that account alone, under the tab the command was
- * typed in ({@link #onPlayerLine}), so the answer comes back with the
- * rest of the tab's history. The words are never changed, and a line
- * is never delayed or refused: whatever fails, the component goes out
- * as it came.
+ * a death, a join or a leave, {@code /say} — patched by the coremod into
+ * the head of {@code ServerConfigurationManager.sendChatMsg}, and where
+ * every line sent to one player passes, patched into the head of
+ * {@code EntityPlayerMP.addChatMessage}. Three things happen to a
+ * server-wide line here: a join or a leave is made to name the account
+ * rather than the character the game's display name gives, since it is
+ * out-of-character news about an account ({@link #namingTheAccount});
+ * a line that will land in a shared channel — an achievement, a death
+ * or anything else everyone sees in Global, a join or a leave in OOC —
+ * is given a message id of the server's own, carried as an empty run on
+ * the component and recorded in the chat history under the Server's
+ * name, so a reply to it on any client names the same message and a
+ * click on the quote finds it; and the Discord relay is told, with that
+ * id, so the embed it posts is linked to the line. A line sent to one
+ * player that answers a command they typed is recorded the same way,
+ * for that account alone, under the tab the command was typed in
+ * ({@link #onPlayerLine}), so the answer comes back with the rest of the
+ * tab's history. A line is never delayed or refused: whatever fails,
+ * the component goes out as it came.
  *
  * <p>A join line's id is also kept for the login replay of the player
  * it announces ({@link #takeJoinLine}). The game announces a join just
@@ -82,29 +82,82 @@ public final class LostTalesServerBroadcastHook {
 
     /**
      * Sees a line about to be broadcast and hands back the one to send:
-     * the same component, with an id run appended when the line belongs
-     * to a shared channel. The relay is told after, with the id; the run
-     * is empty, so the relay reads the line's words as they came.
+     * a join or a leave naming the account, and any line of a shared
+     * channel with an id run appended. The relay is told after, with the
+     * id; the run is empty, so the relay reads the line's words as they
+     * go out.
      */
     public static IChatComponent onBroadcast(IChatComponent message) {
         if (message == null) {
             return null;
         }
+        IChatComponent line = message;
         long messageId = ChatMessageIds.NONE;
         try {
-            ChatChannel channel = ChatSystemLineClassifier.classify(message);
+            line = namingTheAccount(message);
+            ChatChannel channel = ChatSystemLineClassifier.classify(line);
             if (channel == ChatChannel.ALL || channel == ChatChannel.OOC) {
-                messageId = stamp(message, channel);
+                messageId = stamp(line, channel);
             }
         } catch (Throwable throwable) {
             logOnce("name", throwable);
         }
         try {
-            DiscordGameEventRelay.onServerBroadcast(message, messageId);
+            DiscordGameEventRelay.onServerBroadcast(line, messageId);
         } catch (Throwable throwable) {
             logOnce("relay", throwable);
         }
-        return message;
+        return line;
+    }
+
+    /**
+     * A join or a leave rebuilt to name the account where the game wrote
+     * the player's display name, which is their character's: who comes
+     * and goes is an account, and the line stands in OOC. The account is
+     * read off the name's own {@code /msg <account>} click, which vanilla
+     * puts on every player name it announces. Any other line, or a join
+     * whose name carries no such click, is handed back as it came. The
+     * rebuilt line keeps the line's style, the name's click, and every
+     * run appended to the line.
+     */
+    static IChatComponent namingTheAccount(IChatComponent message) {
+        ChatSystemLineClassifier.Kind kind = ChatSystemLineClassifier.kindOf(message);
+        if (kind != ChatSystemLineClassifier.Kind.JOIN
+                && kind != ChatSystemLineClassifier.Kind.LEAVE) {
+            return message;
+        }
+        ChatComponentTranslation translation = (ChatComponentTranslation)message;
+        Object[] arguments = translation.getFormatArgs();
+        if (arguments == null || arguments.length == 0
+                || !(arguments[0] instanceof IChatComponent)) {
+            return message;
+        }
+        IChatComponent name = (IChatComponent)arguments[0];
+        String account = whisperedAccount(name);
+        if (account == null) {
+            return message;
+        }
+        ChatComponentText accountName = new ChatComponentText(account);
+        accountName.setChatStyle(name.getChatStyle().createShallowCopy());
+        Object[] renamed = arguments.clone();
+        renamed[0] = accountName;
+        ChatComponentTranslation rebuilt =
+                new ChatComponentTranslation(translation.getKey(), renamed);
+        rebuilt.setChatStyle(message.getChatStyle().createShallowCopy());
+        // The arguments inherit from the line's style, as the game's own
+        // line's do; setting a style re-parents the siblings alone.
+        for (Object argument : renamed) {
+            if (argument instanceof IChatComponent) {
+                ((IChatComponent)argument).getChatStyle()
+                        .setParentStyle(rebuilt.getChatStyle());
+            }
+        }
+        for (Object sibling : message.getSiblings()) {
+            if (sibling instanceof IChatComponent) {
+                rebuilt.appendSibling((IChatComponent)sibling);
+            }
+        }
+        return rebuilt;
     }
 
     /**
@@ -188,10 +241,11 @@ public final class LostTalesServerBroadcastHook {
      * server to record it on. The history keeps the words, cleaned as
      * a message is, under the Server's name in the Console's colour,
      * and beside them the component itself as the game's own chat JSON
-     * — its hover, its colours, its links — with the players it names
-     * as they are playing right now, so a replay shows the line as the
-     * live one was shown, naming players who may be long gone by the
-     * identity they had.
+     * — its hover, its colours, its links — with the players it names as
+     * the channel presents them right now: an out-of-character channel
+     * by their account, an in-character one by the identity they are
+     * playing. A replay shows the line as the live one was shown, naming
+     * players who may be long gone as they were named then.
      */
     private static long record(IChatComponent message, ChatChannel channel,
                                String tabId, List<UUID> recipients,
@@ -216,7 +270,8 @@ public final class LostTalesServerBroadcastHook {
                 System.currentTimeMillis(), "", null, "", "", 0, true,
                 messageId, ChatReplyReference.NONE, "")
                 .withServerBody(componentJson(message),
-                        namedPlayers(text, online))
+                        namedPlayers(text, online, channel.getPresentation()
+                                == ChatPresentationMode.OUT_OF_CHARACTER))
                 .withTabId(tabId);
         ChatHistory.record(messageId, LostTalesChatMessagePacket.SERVER_SENDER_ID,
                 SERVER_NAME, null, record, recipients, audience);
@@ -234,31 +289,6 @@ public final class LostTalesServerBroadcastHook {
 
     /** The name the server's lines are recorded under; the client shows its own word for it. */
     static final String SERVER_NAME = "Server";
-
-    /**
-     * Says to everyone that the server is up, or going down, as a line of
-     * the server's own: an announcement like a join, filed under OOC
-     * &amp; Discord, where the bridge's embed for the same news is linked
-     * to it. Said where somebody can hear it later — on a dedicated
-     * server, or where the bridge posts the server's events — and not in
-     * a single-player world, whose OOC tab it would only fill.
-     */
-    public static void announceServer(MinecraftServer server,
-                                      boolean started) {
-        if (server == null || server.getConfigurationManager() == null
-                || !(server.isDedicatedServer() || (LostTalesConfig.discordServerEvents
-                        && LostTalesDiscordBridge.getInstance().isPosting()))) {
-            return;
-        }
-        try {
-            server.getConfigurationManager().sendChatMsg(
-                    new ChatComponentTranslation(started
-                            ? ChatSystemLineClassifier.SERVER_STARTED_KEY
-                            : ChatSystemLineClassifier.SERVER_STOPPING_KEY));
-        } catch (RuntimeException failed) {
-            logOnce("announce", failed);
-        }
-    }
 
     /**
      * The id of the line that announced {@code account}'s arrival, no
@@ -317,19 +347,27 @@ public final class LostTalesServerBroadcastHook {
             return String.valueOf(args[0]).trim();
         }
         IChatComponent name = (IChatComponent)args[0];
+        String account = whisperedAccount(name);
+        return account != null ? account : name.getUnformattedText().trim();
+    }
+
+    /**
+     * The account a player's name component suggests whispering to —
+     * {@code /msg <account> }, which vanilla puts on every name it
+     * announces, whatever the name's words were rewritten to — or null
+     * when the name carries no such click.
+     */
+    private static String whisperedAccount(IChatComponent name) {
         ClickEvent click = name.getChatStyle() == null ? null
                 : name.getChatStyle().getChatClickEvent();
         String suggestion = click == null
                 || click.getAction() != ClickEvent.Action.SUGGEST_COMMAND
                 ? null : click.getValue();
-        if (suggestion != null && suggestion.startsWith(WHISPER_SUGGESTION)) {
-            String account = suggestion.substring(
-                    WHISPER_SUGGESTION.length()).trim();
-            if (account.length() > 0) {
-                return account;
-            }
+        if (suggestion == null || !suggestion.startsWith(WHISPER_SUGGESTION)) {
+            return null;
         }
-        return name.getUnformattedText().trim();
+        String account = suggestion.substring(WHISPER_SUGGESTION.length()).trim();
+        return account.length() > 0 ? account : null;
     }
 
     /**
@@ -347,14 +385,16 @@ public final class LostTalesServerBroadcastHook {
     }
 
     /**
-     * Every online player the line names, whole, as the identity they
-     * are playing — the name and colour their own Global line would be
-     * signed with — so a replay names them as the live line did. The
+     * Every online player the line names, whole: by their account where
+     * {@code asAccounts} (a line of an out-of-character channel), else as
+     * the identity they are playing, the name their own Global line would
+     * be signed with; so a replay names them as the live line did. The
      * player a join line announces is not listed yet when it goes out;
      * their login replay names them on it ({@link ChatHistory#namePlayer}).
      */
     private static List<ChatNamedPlayer> namedPlayers(String text,
-                                                      List<EntityPlayerMP> online) {
+                                                      List<EntityPlayerMP> online,
+                                                      boolean asAccounts) {
         List<ChatNamedPlayer> named = new ArrayList<ChatNamedPlayer>();
         for (EntityPlayerMP player : online) {
             if (named.size() >= ChatNamedPlayer.MAX_PER_LINE) {
@@ -364,7 +404,7 @@ public final class LostTalesServerBroadcastHook {
             // is their character's; an account name still names them.
             if (player != null && (ChatNamedPlayer.names(text, accountOf(player))
                     || ChatNamedPlayer.names(text, player.getDisplayName()))) {
-                named.add(namedPlayer(player));
+                named.add(asAccounts ? namedAccount(player) : namedPlayer(player));
             }
         }
         return named;

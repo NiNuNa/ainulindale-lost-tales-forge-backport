@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
+import com.ninuna.losttales.client.motion.Motions;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -36,8 +37,12 @@ public final class ChatSpeechBubbles {
     private static final int MAX_SPEAKERS = 32;
     /** How long a line stands at full strength. */
     static final long HOLD_NANOS = 6000000000L;
-    /** How long it takes to fade out after that. */
-    static final long FADE_NANOS = 1200000000L;
+    /**
+     * How long it takes to fade out after that, at speed 1; the motion
+     * settings shorten it, and with the Animations switch off a line goes
+     * at once.
+     */
+    static final int FADE_MILLIS = 1200;
     /** Longest line kept; anything past this is cut with an ellipsis. */
     private static final int MAX_CHARACTERS = 160;
 
@@ -129,9 +134,10 @@ public final class ChatSpeechBubbles {
         if (speech == null) {
             return null;
         }
+        long fadeNanos = Motions.beatNanos(FADE_MILLIS);
         while (!speech.lines.isEmpty()
                 && nowNanos - speech.lines.get(0).spokenNanos > HOLD_NANOS
-                        + FADE_NANOS) {
+                        + fadeNanos) {
             speech.lines.remove(0);
         }
         if (speech.lines.isEmpty()) {
@@ -174,7 +180,11 @@ public final class ChatSpeechBubbles {
             if (age <= HOLD_NANOS) {
                 return 1.0F;
             }
-            float faded = (float)(age - HOLD_NANOS) / (float)FADE_NANOS;
+            long fadeNanos = Motions.beatNanos(FADE_MILLIS);
+            if (fadeNanos <= 0L) {
+                return 0.0F;
+            }
+            float faded = (float)(age - HOLD_NANOS) / (float)fadeNanos;
             return Math.max(0.0F, Math.min(1.0F, 1.0F - faded));
         }
     }

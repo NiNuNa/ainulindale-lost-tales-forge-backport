@@ -353,9 +353,7 @@ public final class LostTalesCharacterRosterGui extends GuiScreen
                 + I18n.format("gui.losttales.character.age_value",
                 Integer.valueOf(character.getAge()));
         String lineTwo = ClientCharacterDisplayNames.faction(
-                character.getStartingFactionId()) + "  ·  "
-                + I18n.format("gui.losttales.character.level_short",
-                Integer.valueOf(character.getRoleplayLevel()));
+                character.getStartingFactionId());
         this.fontRendererObj.drawStringWithShadow(
                 LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj, lineOne, width),
                 x, y, LostTalesSkyrimUiStyle.TEXT_BRIGHT);
@@ -398,11 +396,8 @@ public final class LostTalesCharacterRosterGui extends GuiScreen
                         nameWidth - (textX - x - 6)),
                 textX, y + 14,
                 active ? LostTalesSkyrimUiStyle.GOLD : LostTalesSkyrimUiStyle.TEXT_BRIGHT);
-        String details = character == null
-                ? ClientCharacterDisplayNames.race(CharacterRaceRegistry.HUMAN)
-                : ClientCharacterDisplayNames.race(character.getRaceId()) + "  ·  "
-                        + I18n.format("gui.losttales.character.level_short",
-                        Integer.valueOf(character.getRoleplayLevel()));
+        String details = ClientCharacterDisplayNames.race(character == null
+                ? CharacterRaceRegistry.HUMAN : character.getRaceId());
         this.fontRendererObj.drawStringWithShadow(
                 LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj, details, nameWidth - 42),
                 x + width / 2, y + 14, LostTalesSkyrimUiStyle.TEXT_MUTED);
@@ -459,9 +454,7 @@ public final class LostTalesCharacterRosterGui extends GuiScreen
                 character.getName(), this.cellWidth - 12);
         this.fontRendererObj.drawStringWithShadow(name, x + 6, y + 19,
                 active ? LostTalesSkyrimUiStyle.GOLD : LostTalesSkyrimUiStyle.TEXT_BRIGHT);
-        String details = ClientCharacterDisplayNames.race(character.getRaceId())
-                + "  " + I18n.format("gui.losttales.character.level_short",
-                Integer.valueOf(character.getRoleplayLevel()));
+        String details = ClientCharacterDisplayNames.race(character.getRaceId());
         this.fontRendererObj.drawStringWithShadow(
                 LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj, details, this.cellWidth - 12),
                 x + 6, y + 31, LostTalesSkyrimUiStyle.TEXT_MUTED);

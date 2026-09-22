@@ -1,0 +1,129 @@
+{
+  "ui.button.lift": {
+    "about": "A glyph button under the pointer: it dips, rises a pixel past its mark and settles; pressed it drops onto the surface; let go it springs back in three shrinking lobes; left it returns quicker than it rose.",
+    "parts": {
+      "glyph": {
+        "poses": {
+          "rest": { "y": 0 },
+          "on": { "y": -1 },
+          "pressed": { "y": 1 }
+        },
+        "beats": {
+          "on": {
+            "to": "on",
+            "duration": 170,
+            "curve": "ease_out",
+            "from": {
+              "rest": {
+                "y": [
+                  { "travel": "ease_out", "begin": 0.28 },
+                  { "bump": 0.34, "end": 0.28 },
+                  { "bump": -0.5, "begin": 0.28 }
+                ]
+              }
+            }
+          },
+          "off": { "to": "rest", "duration": 110, "curve": "ease_out" },
+          "press": { "to": "pressed", "duration": 55, "curve": "ease_out" },
+          "release": {
+            "duration": 260,
+            "curve": "ease_out",
+            "tracks": {
+              "y": [
+                { "travel": "ease_out", "end": 0.3333 },
+                { "ring": -1, "lobes": 3 }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "params": { "turn": 0, "min_press": 90 }
+  },
+  "ui.button.turn": {
+    "about": "The lift with a turn, for a glyph big and lopsided enough to show one: it turns while it travels and is square wherever it rests.",
+    "parts": {
+      "glyph": {
+        "poses": {
+          "rest": { "y": 0 },
+          "on": { "y": -1 },
+          "pressed": { "y": 1 }
+        },
+        "beats": {
+          "on": {
+            "to": "on",
+            "duration": 170,
+            "curve": "ease_out",
+            "from": {
+              "rest": {
+                "y": [
+                  { "travel": "ease_out", "begin": 0.28 },
+                  { "bump": 0.34, "end": 0.28 },
+                  { "bump": -0.5, "begin": 0.28 }
+                ]
+              }
+            }
+          },
+          "off": { "to": "rest", "duration": 110, "curve": "ease_out" },
+          "press": { "to": "pressed", "duration": 55, "curve": "ease_out" },
+          "release": {
+            "duration": 260,
+            "curve": "ease_out",
+            "tracks": {
+              "y": [
+                { "travel": "ease_out", "end": 0.3333 },
+                { "ring": -1, "lobes": 3 }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "params": { "turn": 5, "min_press": 90 }
+  },
+  "ui.button.snap": {
+    "about": "The lift further and quicker, for a decisive control such as a cross, which answers like a switch.",
+    "parts": {
+      "glyph": {
+        "poses": {
+          "rest": { "y": 0 },
+          "on": { "y": -1.25 },
+          "pressed": { "y": 1.25 }
+        },
+        "beats": {
+          "on": {
+            "to": "on",
+            "duration": 116,
+            "curve": "ease_out",
+            "from": {
+              "rest": {
+                "y": [
+                  { "travel": "ease_out", "begin": 0.28 },
+                  { "bump": 0.425, "end": 0.28 },
+                  { "bump": -0.625, "begin": 0.28 }
+                ]
+              }
+            }
+          },
+          "off": { "to": "rest", "duration": 75, "curve": "ease_out" },
+          "press": { "to": "pressed", "duration": 37, "curve": "ease_out" },
+          "release": {
+            "duration": 177,
+            "curve": "ease_out",
+            "tracks": {
+              "y": [
+                { "travel": "ease_out", "end": 0.3333 },
+                { "ring": -1.25, "lobes": 3 }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "params": { "turn": 0, "min_press": 61 }
+  },
+  "ui.button.lit": {
+    "about": "A control crossing to its lit artwork and back: most of the way in this many seconds.",
+    "follow": 0.05
+  }
+}

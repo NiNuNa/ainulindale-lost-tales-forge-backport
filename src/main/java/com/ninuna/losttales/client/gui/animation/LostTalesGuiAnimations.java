@@ -1,7 +1,7 @@
 package com.ninuna.losttales.client.gui.animation;
 
-import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
+import com.ninuna.losttales.client.motion.Motions;
 import net.minecraft.client.gui.GuiScreen;
 import org.lwjgl.opengl.GL11;
 
@@ -14,32 +14,21 @@ public final class LostTalesGuiAnimations {
             LostTalesGuiAnimationProfile.NONE;
     private static final LostTalesGuiAnimationState STATE =
             new LostTalesGuiAnimationState();
-    private static int currentDurationMillis = 1;
-    private static int currentBackdropDurationMillis = 1;
-    private static boolean reducedMotion;
 
     private LostTalesGuiAnimations() {}
 
     static void begin(GuiScreen screen,
                       LostTalesGuiAnimationProfile profile,
-                      int durationMillis, int backdropDurationMillis,
-                      boolean reduceMotion, boolean preserveBackdrop) {
+                      boolean preserveBackdrop) {
         currentScreen = screen;
         currentProfile = profile == null
                 ? LostTalesGuiAnimationProfile.NONE : profile;
-        currentDurationMillis = Math.max(1, durationMillis);
-        currentBackdropDurationMillis = Math.max(0,
-                backdropDurationMillis);
-        reducedMotion = reduceMotion;
         STATE.restart(preserveBackdrop);
     }
 
     static void clear() {
         currentScreen = null;
         currentProfile = LostTalesGuiAnimationProfile.NONE;
-        currentDurationMillis = 1;
-        currentBackdropDurationMillis = 1;
-        reducedMotion = false;
     }
 
     public static LostTalesGuiAnimationSample sample(GuiScreen screen) {
@@ -47,11 +36,7 @@ public final class LostTalesGuiAnimations {
                 || !currentProfile.isEnabled()) {
             return LostTalesGuiAnimationSample.SETTLED;
         }
-        return STATE.sample(System.nanoTime(),
-                currentDurationMillis, currentBackdropDurationMillis,
-                reducedMotion, LostTalesConfig.guiAnimationEasingStyle,
-                LostTalesConfig.guiAnimationDirection,
-                (float)LostTalesConfig.guiAnimationScale);
+        return STATE.sample(System.nanoTime());
     }
 
     static boolean isSpatialTransformAvailable() {
@@ -78,7 +63,7 @@ public final class LostTalesGuiAnimations {
     private static boolean isCurrent(GuiScreen screen) {
         net.minecraft.client.Minecraft minecraft =
                 net.minecraft.client.Minecraft.getMinecraft();
-        return LostTalesConfig.enableGuiAnimations
+        return Motions.enabled()
                 && minecraft != null && minecraft.theWorld != null
                 && screen != null && screen == currentScreen
                 && currentProfile.isEnabled();

@@ -13,7 +13,6 @@ import java.util.UUID;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
-import net.minecraft.util.StatCollector;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -443,10 +442,9 @@ public final class LostTalesChatPresentationTest {
                 123456789L, "", null, "", "",
                 ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR,
                         ChatAccountRole.TEAM));
-        // Without a loaded language a tag reads as its key.
-        String operatorTag = ChatRoleFixtures.OPERATOR.getDisplayTag();
-        String developerTag = StatCollector.translateToLocal(
-                ChatAccountRole.TEAM.getTagKey());
+        // Without a loaded language a built-in's name reads as its key.
+        String operatorTag = "[" + ChatRoleFixtures.OPERATOR.getDisplayName() + "]";
+        String developerTag = "[" + ChatAccountRole.TEAM.getDisplayName() + "]";
         StringBuilder plain = new StringBuilder();
         Integer openingBracketRgb = null;
         for (Object value : LostTalesChatPresentation.build(tagged)) {
@@ -482,7 +480,7 @@ public final class LostTalesChatPresentationTest {
                         "Steve", "", 0xFCECD1,
                         ChatAccountRole.nameColor(roles), "hello",
                         123456789L, "", null, "", "Alex", roles, true);
-        String operatorTag = ChatRoleFixtures.OPERATOR.getDisplayTag();
+        String operatorTag = "[" + ChatRoleFixtures.OPERATOR.getDisplayName() + "]";
         StringBuilder plain = new StringBuilder();
         for (Object value : LostTalesChatPresentation.build(whisper)) {
             plain.append(((IChatComponent)value).getUnformattedTextForChat());
@@ -760,6 +758,34 @@ public final class LostTalesChatPresentationTest {
         assertEquals(ChatMentionColors.PLAYER_RGB, marker.color);
         assertEquals(LostTalesColors.rgb(LostTalesColors.HONEY),
                 ChatMentionColors.PLAYER_RGB);
+    }
+
+    /**
+     * A player is named as the channel presents people: the Server
+     * Console and every out-of-character channel by the account, even
+     * where the record says which character they were playing; an
+     * in-character channel by that character, as the record says.
+     */
+    @Test
+    public void aNameFollowsItsChannelsPresentation() {
+        com.ninuna.losttales.chat.ChatNamedPlayer steveAsAragorn =
+                new com.ninuna.losttales.chat.ChatNamedPlayer(UUID.randomUUID(),
+                        "Steve", UUID.randomUUID(), "Aragorn", "");
+        IChatComponent actor = LostTalesChatPresentation.actorMention(
+                java.util.Collections.<String>emptyList(), "Steve",
+                steveAsAragorn, new boolean[1]);
+        assertEquals("@Steve", actor.getUnformattedTextForChat());
+        java.util.List<com.ninuna.losttales.chat.ChatNamedPlayer> named =
+                java.util.Collections.singletonList(steveAsAragorn);
+        assertEquals("@Steve", LostTalesChatPresentation.asMentionName("Steve",
+                ChatChannel.OOC, java.util.Collections.<String>emptyList(),
+                new boolean[1], named).getUnformattedTextForChat());
+        assertEquals("@Aragorn", LostTalesChatPresentation.asMentionName("Aragorn",
+                ChatChannel.ALL, java.util.Collections.<String>emptyList(),
+                new boolean[1], named).getUnformattedTextForChat());
+        assertEquals("@Aragorn", LostTalesChatPresentation.asMentionName("Steve",
+                ChatChannel.ALL, java.util.Collections.<String>emptyList(),
+                new boolean[1], named).getUnformattedTextForChat());
     }
 
     /**

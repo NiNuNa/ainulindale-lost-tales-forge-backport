@@ -1,6 +1,13 @@
 package com.ninuna.losttales.gui.style;
 
+import com.ninuna.losttales.client.motion.MotionIds;
+import com.ninuna.losttales.client.motion.MotionTestSettings;
+import com.ninuna.losttales.client.motion.MotionTrack;
+import com.ninuna.losttales.client.motion.Motions;
+import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion.Character;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -20,13 +27,32 @@ public final class LostTalesUiButtonMotionTest {
     private static final long START = 1000L * 1000000L;
     private static final long MILLIS = 1000000L;
     private static final double EPSILON = 1.0E-6D;
-    private static final double RISE = LostTalesUiButtonMotion.RISE;
+    /** How far the lift rises and how deep it presses, as its motion says. */
+    private static final double RISE = -liftPose("on");
+    private static final double PRESS = liftPose("pressed");
+
+    private MotionTestSettings settings;
+
+    private static double liftPose(String pose) {
+        return Motions.get(MotionIds.UI_BUTTON_LIFT).part(
+                LostTalesUiButtonMotion.GLYPH).poseValue(pose, MotionTrack.Y);
+    }
+
+    @Before
+    public void setUp() {
+        this.settings = MotionTestSettings.reset();
+    }
+
+    @After
+    public void tearDown() {
+        this.settings.restore();
+    }
 
     /** A button at rest with the pointer away. */
     private static LostTalesUiButtonMotion resting(Character character) {
         LostTalesUiButtonMotion motion =
                 new LostTalesUiButtonMotion(character);
-        motion.advance(START, false, false, false, true);
+        motion.advance(START, false, false, false);
         return motion;
     }
 
@@ -37,8 +63,8 @@ public final class LostTalesUiButtonMotionTest {
     /** The same, risen and settled under the pointer. */
     private static LostTalesUiButtonMotion risen() {
         LostTalesUiButtonMotion motion = resting();
-        motion.advance(START, true, true, false, true);
-        motion.advance(START + 400L * MILLIS, true, true, false, true);
+        motion.advance(START, true, true, false);
+        motion.advance(START + 400L * MILLIS, true, true, false);
         return motion;
     }
 
@@ -53,9 +79,9 @@ public final class LostTalesUiButtonMotionTest {
     @Test
     public void arrivingDipsBeforeItRises() {
         LostTalesUiButtonMotion motion = resting();
-        motion.advance(START, true, true, false, true);
+        motion.advance(START, true, true, false);
         // Early in the arrival, while the anticipation is playing.
-        motion.advance(START + 20L * MILLIS, true, true, false, true);
+        motion.advance(START + 20L * MILLIS, true, true, false);
         assertTrue("dips against the rise", motion.offsetY() > 0.0D);
         assertTrue("and only a little", motion.offsetY() < RISE);
     }
@@ -63,11 +89,11 @@ public final class LostTalesUiButtonMotionTest {
     @Test
     public void theRiseReachesPastItsMarkAndSettlesOnIt() {
         LostTalesUiButtonMotion motion = resting();
-        motion.advance(START, true, true, false, true);
+        motion.advance(START, true, true, false);
         double furthest = 0.0D;
         for (int millis = 0; millis <= 400; millis += 4) {
             motion.advance(START + millis * MILLIS, true, true,
-                    false, true);
+                    false);
             furthest = Math.min(furthest, motion.offsetY());
         }
         assertTrue("reaches past the mark", furthest < -RISE);
@@ -80,9 +106,9 @@ public final class LostTalesUiButtonMotionTest {
     public void aHeldButtonSettlesOnePixelBelowItsRow() {
         LostTalesUiButtonMotion motion = risen();
         long pressed = START + 400L * MILLIS;
-        motion.advance(pressed, true, true, true, true);
-        motion.advance(pressed + 200L * MILLIS, true, true, true, true);
-        assertEquals(LostTalesUiButtonMotion.PRESS, motion.offsetY(), EPSILON);
+        motion.advance(pressed, true, true, true);
+        motion.advance(pressed + 200L * MILLIS, true, true, true);
+        assertEquals(PRESS, motion.offsetY(), EPSILON);
         assertTrue(motion.isSettled());
     }
 
@@ -90,15 +116,15 @@ public final class LostTalesUiButtonMotionTest {
     public void lettingGoSpringsBackPastTheMarkThenRingsOut() {
         LostTalesUiButtonMotion motion = risen();
         long pressed = START + 400L * MILLIS;
-        motion.advance(pressed, true, true, true, true);
-        motion.advance(pressed + 100L * MILLIS, true, true, true, true);
+        motion.advance(pressed, true, true, true);
+        motion.advance(pressed + 100L * MILLIS, true, true, true);
         long released = pressed + 100L * MILLIS;
         double highest = 0.0D;
         double lowestAfterSpring = -10.0D;
         boolean sprung = false;
         for (int millis = 0; millis <= 400; millis += 4) {
             motion.advance(released + millis * MILLIS, true, true,
-                    false, true);
+                    false);
             double place = motion.offsetY();
             highest = Math.min(highest, place);
             sprung |= place < -RISE - 0.5D;
@@ -119,10 +145,10 @@ public final class LostTalesUiButtonMotionTest {
     public void leavingReturnsExactlyToItsRow() {
         LostTalesUiButtonMotion motion = risen();
         long left = START + 400L * MILLIS;
-        motion.advance(left, false, false, false, true);
-        motion.advance(left + 40L * MILLIS, false, false, false, true);
+        motion.advance(left, false, false, false);
+        motion.advance(left + 40L * MILLIS, false, false, false);
         assertTrue("still on its way down", motion.offsetY() < 0.0D);
-        motion.advance(left + 300L * MILLIS, false, false, false, true);
+        motion.advance(left + 300L * MILLIS, false, false, false);
         assertEquals(0.0D, motion.offsetY(), EPSILON);
         assertTrue(motion.isSettled());
     }
@@ -132,15 +158,13 @@ public final class LostTalesUiButtonMotionTest {
     public void thePointerLeavingDoesNotInterruptASpring() {
         LostTalesUiButtonMotion motion = risen();
         long pressed = START + 400L * MILLIS;
-        motion.advance(pressed, true, true, true, true);
+        motion.advance(pressed, true, true, true);
         long released = pressed + 100L * MILLIS;
-        motion.advance(released, true, true, false, true);
-        motion.advance(released + 20L * MILLIS, false, false, false,
-                true);
+        motion.advance(released, true, true, false);
+        motion.advance(released + 20L * MILLIS, false, false, false);
         assertTrue("the spring is still playing",
-                motion.offsetY() < LostTalesUiButtonMotion.PRESS);
-        motion.advance(released + 600L * MILLIS, false, false, false,
-                true);
+                motion.offsetY() < PRESS);
+        motion.advance(released + 600L * MILLIS, false, false, false);
         assertEquals(0.0D, motion.offsetY(), EPSILON);
     }
 
@@ -148,37 +172,14 @@ public final class LostTalesUiButtonMotionTest {
     public void theSamePoseWhateverTheFrameRate() {
         LostTalesUiButtonMotion coarse = resting();
         LostTalesUiButtonMotion fine = resting();
-        coarse.advance(START, true, true, false, true);
-        fine.advance(START, true, true, false, true);
+        coarse.advance(START, true, true, false);
+        fine.advance(START, true, true, false);
         long span = 120L * MILLIS;
-        coarse.advance(START + span, true, true, false, true);
+        coarse.advance(START + span, true, true, false);
         for (int step = 1; step <= 60; step++) {
-            fine.advance(START + span * step / 60, true, true, false, true);
+            fine.advance(START + span * step / 60, true, true, false);
         }
         assertEquals(coarse.offsetY(), fine.offsetY(), EPSILON);
-    }
-
-    /** Terraria's banner spring: alternating triangle lobes that decay. */
-    @Test
-    public void theSpringAlternatesAndDecays() {
-        assertEquals(0.0F, LostTalesUiButtonMotion.ringOut(0.0F, 3), 0.0F);
-        assertEquals(0.0F, LostTalesUiButtonMotion.ringOut(1.0F, 3), 0.0F);
-        assertEquals(0.0F, LostTalesUiButtonMotion.ringOut(1.5F, 3), 0.0F);
-        assertEquals(0.0F, LostTalesUiButtonMotion.ringOut(0.5F, 0), 0.0F);
-        assertEquals(1.0F, LostTalesUiButtonMotion.ringOut(1.0F / 6.0F, 3),
-                1.0E-5F);
-        assertEquals(-2.0F / 3.0F, LostTalesUiButtonMotion.ringOut(0.5F, 3),
-                1.0E-5F);
-        assertEquals(1.0F / 3.0F,
-                LostTalesUiButtonMotion.ringOut(5.0F / 6.0F, 3), 1.0E-5F);
-        assertEquals(0.0F, LostTalesUiButtonMotion.ringOut(1.0F / 3.0F, 3),
-                1.0E-5F);
-        for (int step = 0; step <= 200; step++) {
-            float value = LostTalesUiButtonMotion.ringOut(step / 200.0F,
-                    LostTalesUiButtonMotion.RING_LOBES);
-            assertTrue("bounded at " + step,
-                    Math.abs(value) <= 1.0F + 1.0E-5F);
-        }
     }
 
     /* ---- character ---- */
@@ -193,8 +194,7 @@ public final class LostTalesUiButtonMotionTest {
         }
         assertEquals(0.0F, Character.LIFT.getTurnDegrees(), EPSILON);
         assertEquals(0.0F, Character.SNAP.getTurnDegrees(), EPSILON);
-        assertTrue(Character.TURN.getTurnDegrees()
-                > Character.TWIST.getTurnDegrees());
+        assertTrue(Character.TURN.getTurnDegrees() > 0.0F);
         assertTrue("a turn stays inside what a small glyph can take",
                 Character.TURN.getTurnDegrees() <= 6.0F);
     }
@@ -211,10 +211,10 @@ public final class LostTalesUiButtonMotionTest {
         LostTalesUiButtonMotion motion = resting(Character.TURN);
         assertEquals("square at rest", 0.0F, motion.turnDegrees(), EPSILON);
 
-        motion.advance(START, true, true, false, true);
+        motion.advance(START, true, true, false);
         float furthest = 0.0F;
         for (int millis = 0; millis <= 400; millis += 4) {
-            motion.advance(START + millis * MILLIS, true, true, false, true);
+            motion.advance(START + millis * MILLIS, true, true, false);
             furthest = Math.max(furthest, Math.abs(motion.turnDegrees()));
         }
         assertTrue("turns on the way up", furthest > 1.0F);
@@ -222,10 +222,10 @@ public final class LostTalesUiButtonMotionTest {
                 1.0E-4F);
 
         long pressed = START + 400L * MILLIS;
-        motion.advance(pressed, true, true, true, true);
+        motion.advance(pressed, true, true, true);
         furthest = 0.0F;
         for (int millis = 0; millis <= 300; millis += 4) {
-            motion.advance(pressed + millis * MILLIS, true, true, true, true);
+            motion.advance(pressed + millis * MILLIS, true, true, true);
             furthest = Math.max(furthest, Math.abs(motion.turnDegrees()));
         }
         assertTrue("turns furthest on a press, its longest journey",
@@ -234,8 +234,8 @@ public final class LostTalesUiButtonMotionTest {
                 1.0E-4F);
 
         long left = pressed + 300L * MILLIS;
-        motion.advance(left, false, false, false, true);
-        motion.advance(left + 900L * MILLIS, false, false, false, true);
+        motion.advance(left, false, false, false);
+        motion.advance(left + 900L * MILLIS, false, false, false);
         assertEquals("and square again back on its row", 0.0F,
                 motion.turnDegrees(), 1.0E-4F);
     }
@@ -245,12 +245,12 @@ public final class LostTalesUiButtonMotionTest {
     public void aTurnStaysWithinWhatASmallGlyphCanTake() {
         for (Character character : Character.values()) {
             LostTalesUiButtonMotion motion = resting(character);
-            motion.advance(START, true, true, false, true);
+            motion.advance(START, true, true, false);
             long at = START;
             for (int millis = 0; millis <= 1200; millis += 4) {
                 at = START + millis * MILLIS;
                 boolean held = millis > 400 && millis < 700;
-                motion.advance(at, true, true, held, true);
+                motion.advance(at, true, true, held);
                 assertTrue(character + " turn bounded at " + millis,
                         Math.abs(motion.turnDegrees())
                                 <= 1.5F * character.getTurnDegrees() + 1.0E-4F);
@@ -263,21 +263,21 @@ public final class LostTalesUiButtonMotionTest {
     public void aSnapReachesFurtherAndSettlesSooner() {
         LostTalesUiButtonMotion snap = resting(Character.SNAP);
         LostTalesUiButtonMotion lift = resting();
-        snap.advance(START, true, true, false, true);
-        lift.advance(START, true, true, false, true);
+        snap.advance(START, true, true, false);
+        lift.advance(START, true, true, false);
         long at = START + 400L * MILLIS;
-        snap.advance(at, true, true, false, true);
-        lift.advance(at, true, true, false, true);
+        snap.advance(at, true, true, false);
+        lift.advance(at, true, true, false);
         assertTrue("a snap rises further", snap.offsetY() < lift.offsetY());
 
         // Partway through the arrival the quicker one is already ahead.
         LostTalesUiButtonMotion quick = resting(Character.SNAP);
         LostTalesUiButtonMotion plain = resting();
-        quick.advance(START, true, true, false, true);
-        plain.advance(START, true, true, false, true);
+        quick.advance(START, true, true, false);
+        plain.advance(START, true, true, false);
         long midway = START + 90L * MILLIS;
-        quick.advance(midway, true, true, false, true);
-        plain.advance(midway, true, true, false, true);
+        quick.advance(midway, true, true, false);
+        plain.advance(midway, true, true, false);
         assertTrue("and gets there sooner",
                 quick.offsetY() < plain.offsetY());
     }
@@ -293,8 +293,7 @@ public final class LostTalesUiButtonMotionTest {
         for (Character character : Character.values()) {
             LostTalesUiButtonMotion motion = resting(character);
             for (int millis = 0; millis <= 5000; millis += 40) {
-                motion.advance(START + millis * MILLIS, false, false, false,
-                        true);
+                motion.advance(START + millis * MILLIS, false, false, false);
                 assertEquals(character + " is still when idle", 0.0D,
                         motion.offsetY(), EPSILON);
                 assertEquals(character + " is straight when idle", 0.0F,
@@ -313,19 +312,18 @@ public final class LostTalesUiButtonMotionTest {
         LostTalesUiButtonMotion motion = risen();
         long pressed = START + 400L * MILLIS;
         // Down and up again within a single frame's worth of time.
-        motion.advance(pressed, true, true, true, true);
-        motion.advance(pressed + 4L * MILLIS, true, true, false, true);
+        motion.advance(pressed, true, true, true);
+        motion.advance(pressed + 4L * MILLIS, true, true, false);
         double deepest = -10.0D;
         boolean pressSeen = false;
         for (int millis = 8; millis <= 600; millis += 4) {
-            motion.advance(pressed + millis * MILLIS, true, true, false,
-                    true);
+            motion.advance(pressed + millis * MILLIS, true, true, false);
             deepest = Math.max(deepest, motion.offsetY());
             pressSeen |= motion.offsetY() > RISE * 0.5D;
         }
         assertTrue("the drop is reached", pressSeen);
         assertEquals("all the way onto the surface",
-                LostTalesUiButtonMotion.PRESS, deepest, 0.05D);
+                PRESS, deepest, 0.05D);
         assertEquals("and it settles back under the pointer", -RISE,
                 motion.offsetY(), EPSILON);
     }
@@ -335,30 +333,32 @@ public final class LostTalesUiButtonMotionTest {
     public void aLongPressStaysDown() {
         LostTalesUiButtonMotion motion = risen();
         long pressed = START + 400L * MILLIS;
-        motion.advance(pressed, true, true, true, true);
+        motion.advance(pressed, true, true, true);
         for (int millis = 0; millis <= 2000; millis += 40) {
-            motion.advance(pressed + millis * MILLIS, true, true, true, true);
+            motion.advance(pressed + millis * MILLIS, true, true, true);
         }
-        assertEquals(LostTalesUiButtonMotion.PRESS, motion.offsetY(), EPSILON);
+        assertEquals(PRESS, motion.offsetY(), EPSILON);
         assertTrue(motion.isSettled());
     }
 
     /**
      * With the player's animation setting off a button is drawn where it
-     * was laid out, while its beat keeps running underneath so turning
-     * the setting back on picks the motion up.
+     * was laid out, while its beats keep landing underneath so turning
+     * the setting back on finds it where it should stand.
      */
     @Test
     public void animationOffHoldsEveryButtonStill() {
         LostTalesUiButtonMotion motion = resting(Character.TURN);
-        motion.advance(START, true, true, false, false);
-        motion.advance(START + 90L * MILLIS, true, true, false, false);
+        LostTalesConfig.animations = false;
+        motion.advance(START, true, true, false);
+        motion.advance(START + 90L * MILLIS, true, true, false);
         assertEquals(0.0D, motion.offsetY(), EPSILON);
         assertEquals(0.0F, motion.turnDegrees(), EPSILON);
         assertTrue("the crossing to the lit artwork still runs",
                 motion.lit() > 0.0F);
-        // Switched back on, the beat is where the clock left it.
-        motion.advance(START + 400L * MILLIS, true, true, false, true);
+        // Switched back on, the button stands where the beat left it.
+        LostTalesConfig.animations = true;
+        motion.advance(START + 400L * MILLIS, true, true, false);
         assertEquals(-RISE, motion.offsetY(), EPSILON);
     }
 
@@ -368,8 +368,7 @@ public final class LostTalesUiButtonMotionTest {
      */
     @Test
     public void everyPlaceItHoldsIsAWholePixel() {
-        for (double place : new double[] {0.0D, -RISE,
-                LostTalesUiButtonMotion.PRESS}) {
+        for (double place : new double[] {0.0D, -RISE, PRESS}) {
             assertEquals(place, Math.round(place), EPSILON);
         }
     }

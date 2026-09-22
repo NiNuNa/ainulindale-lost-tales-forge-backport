@@ -26,7 +26,7 @@ public final class LostTalesChatHoverCardTest {
     @Test
     public void theCardListsEveryRoleByDisplayPriority() {
         ChatAccountRole moderator = ChatAccountRole.custom("moderator", "Moderator",
-                "", "", 0xA94B54, true, 20, null);
+                "", 0xA94B54, true, 20, null);
         ChatRoleCatalog.install(ChatRoleCatalog.of(
                 java.util.Arrays.asList(ChatRoleFixtures.OPERATOR, moderator), null, null));
         int held = ChatRoleCatalog.current().byId("moderator").bit()

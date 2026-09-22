@@ -16,6 +16,7 @@ import com.ninuna.losttales.world.map.waypoint.LostTalesMapCoordinateHelper;
 import java.util.UUID;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesWaystoneTravelRequestPacket;
+import com.ninuna.losttales.client.motion.Motions;
 import cpw.mods.fml.common.FMLLog;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -851,13 +852,21 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
                 && ((LostTalesLotrMapGui)gui).smoothZoomInitialized;
     }
 
+    /**
+     * One tick of the zoom's glide toward where the wheel sent it: a
+     * share of the way at speed 1, the share compounded at the speed in
+     * force, and the whole way at once while motion is off or reduced.
+     */
     static float advanceSmoothZoom(float current, float target) {
         target = clampElasticZoomVisual(target);
         float difference = target - current;
-        if (Math.abs(difference) <= SMOOTH_ZOOM_SNAP_EPSILON) {
+        if (Math.abs(difference) <= SMOOTH_ZOOM_SNAP_EPSILON
+                || !Motions.enabled() || Motions.reduced()) {
             return target;
         }
-        float advanced = current + difference * SMOOTH_ZOOM_EASING;
+        float easing = (float)(1.0D - Math.pow(1.0D - SMOOTH_ZOOM_EASING,
+                Motions.speed()));
+        float advanced = current + difference * easing;
         if ((difference > 0.0F && advanced > target)
                 || (difference < 0.0F && advanced < target)) {
             return target;
@@ -2371,14 +2380,24 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
 
     @Override
     protected void keyTyped(char typedChar, int keyCode) {
-        if (LostTalesKeyBindings.isMapKey(keyCode)) {
-            this.mc.displayGuiScreen(null);
-            return;
-        }
+        // A prompt with a field owns the keyboard, the map's own key
+        // included, so every letter types.
         if (this.waypointPrompt != null) {
             handleWaypointPromptAction(
                     this.waypointPrompt.keyTyped(typedChar, keyCode,
                             isWithinCustomWaypointLimit()));
+            return;
+        }
+        if (this.searchPrompt != null) {
+            if (!this.searchPrompt.keyTyped(typedChar, keyCode)) {
+                clearSearchPrompt();
+                return;
+            }
+            handleSearchSelection();
+            return;
+        }
+        if (LostTalesKeyBindings.isMapKey(keyCode)) {
+            this.mc.displayGuiScreen(null);
             return;
         }
         if (this.fastTravelPrompt != null) {
@@ -2389,14 +2408,6 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         if (this.moveMarkerPrompt != null) {
             handleMoveMarkerPromptAction(
                     this.moveMarkerPrompt.keyTyped(keyCode));
-            return;
-        }
-        if (this.searchPrompt != null) {
-            if (!this.searchPrompt.keyTyped(typedChar, keyCode)) {
-                clearSearchPrompt();
-                return;
-            }
-            handleSearchSelection();
             return;
         }
         clearSearchSelectionFrame();

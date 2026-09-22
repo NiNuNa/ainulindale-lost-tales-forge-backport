@@ -1,13 +1,12 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiRegionBlur;
-import com.ninuna.losttales.client.gui.animation.LostTalesUiEasing;
-import com.ninuna.losttales.client.gui.animation.LostTalesUiTransition;
-import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
+import com.ninuna.losttales.client.motion.MotionIds;
+import com.ninuna.losttales.client.motion.MotionTransition;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -250,10 +249,10 @@ final class ChatSnapPreview {
      * part to part, and back into the window.
      */
     private static final class Track {
-        private final LostTalesUiTransition shown =
-                new LostTalesUiTransition();
-        private final LostTalesUiTransition glide =
-                new LostTalesUiTransition();
+        private final MotionTransition shown =
+                new MotionTransition(MotionIds.CHAT_SNAP_PREVIEW);
+        private final MotionTransition glide =
+                new MotionTransition(MotionIds.CHAT_SNAP_PREVIEW, true);
         /** What the running leg is bound for: a part of the screen, or none for the window itself. */
         private ChatWindow.ScreenFill legTo = ChatWindow.ScreenFill.NONE;
         /** Where the running leg set out: the pane as drawn then, or null for the window itself. */
@@ -309,14 +308,9 @@ final class ChatSnapPreview {
          */
         Pane advance(Minecraft minecraft, ChatWindowPlacement.Box window,
                      int screenWidth, int screenHeight, long now) {
-            int duration = LostTalesConfig.enableChatAnimations
-                    ? Math.max(1, LostTalesConfig.chatAnimationDurationMillis)
-                    : 0;
             boolean on = isBound() && !this.landing;
-            float opacity = this.shown.advance(now, on, duration,
-                    LostTalesUiEasing.SMOOTH);
-            float share = this.glide.advance(now, true, duration,
-                    LostTalesUiEasing.SMOOTH);
+            float opacity = this.shown.advance(now, on);
+            float share = this.glide.advance(now, true);
             if (!on && this.shown.isSettled() && opacity <= 0.0F) {
                 reset();
                 return null;

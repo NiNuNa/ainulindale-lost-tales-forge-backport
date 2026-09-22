@@ -56,6 +56,29 @@ public final class ServerConfigAuthorizationCategoriesTest {
         assertEquals(LostTalesConfig.CATEGORY_CHAT, entries.get(0).getCategory());
     }
 
+    /**
+     * The Discord links hold webhook addresses, which are passwords to
+     * their Discord channels: the settings surface never shows them, and
+     * {@code /losttales discord} is what makes them.
+     */
+    @Test
+    public void theDiscordLinksAreNotOnTheSettingsSurface() {
+        Configuration config = new Configuration();
+        config.get(LostTalesConfig.CATEGORY_DISCORD, "channelBindings",
+                new String[0]).set(new String[] {
+                        "ooc=BIDIRECTIONAL;channel=1;webhook=https://discord.com/api/webhooks/1/x"});
+        config.get(LostTalesConfig.CATEGORY_DISCORD, "enabled", false).set(true);
+
+        List<ServerConfigEntry> entries = ServerConfigSnapshot.fromConfiguration(
+                config, ServerConfigSnapshot.EXCLUDED_CATEGORIES,
+                ServerConfigSnapshot.COMMAND_KEYS, ServerConfigSnapshot.SECRET_KEYS);
+
+        assertNull(ServerConfigSnapshot.find(entries,
+                LostTalesConfig.CATEGORY_DISCORD, "channelBindings"));
+        assertEquals("the bridge's other settings still are", 1, entries.size());
+        assertEquals("enabled", entries.get(0).getKey());
+    }
+
     @Test
     public void everyAuthorizationCategoryIsExcludedAlongsideTheClientS() {
         for (String category : ServerConfigSnapshot.AUTHORIZATION_CATEGORIES) {

@@ -153,7 +153,7 @@ public final class ChatChannelSuggester {
                 .replace(" ", "");
     }
 
-    /** The characters a channel word is made of; {@code &} for OOC & Discord's shown name. */
+    /** The characters a channel word is made of; {@code &} for a server's own channel name holding one. */
     public static boolean isNameCharacter(char character) {
         return Character.isLetterOrDigit(character) || character == '_'
                 || character == '&';

@@ -4,7 +4,8 @@ import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationState;
-import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.client.motion.Motions;
+import com.ninuna.losttales.client.motion.MotionIds;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -822,8 +823,7 @@ public final class ClientChatChannelViews {
             RENDERED.put(view, ease);
             return target;
         }
-        if (!LostTalesConfig.enableChatAnimations
-                || scrollEasingSuppressed) {
+        if (!Motions.enabled() || scrollEasingSuppressed) {
             ease.value = target;
             ease.nanos = now;
             return target;
@@ -833,8 +833,8 @@ public final class ClientChatChannelViews {
         if (Math.abs(target - ease.value) <= SCROLL_SNAP_LINES) {
             ease.value = target;
         } else {
-            ease.value = LostTalesChatMotion.approach(ease.value, target,
-                    elapsed, LostTalesChatMotion.SCROLL_EASE_SECONDS);
+            ease.value = Motions.followTravel(MotionIds.CHAT_SCROLL, ease.value,
+                    target, elapsed);
         }
         while (RENDERED.size() > MAX_EASED_VIEWS) {
             Iterator<ChatTab> oldest = RENDERED.keySet().iterator();
@@ -926,26 +926,16 @@ public final class ClientChatChannelViews {
     }
 
     /**
-     * The opening motion for the history and the tabs: the same sampler,
-     * easing, direction, duration and reduced-motion rule every other Lost
-     * Tales screen animates with, so the chat arrives like the rest of the
-     * interface. Only the input bars keep their own entrance.
+     * The opening motion for the history and the tabs: every other Lost
+     * Tales screen's ({@link MotionIds#SCREEN_OPEN}), so the chat arrives
+     * like the rest of the interface. Only the input bars keep their own
+     * entrance.
      */
     public static synchronized LostTalesGuiAnimationSample openSample() {
-        if (!LostTalesConfig.enableGuiAnimations
-                || !LostTalesConfig.enableChatAnimations
-                || openedNanos <= 0L) {
+        if (!Motions.enabled() || openedNanos <= 0L) {
             return LostTalesGuiAnimationSample.SETTLED;
         }
-        int duration = Math.max(10, LostTalesConfig.guiAnimationDurationMillis);
-        if (LostTalesConfig.reducedGuiMotion) {
-            duration = Math.min(duration, 90);
-        }
-        return OPEN_STATE.sample(System.nanoTime(), duration, duration,
-                LostTalesConfig.reducedGuiMotion,
-                LostTalesConfig.guiAnimationEasingStyle,
-                LostTalesConfig.guiAnimationDirection,
-                (float)LostTalesConfig.guiAnimationScale);
+        return OPEN_STATE.sample(System.nanoTime());
     }
 
     public static synchronized void clear() {

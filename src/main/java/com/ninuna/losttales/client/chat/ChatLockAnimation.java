@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiEasing;
+import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
 import org.lwjgl.opengl.GL11;
 
@@ -33,8 +34,10 @@ import org.lwjgl.opengl.GL11;
  * shorter tell of the same shape — a nudge the way a click would send it
  * — so the control says which way it is about to go before it is
  * pressed. All of it is read from elapsed time, so it looks the same at
- * any frame rate, and none of it goes through the shared GUI animation:
- * this is the padlock's own motion, as the key hints have theirs.</p>
+ * any frame rate. It is timed by hand rather than by a motion file, as
+ * the key hints are, and keeps to the motion settings all the same: it
+ * plays at the speed in force, and with the Animations switch off or
+ * motion reduced the shackle simply stands where the lock is.</p>
  */
 final class ChatLockAnimation {
     /**
@@ -223,13 +226,19 @@ final class ChatLockAnimation {
         this.hoverFadeNanos = nowNanos;
         this.hoverFade = LostTalesChatVisualStyle.hoverFade(this.hoverFade,
                 hovered, sinceDrawn);
+        if (!Motions.flourishes()) {
+            this.turnStartedNanos = 0L;
+            this.hoverStartedNanos = 0L;
+            this.swing = locked ? 1.0F : 0.0F;
+            return pose(0.0F, 0.0F, 0.0F, 1.0F, 1.0F);
+        }
         if (!hovered) {
             this.hoverStartedNanos = 0L;
         } else if (this.hoverStartedNanos == 0L) {
             this.hoverStartedNanos = nowNanos;
         }
         if (this.turnStartedNanos != 0L) {
-            long elapsed = nowNanos - this.turnStartedNanos;
+            long elapsed = Motions.paced(nowNanos - this.turnStartedNanos);
             if (elapsed < TURN_ANTICIPATE_NANOS + TURN_ACTION_NANOS
                     + TURN_SETTLE_NANOS) {
                 return turnPose(elapsed);
@@ -241,8 +250,8 @@ final class ChatLockAnimation {
             this.hoverStartedNanos = hovered ? nowNanos : 0L;
         }
         if (hovered) {
-            return hoverPose(nowNanos - this.hoverStartedNanos, nowNanos,
-                    locked);
+            return hoverPose(Motions.paced(nowNanos - this.hoverStartedNanos),
+                    Motions.paced(nowNanos), locked);
         }
         return pose(0.0F, 0.0F, 0.0F, 1.0F, 1.0F);
     }

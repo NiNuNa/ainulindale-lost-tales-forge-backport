@@ -42,6 +42,16 @@ public final class ServerConfigSnapshot {
                     LostTalesConfig.CATEGORY_CHANNELS)));
     /** Every category the general settings surface leaves alone. */
     public static final Set<String> EXCLUDED_CATEGORIES = excluded();
+    /**
+     * Keys a command of their own writes and the general settings
+     * surface leaves alone, as {@code category.key} in lower case: the
+     * Discord links, which hold webhook addresses — as good as passwords
+     * to their Discord channels — and are made with
+     * {@code /losttales discord link}.
+     */
+    public static final Set<String> COMMAND_KEYS = Collections.unmodifiableSet(
+            new HashSet<String>(Arrays.asList(
+                    LostTalesConfig.CATEGORY_DISCORD + ".channelbindings")));
     public static final int MAX_ENTRIES = 512;
 
     private static Set<String> excluded() {
@@ -61,6 +71,18 @@ public final class ServerConfigSnapshot {
     public static List<ServerConfigEntry> fromConfiguration(Configuration config,
                                                             Set<String> excludedCategories,
                                                             Set<String> secretKeys) {
+        return fromConfiguration(config, excludedCategories,
+                Collections.<String>emptySet(), secretKeys);
+    }
+
+    /**
+     * As above, leaving out the {@code excludedKeys} too, each named
+     * {@code category.key} in lower case.
+     */
+    public static List<ServerConfigEntry> fromConfiguration(Configuration config,
+                                                            Set<String> excludedCategories,
+                                                            Set<String> excludedKeys,
+                                                            Set<String> secretKeys) {
         List<ServerConfigEntry> entries = new ArrayList<ServerConfigEntry>();
         if (config == null) {
             return entries;
@@ -73,7 +95,9 @@ public final class ServerConfigSnapshot {
             ConfigCategory category = config.getCategory(categoryName);
             for (String key : new TreeSet<String>(category.getValues().keySet())) {
                 Property property = category.get(key);
-                if (property == null || entries.size() >= MAX_ENTRIES) {
+                if (property == null || entries.size() >= MAX_ENTRIES
+                        || (excludedKeys != null && excludedKeys.contains(
+                                (categoryName + "." + key).toLowerCase(Locale.ROOT)))) {
                     continue;
                 }
                 boolean secret = secretKeys != null

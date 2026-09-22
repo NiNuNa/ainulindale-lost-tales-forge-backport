@@ -1,6 +1,16 @@
 package com.ninuna.losttales.client.gui.animation;
 
-/** Reusable monotonic, frame-rate-independent opening animation lifecycle. */
+import com.ninuna.losttales.client.motion.MotionIds;
+import com.ninuna.losttales.client.motion.Motions;
+
+/**
+ * A screen's opening, timed from the moment it opened and read at any
+ * instant: its content along {@link MotionIds#SCREEN_OPEN}, which says
+ * where it starts (off its place and at what size) and how it travels
+ * home, and the veil behind it along {@link MotionIds#SCREEN_BACKDROP}.
+ * Frame-rate independent; reduced motion sets the content down at once
+ * and keeps the veil's fade short.
+ */
 public final class LostTalesGuiAnimationState {
     private long startedNanos;
     private long backdropStartedNanos;
@@ -14,77 +24,46 @@ public final class LostTalesGuiAnimationState {
         restart(false);
     }
 
+    /**
+     * Starts the opening afresh; {@code preserveBackdrop} keeps the veil
+     * standing, for one screen replacing another over the same world.
+     */
     public void restart(boolean preserveBackdrop) {
         this.startedNanos = System.nanoTime();
         this.backdropStartedNanos = this.startedNanos;
         this.backdropSettled = preserveBackdrop;
     }
 
-    public LostTalesGuiAnimationSample sample(
-            long nowNanos, int durationMillis, boolean reducedMotion) {
-        return sample(nowNanos, durationMillis, durationMillis,
-                reducedMotion, "BACK", "DOWN", 1.0F);
-    }
-
-    public LostTalesGuiAnimationSample sample(
-            long nowNanos, int durationMillis, int backdropDurationMillis,
-            boolean reducedMotion, String easingStyle,
-            String direction, float animationScale) {
-        long durationNanos = Math.max(1, durationMillis) * 1000000L;
-        float progress = LostTalesGuiEasing.clamp(
-                (nowNanos - this.startedNanos) / (float)durationNanos);
-        float eased = ease(progress, easingStyle);
+    /** Where the opening stands at {@code nowNanos}. */
+    public LostTalesGuiAnimationSample sample(long nowNanos) {
+        String open = MotionIds.SCREEN_OPEN;
+        float progress = share(nowNanos - this.startedNanos,
+                Motions.travelNanos(open));
+        float eased = Motions.curve(open).apply(progress);
         float opacity;
-        if (this.backdropSettled || backdropDurationMillis <= 0) {
+        if (this.backdropSettled) {
             opacity = 1.0F;
         } else {
-            long backdropNanos = Math.max(1, backdropDurationMillis)
-                    * 1000000L;
-            opacity = LostTalesGuiEasing.smoothStep(
-                    (nowNanos - this.backdropStartedNanos)
-                            / (float)backdropNanos);
+            opacity = Motions.curve(MotionIds.SCREEN_BACKDROP).apply(share(
+                    nowNanos - this.backdropStartedNanos,
+                    Motions.nanos(MotionIds.SCREEN_BACKDROP)));
             if (opacity >= 1.0F) {
                 this.backdropSettled = true;
             }
         }
-        if (reducedMotion) {
-            return new LostTalesGuiAnimationSample(
-                    progress, eased, opacity,
-                    0.0F, 0.0F, 1.0F, 1.0F);
-        }
-
-        float distance = 14.0F;
-        float translationX = 0.0F;
-        float translationY = 0.0F;
         float remaining = 1.0F - eased;
-        if ("UP".equalsIgnoreCase(direction)) {
-            translationY = distance * remaining;
-        } else if ("LEFT".equalsIgnoreCase(direction)) {
-            translationX = distance * remaining;
-        } else if ("RIGHT".equalsIgnoreCase(direction)) {
-            translationX = -distance * remaining;
-        } else if (!"NONE".equalsIgnoreCase(direction)) {
-            translationY = -distance * remaining;
-        }
-        float startingScale = Math.max(0.5F,
-                Math.min(3.0F, animationScale));
-        float scale = mix(startingScale, 1.0F, eased);
-        return new LostTalesGuiAnimationSample(
-                progress, eased, opacity,
-                translationX, translationY, scale, scale);
+        float startScale = Math.max(0.5F, Math.min(3.0F,
+                Motions.param(open, "start_scale", 1.0F)));
+        float scale = startScale + (1.0F - startScale) * eased;
+        return new LostTalesGuiAnimationSample(progress, eased, opacity,
+                Motions.param(open, "start_x", 0.0F) * remaining,
+                Motions.param(open, "start_y", -14.0F) * remaining,
+                scale, scale);
     }
 
-    private static float ease(float progress, String style) {
-        if ("CUBIC".equalsIgnoreCase(style)) {
-            return LostTalesGuiEasing.easeOutCubic(progress);
-        }
-        if ("SMOOTH".equalsIgnoreCase(style)) {
-            return LostTalesGuiEasing.smoothStep(progress);
-        }
-        return LostTalesGuiEasing.subtleBackOut(progress);
-    }
-
-    private static float mix(float from, float to, float progress) {
-        return from + (to - from) * progress;
+    /** How far through {@code duration} {@code elapsed} is; all of it for none. */
+    private static float share(long elapsed, long duration) {
+        return duration <= 0L ? 1.0F
+                : LostTalesGuiEasing.clamp(elapsed / (float)duration);
     }
 }

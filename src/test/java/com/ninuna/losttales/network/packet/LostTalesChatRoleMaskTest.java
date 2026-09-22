@@ -71,7 +71,7 @@ public final class LostTalesChatRoleMaskTest {
     public void aWideMaskTravelsWhole() {
         java.util.List<ChatAccountRole> custom = new java.util.ArrayList<ChatAccountRole>();
         for (int index = 0; index < 8; index++) {
-            custom.add(ChatAccountRole.custom("role" + index, "Role " + index, "", "",
+            custom.add(ChatAccountRole.custom("role" + index, "Role " + index, "",
                     0, true, 20 + index, null));
         }
         ChatRoleCatalog.install(ChatRoleCatalog.of(custom, null, null));

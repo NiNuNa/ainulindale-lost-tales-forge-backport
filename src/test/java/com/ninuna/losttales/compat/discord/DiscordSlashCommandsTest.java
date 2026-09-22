@@ -18,20 +18,31 @@ import static org.junit.Assert.assertTrue;
 public final class DiscordSlashCommandsTest {
 
     private static final List<DiscordSlashCommands.Player> PLAYERS = Arrays.asList(
-            new DiscordSlashCommands.Player("steve", "Aragorn", "Human", "Gondor", 7),
-            new DiscordSlashCommands.Player("Alex", "", "", "", 0));
+            new DiscordSlashCommands.Player("steve", "Aragorn", "Human", "Gondor"),
+            new DiscordSlashCommands.Player("Alex", "", "", ""));
 
     @Test
-    public void theDefinitionsNameThreeCommandsAndWhoTakesAName() {
+    public void theDefinitionsNameFiveCommandsAndWhatEachTakes() {
         JsonArray commands = new JsonParser().parse(DiscordSlashCommands.definitionsBody())
                 .getAsJsonArray();
-        assertEquals(3, commands.size());
+        assertEquals(5, commands.size());
         JsonObject who = commands.get(1).getAsJsonObject();
         assertEquals("who", who.get("name").getAsString());
         JsonObject option = who.getAsJsonArray("options").get(0).getAsJsonObject();
         assertEquals("name", option.get("name").getAsString());
         assertEquals(3, option.get("type").getAsInt());
         assertTrue(option.get("required").getAsBoolean());
+        // Linking is offered to those who may manage the channel's webhooks.
+        JsonObject link = commands.get(3).getAsJsonObject();
+        assertEquals("link", link.get("name").getAsString());
+        assertEquals("code", link.getAsJsonArray("options").get(0).getAsJsonObject()
+                .get("name").getAsString());
+        assertEquals(String.valueOf(1L << 29),
+                link.get("default_member_permissions").getAsString());
+        JsonObject unlink = commands.get(4).getAsJsonObject();
+        assertEquals("unlink", unlink.get("name").getAsString());
+        assertEquals(String.valueOf(1L << 29),
+                unlink.get("default_member_permissions").getAsString());
     }
 
     @Test
@@ -44,7 +55,7 @@ public final class DiscordSlashCommandsTest {
 
     @Test
     public void whoFindsByAccountOrCharacterAndDescribes() {
-        assertEquals("**Aragorn** — steve's character: Human, of Gondor, level 7.",
+        assertEquals("**Aragorn** — steve's character: Human, of Gondor.",
                 DiscordSlashCommands.who(PLAYERS, "aragorn"));
         assertEquals("**Alex** is online, playing as themselves.",
                 DiscordSlashCommands.who(PLAYERS, "ALEX"));

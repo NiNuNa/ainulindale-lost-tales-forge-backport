@@ -25,11 +25,10 @@ public final class ChatAccountRoleTest {
     }
 
     @Test
-    public void noneOccupiesNoBitAndIsNeverTagged() {
+    public void noneOccupiesNoBitAndHasNoName() {
         assertEquals(0, ChatAccountRole.NONE.bit());
         assertTrue(ChatAccountRole.NONE.isNone());
-        assertEquals("", ChatAccountRole.NONE.getTagKey());
-        assertEquals("", ChatAccountRole.NONE.getDisplayTag());
+        assertEquals("", ChatAccountRole.NONE.getDisplayName());
         assertEquals(0, ChatAccountRole.maskOf(ChatAccountRole.NONE));
         assertEquals(Collections.emptyList(), ChatAccountRole.fromMask(0));
         assertEquals(ChatAccountRole.NONE, ChatAccountRole.primary(0));
@@ -42,7 +41,7 @@ public final class ChatAccountRoleTest {
         for (ChatAccountRole role : ChatAccountRole.all()) {
             assertFalse(role.isNone());
             assertEquals(0, seen & role.bit());
-            assertTrue(role.getDisplayTag().length() > 0);
+            assertTrue(role.getDisplayName().length() > 0);
             seen |= role.bit();
             assertEquals(Collections.singletonList(role),
                     ChatAccountRole.fromMask(role.bit()));
@@ -110,7 +109,7 @@ public final class ChatAccountRoleTest {
     /** A config role joins the catalogue with the next bit and its own look. */
     @Test
     public void aConfigRoleTakesTheNextBitAndItsRankPlacesIt() {
-        ChatAccountRole moderator = ChatAccountRole.custom("moderator", "Moderator", "[Mod]",
+        ChatAccountRole moderator = ChatAccountRole.custom("moderator", "Moderator",
                 "Keeps the peace.", 0x123456, true, 5,
                 Collections.singletonList(ChatRoleSource.opLevel(1)));
         ChatRoleCatalog.install(ChatRoleCatalog.of(
@@ -119,7 +118,6 @@ public final class ChatAccountRoleTest {
         assertFalse(listed.isNone());
         assertEquals(4, listed.bit());
         assertEquals("Moderator", listed.getDisplayName());
-        assertEquals("[Mod]", listed.getDisplayTag());
         assertEquals("Keeps the peace.", listed.getDisplayDescription());
         // Rank 5 sits between the team mark (0) and the operator (10).
         assertEquals(Arrays.asList(ChatAccountRole.TEAM, listed, ChatRoleFixtures.OPERATOR),
@@ -128,10 +126,6 @@ public final class ChatAccountRoleTest {
                 listed.bit() | ChatRoleFixtures.OPERATOR.bit()));
         assertTrue(ChatAccountRole.isValidMask(7));
         assertFalse(ChatAccountRole.isValidMask(8));
-        // A role with no tag of its own wears its name in brackets.
-        ChatAccountRole plain = ChatAccountRole.custom("builder", "Builder", "", "",
-                0, false, 30, null);
-        assertEquals("[Builder]", plain.getDisplayTag());
     }
 
     /**
@@ -147,8 +141,8 @@ public final class ChatAccountRoleTest {
             ChatAccountRole operator = served.byId(ChatRoleFixtures.OPERATOR_ID);
             assertFalse(operator.getSources().isEmpty());
             ChatAccountRole wire = ChatAccountRole.fromWire(operator.getId(),
-                    operator.getBitIndex(), operator.getNameKey(), operator.getTagKey(),
-                    operator.getName(), operator.getTag(), operator.getDescription(),
+                    operator.getBitIndex(), operator.getNameKey(),
+                    operator.getName(), operator.getDescription(),
                     operator.getColor(), operator.isMentionable(), operator.isLocked(),
                     operator.getRank());
             assertTrue(wire.getSources().isEmpty());

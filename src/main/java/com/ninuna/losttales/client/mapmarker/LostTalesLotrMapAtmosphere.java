@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.client.motion.Motions;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import lotr.client.gui.LOTRGuiMap;
@@ -810,8 +811,12 @@ final class LostTalesLotrMapAtmosphere {
         float phase = cellNoise(
                 cellX, cellY, CLOUD_CHANNEL + 7)
                 * (float)(Math.PI * 2.0D);
-        mapX += (float)Math.sin(worldTime * (double)speed + phase)
-                * CLOUD_SWAY_REACH;
+        if (Motions.flourishes()) {
+            // One of the loops that run while nothing happens, stilled with
+            // the rest of the motion.
+            mapX += (float)Math.sin(worldTime * (double)speed + phase)
+                    * CLOUD_SWAY_REACH;
+        }
         float landWeight = cachedCloudLandWeight(
                 cellX, cellY, Math.round(mapX), Math.round(mapY));
         if (landWeight <= 0.0F || cellNoise(

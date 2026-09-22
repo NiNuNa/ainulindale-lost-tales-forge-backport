@@ -1,7 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
-import com.ninuna.losttales.client.gui.animation.LostTalesUiEasing;
-import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.client.motion.Motions;
+import com.ninuna.losttales.client.motion.MotionIds;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -82,7 +82,7 @@ final class ChatRowGlide {
             nextPlaces[index] = rows.top(LostTalesChatOverlayRenderer
                     .rowOfLine(index, dividerIndex));
         }
-        boolean glides = LostTalesConfig.enableChatAnimations
+        boolean glides = Motions.travelNanos(MotionIds.CHAT_ROW_MOVE) > 0L
                 && this.messages.length > 0
                 && Arrays.equals(this.messages, nextMessages);
         Map<Key, Integer> before = new HashMap<Key, Integer>();
@@ -259,10 +259,11 @@ final class ChatRowGlide {
                 : distance;
     }
 
-    /** How far through a trip of the chat's animation duration {@code now} is. */
-    private static float progress(long started, long now) {
-        long duration = Math.max(1,
-                LostTalesConfig.chatAnimationDurationMillis) * 1000000L;
+    /** How far through a beat of {@code duration} {@code now} is; all of it for none. */
+    private static float progress(long started, long now, long duration) {
+        if (duration <= 0L) {
+            return 1.0F;
+        }
         return Math.max(0.0F, Math.min(1.0F,
                 (now - started) / (float)duration));
     }
@@ -322,22 +323,26 @@ final class ChatRowGlide {
             this.fadeStarted = fadeStarted;
         }
 
-        /** The lift at {@code now}: all of it at the start, none at the end, past zero by a hair between. */
+        /** The lift at {@code now}: all of it at the start, none at the end, as its motion travels. */
         float liftAt(long now) {
-            return this.from * (1.0F - LostTalesUiEasing.BACK_OUT.apply(
-                    progress(this.started, now)));
+            return this.from * (1.0F - Motions.curve(MotionIds.CHAT_ROW_MOVE)
+                    .apply(progress(this.started, now,
+                            Motions.travelNanos(MotionIds.CHAT_ROW_MOVE))));
         }
 
         float shownAt(long now) {
             return this.fadeStarted == NOT_FADING ? 1.0F
-                    : LostTalesUiEasing.EASE_OUT.apply(
-                            progress(this.fadeStarted, now));
+                    : Motions.curve(MotionIds.CHAT_ROW_APPEAR).apply(
+                            progress(this.fadeStarted, now,
+                                    Motions.nanos(MotionIds.CHAT_ROW_APPEAR)));
         }
 
         boolean isOver(long now) {
-            return progress(this.started, now) >= 1.0F
+            return progress(this.started, now, Motions.travelNanos(
+                    MotionIds.CHAT_ROW_MOVE)) >= 1.0F
                     && (this.fadeStarted == NOT_FADING
-                            || progress(this.fadeStarted, now) >= 1.0F);
+                            || progress(this.fadeStarted, now, Motions.nanos(
+                                    MotionIds.CHAT_ROW_APPEAR)) >= 1.0F);
         }
     }
 }

@@ -1,0 +1,153 @@
+{
+  "chat.line.hover": {
+    "about": "A chat line under the pointer. The chevron lights toward a lighter shade of its speaker's colour, then steps a pixel right; the words follow three pixels, one after another, the row stretching by its gaps while they travel (gap: pixels across the row). Leaving is quicker: the words go back first and the chevron follows.",
+    "parts": {
+      "chevron": {
+        "poses": {
+          "rest": { "x": 0, "brighten": 0 },
+          "on": { "x": 1, "brighten": 1 }
+        },
+        "beats": {
+          "on": {
+            "to": "on",
+            "duration": 160,
+            "curve": "ease_out",
+            "tracks": {
+              "brighten": [{ "travel": "ease_out", "end": 0.4 }],
+              "x": [{ "travel": "ease_out", "begin": 0.3 }]
+            }
+          },
+          "off": { "to": "rest", "duration": 110, "delay": 30, "curve": "ease_out" }
+        }
+      },
+      "words": {
+        "poses": {
+          "rest": { "x": 0 },
+          "on": { "x": 3 }
+        },
+        "beats": {
+          "on": {
+            "to": "on",
+            "duration": 200,
+            "delay": 30,
+            "stagger": 6,
+            "curve": "spring",
+            "tracks": {
+              "gap": [{ "bump": 2 }]
+            }
+          },
+          "off": { "to": "rest", "duration": 110, "curve": "ease_out" }
+        }
+      }
+    },
+    "params": { "stagger_span": 50 }
+  },
+  "chat.line.appear": {
+    "about": "The newest message: the stack rises into place while the line slides in from the side, past its place and back, fading in a little ahead of the motion.",
+    "duration": 180,
+    "curve": "ease_in_out",
+    "params": { "rise": 7, "slide": 14, "follow_through": 6, "fade_lead": 0.58 }
+  },
+  "chat.bar.appear": {
+    "about": "The input bars coming up from below as the chat opens, with a small swing as they land.",
+    "duration": 180,
+    "curve": "ease_in_out",
+    "params": { "distance": 13, "swing": 1.25, "swings": 2.5 }
+  },
+  "chat.picker.open": {
+    "about": "A picker panel opening from its button and closing back into it.",
+    "duration": 140,
+    "curve": "settle"
+  },
+  "chat.tab.move": {
+    "about": "A tab gliding to its place and width in the row.",
+    "duration": 180,
+    "curve": "ease_out"
+  },
+  "chat.tab.controls": {
+    "about": "A tab's own controls going and coming as the row narrows and widens: the room glides in one half, the ink fades in the other.",
+    "duration": 240,
+    "curve": "ease_in_out"
+  },
+  "chat.row.move": {
+    "about": "A row of the history gliding to its place when the lines are laid out again.",
+    "duration": 180,
+    "curve": "back_out"
+  },
+  "chat.row.appear": {
+    "about": "A row new to the history's layout fading in where it lands.",
+    "duration": 180,
+    "curve": "ease_out"
+  },
+  "chat.snap.assist": {
+    "about": "The snap assist's panes coming and going.",
+    "duration": 180,
+    "curve": "ease_in_out"
+  },
+  "chat.snap.layouts": {
+    "about": "The snap layouts' flyout and the snap bar coming and going.",
+    "duration": 180,
+    "curve": "ease_in_out"
+  },
+  "chat.snap.preview": {
+    "about": "The frosted preview of where a window will snap, growing out of the window and fading.",
+    "duration": 180,
+    "curve": "ease_in_out"
+  },
+  "chat.search.clear": {
+    "about": "The search well's magnifier crossing over to its cross while a search stands in it.",
+    "duration": 180,
+    "curve": "ease_in_out"
+  },
+  "chat.window.fill": {
+    "about": "A window gliding to the part of the screen it fills, and back.",
+    "duration": 180,
+    "curve": "ease_in_out"
+  },
+  "chat.window.area": {
+    "about": "A window's timestamp area driven out and back in.",
+    "duration": 180,
+    "curve": "ease_in_out"
+  },
+  "chat.window.members": {
+    "about": "A window's member list coming out and going back in.",
+    "duration": 180,
+    "curve": "ease_in_out"
+  },
+  "chat.window.appear": {
+    "about": "A new window fading in.",
+    "duration": 150,
+    "curve": "ease_out"
+  },
+  "chat.jump.show": {
+    "about": "The jump-to-present button flying in while a history is scrolled back, and out again.",
+    "duration": 180,
+    "curve": "ease_in_out"
+  },
+  "chat.icon.flip": {
+    "about": "A chevron control playing its run of frames between open and closed.",
+    "duration": 180,
+    "curve": "ease_in_out"
+  },
+  "chat.feed.typing": {
+    "about": "The closed feed's lines rising a row for its typing row, and settling back.",
+    "duration": 180,
+    "curve": "ease_out"
+  },
+  "chat.scroll": {
+    "about": "A history, list or panel gliding to where it was scrolled: most of the way in this many seconds.",
+    "follow": 0.06
+  },
+  "chat.hover.fade": {
+    "about": "A row or control crossing to its lit shade and back.",
+    "follow": 0.05
+  },
+  "chat.scrollbar.fade": {
+    "about": "The scrollbar coming and going.",
+    "follow": 0.12
+  },
+  "chat.marquee.return": {
+    "about": "A name cut short gliding home once the pointer leaves it.",
+    "follow": 0.1
+  }
+}

@@ -28,8 +28,8 @@ import org.lwjgl.opengl.GL11;
  * The bounded player card: opened by a click on the head or name of a
  * chat line, or on a mention, and shown in brief under the pointer for
  * the identity the head button speaks as. A chat line supplies its
- * snapshotted identity; the details — race, starting faction, level,
- * gender, age, and biography — come from the public appearance the
+ * snapshotted identity; the details — race, starting faction, gender,
+ * age, and biography — come from the public appearance the
  * server already synced for that player, and are only shown when they
  * describe the character the line names. An NPC's head and name carry
  * the same card — the portrait, the name in its faction's colour, and
@@ -129,8 +129,8 @@ final class LostTalesChatHoverCard {
      * line is omitted rather than shown empty when the value is unknown.
      * The brief card — the hover — stops after the title, the command a
      * Server line answers and the roles held; the {@code full} card a
-     * click opens goes on to the character's race, faction, level,
-     * gender, age and biography.
+     * click opens goes on to the character's race, faction, gender, age
+     * and biography.
      */
     private static void drawCard(Minecraft minecraft, Target target,
                                  int mouseX, int mouseY,
@@ -203,9 +203,6 @@ final class LostTalesChatHoverCard {
             addDetail(lines, "gui.losttales.character.race",
                     details == null ? "" : ClientCharacterDisplayNames.race(
                             details.getRaceId()));
-            addDetail(lines, "gui.losttales.chat.card.level",
-                    details == null || details.getRoleplayLevel() <= 0
-                            ? "" : String.valueOf(details.getRoleplayLevel()));
             addDetail(lines, "gui.losttales.character.gender",
                     details == null || details.getGenderId().length() == 0
                             ? "" : ClientCharacterDisplayNames.gender(

@@ -1,8 +1,8 @@
 package com.ninuna.losttales.compat.discord;
 
 /**
- * One of the server's own posts to Discord — the server started or is
- * going down, a player joined, left, died, or earned an achievement — as
+ * One of the server's own posts to Discord — a player joined, left,
+ * died, or earned an achievement — as
  * the webhook shows it: an embed with a coloured edge, one line of plain
  * text on the author row, and the player's head beside it when the
  * notice is about a player. The kind is what the config switches on and
@@ -17,8 +17,7 @@ package com.ninuna.losttales.compat.discord;
 public final class DiscordNotice {
     /** What the notice announces; each kind has its own config switch. */
     public enum Kind {
-        SERVER_STARTED, SERVER_STOPPING, PLAYER_JOINED, PLAYER_LEFT,
-        PLAYER_DIED, ACHIEVEMENT
+        PLAYER_JOINED, PLAYER_LEFT, PLAYER_DIED, ACHIEVEMENT
     }
 
     /** Discord's own bound on an embed author name. */

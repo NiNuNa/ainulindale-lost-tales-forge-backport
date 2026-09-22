@@ -37,7 +37,7 @@ public final class LostTalesCommandAuthorizationTest {
 
     /** Installs a server catalogue with one role granting one capability. */
     private static void installRoleGranting(LostTalesCapability capability, UUID member) {
-        ChatAccountRole role = ChatAccountRole.custom("moderator", "Moderator", "", "",
+        ChatAccountRole role = ChatAccountRole.custom("moderator", "Moderator", "",
                 0xA94B54, true, 15, null, new LinkedHashSet<String>(
                         Collections.singletonList(capability.getId())));
         Map<String, Set<UUID>> members = new LinkedHashMap<String, Set<UUID>>();

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.mapmarker;
 
+import com.ninuna.losttales.client.motion.Motions;
 import java.lang.reflect.Field;
 import lotr.client.gui.LOTRGuiMap;
 
@@ -96,7 +97,18 @@ final class LostTalesMapCameraFocus {
         return progress * progress * (3.0F - 2.0F * progress);
     }
 
-    /** Longer journeys take longer, between a floor and a ceiling. */
+    /**
+     * How long the glide takes: {@link #durationFor} at the speed in force,
+     * and none while motion is off or reduced, when the camera jumps.
+     */
+    static long glideNanos(float distance) {
+        if (!Motions.enabled() || Motions.reduced()) {
+            return 0L;
+        }
+        return Math.round(durationFor(distance) / Motions.speed());
+    }
+
+    /** Longer journeys take longer, between a floor and a ceiling; at speed 1. */
     static long durationFor(float distance) {
         long scaled = MIN_DURATION_NANOS
                 + (long)(Math.max(0.0F, distance) * NANOS_PER_MAP_PIXEL);
@@ -217,7 +229,7 @@ final class LostTalesMapCameraFocus {
         float deltaY = mapImageY - this.startFocusY;
         float distance = (float)Math.sqrt(
                 deltaX * deltaX + deltaY * deltaY);
-        this.durationNanos = durationFor(distance);
+        this.durationNanos = glideNanos(distance);
         this.curvature = curvature(distance, screenOffsetRatio(
                 deltaX * startScale, deltaY * startScale, viewport));
         this.active = true;

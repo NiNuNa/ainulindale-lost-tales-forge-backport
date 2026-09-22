@@ -406,9 +406,10 @@ public final class LostTalesChatService {
      * the sender id that stands for that member
      * ({@link LostTalesChatMessagePacket#discordSenderId}) — so a client
      * can ignore them, and a mute stored against that id silences them
-     * here, silently, exactly as an account's mute does — and is never
-     * posted back to Discord: a line of Discord origin never enters the
-     * relay, whatever channel it lands in. A Discord member is an
+     * here, silently, exactly as an account's mute does. Nothing here
+     * posts it to Discord: the bridge itself carries it on to the game
+     * channel's other Discord channels, never back to its own. A Discord
+     * member is an
      * external identity and wears no character. The bridge has already
      * sanitised and bounded the text, and resolved the quote when the
      * message answers one — a Discord reply is shown exactly as a
@@ -420,8 +421,8 @@ public final class LostTalesChatService {
      * can link the line to the Discord message it came from.
      */
     public static long sendFromDiscord(ChatChannel channel, String factionScope,
-                                       String displayName, String discordUserId,
-                                       String message,
+                                       String displayName, String guildName,
+                                       String discordUserId, String message,
                                        ChatReplyReference reply) {
         MinecraftServer server = MinecraftServer.getServer();
         if (!LostTalesConfig.discordEnabled
@@ -445,9 +446,13 @@ public final class LostTalesChatService {
         }
         int ivory = LostTalesColors.rgb(LostTalesColors.HUD_LABEL);
         long messageId = ChatMessageIdAllocator.next();
+        // The member's Discord server stands where a character's title
+        // does, in the tone of what is said about a line: Nils, of The
+        // Shire.
         LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
                 channel, senderId, displayName,
-                displayName, "", ivory, ivory, message,
+                displayName, guildName == null ? "" : guildName,
+                LostTalesColors.rgb(LostTalesColors.ROSE_GRAY), ivory, message,
                 System.currentTimeMillis(), "", null, "", "", 0, true,
                 messageId, reply)
                 .withScope(factionScope == null ? "" : factionScope)
@@ -627,11 +632,11 @@ public final class LostTalesChatService {
     /**
      * A Discord member's own edit, found by the bridge's sweep and
      * delivered on the server thread: the line is rewritten for
-     * everyone who was sent it, exactly as a player's edit is. The
-     * bridge signed the line with its own author id when it was
-     * recorded, which is what allows the rewrite here and what stops
-     * any player from making one. Nothing is posted back to Discord —
-     * the change came from there.
+     * everyone who was sent it, exactly as a player's edit is, and in
+     * the other Discord channels the line was carried on to. The bridge
+     * signed the line with its own author id when it was recorded, which
+     * is what allows the rewrite here and what stops any player from
+     * making one. The member's own message is theirs and is not touched.
      */
     public static void editFromDiscord(long messageId, String message) {
         if (!ChatMessageValidator.isValid(message)) {
@@ -646,13 +651,17 @@ public final class LostTalesChatService {
                 Long.valueOf(messageId), message);
         tellRecipients(recipients,
                 LostTalesChatUpdatePacket.edited(messageId, message));
+        LostTalesDiscordBridge.getInstance().relayEdit(messageId, message);
     }
 
     /**
      * A Discord member's own deletion, on the same terms as an edit:
-     * the line is taken back from everyone who was sent it.
+     * the line is taken back from everyone who was sent it, and from the
+     * other Discord channels it was carried on to.
      */
     public static void deleteFromDiscord(long messageId) {
+        ChatChannel saidIn = ChatHistory.channelOf(messageId);
+        String saidToFaction = ChatHistory.factionScopeOf(messageId);
         Set<UUID> recipients = ChatHistory.remove(messageId,
                 LostTalesChatMessagePacket.DISCORD_SENDER_ID);
         if (recipients == null) {
@@ -662,6 +671,8 @@ public final class LostTalesChatService {
                 Long.valueOf(messageId));
         tellRecipients(recipients,
                 LostTalesChatUpdatePacket.removed(messageId));
+        LostTalesDiscordBridge.getInstance().relayDelete(messageId, saidIn,
+                saidToFaction);
     }
 
     /**
@@ -819,10 +830,8 @@ public final class LostTalesChatService {
         // still bound to the copy's Discord channel.
         ChatChannel saidIn = ChatHistory.channelOf(messageId);
         String saidToFaction = ChatHistory.factionScopeOf(messageId);
-        boolean announcement = ChatHistory.isServerLine(messageId);
         Set<UUID> recipients = ChatHistory.remove(messageId,
                 remover.getUniqueID());
-        boolean fromDiscord = false;
         if (recipients == null) {
             if (!LostTalesPermissions.has(remover, LostTalesCapability.CHAT_MODERATE)) {
                 return;
@@ -833,8 +842,6 @@ public final class LostTalesChatService {
                 return;
             }
             recipients = removal.recipients;
-            fromDiscord = LostTalesChatMessagePacket.DISCORD_SENDER_ID
-                    .equals(removal.authorId);
             FMLLog.info("[losttales/chat/delete] moderator <%s> removed "
                     + "message %d of <%s>", remover.getCommandSenderName(),
                     Long.valueOf(messageId), removal.author);
@@ -852,14 +859,11 @@ public final class LostTalesChatService {
         }
         tellRecipients(recipients,
                 LostTalesChatUpdatePacket.removed(messageId));
-        // Taken back from Discord as well, on the same terms as an edit.
-        // A line that came from Discord is a member's own message there,
-        // which the webhook could not delete anyway: the removal is
-        // in-game moderation only, and Discord's moderators keep theirs.
-        if (!fromDiscord) {
-            LostTalesDiscordBridge.getInstance().relayDelete(messageId,
-                    saidIn, saidToFaction, announcement);
-        }
+        // Taken back from Discord as well, on the same terms as an edit:
+        // every copy a webhook of ours made. A Discord member's own
+        // message was made by none, so it stays for Discord's moderators.
+        LostTalesDiscordBridge.getInstance().relayDelete(messageId,
+                saidIn, saidToFaction);
     }
 
     /**
@@ -1196,7 +1200,9 @@ public final class LostTalesChatService {
                         ChatChannelPolicy.ownCharacterRoles(player),
                         LostTalesConfig.chatProximityRadius,
                         ChatChannelIconCatalog.current(),
-                        ChatProfanityCatalog.serverWords()),
+                        ChatProfanityCatalog.serverWords())
+                        .withDiscordLinks(
+                                LostTalesDiscordBridge.getInstance().linkedKeys()),
                 player);
         ChatIdentitySelection.sendState(player);
     }
@@ -1692,10 +1698,11 @@ public final class LostTalesChatService {
                 player.getCommandSenderName());
         if (ChatMessageIds.isServerId(arrivalId)) {
             // The join line went out before the server listed the
-            // player, so it names nobody; now that their character is
-            // resolved it names them by it for everyone shown it later.
+            // player, so it names nobody; now it names their account,
+            // as the out-of-character line it is, for everyone shown it
+            // later.
             ChatHistory.namePlayer(arrivalId,
-                    LostTalesServerBroadcastHook.namedPlayer(player));
+                    LostTalesServerBroadcastHook.namedAccount(player));
         } else {
             arrivalId = ChatMessageIdAllocator.next();
         }

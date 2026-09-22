@@ -1,6 +1,10 @@
 package com.ninuna.losttales.gui.style;
 
-import com.ninuna.losttales.client.gui.animation.LostTalesGuiEasing;
+import com.ninuna.losttales.client.motion.Motion;
+import com.ninuna.losttales.client.motion.MotionIds;
+import com.ninuna.losttales.client.motion.MotionPlayer;
+import com.ninuna.losttales.client.motion.MotionTrack;
+import com.ninuna.losttales.client.motion.Motions;
 import org.lwjgl.input.Mouse;
 
 /**
@@ -9,82 +13,45 @@ import org.lwjgl.input.Mouse;
  * out, and how far it has turned. One of these per button, anywhere the
  * mod draws a glyph that can be pressed.
  *
- * <p>Four beats. Arriving, the button dips a little against the rise to
- * come, rises past its mark, and settles onto it. Pressed, it drops onto
- * the surface at once, and stays down long enough to be seen however
- * quickly the mouse lets go. Then it springs back through a few
- * alternating lobes that decay to nothing. Leaving, it returns faster
- * than it rose.</p>
+ * <p>Four beats, each a beat of the button's motion ({@link Character}),
+ * so the files say how far and how quickly: arriving, the button dips a
+ * little against the rise to come, rises past its mark, and settles onto
+ * it; pressed, it drops onto the surface at once and stays down long
+ * enough to be seen however quickly the mouse lets go; let go, it springs
+ * back through a few alternating lobes that decay to nothing; leaving, it
+ * returns faster than it rose. This class keeps the rules between the
+ * beats: a press or a spring is never cut short by the pointer moving on,
+ * and a spring ends where the pointer then is.</p>
  *
  * <p>Nothing happens while a button is idle. A slow wander of about a
  * pixel does not read as breathing on artwork sampled one texel to one
  * pixel: the texels land on one row or the next, so each crossing is a
- * visible jump rather than a drift. Motion of that size only reads as
- * motion while it is quick, which is why every beat here is short.</p>
+ * visible jump rather than a drift. Travel is the vocabulary; nothing
+ * scales. A {@link Character} may add a turn, which costs a display pixel
+ * or two of straightness at the peak of a beat and nothing at rest.</p>
  *
- * <p>Travel is the vocabulary; nothing scales. A five-pixel glyph has no
- * crisp step between one texel and two, so a squash needs drawn frames.
- * A {@link Character} may add a turn, which costs a display pixel or two
- * of straightness at the peak of a beat and nothing at all at rest,
- * since every pose the button holds is square.</p>
- *
- * <p>The places a button <em>holds</em> — resting, risen, pressed — are
- * whole GUI pixels, so each lands on the display grid whatever the GUI
- * Scale. The travel between them is left exactly as the curve gives it
- * and drawn through a translated matrix, because a rigid glyph rounded
- * to the grid every frame would step across it instead of moving.</p>
- *
- * <p>Each beat is read from the moment it began rather than accumulated,
- * so the pose is the same however often the screen is drawn, and a beat
- * cut short hands the next one the place it stood.</p>
- *
- * <p>Presentation only. A button answers the pointer on the box it was
- * laid out in, never the box it is drawn in: a risen button tested where
- * it is drawn would slide out from under the pointer and light and
- * unlight every frame.</p>
+ * <p>The places a button holds are whole GUI pixels; the travel between
+ * them is drawn through a translated matrix, because a rigid glyph
+ * rounded to the grid every frame would step across it instead of
+ * moving. Presentation only: a button answers the pointer on the box it
+ * was laid out in, never the box it is drawn in.</p>
  */
 public final class LostTalesUiButtonMotion {
-    /**
-     * The rise, in GUI pixels. One pixel is the clear space a framed
-     * button keeps around what it holds, so a button rises to the edge
-     * of its own clearing and no further.
-     */
-    public static final double RISE = 1.0D;
-    /** How far below its resting row a held button sits. */
-    public static final double PRESS = 1.0D;
-    /** The dip against the rise; a beat passed through, not held. */
-    private static final double DIP = 0.34D;
-    /**
-     * How far past its mark the rise reaches before settling. Stated
-     * rather than taken from a back-out curve, whose own overshoot is a
-     * few hundredths of the travel and would be well under a pixel here.
-     */
-    private static final double OVERSHOOT = 0.5D;
-    /** The first lobe's reach once the button is let go. */
-    private static final double RING = 1.0D;
-    /** Share of the arrival spent dipping before the rise begins. */
-    private static final float ANTICIPATION = 0.28F;
-    private static final long ARRIVE_NANOS = 170L * 1000000L;
-    private static final long LEAVE_NANOS = 110L * 1000000L;
-    private static final long PRESS_NANOS = 55L * 1000000L;
-    private static final long RING_NANOS = 260L * 1000000L;
-    /** Lobes the spring back spends, alternating and decaying. */
-    public static final int RING_LOBES = 3;
-    /** A place this near a whole pixel counts as being on it. */
-    private static final double SETTLED = 0.01D;
-    /** How long a crossing to the lit artwork takes to cover most of its way. */
-    private static final double LIT_SECONDS = 0.05D;
-    /**
-     * How long a press is held before the spring begins, whatever the
-     * mouse does. A click can be shorter than the drop, and a quick one
-     * can be over between two draws.
-     */
-    private static final long MIN_PRESS_NANOS = 90L * 1000000L;
+    /** The part of a button's motion that moves: the glyph. */
+    static final String GLYPH = "glyph";
+    /** The pose of a button pressed onto the surface. */
+    static final String PRESSED = "pressed";
+    private static final String PRESS_BEAT = "press";
+    private static final String RELEASE_BEAT = "release";
+    /** Degrees the glyph turns per pixel it still has to travel. */
+    private static final String TURN_PARAM = "turn";
+    /** How long a press is held before the spring begins, in milliseconds. */
+    private static final String MIN_PRESS_PARAM = "min_press";
 
     /**
-     * What a button does when it answers the pointer. Each character
-     * plays the same four beats and differs in how far and how quickly,
-     * and in whether the glyph turns as it travels.
+     * What a button does when it answers the pointer: its motion, which
+     * says how far and how quickly each beat goes and whether the glyph
+     * turns as it travels.
      */
     public enum Character {
         /**
@@ -92,69 +59,62 @@ public final class LostTalesUiButtonMotion {
          * face, a letter or a picture should use, since a tilted face
          * reads as a mistake.
          */
-        LIFT(1.0F, 1.0F, 0.0F),
+        LIFT(MotionIds.UI_BUTTON_LIFT),
         /**
          * The same with a turn, for a glyph big enough and lopsided
-         * enough to show one: a magnifier hanging off its handle, a
-         * send arrow tipping as it throws. Check the artwork first. A
-         * glyph unchanged by a quarter turn shows nothing however far it
-         * is turned, and one only a few texels across has no
-         * whole-pixel form at any angle between none and a quarter, so
-         * the chat's cog, {@code +} and cross do not turn at all.
+         * enough to show one: a magnifier hanging off its handle, a send
+         * arrow tipping as it throws. A glyph unchanged by a quarter turn
+         * shows nothing however far it is turned, and one only a few
+         * texels across has no whole-pixel form at any angle between none
+         * and a quarter, so the chat's cog, {@code +} and cross do not
+         * turn at all.
          */
-        TURN(1.0F, 1.0F, 5.0F),
-        /**
-         * A smaller turn, for a glyph that reads as twisting into
-         * something else rather than spinning: the {@code +} that
-         * becomes a {@code -}.
-         */
-        TWIST(1.0F, 1.0F, 2.5F),
+        TURN(MotionIds.UI_BUTTON_TURN),
         /**
          * Further and quicker, with no turn: a decisive control such as
          * a cross, which should answer like a switch.
          */
-        SNAP(1.25F, 0.68F, 0.0F);
+        SNAP(MotionIds.UI_BUTTON_SNAP);
 
-        private final float reach;
-        private final float pace;
-        private final float turn;
+        private final String motionId;
 
-        Character(float reach, float pace, float turn) {
-            this.reach = reach;
-            this.pace = pace;
-            this.turn = turn;
+        Character(String motionId) {
+            this.motionId = motionId;
         }
 
-        /** Degrees the glyph turns once the button is fully risen. */
+        /** The motion the character plays. */
+        public String motionId() {
+            return this.motionId;
+        }
+
+        /** Degrees the glyph turns per pixel still to travel, its motion's {@code turn}. */
         public float getTurnDegrees() {
-            return this.turn;
+            return Motions.param(this.motionId, TURN_PARAM, 0.0F);
         }
     }
 
     private enum Beat { REST, ARRIVING, HELD, RINGING }
 
     private final Character character;
+    private final MotionPlayer player;
 
     private Beat beat = Beat.REST;
-    /** When the running beat began, and the place the one before it left. */
+    /** When the running beat began. */
     private long beatNanos;
-    private double from;
-    /** Where the spring back settles: the place it was let go from. */
-    private double ringBase;
-    /** Where the button stands now, in GUI pixels down from its resting row. */
-    private double offset;
     private float lit;
     private boolean hovered;
     private boolean held;
-    private boolean animated = true;
     private boolean started;
     /** Whether the mouse has let go and the spring is waiting on the drop. */
     private boolean releaseWaiting;
     /** The instant of the last step, so each caller need not keep a clock. */
     private long lastNanos;
+    /** The instant the pose was last read at. */
+    private long drawNanos;
 
     public LostTalesUiButtonMotion(Character character) {
         this.character = character == null ? Character.LIFT : character;
+        this.player = new MotionPlayer(this.character.motionId());
     }
 
     /**
@@ -163,20 +123,16 @@ public final class LostTalesUiButtonMotion {
      * or, for a button that says so, its own state; {@code hovered} and
      * {@code held} are the pointer alone. The time since the last step
      * is taken from {@code nowNanos}, so a caller keeps no clock of its
-     * own. {@code animated} is the
-     * player's own setting: the beats keep running while it is off so
-     * turning it back on picks them up, but the button is drawn where it
-     * was laid out and the crossing to the lit artwork is all that
-     * shows.
+     * own.
      */
     public void advance(long nowNanos, boolean lit, boolean hovered,
-                        boolean held, boolean animated) {
-        this.animated = animated;
+                        boolean held) {
         double elapsedSeconds = this.lastNanos == 0L ? 0.0D
                 : Math.max(0.0D, (nowNanos - this.lastNanos) / 1.0E9D);
         this.lastNanos = nowNanos;
-        this.lit = (float)LostTalesGuiEasing.approach(this.lit,
-                lit ? 1.0D : 0.0D, elapsedSeconds, LIT_SECONDS);
+        this.drawNanos = nowNanos;
+        this.lit = (float)Motions.follow(MotionIds.UI_BUTTON_LIT, this.lit,
+                lit ? 1.0D : 0.0D, elapsedSeconds);
         if (Math.abs((lit ? 1.0F : 0.0F) - this.lit) < 0.02F) {
             this.lit = lit ? 1.0F : 0.0F;
         }
@@ -186,13 +142,17 @@ public final class LostTalesUiButtonMotion {
             this.started = true;
             this.hovered = hovered;
             this.held = held;
+            this.player.settle(held ? PRESSED : Motion.REST);
+            this.beat = held ? Beat.HELD : Beat.REST;
             this.beatNanos = nowNanos;
-            this.beat = held ? Beat.HELD
-                    : hovered ? Beat.ARRIVING : Beat.REST;
+            if (hovered && !held) {
+                begin(Beat.ARRIVING, nowNanos);
+            }
         } else if (held != this.held) {
             // A press takes the button wherever it stands. Letting go
             // waits for the drop to have been seen, below.
             if (held) {
+                this.releaseWaiting = false;
                 begin(Beat.HELD, nowNanos);
             } else {
                 this.releaseWaiting = true;
@@ -207,32 +167,30 @@ public final class LostTalesUiButtonMotion {
             }
             this.hovered = hovered;
         }
-        long elapsed = Math.max(0L, nowNanos - this.beatNanos);
         // A click can be over in less time than the drop takes, and a
         // very quick one can be gone between two draws. The press is
         // therefore held for long enough to be seen before the spring
         // begins, so a button always answers a click visibly.
+        long minPress = Motions.scaledNanos(Math.round(Motions.param(
+                this.character.motionId(), MIN_PRESS_PARAM, 0.0F)));
         if (this.releaseWaiting && this.beat == Beat.HELD
-                && elapsed >= paced(MIN_PRESS_NANOS)) {
-            long ended = this.beatNanos + paced(MIN_PRESS_NANOS);
-            this.offset = placeAt(paced(MIN_PRESS_NANOS));
-            this.ringBase = this.hovered ? -rise() : 0.0D;
-            begin(Beat.RINGING, ended);
+                && nowNanos - this.beatNanos >= minPress) {
             this.releaseWaiting = false;
-            elapsed = Math.max(0L, nowNanos - ended);
+            begin(Beat.RINGING, this.beatNanos + minPress);
         }
-        long ringNanos = paced(RING_NANOS);
-        if (this.beat == Beat.RINGING && elapsed >= ringNanos) {
-            // The spring finishes on its base, and what follows begins
-            // at the instant it ended rather than at this frame, so a
-            // long frame carries its leftover time into the next beat
-            // instead of holding the button still for one draw.
-            long ended = this.beatNanos + ringNanos;
-            this.offset = this.ringBase;
-            begin(this.hovered ? Beat.ARRIVING : Beat.REST, ended);
-            elapsed = Math.max(0L, nowNanos - ended);
+        if (this.beat == Beat.RINGING && this.player.isSettled(nowNanos)) {
+            // The spring has finished on the pose it was let go toward.
+            // What follows is where the pointer is now, from the instant
+            // the spring ended rather than this frame, so a long frame
+            // carries its leftover time into the next beat.
+            long ended = this.beatNanos + Motions.nanos(
+                    this.character.motionId(), RELEASE_BEAT);
+            this.beat = this.hovered ? Beat.ARRIVING : Beat.REST;
+            String wanted = this.hovered ? Motion.ON : Motion.REST;
+            if (!wanted.equals(this.player.pose(GLYPH))) {
+                begin(this.beat, ended);
+            }
         }
-        this.offset = placeAt(elapsed);
     }
 
     /**
@@ -241,72 +199,30 @@ public final class LostTalesUiButtonMotion {
      * because a press that is missed costs a flourish rather than an
      * action; a caller whose button is also lit by its own state — a
      * field with the keys, a panel already open — states that with
-     * {@link #advance(long, boolean, boolean, boolean, boolean)}.
+     * {@link #advance(long, boolean, boolean, boolean)}.
      */
-    public void advance(long nowNanos, boolean hovered, boolean animated) {
-        advance(nowNanos, hovered, hovered, hovered && Mouse.isButtonDown(0),
-                animated);
+    public void advance(long nowNanos, boolean hovered) {
+        advance(nowNanos, hovered, hovered, hovered && Mouse.isButtonDown(0));
     }
 
     private void begin(Beat next, long nowNanos) {
-        this.from = this.offset;
         this.beat = next;
         this.beatNanos = nowNanos;
-    }
-
-    /** This character's rise, and the reach of everything measured from it. */
-    private double rise() {
-        return RISE * this.character.reach;
-    }
-
-    private long paced(long nanos) {
-        return (long)(nanos * this.character.pace);
-    }
-
-    /** Where the running beat puts the button after this long. */
-    private double placeAt(long elapsed) {
-        if (this.beat == Beat.HELD) {
-            return lerp(this.from, PRESS * this.character.reach,
-                    LostTalesGuiEasing.easeOutCubic(
-                            share(elapsed, paced(PRESS_NANOS))));
+        switch (next) {
+            case HELD:
+                this.player.play(PRESS_BEAT, nowNanos);
+                break;
+            case RINGING:
+                this.player.play(RELEASE_BEAT,
+                        this.hovered ? Motion.ON : Motion.REST, nowNanos);
+                break;
+            case ARRIVING:
+                this.player.play(Motion.ON, nowNanos);
+                break;
+            default:
+                this.player.play(Motion.OFF, nowNanos);
+                break;
         }
-        if (this.beat == Beat.RINGING) {
-            float progress = share(elapsed, paced(RING_NANOS));
-            // The first lobe is what carries the button up out of the
-            // press, so the base is reached across that lobe rather
-            // than at once.
-            double settling = lerp(this.from, this.ringBase,
-                    LostTalesGuiEasing.easeOutCubic(
-                            Math.min(1.0F, progress * RING_LOBES)));
-            return settling - RING * this.character.reach
-                    * ringOut(progress, RING_LOBES);
-        }
-        if (this.beat == Beat.ARRIVING) {
-            float progress = share(elapsed, paced(ARRIVE_NANOS));
-            if (this.from > -SETTLED) {
-                return arriveFromRest(progress, this.character.reach);
-            }
-            // Already up, where a dip would read as a stumble.
-            return lerp(this.from, -rise(),
-                    LostTalesGuiEasing.easeOutCubic(progress));
-        }
-        return lerp(this.from, 0.0D, LostTalesGuiEasing.easeOutCubic(
-                share(elapsed, paced(LEAVE_NANOS))));
-    }
-
-    /**
-     * The arrival in full: down against the rise, then up past the mark
-     * and back onto it. Both the dip and the reach past the mark are
-     * shaped by a half sine, so each leaves from nothing and returns to
-     * nothing and the three pieces join without a corner.
-     */
-    private static double arriveFromRest(float progress, float reach) {
-        if (progress < ANTICIPATION) {
-            return DIP * reach * Math.sin(Math.PI * progress / ANTICIPATION);
-        }
-        float rise = (progress - ANTICIPATION) / (1.0F - ANTICIPATION);
-        return -reach * (RISE * LostTalesGuiEasing.easeOutCubic(rise)
-                + OVERSHOOT * Math.sin(Math.PI * rise));
     }
 
     /** How far the button has crossed to its lit artwork. */
@@ -320,7 +236,9 @@ public final class LostTalesUiButtonMotion {
      * player has animation switched off.
      */
     public double offsetY() {
-        return this.animated ? this.offset : 0.0D;
+        return Motions.enabled()
+                ? this.player.value(GLYPH, MotionTrack.Y, this.drawNanos)
+                : 0.0D;
     }
 
     /**
@@ -332,70 +250,19 @@ public final class LostTalesUiButtonMotion {
      */
     public float turnDegrees() {
         float turn = this.character.getTurnDegrees();
-        if (!this.animated || turn == 0.0F) {
+        if (!Motions.enabled() || turn == 0.0F) {
             return 0.0F;
         }
         // Measured from where the beat is settling rather than from the
-        // resting row, so every pose the button actually holds is
-        // square and only its travel turns it. A glyph left standing at
-        // an angle reads as pivoting off its own middle, and a still
-        // tilt is exactly where a five-pixel sprite shows its
-        // stairsteps.
-        double travelling = (settlingPlace() - this.offset) / RISE;
+        // resting row, so every pose the button actually holds is square
+        // and only its travel turns it.
+        double travelling = this.player.target(GLYPH, MotionTrack.Y)
+                - offsetY();
         return (float)(turn * Math.max(-1.5D, Math.min(1.5D, travelling)));
     }
 
-    /**
-     * Where the running beat is settling: the place the button holds
-     * once it stops moving. Resting on its row, risen under the pointer,
-     * pressed onto the surface, or the place a spring is decaying to.
-     */
-    private double settlingPlace() {
-        if (this.beat == Beat.HELD) {
-            return PRESS * this.character.reach;
-        }
-        if (this.beat == Beat.RINGING) {
-            return this.ringBase;
-        }
-        return this.beat == Beat.ARRIVING ? -rise() : 0.0D;
-    }
-
-    /** Whether the button is standing still on a whole pixel. */
+    /** Whether the button is standing still on the pose it holds. */
     public boolean isSettled() {
-        return Math.abs(this.offset - Math.round(this.offset)) < SETTLED
-                && (this.beat == Beat.REST || this.beat == Beat.HELD
-                        || (this.beat == Beat.ARRIVING
-                                && Math.abs(this.offset + rise()) < SETTLED));
-    }
-
-    /**
-     * A spring settling through {@code lobes} triangle lobes, each
-     * leaning the opposite way to the one before and reaching less far,
-     * the way a banner rings out after something brushes past it. Zero
-     * at both ends, and one at the first lobe's peak.
-     */
-    public static float ringOut(float progress, int lobes) {
-        if (lobes <= 0 || progress <= 0.0F || progress >= 1.0F) {
-            return 0.0F;
-        }
-        float scaled = progress * lobes;
-        int lobe = (int)scaled;
-        if (lobe >= lobes) {
-            return 0.0F;
-        }
-        float within = scaled - lobe;
-        float triangle = within > 0.5F
-                ? (1.0F - within) * 2.0F : within * 2.0F;
-        float decay = (lobes - lobe) / (float)lobes;
-        return lobe % 2 == 0 ? triangle * decay : -triangle * decay;
-    }
-
-    private static float share(long elapsed, long total) {
-        return total <= 0L ? 1.0F
-                : LostTalesGuiEasing.clamp(elapsed / (float)total);
-    }
-
-    private static double lerp(double from, double to, float progress) {
-        return from + (to - from) * progress;
+        return this.player.isSettled(this.drawNanos);
     }
 }

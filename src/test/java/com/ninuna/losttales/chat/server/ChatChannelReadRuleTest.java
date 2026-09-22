@@ -71,7 +71,7 @@ public final class ChatChannelReadRuleTest {
 
     @Test
     public void aGateAsksTheIdentityInCharacterAndTheAccountOutOfIt() {
-        ChatAccountRole herald = ChatAccountRole.custom("herald", "Herald", "",
+        ChatAccountRole herald = ChatAccountRole.custom("herald", "Herald",
                 "", 0x112233, true, 30, null);
         ChatRoleCatalog.installServer(ChatRoleCatalog.of(Arrays.asList(herald),
                 Collections.<String, Set<UUID>>emptyMap(),

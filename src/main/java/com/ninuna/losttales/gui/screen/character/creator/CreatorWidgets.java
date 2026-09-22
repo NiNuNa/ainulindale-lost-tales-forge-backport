@@ -1,6 +1,5 @@
 package com.ninuna.losttales.gui.screen.character.creator;
 
-import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
@@ -55,8 +54,7 @@ public final class CreatorWidgets {
         if (motion != null) {
             boolean answers = enabled && hovered;
             motion.advance(System.nanoTime(), answers, answers,
-                    answers && Mouse.isButtonDown(0),
-                    LostTalesConfig.enableGuiAnimations);
+                    answers && Mouse.isButtonDown(0));
         }
         int fill = !enabled ? LostTalesSkyrimUiStyle.withAlpha(
                         LostTalesSkyrimUiStyle.PLUM_BLACK, 0x40)
@@ -126,8 +124,7 @@ public final class CreatorWidgets {
         if (motion != null) {
             boolean answers = enabled && hovered;
             motion.advance(System.nanoTime(), answers, answers,
-                    answers && Mouse.isButtonDown(0),
-                    LostTalesConfig.enableGuiAnimations);
+                    answers && Mouse.isButtonDown(0));
         }
         int fill = !enabled
                 ? LostTalesSkyrimUiStyle.withAlpha(

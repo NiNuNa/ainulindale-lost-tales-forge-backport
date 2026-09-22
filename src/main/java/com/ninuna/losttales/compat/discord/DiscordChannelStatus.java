@@ -78,10 +78,10 @@ final class DiscordChannelStatus {
                     + unsupported.getMessage());
             return;
         } catch (IOException exception) {
-            failed(now, exception.toString());
+            failed(now, DiscordHttp.describe(exception));
             return;
         } catch (RuntimeException exception) {
-            failed(now, exception.toString());
+            failed(now, DiscordHttp.describe(exception));
             return;
         }
         if (reply.status == 429) {

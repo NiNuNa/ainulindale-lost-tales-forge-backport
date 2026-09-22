@@ -20,7 +20,12 @@ import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.common.MinecraftForge;
 import org.lwjgl.opengl.GL11;
 
-/** Safe automatic opening fade/blur plus lifecycle for opt-in transforms. */
+/**
+ * Safe automatic opening fade/blur plus lifecycle for opt-in transforms.
+ * The veil and the blur are the screen's look and answer to the Screen
+ * Backgrounds options alone; the motion settings only time how they and
+ * the content arrive, so with motion off they are simply there at once.
+ */
 public final class LostTalesGuiAnimationHandler
         implements IResourceManagerReloadListener {
     private final LostTalesGuiBlurRenderer blurRenderer =
@@ -51,10 +56,8 @@ public final class LostTalesGuiAnimationHandler
             this.blurRenderer.release();
             return;
         }
-        int duration = animationDuration();
         LostTalesGuiAnimations.begin(screen, this.currentProfile,
-                duration, LostTalesConfig.guiBackgroundFadeTimeMillis,
-                LostTalesConfig.reducedGuiMotion, preserveBackdrop);
+                preserveBackdrop);
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
@@ -138,13 +141,12 @@ public final class LostTalesGuiAnimationHandler
 
     private boolean isCurrent(GuiScreen screen) {
         return screen != null && screen == this.currentScreen
-                && this.currentProfile.isEnabled()
-                && LostTalesConfig.enableGuiAnimations;
+                && this.currentProfile.isEnabled();
     }
 
     private static LostTalesGuiAnimationProfile profileFor(
             GuiScreen screen) {
-        if (!LostTalesConfig.enableGuiAnimations || screen == null
+        if (screen == null
                 || Minecraft.getMinecraft().theWorld == null
                 || isExcluded(screen)) {
             return LostTalesGuiAnimationProfile.NONE;
@@ -172,14 +174,5 @@ public final class LostTalesGuiAnimationHandler
                 || screen instanceof GuiDownloadTerrain
                 || screen instanceof GuiGameOver
                 || screen instanceof GuiSleepMP;
-    }
-
-    private static int animationDuration() {
-        int duration = Math.max(10,
-                LostTalesConfig.guiAnimationDurationMillis);
-        if (LostTalesConfig.reducedGuiMotion) {
-            duration = Math.min(duration, 90);
-        }
-        return Math.max(1, duration);
     }
 }

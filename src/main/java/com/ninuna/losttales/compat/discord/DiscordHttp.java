@@ -10,6 +10,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.Charset;
+import java.util.regex.Pattern;
 
 /**
  * The three HTTPS calls the bridge makes, on plain {@link HttpURLConnection}
@@ -37,8 +38,26 @@ final class DiscordHttp {
     private static final Charset UTF_8 = Charset.forName("UTF-8");
     private static final String USER_AGENT = "DiscordBot (losttales, "
             + LostTalesMetaData.MOD_VERSION + ")";
+    /** A webhook's token in an address, which is all its secret is. */
+    private static final Pattern WEBHOOK_TOKEN =
+            Pattern.compile("(/webhooks/\\d+/)[^/?#\\s]+");
 
     private DiscordHttp() {}
+
+    /**
+     * A failure as a log may show it: its kind and its message, with the
+     * token of any webhook address in it blanked, since whoever holds a
+     * webhook's address can post through it.
+     */
+    static String describe(Throwable failure) {
+        if (failure == null) {
+            return "";
+        }
+        String message = failure.getMessage();
+        String text = failure.getClass().getSimpleName()
+                + (message == null ? "" : ": " + message);
+        return WEBHOOK_TOKEN.matcher(text).replaceAll("$1***");
+    }
 
     /**
      * A reply: the HTTP status, the body (empty when there was none), and
@@ -148,6 +167,30 @@ final class DiscordHttp {
             throws IOException {
         return exchange(open(webhookMessageUrl(webhookUrl, messageId),
                 "DELETE"), null);
+    }
+
+    /**
+     * Makes a webhook in a channel for the bridge to post through, with
+     * the bot's token; the bot needs Manage Webhooks there. Discord
+     * answers with the webhook, its id and its token among it.
+     * {@code channelId} is a snowflake the caller has checked.
+     */
+    static Reply createWebhook(String botToken, String channelId, String body)
+            throws IOException {
+        HttpURLConnection connection = open(
+                API_BASE + "/channels/" + channelId + "/webhooks", "POST");
+        connection.setRequestProperty("Authorization", "Bot " + botToken);
+        connection.setRequestProperty("Content-Type", "application/json");
+        return exchange(connection, body);
+    }
+
+    /**
+     * Deletes a webhook through its own address, whose token authorises
+     * it: the bridge's clean-up once a link is taken away. Discord
+     * answers 204, or 404 when it is gone already.
+     */
+    static Reply deleteWebhook(String webhookUrl) throws IOException {
+        return exchange(open(webhookUrl, "DELETE"), null);
     }
 
     /**

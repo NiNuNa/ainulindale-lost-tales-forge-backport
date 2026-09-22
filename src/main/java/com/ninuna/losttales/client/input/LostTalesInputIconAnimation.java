@@ -1,9 +1,15 @@
 package com.ninuna.losttales.client.input;
 
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiEasing;
+import com.ninuna.losttales.client.motion.Motions;
 import org.lwjgl.input.Keyboard;
 
-/** Per-key, frame-rate-independent motion for keyboard hint artwork. */
+/**
+ * Per-key, frame-rate-independent motion for keyboard hint artwork. It is
+ * timed by hand rather than by a motion file and keeps to the motion
+ * settings: it plays at the speed in force, and with the Animations
+ * switch off or motion reduced a key is drawn up or down and nothing more.
+ */
 final class LostTalesInputIconAnimation {
     static final int IDLE_FRAME = 0;
     static final int RELEASE_FRAME = 1;
@@ -39,6 +45,11 @@ final class LostTalesInputIconAnimation {
     }
 
     Pose pose(boolean pressed, long nowNanos, int keyCode) {
+        if (!Motions.flourishes()) {
+            resetTransitions();
+            this.lastSeenNanos = nowNanos;
+            return pressed ? stillPressedPose() : stillIdlePose();
+        }
         if (this.lastSeenNanos != 0L
                 && elapsed(this.lastSeenNanos, nowNanos)
                         > STALE_AFTER_NANOS) {
@@ -53,8 +64,9 @@ final class LostTalesInputIconAnimation {
             }
             this.previouslyPressed = true;
             this.releaseStartedNanos = 0L;
-            pose = pressedPose(elapsed(this.pressStartedNanos, nowNanos),
-                    nowNanos, keyCode);
+            pose = pressedPose(
+                    Motions.paced(elapsed(this.pressStartedNanos, nowNanos)),
+                    Motions.paced(nowNanos), keyCode);
         } else {
             if (this.previouslyPressed) {
                 this.previouslyPressed = false;
@@ -67,13 +79,13 @@ final class LostTalesInputIconAnimation {
             }
             long releaseElapsed = this.releaseStartedNanos == 0L
                     ? RELEASE_SETTLE_NANOS
-                    : elapsed(this.releaseStartedNanos, nowNanos);
+                    : Motions.paced(elapsed(this.releaseStartedNanos, nowNanos));
             if (releaseElapsed < RELEASE_SETTLE_NANOS) {
                 pose = releasePose(releaseElapsed, this.releaseStrength,
                         this.releaseFromPose);
             } else {
                 this.releaseStartedNanos = 0L;
-                pose = idlePose(nowNanos, keyCode);
+                pose = idlePose(Motions.paced(nowNanos), keyCode);
             }
         }
         this.lastBasePose = pose;
@@ -84,6 +96,20 @@ final class LostTalesInputIconAnimation {
         return new Pose(IDLE_FRAME, 0.0F, 0.0F, 0.0F,
                 1.0F, 1.0F, 1.0F,
                 0.0F, 0.0F, 0.0F, 0.0F);
+    }
+
+    /** A key at rest with nothing moving: the idle breath's middle. */
+    static Pose stillIdlePose() {
+        return new Pose(IDLE_FRAME, 0.0F, 0.0F, 0.0F,
+                1.0F, 1.0F, 1.0F,
+                0.0F, 0.58F, 0.10F, 0.0F);
+    }
+
+    /** A key held down with nothing moving: the pressed artwork, in place. */
+    static Pose stillPressedPose() {
+        return new Pose(PRESSED_FRAME, 0.0F, 0.0F, 0.0F,
+                1.0F, 1.0F, 1.0F,
+                0.0F, 0.16F, 0.16F, 1.0F);
     }
 
     private static Pose pressedPose(

@@ -5,10 +5,11 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Edits the {@code channelBindings} list the way the bind and unbind
- * commands need to: one entry per game channel key, written in the form
- * the parser reads. Pure string work; the service writes the list back
- * and the bridge restarts on it.
+ * Edits the {@code channelBindings} list the way linking and unlinking
+ * need to: an entry added for each Discord channel a game channel is
+ * linked to, and entries taken away by game channel or by Discord
+ * channel, written in the form the parser reads. Pure string work; the
+ * config service writes the list back and the bridge restarts on it.
  */
 public final class DiscordBindingEntries {
 
@@ -23,34 +24,34 @@ public final class DiscordBindingEntries {
     }
 
     /**
-     * The list with the entry for {@code key} replaced, or appended when
-     * there was none. A comment line is left where it is. When the
-     * existing entry names a channel or webhook the new one leaves blank,
-     * the old value is kept, so a bind can change one side only.
+     * The list with a link added: {@code key}'s game channel to the
+     * Discord channel, through the webhook. An entry of the same key that
+     * names neither a channel nor a webhook — a placeholder a fresh file
+     * may hold — is taken out, and so is any entry naming the same
+     * Discord channel, which the new link replaces. A comment line is
+     * left where it is.
      */
-    public static List<String> upsert(String[] entries, String key,
-                                      DiscordBridgeDirection direction,
-                                      String discordChannelId, String webhookUrl) {
+    public static List<String> link(String[] entries, String key,
+                                    DiscordBridgeDirection direction,
+                                    String discordChannelId, String webhookUrl) {
         List<String> result = new ArrayList<String>();
-        boolean replaced = false;
         for (String entry : entries == null ? new String[0] : entries) {
-            if (!replaced && key.equalsIgnoreCase(keyOf(entry))) {
-                result.add(format(key, direction,
-                        firstNonBlank(discordChannelId, optionOf(entry, "channel")),
-                        firstNonBlank(webhookUrl, optionOf(entry, "webhook"))));
-                replaced = true;
-            } else {
+            boolean comment = keyOf(entry).length() == 0;
+            boolean placeholder = !comment && key.equalsIgnoreCase(keyOf(entry))
+                    && optionOf(entry, "channel").length() == 0
+                    && optionOf(entry, "webhook").length() == 0;
+            boolean sameChannel = !comment
+                    && discordChannelId.equals(optionOf(entry, "channel"));
+            if (!placeholder && !sameChannel) {
                 result.add(entry);
             }
         }
-        if (!replaced) {
-            result.add(format(key, direction, discordChannelId, webhookUrl));
-        }
+        result.add(format(key, direction, discordChannelId, webhookUrl));
         return result;
     }
 
-    /** The list without the entries for {@code key}; answers whether any went. */
-    public static List<String> remove(String[] entries, String key) {
+    /** The list without the entries for {@code key}. */
+    public static List<String> removeKey(String[] entries, String key) {
         List<String> result = new ArrayList<String>();
         for (String entry : entries == null ? new String[0] : entries) {
             if (!key.equalsIgnoreCase(keyOf(entry))) {
@@ -58,6 +59,34 @@ public final class DiscordBindingEntries {
             }
         }
         return result;
+    }
+
+    /** The list without the entries naming the Discord channel. */
+    public static List<String> removeChannel(String[] entries, String discordChannelId) {
+        List<String> result = new ArrayList<String>();
+        for (String entry : entries == null ? new String[0] : entries) {
+            if (keyOf(entry).length() == 0
+                    || !discordChannelId.equals(optionOf(entry, "channel"))) {
+                result.add(entry);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * The webhooks the entries taken away from {@code before} to leave
+     * {@code after} named: what the bot deletes once a link is gone.
+     */
+    public static List<String> webhooksRemoved(String[] before, List<String> after) {
+        List<String> webhooks = new ArrayList<String>();
+        for (String entry : before == null ? new String[0] : before) {
+            String webhook = optionOf(entry, "webhook");
+            if (webhook.length() > 0 && !after.contains(entry)
+                    && !webhooks.contains(webhook)) {
+                webhooks.add(webhook);
+            }
+        }
+        return webhooks;
     }
 
     public static boolean contains(String[] entries, String key) {
@@ -93,10 +122,5 @@ public final class DiscordBindingEntries {
             }
         }
         return "";
-    }
-
-    private static String firstNonBlank(String preferred, String fallback) {
-        return preferred != null && preferred.trim().length() > 0
-                ? preferred.trim() : fallback;
     }
 }

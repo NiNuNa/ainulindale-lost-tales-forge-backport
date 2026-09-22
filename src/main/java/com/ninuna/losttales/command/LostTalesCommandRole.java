@@ -13,6 +13,7 @@ import com.ninuna.losttales.chat.ChatRoleSource;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.config.server.LostTalesServerConfigService;
 import com.ninuna.losttales.config.server.ServerConfigChange;
+import com.ninuna.losttales.config.server.ServerConfigSnapshot;
 import com.ninuna.losttales.permission.LostTalesCapability;
 import com.ninuna.losttales.permission.LostTalesPermissionCatalog;
 import com.ninuna.losttales.permission.LostTalesPermissions;
@@ -94,7 +95,6 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
             StringBuilder line = new StringBuilder();
             line.append(EnumChatFormatting.GRAY).append(role.getId()).append(" = ")
                     .append(EnumChatFormatting.WHITE).append(role.getDisplayName())
-                    .append(' ').append(role.getDisplayTag())
                     .append(String.format(" #%06X", role.getColor()))
                     .append(role.isMentionable() ? " mentionable" : " worn only")
                     .append(" rank ").append(role.getRank());
@@ -179,9 +179,11 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
         }
         List<String> entries = ChatRoleConfig.withMembers(
                 LostTalesConfig.chatRoleMembers, role.getId(), accounts, characters);
-        LostTalesCommandConfig.report(sender, LostTalesServerConfigService.apply(
+        LostTalesCommandConfig.report(sender, LostTalesServerConfigService.applyOwned(
                 java.util.Collections.singletonList(new ServerConfigChange(
-                        LostTalesConfig.CATEGORY_ROLES, MEMBERS_KEY, true, entries))));
+                        LostTalesConfig.CATEGORY_ROLES, MEMBERS_KEY, true, entries)),
+                ServerConfigSnapshot.AUTHORIZATION_CATEGORIES,
+                java.util.Collections.<String>emptySet()));
     }
 
     /** Whom a name names: one account, or one character, or a problem to report. */
@@ -309,8 +311,8 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
 
     /**
      * {@code create <id> [option ...]} and {@code edit <id> <option ...>}
-     * take the options of a config entry ({@code name:Text tag:[Text]
-     * color:RRGGBB mention:true rank:15 op:1 faction:GONDOR@gondor.knight
+     * take the options of a config entry ({@code name:Text color:RRGGBB
+     * mention:true rank:15 op:1 faction:GONDOR@gondor.knight
      * grant:chat.moderate desc:Text}), space-separated; an edit keeps
      * whatever it does not name. {@code op:}, {@code faction:} and
      * {@code grant:} with nothing after the colon clear that kind.
@@ -318,7 +320,7 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
     private void define(ICommandSender sender, String[] args, boolean create) {
         if (args.length < 2 || (!create && args.length < 3)) {
             LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY + "/losttales role "
-                    + (create ? "create" : "edit") + " <id> [name:<text>] [tag:<[Text]>] "
+                    + (create ? "create" : "edit") + " <id> [name:<text>] "
                     + "[color:<RRGGBB>] [mention:<true|false>] [rank:<n>] [op:<level>] "
                     + "[faction:<FACTION>@<rank>] [grant:<capability>] [desc:<text>]");
             return;
@@ -372,9 +374,11 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
             return;
         }
         List<String> entries = ChatRoleConfig.upsertRole(LostTalesConfig.chatRoles, role);
-        LostTalesCommandConfig.report(sender, LostTalesServerConfigService.apply(
+        LostTalesCommandConfig.report(sender, LostTalesServerConfigService.applyOwned(
                 java.util.Collections.singletonList(new ServerConfigChange(
-                        LostTalesConfig.CATEGORY_ROLES, ROLES_KEY, true, entries))));
+                        LostTalesConfig.CATEGORY_ROLES, ROLES_KEY, true, entries)),
+                ServerConfigSnapshot.AUTHORIZATION_CATEGORIES,
+                java.util.Collections.<String>emptySet()));
     }
 
     private void delete(ICommandSender sender, String[] args) {
@@ -408,7 +412,9 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
                 ChatRoleConfig.removeKey(LostTalesConfig.chatRoles, id)));
         changes.add(new ServerConfigChange(LostTalesConfig.CATEGORY_ROLES, MEMBERS_KEY, true,
                 ChatRoleConfig.removeKey(LostTalesConfig.chatRoleMembers, id)));
-        LostTalesCommandConfig.report(sender, LostTalesServerConfigService.apply(changes));
+        LostTalesCommandConfig.report(sender, LostTalesServerConfigService.applyOwned(changes,
+                ServerConfigSnapshot.AUTHORIZATION_CATEGORIES,
+                java.util.Collections.<String>emptySet()));
     }
 
     /**
@@ -529,7 +535,7 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
         LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY
                 + "/losttales role unassign <role> <player|character>");
         LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY
-                + "/losttales role create <id> [name:<text>] [tag:<[Text]>] [color:<RRGGBB>] "
+                + "/losttales role create <id> [name:<text>] [color:<RRGGBB>] "
                 + "[mention:<true|false>] [rank:<n>] [op:<level>] [faction:<FACTION>@<rank>] "
                 + "[grant:<capability>] [desc:<text>]");
         LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY

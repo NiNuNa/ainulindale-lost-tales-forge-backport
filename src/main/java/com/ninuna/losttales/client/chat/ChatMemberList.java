@@ -2,10 +2,11 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatEpithet;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
-import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
+import com.ninuna.losttales.client.motion.Motions;
+import com.ninuna.losttales.client.motion.MotionIds;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -373,13 +374,8 @@ final class ChatMemberList {
         state.scrollNanos = now;
         float most = Math.max(0.0F, state.contentHeight - room);
         state.scrollTarget = Math.max(0.0F, Math.min(most, state.scrollTarget));
-        if (!LostTalesConfig.enableChatAnimations) {
-            state.scroll = state.scrollTarget;
-            return;
-        }
-        state.scroll = (float)LostTalesChatMotion.approach(state.scroll,
-                state.scrollTarget, elapsed,
-                LostTalesChatMotion.SCROLL_EASE_SECONDS);
+        state.scroll = (float)Motions.followTravel(MotionIds.CHAT_SCROLL,
+                state.scroll, state.scrollTarget, elapsed);
         if (Math.abs(state.scroll - state.scrollTarget) < 0.05F) {
             state.scroll = state.scrollTarget;
         }
@@ -682,8 +678,7 @@ final class ChatMemberList {
         int overflow = (int)Math.ceil(width - room);
         float current = name ? state.nameSlide : state.titleSlide;
         float next;
-        if (rested && overflow > 0 && room > 0.0F
-                && LostTalesConfig.enableChatAnimations) {
+        if (rested && overflow > 0 && room > 0.0F && Motions.enabled()) {
             next = (float)ChatChannelTabBar.marqueeOffset(state.hoverSeconds,
                     overflow);
         } else {

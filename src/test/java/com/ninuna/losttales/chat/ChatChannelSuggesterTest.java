@@ -42,7 +42,7 @@ public final class ChatChannelSuggesterTest {
         List<ChatChannel> global = ChatChannelSuggester.matches("glo", all, 20);
         assertEquals(Arrays.asList(ChatChannel.ALL), global);
         assertEquals(Arrays.asList(ChatChannel.OOC),
-                ChatChannelSuggester.matches("OOC&", all, 20));
+                ChatChannelSuggester.matches("OO", all, 20));
         assertEquals(Arrays.asList(ChatChannel.ALL),
                 ChatChannelSuggester.matches("al", all, 20));
         assertEquals(1, ChatChannelSuggester.matches("", all, 1).size());
@@ -53,10 +53,10 @@ public final class ChatChannelSuggesterTest {
     public void aMessageLinkIsTheShownNameASlashAndTheServersId() {
         assertEquals("#Global/1757522000000",
                 ChatChannelSuggester.messageLink(ChatChannel.ALL, 1757522000000L));
-        assertEquals("#OOC&Discord/12",
+        assertEquals("#OOC/12",
                 ChatChannelSuggester.messageLink(ChatChannel.OOC, 12L));
         // What it spells resolves back to the channel it names.
-        assertSame(ChatChannel.OOC, ChatChannelSuggester.resolve("OOC&Discord"));
+        assertSame(ChatChannel.OOC, ChatChannelSuggester.resolve("OOC"));
         // A whisper cannot be linked to, and neither can a line the
         // server never named.
         assertNull(ChatChannelSuggester.messageLink(ChatChannel.WHISPER, 12L));
@@ -86,7 +86,7 @@ public final class ChatChannelSuggesterTest {
     public void aWordResolvesByIdOrShownNameAndTheTokenIsTheId() {
         assertSame(ChatChannel.ALL, ChatChannelSuggester.resolve("all"));
         assertSame(ChatChannel.ALL, ChatChannelSuggester.resolve("Global"));
-        assertSame(ChatChannel.OOC, ChatChannelSuggester.resolve("ooc&discord"));
+        assertSame(ChatChannel.OOC, ChatChannelSuggester.resolve("OOC"));
         assertNull(ChatChannelSuggester.resolve("discord"));
         assertSame(ChatChannel.CONSOLE, ChatChannelSuggester.resolve("CONSOLE"));
         assertNull(ChatChannelSuggester.resolve("whisper"));

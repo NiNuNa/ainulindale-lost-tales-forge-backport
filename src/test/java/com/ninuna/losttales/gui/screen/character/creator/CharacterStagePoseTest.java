@@ -1,5 +1,7 @@
 package com.ninuna.losttales.gui.screen.character.creator;
 
+import com.ninuna.losttales.client.motion.MotionTestSettings;
+import com.ninuna.losttales.config.LostTalesConfig;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -70,6 +72,24 @@ public class CharacterStagePoseTest {
         assertEquals(0.0F, pose.getYaw(), EPSILON);
         assertEquals(0.0F, pose.getPitch(), EPSILON);
         assertEquals(1.0F, pose.getZoom(), EPSILON);
+    }
+
+    @Test
+    public void withMotionReducedTheCameraArrivesAtOnce() {
+        MotionTestSettings settings = MotionTestSettings.reset();
+        try {
+            LostTalesConfig.reducedMotion = true;
+            CharacterStagePose pose = new CharacterStagePose();
+            long now = 1000000000L;
+            pose.advance(now);
+            pose.drag(30, 0);
+            pose.wheel(2);
+            pose.advance(now + 16000000L);
+            assertEquals(pose.getYaw(), pose.getShownYaw(), EPSILON);
+            assertEquals(pose.getZoom(), pose.getShownZoom(), EPSILON);
+        } finally {
+            settings.restore();
+        }
     }
 
     @Test

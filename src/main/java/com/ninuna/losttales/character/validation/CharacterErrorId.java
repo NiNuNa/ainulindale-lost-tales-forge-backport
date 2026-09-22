@@ -74,6 +74,7 @@ public enum CharacterErrorId {
     LORE_CHARACTER_NOT_OWNED("lore_character_not_owned"),
     LORE_CHARACTER_ACTIVE("lore_character_active"),
     LORE_CHARACTER_CANNOT_DELETE("lore_character_cannot_delete"),
+    LORE_CHARACTER_CANNOT_EDIT("lore_character_cannot_edit"),
     LORE_CHARACTER_STALE_OWNERSHIP("lore_character_stale_ownership"),
     LORE_CHARACTER_TRANSFER_IN_PROGRESS("lore_character_transfer_in_progress"),
     LORE_CHARACTER_TRANSFER_STORAGE_READ_ONLY("lore_character_transfer_storage_read_only"),
@@ -84,6 +85,7 @@ public enum CharacterErrorId {
     PARTY_INVITATION_STORAGE_READ_ONLY("party_invitation_storage_read_only"),
     PARTY_CLEANUP_FAILED("party_cleanup_failed"),
     CAPE_UPDATE_NOT_ALLOWED("cape_update_not_allowed"),
+    PROFILE_UPDATE_NOT_ALLOWED("profile_update_not_allowed"),
     INTERNAL_ERROR("internal_error");
 
     private final String id;

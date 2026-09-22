@@ -9,6 +9,7 @@ public enum CharacterOperationType {
     CAPE_UPDATE(4, "cape_update"),
     LORE_CLAIM(5, "lore_claim"),
     LORE_RELEASE(6, "lore_release"),
+    PROFILE_UPDATE(7, "profile_update"),
     UNKNOWN(255, "unknown");
 
     private final int networkId;

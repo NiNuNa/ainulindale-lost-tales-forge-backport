@@ -10,6 +10,8 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.client.motion.Motions;
+import com.ninuna.losttales.client.motion.MotionIds;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
@@ -137,10 +139,10 @@ final class LostTalesChatVisualStyle {
                 LostTalesColors.PLUM_GRAY);
     }
 
-    /** A line that @-mentions this player, in the client's chosen palette colour; orchid until it chooses. */
+    /** A line that @-mentions this player, in the client's chosen palette colour; coral until it chooses. */
     static int mentionLineRgb() {
         return paletteRgb(LostTalesConfig.chatMentionLineColor,
-                LostTalesColors.ORCHID);
+                LostTalesColors.CORAL);
     }
 
     /** The line a reply's quote jumped to, while it is lit, in the chosen colour. */
@@ -157,7 +159,7 @@ final class LostTalesChatVisualStyle {
     static int selectedMentionLineRgb() {
         String chosen = LostTalesConfig.chatSelectedMentionColor;
         return LostTalesColors.isPaletteName(chosen)
-                ? paletteRgb(chosen, LostTalesColors.ORCHID)
+                ? paletteRgb(chosen, LostTalesColors.CORAL)
                 : automaticSelectedMentionRgb();
     }
 
@@ -316,14 +318,6 @@ final class LostTalesChatVisualStyle {
     }
 
     /**
-     * How long a control takes to cross from its resting artwork to its
-     * hovered one. Quick enough to feel like an answer to the pointer
-     * rather than an animation, slow enough not to be the hard swap it
-     * would otherwise be.
-     */
-    private static final double HOVER_FADE_SECONDS = 0.05D;
-
-    /**
      * One step of a control's crossfade toward {@code hovered}: 0 while
      * it rests, 1 while the pointer is on it, and on the way between
      * them the share of the hovered artwork to lay over the resting one.
@@ -333,8 +327,8 @@ final class LostTalesChatVisualStyle {
     static float hoverFade(float progress, boolean hovered,
                            double elapsed) {
         float target = hovered ? 1.0F : 0.0F;
-        float value = (float)LostTalesChatMotion.approach(progress, target,
-                elapsed, HOVER_FADE_SECONDS);
+        float value = (float)Motions.follow(MotionIds.CHAT_HOVER_FADE,
+                progress, target, elapsed);
         return Math.abs(target - value) < 0.02F ? target : value;
     }
 
@@ -601,6 +595,20 @@ final class LostTalesChatVisualStyle {
                               final ChatHeadMarker.Data metadata,
                               final int x, final int y, final int alpha,
                               final boolean chatOpen) {
+        drawFormatted(font, line, metadata, x, y, alpha, chatOpen, null);
+    }
+
+    /**
+     * As above, a hovered message's body row moving as {@code motion}
+     * says: its chevron and each of its words drawn where the motion has
+     * them. Null draws the row as it always stands.
+     */
+    static void drawFormatted(final FontRenderer font,
+                              final IChatComponent line,
+                              final ChatHeadMarker.Data metadata,
+                              final int x, final int y, final int alpha,
+                              final boolean chatOpen,
+                              final ChatRowMotion motion) {
         if (font == null || line == null || alpha < MIN_VISIBLE_ALPHA) {
             return;
         }
@@ -612,13 +620,13 @@ final class LostTalesChatVisualStyle {
                 if (shadow > 0) {
                     drawComponentPass(font, line, metadata,
                             x + SHADOW_OFFSET, y + SHADOW_OFFSET, shadow, true,
-                            chatOpen);
+                            chatOpen, motion);
                     // The line stands over its shadow, so a line fading
                     // does not show the shadow through its strokes.
                     LostTalesUiFlatLayers.nextLayer();
                 }
                 drawComponentPass(font, line, metadata, x, y, alpha, false,
-                        chatOpen);
+                        chatOpen, motion);
             }
         };
         if (alpha >= 255 || LostTalesUiFlatLayers.isActive()) {
@@ -1017,8 +1025,16 @@ final class LostTalesChatVisualStyle {
     private static void drawComponentPass(
             FontRenderer font, IChatComponent line,
             ChatHeadMarker.Data metadata, int x, int y,
-            int alpha, boolean shadowPass, boolean chatOpen) {
+            int alpha, boolean shadowPass, boolean chatOpen,
+            ChatRowMotion motion) {
         int cursor = x;
+        // A moving row's words, counted as the pass meets them, so each
+        // is drawn at its own place in the row's stagger.
+        int words = motion == null ? 0 : countWords(line, chatOpen);
+        int word = 0;
+        // Where the lit run the rule is under was drawn, so the rule
+        // stays under its words while they move.
+        float ruleShift = 0.0F;
         boolean afterHead = false;
         boolean identitySeen = false;
         boolean colours = chatColoursEnabled();
@@ -1072,7 +1088,7 @@ final class LostTalesChatVisualStyle {
                 // and past the sender: the name's rule ends before them.
                 if (ruleStart >= 0) {
                     drawRule(ruleStart, ruleEnd - ruleTrailing, y, ruleColor,
-                            alpha);
+                            alpha, ruleShift);
                     ruleStart = -1;
                 }
                 identitySpan = false;
@@ -1087,7 +1103,7 @@ final class LostTalesChatVisualStyle {
                 // carry their own shadows, so the shadow pass leaves it.
                 if (ruleStart >= 0) {
                     drawRule(ruleStart, ruleEnd - ruleTrailing, y, ruleColor,
-                            alpha);
+                            alpha, ruleShift);
                     ruleStart = -1;
                 }
                 if (!shadowPass) {
@@ -1132,6 +1148,15 @@ final class LostTalesChatVisualStyle {
 
             ChatEmoji emoji = ChatEmojiMarker.decode(part);
             ChatShowcaseMarker.Data share = ChatShowcaseMarker.decode(part);
+            // An icon in a moving row is a word of it: it travels on the
+            // place its turn in the row gives it.
+            float runShift = 0.0F;
+            boolean icon = isIconRun(part, emoji, share);
+            if (motion != null && icon) {
+                runShift = motion.wordX(word++, words);
+                GL11.glPushMatrix();
+                GL11.glTranslatef(runShift, 0.0F, 0.0F);
+            }
             if (emoji != null) {
                 width = measure(font, formatting, text, colours);
                 if (ChatEmojiMarker.reservesFullSlot(text)) {
@@ -1280,7 +1305,24 @@ final class LostTalesChatVisualStyle {
                 // behind must not decide what the next run's shadow looks
                 // like.
                 beginContent();
-                font.drawString(rendered, cursor, y, argb(color, alpha));
+                if (motion == null) {
+                    font.drawString(rendered, cursor, y, argb(color, alpha));
+                } else if (ChatBodyMarker.isMarker(part)) {
+                    // The chevron steps on its own, lit toward a lighter
+                    // shade of the speaker's colour; its shadow stays
+                    // the shadow.
+                    runShift = motion.chevronX();
+                    int lit = shadowPass ? color : blend(color,
+                            lighterShadeOf(color), motion.brighten());
+                    GL11.glPushMatrix();
+                    GL11.glTranslatef(runShift, 0.0F, 0.0F);
+                    font.drawString(rendered, cursor, y, argb(lit, alpha));
+                    GL11.glPopMatrix();
+                } else {
+                    runShift = motion.wordX(word, words);
+                    word = drawWords(font, rendered, cursor, y,
+                            argb(color, alpha), motion, word, words);
+                }
                 int declared = ChatInlineIcons.declaredWidth(part);
                 width = declared >= 0 ? declared
                         : measure(font, formatting, text, colours);
@@ -1313,6 +1355,10 @@ final class LostTalesChatVisualStyle {
                 }
             }
 
+            if (motion != null && icon) {
+                GL11.glPopMatrix();
+            }
+
             // A spacer holds no ink, so it neither starts, lengthens nor
             // ends a rule: the rule runs on over one only to the next lit
             // run of its element, and ends where the last lit run did
@@ -1323,6 +1369,7 @@ final class LostTalesChatVisualStyle {
                 if (ruleStart < 0) {
                     ruleStart = cursor;
                     ruleColor = underlineColor;
+                    ruleShift = runShift;
                 }
                 ruleEnd = cursor + width;
                 // The last run's trailing spaces belong to the gap
@@ -1331,7 +1378,7 @@ final class LostTalesChatVisualStyle {
                         : trailingSpaceWidth(font, text);
             } else if (ruleStart >= 0 && !spacer) {
                 drawRule(ruleStart, ruleEnd - ruleTrailing, y, ruleColor,
-                        alpha);
+                        alpha, ruleShift);
                 ruleStart = -1;
             }
             cursor += width;
@@ -1341,9 +1388,163 @@ final class LostTalesChatVisualStyle {
             }
         }
         if (ruleStart >= 0) {
-            drawRule(ruleStart, ruleEnd - ruleTrailing, y, ruleColor, alpha);
+            drawRule(ruleStart, ruleEnd - ruleTrailing, y, ruleColor, alpha,
+                    ruleShift);
         }
     }
+
+    /** Whether a run is drawn as an icon rather than as glyphs. */
+    private static boolean isIconRun(IChatComponent part, ChatEmoji emoji,
+                                     ChatShowcaseMarker.Data share) {
+        return emoji != null || share != null && share.icon
+                || ChatReplyMarker.isIconSlot(part)
+                || ChatChannelLinkMarker.isIconSlot(part);
+    }
+
+    /**
+     * The words of a row in the order the pass meets them: every piece of
+     * a run's text with ink in it, and every icon. The chevron and the
+     * markers are none.
+     */
+    private static int countWords(IChatComponent line, boolean chatOpen) {
+        int count = 0;
+        for (Object value : line) {
+            if (!(value instanceof IChatComponent)) {
+                continue;
+            }
+            IChatComponent part = (IChatComponent)value;
+            if (ChatPrefixMarker.isHidden(part, chatOpen)
+                    || ChatLayoutMarker.decode(part) != null
+                    || ChatStampMarker.isMarker(part)
+                    || ChatReactionMarker.isAddButton(part)
+                    || ChatReactionMarker.decode(part) != null
+                    || ChatBodyMarker.isMarker(part)) {
+                continue;
+            }
+            if (isIconRun(part, ChatEmojiMarker.decode(part),
+                    ChatShowcaseMarker.decode(part))) {
+                count++;
+                continue;
+            }
+            String text = part.getUnformattedTextForChat();
+            for (int start = 0; start < text.length();) {
+                int end = pieceEnd(text, start);
+                if (hasInk(text, start, end)) {
+                    count++;
+                }
+                start = end;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * A run's text drawn a word at a time, each where the row's motion
+     * has it, every piece carrying the formatting in force where it
+     * starts. Answers the index of the next word.
+     */
+    private static int drawWords(FontRenderer font, String rendered, int x,
+                                 int y, int argb, ChatRowMotion motion,
+                                 int word, int words) {
+        int next = word;
+        for (int start = 0; start < rendered.length();) {
+            int end = pieceEnd(rendered, start);
+            String before = rendered.substring(0, start);
+            GL11.glPushMatrix();
+            GL11.glTranslatef(motion.wordX(next, words), 0.0F, 0.0F);
+            font.drawString(activeCodes(before)
+                            + rendered.substring(start, end),
+                    x + font.getStringWidth(before), y, argb);
+            GL11.glPopMatrix();
+            if (hasInk(rendered, start, end)) {
+                next++;
+            }
+            start = end;
+        }
+        return next;
+    }
+
+    /**
+     * Where the piece starting at {@code start} ends: past the spaces
+     * before a word, the word with its formatting codes, and the spaces
+     * after it, so the next piece begins on a word.
+     */
+    private static int pieceEnd(String text, int start) {
+        int at = start;
+        while (at < text.length() && text.charAt(at) == ' ') {
+            at++;
+        }
+        while (at < text.length() && text.charAt(at) != ' ') {
+            at += text.charAt(at) == '\u00a7' && at + 1 < text.length() ? 2 : 1;
+        }
+        while (at < text.length() && text.charAt(at) == ' ') {
+            at++;
+        }
+        return at;
+    }
+
+    /** Whether text between the two places holds anything but spaces and codes. */
+    private static boolean hasInk(String text, int start, int end) {
+        for (int at = start; at < end; at++) {
+            char glyph = text.charAt(at);
+            if (glyph == '\u00a7') {
+                at++;
+            } else if (glyph != ' ') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The formatting codes in force at the end of {@code text}, as the
+     * font reads them: a colour clears the styles before it, a reset
+     * clears everything.
+     */
+    static String activeCodes(String text) {
+        String colour = "";
+        StringBuilder styles = new StringBuilder();
+        for (int at = 0; at + 1 < text.length(); at++) {
+            if (text.charAt(at) != '\u00a7') {
+                continue;
+            }
+            char code = Character.toLowerCase(text.charAt(at + 1));
+            if ("0123456789abcdef".indexOf(code) >= 0) {
+                colour = "\u00a7" + code;
+                styles.setLength(0);
+            } else if ("klmno".indexOf(code) >= 0) {
+                styles.append('\u00a7').append(code);
+            } else if (code == 'r') {
+                colour = "";
+                styles.setLength(0);
+            }
+            at++;
+        }
+        return colour + styles;
+    }
+
+    /**
+     * A shade lighter than {@code rgb}: the next step of its own ramp when
+     * it is a palette colour, else partway toward ivory.
+     */
+    static int lighterShadeOf(int rgb) {
+        int wanted = rgb & 0xFFFFFF;
+        for (String name : LostTalesColors.paletteNames()) {
+            if (LostTalesColors.rgb(LostTalesColors.paletteColor(name, 0))
+                    == wanted) {
+                String lighter = LostTalesColors.lighterStep(name);
+                if (lighter != null) {
+                    return LostTalesColors.rgb(
+                            LostTalesColors.paletteColor(lighter, 0));
+                }
+                break;
+            }
+        }
+        return blend(wanted, IVORY, LIGHTER_SHADE_SHARE);
+    }
+
+    /** How far toward ivory a colour off the palette is taken for its lighter shade. */
+    private static final float LIGHTER_SHADE_SHARE = 0.45F;
 
     /**
      * One reaction chip: a framed button holding the emoji at its native
@@ -1539,6 +1740,18 @@ final class LostTalesChatVisualStyle {
      * the shadow takes is under every glyph and every glyph's shadow, so
      * nothing of the line lies there for it to be laid over.
      */
+    private static void drawRule(int start, int end, int y, int color,
+                                 int alpha, float shift) {
+        if (shift == 0.0F) {
+            drawRule(start, end, y, color, alpha);
+            return;
+        }
+        GL11.glPushMatrix();
+        GL11.glTranslatef(shift, 0.0F, 0.0F);
+        drawRule(start, end, y, color, alpha);
+        GL11.glPopMatrix();
+    }
+
     private static void drawRule(int start, int end, int y, int color,
                                  int alpha) {
         if (end - 1 <= start) {

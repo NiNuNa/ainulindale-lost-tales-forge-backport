@@ -1,8 +1,14 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiEasing;
+import com.ninuna.losttales.client.motion.Motions;
+import com.ninuna.losttales.client.motion.MotionIds;
 
-/** Project-owned motion curves used by the Lost Tales chat presentation. */
+/**
+ * The chat's two entrances whose shape is its own: the newest message
+ * and the input bars. Their times and distances are their motions'
+ * ({@link MotionIds#CHAT_LINE_APPEAR}, {@link MotionIds#CHAT_BAR_APPEAR}).
+ */
 final class LostTalesChatMotion {
     private LostTalesChatMotion() {}
 
@@ -15,46 +21,33 @@ final class LostTalesChatMotion {
      * the motion is still finishing.
      */
     static MessageSample message(float progress) {
+        String id = MotionIds.CHAT_LINE_APPEAR;
+        float rise = Motions.param(id, "rise", 7.0F);
+        float slide = Motions.param(id, "slide", 14.0F);
+        float followThrough = Motions.param(id, "follow_through", 6.0F);
+        float fadeLead = Math.max(0.05F, Motions.param(id, "fade_lead", 0.58F));
         float p = clamp(progress);
         float settled = smoothStep(p);
-        float slideIn = -14.0F * (1.0F - settled) * (1.0F - settled);
-        float followThrough = 6.0F * (1.0F - p)
+        float slideIn = -slide * (1.0F - settled) * (1.0F - settled);
+        float swing = followThrough * (1.0F - p)
                 * (float)Math.sin(clamp((p - 0.35F) / 0.65F) * Math.PI);
         return new MessageSample(
-                7.0F * (1.0F - settled),
-                smoothStep(clamp(p / 0.58F)),
-                slideIn + followThrough);
+                rise * (1.0F - settled),
+                smoothStep(clamp(p / fadeLead)),
+                slideIn + swing);
     }
 
     /** Entry of the input bars: up from below with a brief overshoot. */
     static float inputOffset(float progress) {
+        String id = MotionIds.CHAT_BAR_APPEAR;
+        float distance = Motions.param(id, "distance", 13.0F);
+        float swing = Motions.param(id, "swing", 1.25F);
+        float swings = Motions.param(id, "swings", 2.5F);
         float p = clamp(progress);
         float settled = smoothStep(p);
-        float followThrough = (float)Math.sin(p * Math.PI * 2.5D)
+        float followThrough = (float)Math.sin(p * Math.PI * swings)
                 * (1.0F - p) * (1.0F - p);
-        return 13.0F * (1.0F - settled) + 1.25F * followThrough;
-    }
-
-    /**
-     * How long the shared scroll easing takes to cover most of the
-     * distance to its target: short enough to feel immediate, long
-     * enough to read as motion rather than a jump.
-     */
-    static final double SCROLL_EASE_SECONDS = 0.06D;
-
-    /**
-     * One step of the chat's shared scroll easing: the drawn value moves
-     * toward its target by an exponential share of the remaining
-     * distance, so the glide covers most of the gap in
-     * {@code easeSeconds} and looks the same at every frame rate. The
-     * elapsed time is capped so a long-hidden view steps rather than
-     * leaps. The history's per-view offset and the pickers' body scroll
-     * both step with this.
-     */
-    static double approach(double current, double target,
-                           double elapsedSeconds, double easeSeconds) {
-        return LostTalesGuiEasing.approach(current, target, elapsedSeconds,
-                easeSeconds);
+        return distance * (1.0F - settled) + swing * followThrough;
     }
 
     static float smoothStep(float value) {

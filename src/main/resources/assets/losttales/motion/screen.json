@@ -1,0 +1,32 @@
+{
+  "screen.open": {
+    "about": "A screen's content arriving as it opens: from start_x and start_y pixels off its place and start_scale of its size, into place. The chat's windows open on it too.",
+    "duration": 220,
+    "curve": "back_out",
+    "params": { "start_x": 0, "start_y": -14, "start_scale": 1 }
+  },
+  "screen.backdrop": {
+    "about": "The veil and blur behind a screen fading in.",
+    "duration": 150,
+    "curve": "ease_in_out"
+  },
+  "screen.control_bar": {
+    "about": "A screen's bottom control strip following its content in: waiting delay milliseconds, then rising travel pixels into place.",
+    "duration": 189,
+    "curve": "back_out",
+    "params": { "delay": 31, "travel": 24 }
+  },
+  "screen.journal.fold": {
+    "about": "The quest journal's categories folding and unfolding, and its search field growing out of the magnifier.",
+    "duration": 140,
+    "curve": "settle"
+  },
+  "screen.journal.scroll": {
+    "about": "The quest journal's lists and its reading marker gliding to where they were scrolled.",
+    "follow": 0.09
+  },
+  "screen.dialogue.glide": {
+    "about": "A quest conversation's replies gliding to bring the chosen one to the middle.",
+    "follow": 0.08
+  }
+}

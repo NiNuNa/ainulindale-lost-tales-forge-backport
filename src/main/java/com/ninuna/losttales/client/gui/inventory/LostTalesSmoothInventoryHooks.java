@@ -1,7 +1,8 @@
 package com.ninuna.losttales.client.gui.inventory;
 
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiEasing;
-import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.client.motion.Motions;
+import com.ninuna.losttales.client.motion.MotionIds;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
@@ -66,7 +67,7 @@ public final class LostTalesSmoothInventoryHooks {
             previous = current;
             return;
         }
-        if (!LostTalesConfig.enableSmoothInventoryMovement) {
+        if (Motions.travelNanos(MotionIds.INVENTORY_ITEM_SLIDE) <= 0L) {
             previous = current;
             motions.clear();
             pendingSources.clear();
@@ -163,14 +164,14 @@ public final class LostTalesSmoothInventoryHooks {
         }
     }
 
-    /** Exposed for deterministic tests and shared visual tuning. */
+    /** How far along its slide a stack is at {@code progress}, on its motion's curve. */
     public static float ease(float progress) {
-        return LostTalesGuiEasing.subtleBackOut(progress);
+        return Motions.curve(MotionIds.INVENTORY_ITEM_SLIDE).apply(progress);
     }
 
     private static Visual visualFor(
             GuiContainer screen, Slot slot, ItemStack stack) {
-        if (!LostTalesConfig.enableSmoothInventoryMovement
+        if (Motions.travelNanos(MotionIds.INVENTORY_ITEM_SLIDE) <= 0L
                 || screen == null || screen != currentScreen
                 || slot == null || stack == null
                 || stack != slot.getStack()) {
@@ -324,10 +325,8 @@ public final class LostTalesSmoothInventoryHooks {
     }
 
     private static float progress(Motion motion, long now) {
-        long duration = Math.max(40,
-                LostTalesConfig.smoothInventoryAnimationDurationMillis)
-                * 1000000L;
-        return LostTalesGuiEasing.clamp(
+        long duration = Motions.travelNanos(MotionIds.INVENTORY_ITEM_SLIDE);
+        return duration <= 0L ? 1.0F : LostTalesGuiEasing.clamp(
                 (now - motion.startedNanos) / (float)duration);
     }
 

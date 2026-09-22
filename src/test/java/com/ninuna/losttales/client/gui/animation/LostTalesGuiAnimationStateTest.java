@@ -1,27 +1,52 @@
 package com.ninuna.losttales.client.gui.animation;
 
+import com.ninuna.losttales.client.motion.MotionTestSettings;
+import com.ninuna.losttales.config.LostTalesConfig;
 import java.lang.reflect.Field;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+/** A screen's opening along its motion: frame-rate independent, and still under reduced motion. */
 public final class LostTalesGuiAnimationStateTest {
     private static final float EPSILON = 0.0001F;
+    private static final long MILLIS = 1000000L;
+
+    private MotionTestSettings settings;
+
+    @Before
+    public void setUp() {
+        this.settings = MotionTestSettings.reset();
+        MotionTestSettings.preview("{"
+                + "\"screen.open\": {\"duration\": 200, \"curve\": \"back_out\","
+                + " \"params\": {\"start_x\": 0, \"start_y\": -14,"
+                + " \"start_scale\": 1}},"
+                + "\"screen.backdrop\": {\"duration\": 150,"
+                + " \"curve\": \"ease_in_out\"}}");
+    }
+
+    @After
+    public void tearDown() {
+        this.settings.restore();
+    }
 
     @Test
     public void elapsedTimeClampsAndSettlesIndependentlyOfFrames()
             throws Exception {
-        LostTalesGuiAnimationState state =
-                new LostTalesGuiAnimationState();
+        LostTalesGuiAnimationState state = new LostTalesGuiAnimationState();
         long started = startedAt(state);
         LostTalesGuiAnimationSample halfway = state.sample(
-                started + 100000000L, 200, false);
+                started + 100L * MILLIS);
         LostTalesGuiAnimationSample settled = state.sample(
-                started + 900000000L, 200, false);
+                started + 900L * MILLIS);
 
         assertEquals(0.5F, halfway.getProgress(), EPSILON);
         assertTrue(halfway.getOpacity() > 0.0F);
+        // Half way along its curve the content has already swung past
+        // its place, and settles back onto it.
         assertTrue(halfway.getTranslationY() > 0.0F);
         assertEquals(1.0F, settled.getProgress(), EPSILON);
         assertEquals(0.0F, settled.getTranslationY(), EPSILON);
@@ -31,31 +56,30 @@ public final class LostTalesGuiAnimationStateTest {
 
     @Test
     public void reducedMotionRemovesSpatialMovement() throws Exception {
-        LostTalesGuiAnimationState state =
-                new LostTalesGuiAnimationState();
+        LostTalesConfig.reducedMotion = true;
+        LostTalesGuiAnimationState state = new LostTalesGuiAnimationState();
         long started = startedAt(state);
         LostTalesGuiAnimationSample sample = state.sample(
-                started + 50000000L, 200, true);
+                started + 50L * MILLIS);
 
         assertEquals(0.0F, sample.getTranslationY(), EPSILON);
         assertEquals(1.0F, sample.getScaleX(), EPSILON);
         assertEquals(1.0F, sample.getScaleY(), EPSILON);
+        // The veil still fades, briefly.
+        assertTrue(sample.getOpacity() > 0.0F);
     }
 
     @Test
-    public void openingUsesRestrainedFlyInAndSmallSettle()
-            throws Exception {
-        LostTalesGuiAnimationState state =
-                new LostTalesGuiAnimationState();
+    public void openingFliesInAndSettlesPastItsPlace() throws Exception {
+        LostTalesGuiAnimationState state = new LostTalesGuiAnimationState();
         long started = startedAt(state);
         LostTalesGuiAnimationSample entering = state.sample(
-                started + 30000000L, 300, false);
+                started + 20L * MILLIS);
         LostTalesGuiAnimationSample settle = state.sample(
-                started + 228000000L, 300, false);
+                started + 150L * MILLIS);
 
         assertTrue(entering.getTranslationY() < 0.0F);
         assertEquals(1.0F, entering.getScaleX(), EPSILON);
-        assertEquals(1.0F, entering.getScaleY(), EPSILON);
         assertTrue(settle.getTranslationY() > 0.0F);
         assertTrue(settle.getTranslationY() < 1.0F);
     }
@@ -72,13 +96,10 @@ public final class LostTalesGuiAnimationStateTest {
     @Test
     public void preservedBackdropStaysSettledAcrossScreenChanges()
             throws Exception {
-        LostTalesGuiAnimationState state =
-                new LostTalesGuiAnimationState();
+        LostTalesGuiAnimationState state = new LostTalesGuiAnimationState();
         state.restart(true);
         long started = startedAt(state);
-        LostTalesGuiAnimationSample opening = state.sample(
-                started, 220, 150, false,
-                "BACK", "DOWN", 1.0F);
+        LostTalesGuiAnimationSample opening = state.sample(started);
 
         assertEquals(0.0F, opening.getProgress(), EPSILON);
         assertEquals(1.0F, opening.getBackdropProgress(), EPSILON);

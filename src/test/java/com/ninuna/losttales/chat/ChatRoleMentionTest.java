@@ -38,8 +38,6 @@ public final class ChatRoleMentionTest {
             assertFalse(role.isNone());
             assertTrue(role.isMentionable());
             assertTrue(role.getDisplayName().length() > 0);
-            // The plain name is its own, never the bracketed tag.
-            assertFalse(role.getDisplayName().equals(role.getDisplayTag()));
         }
         assertTrue(roles.contains(ChatRoleFixtures.OPERATOR));
         // A vanity mark is worn and never called.
@@ -47,8 +45,7 @@ public final class ChatRoleMentionTest {
         assertFalse(roles.contains(ChatAccountRole.TEAM));
         assertFalse(ChatAccountRole.NONE.isMentionable());
         assertEquals("", ChatAccountRole.NONE.getNameKey());
-        // Wearing it is untouched: it still tags and colours a name.
-        assertTrue(ChatAccountRole.TEAM.getTagKey().length() > 0);
+        // Wearing it is untouched: it still colours a name.
         assertEquals(ChatAccountRole.TEAM, ChatAccountRole.primary(
                 ChatAccountRole.maskOf(ChatAccountRole.TEAM)));
     }

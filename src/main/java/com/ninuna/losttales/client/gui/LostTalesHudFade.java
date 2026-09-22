@@ -1,8 +1,8 @@
 package com.ninuna.losttales.client.gui;
 
-import com.ninuna.losttales.client.gui.animation.LostTalesUiEasing;
-import com.ninuna.losttales.client.gui.animation.LostTalesUiTransition;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.client.motion.MotionIds;
+import com.ninuna.losttales.client.motion.MotionTransition;
 import java.nio.ByteBuffer;
 import java.util.EnumSet;
 import java.util.Set;
@@ -47,8 +47,8 @@ public final class LostTalesHudFade {
             ElementType.DEBUG, ElementType.TEXT, ElementType.CHAT,
             ElementType.PLAYER_LIST);
 
-    private static final LostTalesUiTransition TRANSITION =
-            new LostTalesUiTransition();
+    private static final MotionTransition TRANSITION =
+            new MotionTransition(MotionIds.HUD_CHAT_HIDE);
     /** How much of the HUD shows this frame: 1 fully, 0 not at all. */
     private static float shown = 1.0F;
     private static int texture = -1;
@@ -177,11 +177,7 @@ public final class LostTalesHudFade {
     private static void beginFrame(Minecraft minecraft) {
         captured = false;
         captureFailed = false;
-        int duration = LostTalesConfig.enableChatAnimations
-                ? Math.max(1, LostTalesConfig.chatInputAnimationDurationMillis)
-                : 0;
-        TRANSITION.advance(System.nanoTime(), !chatWantsWorld(minecraft),
-                duration, LostTalesUiEasing.SMOOTH);
+        TRANSITION.advance(System.nanoTime(), !chatWantsWorld(minecraft));
         shown = TRANSITION.clamped();
     }
 

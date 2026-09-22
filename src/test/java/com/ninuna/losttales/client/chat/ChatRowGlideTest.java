@@ -1,6 +1,8 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.client.motion.Motions;
+import com.ninuna.losttales.client.motion.MotionIds;
 import java.util.Arrays;
 import java.util.List;
 import net.minecraft.client.gui.ChatLine;
@@ -25,13 +27,13 @@ public final class ChatRowGlideTest {
     private static final int LINE = ChatStackRows.LINE_HEIGHT;
     private static final long START = 1000000000L;
     private static final long DURATION =
-            LostTalesConfig.chatAnimationDurationMillis * 1000000L;
+            Motions.travelNanos(MotionIds.CHAT_ROW_MOVE);
     private static final int OLDER = 11;
     private static final int NEWER = 12;
 
     @After
     public void restoreAnimations() {
-        LostTalesConfig.enableChatAnimations = true;
+        LostTalesConfig.animations = true;
     }
 
     @Test
@@ -115,7 +117,7 @@ public final class ChatRowGlideTest {
 
     @Test
     public void nothingGlidesWithAnimationsOff() {
-        LostTalesConfig.enableChatAnimations = false;
+        LostTalesConfig.animations = false;
         ChatRowGlide glide = new ChatRowGlide();
         lay(glide, START, row(NEWER, "a b c d"), row(OLDER, "hello"));
         lay(glide, START, row(NEWER, "c d"), row(NEWER, "a b"),

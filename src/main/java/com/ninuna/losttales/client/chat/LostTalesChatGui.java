@@ -10,6 +10,7 @@ import com.ninuna.losttales.client.gui.LostTalesPointerOwner;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiRegionBlur;
+import com.ninuna.losttales.client.input.LostTalesKeyPress;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
@@ -289,8 +290,9 @@ public final class LostTalesChatGui extends GuiChat
 
     /**
      * Who is typing into the window's front tab, in the gap between the
-     * history and the bar: one or two names, three names, or a count
-     * past that. Nothing is drawn while nobody is.
+     * history and the bar: one to three names, or a count past that,
+     * closed by the pulsing dots ({@link ChatTypingLine}). Nothing is
+     * drawn while nobody is.
      */
     private void drawTypingLine(ChatWindow window, ChatWindowFrame frame,
                                 LostTalesGuiAnimationSample opening,
@@ -305,23 +307,6 @@ public final class LostTalesChatGui extends GuiChat
         List<String> names = ClientChatTypingState.namesTyping(front);
         if (names.isEmpty()) {
             return;
-        }
-        String text;
-        if (names.size() == 1) {
-            text = StatCollector.translateToLocalFormatted(
-                    "gui.losttales.chat.typing.one", names.get(0));
-        } else if (names.size() == 2) {
-            text = StatCollector.translateToLocalFormatted(
-                    "gui.losttales.chat.typing.two", names.get(0),
-                    names.get(1));
-        } else if (names.size() == 3) {
-            text = StatCollector.translateToLocalFormatted(
-                    "gui.losttales.chat.typing.three", names.get(0),
-                    names.get(1), names.get(2));
-        } else {
-            text = StatCollector.translateToLocalFormatted(
-                    "gui.losttales.chat.typing.many",
-                    String.valueOf(names.size()));
         }
         // The trailing strip belongs to the typing line only while the
         // view rests on the newest message; a view scrolled back hands
@@ -355,15 +340,17 @@ public final class LostTalesChatGui extends GuiChat
         bubble.drawWithShadow(x, y + LostTalesChatOverlayRenderer
                 .centredBoxTop(bubble.getHeight()), alpha);
         int textX = x + bubble.getWidth() + TYPING_BUBBLE_GAP;
-        LostTalesChatVisualStyle.drawColored(this.fontRendererObj,
-                "§o" + this.fontRendererObj.trimStringToWidth(text,
-                        room - (textX - x)),
-                textX, y, LostTalesChatVisualStyle.asideRgb(), alpha);
+        ChatTypingLine.draw(this.fontRendererObj, ChatTypingLine.words(names),
+                textX, y, room - (textX - x), alpha, System.nanoTime());
     }
 
     @Override
     protected void keyTyped(char typedChar, int keyCode) {
-        if (handleSnapKey(keyCode)) {
+        // A press that types a character types it. Every shortcut here
+        // takes a press that types nothing, so no symbol a keyboard
+        // layout puts under Alt Gr is lost to the shortcut on its key.
+        LostTalesKeyPress press = LostTalesKeyPress.read(typedChar, keyCode);
+        if (handleSnapKey(press)) {
             return;
         }
         // Vanilla's own rule: any key ends a pending completion request,
@@ -395,17 +382,17 @@ public final class LostTalesChatGui extends GuiChat
             this.gestures.cancelDrags();
             return;
         }
-        // A searchable list takes plain typing while it is open; the
-        // shortcuts that act on the chat still reach past it.
-        if (!isCtrlKeyDown()
-                && this.menus.handleKeyTyped(typedChar, keyCode)) {
+        // A list that is typed into takes the keys while it is open, and
+        // only the chat's own Ctrl shortcuts reach past it.
+        if (this.menus.handleKeyTyped(press)) {
+            syncChatIdentity();
             return;
         }
         // Ctrl+F opens the search over the window being typed in, and
         // while its field holds the keys they are its own: Enter walks
         // the matches down and Shift+Enter up, Escape closes it, and
         // everything else is typed into it.
-        if (isCtrlKeyDown() && keyCode == Keyboard.KEY_F) {
+        if (press.isCommand(Keyboard.KEY_F)) {
             openSearch();
             return;
         }
@@ -423,14 +410,13 @@ public final class LostTalesChatGui extends GuiChat
         // Ctrl+N is the + control by keyboard, and Ctrl+Shift+A the
         // search panel: both mean something with nothing open, since
         // both are ways back to a channel.
-        if (isCtrlKeyDown() && isShiftKeyDown()
-                && keyCode == Keyboard.KEY_A) {
+        if (press.isCommand(Keyboard.KEY_A) && press.shift) {
             this.menus.openSearchPanel(ChatWindowLayout.windowOf(
                     ClientChatChannelState.getSelected()), null,
                     emptyPlusAnchor());
             return;
         }
-        if (isCtrlKeyDown() && keyCode == Keyboard.KEY_N) {
+        if (press.isCommand(Keyboard.KEY_N)) {
             this.menus.openChannelMenu(emptyPlusAnchor());
             return;
         }
@@ -447,28 +433,29 @@ public final class LostTalesChatGui extends GuiChat
         // selected window's, and Ctrl+W closes the selected one: none of
         // them clashes with autocomplete, so all work with text in the
         // field (drafts belong to their tabs).
-        if (isCtrlKeyDown() && keyCode == Keyboard.KEY_TAB) {
-            this.tabActions.selectChannel(ClientChatChannelState.cycleAll(isShiftKeyDown()));
+        if (press.isCommand(Keyboard.KEY_TAB)) {
+            this.tabActions.selectChannel(
+                    ClientChatChannelState.cycleAll(press.shift));
             return;
         }
-        if (isCtrlKeyDown() && keyCode == Keyboard.KEY_RIGHT) {
+        if (press.isCommand(Keyboard.KEY_RIGHT)) {
             this.tabActions.selectChannel(ClientChatChannelState.cycle());
             return;
         }
-        if (isCtrlKeyDown() && keyCode == Keyboard.KEY_LEFT) {
+        if (press.isCommand(Keyboard.KEY_LEFT)) {
             this.tabActions.selectChannel(ClientChatChannelState.cycleBack());
             return;
         }
         // Ctrl+1 to Ctrl+8 pick the selected window's tabs by place and
         // Ctrl+9 its last, as a browser's do; the digits are the main
         // row's, which sit together in the keyboard's own numbering.
-        if (isCtrlKeyDown() && keyCode >= Keyboard.KEY_1
+        if (press.command && keyCode >= Keyboard.KEY_1
                 && keyCode <= Keyboard.KEY_9) {
             this.tabActions.selectChannel(ClientChatChannelState.selectOrdinal(
                     keyCode - Keyboard.KEY_1 + 1));
             return;
         }
-        if (isCtrlKeyDown() && keyCode == Keyboard.KEY_W) {
+        if (press.isCommand(Keyboard.KEY_W)) {
             this.tabActions.closeMarkedOrActiveTabs();
             return;
         }
@@ -523,7 +510,7 @@ public final class LostTalesChatGui extends GuiChat
             this.completion.completeInput();
             return;
         }
-        if (refusesCharacter(typedChar, keyCode)) {
+        if (refusesCharacter(press)) {
             return;
         }
         super.keyTyped(typedChar, keyCode);
@@ -760,13 +747,13 @@ public final class LostTalesChatGui extends GuiChat
     }
 
     /**
-     * A printable character typed into a message already at the limit
-     * is refused outright, so the counter's ceiling is a wall, not a
-     * warning. Control keys, shortcuts and commands pass.
+     * A character typed into a message already at the limit is refused
+     * outright, so the counter's ceiling is a wall, not a warning.
+     * Shortcuts, commands and a press over a selection pass.
      */
-    private boolean refusesCharacter(char typedChar, int keyCode) {
-        if (isCommand() || !ChatAllowedCharacters.isAllowedCharacter(typedChar)
-                || isCtrlKeyDown()
+    private boolean refusesCharacter(LostTalesKeyPress press) {
+        if (isCommand() || !press.types
+                || !ChatAllowedCharacters.isAllowedCharacter(press.character)
                 || this.inputField.getSelectedText().length() > 0) {
             return false;
         }
@@ -1132,10 +1119,12 @@ public final class LostTalesChatGui extends GuiChat
      * an arrow sends it on through the parts of the screen as the
      * desktop's Windows key does ({@link ChatSnapKeys}), and Alt+Z opens
      * its snap layouts, which the arrows then walk, Enter takes and
-     * Escape — or Alt+Z again — puts away. Alt Gr, which a keyboard
-     * layout may need for its characters, is left alone.
+     * Escape — or Alt+Z again — puts away. A press that types a
+     * character, as Alt Gr and a Mac's Option do, is typing, not
+     * snapping.
      */
-    private boolean handleSnapKey(int keyCode) {
+    private boolean handleSnapKey(LostTalesKeyPress press) {
+        int keyCode = press.key;
         if (this.snapFlyout.isKeyboardOpen()) {
             ChatSnapKeys.Direction walk = ChatSnapKeys.direction(keyCode);
             if (walk != null) {
@@ -1156,9 +1145,7 @@ public final class LostTalesChatGui extends GuiChat
                 return true;
             }
         }
-        boolean alt = Keyboard.isKeyDown(Keyboard.KEY_LMENU)
-                || Keyboard.isKeyDown(Keyboard.KEY_RMENU);
-        if (!alt || isCtrlKeyDown() || this.gestures.isDragging()) {
+        if (!press.alt || this.gestures.isDragging()) {
             return false;
         }
         ChatWindow window = ChatWindowLayout.windowOf(

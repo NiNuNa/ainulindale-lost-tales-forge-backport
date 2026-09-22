@@ -30,13 +30,13 @@ public final class LostTalesCommandRoleGrantGuardTest {
         for (LostTalesCapability capability : capabilities) {
             grants.add(capability.getId());
         }
-        return ChatAccountRole.custom("moderator", "Moderator", "", "",
+        return ChatAccountRole.custom("moderator", "Moderator", "",
                 0xA94B54, true, 15, null, grants);
     }
 
     /** A role granting a configured permission is refused the same way. */
     private static ChatAccountRole grantingPermission(String permissionId) {
-        return ChatAccountRole.custom("moderator", "Moderator", "", "",
+        return ChatAccountRole.custom("moderator", "Moderator", "",
                 0xA94B54, true, 15, null,
                 new LinkedHashSet<String>(Arrays.asList(permissionId)));
     }
@@ -86,7 +86,7 @@ public final class LostTalesCommandRoleGrantGuardTest {
     public void aRoleThatGrantsNothingIsWithheldFromNobody() {
         assertNull(LostTalesCommandRole.withheldGrant(
                 FakeCommandSender.player("Someone"),
-                ChatAccountRole.custom("herald", "Herald", "", "", 0x112233,
+                ChatAccountRole.custom("herald", "Herald", "", 0x112233,
                         true, 30, null, null)));
     }
 

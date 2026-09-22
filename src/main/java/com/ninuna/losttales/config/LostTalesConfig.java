@@ -178,7 +178,7 @@ public final class LostTalesConfig {
      */
     static final String DEFAULT_CHAT_BACKGROUND_COLOR = "PLUM_BLACK";
     static final String DEFAULT_CHAT_SELECTED_LINE_COLOR = "PLUM_GRAY";
-    static final String DEFAULT_CHAT_MENTION_LINE_COLOR = "ORCHID";
+    static final String DEFAULT_CHAT_MENTION_LINE_COLOR = "CORAL";
     static final String DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR = "APRICOT";
     /**
      * A colour option's value that follows another colour instead of
@@ -226,7 +226,18 @@ public final class LostTalesConfig {
      * screen is open, leaving the world and the chat.
      */
     public static boolean hideHudWhileChatting = true;
-    public static boolean enableChatAnimations = true;
+    /**
+     * Whether anything of the mod's moves: every screen, HUD panel and
+     * chat motion. Off, everything stands where it ends.
+     */
+    public static boolean animations = true;
+    /** How fast every motion plays: 2 is twice as fast, 0.5 half as fast. */
+    public static double animationSpeed = 1.0D;
+    /**
+     * Motion kept to short fades: nothing travels, overshoots, anticipates
+     * or stretches.
+     */
+    public static boolean reducedMotion = false;
     /**
      * Developer aid: a local PNG drawn on the local player instead of the
      * account skin, with a chosen arm width. Empty path disables it.
@@ -277,27 +288,23 @@ public final class LostTalesConfig {
     public static String[] chatChannelIcons = new String[0];
     /**
      * The server's Discord bridge; read on the server only. The token
-     * and the webhook URL are secrets: they stay in this file and are
-     * never logged or sent to a client.
+     * and the webhook addresses in the links are secrets: they stay in
+     * this file and are never logged, shown or sent to a client.
      */
     public static boolean discordEnabled;
     public static String discordBotToken = "";
     public static int discordPollIntervalSeconds = 3;
     /**
-     * The bindings a fresh file offers: OOC &amp; Discord and Global, each
-     * switched off until its channel and webhook are filled in.
+     * The links, one entry per Discord channel a game channel goes to
+     * ({@code DiscordChannelBindings}); none in a fresh file, since a
+     * link is made by a code with {@code /losttales discord link}.
      */
-    private static final String[] DEFAULT_DISCORD_BINDINGS = {
-            "ooc=DISABLED;channel=;webhook=",
-            "all=DISABLED;webhook=",
-    };
-    /** One entry per bound game channel. See {@code DiscordChannelBindings}. */
-    public static String[] discordChannelBindings = DEFAULT_DISCORD_BINDINGS.clone();
+    public static String[] discordChannelBindings = new String[0];
     /** The picture a post carries: {name}/{uuid} of the sender's account. */
     public static String discordAvatarUrlTemplate =
             "https://mc-heads.net/head/{name}/64";
-    /** Post server start/stop and player join/leave notices to the webhook. */
-    public static boolean discordServerEvents = true;
+    /** Post player join and leave notices to OOC's Discord channels. */
+    public static boolean discordJoinsAndLeaves = true;
     /** Post every player death message to the webhook. */
     public static boolean discordDeathMessages = true;
     /** Post vanilla and LOTR achievement announcements to the webhook. */
@@ -311,29 +318,13 @@ public final class LostTalesConfig {
     public static boolean discordSlashCommands = true;
     /** How the profanity list's words read in what the bridge posts: a {@link ChatProfanityMode} name. */
     public static String discordProfanityFilter = ChatProfanityMode.OFF.name();
-    public static int chatAnimationDurationMillis = 180;
-    public static int chatInputAnimationDurationMillis = 180;
-    public static int chatSelectorAnimationDurationMillis = 140;
 
-    /** Client-only general GUI motion and background preferences. */
-    public static boolean enableGuiAnimations = true;
-    public static int guiAnimationDurationMillis = 220;
-    public static double guiAnimationScale = 1.0D;
-    /** The foreground's easing styles, as the option names them. */
-    static final String[] GUI_EASING_STYLES = {"BACK", "CUBIC", "SMOOTH"};
-    public static String guiAnimationEasingStyle = GUI_EASING_STYLES[0];
-    /** Where the foreground flies in toward its place from, or nowhere. */
-    static final String[] GUI_DIRECTIONS = {"DOWN", "UP", "LEFT", "RIGHT", "NONE"};
-    public static String guiAnimationDirection = GUI_DIRECTIONS[0];
-    public static boolean reducedGuiMotion = false;
+    /** Client-only screen background preferences. */
     public static boolean enableGuiBackground = true;
     public static double guiBackgroundOpacity = 0.65D;
-    public static int guiBackgroundFadeTimeMillis = 150;
     public static boolean guiAlwaysBlur = false;
     public static boolean enableGuiBackgroundBlur = true;
     public static double guiBlurStrength = 4.5D;
-    public static boolean enableSmoothInventoryMovement = true;
-    public static int smoothInventoryAnimationDurationMillis = 140;
 
     public static boolean enableQuestPrerequisites = true;
     public static boolean enableQuestRewards = true;
@@ -1050,7 +1041,7 @@ public final class LostTalesConfig {
                     "definitions",
                     CATEGORY_ROLES,
                     new String[] {ChatRoleConfig.DEFAULT_OPERATOR_ENTRY},
-                    "The chat roles, one per line as <id>=name:<text>;tag:<[Text]>;color:<RRGGBB>;mention:<true|false>;rank:<number>;op:<level>;faction:<FACTION>@<rank>;grant:<permission>;desc:<text>. Every option is optional: a role is held by the accounts and characters listed under members, by anyone with the op level, and by anyone whose played identity holds the LOTR faction rank (a rank code name such as gondor.knight, or an alignment number). Lower rank comes first and colours the name; rank never grants anything. grant names a permission from the permissions list, or a capability directly; it may repeat, and one naming neither is kept and allows nothing until a permission of that id is defined. The operator entry a fresh file starts with is a role like any other; the Lost Tales Team mark is the code's alone and cannot be listed. Edit live from the Server Settings screen or /losttales role."
+                    "The chat roles, one per line as <id>=name:<text>;color:<RRGGBB>;mention:<true|false>;rank:<number>;op:<level>;faction:<FACTION>@<rank>;grant:<permission>;desc:<text>. Every option is optional: a role is held by the accounts and characters listed under members, by anyone with the op level, and by anyone whose played identity holds the LOTR faction rank (a rank code name such as gondor.knight, or an alignment number). Lower rank comes first and colours the name; rank never grants anything. grant names a permission from the permissions list, or a capability directly; it may repeat, and one naming neither is kept and allows nothing until a permission of that id is defined. The operator entry a fresh file starts with is a role like any other; the Lost Tales Team mark is the code's alone and cannot be listed. Edit live from the Server Settings screen or /losttales role."
             );
             chatRoleMembers = config.getStringList(
                     "members",
@@ -1081,7 +1072,7 @@ public final class LostTalesConfig {
                     "enabled",
                     CATEGORY_DISCORD,
                     discordEnabled,
-                    "Server only: bridge game channels to Discord text channels as channelBindings says, game to Discord through webhooks and Discord to game by polling with a bot. OOC & Discord exists for players whether or not this is on; the switch only says whether anything crosses."
+                    "Server only: run the Discord bridge. The links in channelBindings carry game channels to Discord text channels and back: game to Discord through webhooks the bot makes, Discord to game through the bot's gateway, read by polling while it is down. With the bot's slash commands on it runs before the first link, so channels can be linked with /losttales discord link. Every channel exists for players whether or not this is on; the switch only says whether anything crosses."
             );
             discordBotToken = config.getString(
                     "botToken",
@@ -1100,8 +1091,8 @@ public final class LostTalesConfig {
             Property bindingsProperty = config.get(
                     CATEGORY_DISCORD,
                     "channelBindings",
-                    DEFAULT_DISCORD_BINDINGS,
-                    "Server only, secrets: one entry per game channel and Discord channel it goes to, as <channel>=<direction>;channel=<Discord channel id>;webhook=<webhook URL>. A game channel may have several entries, one per Discord channel, in any guild the bot is in; a Discord channel is read into one game channel only. The channel is a wire id (all, proximity, faction, ooc, admin; ooc is OOC & Discord, the channel the bridge carries by default) or faction:<faction id> for one faction's Faction chat, with the id as LOTR names it (faction:lotr:gondor); the direction is DISABLED, GAME_TO_DISCORD, DISCORD_TO_GAME or BIDIRECTIONAL. channel= is needed to read, webhook= to post. Party, Console and whispers are private and refused."
+                    new String[0],
+                    "Server only, secrets: the links between game channels and Discord channels. Make one with /losttales discord link <channel> in the game, which gives a code, and /link code:<code> in the Discord channel, where the bot makes the channel's webhook itself; take one away with /losttales discord unlink or /unlink. Each entry is <channel>=<direction>;channel=<Discord channel id>;webhook=<webhook address>: a game channel may be linked to several Discord channels, in any Discord server the bot is in, while a Discord channel holds one game channel only. The channel is a wire id (all, proximity, ooc, admin, or a server's own) or faction:<faction id> for one faction's chat (faction:lotr:gondor); the direction is DISABLED, GAME_TO_DISCORD, DISCORD_TO_GAME or BIDIRECTIONAL. Party, the consoles and whispers are private and refused. Kept off the Server Settings screen and /losttales config, since a webhook address lets whoever holds it post into its channel."
             );
             discordChannelBindings = bindingsProperty.getStringList();
             discordAvatarUrlTemplate = config.getString(
@@ -1110,23 +1101,23 @@ public final class LostTalesConfig {
                     discordAvatarUrlTemplate,
                     "Server only: the https URL of the picture a Discord post carries, with {name} and/or {uuid} replaced by the sender's Minecraft account (the default is an isometric head; https://mc-heads.net/avatar/{name}/64 is the flat face); empty shows the webhook's own picture."
             );
-            discordServerEvents = config.getBoolean(
-                    "serverEvents",
+            discordJoinsAndLeaves = config.getBoolean(
+                    "joinsAndLeaves",
                     CATEGORY_DISCORD,
-                    discordServerEvents,
-                    "Server only: post a notice when the server starts or shuts down and when a player joins or leaves, to every Discord channel a binding posts to, once each."
+                    discordJoinsAndLeaves,
+                    "Server only: post a notice when a player joins or leaves, naming the account, to the Discord channels linked to OOC, as the game says it there."
             );
             discordDeathMessages = config.getBoolean(
                     "deathMessages",
                     CATEGORY_DISCORD,
                     discordDeathMessages,
-                    "Server only: post every player's death message, worded exactly as the game announces it, to every Discord channel a binding posts to, once each."
+                    "Server only: post every player's death message, worded exactly as the game announces it in Global, to the Discord channels linked to Global."
             );
             discordAchievements = config.getBoolean(
                     "achievements",
                     CATEGORY_DISCORD,
                     discordAchievements,
-                    "Server only: post vanilla and Middle-earth achievement announcements, worded exactly as the game announces them, to every Discord channel a binding posts to, once each."
+                    "Server only: post vanilla and Middle-earth achievement announcements, worded exactly as the game announces them in Global, to the Discord channels linked to Global."
             );
             discordChannelStatus = config.getBoolean(
                     "channelStatus",
@@ -1152,7 +1143,7 @@ public final class LostTalesConfig {
                     "slashCommands",
                     CATEGORY_DISCORD,
                     discordSlashCommands,
-                    "Server only: register the bot's slash commands (/online, /who, /server) in every guild the bot is in when the gateway connects, and answer them. Needs gateway."
+                    "Server only: register the bot's slash commands (/link, /unlink, /online, /who, /server) in every guild the bot is in as the gateway sees it, and answer them; /online, /who and /server answer only in linked channels. Linking a channel needs them. Needs gateway."
             );
             Property discordProfanityProperty = config.get(
                     CATEGORY_DISCORD, "profanityFilter", discordProfanityFilter,
@@ -1344,71 +1335,20 @@ public final class LostTalesConfig {
                     "showChatSpeechBubbles",
                     CATEGORY_CLIENT,
                     showChatSpeechBubbles,
-                    "Show what a player says in character over their head, the way LOTR shows an NPC's speech, as far as the server's Proximity radius. In-character channels only (Global, Proximity, Party, Faction and whispers); never OOC & Discord, the operator channel or the console."
+                    "Show what a player says in character over their head, the way LOTR shows an NPC's speech, as far as the server's Proximity radius. In-character channels only (Global, Proximity, Party, Faction and whispers); never OOC, the operator channel or the consoles."
             );
-            enableChatAnimations = config.getBoolean(
-                    "enableChatAnimations",
-                    CATEGORY_CLIENT,
-                    enableChatAnimations,
-                    "Use subtle time-based message, input-bar, and channel-selector animations."
+            animations = config.getBoolean(
+                    "animations", CATEGORY_CLIENT, animations,
+                    "Let the mod's screens, HUD and chat move. Off, everything stands where it ends. How each motion looks is in the motion files (assets/losttales/motion, tuned in the Motion Lab)."
             );
-            chatAnimationDurationMillis = config.getInt(
-                    "chatAnimationDurationMillis",
-                    CATEGORY_CLIENT,
-                    chatAnimationDurationMillis,
-                    60,
-                    1000,
-                    "Duration of player-message entry easing in milliseconds."
+            animationSpeed = getBoundedDouble(
+                    config, CATEGORY_CLIENT, "animationSpeed",
+                    animationSpeed, 0.25D, 4.0D,
+                    "How fast every motion plays: 2 is twice as fast, 0.5 half as fast."
             );
-            chatInputAnimationDurationMillis = config.getInt(
-                    "chatInputAnimationDurationMillis",
-                    CATEGORY_CLIENT,
-                    chatInputAnimationDurationMillis,
-                    60,
-                    1000,
-                    "Duration of the chat input bars' opening animation in milliseconds."
-            );
-            chatSelectorAnimationDurationMillis = config.getInt(
-                    "chatSelectorAnimationDurationMillis",
-                    CATEGORY_CLIENT,
-                    chatSelectorAnimationDurationMillis,
-                    60,
-                    1000,
-                    "Duration of the upward channel-selector opening animation in milliseconds."
-            );
-            enableGuiAnimations = config.getBoolean(
-                    "enableGuiAnimations", CATEGORY_CLIENT,
-                    enableGuiAnimations,
-                    "Apply safe elapsed-time opening transitions to compatible GUI screens."
-            );
-            guiAnimationDurationMillis = config.getInt(
-                    "guiAnimationDurationMillis", CATEGORY_CLIENT,
-                    guiAnimationDurationMillis, 10, 1000,
-                    "Duration of compatible GUI foreground opening animations in milliseconds."
-            );
-            guiAnimationScale = getBoundedDouble(
-                    config, CATEGORY_CLIENT, "guiAnimationScale",
-                    guiAnimationScale, 0.5D, 3.0D,
-                    "Starting scale of the foreground animation. 1.0 keeps pixel art at its native size."
-            );
-            Property guiEasingProperty = config.get(
-                    CATEGORY_CLIENT, "guiAnimationEasingStyle",
-                    guiAnimationEasingStyle,
-                    "Foreground easing style: BACK, CUBIC, or SMOOTH.");
-            guiEasingProperty.setValidValues(GUI_EASING_STYLES);
-            guiAnimationEasingStyle = normalizeGuiEasing(
-                    guiEasingProperty.getString());
-            Property guiDirectionProperty = config.get(
-                    CATEGORY_CLIENT, "guiAnimationDirection",
-                    guiAnimationDirection,
-                    "Direction the foreground flies toward its resting position: DOWN, UP, LEFT, RIGHT, or NONE.");
-            guiDirectionProperty.setValidValues(GUI_DIRECTIONS);
-            guiAnimationDirection = normalizeGuiDirection(
-                    guiDirectionProperty.getString());
-            reducedGuiMotion = config.getBoolean(
-                    "reducedGuiMotion", CATEGORY_CLIENT,
-                    reducedGuiMotion,
-                    "Remove spatial foreground and control-bar movement and shorten the foreground transition."
+            reducedMotion = config.getBoolean(
+                    "reducedMotion", CATEGORY_CLIENT, reducedMotion,
+                    "Keep motion to short fades: nothing travels, overshoots, anticipates or stretches."
             );
             enableGuiBackground = config.getBoolean(
                     "enableGuiBackground", CATEGORY_CLIENT,
@@ -1419,11 +1359,6 @@ public final class LostTalesConfig {
                     config, CATEGORY_CLIENT, "guiBackgroundOpacity",
                     guiBackgroundOpacity, 0.0D, 1.0D,
                     "Final opacity of the GUI's black background veil."
-            );
-            guiBackgroundFadeTimeMillis = config.getInt(
-                    "guiBackgroundFadeTimeMillis", CATEGORY_CLIENT,
-                    guiBackgroundFadeTimeMillis, 0, 800,
-                    "Duration of the background darkness and blur fade in milliseconds."
             );
             guiAlwaysBlur = config.getBoolean(
                     "guiAlwaysBlur", CATEGORY_CLIENT,
@@ -1439,17 +1374,6 @@ public final class LostTalesConfig {
                     config, CATEGORY_CLIENT, "guiBlurStrength",
                     guiBlurStrength, 0.0D, 8.0D,
                     "Background blur radius. Blur failure falls back to the normal GUI background."
-            );
-            enableSmoothInventoryMovement = config.getBoolean(
-                    "enableSmoothInventoryMovement", CATEGORY_CLIENT,
-                    enableSmoothInventoryMovement,
-                    "Animate item stacks smoothly between inventory slots."
-            );
-            smoothInventoryAnimationDurationMillis = config.getInt(
-                    "smoothInventoryAnimationDurationMillis",
-                    CATEGORY_CLIENT,
-                    smoothInventoryAnimationDurationMillis, 40, 600,
-                    "Duration of inventory item movement in milliseconds."
             );
             playQuestSounds = config.getBoolean(
                     "playQuestSounds",
@@ -2173,57 +2097,22 @@ public final class LostTalesConfig {
         profanityProperty.setValidValues(ChatProfanityMode.names());
         config.get(CATEGORY_CLIENT, "hideHudWhileChatting",
                 hideHudWhileChatting).set(hideHudWhileChatting);
-        config.get(CATEGORY_CLIENT, "enableChatAnimations",
-                enableChatAnimations).set(enableChatAnimations);
-        config.get(CATEGORY_CLIENT, "chatAnimationDurationMillis",
-                chatAnimationDurationMillis).set(
-                chatAnimationDurationMillis);
-        config.get(CATEGORY_CLIENT, "chatInputAnimationDurationMillis",
-                chatInputAnimationDurationMillis).set(
-                chatInputAnimationDurationMillis);
-        config.get(CATEGORY_CLIENT,
-                "chatSelectorAnimationDurationMillis",
-                chatSelectorAnimationDurationMillis).set(
-                chatSelectorAnimationDurationMillis);
-        config.get(CATEGORY_CLIENT, "enableGuiAnimations",
-                enableGuiAnimations).set(enableGuiAnimations);
-        config.get(CATEGORY_CLIENT, "guiAnimationDurationMillis",
-                guiAnimationDurationMillis).set(
-                guiAnimationDurationMillis);
-        config.get(CATEGORY_CLIENT, "guiAnimationScale",
-                guiAnimationScale).set(guiAnimationScale);
-        Property guiEasingProperty = config.get(
-                CATEGORY_CLIENT, "guiAnimationEasingStyle",
-                guiAnimationEasingStyle);
-        guiEasingProperty.set(guiAnimationEasingStyle);
-        guiEasingProperty.setValidValues(GUI_EASING_STYLES);
-        Property guiDirectionProperty = config.get(
-                CATEGORY_CLIENT, "guiAnimationDirection",
-                guiAnimationDirection);
-        guiDirectionProperty.set(guiAnimationDirection);
-        guiDirectionProperty.setValidValues(GUI_DIRECTIONS);
-        config.get(CATEGORY_CLIENT, "reducedGuiMotion",
-                reducedGuiMotion).set(reducedGuiMotion);
+        config.get(CATEGORY_CLIENT, "animations",
+                animations).set(animations);
+        config.get(CATEGORY_CLIENT, "animationSpeed",
+                animationSpeed).set(animationSpeed);
+        config.get(CATEGORY_CLIENT, "reducedMotion",
+                reducedMotion).set(reducedMotion);
         config.get(CATEGORY_CLIENT, "enableGuiBackground",
                 enableGuiBackground).set(enableGuiBackground);
         config.get(CATEGORY_CLIENT, "guiBackgroundOpacity",
                 guiBackgroundOpacity).set(guiBackgroundOpacity);
-        config.get(CATEGORY_CLIENT, "guiBackgroundFadeTimeMillis",
-                guiBackgroundFadeTimeMillis).set(
-                guiBackgroundFadeTimeMillis);
         config.get(CATEGORY_CLIENT, "guiAlwaysBlur",
                 guiAlwaysBlur).set(guiAlwaysBlur);
         config.get(CATEGORY_CLIENT, "enableGuiBackgroundBlur",
                 enableGuiBackgroundBlur).set(enableGuiBackgroundBlur);
         config.get(CATEGORY_CLIENT, "guiBlurStrength",
                 guiBlurStrength).set(guiBlurStrength);
-        config.get(CATEGORY_CLIENT, "enableSmoothInventoryMovement",
-                enableSmoothInventoryMovement).set(
-                enableSmoothInventoryMovement);
-        config.get(CATEGORY_CLIENT,
-                "smoothInventoryAnimationDurationMillis",
-                smoothInventoryAnimationDurationMillis).set(
-                smoothInventoryAnimationDurationMillis);
         config.get(CATEGORY_RANGED_COMBAT, "chargeTierOneTicks",
                 chargeTierOneTicks).set(chargeTierOneTicks);
         config.get(CATEGORY_RANGED_COMBAT, "chargeTierTwoTicks",
@@ -2469,13 +2358,6 @@ public final class LostTalesConfig {
         return value;
     }
 
-    private static String normalizeGuiEasing(String value) {
-        String normalized = value == null
-                ? "" : value.trim().toUpperCase(java.util.Locale.ROOT);
-        return "CUBIC".equals(normalized) || "SMOOTH".equals(normalized)
-                ? normalized : "BACK";
-    }
-
     /**
      * The feed alignment a config value names, case and surrounding space
      * aside: {@code LEFT}, {@code CENTRE} — {@code CENTER} is read as it —
@@ -2524,15 +2406,6 @@ public final class LostTalesConfig {
         }
         return "LEFT".equals(normalized) || "RIGHT".equals(normalized)
                 ? normalized : DEFAULT_CHAT_FEED_ALIGNMENT;
-    }
-
-    private static String normalizeGuiDirection(String value) {
-        String normalized = value == null
-                ? "" : value.trim().toUpperCase(java.util.Locale.ROOT);
-        return "UP".equals(normalized) || "LEFT".equals(normalized)
-                || "RIGHT".equals(normalized)
-                || "NONE".equals(normalized)
-                ? normalized : "DOWN";
     }
 
     static double getHudPercent(
