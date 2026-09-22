@@ -144,13 +144,13 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             buffer.writeBoolean(appearance.isMinecraftCapeVisible());
             buffer.writeShort(appearance.getCosmeticCapeId());
-            // Appended after the original layout; account names pair the
-            // tab list with characters for mention completion.
+            // The account name pairs the tab list with characters for
+            // mention completion.
             CharacterPacketCodec.writeString(
                     buffer, appearance.getAccountName(),
                     CharacterPacketCodec.MAX_NAME_BYTES);
-            // Appended again for the chat player card: starting faction,
-            // level, age, and biography are public character identity.
+            // For the chat player card: starting faction, level, age, and
+            // biography are public character identity.
             CharacterPacketCodec.writeString(
                     buffer, appearance.getStartingFactionId(),
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
@@ -159,20 +159,19 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
             CharacterPacketCodec.writeString(
                     buffer, appearance.getDescription(),
                     CharacterPacketCodec.MAX_DESCRIPTION_BYTES);
-            // Appended again: the arm width, which other clients need to
-            // pick the body the character is drawn with.
+            // The arm width, which other clients need to pick the body the
+            // character is drawn with, and the chest type.
             CharacterPacketCodec.writeString(
                     buffer, appearance.getBodyTypeId(),
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-            // Appended again: the chest type.
             CharacterPacketCodec.writeString(
                     buffer, appearance.getChestTypeId(),
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-            // Appended again: which identity this is, so the account can
-            // be drawn from its own entry rather than reconstructed.
+            // Which identity this is, so the account can be drawn from its
+            // own entry rather than reconstructed.
             buffer.writeByte(appearance.getKind().getCode());
-            // Appended again: the character's stable id, so clients key
-            // conversations and mentions by it rather than by a name.
+            // The character's stable id, so clients key conversations and
+            // mentions by it rather than by a name.
             buffer.writeBoolean(appearance.getCharacterId() != null);
             if (appearance.getCharacterId() != null) {
                 CharacterPacketCodec.writeUuid(buffer, appearance.getCharacterId());

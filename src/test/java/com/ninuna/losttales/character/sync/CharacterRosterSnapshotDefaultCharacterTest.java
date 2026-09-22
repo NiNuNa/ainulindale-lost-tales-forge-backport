@@ -74,13 +74,17 @@ public final class CharacterRosterSnapshotDefaultCharacterTest {
     private static CharacterRosterSnapshot snapshot(
             java.util.List<CharacterSummary> characters) {
         return new CharacterRosterSnapshot(OWNER, 2, null, 1L,
-                RoleplayCharacter.CURRENT_DATA_VERSION, characters);
+                RoleplayCharacter.CURRENT_DATA_VERSION, characters,
+                RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
+                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true);
     }
 
     private static CharacterSummary summary(UUID id, int slot, String name) {
         return new CharacterSummary(id, slot, name, "losttales:human",
-                "losttales:male", "losttales:account_skin", 30,
+                "losttales:male", "losttales:account_skin",
+                RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
+                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, 30,
                 "lotr:gondor", 1, 0L, 1L,
-                RoleplayCharacter.CURRENT_DATA_VERSION);
+                RoleplayCharacter.CURRENT_DATA_VERSION, "", "", "");
     }
 }

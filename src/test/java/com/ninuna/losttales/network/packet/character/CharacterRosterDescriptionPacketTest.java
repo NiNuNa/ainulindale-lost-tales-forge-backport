@@ -30,11 +30,13 @@ public final class CharacterRosterDescriptionPacketTest {
                 RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID,
                 32, "lotr:bree", 1, 0L, 1L,
                 RoleplayCharacter.CURRENT_DATA_VERSION,
-                "A watchful traveller from the North.");
+                "A watchful traveller from the North.", "", "");
         CharacterRosterSnapshot snapshot = new CharacterRosterSnapshot(
                 ownerId, CharacterRoster.INITIAL_UNLOCKED_SLOTS,
                 characterId, 1L, CharacterRoster.CURRENT_DATA_VERSION,
-                Collections.singletonList(summary));
+                Collections.singletonList(summary),
+                RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
+                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true);
 
         ByteBuf buffer = Unpooled.buffer();
         try {

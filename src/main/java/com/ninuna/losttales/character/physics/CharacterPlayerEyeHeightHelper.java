@@ -1,6 +1,5 @@
 package com.ninuna.losttales.character.physics;
 
-import com.ninuna.losttales.character.registry.CharacterRaceGameplayProfile;
 import net.minecraft.entity.player.EntityPlayer;
 
 /** Applies race eye positions through Forge's public player eyeHeight field. */
@@ -33,17 +32,6 @@ public final class CharacterPlayerEyeHeightHelper {
 
         float absoluteEyeHeight = dimensions.getEyeHeight(player.isSneaking());
         player.eyeHeight = toPlayerEyeHeightField(player, absoluteEyeHeight);
-    }
-
-    /** Backwards-compatible entry point for callers not yet using the snapshot. */
-    public static void apply(
-            EntityPlayer player,
-            CharacterRaceGameplayProfile profile,
-            boolean hasRace) {
-        CharacterRaceDimensions dimensions = profile == null
-                ? null
-                : CharacterRaceDimensions.fromProfile(profile.getRaceId(), profile);
-        apply(player, dimensions, hasRace);
     }
 
     public static void restoreVanilla(EntityPlayer player) {

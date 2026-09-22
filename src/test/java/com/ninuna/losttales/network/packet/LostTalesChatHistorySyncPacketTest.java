@@ -113,14 +113,13 @@ public final class LostTalesChatHistorySyncPacketTest {
         assertEquals(Long.MAX_VALUE, page.getArrivalId());
         assertTrue(page.saidBeforeArrival(page.getMessages().get(0)));
 
-        // A batch written without it is history, as it was then.
+        // A batch without it is malformed.
         buffer = Unpooled.buffer();
         packet.toBytes(buffer);
-        LostTalesChatHistorySyncPacket older = new LostTalesChatHistorySyncPacket();
-        older.fromBytes(buffer.slice(0, buffer.readableBytes() - 8));
-        assertFalse(older.isMalformed());
-        assertEquals(Long.MAX_VALUE, older.getArrivalId());
-        assertTrue(older.saidBeforeArrival(older.getMessages().get(1)));
+        LostTalesChatHistorySyncPacket shortened = new LostTalesChatHistorySyncPacket();
+        shortened.fromBytes(buffer.slice(0, buffer.readableBytes() - 8));
+        assertTrue(shortened.isMalformed());
+        assertTrue(shortened.getMessages().isEmpty());
     }
 
     private static LostTalesChatMessagePacket line(long id, String text) {

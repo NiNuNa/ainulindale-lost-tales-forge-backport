@@ -223,6 +223,37 @@ public final class ChatHistoryNbtCodecTest {
         assertFalse(ChatHistory.quoteFor(whisper, BOB, ChatChannel.ALL, "").exists());
     }
 
+    /**
+     * A kept line cut short of its last part is quarantined rather than
+     * shown: the save is read through the one line codec, which reads one
+     * layout.
+     */
+    @Test
+    public void aKeptLineCutShortIsQuarantined() {
+        long id = ChatMessageIdAllocator.next();
+        ChatHistory.record(id, ALICE, "Aldric", null,
+                line(id, ChatChannel.ALL, ALICE, "hail", ""),
+                Arrays.asList(ALICE), ChatHistory.Audience.everyone());
+        NBTTagCompound written = new NBTTagCompound();
+        ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
+                ChatConsoleStream.snapshot(), Collections.<NBTTagCompound>emptyList());
+        NBTTagCompound shortened = (NBTTagCompound)written.getTagList("Entries",
+                Constants.NBT.TAG_COMPOUND).getCompoundTagAt(0).copy();
+        byte[] whole = shortened.getByteArray("ForOthers");
+        // Without the tab a command's answer is filed under: one byte.
+        shortened.setByteArray("ForOthers", Arrays.copyOf(whole, whole.length - 1));
+        NBTTagList rewritten = new NBTTagList();
+        rewritten.appendTag(shortened);
+        written.setTag("Entries", rewritten);
+
+        ChatHistoryNbtCodec.ReadResult result = ChatHistoryNbtCodec.read(written);
+        assertFalse(result.isReadOnly());
+        assertTrue(result.getEntries().isEmpty());
+        assertEquals(1, result.getQuarantineEntriesCopy().size());
+        assertEquals("invalid_line",
+                result.getQuarantineEntriesCopy().get(0).getString("Reason"));
+    }
+
     @Test
     public void aLineTheSaveCannotVouchForIsQuarantined() {
         long id = ChatMessageIdAllocator.next();

@@ -30,47 +30,7 @@ public final class CharacterSummary {
     private final long creationTimestamp;
     private final int dataVersion;
 
-    /** Compatibility constructor for pre-cape packet tests and callers. */
-    public CharacterSummary(UUID characterId, int slotIndex, String name,
-                            String raceId, String genderId, String skinId, int age,
-                            String startingFactionId, int roleplayLevel,
-                            long experiencePoints, long creationTimestamp,
-                            int dataVersion) {
-        this(characterId, slotIndex, name, raceId, genderId, skinId,
-                RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID,
-                age, startingFactionId, roleplayLevel, experiencePoints,
-                creationTimestamp, dataVersion, "");
-    }
-
-    /** Body and chest types default from the sex. */
-    public CharacterSummary(UUID characterId, int slotIndex, String name,
-                            String raceId, String genderId, String skinId,
-                            boolean showMinecraftCape, int cosmeticCapeId,
-                            int age, String startingFactionId, int roleplayLevel,
-                            long experiencePoints, long creationTimestamp,
-                            int dataVersion, String description) {
-        this(characterId, slotIndex, name, raceId, genderId, skinId,
-                showMinecraftCape, cosmeticCapeId, age, startingFactionId,
-                roleplayLevel, experiencePoints, creationTimestamp,
-                dataVersion, description,
-                CharacterBodyTypeRegistry.defaultFor(genderId));
-    }
-
-    /** Chest type defaults from the sex. */
-    public CharacterSummary(UUID characterId, int slotIndex, String name,
-                            String raceId, String genderId, String skinId,
-                            boolean showMinecraftCape, int cosmeticCapeId,
-                            int age, String startingFactionId, int roleplayLevel,
-                            long experiencePoints, long creationTimestamp,
-                            int dataVersion, String description, String bodyTypeId) {
-        this(characterId, slotIndex, name, raceId, genderId, skinId,
-                showMinecraftCape, cosmeticCapeId, age, startingFactionId,
-                roleplayLevel, experiencePoints, creationTimestamp,
-                dataVersion, description, bodyTypeId,
-                CharacterChestTypeRegistry.defaultFor(genderId));
-    }
-
+    /** A body or chest type the registry does not know takes the sex's default. */
     public CharacterSummary(UUID characterId, int slotIndex, String name,
                             String raceId, String genderId, String skinId,
                             boolean showMinecraftCape, int cosmeticCapeId,

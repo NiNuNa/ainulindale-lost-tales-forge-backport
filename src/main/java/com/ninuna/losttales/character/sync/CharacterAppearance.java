@@ -28,9 +28,10 @@ public final class CharacterAppearance {
     private final CharacterAppearanceKind kind;
     private final UUID playerId;
     /**
-     * The stable id of the character this is, or null for the account
-     * and for an appearance an older server sent without it. Names are
-     * for reading; this is what keys the character across renames.
+     * The stable id of the character this is, or null for the account, a
+     * removal, and a projection built without one, such as a preview of a
+     * character not yet created. Names are for reading; this is what keys
+     * the character across renames.
      */
     private final UUID characterId;
     private final String accountName;
@@ -47,22 +48,11 @@ public final class CharacterAppearance {
     private final int age;
     private final String description;
 
-    /** Compatibility constructor for pre-cape callers and previews. */
-    public CharacterAppearance(UUID playerId, String raceId,
-                               String genderId, String skinId) {
-        this(playerId, "", raceId, genderId, skinId,
-                RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID);
-    }
-
-    /** Preview constructor carrying a chosen body type. */
-    public CharacterAppearance(UUID playerId, String raceId,
-                               String genderId, String skinId, String bodyTypeId) {
-        this(playerId, raceId, genderId, skinId, bodyTypeId,
-                CharacterChestTypeRegistry.defaultFor(genderId));
-    }
-
-    /** Preview constructor carrying chosen body and chest types. */
+    /**
+     * Preview constructor carrying chosen body and chest types. A type the
+     * registry does not know, an empty one included, takes the sex's
+     * default.
+     */
     public CharacterAppearance(UUID playerId, String raceId,
                                String genderId, String skinId, String bodyTypeId,
                                String chestTypeId) {
@@ -70,13 +60,6 @@ public final class CharacterAppearance {
                 RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
                 RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID,
                 "", 0, 0, "", bodyTypeId, chestTypeId);
-    }
-
-    public CharacterAppearance(UUID playerId, String raceId,
-                               String genderId, String skinId,
-                               boolean showMinecraftCape, int cosmeticCapeId) {
-        this(playerId, "", raceId, genderId, skinId,
-                showMinecraftCape, cosmeticCapeId);
     }
 
     /** Preview projection carrying capes and chosen body and chest types. */
@@ -89,60 +72,13 @@ public final class CharacterAppearance {
                 showMinecraftCape, cosmeticCapeId, "", 0, 0, "", bodyTypeId, chestTypeId);
     }
 
-    public CharacterAppearance(UUID playerId, String characterName,
-                               String raceId, String genderId, String skinId,
-                               boolean showMinecraftCape, int cosmeticCapeId) {
-        this(playerId, "", characterName, raceId, genderId, skinId,
-                showMinecraftCape, cosmeticCapeId);
-    }
-
     /**
-     * Full projection including the public Minecraft account name, which
-     * lets clients pair a tab-list account with its active character without
-     * a second roster sync. Account names are already public on the tab list.
-     */
-    public CharacterAppearance(UUID playerId, String accountName,
-                               String characterName,
-                               String raceId, String genderId, String skinId,
-                               boolean showMinecraftCape, int cosmeticCapeId) {
-        this(playerId, accountName, characterName, raceId, genderId, skinId,
-                showMinecraftCape, cosmeticCapeId, "", 0, 0, "");
-    }
-
-    /**
-     * Full projection including the card details. A level or age of zero
-     * and an empty faction or description mean "not known", which is what
-     * previews and removals carry; the card omits those lines. Body and
-     * chest types default from the sex.
-     */
-    public CharacterAppearance(UUID playerId, String accountName,
-                               String characterName,
-                               String raceId, String genderId, String skinId,
-                               boolean showMinecraftCape, int cosmeticCapeId,
-                               String startingFactionId, int roleplayLevel,
-                               int age, String description) {
-        this(playerId, accountName, characterName, raceId, genderId, skinId,
-                showMinecraftCape, cosmeticCapeId, startingFactionId,
-                roleplayLevel, age, description,
-                CharacterBodyTypeRegistry.defaultFor(genderId));
-    }
-
-    /** Chest type defaults from the sex. */
-    public CharacterAppearance(UUID playerId, String accountName,
-                               String characterName,
-                               String raceId, String genderId, String skinId,
-                               boolean showMinecraftCape, int cosmeticCapeId,
-                               String startingFactionId, int roleplayLevel,
-                               int age, String description, String bodyTypeId) {
-        this(playerId, accountName, characterName, raceId, genderId, skinId,
-                showMinecraftCape, cosmeticCapeId, startingFactionId,
-                roleplayLevel, age, description, bodyTypeId,
-                CharacterChestTypeRegistry.defaultFor(genderId));
-    }
-
-    /**
-     * A character projection; one with no race is a removal. The kind
-     * follows from the race so every existing caller keeps its meaning.
+     * A character projection with its card details; one with no race is a
+     * removal. The account name is the public one from the tab list, which
+     * lets clients pair a tab-list account with its active character
+     * without a second roster sync. A level or age of zero and an empty
+     * faction or description mean "not known", which is what previews and
+     * removals carry; the card omits those lines.
      */
     public CharacterAppearance(UUID playerId, String accountName,
                                String characterName,
@@ -282,9 +218,11 @@ public final class CharacterAppearance {
     }
 
     public static CharacterAppearance removed(UUID playerId) {
-        return new CharacterAppearance(playerId, "", "", "", "",
+        return new CharacterAppearance(CharacterAppearanceKind.NONE, playerId,
+                "", "", "", "", "",
                 RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID);
+                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID,
+                "", 0, 0, "", "", "");
     }
 
     public CharacterAppearanceKind getKind() {
@@ -370,7 +308,7 @@ public final class CharacterAppearance {
 
     /**
      * The character's stable id, or null for the account, a removal, and
-     * a character an older server described by name alone.
+     * a projection built without one, such as a preview.
      */
     public UUID getCharacterId() {
         return this.characterId;

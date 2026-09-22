@@ -36,7 +36,7 @@ public final class CharacterSelectRequestPacketTest {
     }
 
     @Test
-    public void aRequestWithoutTheTrailingFlagIsACharacterSelection() {
+    public void aRequestWithoutTheTrailingFlagIsMalformed() {
         ByteBuf buffer = Unpooled.buffer();
         try {
             buffer.writeInt(3);
@@ -45,9 +45,7 @@ public final class CharacterSelectRequestPacketTest {
             buffer.writeLong(CHARACTER.getLeastSignificantBits());
             CharacterSelectRequestPacket decoded = new CharacterSelectRequestPacket();
             decoded.fromBytes(buffer);
-            assertFalse(decoded.isMalformed());
-            assertFalse(decoded.isSelectAccount());
-            assertEquals(CHARACTER, decoded.getCharacterId());
+            assertTrue(decoded.isMalformed());
         } finally {
             buffer.release();
         }

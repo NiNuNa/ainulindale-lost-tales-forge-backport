@@ -44,8 +44,6 @@ public final class LostTalesChatSendPacket implements IMessage {
     private static final int MAX_TARGET_BYTES = 64;
     /** An identity name is bounded like the one a line is signed with. */
     private static final int MAX_IDENTITY_BYTES = 256;
-    /** A presence flag and a UUID: the appended target-character tail. */
-    static final int TARGET_ID_TAIL_BYTES = 1 + 2 * 8;
     /**
      * Whose line an unnamed quote is, as far as the sender can say: a
      * line of somebody the server cannot vouch for, which is quoted
@@ -80,7 +78,7 @@ public final class LostTalesChatSendPacket implements IMessage {
      * For a whisper, the id of the character it is addressed to, when the
      * client knows it; null addresses the target by name, or their account.
      * The server resolves it against the target's own roster before the
-     * line is filed under it. Appended; null from an older client.
+     * line is filed under it.
      */
     private UUID targetCharacterId;
     /**
@@ -287,36 +285,23 @@ public final class LostTalesChatSendPacket implements IMessage {
             this.targetIdentity = LostTalesPacketCodec.readUtf8String(
                     buffer, MAX_IDENTITY_BYTES).trim();
             this.echoNonce = buffer.readLong();
-            // Appended: the character the whisper is addressed to, by id,
-            // a fixed tail so a payload cut short inside it stays
-            // malformed rather than reading as an older layout.
-            this.targetCharacterId = null;
-            boolean targetTail = false;
-            if (buffer.readableBytes() >= TARGET_ID_TAIL_BYTES) {
-                boolean present = buffer.readBoolean();
-                long most = buffer.readLong();
-                long least = buffer.readLong();
-                this.targetCharacterId = present ? new UUID(most, least) : null;
-                targetTail = true;
-            }
-            // Appended after that: the quote of a line nobody named,
-            // author then words, written only when there is one. It can
-            // only follow a whole target tail, so a payload cut short
-            // inside that tail is never read as a quote.
+            // The character the whisper is addressed to, by id: a presence
+            // flag and a UUID, written whole either way.
+            boolean targeted = buffer.readBoolean();
+            long most = buffer.readLong();
+            long least = buffer.readLong();
+            this.targetCharacterId = targeted ? new UUID(most, least) : null;
+            // Last, and only when there is one: the quote of a line nobody
+            // named — its author, its words, and whose line it is.
             this.quoteAuthor = "";
             this.quoteExcerpt = "";
             this.quoteSource = QUOTE_OTHER;
-            if (targetTail && buffer.readableBytes() >= 1) {
+            if (buffer.isReadable()) {
                 this.quoteAuthor = LostTalesPacketCodec.readUtf8String(
                         buffer, ChatReplyReference.MAX_AUTHOR_BYTES).trim();
                 this.quoteExcerpt = LostTalesPacketCodec.readUtf8String(
                         buffer, ChatReplyReference.MAX_EXCERPT_BYTES).trim();
-                // Appended after the quote: whose line it is. A quote
-                // written before it names nobody the server could vouch
-                // for, and is drawn without a head as it was then.
-                if (buffer.readableBytes() >= 1) {
-                    this.quoteSource = buffer.readUnsignedByte();
-                }
+                this.quoteSource = buffer.readUnsignedByte();
             }
             LostTalesPacketCodec.requireFinished(buffer);
             validate();

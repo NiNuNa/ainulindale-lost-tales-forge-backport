@@ -377,12 +377,15 @@ public final class ClientChatChannelStateTest {
         UUID characterId = UUID.randomUUID();
         CharacterSummary character = new CharacterSummary(
                 characterId, 0, "Arathorn", "human", "male",
-                "human_male_0", 30, factionId, 1,
-                0L, 1L, RoleplayCharacter.CURRENT_DATA_VERSION);
+                "human_male_0", RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
+                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, 30, factionId, 1,
+                0L, 1L, RoleplayCharacter.CURRENT_DATA_VERSION, "", "", "");
         CharacterRosterSnapshot snapshot = new CharacterRosterSnapshot(
                 ownerId, 1, characterId, 1L,
                 RoleplayCharacter.CURRENT_DATA_VERSION,
-                Collections.singletonList(character));
+                Collections.singletonList(character),
+                RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
+                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true);
         ClientCharacterRosterCache.acceptRoster(0, snapshot);
         return characterId;
     }

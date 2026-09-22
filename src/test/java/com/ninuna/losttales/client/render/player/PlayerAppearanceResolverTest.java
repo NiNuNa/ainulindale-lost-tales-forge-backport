@@ -28,6 +28,12 @@ public final class PlayerAppearanceResolverTest {
     private static final UUID PLAYER = UUID.fromString(
             "5b1a8c2e-2b6f-4b7e-9a1e-0f3c6d2a8b11");
 
+    /** An appearance whose body and chest were never chosen: the sex's defaults apply. */
+    private static CharacterAppearance unchosen(String raceId, String genderId,
+                                                String skinId) {
+        return new CharacterAppearance(PLAYER, raceId, genderId, skinId, "", "");
+    }
+
     @Test
     public void playersWithoutACharacterRenderAsVanilla() {
         assertNull(PlayerAppearanceResolver.resolve(PLAYER, null));
@@ -37,14 +43,14 @@ public final class PlayerAppearanceResolverTest {
 
     @Test
     public void unknownRaceRendersAsVanilla() {
-        assertNull(PlayerAppearanceResolver.resolve(PLAYER, new CharacterAppearance(
-                PLAYER, "losttales:balrog", CharacterGenderRegistry.MALE, "")));
+        assertNull(PlayerAppearanceResolver.resolve(PLAYER, unchosen(
+                "losttales:balrog", CharacterGenderRegistry.MALE, "")));
     }
 
     @Test
     public void feminineHumanGetsTheDefaultChestAndHerSkin() {
         ResolvedPlayerAppearance resolved = PlayerAppearanceResolver.resolve(
-                PLAYER, new CharacterAppearance(PLAYER, CharacterRaceRegistry.HUMAN,
+                PLAYER, unchosen(CharacterRaceRegistry.HUMAN,
                         CharacterGenderRegistry.FEMALE,
                         "losttales:human_bree_female_0"));
         assertNotNull(resolved);
@@ -61,7 +67,7 @@ public final class PlayerAppearanceResolverTest {
     @Test
     public void masculineHumanHasNoChestUnlessChosen() {
         ResolvedPlayerAppearance resolved = PlayerAppearanceResolver.resolve(
-                PLAYER, new CharacterAppearance(PLAYER, CharacterRaceRegistry.HUMAN,
+                PLAYER, unchosen(CharacterRaceRegistry.HUMAN,
                         CharacterGenderRegistry.MALE, "losttales:human_bree_male_0"));
         assertNotNull(resolved);
         assertFalse(resolved.hasChest());
@@ -90,7 +96,7 @@ public final class PlayerAppearanceResolverTest {
                 resolved.getRendererScale(), 0.0F);
 
         ResolvedPlayerAppearance troll = PlayerAppearanceResolver.resolve(
-                PLAYER, new CharacterAppearance(PLAYER, CharacterRaceRegistry.HALF_TROLL,
+                PLAYER, unchosen(CharacterRaceRegistry.HALF_TROLL,
                         CharacterGenderRegistry.FEMALE, ""));
         assertNotNull(troll);
         assertEquals(CharacterRaceRegistry.HALF_TROLL, troll.getRaceId());
@@ -116,7 +122,7 @@ public final class PlayerAppearanceResolverTest {
         ResolvedPlayerAppearance resolved = PlayerAppearanceResolver.resolve(
                 PLAYER, new CharacterAppearance(PLAYER, CharacterRaceRegistry.HUMAN,
                         CharacterGenderRegistry.MALE, CharacterSkinRegistry.ACCOUNT_SKIN_ID,
-                        "losttales:slim"));
+                        "losttales:slim", ""));
         assertNotNull(resolved);
         assertEquals(CharacterBodyModelRegistry.LOSTTALES_PLAYER, resolved.getModelId());
         assertEquals(CharacterSkinLayout.MINECRAFT_64X64, resolved.getLayout());
@@ -129,12 +135,12 @@ public final class PlayerAppearanceResolverTest {
 
         // The sex only picks the defaults when nothing was stored.
         ResolvedPlayerAppearance defaulted = PlayerAppearanceResolver.resolve(
-                PLAYER, new CharacterAppearance(PLAYER, CharacterRaceRegistry.HUMAN,
+                PLAYER, unchosen(CharacterRaceRegistry.HUMAN,
                         CharacterGenderRegistry.FEMALE, CharacterSkinRegistry.ACCOUNT_SKIN_ID));
         assertEquals("losttales:slim", defaulted.getBodyTypeId());
         assertEquals(CharacterChestTypeRegistry.ROUNDED_MEDIUM, defaulted.getChestTypeId());
         ResolvedPlayerAppearance male = PlayerAppearanceResolver.resolve(
-                PLAYER, new CharacterAppearance(PLAYER, CharacterRaceRegistry.HUMAN,
+                PLAYER, unchosen(CharacterRaceRegistry.HUMAN,
                         CharacterGenderRegistry.MALE, CharacterSkinRegistry.ACCOUNT_SKIN_ID));
         assertEquals("losttales:wide", male.getBodyTypeId());
     }
@@ -158,7 +164,7 @@ public final class PlayerAppearanceResolverTest {
     @Test
     public void otherRacesWearTheAccountSkinOnTheirOwnBody() {
         ResolvedPlayerAppearance elf = PlayerAppearanceResolver.resolve(
-                PLAYER, new CharacterAppearance(PLAYER, CharacterRaceRegistry.ELF,
+                PLAYER, unchosen(CharacterRaceRegistry.ELF,
                         CharacterGenderRegistry.FEMALE, "losttales:account_skin_elf"));
         assertNotNull(elf);
         assertEquals(CharacterBodyModelRegistry.LOTR_ELF, elf.getModelId());
@@ -169,7 +175,7 @@ public final class PlayerAppearanceResolverTest {
                 elf.getRendererKey());
 
         ResolvedPlayerAppearance orc = PlayerAppearanceResolver.resolve(
-                PLAYER, new CharacterAppearance(PLAYER, CharacterRaceRegistry.ORC,
+                PLAYER, unchosen(CharacterRaceRegistry.ORC,
                         CharacterGenderRegistry.NON_BINARY, "losttales:account_skin_orc"));
         assertNotNull(orc);
         assertEquals(CharacterSkinLayout.MINECRAFT_64X64, orc.getLayout());
@@ -178,8 +184,8 @@ public final class PlayerAppearanceResolverTest {
 
     @Test
     public void incompatibleSkinFallsBackDeterministically() {
-        CharacterAppearance appearance = new CharacterAppearance(
-                PLAYER, CharacterRaceRegistry.ELF, CharacterGenderRegistry.MALE,
+        CharacterAppearance appearance = unchosen(
+                CharacterRaceRegistry.ELF, CharacterGenderRegistry.MALE,
                 "losttales:human_bree_male_0");
         ResolvedPlayerAppearance first = PlayerAppearanceResolver.resolve(PLAYER, appearance);
         ResolvedPlayerAppearance second = PlayerAppearanceResolver.resolve(PLAYER, appearance);

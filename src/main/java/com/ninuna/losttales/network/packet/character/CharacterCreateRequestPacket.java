@@ -119,13 +119,12 @@ public final class CharacterCreateRequestPacket implements IMessage {
         CharacterPacketCodec.writeString(buffer, this.startingWaypointId,
                 CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
         buffer.writeBoolean(this.unconventionalSettings);
-        // Appended after the original layout: the requested arm width.
+        // The requested arm width and chest type.
         CharacterPacketCodec.writeString(
                 buffer, this.bodyTypeId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-        // Appended again: the requested chest type.
         CharacterPacketCodec.writeString(
                 buffer, this.chestTypeId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-        // Appended again: the cape, as the creator's cape page chose it.
+        // The cape, as the creator's cape page chose it.
         buffer.writeBoolean(this.showMinecraftCape);
         buffer.writeInt(this.cosmeticCapeId);
     }

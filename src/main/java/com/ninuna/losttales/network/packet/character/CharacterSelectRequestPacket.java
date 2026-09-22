@@ -17,8 +17,6 @@ import java.util.UUID;
  * account itself. The account form carries the owner's UUID in the
  * character slot as a placeholder and says so with the trailing flag; the
  * server builds the target from the live player and never from that slot.
- * The flag is the last field, so a request without it still decodes as a
- * character selection.
  */
 public final class CharacterSelectRequestPacket implements IMessage {
 
@@ -56,7 +54,7 @@ public final class CharacterSelectRequestPacket implements IMessage {
             this.requestId = buffer.readInt();
             this.expectedRosterRevision = buffer.readLong();
             this.characterId = CharacterPacketCodec.readUuid(buffer);
-            this.selectAccount = buffer.isReadable() && buffer.readBoolean();
+            this.selectAccount = buffer.readBoolean();
             CharacterPacketCodec.requireFinished(buffer);
             if (this.expectedRosterRevision < 0L) {
                 throw new CharacterPacketCodec.DecodeException("missing roster revision");

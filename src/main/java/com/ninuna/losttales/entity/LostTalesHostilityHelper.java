@@ -26,10 +26,4 @@ public final class LostTalesHostilityHelper {
     public static boolean isActivelyHostileTo(EntityLivingBase living, EntityPlayer player) {
         return getDirectEngagement(living, player) != LostTalesCombatEngagement.NONE;
     }
-
-    /** Kept for source compatibility; broad class/faction hostility is no longer marker evidence. */
-    @Deprecated
-    public static boolean isPassiveFallbackHostile(EntityLivingBase living, EntityPlayer player) {
-        return false;
-    }
 }

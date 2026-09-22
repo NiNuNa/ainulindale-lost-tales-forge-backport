@@ -66,7 +66,8 @@ public final class ChatInputCompletionTest {
         Map<String, CharacterAppearance> byAccount =
                 new HashMap<String, CharacterAppearance>();
         byAccount.put("beren", new CharacterAppearance(beren, "Beren",
-                "Beren Erchamion", "losttales:human", "male", "", true, 0));
+                "Beren Erchamion", "losttales:human", "male", "", true, 0,
+                "", 0, 0, "", "", ""));
         List<ChatMentionCandidate> candidates =
                 ChatInputCompletion.mentionCandidatesFor(SELF, "Nils",
                         "Aldric", Arrays.asList("Beren", "zoe"), byAccount);
@@ -106,7 +107,7 @@ public final class ChatInputCompletionTest {
                 new HashMap<String, CharacterAppearance>();
         byAccount.put("beren", new CharacterAppearance(beren, "Beren",
                 "Beren Erchamion", "losttales:human", "male", "", true, 0,
-                "lotr:gondor", 1, 30, "").withCharacterId(erchamion));
+                "lotr:gondor", 1, 30, "", "", "").withCharacterId(erchamion));
         List<ChatMentionCandidate> candidates =
                 ChatInputCompletion.mentionCandidatesFor(SELF, "Nils",
                         "Aldric", aldric, Arrays.asList("Beren"), byAccount);

@@ -32,25 +32,6 @@ public final class CharacterRosterSnapshot {
     public CharacterRosterSnapshot(UUID ownerId, int unlockedSlotCount,
                                    UUID activeCharacterId, long revision,
                                    int dataVersion,
-                                   List<CharacterSummary> characters) {
-        this(ownerId, unlockedSlotCount, activeCharacterId, revision, dataVersion,
-                characters, RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true);
-    }
-
-    public CharacterRosterSnapshot(UUID ownerId, int unlockedSlotCount,
-                                   UUID activeCharacterId, long revision,
-                                   int dataVersion,
-                                   List<CharacterSummary> characters,
-                                   boolean accountShowMinecraftCape,
-                                   int accountCosmeticCapeId) {
-        this(ownerId, unlockedSlotCount, activeCharacterId, revision, dataVersion,
-                characters, accountShowMinecraftCape, accountCosmeticCapeId, true);
-    }
-
-    public CharacterRosterSnapshot(UUID ownerId, int unlockedSlotCount,
-                                   UUID activeCharacterId, long revision,
-                                   int dataVersion,
                                    List<CharacterSummary> characters,
                                    boolean accountShowMinecraftCape,
                                    int accountCosmeticCapeId,

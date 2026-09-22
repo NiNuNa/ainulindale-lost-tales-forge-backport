@@ -62,7 +62,9 @@ public final class CharacterBodyTypePacketTest {
         CharacterRosterSnapshot snapshot = new CharacterRosterSnapshot(
                 ownerId, CharacterRoster.INITIAL_UNLOCKED_SLOTS,
                 characterId, 1L, CharacterRoster.CURRENT_DATA_VERSION,
-                Collections.singletonList(summary));
+                Collections.singletonList(summary),
+                RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
+                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true);
 
         ByteBuf buffer = Unpooled.buffer();
         try {
@@ -82,7 +84,7 @@ public final class CharacterBodyTypePacketTest {
                 characterId, 0, "Ranger", "losttales:human",
                 "losttales:female", "losttales:human_bree_female_0",
                 true, 0, 32, "lotr:bree", 1, 0L, 1L,
-                RoleplayCharacter.CURRENT_DATA_VERSION, "", "losttales:huge");
+                RoleplayCharacter.CURRENT_DATA_VERSION, "", "losttales:huge", "");
         assertEquals(CharacterBodyTypeRegistry.SLIM, unknown.getBodyTypeId());
     }
 }

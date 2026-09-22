@@ -59,7 +59,7 @@ public final class CharacterAppearanceTest {
         assertFalse(removed.isAccount());
         CharacterAppearance character = new CharacterAppearance(PLAYER,
                 CharacterRaceRegistry.HUMAN, CharacterGenderRegistry.MALE,
-                "losttales:human_bree_male_0");
+                "losttales:human_bree_male_0", "", "");
         assertEquals(CharacterAppearanceKind.CHARACTER, character.getKind());
         assertTrue(character.hasCharacter());
     }

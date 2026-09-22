@@ -2,7 +2,6 @@ package com.ninuna.losttales.network.packet.character;
 
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.model.CharacterRoster;
-import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.character.sync.CharacterAppearanceKind;
@@ -23,7 +22,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * The account travels on the wire as an identity of its own: the appearance
  * sync names its kind, the private roster carries its cape, and a cape
- * request can name it with an appended flag an older client never sends.
+ * request names it with a flag.
  */
 public final class CharacterAccountCapePacketTest {
 
@@ -69,12 +68,12 @@ public final class CharacterAccountCapePacketTest {
     }
 
     @Test
-    public void thePrivateRosterCarriesTheAccountCapeAndDefaultsWithoutIt() {
+    public void thePrivateRosterCarriesTheAccountCapeAndTemplateFlag() {
         CharacterRosterSnapshot snapshot = new CharacterRosterSnapshot(
                 OWNER, CharacterRoster.INITIAL_UNLOCKED_SLOTS, null, 3L,
                 CharacterRoster.CURRENT_DATA_VERSION,
                 Collections.<CharacterSummary>emptyList(), false,
-                CharacterCapeCatalog.RANGER);
+                CharacterCapeCatalog.RANGER, false);
         ByteBuf buffer = Unpooled.buffer();
         new CharacterRosterSyncPacket(1, snapshot).toBytes(buffer);
 
@@ -84,18 +83,18 @@ public final class CharacterAccountCapePacketTest {
         assertFalse(decoded.getSnapshot().isAccountMinecraftCapeVisible());
         assertEquals(CharacterCapeCatalog.RANGER,
                 decoded.getSnapshot().getAccountCosmeticCapeId());
+        assertFalse(decoded.getSnapshot().isTemplateTaken());
 
-        CharacterRosterSyncPacket older = new CharacterRosterSyncPacket();
-        older.fromBytes(buffer.slice(0, buffer.readableBytes() - 3));
-        assertFalse(older.isMalformed());
-        assertEquals(RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                older.getSnapshot().isAccountMinecraftCapeVisible());
-        assertEquals(RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID,
-                older.getSnapshot().getAccountCosmeticCapeId());
+        // The cape and the flag close every roster: one without them is
+        // malformed.
+        CharacterRosterSyncPacket shortened = new CharacterRosterSyncPacket();
+        shortened.fromBytes(buffer.slice(0, buffer.readableBytes() - 4));
+        assertTrue(shortened.isMalformed());
+        assertNull(shortened.getSnapshot());
     }
 
     @Test
-    public void aCapeRequestNamesTheAccountWithTheAppendedFlag() {
+    public void aCapeRequestNamesTheAccountWithItsFlag() {
         ByteBuf buffer = Unpooled.buffer();
         new CharacterCapeUpdateRequestPacket(5, 2L, null, true,
                 CharacterCapeCatalog.PELARGIR).toBytes(buffer);
@@ -113,17 +112,17 @@ public final class CharacterAccountCapePacketTest {
         assertFalse(forCharacter.isMalformed());
         assertEquals(character, forCharacter.getCharacterId());
 
-        // An older client sends no flag: the id it named still stands.
-        CharacterCapeUpdateRequestPacket older = new CharacterCapeUpdateRequestPacket();
-        older.fromBytes(named.slice(0, named.readableBytes() - 1));
-        assertFalse(older.isMalformed());
-        assertEquals(character, older.getCharacterId());
+        // A request without the flag is malformed, whatever id it names.
+        CharacterCapeUpdateRequestPacket unflagged = new CharacterCapeUpdateRequestPacket();
+        unflagged.fromBytes(named.slice(0, named.readableBytes() - 1));
+        assertTrue(unflagged.isMalformed());
 
-        // The nil id without the flag names nothing.
+        // The nil id names no character.
         ByteBuf nil = Unpooled.buffer();
         new CharacterCapeUpdateRequestPacket(7, 2L, null, true, 0).toBytes(nil);
+        nil.setBoolean(nil.writerIndex() - 1, false);
         CharacterCapeUpdateRequestPacket refused = new CharacterCapeUpdateRequestPacket();
-        refused.fromBytes(nil.slice(0, nil.readableBytes() - 1));
+        refused.fromBytes(nil);
         assertTrue(refused.isMalformed());
     }
 }

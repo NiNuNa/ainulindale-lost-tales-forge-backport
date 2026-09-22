@@ -100,10 +100,8 @@ public final class LostTalesChatConsoleSyncPacket implements IMessage {
                 decoded.add(new ChatConsoleEvent(id, timestamp, kind, severity, actor, text,
                         context, actorIdentity));
             }
-            // Appended after the entries: where the reader arrived. Entries
-            // written before it are news, as they were then.
-            this.arrivalId = buffer.readableBytes() >= 8
-                    ? buffer.readLong() : Long.MIN_VALUE;
+            // After the entries: where the reader arrived.
+            this.arrivalId = buffer.readLong();
             LostTalesPacketCodec.requireFinished(buffer);
             this.events = Collections.unmodifiableList(decoded);
         } catch (RuntimeException exception) {

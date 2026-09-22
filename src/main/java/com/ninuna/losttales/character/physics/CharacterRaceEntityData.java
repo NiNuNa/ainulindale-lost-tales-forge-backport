@@ -1,6 +1,5 @@
 package com.ninuna.losttales.character.physics;
 
-import com.ninuna.losttales.character.registry.CharacterRaceGameplayProfile;
 import net.minecraft.entity.Entity;
 import net.minecraft.nbt.NBTTagCompound;
 
@@ -36,17 +35,6 @@ public final class CharacterRaceEntityData {
         data.setFloat(TAG_WIDTH, dimensions.getWidth());
         data.setFloat(TAG_HEIGHT, dimensions.getHeight());
         data.setBoolean(TAG_LOTR_DERIVED, dimensions.isLotrDerived());
-    }
-
-    /** Backwards-compatible entry point for existing integrations. */
-    public static void write(
-            Entity entity,
-            String raceId,
-            CharacterRaceGameplayProfile profile) {
-        if (profile == null) {
-            return;
-        }
-        write(entity, CharacterRaceDimensions.fromProfile(raceId, profile));
     }
 
     public static CharacterRaceDimensions read(
@@ -88,11 +76,6 @@ public final class CharacterRaceEntityData {
         }
         float value = entity.getEntityData().getFloat(TAG_SNEAKING_EYE_HEIGHT);
         return value > 0.0F ? value : getStandingEyeHeight(entity, fallback);
-    }
-
-    /** Backwards-compatible name used by older callers. */
-    public static float getEyeHeight(Entity entity, float fallback) {
-        return getStandingEyeHeight(entity, fallback);
     }
 
     public static boolean isLotrDerived(Entity entity) {

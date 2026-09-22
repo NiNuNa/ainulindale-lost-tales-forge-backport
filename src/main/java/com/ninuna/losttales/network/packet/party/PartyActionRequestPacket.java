@@ -33,29 +33,6 @@ public final class PartyActionRequestPacket implements IMessage {
 
     public PartyActionRequestPacket() {}
 
-    /** Compatibility constructor; mutation packets require the context-aware overload. */
-    public PartyActionRequestPacket(int requestId,
-                                    PartyOperationType operationType,
-                                    long expectedPartyRevision,
-                                    UUID targetId,
-                                    PartyColor color) {
-        this(requestId, operationType, null, null,
-                expectedPartyRevision, targetId, color,
-                false, 0, 0.0D, 0.0D);
-    }
-
-    public PartyActionRequestPacket(int requestId,
-                                    PartyOperationType operationType,
-                                    UUID expectedActiveCharacterId,
-                                    UUID expectedPartyId,
-                                    long expectedPartyRevision,
-                                    UUID targetId,
-                                    PartyColor color) {
-        this(requestId, operationType, expectedActiveCharacterId,
-                expectedPartyId, expectedPartyRevision, targetId, color,
-                false, 0, 0.0D, 0.0D);
-    }
-
     public PartyActionRequestPacket(int requestId,
                                     PartyOperationType operationType,
                                     UUID expectedActiveCharacterId,

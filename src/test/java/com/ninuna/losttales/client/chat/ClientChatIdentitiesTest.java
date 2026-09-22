@@ -119,14 +119,17 @@ public final class ClientChatIdentitiesTest {
         for (UUID id : characters) {
             summaries.add(new CharacterSummary(id, summaries.size(),
                     id.equals(ARAGORN) ? "Aragorn" : "Legolas", "human", "male",
-                    "skin", 30, "GONDOR", 1, 0L, 1L,
-                    RoleplayCharacter.CURRENT_DATA_VERSION));
+                    "skin", RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
+                    RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, 30, "GONDOR", 1, 0L, 1L,
+                    RoleplayCharacter.CURRENT_DATA_VERSION, "", "", ""));
         }
         ClientCharacterRosterCache.acceptRoster(0, new CharacterRosterSnapshot(
                 OWNER, Math.max(1, summaries.size()), active, 1L,
                 RoleplayCharacter.CURRENT_DATA_VERSION,
                 summaries.isEmpty() ? Collections.<CharacterSummary>emptyList()
                         : Arrays.asList(summaries.toArray(
-                                new CharacterSummary[summaries.size()]))));
+                                new CharacterSummary[summaries.size()])),
+                RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
+                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true));
     }
 }

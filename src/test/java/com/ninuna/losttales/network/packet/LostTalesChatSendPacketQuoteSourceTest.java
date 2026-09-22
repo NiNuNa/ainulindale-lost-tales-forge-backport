@@ -43,15 +43,13 @@ public final class LostTalesChatSendPacketQuoteSourceTest {
     }
 
     @Test
-    public void aQuoteWrittenWithoutASourceNamesNobody() {
+    public void aQuoteWithoutASourceIsMalformed() {
         ByteBuf buffer = Unpooled.buffer();
         quoting(LostTalesChatSendPacket.QUOTE_SYSTEM).toBytes(buffer);
-        LostTalesChatSendPacket older = new LostTalesChatSendPacket();
-        older.fromBytes(buffer.slice(0, buffer.readableBytes() - 1));
-        assertFalse(older.isMalformed());
-        assertEquals(LostTalesChatSendPacket.QUOTE_OTHER,
-                older.getQuoteSource());
-        assertEquals("Unknown command", older.getQuoteExcerpt());
+        LostTalesChatSendPacket shortened = new LostTalesChatSendPacket();
+        shortened.fromBytes(buffer.slice(0, buffer.readableBytes() - 1));
+        assertTrue(shortened.isMalformed());
+        assertEquals("", shortened.getQuoteExcerpt());
     }
 
     @Test

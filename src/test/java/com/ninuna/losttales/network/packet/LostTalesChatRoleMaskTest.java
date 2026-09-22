@@ -6,7 +6,6 @@ import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import java.util.Collections;
 import java.util.UUID;
 import org.junit.After;
 import org.junit.Before;
@@ -17,9 +16,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * The role mask rides in the message layout twice: one byte where it
- * always was, and the whole int appended at the tail, so a config role
- * past the eighth bit travels too.
+ * The role mask rides in the message layout as a whole int, so a config
+ * role past the eighth bit travels too.
  */
 public final class LostTalesChatRoleMaskTest {
 
@@ -68,7 +66,7 @@ public final class LostTalesChatRoleMaskTest {
         assertEquals(0, decoded.getRoles());
     }
 
-    /** A role past the eighth bit travels in the appended int. */
+    /** A role past the eighth bit travels too. */
     @Test
     public void aWideMaskTravelsWhole() {
         java.util.List<ChatAccountRole> custom = new java.util.ArrayList<ChatAccountRole>();
@@ -106,26 +104,19 @@ public final class LostTalesChatRoleMaskTest {
                 ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR));
         ByteBuf buffer = Unpooled.buffer();
         roled.toBytes(buffer);
-        // The whole mask is the int ahead of the three id tails: a bit no role
+        // The mask is the int ahead of the three id tails: a bit no role
         // occupies, planted there, is refused.
         buffer.setInt(buffer.writerIndex() - scopeTailBytes("") - 4
                 - 3 * LostTalesChatMessagePacket.IDENTITY_ID_TAIL_BYTES,
                 0x40000000 | ChatRoleFixtures.OPERATOR.bit());
         LostTalesChatMessagePacket decoded = new LostTalesChatMessagePacket();
-        decoded.fromBytes(buffer.copy());
+        decoded.fromBytes(buffer);
         assertTrue(decoded.isMalformed());
         assertEquals(0, decoded.getRoles());
-        // And the two copies of the mask must agree.
-        buffer.setInt(buffer.writerIndex() - scopeTailBytes("") - 4
-                - 3 * LostTalesChatMessagePacket.IDENTITY_ID_TAIL_BYTES,
-                ChatAccountRole.TEAM.bit());
-        LostTalesChatMessagePacket disagreeing = new LostTalesChatMessagePacket();
-        disagreeing.fromBytes(buffer);
-        assertTrue(disagreeing.isMalformed());
     }
 
     @Test
-    public void aLayoutWithoutTheTailReadsTheByte() {
+    public void aPayloadEndingBeforeTheMaskIsMalformed() {
         LostTalesChatMessagePacket roled = new LostTalesChatMessagePacket(
                 ChatChannel.OOC, UUID.randomUUID(), "Steve", "Steve", "",
                 0xFFFFFF, 0xFFFFFF, "hello", 1L, "", null, "", "",
@@ -136,10 +127,8 @@ public final class LostTalesChatRoleMaskTest {
         decoded.fromBytes(buffer.slice(0, buffer.readableBytes()
                 - scopeTailBytes("") - 4
                 - 3 * LostTalesChatMessagePacket.IDENTITY_ID_TAIL_BYTES));
-        assertFalse(decoded.isMalformed());
-        assertEquals(ChatRoleFixtures.OPERATOR.bit(), decoded.getRoles());
-        assertEquals(Collections.singletonList(ChatRoleFixtures.OPERATOR),
-                ChatAccountRole.fromMask(decoded.getRoles()));
+        assertTrue(decoded.isMalformed());
+        assertEquals(0, decoded.getRoles());
     }
 
     /**

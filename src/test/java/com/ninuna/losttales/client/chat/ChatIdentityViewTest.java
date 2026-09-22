@@ -238,7 +238,9 @@ public final class ChatIdentityViewTest {
                 UUID.fromString("00000000-0000-0000-0000-0000000000a1"), 2,
                 ALDRIC, 1L, RoleplayCharacter.CURRENT_DATA_VERSION,
                 Arrays.asList(summary(ALDRIC, "Aldric", GONDOR, 0),
-                        summary(BEREN, "Beren", ROHAN, 1))));
+                        summary(BEREN, "Beren", ROHAN, 1)),
+                RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
+                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true));
     }
 
     /** As above, with a second character of the same faction as Aldric. */
@@ -248,14 +250,17 @@ public final class ChatIdentityViewTest {
                 ALDRIC, 1L, RoleplayCharacter.CURRENT_DATA_VERSION,
                 Arrays.asList(summary(ALDRIC, "Aldric", GONDOR, 0),
                         summary(BEREN, "Beren", ROHAN, 1),
-                        summary(CIRION, "Cirion", GONDOR, 2))));
+                        summary(CIRION, "Cirion", GONDOR, 2)),
+                RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
+                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true));
     }
 
     private static CharacterSummary summary(UUID id, String name, String faction,
                                             int slot) {
         return new CharacterSummary(id, slot, name, "human", "male",
-                "human_male_0", 30, faction, 1, 0L, 1L,
-                RoleplayCharacter.CURRENT_DATA_VERSION);
+                "human_male_0", RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
+                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, 30, faction, 1, 0L, 1L,
+                RoleplayCharacter.CURRENT_DATA_VERSION, "", "", "");
     }
 
     private static String keyOf(UUID characterId) {

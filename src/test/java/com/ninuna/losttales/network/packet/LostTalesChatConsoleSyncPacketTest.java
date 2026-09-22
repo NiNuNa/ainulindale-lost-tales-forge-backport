@@ -172,13 +172,12 @@ public final class LostTalesChatConsoleSyncPacketTest {
         assertTrue(decoded.saidBeforeArrival(decoded.getEvents().get(0)));
         assertFalse(decoded.saidBeforeArrival(decoded.getEvents().get(1)));
 
-        // Entries written without it are news, as they were then.
+        // Entries without it are malformed.
         buffer = Unpooled.buffer();
         replay.toBytes(buffer);
-        LostTalesChatConsoleSyncPacket older = new LostTalesChatConsoleSyncPacket();
-        older.fromBytes(buffer.slice(0, buffer.readableBytes() - 8));
-        assertFalse(older.isMalformed());
-        assertFalse(older.isReplay());
-        assertFalse(older.saidBeforeArrival(older.getEvents().get(0)));
+        LostTalesChatConsoleSyncPacket shortened = new LostTalesChatConsoleSyncPacket();
+        shortened.fromBytes(buffer.slice(0, buffer.readableBytes() - 8));
+        assertTrue(shortened.isMalformed());
+        assertTrue(shortened.getEvents().isEmpty());
     }
 }

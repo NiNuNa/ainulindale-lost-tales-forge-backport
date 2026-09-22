@@ -16,8 +16,8 @@ import java.util.UUID;
 /**
  * Client request to update the persistent cape settings of one owned
  * identity: a character by id, or the account itself (a null id; on the
- * wire the id slot holds the nil UUID and an appended flag names the
- * account).
+ * wire the id slot holds the nil UUID and the last field, a flag, names
+ * the account).
  */
 public final class CharacterCapeUpdateRequestPacket implements IMessage {
 
@@ -56,9 +56,8 @@ public final class CharacterCapeUpdateRequestPacket implements IMessage {
             UUID characterId = CharacterPacketCodec.readUuid(buffer);
             this.showMinecraftCape = buffer.readBoolean();
             this.cosmeticCapeId = buffer.readUnsignedShort();
-            // Appended: whether the request is the account's own. An older
-            // client never sends it and never names the account.
-            boolean forAccount = buffer.readableBytes() >= 1 && buffer.readBoolean();
+            // Whether the request is the account's own.
+            boolean forAccount = buffer.readBoolean();
             this.characterId = forAccount ? null : characterId;
             if (!forAccount && NIL_UUID.equals(characterId)) {
                 throw new CharacterPacketCodec.DecodeException("nil character id");

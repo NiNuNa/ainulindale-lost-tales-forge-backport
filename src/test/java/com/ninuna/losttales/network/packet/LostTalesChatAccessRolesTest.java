@@ -20,8 +20,7 @@ import static org.junit.Assert.assertTrue;
  * The access packet states the roles apart by identity — the account's
  * own, each own character's own, and each roster holder's account roles
  * and played character — and the server's Proximity radius, after
- * everything else. A payload written before them states neither, and the
- * played mask stands for the account.
+ * everything else.
  */
 public final class LostTalesChatAccessRolesTest {
 

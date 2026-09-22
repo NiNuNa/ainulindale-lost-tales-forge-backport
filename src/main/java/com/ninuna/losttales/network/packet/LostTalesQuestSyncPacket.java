@@ -161,9 +161,6 @@ public class LostTalesQuestSyncPacket implements IMessage {
                         acceptedWorldTime, deadlineWorldTime));
             }
 
-            // Retained on the wire for compatibility with older clients.
-            addIfPresent(this.pinnedQuestIds, readIdentifier(buf));
-
             int pinnedQuestCount = LostTalesPacketCodec.readCount(
                     buf, MAX_QUEST_ID_COLLECTION, "pinned quest");
             for (int i = 0; i < pinnedQuestCount; i++) {
@@ -290,7 +287,6 @@ public class LostTalesQuestSyncPacket implements IMessage {
             }
         }
 
-        writeIdentifier(buf, getPinnedQuestId());
         writeIdentifierSet(buf, this.pinnedQuestIds, "pinned quest");
         writeIdentifier(buf, this.pinnedMapMarkerId);
         writeIdentifierSet(buf, this.discoveredMarkerIds,
@@ -383,13 +379,6 @@ public class LostTalesQuestSyncPacket implements IMessage {
 
     public List<LostTalesQuestDefinition> getDynamicQuestDefinitions() {
         return Collections.unmodifiableList(new ArrayList<LostTalesQuestDefinition>(this.dynamicQuestDefinitions));
-    }
-
-    public String getPinnedQuestId() {
-        for (String questId : this.pinnedQuestIds) {
-            return questId == null ? "" : questId;
-        }
-        return "";
     }
 
     public Set<String> getPinnedQuestIds() {

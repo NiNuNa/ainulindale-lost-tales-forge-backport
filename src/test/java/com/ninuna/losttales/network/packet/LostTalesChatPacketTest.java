@@ -687,31 +687,33 @@ public final class LostTalesChatPacketTest {
                 .getBodyJson());
     }
 
-    /** A payload written before the tail decodes as a line with nothing appended. */
+    /**
+     * Every part of a line is there, the last ones included: a payload
+     * that ends before the quote block, the quote's head, the reactions
+     * or the tab is malformed. The chat history keeps lines as these
+     * bytes, so a kept line of such a shape is quarantined.
+     */
     @Test
-    public void anOlderLayoutWithoutTheTailStillDecodes() {
+    public void aLineEndingBeforeItsLastPartsIsMalformed() {
         LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
                 ChatChannel.ALL, UUID.randomUUID(), "Beren", "Steve", "",
                 0xFFFFFF, 0xFFFFFF, "hello", 1L, "");
         ByteBuf buffer = Unpooled.buffer();
         packet.toBytes(buffer);
-        // The older layout ended where the quote block starts: nothing
-        // for a line that quotes nothing. An empty string is one byte
-        // of length; the tail is a head (17 and a flag), a skin, a
-        // component and a count of named players.
-        // The tab a command's answer is filed under is one more byte
-        // of length, appended last.
+        // The quote block is nothing for a line that quotes nothing. An
+        // empty string is one byte of length; the tail is a head (17 and
+        // a flag), a skin, a component, a count of named players, the
+        // reactions and the tab a command's answer is filed under.
         int tail = 17 + 1 + 1 + 1 + 4 + 4 + 1;
         int quoteBlock = 1 + 1 + 4;
-        ByteBuf older = Unpooled.buffer();
-        older.writeBytes(buffer, buffer.readableBytes() - tail - quoteBlock);
-        LostTalesChatMessagePacket decoded =
-                new LostTalesChatMessagePacket();
-        decoded.fromBytes(older);
-        assertFalse(decoded.isMalformed());
-        assertFalse(decoded.getReply().exists());
-        assertEquals("", decoded.getBodyJson());
-        assertTrue(decoded.getNamedPlayers().isEmpty());
+        int[] shortBy = {tail + quoteBlock, tail, 4 + 1, 1};
+        for (int cut : shortBy) {
+            LostTalesChatMessagePacket decoded =
+                    new LostTalesChatMessagePacket();
+            decoded.fromBytes(buffer.slice(0, buffer.readableBytes() - cut));
+            assertTrue(cut + " bytes short", decoded.isMalformed());
+            assertTrue(decoded.getNamedPlayers().isEmpty());
+        }
     }
 
     /** The reactions ride on the line a reader is handed, and survive its copies. */
@@ -1069,20 +1071,20 @@ public final class LostTalesChatPacketTest {
         assertEquals(partner, theirs.getOwnCharacterId());
         assertEquals(own, theirs.getPartnerCharacterId());
         assertEquals("Aragorn", theirs.getPartnerIdentity());
-        // A payload cut short inside a conversation tail is malformed;
-        // one from an older server, without the tails, reads as accounts.
+        // A payload cut short inside a conversation id, or ending before
+        // them, is malformed.
         buffer = Unpooled.buffer();
         whisper.toBytes(buffer);
         LostTalesChatMessagePacket cut = new LostTalesChatMessagePacket();
         cut.fromBytes(buffer.slice(0,
                 buffer.readableBytes() - scopeTailBytes("") - 5));
         assertTrue(cut.isMalformed());
-        LostTalesChatMessagePacket older = new LostTalesChatMessagePacket();
-        older.fromBytes(buffer.slice(0, buffer.readableBytes() - scopeTailBytes("")
+        LostTalesChatMessagePacket shortened = new LostTalesChatMessagePacket();
+        shortened.fromBytes(buffer.slice(0, buffer.readableBytes() - scopeTailBytes("")
                 - 2 * LostTalesChatMessagePacket.IDENTITY_ID_TAIL_BYTES));
-        assertFalse(older.isMalformed());
-        assertNull(older.getOwnCharacterId());
-        assertNull(older.getPartnerCharacterId());
+        assertTrue(shortened.isMalformed());
+        assertNull(shortened.getOwnCharacterId());
+        assertNull(shortened.getPartnerCharacterId());
         // A plain line never carries them, whatever it is built with.
         LostTalesChatMessagePacket plain = new LostTalesChatMessagePacket(
                 ChatChannel.ALL, UUID.randomUUID(), "Aragorn", "Steve", "",
@@ -1133,10 +1135,16 @@ public final class LostTalesChatPacketTest {
         assertEquals("", global.getScopeValue());
         buffer = Unpooled.buffer();
         faction.toBytes(buffer);
+        // The same line with an empty scope where its own was, and what
+        // follows the scope as it was: scopeTailBytes("") less the empty
+        // scope's one length byte.
+        int behindScope = scopeTailBytes("") - 1;
         ByteBuf forged = Unpooled.buffer();
         forged.writeBytes(buffer.slice(0, buffer.readableBytes()
                 - scopeTailBytes("lotr:gondor")));
         LostTalesPacketCodec.writeUtf8String(forged, "", 128);
+        forged.writeBytes(buffer.slice(buffer.readableBytes() - behindScope,
+                behindScope));
         LostTalesChatMessagePacket unscoped = new LostTalesChatMessagePacket();
         unscoped.fromBytes(forged);
         assertFalse("a faction line may name no conversation at all",
@@ -1161,19 +1169,17 @@ public final class LostTalesChatPacketTest {
         assertEquals(target, decoded.getTargetCharacterId());
         assertEquals("Aldric", decoded.getTargetIdentity());
         assertEquals(3L, decoded.getEchoNonce());
-        // Cut short inside the tail it is malformed; without the tail,
-        // as an older client sends it, the target is named alone.
+        // Cut short inside the id, or without it (a presence flag and a
+        // UUID), the request is malformed.
         buffer = Unpooled.buffer();
         send.toBytes(buffer);
         LostTalesChatSendPacket cut = new LostTalesChatSendPacket();
         cut.fromBytes(buffer.slice(0, buffer.readableBytes() - 3));
         assertTrue(cut.isMalformed());
-        LostTalesChatSendPacket older = new LostTalesChatSendPacket();
-        older.fromBytes(buffer.slice(0, buffer.readableBytes()
-                - LostTalesChatSendPacket.TARGET_ID_TAIL_BYTES));
-        assertFalse(older.isMalformed());
-        assertNull(older.getTargetCharacterId());
-        assertEquals("Aldric", older.getTargetIdentity());
+        LostTalesChatSendPacket shortened = new LostTalesChatSendPacket();
+        shortened.fromBytes(buffer.slice(0, buffer.readableBytes() - (1 + 16)));
+        assertTrue(shortened.isMalformed());
+        assertNull(shortened.getTargetCharacterId());
         assertNull(new LostTalesChatSendPacket(ChatChannel.OOC, "hi")
                 .getTargetCharacterId());
     }

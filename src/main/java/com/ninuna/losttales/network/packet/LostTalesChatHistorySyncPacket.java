@@ -85,10 +85,8 @@ public final class LostTalesChatHistorySyncPacket implements IMessage {
                 }
                 decoded.add(message);
             }
-            // Appended after the lines: where the reader arrived. A batch
-            // written before it is all history, as it was then.
-            this.arrivalId = buffer.readableBytes() >= 8
-                    ? buffer.readLong() : Long.MAX_VALUE;
+            // After the lines: where the reader arrived.
+            this.arrivalId = buffer.readLong();
             LostTalesPacketCodec.requireFinished(buffer);
             this.messages = Collections.unmodifiableList(decoded);
         } catch (RuntimeException exception) {
