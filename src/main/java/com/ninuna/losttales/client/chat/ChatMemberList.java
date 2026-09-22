@@ -1,10 +1,18 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatAccountRole;
+import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatChannelIconSpec;
 import com.ninuna.losttales.chat.ChatEpithet;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
+import com.ninuna.losttales.chat.ChatRolePresentation;
+import com.ninuna.losttales.chat.emoji.ChatEmoji;
+import com.ninuna.losttales.compat.lotr.LotrFactionBannerResolver;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.client.motion.MotionIds;
 import java.nio.charset.Charset;
@@ -15,6 +23,8 @@ import java.util.Locale;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.StatCollector;
 import org.lwjgl.opengl.GL11;
 
@@ -28,10 +38,12 @@ import org.lwjgl.opengl.GL11;
  * <p>Every conversation has one. The server says who is in it and how
  * they are grouped ({@link ClientChatMembers}): those here by faction on
  * an in-character channel and by highest role on an out-of-character one,
- * each group headed with its name and count, those without a role under
- * Online; then under Offline everyone else who may read it, by name — its
- * count taking in those an answer too long to list leaves out, who are
- * counted on a line of their own at the end. A whisper lists its two
+ * each group headed with its icon, its name and its count — a faction's
+ * banner, as the Faction tab wears it, a role's icon, the green sphere
+ * over those without a role under Online — then under the grey sphere and
+ * Offline everyone else who may read it, by name, its count taking in
+ * those an answer too long to list leaves out, who are counted on a line
+ * of their own at the end. A whisper lists its two
  * people and the Client Console the player alone; a conversation with an
  * NPC lists the player and the NPC, whom this client adds itself
  * ({@link #membersOf}).</p>
@@ -81,6 +93,11 @@ final class ChatMemberList {
     static final int INSET = 5;
     /** Clear space between a head's sphere and the name, in the list's units. */
     static final int NAME_GAP = 3;
+    /** A heading's icon: an emoji's box, in the list's units, and the space after it. */
+    static final int HEADING_ICON_SIZE = ChatEmoji.SPRITE_SIZE;
+    static final int HEADING_ICON_GAP = 3;
+    /** What an NPC's own group is known by, before its faction's name. */
+    static final String NPC_GROUP_PREFIX = "npc:";
     /** Clear space between the name's capitals and the title's, in the list's units. */
     static final int TITLE_GAP = 3;
     /** Clear space the names keep from the window's edge, in the list's units. */
@@ -93,14 +110,25 @@ final class ChatMemberList {
     static final class Row {
         /** The heading's words; null on a member's row. */
         final String heading;
+        /**
+         * The first member of the group a heading heads, whose group its
+         * icon is read from; null on a member's row, over the absent and
+         * on the line counting those left out.
+         */
+        final LostTalesChatMembersPacket.Member groupOf;
+        /** Whether the heading heads the absent, under the grey sphere. */
+        final boolean offline;
         final LostTalesChatMembersPacket.Member member;
         /** The row's top, in the list's units, measured down from the list's own top. */
         final int top;
         final int height;
 
-        private Row(String heading, LostTalesChatMembersPacket.Member member,
+        private Row(String heading, LostTalesChatMembersPacket.Member groupOf,
+                    boolean offline, LostTalesChatMembersPacket.Member member,
                     int top, int height) {
             this.heading = heading;
+            this.groupOf = groupOf;
+            this.offline = offline;
             this.member = member;
             this.top = top;
             this.height = height;
@@ -244,7 +272,7 @@ final class ChatMemberList {
         int groupOrder = 0;
         if (faction != null && faction.trim().length() > 0) {
             groupName = faction.trim();
-            groupKey = "npc:" + groupName.toLowerCase(Locale.ROOT);
+            groupKey = NPC_GROUP_PREFIX + groupName.toLowerCase(Locale.ROOT);
             for (LostTalesChatMembersPacket.Member member : answered) {
                 if (member.isOnline()
                         && member.getGroupName().equalsIgnoreCase(groupName)) {
@@ -287,10 +315,12 @@ final class ChatMemberList {
             boolean offline = !first.isOnline();
             offlineHeaded |= offline;
             rows.add(new Row(headingOf(first, end - index
-                    + (offline ? unlisted : 0)), null, top, HEADER_HEIGHT));
+                    + (offline ? unlisted : 0)), offline ? null : first,
+                    offline, null, top, HEADER_HEIGHT));
             top += HEADER_HEIGHT;
             for (int at = index; at < end; at++) {
-                rows.add(new Row(null, members.get(at), top, ROW_HEIGHT));
+                rows.add(new Row(null, null, false, members.get(at), top,
+                        ROW_HEIGHT));
                 top += ROW_HEIGHT;
             }
             index = end;
@@ -300,13 +330,14 @@ final class ChatMemberList {
                 if (!rows.isEmpty()) {
                     top += GROUP_GAP;
                 }
-                rows.add(new Row(offlineHeading(unlisted), null, top,
-                        HEADER_HEIGHT));
+                rows.add(new Row(offlineHeading(unlisted), null, true,
+                        null, top, HEADER_HEIGHT));
                 top += HEADER_HEIGHT;
             }
             rows.add(new Row(StatCollector.translateToLocalFormatted(
                     "gui.losttales.chat.members.more",
-                    Integer.toString(unlisted)), null, top, HEADER_HEIGHT));
+                    Integer.toString(unlisted)), null, false, null, top,
+                    HEADER_HEIGHT));
         }
         return rows;
     }
@@ -345,6 +376,13 @@ final class ChatMemberList {
                 "gui.losttales.chat.members.heading",
                 StatCollector.translateToLocal("gui.losttales.chat.members.offline"),
                 Integer.toString(count));
+    }
+
+    /** A member's name as the row writes it: the server's in this client's language. */
+    static String nameOf(LostTalesChatMembersPacket.Member member) {
+        return LostTalesChatMessagePacket.isServerSender(member.getPlayerId())
+                ? StatCollector.translateToLocal("chat.losttales.server.name")
+                : member.getName();
     }
 
     /**
@@ -520,7 +558,7 @@ final class ChatMemberList {
                     continue;
                 }
                 if (row.member == null) {
-                    drawHeading(minecraft, font, row.heading, rowsLeft, rowTop,
+                    drawHeading(minecraft, font, tab, row, rowsLeft, rowTop,
                             unit, roomRight, rowsOriginX, scale, clipTop,
                             clipBottom, alpha);
                     continue;
@@ -557,26 +595,118 @@ final class ChatMemberList {
     /**
      * A heading, or the line counting the absent left out: the chat's
      * small text in its aside tone, its capitals centred in the row, the
-     * odd pixel up, sinking into the list's edge where it is cut.
+     * odd pixel up, sinking into the list's edge where it is cut. A
+     * heading stands behind its group's icon, as a tab's name stands
+     * behind the tab's.
      */
     private static void drawHeading(Minecraft minecraft, FontRenderer font,
-                                    String heading, float rowsLeft,
+                                    ChatTab tab, Row row, float rowsLeft,
                                     float rowTop, float unit, float roomRight,
                                     float rowsOriginX, float scale,
                                     float clipTop, float clipBottom,
                                     int alpha) {
+        int textTop = LostTalesUiInk.centredStart(HEADER_HEIGHT,
+                LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT);
+        int textLeft = INSET;
         GL11.glPushMatrix();
         try {
             GL11.glTranslatef(rowsLeft, rowTop, 0.0F);
             GL11.glScalef(unit, unit, 1.0F);
-            drawCutText(minecraft, font, heading, INSET,
-                    LostTalesUiInk.centredStart(HEADER_HEIGHT,
-                            LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT),
+            if (row.offline) {
+                drawHeadingSphere(LostTalesUiSheet.PRESENCE_OFFLINE, INSET,
+                        textTop, alpha);
+                textLeft += HEADING_ICON_SIZE + HEADING_ICON_GAP;
+            } else if (row.groupOf != null) {
+                drawHeadingIcon(minecraft, tab, row.groupOf, INSET, textTop,
+                        alpha);
+                textLeft += HEADING_ICON_SIZE + HEADING_ICON_GAP;
+            }
+            drawCutText(minecraft, font, row.heading, textLeft, textTop,
                     LostTalesChatVisualStyle.asideRgb(), alpha, roomRight,
                     0.0F, rowsOriginX, scale * unit, clipTop, clipBottom);
         } finally {
             GL11.glPopMatrix();
         }
+    }
+
+    /**
+     * The icon the heading of a group of those here stands behind, in an
+     * emoji's box at {@code x} beside capitals whose top is
+     * {@code textTop}: the green sphere over those without a role, a
+     * faction's banner as the Faction tab wears it, a role's own icon,
+     * the face an NPC's conversation wears over an NPC's group, and the
+     * Discord emoji over a Discord server's members.
+     */
+    private static void drawHeadingIcon(Minecraft minecraft, ChatTab tab,
+                                        LostTalesChatMembersPacket.Member first,
+                                        int x, int textTop, int alpha) {
+        int boxTop = textTop - LostTalesChatOverlayRenderer.ROW_TEXT_TOP;
+        String group = first.getGroupKey();
+        if (group.startsWith(NPC_GROUP_PREFIX)) {
+            ChatInlineIcons.drawEmoji(minecraft, ChatEmoji.GRINNING, x, boxTop,
+                    HEADING_ICON_SIZE, alpha);
+            return;
+        }
+        if (LostTalesChatMembersPacket.isDiscordGroup(group)) {
+            ChatInlineIcons.drawEmoji(minecraft, ChatEmoji.DISCORD, x, boxTop,
+                    HEADING_ICON_SIZE, alpha);
+            return;
+        }
+        ChatChannel channel = tab == null ? null : tab.getChannel();
+        if (channel != null && ChatRolePresentation.isInCharacter(channel)) {
+            ItemStack banner = group.length() == 0 ? null
+                    : LotrFactionBannerResolver.bannerFor(group);
+            if (banner != null) {
+                ChatInlineIcons.drawItem(minecraft, banner, x, boxTop,
+                        HEADING_ICON_SIZE, alpha);
+            } else {
+                ChatInlineIcons.drawEmoji(minecraft,
+                        ChatChannelIcons.iconOf(ChatChannel.FACTION), x, boxTop,
+                        HEADING_ICON_SIZE, alpha);
+            }
+            return;
+        }
+        if (group.length() == 0) {
+            drawHeadingSphere(LostTalesUiSheet.PRESENCE_ONLINE, x, textTop,
+                    alpha);
+            return;
+        }
+        drawRoleIcon(minecraft, ChatAccountRole.byId(group), x, boxTop, alpha);
+    }
+
+    /** A sphere at its own size, centred in the icon's box and on the capitals beside it. */
+    private static void drawHeadingSphere(LostTalesUiSheet sphere, int x,
+                                          int textTop, int alpha) {
+        sphere.drawWithShadow(x + LostTalesUiInk.centredStart(HEADING_ICON_SIZE,
+                        sphere.getWidth()),
+                textTop + LostTalesUiInk.centredStart(
+                        LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT,
+                        sphere.getHeight()), alpha);
+    }
+
+    /**
+     * A role's icon: its emoji, or its item drawn as an item in a line
+     * is, and the face a channel given no icon wears for a role given
+     * none or one this client cannot draw.
+     */
+    private static void drawRoleIcon(Minecraft minecraft, ChatAccountRole role,
+                                     int x, int boxTop, int alpha) {
+        ChatChannelIconSpec icon = role.getIcon();
+        if (icon != null && icon.getKind() == ChatChannelIconSpec.Kind.ITEM) {
+            Object item = Item.itemRegistry.getObject(icon.getName());
+            if (item instanceof Item) {
+                ChatInlineIcons.drawItem(minecraft,
+                        new ItemStack((Item)item, 1, icon.getMeta()), x, boxTop,
+                        HEADING_ICON_SIZE, alpha);
+                return;
+            }
+        }
+        ChatEmoji emoji = icon != null && icon.getKind()
+                == ChatChannelIconSpec.Kind.EMOJI ? ChatEmoji.fromName(icon.getName())
+                : null;
+        ChatInlineIcons.drawEmoji(minecraft, emoji != null ? emoji
+                        : ChatChannelIcons.PLAIN_FACE, x, boxTop,
+                HEADING_ICON_SIZE, alpha);
     }
 
     /**
@@ -600,7 +730,7 @@ final class ChatMemberList {
                                    final int alpha, double elapsed) {
         final int capitals = LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT;
         final List<Part> nameLine = new ArrayList<Part>(2);
-        nameLine.add(new Part(member.getName(), "", member.getNameColor()));
+        nameLine.add(new Part(nameOf(member), "", member.getNameColor()));
         if (member.getTitle().length() > 0) {
             nameLine.add(new Part(ChatEpithet.translate(
                     "chat.losttales.title.suffix", ", the %s",
@@ -622,6 +752,10 @@ final class ChatMemberList {
                 said ? capitals + TITLE_GAP + capitals : capitals);
         final int textLeft = INSET + ChatAvatar.ICON_WIDTH + NAME_GAP;
         final float unitScale = scale * unit;
+        // The display pixels one of the list's units takes, which a mark
+        // standing for a head is fitted to as an avatar's is.
+        final float pixelsPerUnit = unitScale
+                * ChatWindowFrame.displayScaleFactor();
         // A line cut short slides along while the pointer rests on its
         // row, as a cut tab name does, and glides home after; one row at
         // a time, the one last lit, and every other stays home.
@@ -641,11 +775,11 @@ final class ChatMemberList {
                     + RIGHT_GAP, ROW_HEIGHT, new LostTalesUiFlatLayers.Layers() {
                         @Override
                         public void draw() {
-                            LostTalesChatOverlayRenderer.drawFace(minecraft,
-                                    headOf(member), INSET,
+                            LostTalesChatOverlayRenderer.drawAvatarHead(
+                                    minecraft, headOf(member), INSET,
                                     LostTalesUiInk.centredStart(ROW_HEIGHT,
                                             ChatAvatar.SIZE),
-                                    ChatAvatar.SIZE, alpha);
+                                    pixelsPerUnit, alpha);
                             LostTalesUiFlatLayers.nextLayer();
                             drawCutParts(minecraft, font, nameLine,
                                     textLeft, nameTop, alpha, roomRight,

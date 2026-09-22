@@ -168,6 +168,11 @@ final class ChatMentionMarker {
             this.recorded = recorded;
         }
 
+        /** Whether the mention is of a role rather than of a player. */
+        boolean isRole() {
+            return this.account.startsWith(ROLE_TARGET_PREFIX);
+        }
+
         /**
          * The targeted role, or null for an account mention. Every real
          * role answers, not only the mentionable ones: a worn-only role

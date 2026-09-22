@@ -13,9 +13,14 @@ import com.ninuna.losttales.chat.ChatFormattingCodes;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.chat.ChatRecipientRule;
 import com.ninuna.losttales.chat.ChatRolePresentation;
+import com.ninuna.losttales.compat.discord.DiscordMemberDirectory;
+import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.compat.lotr.LotrFactionColors;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatMembersRequestPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.party.model.Party;
 import com.ninuna.losttales.party.model.PartyMember;
 import java.util.ArrayList;
@@ -66,6 +71,11 @@ import net.minecraft.world.storage.IPlayerFileData;
  * player's own console is the player alone, and a whisper is its two
  * people ({@link #answerForWhisper}).</p>
  *
+ * <p>While the server lists Discord members, everyone who can see a
+ * Discord channel linked to the conversation is a member too: under their
+ * Discord server's name while online, after all of the game's own groups,
+ * and among the absent while offline.</p>
+ *
  * <p>Who is here is read afresh for every answer. Who may be absent from a
  * room is read from the rosters at most once every
  * {@link #ABSENT_REFRESH_MILLIS} for each conversation and kept until
@@ -78,6 +88,10 @@ public final class ChatMemberDirectory {
     static final long ABSENT_REFRESH_MILLIS = 15000L;
 
     private static final Map<String, Absentees> ABSENT = new HashMap<String, Absentees>();
+    /** The server's name as its member row sorts. */
+    private static final String SERVER_NAME = "Server";
+    /** A Discord server's heading while its name is not known. */
+    private static final String DISCORD_NAME = "Discord";
 
     /** A conversation's members as one answer lists them, and how many more absent ones it leaves out. */
     public static final class Answer {
@@ -118,12 +132,31 @@ public final class ChatMemberDirectory {
     private ChatMemberDirectory() {}
 
     /**
+     * The list a client's ask names, as the packet that answers it: a
+     * whisper's two people, or whoever the channel reaches and may read
+     * it.
+     */
+    public static LostTalesChatMembersPacket listFor(EntityPlayerMP viewer,
+            LostTalesChatMembersRequestPacket request) {
+        ChatChannel channel = request.getChannel();
+        Answer answer = channel == ChatChannel.WHISPER
+                ? answerForWhisper(viewer, request.getPartnerAccount(),
+                        request.getPartnerIdentity(),
+                        request.getPartnerCharacterId(),
+                        request.getHeldCharacterId())
+                : answerFor(viewer, channel);
+        return new LostTalesChatMembersPacket(channel,
+                request.getConversationKey(), answer.members, answer.unlisted);
+    }
+
+    /**
      * The members of {@code channel}'s conversation as {@code viewer}
      * reads it, grouped and ordered as the list stands them, at most
      * {@link LostTalesChatMembersPacket#MAX_MEMBERS}: the viewer alone in
-     * a private console, and none for a channel the viewer may not read,
-     * or for the whisper channel, whose conversations are asked for by
-     * their two people ({@link #answerForWhisper}).
+     * a private console, the server itself among the Server Console's
+     * readers, and none for a channel the viewer may not read, or for the
+     * whisper channel, whose conversations are asked for by their two
+     * people ({@link #answerForWhisper}).
      */
     public static Answer answerFor(EntityPlayerMP viewer, ChatChannel channel) {
         if (viewer == null || channel == null || channel == ChatChannel.WHISPER
@@ -171,12 +204,37 @@ public final class ChatMemberDirectory {
             present.add(present(member, character, channel, inCharacter));
             presentKeys.add(keyOf(member, character));
         }
+        if (channel == ChatChannel.SERVER_CONSOLE) {
+            // The server speaks in its console as a voice of its own,
+            // and is online for as long as anybody can read it.
+            present.add(serverMember());
+        }
         List<Absentee> absent = absenteesOf(viewer, channel, party, factionId,
                 inCharacter);
         RoleplayCharacter viewerAs = inCharacter
                 ? ChatIdentitySelection.character(viewer) : null;
         if (!presentKeys.contains(keyOf(viewer, viewerAs))) {
             absent = with(absent, absentAs(viewer, viewerAs, channel));
+        }
+        List<Absentee> discordAbsent = new ArrayList<Absentee>();
+        for (DiscordMemberDirectory.Seen seen : LostTalesDiscordBridge.getInstance()
+                .membersSeeing(channel, factionId)) {
+            UUID senderId = LostTalesChatMessagePacket.discordSenderId(seen.userId);
+            if (LostTalesChatMessagePacket.DISCORD_SENDER_ID.equals(senderId)) {
+                continue;
+            }
+            LostTalesChatMembersPacket.Member member = discordMember(senderId, seen);
+            if (member.isOnline()) {
+                present.add(member);
+                presentKeys.add(accountKey(senderId));
+            } else {
+                discordAbsent.add(new Absentee(accountKey(senderId), member));
+            }
+        }
+        if (!discordAbsent.isEmpty()) {
+            discordAbsent.addAll(absent);
+            Collections.sort(discordAbsent, BY_NAME);
+            absent = discordAbsent;
         }
         return assemble(present, absent, presentKeys,
                 LostTalesChatMembersPacket.MAX_MEMBERS);
@@ -573,6 +631,34 @@ public final class ChatMemberDirectory {
                 role.isNone() ? "" : role.getId(),
                 role.isNone() ? "" : role.getDisplayName(),
                 role.isNone() ? 0 : rolePlace(role), true);
+    }
+
+    /**
+     * The server as a member of its console: online, in the console's
+     * grey, named as its lines are named. The client writes the name in
+     * its own language; this one sorts it.
+     */
+    private static LostTalesChatMembersPacket.Member serverMember() {
+        int color = LostTalesColors.rgb(LostTalesColors.ROSE_GRAY);
+        return new LostTalesChatMembersPacket.Member(
+                LostTalesChatMessagePacket.SERVER_SENDER_ID, SERVER_NAME, null,
+                SERVER_NAME, color, "", "", color, "", "", 0, true);
+    }
+
+    /**
+     * A Discord member as a list stands them: named as their lines are,
+     * and in the same grey, under their Discord server while online.
+     */
+    private static LostTalesChatMembersPacket.Member discordMember(UUID senderId,
+            DiscordMemberDirectory.Seen seen) {
+        int color = LostTalesColors.rgb(LostTalesColors.ROSE_GRAY);
+        boolean online = seen.status != null;
+        String server = seen.guildName.length() > 0 ? seen.guildName : DISCORD_NAME;
+        return new LostTalesChatMembersPacket.Member(senderId, seen.name, null,
+                seen.name, color, "", "", color,
+                online ? LostTalesChatMembersPacket.DISCORD_GROUP_PREFIX + seen.guildId
+                        : ABSENT_GROUP,
+                online ? server : "", 0, online);
     }
 
     /** An absent character, in its faction's colour; the title is read from a player here only. */

@@ -38,16 +38,20 @@ final class DiscordHttp {
     private static final Charset UTF_8 = Charset.forName("UTF-8");
     private static final String USER_AGENT = "DiscordBot (losttales, "
             + LostTalesMetaData.MOD_VERSION + ")";
-    /** A webhook's token in an address, which is all its secret is. */
-    private static final Pattern WEBHOOK_TOKEN =
-            Pattern.compile("(/webhooks/\\d+/)[^/?#\\s]+");
+    /**
+     * The token in a webhook's address or in a slash command's answer
+     * address: all the secret either has.
+     */
+    private static final Pattern ADDRESS_TOKEN =
+            Pattern.compile("(/(?:webhooks|interactions)/\\d+/)[^/?#\\s]+");
 
     private DiscordHttp() {}
 
     /**
      * A failure as a log may show it: its kind and its message, with the
-     * token of any webhook address in it blanked, since whoever holds a
-     * webhook's address can post through it.
+     * token of any webhook or slash command address in it blanked, since
+     * whoever holds a webhook's address can post through it, and a slash
+     * command's can answer for the bot while it lasts.
      */
     static String describe(Throwable failure) {
         if (failure == null) {
@@ -56,7 +60,7 @@ final class DiscordHttp {
         String message = failure.getMessage();
         String text = failure.getClass().getSimpleName()
                 + (message == null ? "" : ": " + message);
-        return WEBHOOK_TOKEN.matcher(text).replaceAll("$1***");
+        return ADDRESS_TOKEN.matcher(text).replaceAll("$1***");
     }
 
     /**

@@ -182,6 +182,8 @@ public class LostTalesCommonProxy {
                 new LostTalesWaystoneGenerationHandler();
         cpw.mods.fml.common.FMLCommonHandler.instance().bus().register(new ChatIdentitySelection());
         cpw.mods.fml.common.FMLCommonHandler.instance().bus().register(new ChatPresenceService());
+        cpw.mods.fml.common.FMLCommonHandler.instance().bus().register(
+                new com.ninuna.losttales.chat.server.ChatMemberWatches());
         LostTalesChatRoleRosterWatcher chatRoleRosterWatcher =
                 new LostTalesChatRoleRosterWatcher();
         MinecraftForge.EVENT_BUS.register(questPlayerEventHandler);
@@ -416,6 +418,7 @@ public class LostTalesCommonProxy {
         DiscordGameEventRelay.clear();
         LostTalesDiscordBridge.getInstance().resetSession();
         ChatMemberDirectory.clear();
+        com.ninuna.losttales.chat.server.ChatMemberWatches.clear();
         ChatAuditLog.onServerStarting();
         LostTalesMobAggroEventHandler.clearAll();
         LotrRaceProfileAdapter.getInstance().clear();
@@ -529,6 +532,7 @@ public class LostTalesCommonProxy {
         DiscordGameEventRelay.clear();
         LostTalesDiscordBridge.getInstance().resetSession();
         ChatMemberDirectory.clear();
+        com.ninuna.losttales.chat.server.ChatMemberWatches.clear();
         ChatAuditLog.onServerStopping();
         LostTalesMobAggroEventHandler.clearAll();
         LotrRaceProfileAdapter.getInstance().clear();

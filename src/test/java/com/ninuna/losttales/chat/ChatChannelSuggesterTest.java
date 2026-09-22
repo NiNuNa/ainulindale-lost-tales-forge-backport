@@ -53,9 +53,10 @@ public final class ChatChannelSuggesterTest {
     public void aMessageLinkIsTheShownNameASlashAndTheServersId() {
         assertEquals("#Global/1757522000000",
                 ChatChannelSuggester.messageLink(ChatChannel.ALL, 1757522000000L));
-        assertEquals("#OOC/12",
+        assertEquals("#OutofCharacter/12",
                 ChatChannelSuggester.messageLink(ChatChannel.OOC, 12L));
         // What it spells resolves back to the channel it names.
+        assertSame(ChatChannel.OOC, ChatChannelSuggester.resolve("OutofCharacter"));
         assertSame(ChatChannel.OOC, ChatChannelSuggester.resolve("OOC"));
         // A whisper cannot be linked to, and neither can a line the
         // server never named.

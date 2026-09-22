@@ -863,6 +863,7 @@ gui.losttales.chat.window.color.selected=Selected Line Colour
 gui.losttales.chat.window.color.mention=Mention Colour
 gui.losttales.chat.window.color.selected_mention=Selected Mention Colour
 gui.losttales.chat.window.color.automatic=One Shade Lighter
+gui.losttales.chat.window.color.default=%s (Default)
 gui.losttales.chat.window.color.reply=Reply Highlight Colour
 losttales.palette.seafoam=Seafoam
 losttales.palette.teal=Teal

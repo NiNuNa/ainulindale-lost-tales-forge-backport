@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiCaret;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -32,7 +33,7 @@ public final class ChatInputLineTest {
         assertEquals(gap, line.fieldLeft - (line.leftDividerX + divider));
         // From a caret standing at the field's end to the second divider.
         assertEquals(gap, line.rightDividerX
-                - (line.fieldRight + ChatInputField.CARET_WIDTH));
+                - (line.fieldRight + LostTalesUiCaret.WIDTH));
         // From the second divider to the counter.
         assertEquals(gap, line.counterLeft - (line.rightDividerX + divider));
         // And from the end of the counter's slot to the controls.
@@ -46,7 +47,7 @@ public final class ChatInputLineTest {
                 line.wellLeft);
         assertEquals(line.rightDividerX, line.wellRight);
         assertTrue(line.fieldLeft > line.wellLeft);
-        assertTrue(line.fieldRight + ChatInputField.CARET_WIDTH
+        assertTrue(line.fieldRight + LostTalesUiCaret.WIDTH
                 < line.wellRight);
     }
 

@@ -1,6 +1,8 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatNarrator;
 import com.ninuna.losttales.chat.ChatPresence;
+import com.ninuna.losttales.gui.style.LostTalesUiCornerCut;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.awt.image.BufferedImage;
@@ -16,9 +18,10 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * The sphere a head wears for its identity's presence sits in a corner
- * the head gives up: the cut is the sphere's shape grown by a pixel, so a
- * clear pixel runs between the two along every side the sphere has ink
- * on, and the corner its round artwork does not reach keeps its pixel.
+ * the head gives up: the cut is the sphere's shape grown by a pixel up,
+ * down, left and right, so a clear pixel runs between the two along
+ * every side the sphere has ink on, and the pixels off its rounded
+ * corner stay the head's.
  * It stands two pixels past the head's right edge and one below its
  * bottom, and the head and the sphere are laid out as one icon, so what
  * follows keeps its clear space from the sphere.
@@ -44,24 +47,18 @@ public final class ChatPresenceMarkTest {
     }
 
     /**
-     * The head gives up the sphere's <em>shape</em> grown by a pixel on
-     * every side, not its box: read from the sheet's own artwork, every
-     * head pixel within one of a sphere's inked texels is cut, and no
-     * other. The two steps {@link ChatPresenceMark#beginHeadCut} cuts in
-     * are exactly that, and the corner they meet at keeps its pixel
-     * because the sphere's own corner there is clear.
+     * The head gives up the sphere's <em>shape</em> grown by a pixel up,
+     * down, left and right, not its box: read from the sheet's own
+     * artwork, every head pixel next to one of a sphere's inked texels,
+     * or on one, is cut, and no other. The outline the cut is built
+     * from is the sheet's own.
      */
     @Test
     public void theCutIsTheSpheresShapeGrownByAPixel() throws Exception {
-        assertEquals(1, ChatPresenceMark.CUT_MARGIN);
         BufferedImage sheet = readSheet();
         int sphereX = HEAD - ChatPresenceMark.INSET_X;
         int sphereY = HEAD - ChatPresenceMark.INSET_Y;
-        // The two steps the head is cut in.
-        int lowerX = sphereX - ChatPresenceMark.CUT_MARGIN;
-        int lowerY = sphereY;
-        int upperX = sphereX;
-        int upperY = sphereY - ChatPresenceMark.CUT_MARGIN;
+        LostTalesUiCornerCut cut = ChatPresenceMark.cutFor(0.0F, 0.0F, HEAD);
         LostTalesUiSheet[] spheres = {
                 LostTalesUiSheet.PRESENCE_ONLINE,
                 LostTalesUiSheet.PRESENCE_AWAY,
@@ -70,11 +67,19 @@ public final class ChatPresenceMarkTest {
                 LostTalesUiSheet.PRESENCE_SELECTED,
         };
         for (LostTalesUiSheet sphere : spheres) {
+            for (int row = 0; row < ChatPresenceMark.SIZE; row++) {
+                assertEquals(sphere + " row " + row,
+                        ChatPresenceMark.SPHERE_INK_LEFT[row],
+                        firstInk(sheet, sphere, row));
+            }
             for (int y = 0; y < HEAD; y++) {
                 for (int x = 0; x < HEAD; x++) {
                     boolean nearInk = false;
                     for (int dy = -1; dy <= 1 && !nearInk; dy++) {
                         for (int dx = -1; dx <= 1 && !nearInk; dx++) {
+                            if (Math.abs(dx) + Math.abs(dy) > 1) {
+                                continue;
+                            }
                             int sx = x + dx - sphereX;
                             int sy = y + dy - sphereY;
                             nearInk = sx >= 0 && sy >= 0
@@ -83,21 +88,27 @@ public final class ChatPresenceMarkTest {
                                     && inked(sheet, sphere, sx, sy);
                         }
                     }
-                    boolean cut = (x >= lowerX && y >= lowerY)
-                            || (x >= upperX && y >= upperY);
                     assertEquals(sphere + " at " + x + "," + y, nearInk,
-                            cut);
+                            cut.cuts(x, y));
                 }
             }
         }
-        // The pixel the steps meet at stays: the one the sphere's round
-        // corner points at, diagonally off it.
-        int cornerX = lowerX;
-        int cornerY = upperY;
-        assertEquals(4, cornerX);
-        assertEquals(3, cornerY);
-        assertFalse((cornerX >= lowerX && cornerY >= lowerY)
-                || (cornerX >= upperX && cornerY >= upperY));
+        // The two pixels off the sphere's rounded top-left corner stay.
+        assertFalse(cut.cuts(sphereX, sphereY - 1));
+        assertFalse(cut.cuts(sphereX - 1, sphereY));
+        assertTrue(cut.cuts(sphereX + 1, sphereY - 1));
+        assertTrue(cut.cuts(sphereX - 1, sphereY + 1));
+    }
+
+    /** The first inked column of a cell's row; the cell's width for a clear row. */
+    private static int firstInk(BufferedImage sheet, LostTalesUiSheet cell,
+                                int row) {
+        for (int x = 0; x < cell.getWidth(); x++) {
+            if (inked(sheet, cell, x, row)) {
+                return x;
+            }
+        }
+        return cell.getWidth();
     }
 
     private static boolean inked(BufferedImage sheet, LostTalesUiSheet cell,
@@ -128,31 +139,69 @@ public final class ChatPresenceMarkTest {
                 > ChatInlineIcons.HEAD_SLOT_WIDTH);
     }
 
-    /** A player's own head on their own line wears one; nothing else does. */
+    /**
+     * Every voice that can be online wears one on its own line: a
+     * player's account and characters, and the server. An NPC, the
+     * client, the Narrator and the bridge itself never do, and nor does a
+     * reply's quote.
+     */
     @Test
-    public void onlyAPlayersOwnHeadWearsASphere() {
+    public void everyVoiceThatCanBeOnlineWearsASphere() {
         UUID player = UUID.randomUUID();
         assertTrue(ChatPresenceMark.wears(ownHead(ChatHeadMarker.encode(
                 player, true, null, "", "", 0, 0))));
         assertTrue(ChatPresenceMark.wears(ownHead(ChatHeadMarker.encode(
                 player, false, UUID.randomUUID(), "skin", "", 0, 0))));
-        // An NPC has no account at all.
-        assertFalse(ChatPresenceMark.wears(ownHead(ChatHeadMarker.encodeNpc(
-                player, "skin", "", 0, 0))));
-        // Nor have the server, the client or the bridge.
-        assertFalse(ChatPresenceMark.wears(ownHead(ChatHeadMarker.encode(
+        assertTrue(ChatPresenceMark.wears(ownHead(ChatHeadMarker.encode(
                 LostTalesChatMessagePacket.SERVER_SENDER_ID, true, null, "",
                 "", 0, 0))));
+        assertFalse(ChatPresenceMark.wears(ownHead(ChatHeadMarker.encodeNpc(
+                player, "skin", "", 0, 0))));
         assertFalse(ChatPresenceMark.wears(ownHead(ChatHeadMarker.encode(
                 LostTalesChatMessagePacket.CLIENT_SENDER_ID, true, null, "",
                 "", 0, 0))));
-        // A reply's quote wears the quoted head without one: a quote does
-        // not say which of the sender's characters spoke.
+        assertFalse(ChatPresenceMark.wears(ownHead(ChatHeadMarker.encode(
+                LostTalesChatMessagePacket.DISCORD_SENDER_ID, true, null, "",
+                "", 0, 0))));
+        assertFalse(ChatPresenceMark.wears(ownHead(ChatHeadMarker.encode(
+                player, false, UUID.randomUUID(), ChatNarrator.SKIN_ID, "", 0, 0))));
+        // A quote does not say which of the sender's characters spoke.
         assertFalse(ChatPresenceMark.wears(
                 ChatHeadMarker.Data.head(player, true, false, "")));
         assertFalse(ChatPresenceMark.wears(
                 ChatHeadMarker.Data.head(player, false, false, "skin")));
         assertFalse(ChatPresenceMark.wears(null));
+    }
+
+    /** A Discord member wears their status only while the server follows Discord statuses. */
+    @Test
+    public void aDiscordMemberWearsAStatusOnlyWhileTheServerFollowsThem() {
+        UUID member = LostTalesChatMessagePacket.discordSenderId("80351110224678912");
+        try {
+            assertFalse(ChatPresenceMark.hasStatus(member, false, false));
+            ClientChatPresence.setDiscordStatuses(true);
+            assertTrue(ChatPresenceMark.hasStatus(member, false, false));
+            // Nobody has said they are online, so they are offline.
+            assertEquals(ChatPresence.OFFLINE,
+                    ChatPresenceMark.statusOf(member, true, null));
+            // The bridge's own id is nobody, statuses or not.
+            assertFalse(ChatPresenceMark.hasStatus(
+                    LostTalesChatMessagePacket.DISCORD_SENDER_ID, false, false));
+        } finally {
+            ClientChatPresence.clear();
+        }
+    }
+
+    /** The server is online while it runs; a character line naming no character is offline. */
+    @Test
+    public void theServerIsOnlineAndAnUnnamedCharacterIsOffline() {
+        assertEquals(ChatPresence.ONLINE, ChatPresenceMark.statusOf(
+                LostTalesChatMessagePacket.SERVER_SENDER_ID, true, null));
+        assertEquals(ChatPresence.OFFLINE, ChatPresenceMark.statusOf(
+                UUID.randomUUID(), false, null));
+        assertFalse(ChatPresenceMark.hasStatus(null, false, false));
+        assertFalse(ChatPresenceMark.hasStatus(UUID.randomUUID(), true, false));
+        assertFalse(ChatPresenceMark.hasStatus(UUID.randomUUID(), false, true));
     }
 
     /** A line's own head carries the character it was said as. */

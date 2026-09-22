@@ -46,13 +46,13 @@ public final class ChatChannelTest {
         assertEquals(null, ChatChannel.fromId(null));
     }
 
-    /** OOC is one channel under the id {@code ooc}; the bare word Discord names nothing. */
+    /** Out of Character is one channel under the id {@code ooc}; the bare word Discord names nothing. */
     @Test
-    public void oocAndDiscordIsOneChannel() {
+    public void outOfCharacterIsOneChannel() {
         assertEquals(null, ChatChannel.fromId("discord"));
         assertEquals(ChatChannel.OOC, ChatChannel.fromId(" OOC "));
         assertEquals("ooc", ChatChannel.OOC.getId());
-        assertEquals("OOC", ChatChannel.OOC.getDisplayName());
+        assertEquals("Out of Character", ChatChannel.OOC.getDisplayName());
         assertEquals(ChatRecipientRule.SELF,
                 ChatChannel.CONSOLE.getRecipientRule());
         assertEquals(ChatRecipientRule.CONSOLE_READERS,

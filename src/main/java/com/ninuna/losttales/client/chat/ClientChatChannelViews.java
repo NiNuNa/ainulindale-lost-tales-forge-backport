@@ -43,7 +43,7 @@ public final class ClientChatChannelViews {
      * the history trims.
      */
     private static final int TRACKED_LINES_MARGIN = 64;
-    /** Unread counts stop climbing here; the tab shows "99+". */
+    /** Unread counts stop climbing here; the jump button and the {@code +}'s tip say "99+". */
     public static final int MAX_UNREAD = 99;
     /**
      * The channel whose tab shows lines Lost Tales did not route: they
@@ -68,7 +68,7 @@ public final class ClientChatChannelViews {
             new HashMap<ChatTab, Ease>();
     /**
      * Messages that have arrived in a tab while its own view was
-     * scrolled back, capped like the unread counters. Cleared the moment
+     * scrolled back, capped like the unread counts. Cleared the moment
      * the view returns to the newest message, which is what the
      * jump-to-present button does.
      */
@@ -480,7 +480,7 @@ public final class ClientChatChannelViews {
     }
 
     /**
-     * Called while a view is on screen; clears its unread counters and
+     * Called while a view is on screen; clears its unread counts and
      * moves the view's read mark to its newest line, so the next join
      * knows these were seen.
      */
@@ -647,18 +647,6 @@ public final class ClientChatChannelViews {
 
     public static synchronized int unreadCount(ChatChannel channel) {
         return unreadCount(ChatTab.of(channel));
-    }
-
-    /**
-     * The unread indicator every chat label carries: {@code [n]} for a
-     * positive count, {@code [99+]} past the cap, nothing otherwise.
-     */
-    public static String counterText(int count) {
-        if (count <= 0) {
-            return "";
-        }
-        return "[" + (count > MAX_UNREAD ? MAX_UNREAD + "+"
-                : String.valueOf(count)) + "]";
     }
 
     public static synchronized int unreadPingCount(ChatChannel channel) {

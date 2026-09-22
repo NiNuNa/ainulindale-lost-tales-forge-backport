@@ -1,8 +1,10 @@
 package com.ninuna.losttales.compat.discord;
 
 import com.ninuna.losttales.chat.ChatMessageValidator;
+import com.ninuna.losttales.chat.ChatStatusLine;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
+import java.nio.charset.Charset;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -42,6 +44,14 @@ public final class DiscordMessageSanitizer {
             Pattern.compile("(?<![\\w*_])_([^_\\s](?:[^_]*?[^_\\s])?)_(?![\\w_])");
     /** Discord display names are bounded; the chat bounds them again. */
     private static final int MAX_NAME_LENGTH = 32;
+    /**
+     * The most bytes a name takes as UTF-8: a Discord member's name is
+     * their account's name in the chat, and has to fit where an account
+     * name goes.
+     */
+    static final int MAX_NAME_BYTES = 64;
+
+    private static final Charset UTF_8 = Charset.forName("UTF-8");
 
     private DiscordMessageSanitizer() {}
 
@@ -78,6 +88,33 @@ public final class DiscordMessageSanitizer {
                     .trim() + "...";
         }
         return ChatMessageValidator.isValid(text) ? text : "";
+    }
+
+    /**
+     * A Discord member's custom status as the chat's status line: its
+     * emoji first where the chat has that emoji, a Unicode emoji the chat
+     * has as its shortcode, anything no font can draw left out, and the
+     * whole cleaned and cut as a player's line is
+     * ({@link ChatStatusLine#clean}); empty for nothing left.
+     * {@code emojiName} is the status emoji's name, the character itself
+     * for a Unicode one; {@code custom} says it is a server's own emoji.
+     */
+    public static String inboundStatusLine(String state, String emojiName,
+                                           boolean custom) {
+        String emoji = "";
+        if (emojiName != null && emojiName.length() > 0) {
+            if (custom) {
+                ChatEmoji known = ChatEmoji.fromInputName(
+                        emojiName.toLowerCase(Locale.ROOT));
+                emoji = known == null ? "" : known.getShortcode();
+            } else {
+                emoji = stripUnsendable(unicodeToShortcodes(emojiName)).trim();
+            }
+        }
+        String words = state == null ? ""
+                : stripUnsendable(unicodeToShortcodes(state)).trim();
+        return ChatStatusLine.clean(emoji.length() == 0 ? words
+                : words.length() == 0 ? emoji : emoji + " " + words);
     }
 
     /**
@@ -210,15 +247,25 @@ public final class DiscordMessageSanitizer {
         return escaped.toString();
     }
 
-    /** A Discord author's name as the chat shows it; empty for nothing usable. */
+    /**
+     * A Discord author's name as the chat shows it, at most
+     * {@link #MAX_NAME_LENGTH} characters and {@link #MAX_NAME_BYTES}
+     * bytes; empty for nothing usable.
+     */
     public static String inboundName(String name) {
         if (name == null) {
             return "";
         }
         String clean = WHITESPACE.matcher(stripUnsendable(name))
                 .replaceAll(" ").trim();
-        return clean.length() > MAX_NAME_LENGTH
-                ? clean.substring(0, MAX_NAME_LENGTH).trim() : clean;
+        if (clean.length() > MAX_NAME_LENGTH) {
+            clean = clean.substring(0, MAX_NAME_LENGTH);
+        }
+        // What is left has no surrogates, so every character is whole.
+        while (clean.getBytes(UTF_8).length > MAX_NAME_BYTES) {
+            clean = clean.substring(0, clean.length() - 1);
+        }
+        return clean.trim();
     }
 
     private static String replaceAll(Pattern pattern, String text,

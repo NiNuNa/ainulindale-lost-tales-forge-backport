@@ -111,13 +111,32 @@ final class ChatScreenMenus {
         final boolean consumed;
         /** The kind of the menu this click closed; empty for none open. */
         final String closedKind;
+        /**
+         * The window whose search panel or {@code +} menu this click
+         * closed; null for the empty screen's own {@code +} and for any
+         * other menu.
+         */
+        final String closedWindowId;
         /** A command a row asked the screen to send, or null. */
         final String command;
 
-        Click(boolean consumed, String closedKind, String command) {
+        Click(boolean consumed, String closedKind, String closedWindowId,
+              String command) {
             this.consumed = consumed;
             this.closedKind = closedKind;
+            this.closedWindowId = closedWindowId;
             this.command = command;
+        }
+
+        /**
+         * Whether this click put away the {@code kind} menu of the window
+         * {@code windowId} (null for the empty screen): the press on its
+         * own control that must not open it again.
+         */
+        boolean closed(String kind, String windowId) {
+            return kind.equals(this.closedKind) && (windowId == null
+                    ? this.closedWindowId == null
+                    : windowId.equals(this.closedWindowId));
         }
     }
 
@@ -203,6 +222,11 @@ final class ChatScreenMenus {
 
     boolean isKindOpen(String kind) {
         return this.popup.isOpen() && kind.equals(this.popup.kind());
+    }
+
+    /** Whether an open menu has a field that holds the keys. */
+    boolean isTyping() {
+        return this.popup.isOpen() && this.popup.isSearchable();
     }
 
     /** Whether this window's own search panel or {@code +} menu is out. */
@@ -292,9 +316,12 @@ final class ChatScreenMenus {
     /** An entry acts and closes the menu; an outside press continues behind it. */
     Click click(double mouseX, double mouseY, int button) {
         if (!this.popup.isOpen()) {
-            return new Click(false, "", null);
+            return new Click(false, "", null, null);
         }
         String closedKind = this.popup.kind();
+        String closedWindowId = POPUP_SEARCH.equals(closedKind)
+                || POPUP_RESTORE.equals(closedKind)
+                ? this.restoreWindowId : null;
         ChatPopupMenu.Entry entry = this.popup.entryAt(mouseX, mouseY);
         boolean inside = this.popup.contains(mouseX, mouseY);
         this.pendingCommand = null;
@@ -302,10 +329,47 @@ final class ChatScreenMenus {
             // The entry asked a question of its own and the menu is
             // showing it: closing here would close the question along
             // with the menu that asked it.
-            return new Click(true, closedKind, this.pendingCommand);
+            return new Click(true, closedKind, closedWindowId,
+                    this.pendingCommand);
         }
         this.popup.close();
-        return new Click(inside, closedKind, this.pendingCommand);
+        return new Click(inside, closedKind, closedWindowId,
+                this.pendingCommand);
+    }
+
+    /**
+     * Ctrl+Shift+A: the search panel of the window being typed in, or
+     * away again when that very panel is out, as its control on the
+     * strip is a switch too. Out for another window, it moves here.
+     */
+    void toggleSearchPanel(ChatWindow window, ChatPopupMenu.Anchor emptyPlus) {
+        String windowId = window == null ? null : window.getId();
+        if (isKindOpen(POPUP_SEARCH) && sameWindow(windowId)) {
+            close();
+            return;
+        }
+        openSearchPanel(window, null, emptyPlus);
+    }
+
+    /**
+     * Ctrl+N: the {@code +} menu of the window being typed in (or the
+     * empty screen's), or away again when it is already out there.
+     */
+    void toggleChannelMenu(ChatPopupMenu.Anchor emptyPlus) {
+        ChatWindow window = emptyPlus != null ? null : ChatWindowLayout.windowOf(
+                ClientChatChannelState.getSelected());
+        if (isKindOpen(POPUP_RESTORE)
+                && sameWindow(window == null ? null : window.getId())) {
+            close();
+            return;
+        }
+        openChannelMenu(emptyPlus);
+    }
+
+    /** Whether the open search panel or {@code +} menu belongs to {@code windowId}. */
+    private boolean sameWindow(String windowId) {
+        return windowId == null ? this.restoreWindowId == null
+                : windowId.equals(this.restoreWindowId);
     }
 
     /* ---- The strip's menus ---- */
@@ -446,14 +510,18 @@ final class ChatScreenMenus {
 
     /**
      * The palette, in the window menu's place: every entry as a chip
-     * beside its name, the one in use named in honey — for the selected
-     * mention, the automatic choice before them. Choosing one is the
-     * whole change — the option is written to the client file and every
-     * window is drawn in it from the next frame.
+     * beside its name, the one in use named in honey and the one the mod
+     * ships marked as the default — for the selected mention, the
+     * automatic choice before them, which is its default. Choosing one is
+     * the whole change — the option is written to the client file and
+     * every window is drawn in it from the next frame. These colours are
+     * set here and nowhere else: the Config Screen leaves them to the
+     * chat.
      */
     private void openColorPopup(String role) {
         this.colorRole = role;
         String current = currentColorName(role);
+        String shipped = shippedColorName(role);
         String[] names = LostTalesColors.paletteNames();
         List<ChatPopupMenu.Entry> entries =
                 new ArrayList<ChatPopupMenu.Entry>(names.length + 1);
@@ -462,8 +530,10 @@ final class ChatScreenMenus {
             // chipped in the colour that comes to now.
             ChatPopupMenu.Entry automatic = new ChatPopupMenu.Entry(
                     ENTRY_COLOR_PREFIX + LostTalesConfig.CHAT_COLOR_AUTOMATIC,
-                    StatCollector.translateToLocal(
-                            "gui.losttales.chat.window.color.automatic"),
+                    StatCollector.translateToLocalFormatted(
+                            "gui.losttales.chat.window.color.default",
+                            StatCollector.translateToLocal(
+                                    "gui.losttales.chat.window.color.automatic")),
                     false,
                     LostTalesChatVisualStyle.automaticSelectedMentionRgb(),
                     null).asChip();
@@ -474,8 +544,14 @@ final class ChatScreenMenus {
             entries.add(automatic);
         }
         for (int index = 0; index < names.length; index++) {
+            String label = paletteLabel(names[index]);
             ChatPopupMenu.Entry entry = new ChatPopupMenu.Entry(
-                    ENTRY_COLOR_PREFIX + names[index], paletteLabel(names[index]),
+                    ENTRY_COLOR_PREFIX + names[index],
+                    names[index].equalsIgnoreCase(shipped)
+                            ? StatCollector.translateToLocalFormatted(
+                                    "gui.losttales.chat.window.color.default",
+                                    label)
+                            : label,
                     false, LostTalesColors.rgb(LostTalesColors.paletteColor(
                             names[index], LostTalesColors.PLUM_BLACK)),
                     null).asChip();
@@ -486,6 +562,23 @@ final class ChatScreenMenus {
         }
         this.popup.open(POPUP_COLOR, null, entries, this.font,
                 this.settingsAnchor, this.screenWidth, this.screenHeight);
+    }
+
+    /** The colour the mod ships for a colour row's surface: its default. */
+    private static String shippedColorName(String role) {
+        if (ENTRY_WINDOW_COLOR_SELECTED.equals(role)) {
+            return LostTalesConfig.DEFAULT_CHAT_SELECTED_LINE_COLOR;
+        }
+        if (ENTRY_WINDOW_COLOR_MENTION.equals(role)) {
+            return LostTalesConfig.DEFAULT_CHAT_MENTION_LINE_COLOR;
+        }
+        if (ENTRY_WINDOW_COLOR_SELECTED_MENTION.equals(role)) {
+            return LostTalesConfig.CHAT_COLOR_AUTOMATIC;
+        }
+        if (ENTRY_WINDOW_COLOR_REPLY.equals(role)) {
+            return LostTalesConfig.DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR;
+        }
+        return LostTalesConfig.DEFAULT_CHAT_BACKGROUND_COLOR;
     }
 
     /** A palette entry's name as the language file gives it. */
@@ -543,7 +636,13 @@ final class ChatScreenMenus {
                 return;
             }
         }
-        this.restoreWindowId = window == null ? null : window.getId();
+        String windowId = window == null ? null : window.getId();
+        if (isKindOpen(POPUP_SEARCH) && !sameWindow(windowId)) {
+            // Moving to another window starts the search afresh: the
+            // words typed for the other one are not this one's.
+            close();
+        }
+        this.restoreWindowId = windowId;
         this.popup.open(POPUP_SEARCH, null, searchEntries(""), this.font,
                 at, this.screenWidth, this.screenHeight,
                 StatCollector.translateToLocal(
@@ -588,9 +687,7 @@ final class ChatScreenMenus {
                     continue;
                 }
                 open.add(new ChatPopupMenu.Entry(
-                        ENTRY_OPEN_PREFIX + tab.id(),
-                        withCounter(name,
-                                ClientChatChannelViews.unreadCount(tab)),
+                        ENTRY_OPEN_PREFIX + tab.id(), name,
                         ChatWindowLayout.isMuted(tab),
                         ClientChatChannelState.displayColor(tab), tab));
             }
@@ -601,9 +698,7 @@ final class ChatScreenMenus {
         for (ChatChannel channel : restorableChannels()) {
             String name = ClientChatChannelState.displayName(channel);
             if (matchesFilter(name, filter)) {
-                closed.add(new ChatPopupMenu.Entry(channel.getId(),
-                        withCounter(name,
-                                ClientChatChannelViews.unreadCount(channel)),
+                closed.add(new ChatPopupMenu.Entry(channel.getId(), name,
                         ChatWindowLayout.isMuted(channel),
                         ClientChatChannelState.displayColor(channel),
                         ChatTab.of(channel)));
@@ -617,10 +712,7 @@ final class ChatScreenMenus {
             if (conversation != null && !ChatWindowLayout.isOpen(conversation)
                     && matchesFilter(name, filter)) {
                 players.add(new ChatPopupMenu.Entry(conversation.id(),
-                        withCounter(name,
-                                ClientChatChannelViews.unreadCount(
-                                        conversation)),
-                        ChatWindowLayout.isMuted(conversation), -1,
+                        name, ChatWindowLayout.isMuted(conversation), -1,
                         conversation));
             }
         }
@@ -680,6 +772,9 @@ final class ChatScreenMenus {
      * state's own {@code +} when {@code windowId} is null.
      */
     void openRestorePopup(String windowId, ChatPopupMenu.Anchor anchor) {
+        if (isKindOpen(POPUP_RESTORE) && !sameWindow(windowId)) {
+            close();
+        }
         this.restoreWindowId = windowId;
         this.restoreRefreshedNanos = System.nanoTime();
         this.popup.open(POPUP_RESTORE, null, restoreEntries(), this.font,
@@ -741,13 +836,13 @@ final class ChatScreenMenus {
 
     /**
      * The {@code +} menu: a channel-opening list in two sections. The
-     * closed channels come first, each with the unread indicator its tab
-     * would carry ({@code Trade [3]}) — a closed channel keeps
-     * receiving, and the count is the one the tab shows once restored; a
-     * muted one reads italic, like its tab would. The online players
-     * follow, each opening (or selecting) the whisper conversation with
-     * them, wearing the same head its tab wears and the conversation's
-     * unread count. A section absent of rows is left out altogether.
+     * closed channels come first, each wearing the icon its tab would
+     * wear, its unread mark included — a closed channel keeps receiving,
+     * and the mark is the one the tab shows once restored; a muted one
+     * reads italic, like its tab would. The online players follow, each
+     * opening (or selecting) the whisper conversation with them, wearing
+     * the same head its tab wears and the conversation's mark. A section
+     * absent of rows is left out altogether.
      */
     List<ChatPopupMenu.Entry> restoreEntries() {
         List<ChatPopupMenu.Entry> entries =
@@ -759,9 +854,7 @@ final class ChatScreenMenus {
                             "gui.losttales.chat.open.channels")));
             for (ChatChannel channel : closed) {
                 entries.add(new ChatPopupMenu.Entry(channel.getId(),
-                        withCounter(
-                                ClientChatChannelState.displayName(channel),
-                                ClientChatChannelViews.unreadCount(channel)),
+                        ClientChatChannelState.displayName(channel),
                         ChatWindowLayout.isMuted(channel),
                         ClientChatChannelState.displayColor(channel),
                         ChatTab.of(channel)));
@@ -775,20 +868,11 @@ final class ChatScreenMenus {
             for (String name : players) {
                 ChatTab conversation = ChatTab.whisper(name, "");
                 entries.add(new ChatPopupMenu.Entry(conversation.id(),
-                        withCounter(name,
-                                ClientChatChannelViews.unreadCount(
-                                        conversation)),
-                        ChatWindowLayout.isMuted(conversation),
-                        -1, conversation));
+                        name, ChatWindowLayout.isMuted(conversation), -1,
+                        conversation));
             }
         }
         return entries;
-    }
-
-    /** {@code Name [3]} while anything is unread; the bare name otherwise. */
-    static String withCounter(String name, int unread) {
-        String counter = ClientChatChannelViews.counterText(unread);
-        return counter.length() == 0 ? name : name + " " + counter;
     }
 
     /** Closed channels the player could see if they were open. */
@@ -868,6 +952,19 @@ final class ChatScreenMenus {
         }
         Collections.sort(result, String.CASE_INSENSITIVE_ORDER);
         return result;
+    }
+
+    /**
+     * The mark after the {@code +}: the channels it would list together,
+     * their pings on the tile, else the white sphere while any holds
+     * something unread.
+     */
+    static ChatIconMark closedMark() {
+        List<ChatTab> closed = new ArrayList<ChatTab>();
+        for (ChatChannel channel : restorableChannels()) {
+            closed.add(ChatTab.of(channel));
+        }
+        return ChatIconMark.combined(closed);
     }
 
     /** Sum of the unread counts of the channels the {@code +} would list. */

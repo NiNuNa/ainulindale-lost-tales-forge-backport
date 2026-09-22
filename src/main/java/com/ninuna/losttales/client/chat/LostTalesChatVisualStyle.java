@@ -590,25 +590,20 @@ final class LostTalesChatVisualStyle {
                 * (rowPixels - words));
     }
 
-    static void drawFormatted(final FontRenderer font,
-                              final IChatComponent line,
-                              final ChatHeadMarker.Data metadata,
-                              final int x, final int y, final int alpha,
-                              final boolean chatOpen) {
-        drawFormatted(font, line, metadata, x, y, alpha, chatOpen, null);
-    }
-
     /**
-     * As above, a hovered message's body row moving as {@code motion}
-     * says: its chevron and each of its words drawn where the motion has
-     * them. Null draws the row as it always stands.
+     * One row of a line, its shadow under it, at {@code x}, {@code y}. A
+     * hovered message's body row moves as {@code motion} says: its chevron
+     * and each of its words drawn where the motion has them; null draws
+     * the row as it always stands. {@code chatLineId} is the message the
+     * row is of, which its backdrops light with; zero for none.
      */
     static void drawFormatted(final FontRenderer font,
                               final IChatComponent line,
                               final ChatHeadMarker.Data metadata,
                               final int x, final int y, final int alpha,
                               final boolean chatOpen,
-                              final ChatRowMotion motion) {
+                              final ChatRowMotion motion,
+                              final int chatLineId) {
         if (font == null || line == null || alpha < MIN_VISIBLE_ALPHA) {
             return;
         }
@@ -620,13 +615,13 @@ final class LostTalesChatVisualStyle {
                 if (shadow > 0) {
                     drawComponentPass(font, line, metadata,
                             x + SHADOW_OFFSET, y + SHADOW_OFFSET, shadow, true,
-                            chatOpen, motion);
+                            chatOpen, motion, chatLineId);
                     // The line stands over its shadow, so a line fading
                     // does not show the shadow through its strokes.
                     LostTalesUiFlatLayers.nextLayer();
                 }
                 drawComponentPass(font, line, metadata, x, y, alpha, false,
-                        chatOpen, motion);
+                        chatOpen, motion, chatLineId);
             }
         };
         if (alpha >= 255 || LostTalesUiFlatLayers.isActive()) {
@@ -634,13 +629,12 @@ final class LostTalesChatVisualStyle {
             return;
         }
         // A fading line fades as one picture with its shadow. The bounds
-        // reach past the words for the icons a line carries, which stand
-        // a little taller than the capitals and may be wider than the
-        // room their placeholders declare.
+        // reach past the row's ink for the icons a line carries, which
+        // stand a little taller than the capitals and may be wider than
+        // the room their placeholders declare.
         LostTalesUiFlatLayers.draw(alpha, x - LINE_PICTURE_MARGIN,
                 y - LINE_PICTURE_MARGIN,
-                x + font.getStringWidth(line.getFormattedText())
-                        + 3 * LINE_PICTURE_MARGIN,
+                x + inkEnd(font, line, chatOpen) + 3 * LINE_PICTURE_MARGIN,
                 y + font.FONT_HEIGHT + LINE_PICTURE_MARGIN, layers);
     }
 
@@ -870,9 +864,10 @@ final class LostTalesChatVisualStyle {
     /**
      * Width of one component as the renderer advances past it: the text
      * measured with its style's formatting code, or, for an indent marker,
-     * the inset recorded for the current chat state. Every walk over a
-     * line — drawing, head placement, hit testing, the hover card — must
-     * advance by this, so they all ask here.
+     * the inset recorded for the current chat state, and the padding of a
+     * backdrop it opens or closes ({@link ChatRunBackdrops}). Every walk
+     * over a line — drawing, head placement, hit testing, the hover card —
+     * must advance by this, so they all ask here.
      */
     static int partWidth(FontRenderer font, IChatComponent part,
                          boolean chatOpen) {
@@ -880,12 +875,35 @@ final class LostTalesChatVisualStyle {
         if (layout != null) {
             return layout.indent(chatOpen);
         }
+        int pads = ChatRunBackdrops.pads(part);
         int declared = ChatInlineIcons.declaredWidth(part);
         if (declared >= 0) {
-            return declared;
+            return declared + pads;
         }
         return measure(font, part.getChatStyle().getFormattingCode(),
-                part.getUnformattedTextForChat(), chatColoursEnabled());
+                part.getUnformattedTextForChat(), chatColoursEnabled()) + pads;
+    }
+
+    /**
+     * The colour a backdropped run's words are drawn in, as the draw
+     * picks it: a share's, a mention's, a link's, and an achievement's own
+     * colour in the palette's tone; ivory for anything else.
+     */
+    static int runRgb(IChatComponent part) {
+        ChatShowcaseMarker.Data share = ChatShowcaseMarker.decode(part);
+        if (share != null) {
+            return share.textColor;
+        }
+        ChatMentionMarker.Data mention = ChatMentionMarker.decode(part);
+        if (mention != null) {
+            return mention.color;
+        }
+        Integer link = ChatChannelLinkMarker.colorOf(part);
+        if (link != null) {
+            return link.intValue();
+        }
+        return part.getChatStyle().getColor() != null
+                ? paletteRgb(part.getChatStyle().getColor()) : IVORY;
     }
 
     /**
@@ -972,7 +990,7 @@ final class LostTalesChatVisualStyle {
      * marker's icon, a bubble, a reaction chip, the time behind a name —
      * rather than glyphs of its own size.
      */
-    private static boolean drawsSlot(IChatComponent part) {
+    static boolean drawsSlot(IChatComponent part) {
         ChatShowcaseMarker.Data share = ChatShowcaseMarker.decode(part);
         return ChatHeadMarker.headOf(part) != null
                 || ChatStampMarker.isMarker(part)
@@ -1026,7 +1044,7 @@ final class LostTalesChatVisualStyle {
             FontRenderer font, IChatComponent line,
             ChatHeadMarker.Data metadata, int x, int y,
             int alpha, boolean shadowPass, boolean chatOpen,
-            ChatRowMotion motion) {
+            ChatRowMotion motion, int chatLineId) {
         int cursor = x;
         // A moving row's words, counted as the pass meets them, so each
         // is drawn at its own place in the row's stagger.
@@ -1145,6 +1163,14 @@ final class LostTalesChatVisualStyle {
             boolean underlined = false;
             int underlineColor = IVORY;
             int width;
+            // A run that wears a backdrop stands inside its padding, and
+            // the pointer lights the backdrop and turns its words ivory
+            // instead of underlining them.
+            boolean backdropped = ChatRunBackdrops.kindOf(part)
+                    != ChatRunBackdrops.Kind.NONE;
+            float backdropLit = backdropped && !shadowPass
+                    ? ChatRunBackdrops.litShare(chatLineId, part) : 0.0F;
+            cursor += ChatRunBackdrops.padBefore(part);
 
             ChatEmoji emoji = ChatEmojiMarker.decode(part);
             ChatShowcaseMarker.Data share = ChatShowcaseMarker.decode(part);
@@ -1176,10 +1202,10 @@ final class LostTalesChatVisualStyle {
                     drawShareIcon(share, cursor, y, width, alpha,
                             shadowPass);
                 }
-                // The icon is a piece of its share, between the bracket
-                // and the name: while the share is lit the rule runs on
+                // The icon is a piece of its share, before its name:
+                // while a share a spoiler hides is lit, the rule runs on
                 // under it, so the share keeps one underline.
-                underlined = hovered != null
+                underlined = !backdropped && hovered != null
                         && ChatInteractions.answersClick(part,
                                 chatLinksEnabled())
                         && sharesInteraction(part, line, index, hovered);
@@ -1212,8 +1238,8 @@ final class LostTalesChatVisualStyle {
                         ChatInlineIcons.boxLeft(cursor, width),
                         ChatInlineIcons.boxTop(y, width),
                         ChatInlineIcons.contentSize(width),
-                        !colours || linkColor == null ? IVORY
-                                : linkColor.intValue(),
+                        ChatRunBackdrops.wordsRgb(!colours || linkColor == null
+                                ? IVORY : linkColor.intValue(), backdropLit),
                         alpha, shadowPass);
             } else {
                 String rendered;
@@ -1300,6 +1326,9 @@ final class LostTalesChatVisualStyle {
                     color = IVORY;
                     glyphColor = lastInlineColor(rendered, IVORY);
                 }
+                if (backdropped && !shadowPass) {
+                    color = ChatRunBackdrops.wordsRgb(color, backdropLit);
+                }
                 // Asked again for every run: an inline glyph between two of
                 // them is drawn by code of its own, and whatever that leaves
                 // behind must not decide what the next run's shadow looks
@@ -1326,7 +1355,10 @@ final class LostTalesChatVisualStyle {
                 int declared = ChatInlineIcons.declaredWidth(part);
                 width = declared >= 0 ? declared
                         : measure(font, formatting, text, colours);
-                if (personHovered && identitySpan) {
+                if (backdropped) {
+                    // Its backdrop lights instead.
+                    underlined = false;
+                } else if (personHovered && identitySpan) {
                     // Every part of the sender, the head's slot and the
                     // title and the spacers between included, under one
                     // rule in the name's colour.
@@ -1381,7 +1413,7 @@ final class LostTalesChatVisualStyle {
                         alpha, ruleShift);
                 ruleStart = -1;
             }
-            cursor += width;
+            cursor += width + ChatRunBackdrops.padAfter(part);
             identitySeen |= replyIdentity;
             if (closesSpan) {
                 identitySpan = false;
@@ -1406,7 +1438,7 @@ final class LostTalesChatVisualStyle {
      * a run's text with ink in it, and every icon. The chevron and the
      * markers are none.
      */
-    private static int countWords(IChatComponent line, boolean chatOpen) {
+    static int countWords(IChatComponent line, boolean chatOpen) {
         int count = 0;
         for (Object value : line) {
             if (!(value instanceof IChatComponent)) {
@@ -1417,23 +1449,34 @@ final class LostTalesChatVisualStyle {
                     || ChatLayoutMarker.decode(part) != null
                     || ChatStampMarker.isMarker(part)
                     || ChatReactionMarker.isAddButton(part)
-                    || ChatReactionMarker.decode(part) != null
-                    || ChatBodyMarker.isMarker(part)) {
+                    || ChatReactionMarker.decode(part) != null) {
                 continue;
             }
-            if (isIconRun(part, ChatEmojiMarker.decode(part),
-                    ChatShowcaseMarker.decode(part))) {
+            count += wordsIn(part);
+        }
+        return count;
+    }
+
+    /**
+     * How many of a moving row's words one run is: one for an icon, none
+     * for the chevron, and one for each piece of its text with ink in it.
+     */
+    static int wordsIn(IChatComponent part) {
+        if (isIconRun(part, ChatEmojiMarker.decode(part),
+                ChatShowcaseMarker.decode(part))) {
+            return 1;
+        }
+        if (ChatBodyMarker.isMarker(part)) {
+            return 0;
+        }
+        String text = part.getUnformattedTextForChat();
+        int count = 0;
+        for (int start = 0; start < text.length();) {
+            int end = pieceEnd(text, start);
+            if (hasInk(text, start, end)) {
                 count++;
-                continue;
             }
-            String text = part.getUnformattedTextForChat();
-            for (int start = 0; start < text.length();) {
-                int end = pieceEnd(text, start);
-                if (hasInk(text, start, end)) {
-                    count++;
-                }
-                start = end;
-            }
+            start = end;
         }
         return count;
     }
@@ -1777,7 +1820,7 @@ final class LostTalesChatVisualStyle {
     }
 
     /** The width of the spaces a run ends with. */
-    private static int trailingSpaceWidth(FontRenderer font, String text) {
+    static int trailingSpaceWidth(FontRenderer font, String text) {
         int spaces = 0;
         for (int at = text.length() - 1; at >= 0 && text.charAt(at) == ' ';
              at--) {

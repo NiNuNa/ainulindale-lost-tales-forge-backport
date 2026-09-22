@@ -33,8 +33,11 @@ import net.minecraft.client.gui.GuiPlayerInfo;
  * wherever it appears.</p>
  */
 final class ChatMentionColors {
-    /** The one colour a mention of a player is drawn in. */
-    static final int PLAYER_RGB = LostTalesColors.rgb(LostTalesColors.HONEY);
+    /**
+     * The one colour a mention of a player is drawn in: seafoam, on the
+     * slate blue of its backdrop ({@link ChatRunBackdrops}).
+     */
+    static final int PLAYER_RGB = LostTalesColors.rgb(LostTalesColors.SEAFOAM);
 
     private ChatMentionColors() {}
 

@@ -35,14 +35,6 @@ public final class ChatScreenMenusTest {
     }
 
     @Test
-    public void aCounterFollowsTheNameOnlyWhileSomethingIsUnread() {
-        assertEquals("Trade", ChatScreenMenus.withCounter("Trade", 0));
-        assertEquals("Trade "
-                + ClientChatChannelViews.counterText(3),
-                ChatScreenMenus.withCounter("Trade", 3));
-    }
-
-    @Test
     public void whisperCandidatesLeaveOutOneselfAndDuplicatesAndSort() {
         List<String> accounts = Arrays.asList("zed", "Steve", null, "  ",
                 "alex", "STEVE", "Alex ", "me");

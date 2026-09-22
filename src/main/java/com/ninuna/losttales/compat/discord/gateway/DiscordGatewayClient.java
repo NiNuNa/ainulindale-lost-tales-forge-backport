@@ -14,10 +14,11 @@ import java.util.concurrent.LinkedBlockingQueue;
  * resumes, keeps the heartbeat, reads events until the server closes or
  * the link fails, and connects again with backoff — or stops for the
  * session when Discord's close code says the token or the intents are
- * wrong. Events are handed to a {@link Listener} on this thread; the
- * listener must not block. A second thread runs the small HTTP jobs the
- * listener hands back ({@link #submit}), so an answer to Discord never
- * holds the reader up.
+ * wrong. The member intents are the exception: refused, they are dropped
+ * and the bot connects again without them. Events are handed to a
+ * {@link Listener} on this thread; the listener must not block. A second
+ * thread runs the small HTTP jobs the listener hands back
+ * ({@link #submit}), so an answer to Discord never holds the reader up.
  */
 public final class DiscordGatewayClient extends Thread {
 
@@ -33,6 +34,9 @@ public final class DiscordGatewayClient extends Thread {
         void onConnected();
 
         void onDisconnected();
+
+        /** Discord refused the member intents; the bot goes on without them. */
+        void onMembersRefused();
     }
 
     private static final long MIN_BACKOFF_MILLIS = 2000L;
@@ -52,10 +56,12 @@ public final class DiscordGatewayClient extends Thread {
     private long backoffMillis = MIN_BACKOFF_MILLIS;
     private String gatewayUrl = "";
 
-    public DiscordGatewayClient(String token, Listener listener) {
+    /** {@code members} asks for the member intents as well. */
+    public DiscordGatewayClient(String token, boolean members, Listener listener) {
         super("LostTales-Discord-Gateway");
         setDaemon(true);
-        this.protocol = new DiscordGatewayProtocol(token, DiscordGatewayProtocol.INTENTS);
+        this.protocol = new DiscordGatewayProtocol(token, DiscordGatewayProtocol.INTENTS
+                | (members ? DiscordGatewayProtocol.MEMBER_INTENTS : 0));
         this.listener = listener;
         this.jobRunner = new Thread("LostTales-Discord-Gateway-Jobs") {
             @Override
@@ -74,6 +80,30 @@ public final class DiscordGatewayClient extends Thread {
     /** Whether Discord refused the session for good this run. */
     public boolean isFatal() {
         return this.fatal;
+    }
+
+    /** Whether the bot hears who is in its servers and what they are doing. */
+    public boolean followsMembers() {
+        return (this.protocol.getIntents() & DiscordGatewayProtocol.MEMBER_INTENTS)
+                == DiscordGatewayProtocol.MEMBER_INTENTS;
+    }
+
+    /**
+     * Asks Discord for every member of a server, on the connection that
+     * is open now; answers false when none is, or the ask did not go out.
+     */
+    public boolean requestMembers(String guildId) {
+        DiscordWebSocket opened = this.socket;
+        if (opened == null || opened.isClosed() || !followsMembers()) {
+            return false;
+        }
+        try {
+            opened.sendText(DiscordGatewayProtocol.requestMembersPayload(guildId));
+            return true;
+        } catch (IOException failure) {
+            note("Could not ask Discord for a server's members: " + failure.getMessage());
+            return false;
+        }
     }
 
     /** Runs a short HTTP job off the reader thread; dropped when the queue is full. */
@@ -208,11 +238,27 @@ public final class DiscordGatewayClient extends Thread {
                 fatal("Discord refused the gateway session (close " + code
                         + "); the gateway is off for this run");
                 return false;
-            case 4013:
             case 4014:
-                fatal("Discord refused the bot's intents (close " + code + "): enable "
-                        + "the Message Content intent on the application; the gateway "
-                        + "is off until then");
+                if (followsMembers()) {
+                    // The member intents are the ones a server switches
+                    // on for the member lists; without them the bridge
+                    // still relays.
+                    this.protocol.dropIntents(DiscordGatewayProtocol.MEMBER_INTENTS);
+                    FMLLog.warning("[%s] Discord refused the Server Members or Presence "
+                            + "intent (close 4014): switch both on for the bot in the "
+                            + "Discord developer portal, or turn memberList off; the "
+                            + "gateway goes on without Discord members",
+                            LostTalesMetaData.MOD_ID);
+                    this.listener.onMembersRefused();
+                    return false;
+                }
+                fatal("Discord refused the bot's intents (close 4014): enable the "
+                        + "Message Content intent on the application; the gateway is "
+                        + "off until then");
+                return false;
+            case 4013:
+                fatal("Discord refused the bot's intents (close 4013); the gateway "
+                        + "is off for this run");
                 return false;
             default:
                 if (code == 4007 || code == 4009) {

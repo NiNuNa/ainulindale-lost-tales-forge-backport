@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiCaret;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
@@ -130,16 +131,13 @@ abstract class ChatPickerPanel {
                 && this.searchField.isFocused();
     }
 
-    /** Ticks the search caret blink; called from the screen's updateScreen. */
-    void tick() {
-        if (this.searchField != null) {
-            this.searchField.updateCursorCounter();
-        }
-    }
-
     /**
-     * Consumes keys owned by the picker: ESC closes it, and everything else
-     * is routed into the search field while that is focused.
+     * Consumes keys owned by the picker: ESC closes it, and while its
+     * search holds the keys every other key is the search's, as a menu's
+     * field keeps them — what the field cannot use goes no further, so
+     * Enter never sends the message behind it and the arrows never walk
+     * what was sent. The chat's own Ctrl shortcuts are handled before
+     * the picker is asked.
      */
     boolean handleKeyTyped(char typedChar, int keyCode) {
         if (!this.targetOpen) {
@@ -149,8 +147,34 @@ abstract class ChatPickerPanel {
             setOpen(false);
             return true;
         }
-        return this.searchField != null
-                && this.searchField.textboxKeyTyped(typedChar, keyCode);
+        if (!isSearchFocused()) {
+            return false;
+        }
+        this.searchField.textboxKeyTyped(typedChar, keyCode);
+        return true;
+    }
+
+    /**
+     * The cell Enter takes from the search: the first one the typing
+     * found, and none while nothing is typed, as a menu's search does.
+     */
+    Entry firstFound() {
+        if (!this.targetOpen || searchQuery().length() == 0) {
+            return null;
+        }
+        for (Section section : buildSections(searchQuery())) {
+            if (!section.entries.isEmpty()) {
+                return section.entries.get(0);
+            }
+        }
+        return null;
+    }
+
+    /** The search gives the keys back, as the screen moves them elsewhere. */
+    void releaseSearch() {
+        if (this.searchField != null) {
+            this.searchField.setFocused(false);
+        }
     }
 
     /**
@@ -467,7 +491,7 @@ abstract class ChatPickerPanel {
             return;
         }
         if (this.searchField.getText().length() == 0) {
-            int x = this.searchField.xPosition + ChatInputField.CARET_WIDTH
+            int x = this.searchField.xPosition + LostTalesUiCaret.WIDTH
                     + 1;
             String prompt = LostTalesSkyrimUiStyle.trimToWidth(font,
                     StatCollector.translateToLocal(
@@ -563,7 +587,7 @@ abstract class ChatPickerPanel {
                     + SEARCH_ICON_RUN;
             this.searchField.yPosition = layout.searchY;
             this.searchField.width = panelWidth() - PADDING * 2 - 2
-                    - ChatInputField.CARET_WIDTH - SEARCH_ICON_RUN;
+                    - LostTalesUiCaret.WIDTH - SEARCH_ICON_RUN;
             this.searchField.height = SEARCH_HEIGHT - 3;
         }
     }

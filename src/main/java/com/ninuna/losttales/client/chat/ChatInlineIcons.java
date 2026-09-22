@@ -123,11 +123,13 @@ final class ChatInlineIcons {
                 // Drawn in the open window's timestamp area, not the row.
                 return 0;
             }
-            if (head.mark() != null) {
-                return MARK_HEAD_SLOT_WIDTH;
-            }
+            // A head and its sphere are one icon: a head that wears one
+            // takes the room the sphere reaches past it, a mark standing
+            // for a head as a face does.
+            int slot = head.mark() != null ? MARK_HEAD_SLOT_WIDTH
+                    : HEAD_SLOT_WIDTH;
             return ChatPresenceMark.wears(head)
-                    ? PRESENCE_HEAD_SLOT_WIDTH : HEAD_SLOT_WIDTH;
+                    ? slot + ChatPresenceMark.OVERHANG_X : slot;
         }
         if (ChatReplyMarker.isIconSlot(part)) {
             return ChatReplyMarker.ICON_SLOT_WIDTH;
@@ -229,8 +231,8 @@ final class ChatInlineIcons {
     }
 
     /**
-     * The colour a marker is <em>named</em> with — its bracketed name in
-     * a message and in the input preview: the same map colour, with
+     * The colour a marker is <em>named</em> with — its name in a message
+     * and in the input preview: the same map colour, with
      * plain white swapped for the chat's ivory, so a white marker's text
      * reads in the one white every other word does. Only the artwork
      * keeps pure white.

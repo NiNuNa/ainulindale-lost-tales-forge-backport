@@ -24,14 +24,23 @@ import net.minecraft.client.Minecraft;
  * {@link #MIN_ASK_MILLIS}. Each ask carries the fingerprint of the answer
  * held, so the server only says so when nothing has changed; a whisper's
  * ask names its other party and the identity it is held as. Until a new
- * answer comes, the old one stays on screen. Session state, cleared on
- * disconnect.</p>
+ * answer comes, the old one stays on screen. The server keeps the lists
+ * a player has asked for lately and sends one again by itself the moment
+ * it changes, so these asks are what keeps it doing so.</p>
+ *
+ * <p>When the chat opens, every tab of a window whose list stands is
+ * asked for ahead of being shown ({@link #prefetch}), so a tab brought
+ * forward finds its list waiting rather than empty. A status this player
+ * chooses asks again at once ({@link #askAgain}). Session state, cleared
+ * on disconnect.</p>
  */
 public final class ClientChatMembers {
     /** How long an answer is kept before the list asks again. */
     static final long REFRESH_MILLIS = 4000L;
     /** The least time between two asks for one conversation. */
     private static final long MIN_ASK_MILLIS = 1000L;
+    /** The most conversations asked for ahead as the chat opens. */
+    static final int MAX_PREFETCH = 8;
 
     /** One conversation's members as last told, and how many absent ones the answer left out. */
     static final class Answer {
@@ -103,12 +112,58 @@ public final class ClientChatMembers {
         long now = System.currentTimeMillis();
         String asAs = ClientChatIdentities.viewIdentityKey();
         String key = viewed.id();
-        long held;
         synchronized (ClientChatMembers.class) {
             if (!isDue(now, ASKED_AT.get(key), ANSWERED_AT.get(key),
                     asAs.equals(ASKED_AS.get(key)))) {
                 return;
             }
+        }
+        ask(viewed, now, asAs);
+    }
+
+    /**
+     * Asks ahead for every tab of the windows whose list stands, the tab
+     * in front first, as the chat opens: at most {@link #MAX_PREFETCH},
+     * and none already answered or asked for this session.
+     */
+    static void prefetch(List<ChatTab> tabs) {
+        if (tabs == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        String asAs = ClientChatIdentities.viewIdentityKey();
+        int asked = 0;
+        for (ChatTab tab : tabs) {
+            if (asked >= MAX_PREFETCH) {
+                return;
+            }
+            ChatTab viewed = ChatTab.viewed(tab);
+            if (viewed == null || viewed.getChannel() == null) {
+                continue;
+            }
+            synchronized (ClientChatMembers.class) {
+                if (ASKED_AT.containsKey(viewed.id())) {
+                    continue;
+                }
+            }
+            ask(viewed, now, asAs);
+            asked++;
+        }
+    }
+
+    /**
+     * Makes every list asked for lately due again, so the windows showing
+     * one ask on their next frame whatever the last ask's age: what a
+     * status of this player's own asks for.
+     */
+    static synchronized void askAgain() {
+        ASKED_AT.clear();
+    }
+
+    private static void ask(ChatTab viewed, long now, String asAs) {
+        String key = viewed.id();
+        long held;
+        synchronized (ClientChatMembers.class) {
             ASKED_AT.put(key, Long.valueOf(now));
             ASKED_AS.put(key, asAs);
             Answer answer = BY_CONVERSATION.get(key);

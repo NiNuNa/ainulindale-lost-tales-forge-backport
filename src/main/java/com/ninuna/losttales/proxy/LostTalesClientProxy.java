@@ -586,6 +586,8 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                     packet.getProximityRadius());
             ClientChatChannelState.setChannelIcons(packet.getChannelIcons());
             ClientChatChannelState.setDiscordLinks(packet.getDiscordLinks());
+            com.ninuna.losttales.client.chat.ClientChatPresence.setDiscordStatuses(
+                    packet.showsDiscordStatuses());
             // The words the server adds to the profanity list, over the
             // bundled ones, for as long as this server is the place.
             ChatProfanityCatalog.installServerWords(packet.getProfanityWords());

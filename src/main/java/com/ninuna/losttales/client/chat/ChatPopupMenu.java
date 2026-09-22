@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiCaret;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
@@ -54,8 +55,6 @@ final class ChatPopupMenu {
     static final int MAX_VISIBLE_ROWS = 12;
     /** Longest thing a search field takes; far past any tab's name. */
     private static final int MAX_FILTER_LENGTH = 48;
-    /** The caret's blink, in nanoseconds of one full on-off turn. */
-    private static final long CARET_BLINK_NANOS = 1000L * 1000000L;
     /** Seam between a shortcut's key icons and the + joining them. */
     private static final int KEY_GAP = 2;
     private static final int[] NO_KEYS = new int[0];
@@ -496,12 +495,12 @@ final class ChatPopupMenu {
         // the names line up; headers hang left of them with the padding.
         this.swatchWidth = chips ? CHIP_WIDTH : SWATCH_WIDTH;
         this.labelX = PADDING_X + (swatches ? this.swatchWidth + SWATCH_GAP : 0)
-                + (icons ? ChatChannelIcons.SIZE + ChatChannelIcons.GAP : 0);
+                + (icons ? ChatChannelIcons.SLOT + ChatChannelIcons.GAP : 0);
         if (this.filter != null) {
             // The field's prompt and the shortcut beside it are content
             // too: a list narrower than they are would cut them off.
             widest = Math.max(widest, fieldIconRun()
-                    + ChatInputField.CARET_WIDTH + 1
+                    + LostTalesUiCaret.WIDTH + 1
                     + font.getStringWidth(this.filterPrompt)
                     + SWATCH_GAP + hintWidth(Minecraft.getMinecraft()));
         }
@@ -629,7 +628,7 @@ final class ChatPopupMenu {
             // A pixel clear of the caret waiting at the field's start.
             LostTalesChatVisualStyle.drawColored(font,
                     "§o" + this.filterPrompt, textX
-                            + ChatInputField.CARET_WIDTH + 1, textY,
+                            + LostTalesUiCaret.WIDTH + 1, textY,
                     LostTalesChatVisualStyle.asideRgb(), 255);
         } else {
             LostTalesChatVisualStyle.drawPlain(font, typed, textX, textY,
@@ -661,8 +660,7 @@ final class ChatPopupMenu {
                         this.filterHint[index], keyX, keyY, 1.0F);
             }
         }
-        if ((System.nanoTime() - this.filterNanos) % CARET_BLINK_NANOS
-                < CARET_BLINK_NANOS / 2L) {
+        if (LostTalesUiCaret.isLit(this.filterNanos, System.nanoTime())) {
             ChatInputField.drawCaret(textX + font.getStringWidth(typed),
                     textY);
         }
@@ -846,18 +844,20 @@ final class ChatPopupMenu {
             }
             // An icon or a head stands beside the label as it does in a
             // message row: centred on the label's capitals by the chat's
-            // one rule, on whole pixels, since both are pixel art.
+            // one rule, on whole pixels, since both are pixel art. A row
+            // naming a tab wears the tab's own icon, its unread mark in
+            // its corner, as the tab does.
             int labelTop = rowY + 2;
+            int iconX = this.x + this.labelX - ChatChannelIcons.SLOT
+                    - ChatChannelIcons.GAP;
             if (entry.icon != null) {
                 ChatChannelIcons.draw(Minecraft.getMinecraft(), entry.icon,
-                        this.x + this.labelX - ChatChannelIcons.SIZE
-                                - ChatChannelIcons.GAP,
-                        labelTop + ChatInlineIcons.CONTENT_TOP_OFFSET, 255);
+                        iconX, labelTop + ChatInlineIcons.CONTENT_TOP_OFFSET,
+                        255, ChatIconMark.of(entry.icon));
             } else if (entry.head != null) {
                 // A head drawn as the tabs draw theirs: eight pixels,
-                // centred across the icon column.
-                float headX = this.x + this.labelX - ChatChannelIcons.SIZE
-                        - ChatChannelIcons.GAP + 1.0F;
+                // centred across the icon's box.
+                float headX = iconX + 1.0F;
                 float headY = labelTop
                         + LostTalesChatOverlayRenderer.HEAD_TOP_OFFSET;
                 if (entry.head.skinId.length() == 0) {
@@ -873,9 +873,8 @@ final class ChatPopupMenu {
             } else if (entry.sprite != null) {
                 // Centred in the icon column and on the label's capitals,
                 // the odd pixel left and up.
-                int spriteX = this.x + this.labelX - ChatChannelIcons.SIZE
-                        - ChatChannelIcons.GAP + LostTalesUiInk.centredStart(
-                                ChatChannelIcons.SIZE, entry.sprite.getWidth());
+                int spriteX = iconX + LostTalesUiInk.centredStart(
+                        ChatChannelIcons.SIZE, entry.sprite.getWidth());
                 int spriteY = labelTop + Math.floorDiv(
                         LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT
                                 - entry.sprite.getHeight(), 2);

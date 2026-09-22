@@ -1,5 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiCaret;
+
 /**
  * The one description of the input bar's typing line, in the bar's own
  * pixels, left to right:
@@ -46,7 +48,7 @@ final class ChatInputLine {
         this.wellRight = rightDividerX;
         this.fieldLeft = this.wellLeft + ChatInputBar.BAR_GAP;
         this.fieldRight = rightDividerX - ChatInputBar.BAR_GAP
-                - ChatInputField.CARET_WIDTH;
+                - LostTalesUiCaret.WIDTH;
         this.rightDividerX = rightDividerX;
         this.counterLeft = counterLeft;
     }
@@ -74,3 +76,4 @@ final class ChatInputLine {
         return indicatorInkRight + ChatInputBar.BAR_GAP;
     }
 }
+

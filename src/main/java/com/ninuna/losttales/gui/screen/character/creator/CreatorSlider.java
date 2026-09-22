@@ -1,9 +1,9 @@
 package com.ninuna.losttales.gui.screen.character.creator;
 
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiTextField;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
-import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.gui.GuiScreen;
 import org.lwjgl.input.Keyboard;
 
@@ -39,7 +39,7 @@ public final class CreatorSlider extends CreatorControl {
     private final String label;
     private final IntValue value;
     private final String endLabel;
-    private final GuiTextField typing;
+    private final LostTalesUiTextField typing;
     private boolean dragging;
     private boolean typingOpen;
 
@@ -49,11 +49,9 @@ public final class CreatorSlider extends CreatorControl {
         this.label = label;
         this.value = value;
         this.endLabel = endLabel;
-        this.typing = new GuiTextField(context.getFont(), 0, 0,
+        this.typing = new LostTalesUiTextField(context.getFont(), 0, 0,
                 READOUT_WIDTH - 6, CreatorWidgets.FIELD_HEIGHT - 4);
-        this.typing.setEnableBackgroundDrawing(false);
         this.typing.setMaxStringLength(6);
-        this.typing.setTextColor(LostTalesSkyrimUiStyle.TEXT_BRIGHT);
     }
 
     @Override

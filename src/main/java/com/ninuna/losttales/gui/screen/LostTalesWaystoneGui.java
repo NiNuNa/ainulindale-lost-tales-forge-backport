@@ -7,6 +7,7 @@ import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapMarkerIconOverlay;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrWaypointText;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarker;
+import com.ninuna.losttales.gui.style.LostTalesUiTextField;
 import com.ninuna.losttales.inventory.container.LostTalesContainerWaystone;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerEditableSettings;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerIdResolver;
@@ -122,8 +123,9 @@ public final class LostTalesWaystoneGui extends GuiContainer {
 
     private GuiTextField field(
             int x, int y, int width, int maximumLength) {
-        GuiTextField result = new GuiTextField(
+        GuiTextField result = new LostTalesUiTextField(
                 this.fontRendererObj, x, y, width, 18);
+        result.setEnableBackgroundDrawing(true);
         result.setMaxStringLength(maximumLength);
         return result;
     }

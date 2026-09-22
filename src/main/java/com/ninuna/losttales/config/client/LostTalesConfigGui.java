@@ -135,9 +135,7 @@ public class LostTalesConfigGui extends GuiConfig {
                 "enableChatEmojis", "convertChatEmoticons",
                 "chatProfanityFilter",
                 "enableChatMessageGrouping", "enableChatBackgroundBlur",
-                "enableChatPings", "chatPingSound", "chatBackgroundColor",
-                "chatSelectedLineColor", "chatMentionLineColor",
-                "chatSelectedMentionColor", "chatReplyHighlightColor",
+                "enableChatPings", "chatPingSound",
                 "chatFeedAlignment", "chatSpeakerSize",
                 "chatFeedSpeakerSize", "chatFeedMessageSize",
                 "chatQuoteSize", "chatFeedQuoteSize", "hideHudWhileChatting",
@@ -216,6 +214,8 @@ public class LostTalesConfigGui extends GuiConfig {
                 }
             }
         }
+        // The chat's own windows set these, and nothing else shows them.
+        used.addAll(LostTalesConfig.CHAT_WINDOW_KEYS);
         for (IConfigElement element : source) {
             if (element != null && !used.contains(element.getName())) {
                 result.add(element);

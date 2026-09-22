@@ -25,6 +25,7 @@ public final class DiscordGatewayProtocol {
     public static final int OP_IDENTIFY = 2;
     public static final int OP_RESUME = 6;
     public static final int OP_RECONNECT = 7;
+    public static final int OP_REQUEST_GUILD_MEMBERS = 8;
     public static final int OP_INVALID_SESSION = 9;
     public static final int OP_HELLO = 10;
     public static final int OP_HEARTBEAT_ACK = 11;
@@ -34,6 +35,19 @@ public final class DiscordGatewayProtocol {
      * MESSAGE_CONTENT is privileged.
      */
     public static final int INTENTS = 1 | (1 << 9) | (1 << 10) | (1 << 15);
+    /**
+     * GUILD_MEMBERS and GUILD_PRESENCES: who is in a server and what
+     * they are doing, which the member lists need. Both are privileged,
+     * and asked for only while the server lists Discord members.
+     */
+    public static final int MEMBER_INTENTS = (1 << 1) | (1 << 8);
+    /**
+     * Servers of up to this many members arrive whole with their
+     * GUILD_CREATE while the member intents are asked for; Discord's
+     * highest. A larger one sends its online members, and the rest are
+     * asked for ({@link #requestMembersPayload}).
+     */
+    public static final int LARGE_THRESHOLD = 250;
 
     /** What the connection is to do with a payload. */
     public static final class Action {
@@ -89,7 +103,7 @@ public final class DiscordGatewayProtocol {
     }
 
     private final String token;
-    private final int intents;
+    private int intents;
     private long sequence = -1L;
     private String sessionId = "";
     private String resumeGatewayUrl = "";
@@ -121,6 +135,19 @@ public final class DiscordGatewayProtocol {
 
     public long getHeartbeatIntervalMillis() {
         return this.heartbeatIntervalMillis;
+    }
+
+    /** The intents the next identify asks for. */
+    public int getIntents() {
+        return this.intents;
+    }
+
+    /**
+     * Stops asking for {@code dropped}, from the next identify on: what a
+     * refused privileged intent comes to.
+     */
+    public void dropIntents(int dropped) {
+        this.intents &= ~dropped;
     }
 
     /** Forgets the session, so the next connection identifies afresh. */
@@ -228,6 +255,9 @@ public final class DiscordGatewayProtocol {
         data.addProperty("token", this.token);
         data.addProperty("intents", Integer.valueOf(this.intents));
         data.add("properties", properties);
+        if ((this.intents & MEMBER_INTENTS) != 0) {
+            data.addProperty("large_threshold", Integer.valueOf(LARGE_THRESHOLD));
+        }
         JsonObject payload = new JsonObject();
         payload.addProperty("op", Integer.valueOf(OP_IDENTIFY));
         payload.add("d", data);
@@ -241,6 +271,24 @@ public final class DiscordGatewayProtocol {
         data.addProperty("seq", Long.valueOf(this.sequence));
         JsonObject payload = new JsonObject();
         payload.addProperty("op", Integer.valueOf(OP_RESUME));
+        payload.add("d", data);
+        return payload.toString();
+    }
+
+    /**
+     * Asks for every member of a server and their statuses, which come
+     * back as GUILD_MEMBERS_CHUNK events of up to a thousand members.
+     * Discord answers this at most once per server in thirty seconds,
+     * and a RATE_LIMITED event says when to ask again.
+     */
+    public static String requestMembersPayload(String guildId) {
+        JsonObject data = new JsonObject();
+        data.addProperty("guild_id", guildId == null ? "" : guildId);
+        data.addProperty("query", "");
+        data.addProperty("limit", Integer.valueOf(0));
+        data.addProperty("presences", Boolean.TRUE);
+        JsonObject payload = new JsonObject();
+        payload.addProperty("op", Integer.valueOf(OP_REQUEST_GUILD_MEMBERS));
         payload.add("d", data);
         return payload.toString();
     }

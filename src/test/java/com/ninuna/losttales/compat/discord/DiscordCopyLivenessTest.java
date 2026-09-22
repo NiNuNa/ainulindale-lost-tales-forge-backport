@@ -374,7 +374,7 @@ public final class DiscordCopyLivenessTest {
         Said said = new Said().put(MESSAGE, ChatChannel.OOC, "");
         DiscordChannelBindings bindings = bound(
                 "ooc=BIDIRECTIONAL;channel=5;webhook=" + HOOK_A);
-        assertEquals("#OOC/1000", DiscordCopyLiveness.gameLink(links,
+        assertEquals("#OutofCharacter/1000", DiscordCopyLiveness.gameLink(links,
                 bindings, said, "5", "111"));
         assertEquals("posted there but not read", "", DiscordCopyLiveness.gameLink(
                 links, bound("ooc=GAME_TO_DISCORD;channel=5;webhook=" + HOOK_A),
@@ -396,7 +396,7 @@ public final class DiscordCopyLivenessTest {
         links.link(MESSAGE, "222", "", "channel:6", HOOK_B, "ooc#2");
         assertEquals("the linked copy is not the one in that channel", "",
                 DiscordCopyLiveness.gameLink(links, bindings, said, "5", "222"));
-        assertEquals("#OOC/1000", DiscordCopyLiveness.gameLink(links,
+        assertEquals("#OutofCharacter/1000", DiscordCopyLiveness.gameLink(links,
                 bindings, said, "5", "111"));
     }
 

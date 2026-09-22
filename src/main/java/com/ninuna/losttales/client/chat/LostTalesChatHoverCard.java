@@ -692,7 +692,9 @@ final class LostTalesChatHoverCard {
                     member.getNameColor());
         }
         boolean accountIdentity = member.getCharacterId() == null;
-        if (accountIdentity && minecraft != null) {
+        // A Discord member has no Minecraft account to fetch a skin for.
+        if (accountIdentity && minecraft != null
+                && !LostTalesChatMessagePacket.isDiscordSender(member.getPlayerId())) {
             LostTalesCharacterHeadIconRenderer.rememberAccountSkin(
                     minecraft, member.getPlayerId(), member.getAccount());
         }
@@ -1062,22 +1064,17 @@ final class LostTalesChatHoverCard {
 
         /**
          * The status of the identity the card is about; null where there
-         * is none to tell — a role, an NPC, the server, the client, the
-         * Discord bridge, or a character the card cannot name.
+         * is none to tell — a role, a voice that is never online, or a
+         * character the card cannot name.
          */
         ChatPresence presence() {
-            if (this.role != null || this.npcIdentity || this.playerId == null
-                    || LostTalesChatMessagePacket.isSystemSender(this.playerId)
-                    || LostTalesChatMessagePacket.isDiscordSender(this.playerId)) {
+            if (this.role != null || !ChatPresenceMark.hasStatus(this.playerId,
+                    this.npcIdentity, false)
+                    || (!this.accountIdentity && this.characterId == null)) {
                 return null;
             }
-            if (this.accountIdentity) {
-                return ClientChatPresence.presenceOf(this.playerId,
-                        ChatPresenceIdentity.ACCOUNT);
-            }
-            return this.characterId == null ? null
-                    : ClientChatPresence.presenceOf(this.playerId,
-                            ChatPresenceIdentity.character(this.characterId));
+            return ChatPresenceMark.statusOf(this.playerId,
+                    this.accountIdentity, this.characterId);
         }
     }
 }

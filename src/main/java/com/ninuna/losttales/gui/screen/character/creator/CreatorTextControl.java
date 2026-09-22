@@ -1,8 +1,8 @@
 package com.ninuna.losttales.gui.screen.character.creator;
 
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiTextField;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.gui.GuiTextField;
 import org.lwjgl.input.Keyboard;
 
 /**
@@ -14,7 +14,7 @@ import org.lwjgl.input.Keyboard;
 public final class CreatorTextControl extends CreatorControl {
 
     private final String label;
-    private final GuiTextField field;
+    private final LostTalesUiTextField field;
     private final int maxLength;
     private final boolean showCounter;
 
@@ -24,11 +24,11 @@ public final class CreatorTextControl extends CreatorControl {
         this.label = label;
         this.maxLength = maxLength;
         this.showCounter = showCounter;
-        this.field = new GuiTextField(context.getFont(), 0, 0, 10,
+        this.field = new LostTalesUiTextField(context.getFont(), 0, 0, 10,
                 CreatorWidgets.FIELD_HEIGHT - 4);
-        this.field.setEnableBackgroundDrawing(false);
+        this.field.setCanLoseFocus(false);
+        this.field.setFocused(false);
         this.field.setMaxStringLength(maxLength);
-        this.field.setTextColor(LostTalesSkyrimUiStyle.TEXT_BRIGHT);
         this.field.setText(text == null ? "" : text);
     }
 

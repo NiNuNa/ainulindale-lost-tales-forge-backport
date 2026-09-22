@@ -64,7 +64,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
     private static final int MAX_ROLE_DESCRIPTION_BYTES =
             ChatAccountRole.MAX_DESCRIPTION_LENGTH * 4;
     private static final int MAX_ROLE_BYTES = MAX_ROLE_ID_BYTES + 2 * MAX_ROLE_TEXT_BYTES
-            + MAX_ROLE_DESCRIPTION_BYTES + 32;
+            + MAX_ROLE_DESCRIPTION_BYTES + ChatChannelIconSpec.MAX_TEXT_LENGTH + 32;
     /** A channel id is bounded as the send packet bounds the same field. */
     private static final int MAX_CHANNEL_ID_BYTES = 16;
     /** More channel ids than this is a broken payload, not an access answer. */
@@ -101,7 +101,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
                     * (MAX_CHANNEL_ID_BYTES + MAX_CHANNEL_ICON_BYTES + 4)
             + 2 + ChatProfanityWords.MAX_WORDS
                     * (ChatProfanityWords.MAX_ENTRY_BYTES + 2)
-            + 1 + MAX_DISCORD_LINKS * (MAX_DISCORD_LINK_BYTES + 2);
+            + 1 + MAX_DISCORD_LINKS * (MAX_DISCORD_LINK_BYTES + 2) + 1;
     /**
      * Every channel this build knows, by id: what a payload written
      * without a channel answer reads as, and what a client falls back to.
@@ -169,9 +169,14 @@ public final class LostTalesChatAccessPacket implements IMessage {
     /**
      * The game channels linked to Discord now, by their link key: a
      * channel's id, or {@code faction:<id>} for one faction's chat. What
-     * the tabs' Discord mark reads.
+     * a linked channel's split icon reads.
      */
     private List<String> discordLinks = Collections.emptyList();
+    /**
+     * Whether the server lists Discord members and follows their Discord
+     * status: only then does a Discord member wear one.
+     */
+    private boolean discordStatuses;
     private boolean malformed;
 
     public LostTalesChatAccessPacket() {}
@@ -541,6 +546,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
                 }
                 links.add(key);
             }
+            boolean statuses = buffer.readBoolean();
             LostTalesPacketCodec.requireFinished(buffer);
             int knownMask = known.knownMask();
             List<RoleHolder> stated = new ArrayList<RoleHolder>(holderCount);
@@ -578,6 +584,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.channelIcons = Collections.unmodifiableMap(icons);
             this.profanityWords = words;
             this.discordLinks = Collections.unmodifiableList(links);
+            this.discordStatuses = statuses;
         } catch (RuntimeException exception) {
             this.malformed = true;
             this.adminAccess = false;
@@ -597,6 +604,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.channelIcons = Collections.emptyMap();
             this.profanityWords = ChatProfanityWords.NONE;
             this.discordLinks = Collections.emptyList();
+            this.discordStatuses = false;
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -672,11 +680,16 @@ public final class LostTalesChatAccessPacket implements IMessage {
         boolean mentionable = buffer.readBoolean();
         boolean locked = buffer.readBoolean();
         int rank = buffer.readInt();
+        String iconText = LostTalesPacketCodec.readUtf8String(buffer,
+                ChatChannelIconSpec.MAX_TEXT_LENGTH);
         if (id.length() == 0 || bitIndex >= ChatRoleCatalog.MAX_ROLES) {
             throw new LostTalesPacketCodec.DecodeException("invalid role");
         }
+        // No icon, or one this side cannot read, is the plain face.
+        ChatChannelIconSpec icon = iconText.length() == 0 ? null
+                : ChatChannelIconSpec.parse(iconText);
         return ChatAccountRole.fromWire(id, bitIndex, nameKey, name, description, color,
-                mentionable, locked, rank);
+                mentionable, locked, rank, icon);
     }
 
     @Override
@@ -706,6 +719,8 @@ public final class LostTalesChatAccessPacket implements IMessage {
             buffer.writeBoolean(role.isMentionable());
             buffer.writeBoolean(role.isLocked());
             buffer.writeInt(role.getRank());
+            LostTalesPacketCodec.writeUtf8String(buffer, role.getIcon() == null ? ""
+                    : role.getIcon().toText(), ChatChannelIconSpec.MAX_TEXT_LENGTH);
         }
         writeChannelIds(buffer, this.readableChannels);
         writeChannelIds(buffer, this.sendableChannels);
@@ -771,12 +786,14 @@ public final class LostTalesChatAccessPacket implements IMessage {
             LostTalesPacketCodec.writeUtf8String(buffer, entry,
                     ChatProfanityWords.MAX_ENTRY_BYTES);
         }
-        // Last, the channels linked to Discord.
+        // Last, the channels linked to Discord, and whether Discord
+        // members wear their status.
         buffer.writeByte(this.discordLinks.size());
         for (String key : this.discordLinks) {
             LostTalesPacketCodec.writeUtf8String(buffer, key,
                     MAX_DISCORD_LINK_BYTES);
         }
+        buffer.writeBoolean(this.discordStatuses);
     }
 
     /**
@@ -800,6 +817,15 @@ public final class LostTalesChatAccessPacket implements IMessage {
 
     /** The game channels linked to Discord, by link key. */
     public List<String> getDiscordLinks() { return this.discordLinks; }
+
+    /** The same statement saying whether Discord members wear their Discord status. */
+    public LostTalesChatAccessPacket withDiscordStatuses(boolean shown) {
+        this.discordStatuses = shown;
+        return this;
+    }
+
+    /** Whether Discord members wear their Discord status on this server. */
+    public boolean showsDiscordStatuses() { return this.discordStatuses; }
 
     /** A link key: a channel's id, or {@code faction:} and a faction's id. */
     static boolean isLinkKey(String key) {

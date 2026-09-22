@@ -141,11 +141,10 @@ final class ChatChannelSuggestionBox {
         for (int row = 0; row < this.matches.size(); row++) {
             int rowTop = top + PADDING + row * ROW_HEIGHT;
             ChatChannel channel = this.matches.get(row);
-            ChatEmoji icon = ChatChannelIcons.iconOf(channel);
-            if (icon != null) {
-                ChatEmojiRenderer.draw(minecraft, icon, inputX + 4,
-                        rowTop + 1, ICON_SIZE, 255);
-            }
+            // The channel's emoji as its tab wears it, half Discord's
+            // while it is linked, over the one shadow.
+            ChatChannelIcons.drawChannelEmoji(minecraft, channel, inputX + 4,
+                    rowTop + 1, ICON_SIZE, 255);
             LostTalesChatVisualStyle.drawColored(font, label(channel),
                     inputX + 4 + ICON_SIZE + ICON_GAP, rowTop + 2,
                     ClientChatChannelState.displayColor(channel), 255);

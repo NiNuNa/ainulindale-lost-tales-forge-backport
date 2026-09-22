@@ -3,11 +3,11 @@ package com.ninuna.losttales.chat;
 import java.util.Locale;
 
 /**
- * What a channel wears before its name when a server chooses it: one of
- * the chat's own emoji, or an item's icon. Written in the channels file
- * as {@code emoji:<name>} — or the bare name — or {@code item:<id>}, with
- * {@code @<damage>} after an item that needs one, and carried to clients
- * as that same text. Each side parses the text for itself, and text that
+ * What a channel wears before its name when a server chooses it, and a
+ * role over its members: one of the chat's own emoji, or an item's icon.
+ * Written in the channels and roles files as {@code emoji:<name>} — or
+ * the bare name — or {@code item:<id>}, with {@code @<damage>} after an
+ * item that needs one, and carried to clients as that same text. Each side parses the text for itself, and text that
  * names nothing is refused rather than guessed at; whether the emoji or
  * the item exists is the drawing side's question, since a client may
  * lack the mod an item comes from.

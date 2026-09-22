@@ -101,6 +101,25 @@ final class ChatChannelLinkMarker {
         return payload(component) != null;
     }
 
+    /**
+     * Whether the run is a piece of a link to a message, read off its
+     * payload without decoding it: only such a payload has a fourth
+     * field, and the tab's name, in base64, holds no colon.
+     */
+    static boolean linksMessage(IChatComponent component) {
+        String payload = payload(component);
+        if (payload == null) {
+            return false;
+        }
+        int colons = 0;
+        for (int index = 0; index < payload.length(); index++) {
+            if (payload.charAt(index) == ':') {
+                colons++;
+            }
+        }
+        return colons == 3;
+    }
+
     /** Whether two runs are pieces of one link: the same payload. */
     static boolean sameLink(IChatComponent one, IChatComponent other) {
         String left = payload(one);

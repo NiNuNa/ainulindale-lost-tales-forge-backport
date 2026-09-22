@@ -111,6 +111,8 @@ public final class ChatPresenceService {
                     new LostTalesChatPresenceSyncPacket(
                             Collections.singletonMap(account, shown),
                             Collections.singletonMap(account, lines)));
+            // Who shows, and as whom, is what the member lists group by.
+            ChatMemberWatches.markChanged();
         }
     }
 

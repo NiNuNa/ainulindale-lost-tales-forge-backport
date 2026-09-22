@@ -144,7 +144,7 @@ public final class ChatAccountRoleTest {
                     operator.getBitIndex(), operator.getNameKey(),
                     operator.getName(), operator.getDescription(),
                     operator.getColor(), operator.isMentionable(), operator.isLocked(),
-                    operator.getRank());
+                    operator.getRank(), operator.getIcon());
             assertTrue(wire.getSources().isEmpty());
             ChatRoleCatalog.install(ChatRoleCatalog.fromWire(
                     Collections.singletonList(wire)));

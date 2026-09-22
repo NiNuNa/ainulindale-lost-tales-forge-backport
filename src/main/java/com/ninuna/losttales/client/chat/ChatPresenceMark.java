@@ -3,8 +3,10 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
+import com.ninuna.losttales.gui.style.LostTalesUiCornerCut;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
+import java.util.UUID;
 import net.minecraft.util.StatCollector;
 
 /**
@@ -16,20 +18,24 @@ import net.minecraft.util.StatCollector;
  * sees of Invisible.
  *
  * <p>The head is <em>cut</em> at the sphere's corner rather than painted
- * over: {@link #beginHeadCut} takes the sphere grown by
- * {@link #CUT_MARGIN} on every side away from every layer of the head
- * while it is drawn, and the sphere is drawn in it. What is taken is the
- * sphere's shape grown, not its box: the clear pixel runs along the
- * sides the sphere has ink on, and the corner it points at, where its
- * artwork is clear, keeps its head pixel. The sphere stands two pixels
- * past the head's right edge and one below its bottom, a pixel higher
- * than it is far in.</p>
+ * over: {@link #beginHeadCut} takes the sphere's shape grown by a pixel
+ * up, down, left and right away from every layer of the head while it
+ * is drawn ({@link LostTalesUiCornerCut}), and the sphere is drawn in it.
+ * What is taken follows the sphere's round outline, not its box: the
+ * clear pixel runs along the sides the sphere has ink on, and the head
+ * keeps the pixels off the sphere's rounded corner. The sphere stands two
+ * pixels past the head's right edge and one below its bottom, a pixel
+ * higher than it is far in.</p>
  *
- * <p>Only a player's own head on their own line wears one. An NPC has no
- * account and no presence, and neither has a line from the server, the
- * client or the Discord bridge; a reply's quote wears the quoted head
- * without one, as a messenger's reply preview does, since a quote does
- * not say which of the sender's characters spoke.</p>
+ * <p>Every voice that can be online wears one ({@link #hasStatus}): a
+ * player's account and characters, the server, which is online while it
+ * runs, and a Discord member while the server follows their Discord
+ * status. The mark standing for the server's or a member's head gives its
+ * corner up as a head does. An NPC has no account and no presence, and
+ * neither has the client, the Narrator or the Discord bridge itself; a
+ * reply's quote wears the quoted head without one, as a messenger's reply
+ * preview does, since a quote does not say which of the sender's
+ * characters spoke.</p>
  */
 public final class ChatPresenceMark {
     /** The sphere's size on screen: the sheet's own, one texel to one pixel. */
@@ -47,15 +53,21 @@ public final class ChatPresenceMark {
     public static final int OVERHANG_X = SIZE - INSET_X;
     public static final int OVERHANG_Y = SIZE - INSET_Y;
     /**
-     * How far past the sphere the head is cut, on every side: one clear
-     * pixel, so the two never touch. Only the top and left of it fall on
-     * the head at all — the sphere's other two sides already stand past
-     * the head's edges — and the corner they meet at keeps its pixel,
-     * since the sphere is round and has no ink of its own there.
+     * The sphere's outline, row by row from its top: the column each
+     * row's ink starts at. Round: its top and bottom rows are a pixel in
+     * from its sides ({@code ChatPresenceMarkTest} reads the sheet to
+     * hold it).
      */
-    public static final int CUT_MARGIN = 1;
+    static final int[] SPHERE_INK_LEFT = {1, 0, 0, 0, 1};
 
     private ChatPresenceMark() {}
+
+    /** The cut a head drawn at {@code headX}, {@code headY}, {@code headSize} square gives its sphere. */
+    public static LostTalesUiCornerCut cutFor(float headX, float headY,
+                                              float headSize) {
+        return LostTalesUiCornerCut.around(headX + headSize - INSET_X,
+                headY + headSize - INSET_Y, SPHERE_INK_LEFT);
+    }
 
     /**
      * Opens the cut a head drawn at {@code headX}, {@code headY},
@@ -64,14 +76,8 @@ public final class ChatPresenceMark {
      */
     public static void beginHeadCut(float headX, float headY,
                                     float headSize) {
-        float sphereX = headX + headSize - INSET_X;
-        float sphereY = headY + headSize - INSET_Y;
-        // The column left of the sphere goes with it, and so does the
-        // row above it — but not the pixel where those two meet, which
-        // the sphere's round corner never reaches.
         LostTalesCharacterHeadIconRenderer.beginCorner(
-                sphereX - CUT_MARGIN, sphereY,
-                sphereX, sphereY - CUT_MARGIN);
+                cutFor(headX, headY, headSize));
     }
 
     /**
@@ -122,17 +128,50 @@ public final class ChatPresenceMark {
     }
 
     /**
-     * Whether a head wears a sphere and gives up its corner: a player's
-     * own head on their own line — not an NPC's, not a mark standing in
-     * for a head, not one of the synthetic senders a line from the
-     * server, the client or the Discord bridge carries, and not the head
-     * a reply's quote wears.
+     * Whether a head wears a sphere and gives up its corner: the head of
+     * a voice with a status on its own line, and never the head a reply's
+     * quote wears.
      */
     public static boolean wears(ChatHeadMarker.Data head) {
-        return head != null && !head.npcIdentity && !head.quoted
-                && head.mark() == null && head.senderId != null
-                && !LostTalesChatMessagePacket.isSystemSender(head.senderId)
-                && !LostTalesChatMessagePacket.isDiscordSender(head.senderId);
+        return head != null && !head.quoted && hasStatus(head.senderId,
+                head.npcIdentity, head.isNarrator());
+    }
+
+    /**
+     * Whether a voice can be online at all: a player's account or
+     * character, the server, and a Discord member while the server follows
+     * Discord statuses — never an NPC, the client, the Narrator or the
+     * Discord bridge itself.
+     */
+    public static boolean hasStatus(UUID senderId, boolean npc,
+                                    boolean narrator) {
+        if (senderId == null || npc || narrator
+                || LostTalesChatMessagePacket.isClientSender(senderId)
+                || LostTalesChatMessagePacket.DISCORD_SENDER_ID.equals(senderId)) {
+            return false;
+        }
+        return !LostTalesChatMessagePacket.isDiscordSender(senderId)
+                || ClientChatPresence.showsDiscordStatuses();
+    }
+
+    /**
+     * What a voice with a status is doing: the server is online while it
+     * runs, a Discord member as Discord says, and a player's identity as
+     * the server says — the account on an account line, the character on
+     * a character line, and Offline where a line does not say which
+     * character spoke.
+     */
+    public static ChatPresence statusOf(UUID senderId, boolean accountIdentity,
+                                        UUID characterId) {
+        if (LostTalesChatMessagePacket.isServerSender(senderId)) {
+            return ChatPresence.ONLINE;
+        }
+        if (!accountIdentity && characterId == null) {
+            return ChatPresence.OFFLINE;
+        }
+        return ClientChatPresence.presenceOf(senderId, accountIdentity
+                ? ChatPresenceIdentity.ACCOUNT
+                : ChatPresenceIdentity.character(characterId));
     }
 
     /**
@@ -141,12 +180,9 @@ public final class ChatPresenceMark {
      * Offline where the line does not say which character spoke.
      */
     public static ChatPresence presenceOf(ChatHeadMarker.Data head) {
-        if (head == null || (!head.accountIdentity && head.characterId == null)) {
-            return ChatPresence.OFFLINE;
-        }
-        return ClientChatPresence.presenceOf(head.senderId, head.accountIdentity
-                ? ChatPresenceIdentity.ACCOUNT
-                : ChatPresenceIdentity.character(head.characterId));
+        return head == null ? ChatPresence.OFFLINE
+                : statusOf(head.senderId, head.accountIdentity,
+                        head.characterId);
     }
 
     /** What a card says of a presence; empty for Online, which is no news. */

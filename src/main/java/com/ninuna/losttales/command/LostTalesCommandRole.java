@@ -313,7 +313,8 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
      * {@code create <id> [option ...]} and {@code edit <id> <option ...>}
      * take the options of a config entry ({@code name:Text color:RRGGBB
      * mention:true rank:15 op:1 faction:GONDOR@gondor.knight
-     * grant:chat.moderate desc:Text}), space-separated; an edit keeps
+     * grant:chat.moderate icon:emoji:bee desc:Text}), space-separated;
+     * an edit keeps
      * whatever it does not name. {@code op:}, {@code faction:} and
      * {@code grant:} with nothing after the colon clear that kind.
      */
@@ -322,7 +323,8 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
             LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY + "/losttales role "
                     + (create ? "create" : "edit") + " <id> [name:<text>] "
                     + "[color:<RRGGBB>] [mention:<true|false>] [rank:<n>] [op:<level>] "
-                    + "[faction:<FACTION>@<rank>] [grant:<capability>] [desc:<text>]");
+                    + "[faction:<FACTION>@<rank>] [grant:<capability>] "
+                    + "[icon:<emoji:name|item:id>] [desc:<text>]");
             return;
         }
         String id = args[1].toLowerCase(Locale.ROOT);
@@ -537,7 +539,7 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
         LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY
                 + "/losttales role create <id> [name:<text>] [color:<RRGGBB>] "
                 + "[mention:<true|false>] [rank:<n>] [op:<level>] [faction:<FACTION>@<rank>] "
-                + "[grant:<capability>] [desc:<text>]");
+                + "[grant:<capability>] [icon:<emoji:name|item:id>] [desc:<text>]");
         LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY
                 + "  capabilities: " + capabilityIds());
         LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY

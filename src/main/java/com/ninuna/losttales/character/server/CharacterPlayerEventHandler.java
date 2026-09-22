@@ -47,6 +47,10 @@ public final class CharacterPlayerEventHandler {
         // The remaining players' role rosters follow the leave.
         com.ninuna.losttales.chat.server.ChatIdentitySelection.forget(player.getUniqueID());
         ChatPresenceService.forget(player.getUniqueID());
+        com.ninuna.losttales.chat.server.ChatMemberWatches.forget(
+                player.getUniqueID());
+        com.ninuna.losttales.compat.discord.LostTalesDiscordBridge.getInstance()
+                .forgetPlayer(player.getUniqueID());
         LostTalesChatService.sendAccessToAll(player);
         CharacterSwitchCoordinator.getInstance().clearRuntimeState(player.getUniqueID());
     }

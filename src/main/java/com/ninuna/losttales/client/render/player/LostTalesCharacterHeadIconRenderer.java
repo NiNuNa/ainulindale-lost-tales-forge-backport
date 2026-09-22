@@ -6,6 +6,7 @@ import com.ninuna.losttales.client.skin.LostTalesAccountSkins;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
+import com.ninuna.losttales.gui.style.LostTalesUiCornerCut;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.minecraft.MinecraftProfileTexture;
@@ -66,24 +67,14 @@ public final class LostTalesCharacterHeadIconRenderer {
 
     /**
      * The corner every head drawn right now gives up, in the units the
-     * head is drawn in: a head wearing a presence sphere is cut away
-     * from the sphere so the sphere sits in the head rather than on it,
-     * with a clear pixel between them. Set around a head's draw and
-     * cleared after it, like the silhouette state, so a head is cut
-     * whatever matrix it is drawn in and whichever of its layers is
-     * being drawn.
-     *
-     * <p>Two steps, not one square: the sphere is round, so the corner
-     * it points at keeps its pixel while the sides beside it go. The
-     * lower step reaches further left, the upper one starts higher and
-     * further right, and what survives is the three bands between
-     * them.</p>
+     * head is drawn in: a head wearing a mark — its presence sphere, or a
+     * tab's unread mark — is cut away from it so the mark sits in the
+     * head rather than on it, with a clear pixel between them. Set around
+     * a head's draw and cleared after it, like the silhouette state, so a
+     * head is cut whatever matrix it is drawn in and whichever of its
+     * layers is being drawn.
      */
-    private static boolean cutting;
-    private static float cutX;
-    private static float cutY;
-    private static float cutStepX;
-    private static float cutStepY;
+    private static LostTalesUiCornerCut cut = LostTalesUiCornerCut.NONE;
     /**
      * How far the head being drawn was moved onto the display's grid; the
      * cut, given where the caller put the head, moves with it.
@@ -354,34 +345,18 @@ public final class LostTalesCharacterHeadIconRenderer {
     }
 
     /**
-     * Cuts every head drawn until {@link #endCorner} away from
-     * {@code x}, {@code y} down and to the right. Always paired in a
+     * Cuts every head drawn until {@link #endCorner} by {@code corner},
+     * given where the caller puts the head. Always paired in a
      * {@code finally}, so a head that fails to draw does not leave the
      * cut standing.
      */
-    public static void beginCorner(float x, float y) {
-        beginCorner(x, y, x, y);
-    }
-
-    /**
-     * As above in two steps: everything at or past {@code x} from
-     * {@code y} down goes, and so does everything at or past
-     * {@code stepX} from {@code stepY} down. {@code stepX} is the
-     * further right of the two and {@code stepY} the higher, so the
-     * head keeps the pixel in the notch between them.
-     */
-    public static void beginCorner(float x, float y, float stepX,
-                                   float stepY) {
-        cutting = true;
-        cutX = x;
-        cutY = y;
-        cutStepX = Math.max(x, stepX);
-        cutStepY = Math.min(y, stepY);
+    public static void beginCorner(LostTalesUiCornerCut corner) {
+        cut = corner == null ? LostTalesUiCornerCut.NONE : corner;
     }
 
     /** Ends the cut {@link #beginCorner} opened. */
     public static void endCorner() {
-        cutting = false;
+        cut = LostTalesUiCornerCut.NONE;
     }
 
     public static void clearAccountSkinCache() {
@@ -681,36 +656,35 @@ public final class LostTalesCharacterHeadIconRenderer {
         }
         double v0 = textureY / imageHeight;
         double v1 = (textureY + textureHeight) / imageHeight;
-        if (!cutting) {
+        LostTalesUiCornerCut corner = cut;
+        if (corner.isNone()) {
             quad(x, y, x + width, y + height, u0, v0, u1, v1);
             return;
         }
-        // The corner a head gives up to its presence sphere, in three
-        // bands: the rows above the upper step whole, the rows between
-        // the steps cut to the upper one, and the rows below cut to the
-        // lower. Each piece keeps the texels it covers, so every layer
-        // of the head is cut in the same place whatever size it is drawn
-        // at.
-        // The cut was given where the caller put the head; the head was
-        // moved onto the display's grid, and the cut goes with it.
+        // The corner a head gives up to its mark, band by band: the rows
+        // above the cut whole, and each band of the cut up to where it
+        // cuts from. Each piece keeps the texels it covers, so every
+        // layer of the head is cut in the same place whatever size it is
+        // drawn at. The cut was given where the caller put the head; the
+        // head was moved onto the display's grid, and the cut goes with
+        // it.
+        float right = x + width;
         float bottom = y + height;
-        float above = Math.min(bottom, cutStepY + shiftY);
-        if (above > y) {
+        float firstBand = Math.min(bottom, corner.bandTop(0) + shiftY);
+        if (firstBand > y) {
             quadPart(x, y, width, height, u0, v0, u1, v1,
-                    x, y, x + width, above);
+                    x, y, right, firstBand);
         }
-        float between = Math.min(bottom, cutY + shiftY);
-        float betweenTop = Math.max(y, above);
-        float stepRight = Math.min(x + width, cutStepX + shiftX);
-        if (between > betweenTop && stepRight > x) {
-            quadPart(x, y, width, height, u0, v0, u1, v1,
-                    x, betweenTop, stepRight, between);
-        }
-        float belowTop = Math.max(y, between);
-        float beside = Math.min(x + width, cutX + shiftX);
-        if (bottom > belowTop && beside > x) {
-            quadPart(x, y, width, height, u0, v0, u1, v1,
-                    x, belowTop, beside, bottom);
+        for (int band = 0; band < corner.bands(); band++) {
+            float top = Math.max(y, corner.bandTop(band) + shiftY);
+            float end = band + 1 < corner.bands()
+                    ? Math.min(bottom, corner.bandTop(band + 1) + shiftY)
+                    : bottom;
+            float kept = Math.min(right, corner.bandColumn(band) + shiftX);
+            if (end > top && kept > x) {
+                quadPart(x, y, width, height, u0, v0, u1, v1,
+                        x, top, kept, end);
+            }
         }
     }
 

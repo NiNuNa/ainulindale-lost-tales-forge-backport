@@ -178,10 +178,10 @@ final class ChatInteractions {
     /**
      * Whether two runs are pieces of one element the pointer uses as
      * one: the same reply quote, channel link, spoiler, share or
-     * achievement, or the same click. A bracketed achievement or share
-     * is several runs — its brackets, its name, a share's icon — and
-     * every one of them lights, underlines and answers with the others,
-     * so the element reads as one thing wherever the pointer rests on it.
+     * achievement, or the same click. A share is two runs, its icon and
+     * its name, and a link to a message three; every piece lights and
+     * answers with the others, so the element reads as one thing
+     * wherever the pointer rests on it.
      */
     static boolean sameElement(IChatComponent one, IChatComponent other) {
         if (one == null || other == null) {

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiCaret;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
@@ -154,13 +155,6 @@ final class ChatToolStrip {
         return this.field != null && this.field.textboxKeyTyped(typedChar, keyCode);
     }
 
-    /** Ticks the caret blink; called from the screen's updateScreen. */
-    void tick() {
-        if (this.field != null) {
-            this.field.updateCursorCounter();
-        }
-    }
-
     /**
      * Lays a window's strip out for its row before the row is drawn, and
      * tells the row where the well is cut out of the strip's surface.
@@ -223,7 +217,7 @@ final class ChatToolStrip {
         laid.iconSlotLeft = laid.wellRight - WELL_INSET
                 - LostTalesUiSheet.SEARCH.getWidth();
         laid.fieldX = laid.wellLeft + WELL_INSET;
-        laid.fieldWidth = laid.iconSlotLeft - GAP - ChatInputField.CARET_WIDTH
+        laid.fieldWidth = laid.iconSlotLeft - GAP - LostTalesUiCaret.WIDTH
                 - laid.fieldX;
         laid.nextX = laid.wellLeft - GAP - LostTalesUiSheet.CHEVRON_1.getWidth();
         laid.previousX = laid.nextX - GAP - LostTalesUiSheet.CHEVRON_5.getWidth();
@@ -280,13 +274,13 @@ final class ChatToolStrip {
         if (searching && this.field != null) {
             if (this.field.getText().length() == 0) {
                 drawPrompt(font, laid, window, row,
-                        this.field.xPosition + ChatInputField.CARET_WIDTH + 1,
+                        this.field.xPosition + LostTalesUiCaret.WIDTH + 1,
                         ink);
             }
             this.field.drawTextBox();
         } else {
             drawPrompt(font, laid, window, row, laid.fieldX
-                    + ChatInputField.CARET_WIDTH + 1, ink);
+                    + LostTalesUiCaret.WIDTH + 1, ink);
         }
         // The magnifier, lit while the field has the keys or the pointer
         // is on the well, crossing over to the cross while a search

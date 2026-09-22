@@ -23,11 +23,13 @@ import java.util.regex.Pattern;
  * <p>{@code roles.definitions} in {@code server/roles.cfg}, one role per
  * entry:</p>
  * <pre>
- * operator=name:Operator;color:A94B54;mention:true;rank:10;op:2
- * moderator=name:Moderator;color:A94B54;mention:true;rank:15;op:1;faction:GONDOR@gondor.knight;grant:chat.moderate;desc:Keeps the peace.
+ * operator=name:Operator;color:A94B54;mention:true;rank:10;op:2;icon:emoji:expressionless
+ * moderator=name:Moderator;color:A94B54;mention:true;rank:15;op:1;faction:GONDOR@gondor.knight;grant:chat.moderate;icon:item:minecraft:iron_sword;desc:Keeps the peace.
  * </pre>
  * Options are optional and case-insensitive; a role without a name is
- * named by its id. The
+ * named by its id. {@code icon:} is what the role wears over its members
+ * in a member list, written as a channel's icon is: {@code emoji:<name>}
+ * or {@code item:<id>}. The
  * operator entry is seeded into a fresh file ({@link #DEFAULT_OPERATOR_ENTRY})
  * and is a role like any other from then on: restyle it, regrant it,
  * or delete it. The team entry is refused: the team mark is the code's
@@ -76,7 +78,7 @@ public final class ChatRoleConfig {
      */
     public static final String DEFAULT_OPERATOR_ENTRY =
             "operator=name:Operator;color:A94B54;mention:true;rank:10;op:2"
-            + ";desc:Runs the server day to day.";
+            + ";icon:emoji:expressionless;desc:Runs the server day to day.";
     /** The gate a fresh file starts with: the Operator channel for the operator role. */
     public static final String DEFAULT_ADMIN_GATE = ChatChannel.ADMIN.getId()
             + "=read:operator;send:operator";
@@ -200,8 +202,18 @@ public final class ChatRoleConfig {
             grants.add(granted);
         }
         warnIfGrantsFollowAFaction(id, sources, grants, out);
+        ChatChannelIconSpec icon = null;
+        String iconOption = first(options, "icon");
+        if (iconOption.length() > 0) {
+            icon = ChatChannelIconSpec.parse(iconOption);
+            if (icon == null) {
+                out.warn("Chat role '" + id + "' has icon '" + iconOption
+                        + "', which is neither emoji:<name> nor item:<id>; it wears "
+                        + "the plain face");
+            }
+        }
         return ChatAccountRole.custom(id, name.length() == 0 ? id : name, description,
-                color, mentionable, rank, sources, grants);
+                color, mentionable, rank, sources, grants, icon);
     }
 
     /**
@@ -639,6 +651,9 @@ public final class ChatRoleConfig {
         }
         for (String granted : role.getGrants()) {
             entry.append(";grant:").append(granted);
+        }
+        if (role.getIcon() != null) {
+            entry.append(";icon:").append(role.getIcon().toText());
         }
         if (role.getDescription().length() > 0) {
             entry.append(";desc:").append(role.getDescription());

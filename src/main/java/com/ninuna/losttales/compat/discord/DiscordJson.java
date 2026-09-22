@@ -145,13 +145,13 @@ public final class DiscordJson {
                     JsonObject user = value.getAsJsonObject();
                     String userId = string(user, "id");
                     if (userId.length() > 0) {
-                        mentions.put(userId, displayName(user));
+                        mentions.put(userId, memberName(member(user), user));
                     }
                 }
             }
         }
         return new Message(id, author == null ? "" : string(author, "id"),
-                author == null ? "" : displayName(author),
+                author == null ? "" : memberName(member(object), author),
                 author != null && bool(author, "bot"),
                 string(object, "content"),
                 Collections.unmodifiableMap(mentions),
@@ -279,8 +279,8 @@ public final class DiscordJson {
         JsonObject user = object.has("user") && object.get("user").isJsonObject()
                 ? object.getAsJsonObject("user") : null;
         String permissions = "";
-        if (object.has("member") && object.get("member").isJsonObject()) {
-            JsonObject member = object.getAsJsonObject("member");
+        JsonObject member = member(object);
+        if (member != null) {
             permissions = string(member, "permissions");
             if (user == null) {
                 user = member.has("user") && member.get("user").isJsonObject()
@@ -289,7 +289,7 @@ public final class DiscordJson {
         }
         return new Interaction(id, token, string(object, "application_id"), name,
                 Collections.unmodifiableMap(options), string(object, "channel_id"),
-                string(object, "guild_id"), user == null ? "" : displayName(user),
+                string(object, "guild_id"), user == null ? "" : memberName(member, user),
                 permissions);
     }
 
@@ -496,18 +496,33 @@ public final class DiscordJson {
         JsonObject user = member != null && member.has("user")
                 && member.get("user").isJsonObject()
                 ? member.getAsJsonObject("user") : null;
-        String nick = member == null ? "" : string(member, "nick");
         return new Reaction(string(data, "user_id"), channelId, messageId,
                 emoji == null ? "" : string(emoji, "id"),
                 emoji == null ? "" : string(emoji, "name"),
-                nick.length() > 0 ? nick : user == null ? "" : displayName(user),
+                memberName(member, user),
                 user != null && bool(user, "bot"));
     }
 
-    /** The name Discord shows: the global display name, else the username. */
-    private static String displayName(JsonObject user) {
-        String global = string(user, "global_name");
-        return global.length() > 0 ? global : string(user, "username");
+    /**
+     * The name a member goes by in a Discord server, as the server shows
+     * it: their nickname there, else their global display name, else
+     * their username. {@code member} is null where Discord sent none.
+     */
+    static String memberName(JsonObject member, JsonObject user) {
+        String nick = member == null ? "" : string(member, "nick");
+        if (nick.length() > 0) {
+            return nick;
+        }
+        String global = user == null ? "" : string(user, "global_name");
+        return global.length() > 0 ? global : user == null ? ""
+                : string(user, "username");
+    }
+
+    /** The {@code member} object beside a user or on a message; null where there is none. */
+    private static JsonObject member(JsonObject object) {
+        return object != null && object.has("member")
+                && object.get("member").isJsonObject()
+                ? object.getAsJsonObject("member") : null;
     }
 
     /**
@@ -636,7 +651,6 @@ public final class DiscordJson {
         return body.toString();
     }
 
-    /** The mention block that lets a post ping nobody. */
     /** A field of a gateway event as text; empty when it is missing or no value. */
     static String stringOf(JsonObject object, String key) {
         return object == null ? "" : string(object, key);

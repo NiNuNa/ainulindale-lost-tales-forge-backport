@@ -39,6 +39,35 @@ public final class DiscordGatewayProtocolTest {
         assertEquals(34305, DiscordGatewayProtocol.INTENTS);
     }
 
+    /**
+     * With the member intents a server of up to 250 members arrives
+     * whole; refused, they are dropped from the next identify.
+     */
+    @Test
+    public void theMemberIntentsAskForWholeServersAndCanBeDropped() {
+        DiscordGatewayProtocol protocol = new DiscordGatewayProtocol(TOKEN,
+                DiscordGatewayProtocol.INTENTS | DiscordGatewayProtocol.MEMBER_INTENTS);
+        JsonObject identify = json(protocol.identifyPayload()).getAsJsonObject("d");
+        assertEquals(34305 | 2 | 256, identify.get("intents").getAsInt());
+        assertEquals(250, identify.get("large_threshold").getAsInt());
+        protocol.dropIntents(DiscordGatewayProtocol.MEMBER_INTENTS);
+        identify = json(protocol.identifyPayload()).getAsJsonObject("d");
+        assertEquals(34305, identify.get("intents").getAsInt());
+        assertFalse(identify.has("large_threshold"));
+    }
+
+    /** The ask for a server's members names it and wants everyone, statuses included. */
+    @Test
+    public void membersAreAskedForWithTheirStatuses() {
+        JsonObject ask = json(DiscordGatewayProtocol.requestMembersPayload("100"));
+        assertEquals(8, ask.get("op").getAsInt());
+        JsonObject data = ask.getAsJsonObject("d");
+        assertEquals("100", data.get("guild_id").getAsString());
+        assertEquals("", data.get("query").getAsString());
+        assertEquals(0, data.get("limit").getAsInt());
+        assertTrue(data.get("presences").getAsBoolean());
+    }
+
     @Test
     public void readyRemembersTheSessionAndEventsAreDispatched() {
         DiscordGatewayProtocol protocol = new DiscordGatewayProtocol(TOKEN, 0);

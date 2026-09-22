@@ -288,10 +288,6 @@ public final class ClientChatChannelViewsTest {
         // The total shares the cap rather than summing past it.
         assertEquals(ClientChatChannelViews.MAX_UNREAD + 1,
                 ClientChatChannelViews.unreadCount(ChatChannel.OOC));
-        assertEquals("", ClientChatChannelViews.counterText(0));
-        assertEquals("[3]", ClientChatChannelViews.counterText(3));
-        assertEquals("[99]", ClientChatChannelViews.counterText(99));
-        assertEquals("[99+]", ClientChatChannelViews.counterText(100));
     }
 
     /**
@@ -312,8 +308,6 @@ public final class ClientChatChannelViewsTest {
                     ChatChannel.ALL, false);
             assertEquals(3, ClientChatChannelViews.unreadCount(
                     ChatChannel.PARTY));
-            assertEquals("[3]", ClientChatChannelViews.counterText(
-                    ClientChatChannelViews.unreadCount(ChatChannel.PARTY)));
             // Closing and restoring touch no counter on their own.
             assertTrue(ChatWindowLayout.restore(ChatChannel.PARTY));
             assertEquals(3, ClientChatChannelViews.unreadCount(

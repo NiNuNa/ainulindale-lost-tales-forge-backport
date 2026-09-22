@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerIcon;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiTextField;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import java.util.ArrayList;
@@ -10,7 +11,6 @@ import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
-import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.resources.I18n;
 import org.lwjgl.input.Keyboard;
 
@@ -79,8 +79,8 @@ final class LostTalesMapWaypointPrompt {
     }
 
     private final boolean editing;
-    private final GuiTextField nameField;
-    private final GuiTextField noteField;
+    private final LostTalesUiTextField nameField;
+    private final LostTalesUiTextField noteField;
     private final String originalName;
     private List<ShareTarget> shareTargets = Collections.emptyList();
     private String colorName;
@@ -117,15 +117,17 @@ final class LostTalesMapWaypointPrompt {
                 : LostTalesCustomWaypointStyle.DEFAULT_PERSONAL_COLOR;
         Layout layout = calculateLayout(
                 screenWidth, screenHeight, editing);
-        this.nameField = new GuiTextField(fontRenderer,
+        this.nameField = new LostTalesUiTextField(fontRenderer,
                 layout.nameField.x, layout.nameField.y,
                 layout.nameField.width, layout.nameField.height);
+        this.nameField.setEnableBackgroundDrawing(true);
         this.nameField.setMaxStringLength(MAX_NAME_LENGTH);
         this.nameField.setText(this.originalName);
         this.nameField.setFocused(true);
-        this.noteField = new GuiTextField(fontRenderer,
+        this.noteField = new LostTalesUiTextField(fontRenderer,
                 layout.noteField.x, layout.noteField.y,
                 layout.noteField.width, layout.noteField.height);
+        this.noteField.setEnableBackgroundDrawing(true);
         this.noteField.setMaxStringLength(
                 LostTalesCustomWaypointStyle.MAX_NOTE_LENGTH);
         this.noteField.setText(note == null ? "" : note);

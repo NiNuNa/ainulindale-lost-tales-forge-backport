@@ -8,9 +8,9 @@ import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
 
 /**
- * Invisible style marker for an inline shared thing — an item or a map
- * marker: the two bold spaces reserving the icon slot and the bracketed
- * name beside it. Same mechanism as {@link ChatEmojiMarker}. The marker
+ * Invisible style marker for an inline shared thing — an item, a map
+ * marker or a quest: the two bold spaces reserving the icon slot and the
+ * name beside it, on the backdrop that frames the two. Same mechanism as {@link ChatEmojiMarker}. The marker
  * carries only a key into {@link ClientChatShowcaseStore}; the decoded
  * payload itself never lives in the component, so wrapped-line copies stay
  * cheap and nothing is re-parsed while rendering.
@@ -96,7 +96,7 @@ final class ChatShowcaseMarker {
     static final class Data {
         final ChatShareKind kind;
         final int showcaseId;
-        /** True for the icon slot, false for the bracketed name text. */
+        /** True for the icon slot, false for the name text. */
         final boolean icon;
         final int textColor;
 

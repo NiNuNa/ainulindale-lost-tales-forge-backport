@@ -172,6 +172,56 @@ public class LostTalesColors {
         return null;
     }
 
+    /**
+     * The name of the palette entry nearest {@code rgb}, by the distance
+     * between their red, green and blue: what a colour off the palette,
+     * a faction's own, is taken for when its family is asked.
+     */
+    public static String nearestName(int rgb) {
+        int red = (rgb >> 16) & 0xFF;
+        int green = (rgb >> 8) & 0xFF;
+        int blue = rgb & 0xFF;
+        String nearest = PALETTE_NAMES[0];
+        long best = Long.MAX_VALUE;
+        for (int index = 0; index < PALETTE_NAMES.length; index++) {
+            int value = PALETTE_VALUES[index];
+            long dr = ((value >> 16) & 0xFF) - red;
+            long dg = ((value >> 8) & 0xFF) - green;
+            long db = (value & 0xFF) - blue;
+            long distance = dr * dr + dg * dg + db * db;
+            if (distance < best) {
+                best = distance;
+                nearest = PALETTE_NAMES[index];
+            }
+        }
+        return nearest;
+    }
+
+    /**
+     * The darkest entry of the family {@code rgb} belongs to (the nearest
+     * entry's family, for a colour off the palette) that is neither
+     * {@code rgb} itself nor {@code surfaceRgb}: the shade a thing in that
+     * colour is set on, never lost against the surface under it. Both
+     * are opaque RGB, and so is the answer.
+     */
+    public static int darkestShade(int rgb, int surfaceRgb) {
+        String name = nearestName(rgb);
+        int own = rgb & 0xFFFFFF;
+        int surface = surfaceRgb & 0xFFFFFF;
+        for (String[] ramp : RAMPS) {
+            if (!java.util.Arrays.asList(ramp).contains(name)) {
+                continue;
+            }
+            for (String shade : ramp) {
+                int value = rgb(paletteColor(shade, 0));
+                if (value != own && value != surface) {
+                    return value;
+                }
+            }
+        }
+        return rgb(PLUM_DARK);
+    }
+
     /** Strips the alpha byte so a renderer can supply its own opacity. */
     public static int rgb(int argb) {
         return argb & 0xFFFFFF;

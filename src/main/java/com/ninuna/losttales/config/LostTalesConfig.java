@@ -66,6 +66,16 @@ public final class LostTalesConfig {
      */
     public static final Set<String> CLIENT_CATEGORIES = Collections.unmodifiableSet(
             new HashSet<String>(Arrays.asList(CATEGORY_CLIENT)));
+    /**
+     * The client options the chat sets from its own windows' menus — the
+     * colours behind the cog — and saves the moment they are chosen. The
+     * Config Screen leaves them to the chat: they stay in the client
+     * file, and are shown nowhere else.
+     */
+    public static final Set<String> CHAT_WINDOW_KEYS = Collections.unmodifiableSet(
+            new HashSet<String>(Arrays.asList("chatBackgroundColor",
+                    "chatSelectedLineColor", "chatMentionLineColor",
+                    "chatSelectedMentionColor", "chatReplyHighlightColor")));
 
     private static File loadedClientFile;
     private static File loadedServerFile;
@@ -176,10 +186,10 @@ public final class LostTalesConfig {
      * pointer, and a line that mentions this player. Names, not
      * numbers, so every choice is one of the palette's colours.
      */
-    static final String DEFAULT_CHAT_BACKGROUND_COLOR = "PLUM_BLACK";
-    static final String DEFAULT_CHAT_SELECTED_LINE_COLOR = "PLUM_GRAY";
-    static final String DEFAULT_CHAT_MENTION_LINE_COLOR = "CORAL";
-    static final String DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR = "APRICOT";
+    public static final String DEFAULT_CHAT_BACKGROUND_COLOR = "PLUM_BLACK";
+    public static final String DEFAULT_CHAT_SELECTED_LINE_COLOR = "PLUM_GRAY";
+    public static final String DEFAULT_CHAT_MENTION_LINE_COLOR = "CORAL";
+    public static final String DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR = "APRICOT";
     /**
      * A colour option's value that follows another colour instead of
      * naming a palette entry: the selected mention's, which is by
@@ -316,6 +326,8 @@ public final class LostTalesConfig {
     /** Connect the bot to Discord's gateway for instant relay and slash commands. */
     public static boolean discordGateway = true;
     public static boolean discordSlashCommands = true;
+    /** List the members of the linked Discord channels, with their Discord status. */
+    public static boolean discordMemberList = false;
     /** How the profanity list's words read in what the bridge posts: a {@link ChatProfanityMode} name. */
     public static String discordProfanityFilter = ChatProfanityMode.OFF.name();
 
@@ -1145,6 +1157,12 @@ public final class LostTalesConfig {
                     discordSlashCommands,
                     "Server only: register the bot's slash commands (/link, /unlink, /online, /who, /server) in every guild the bot is in as the gateway sees it, and answer them; /online, /who and /server answer only in linked channels. Linking a channel needs them. Needs gateway."
             );
+            discordMemberList = config.getBoolean(
+                    "memberList",
+                    CATEGORY_DISCORD,
+                    discordMemberList,
+                    "Server only: show everyone who can see a linked Discord channel in the member list of the game channel it is linked to, under their Discord server's name while they are online and under Offline otherwise, and let them and their lines wear their Discord status. A player is told only about the members of channels linked to what they can read. Needs gateway, and the Server Members and Presence intents switched on for the bot in the Discord developer portal; if Discord refuses them, the bridge goes on without the member lists."
+            );
             Property discordProfanityProperty = config.get(
                     CATEGORY_DISCORD, "profanityFilter", discordProfanityFilter,
                     "Server only: how the words on the chat's profanity list read in what the bridge posts to Discord: OFF as typed, SILLY as their silly stand-ins, STARS as their first letter and stars. Lines arriving from Discord are left as they are; each client shows them by its own setting.");
@@ -1197,35 +1215,35 @@ public final class LostTalesConfig {
                     "chatBackgroundColor",
                     CATEGORY_CLIENT,
                     chatBackgroundColor,
-                    "Palette colour of the open chat's history panel and the rows framing it. Also set from a chat window's own menu.",
+                    "Palette colour of the open chat's history panel and the rows framing it. Set from a chat window's own menu.",
                     LostTalesColors.paletteNames()
             ), DEFAULT_CHAT_BACKGROUND_COLOR);
             chatSelectedLineColor = paletteName(config.getString(
                     "chatSelectedLineColor",
                     CATEGORY_CLIENT,
                     chatSelectedLineColor,
-                    "Palette colour of the chat line under the pointer. Also set from a chat window's own menu.",
+                    "Palette colour of the chat line under the pointer. Set from a chat window's own menu.",
                     LostTalesColors.paletteNames()
             ), DEFAULT_CHAT_SELECTED_LINE_COLOR);
             chatMentionLineColor = paletteName(config.getString(
                     "chatMentionLineColor",
                     CATEGORY_CLIENT,
                     chatMentionLineColor,
-                    "Palette colour of a chat line that @-mentions you. Also set from a chat window's own menu.",
+                    "Palette colour of a chat line that @-mentions you. Set from a chat window's own menu.",
                     LostTalesColors.paletteNames()
             ), DEFAULT_CHAT_MENTION_LINE_COLOR);
             chatSelectedMentionColor = automaticOrPaletteName(config.getString(
                     "chatSelectedMentionColor",
                     CATEGORY_CLIENT,
                     chatSelectedMentionColor,
-                    "Palette colour of a chat line that @-mentions you while it is under the pointer. AUTO, the default, is the mention colour one shade lighter on its own ramp of the palette, or the selected-line colour where the mention colour is already its ramp's lightest. Also set from a chat window's own menu.",
+                    "Palette colour of a chat line that @-mentions you while it is under the pointer. AUTO, the default, is the mention colour one shade lighter on its own ramp of the palette, or the selected-line colour where the mention colour is already its ramp's lightest. Set from a chat window's own menu.",
                     automaticOrPaletteNames()
             ));
             chatReplyHighlightColor = paletteName(config.getString(
                     "chatReplyHighlightColor",
                     CATEGORY_CLIENT,
                     chatReplyHighlightColor,
-                    "Palette colour a chat line is lit in when a reply's quote jumps to it. Also set from a chat window's own menu.",
+                    "Palette colour a chat line is lit in when a reply's quote jumps to it. Set from a chat window's own menu.",
                     LostTalesColors.paletteNames()
             ), DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR);
             Property feedAlignmentProperty = config.get(

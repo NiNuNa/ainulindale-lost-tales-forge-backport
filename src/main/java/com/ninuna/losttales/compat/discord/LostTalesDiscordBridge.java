@@ -7,12 +7,17 @@ import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatDeliveryMark;
 import com.ninuna.losttales.chat.ChatEpithet;
 import com.ninuna.losttales.chat.ChatMessageIds;
+import com.ninuna.losttales.chat.ChatPresence;
+import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.emoji.ChatForeignEmoji;
 import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
 import com.ninuna.losttales.chat.profanity.ChatProfanityFilter;
 import com.ninuna.losttales.chat.profanity.ChatProfanityMode;
+import com.ninuna.losttales.chat.server.ChatChannelPolicy;
 import com.ninuna.losttales.chat.server.ChatHistory;
+import com.ninuna.losttales.chat.server.ChatIdentitySelection;
+import com.ninuna.losttales.chat.server.ChatMemberWatches;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.compat.discord.gateway.DiscordGatewayClient;
 import com.ninuna.losttales.compat.discord.gateway.DiscordGatewayProtocol;
@@ -25,6 +30,8 @@ import com.ninuna.losttales.config.server.ServerConfigSnapshot;
 import com.ninuna.losttales.core.LostTalesClassTransformer;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatDeliveryMarkPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
+import com.ninuna.losttales.network.packet.LostTalesChatPresenceSyncPacket;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.FMLLog;
@@ -49,6 +56,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
@@ -102,6 +110,14 @@ import net.minecraft.util.ChatComponentText;
  * on the way down and once on the way back. The webhook's own posts
  * come back as bot messages and are ignored, so nothing echoes. The
  * token and the webhook URL are never logged.</p>
+ *
+ * <p>With the {@code memberList} option on, the bot also hears who is
+ * in the Discord servers of the linked channels and what they are doing
+ * ({@link DiscordMemberDirectory}). The game's member lists then show
+ * everyone who can see a linked channel, and each player is told the
+ * statuses of the members they may see ({@link DiscordMemberStatuses}).
+ * Discord asks for the two privileged intents that needs; if the bot has
+ * not been given them, the bridge goes on without the member lists.</p>
  *
  * <p>A player's own line that is slow to reach Discord, or will not
  * reach it, is marked on that player's screen alone: the worker follows
@@ -245,6 +261,16 @@ public final class LostTalesDiscordBridge {
     private boolean registered;
     /** The names of the Discord servers and channels the bot is in. */
     private final DiscordGuildDirectory directory = new DiscordGuildDirectory();
+    /** Who is in the Discord servers of the linked channels, while their members are listed. */
+    private final DiscordMemberDirectory members = new DiscordMemberDirectory();
+    /** What each player has been told of those members' statuses. Server thread. */
+    private final DiscordMemberStatuses memberStatuses = new DiscordMemberStatuses();
+    /** Set when Discord refused the member intents, for the next tick to tell everyone. */
+    private final AtomicBoolean membersRefused = new AtomicBoolean();
+    /** Ticks since the member lists were last looked at. */
+    private int memberTicks;
+    /** Ticks between two looks at the member lists and statuses. */
+    private static final int MEMBER_STEP_TICKS = 20;
     /** The Discord servers the slash commands were registered in this run. */
     private final Set<String> commandGuilds =
             Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
@@ -314,10 +340,16 @@ public final class LostTalesDiscordBridge {
         Worker started = new Worker(configured, reads, posts, manages);
         this.worker = started;
         started.start();
+        boolean listsMembers = LostTalesConfig.discordMemberList
+                && !configured.channels().isEmpty();
         if (botPresent && LostTalesConfig.discordGateway
-                && (reads || LostTalesConfig.discordSlashCommands)) {
+                && (reads || LostTalesConfig.discordSlashCommands || listsMembers)) {
+            if (listsMembers) {
+                this.members.watch(configured.channels());
+            }
             DiscordGatewayClient client = new DiscordGatewayClient(
-                    LostTalesConfig.discordBotToken.trim(), new GatewayListener(configured));
+                    LostTalesConfig.discordBotToken.trim(), listsMembers,
+                    new GatewayListener(configured));
             this.gateway = client;
             client.start();
         }
@@ -380,6 +412,11 @@ public final class LostTalesDiscordBridge {
             client.shutdown();
         }
         this.applicationId = "";
+        // What each player was told stays, so the next start tells them
+        // only what changed, members gone offline included.
+        this.members.clear();
+        this.membersRefused.set(false);
+        this.memberTicks = 0;
         this.lastSeenByChannel.clear();
         synchronized (this.recentInboundIds) {
             this.recentInboundIds.clear();
@@ -817,6 +854,10 @@ public final class LostTalesDiscordBridge {
                         server.getCurrentPlayerCount(),
                         server.getMaxPlayers()));
             }
+        }
+        if (++this.memberTicks >= MEMBER_STEP_TICKS) {
+            this.memberTicks = 0;
+            stepMembers();
         }
         // Last, since saving a link restarts the bridge under this tick.
         LinkResult linked = this.linkResults.poll();
@@ -1427,9 +1468,9 @@ public final class LostTalesDiscordBridge {
 
     /**
      * The game channels linked to Discord now, by link key — a channel's
-     * id, or {@code faction:<id>} for one faction's chat — which the
-     * clients' tabs wear the Discord mark for. A link switched off, or
-     * one whose channel may not leave the game, marks nothing.
+     * id, or {@code faction:<id>} for one faction's chat — whose icons the
+     * clients split with Discord's. A link switched off, or one whose
+     * channel may not leave the game, splits nothing.
      */
     public List<String> linkedKeys() {
         Worker running = this.worker;
@@ -1447,16 +1488,214 @@ public final class LostTalesDiscordBridge {
     }
 
     /**
+     * Whether Discord members are listed and wear their Discord status:
+     * the option is on, the bot is on the gateway, and Discord has not
+     * refused the member intents.
+     */
+    public boolean followsMemberStatuses() {
+        DiscordGatewayClient client = this.gateway;
+        return LostTalesConfig.discordMemberList && client != null
+                && client.followsMembers();
+    }
+
+    /**
+     * The Discord members who can see a Discord channel linked to
+     * {@code channel} (for the Faction channel, to {@code factionId}'s
+     * chat) while Discord members are listed; none otherwise. Asked on the
+     * server thread, for a player who may read that channel.
+     */
+    public List<DiscordMemberDirectory.Seen> membersSeeing(ChatChannel channel,
+                                                           String factionId) {
+        if (!followsMemberStatuses() || !DiscordBridgePolicy.isOpenToTheBridge(channel)) {
+            return Collections.emptyList();
+        }
+        List<String> channels = new ArrayList<String>();
+        for (DiscordChannelBinding binding : this.bindings.forGame(channel, factionId)) {
+            String discordChannelId = binding.getDiscordChannelId();
+            if ((binding.readsFromDiscord() || binding.sendsToDiscord())
+                    && discordChannelId.length() > 0
+                    && !channels.contains(discordChannelId)) {
+                channels.add(discordChannelId);
+            }
+        }
+        return channels.isEmpty() ? Collections.<DiscordMemberDirectory.Seen>emptyList()
+                : this.members.seeing(channels);
+    }
+
+    /** A player who left holds nothing; if they come back, they are told everything again. Server thread. */
+    public void forgetPlayer(UUID playerId) {
+        this.memberStatuses.forget(playerId);
+    }
+
+    /**
+     * Once a second: asks again for the members Discord said to wait for,
+     * has the member lists looked at again when anybody in them changed,
+     * and tells each player the statuses that changed among the members
+     * they may see. After Discord refused the member intents, everyone's
+     * access is sent again, so no client goes on drawing statuses nobody
+     * follows. Server thread.
+     */
+    private void stepMembers() {
+        if (this.membersRefused.getAndSet(false)) {
+            LostTalesChatService.sendAccessToAll(null);
+            ChatMemberWatches.markChanged();
+        }
+        final DiscordGatewayClient client = this.gateway;
+        if (client == null || !followsMemberStatuses()) {
+            return;
+        }
+        for (final String guildId : this.members.dueRequests(System.currentTimeMillis())) {
+            client.submit(new Runnable() {
+                @Override
+                public void run() {
+                    client.requestMembers(guildId);
+                }
+            });
+        }
+        for (String server : this.members.takeOverflowed()) {
+            FMLLog.info("[%s] Discord server %s has more than %d members; the member "
+                    + "lists leave the rest out", LostTalesMetaData.MOD_ID, server,
+                    Integer.valueOf(DiscordMemberDirectory.MAX_MEMBERS_PER_GUILD));
+        }
+        if (this.members.takeListsChanged()) {
+            ChatMemberWatches.markChanged();
+        }
+        Map<UUID, Map<String, DiscordMemberStatuses.Shown>> sends =
+                this.memberStatuses.step(linkedChannelsByPlayer(),
+                        this.members.takeChangedStatuses(),
+                        this.members.takeSeeingChanged(), this.members);
+        for (Map.Entry<UUID, Map<String, DiscordMemberStatuses.Shown>> entry
+                : sends.entrySet()) {
+            sendStatuses(entry.getKey(), entry.getValue());
+        }
+    }
+
+    /** Each player here, with the Discord channels linked to what they can read now. */
+    private Map<UUID, List<String>> linkedChannelsByPlayer() {
+        Map<UUID, List<String>> players = new LinkedHashMap<UUID, List<String>>();
+        MinecraftServer server = MinecraftServer.getServer();
+        if (server == null || server.getConfigurationManager() == null) {
+            return players;
+        }
+        DiscordChannelBindings bound = this.bindings;
+        for (Object value : server.getConfigurationManager().playerEntityList) {
+            if (value instanceof EntityPlayerMP) {
+                EntityPlayerMP player = (EntityPlayerMP)value;
+                players.put(player.getUniqueID(), linkedChannelsReadBy(player, bound));
+            }
+        }
+        return players;
+    }
+
+    /**
+     * The Discord channels linked to the game channels a player may read
+     * now, each once in the links' order; for the Faction channel, only
+     * those linked to the faction the player speaks for.
+     */
+    private static List<String> linkedChannelsReadBy(EntityPlayerMP player,
+                                                     DiscordChannelBindings bound) {
+        int roles = ChatIdentitySelection.roles(player);
+        String factionId = ChatChannelPolicy.factionOf(ChatIdentitySelection.character(player));
+        Map<ChatChannel, Boolean> readable = new HashMap<ChatChannel, Boolean>();
+        List<String> channels = new ArrayList<String>();
+        for (DiscordChannelBinding binding : bound.all()) {
+            String discordChannelId = binding.getDiscordChannelId();
+            ChatChannel channel = binding.getChannel();
+            if ((!binding.readsFromDiscord() && !binding.sendsToDiscord())
+                    || discordChannelId.length() == 0
+                    || channels.contains(discordChannelId)
+                    || !DiscordBridgePolicy.isOpenToTheBridge(channel)
+                    || !bound.forGame(channel, factionId).contains(binding)) {
+                continue;
+            }
+            Boolean may = readable.get(channel);
+            if (may == null) {
+                may = Boolean.valueOf(ChatChannelPolicy.canRead(player, channel, roles));
+                readable.put(channel, may);
+            }
+            if (may.booleanValue()) {
+                channels.add(discordChannelId);
+            }
+        }
+        return channels;
+    }
+
+    /**
+     * Tells one player some Discord members' statuses, in the presence
+     * sync every player's status travels in: each member under their
+     * sender id, as their account, with their custom status as its line;
+     * one now offline to them is stated with none.
+     */
+    private static void sendStatuses(UUID playerId,
+                                     Map<String, DiscordMemberStatuses.Shown> members) {
+        EntityPlayerMP player = LostTalesServerPlayers.findOnline(playerId);
+        if (player == null) {
+            return;
+        }
+        Map<UUID, Map<ChatPresenceIdentity, ChatPresence>> batch =
+                new LinkedHashMap<UUID, Map<ChatPresenceIdentity, ChatPresence>>();
+        Map<UUID, Map<ChatPresenceIdentity, String>> lines =
+                new LinkedHashMap<UUID, Map<ChatPresenceIdentity, String>>();
+        for (Map.Entry<String, DiscordMemberStatuses.Shown> entry : members.entrySet()) {
+            UUID senderId = LostTalesChatMessagePacket.discordSenderId(entry.getKey());
+            if (LostTalesChatMessagePacket.DISCORD_SENDER_ID.equals(senderId)) {
+                continue;
+            }
+            DiscordMemberStatuses.Shown shown = entry.getValue();
+            batch.put(senderId, shown == null
+                    ? Collections.<ChatPresenceIdentity, ChatPresence>emptyMap()
+                    : Collections.singletonMap(ChatPresenceIdentity.ACCOUNT, shown.status));
+            if (shown != null && shown.line.length() > 0) {
+                lines.put(senderId, Collections.singletonMap(ChatPresenceIdentity.ACCOUNT,
+                        shown.line));
+            }
+            if (batch.size() == LostTalesChatPresenceSyncPacket.MAX_ACCOUNTS) {
+                LostTalesNetworkHandler.CHANNEL.sendTo(
+                        new LostTalesChatPresenceSyncPacket(batch, lines), player);
+                batch = new LinkedHashMap<UUID, Map<ChatPresenceIdentity, ChatPresence>>();
+                lines = new LinkedHashMap<UUID, Map<ChatPresenceIdentity, String>>();
+            }
+        }
+        if (!batch.isEmpty()) {
+            LostTalesNetworkHandler.CHANNEL.sendTo(
+                    new LostTalesChatPresenceSyncPacket(batch, lines), player);
+        }
+    }
+
+    /**
      * Forgets what the bridge learnt in this server's run: the Discord
-     * servers' names, where the slash commands were registered, the links
+     * servers' names, what each player was told of Discord members'
+     * statuses, where the slash commands were registered, the links
      * waiting to be saved and the codes waiting to be typed. With the
      * rest of the server's state, as the server starts and stops.
      */
     public void resetSession() {
         this.directory.clear();
+        this.memberStatuses.clear();
         this.commandGuilds.clear();
         this.linkResults.clear();
         DiscordLinkCodes.clear();
+    }
+
+    /**
+     * The name a message's author goes by in its Discord server: their
+     * nickname there where the bridge has heard it, else the name the
+     * message came with. A message read through the REST API comes
+     * without the nickname, one from the gateway with it.
+     */
+    private String authorNameIn(DiscordJson.Message message) {
+        return this.directory.nameIn(message.channelId, message.authorId,
+                message.authorName);
+    }
+
+    /** The names a message's mentions of members are written with, by the same rule. */
+    private Map<String, String> mentionNamesIn(DiscordJson.Message message) {
+        Map<String, String> names = new HashMap<String, String>();
+        for (Map.Entry<String, String> entry : message.mentionNames.entrySet()) {
+            names.put(entry.getKey(), this.directory.nameIn(message.channelId,
+                    entry.getKey(), entry.getValue()));
+        }
+        return names;
     }
 
     /** The newer of two message ids, which are snowflakes: numeric, and ordered. */
@@ -1556,6 +1795,13 @@ public final class LostTalesDiscordBridge {
         @Override
         public void onEvent(String name, JsonObject data) {
             directory.onEvent(name, data);
+            final DiscordGatewayClient client = gateway;
+            if (members.onEvent(name, data, System.currentTimeMillis())
+                    && client != null) {
+                // A large server's offline members are asked for; they
+                // come back as chunks.
+                client.requestMembers(DiscordJson.stringOf(data, "id"));
+            }
             if ("GUILD_CREATE".equals(name)) {
                 offerCommands(DiscordJson.stringOf(data, "id"));
                 return;
@@ -1576,11 +1822,11 @@ public final class LostTalesDiscordBridge {
                 if (message.bot) {
                     return;
                 }
-                String author = DiscordMessageSanitizer.inboundName(message.authorName);
+                String author = DiscordMessageSanitizer.inboundName(authorNameIn(message));
                 String text = DiscordMessageSanitizer.inbound(
                         DiscordMessageLinkRewriter.inbound(message.content,
                                 linkResolver(this.bound)),
-                        message.mentionNames);
+                        mentionNamesIn(message));
                 if (author.length() > 0 && text.length() > 0) {
                     rememberAuthor(author, message.authorId);
                     enqueueInbound(Inbound.message(author, message.authorId,
@@ -1600,7 +1846,7 @@ public final class LostTalesDiscordBridge {
                 String text = DiscordMessageSanitizer.inbound(
                         DiscordMessageLinkRewriter.inbound(message.content,
                                 linkResolver(this.bound)),
-                        message.mentionNames);
+                        mentionNamesIn(message));
                 if (text.length() > 0) {
                     enqueueInbound(new Inbound(Inbound.Kind.EDIT, "", "", text,
                             message.id, "", message.channelId));
@@ -1655,7 +1901,6 @@ public final class LostTalesDiscordBridge {
                         reaction.messageId, "", reaction.channelId, emojiId));
             } else if ("INTERACTION_CREATE".equals(name)) {
                 final DiscordJson.Interaction interaction = DiscordJson.parseInteraction(data);
-                final DiscordGatewayClient client = gateway;
                 if (interaction == null || client == null
                         || !LostTalesConfig.discordSlashCommands) {
                     return;
@@ -1699,6 +1944,12 @@ public final class LostTalesDiscordBridge {
                 FMLLog.info("[%s] Discord gateway disconnected; polling reads until "
                         + "it is back", LostTalesMetaData.MOD_ID);
             }
+        }
+
+        @Override
+        public void onMembersRefused() {
+            members.clear();
+            membersRefused.set(true);
         }
     }
 
@@ -2536,11 +2787,11 @@ public final class LostTalesDiscordBridge {
                         continue;
                     }
                     String name = DiscordMessageSanitizer.inboundName(
-                            message.authorName);
+                            authorNameIn(message));
                     String text = DiscordMessageSanitizer.inbound(
                             DiscordMessageLinkRewriter.inbound(message.content,
                                     linkResolver(this.bindings)),
-                            message.mentionNames);
+                            mentionNamesIn(message));
                     if (name.length() > 0 && text.length() > 0) {
                         rememberAuthor(name, message.authorId);
                         enqueueInbound(Inbound.message(name, message.authorId,
@@ -2669,7 +2920,7 @@ public final class LostTalesDiscordBridge {
                     String text = DiscordMessageSanitizer.inbound(
                             DiscordMessageLinkRewriter.inbound(message.content,
                                     linkResolver(this.bindings)),
-                            message.mentionNames);
+                            mentionNamesIn(message));
                     // Edited down to nothing sayable — an attachment left
                     // alone — keeps the words it was delivered with.
                     if (text.length() > 0) {

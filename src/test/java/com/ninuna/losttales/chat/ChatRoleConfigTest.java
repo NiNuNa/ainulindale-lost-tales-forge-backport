@@ -45,6 +45,40 @@ public final class ChatRoleConfigTest {
         ChatRoleCatalog.installServer(null);
     }
 
+    /** A role's icon is written as a channel's is, read back and written out again. */
+    @Test
+    public void aRoleWearsTheIconItsEntryNames() {
+        ChatRoleCatalog catalog = ChatRoleConfig.parse(new String[] {
+                "herald=name:Herald;icon:emoji:bee",
+                "smith=name:Smith;icon:item:minecraft:iron_sword@3",
+                "scribe=name:Scribe;icon:not an icon",
+                "reeve=name:Reeve",
+        }, null, collect);
+        ChatAccountRole herald = catalog.byId("herald");
+        assertEquals(ChatChannelIconSpec.Kind.EMOJI, herald.getIcon().getKind());
+        assertEquals("bee", herald.getIcon().getName());
+        ChatAccountRole smith = catalog.byId("smith");
+        assertEquals(ChatChannelIconSpec.Kind.ITEM, smith.getIcon().getKind());
+        assertEquals(3, smith.getIcon().getMeta());
+        // Text that names no icon wears the plain face, and says so.
+        assertNull(catalog.byId("scribe").getIcon());
+        assertEquals(1, warnings.size());
+        assertTrue(warnings.get(0).contains("scribe"));
+        assertNull(catalog.byId("reeve").getIcon());
+        assertTrue(ChatRoleConfig.formatRole(herald).contains(";icon:emoji:bee"));
+        assertTrue(ChatRoleConfig.formatRole(smith)
+                .contains(";icon:item:minecraft:iron_sword@3"));
+        assertFalse(ChatRoleConfig.formatRole(catalog.byId("reeve"))
+                .contains("icon:"));
+        // The seeded operator wears the Operator channel's face.
+        ChatRoleCatalog seeded = ChatRoleConfig.parse(new String[] {
+                ChatRoleConfig.DEFAULT_OPERATOR_ENTRY}, null, collect);
+        assertEquals("expressionless",
+                seeded.byId("operator").getIcon().getName());
+        // The team mark wears its own, in the code.
+        assertEquals("purple_heart", ChatAccountRole.TEAM.getIcon().getName());
+    }
+
     @Test
     public void rolesMembersAndSourcesAreRead() {
         ChatRoleCatalog catalog = ChatRoleConfig.parse(new String[] {

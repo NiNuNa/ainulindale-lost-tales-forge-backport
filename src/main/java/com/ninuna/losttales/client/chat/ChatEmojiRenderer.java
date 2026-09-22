@@ -47,8 +47,46 @@ final class ChatEmojiRenderer {
     static void drawTinted(Minecraft minecraft, ChatEmoji emoji,
                            float x, float y, float size,
                            float red, float green, float blue, int alpha) {
+        drawRegion(minecraft, emoji, x, y, size, red, green, blue, alpha,
+                0.0F, 0.0F, size, size);
+    }
+
+    /**
+     * Part of the sprite: the stretch from {@code left}, {@code top} to
+     * {@code right}, {@code bottom} of its box, measured from the box's
+     * corner in the box's own units, with the texels that stretch covers.
+     * What a channel's icon is built from where it is cut: half an icon
+     * beside half of Discord's, and the corner a mark takes.
+     */
+    static void drawRegion(Minecraft minecraft, ChatEmoji emoji,
+                           float x, float y, float size, int alpha,
+                           boolean silhouette, float left, float top,
+                           float right, float bottom) {
+        if (!silhouette) {
+            drawRegion(minecraft, emoji, x, y, size, 1.0F, 1.0F, 1.0F,
+                    alpha, left, top, right, bottom);
+            return;
+        }
+        LostTalesSilhouetteRenderState.begin(LostTalesChatVisualStyle.SHADOW);
+        try {
+            drawRegion(minecraft, emoji, x, y, size, 1.0F, 1.0F, 1.0F,
+                    alpha, left, top, right, bottom);
+        } finally {
+            LostTalesSilhouetteRenderState.end();
+        }
+    }
+
+    private static void drawRegion(Minecraft minecraft, ChatEmoji emoji,
+                                   float x, float y, float size, float red,
+                                   float green, float blue, int alpha,
+                                   float left, float top, float right,
+                                   float bottom) {
+        float fromX = Math.max(0.0F, left);
+        float fromY = Math.max(0.0F, top);
+        float toX = Math.min(size, right);
+        float toY = Math.min(size, bottom);
         if (minecraft == null || emoji == null || size <= 0.0F
-                || alpha <= 3) {
+                || alpha <= 3 || toX <= fromX || toY <= fromY) {
             return;
         }
         minecraft.getTextureManager().bindTexture(TEXTURE);
@@ -61,18 +99,23 @@ final class ChatEmojiRenderer {
                 MathHelper.clamp_float(blue, 0.0F, 1.0F),
                 MathHelper.clamp_float(alpha / 255.0F, 0.0F, 1.0F));
         try {
-            float u0 = emoji.getTextureU() / (float)ChatEmoji.SHEET_WIDTH;
-            float u1 = (emoji.getTextureU() + ChatEmoji.SPRITE_SIZE)
+            // The texels the stretch covers, a cell's worth over the
+            // box's size.
+            float texels = ChatEmoji.SPRITE_SIZE / size;
+            float u0 = (emoji.getTextureU() + fromX * texels)
                     / (float)ChatEmoji.SHEET_WIDTH;
-            float v0 = emoji.getTextureV() / (float)ChatEmoji.SHEET_HEIGHT;
-            float v1 = (emoji.getTextureV() + ChatEmoji.SPRITE_SIZE)
+            float u1 = (emoji.getTextureU() + toX * texels)
+                    / (float)ChatEmoji.SHEET_WIDTH;
+            float v0 = (emoji.getTextureV() + fromY * texels)
+                    / (float)ChatEmoji.SHEET_HEIGHT;
+            float v1 = (emoji.getTextureV() + toY * texels)
                     / (float)ChatEmoji.SHEET_HEIGHT;
             Tessellator tessellator = Tessellator.instance;
             tessellator.startDrawingQuads();
-            tessellator.addVertexWithUV(x, y + size, 0.0D, u0, v1);
-            tessellator.addVertexWithUV(x + size, y + size, 0.0D, u1, v1);
-            tessellator.addVertexWithUV(x + size, y, 0.0D, u1, v0);
-            tessellator.addVertexWithUV(x, y, 0.0D, u0, v0);
+            tessellator.addVertexWithUV(x + fromX, y + toY, 0.0D, u0, v1);
+            tessellator.addVertexWithUV(x + toX, y + toY, 0.0D, u1, v1);
+            tessellator.addVertexWithUV(x + toX, y + fromY, 0.0D, u1, v0);
+            tessellator.addVertexWithUV(x + fromX, y + fromY, 0.0D, u0, v0);
             tessellator.draw();
         } finally {
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);

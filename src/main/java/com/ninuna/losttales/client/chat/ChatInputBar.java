@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiCaret;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
@@ -438,12 +439,6 @@ final class ChatInputBar {
         return this.markerPicker;
     }
 
-    void tickPickers() {
-        for (ChatPickerPanel picker : this.pickers) {
-            picker.tick();
-        }
-    }
-
     /** Re-reads the inventory and the marker cache the pickers list. */
     void refreshPickers() {
         this.itemPicker.refresh(this.mc.thePlayer);
@@ -703,7 +698,7 @@ final class ChatInputBar {
         if (draft.length() == 0) {
             return;
         }
-        int x = line.fieldLeft + ChatInputField.CARET_WIDTH + 1;
+        int x = line.fieldLeft + LostTalesUiCaret.WIDTH + 1;
         String shown = this.font.trimStringToWidth(draft, line.fieldRight - x);
         int code = Math.min(ChatInputStyles.commandCodeLength(draft),
                 shown.length());
@@ -756,7 +751,7 @@ final class ChatInputBar {
         String key = ClientChatChannelState.canSend(tab)
                 ? "gui.losttales.chat.input.hint"
                 : "gui.losttales.chat.input.hint.read_only";
-        int x = line.fieldLeft + ChatInputField.CARET_WIDTH + 1;
+        int x = line.fieldLeft + LostTalesUiCaret.WIDTH + 1;
         String hint = LostTalesSkyrimUiStyle.trimToWidth(this.font,
                 StatCollector.translateToLocal(key), line.fieldRight - x);
         LostTalesChatVisualStyle.drawColored(this.font, "§o" + hint, x,

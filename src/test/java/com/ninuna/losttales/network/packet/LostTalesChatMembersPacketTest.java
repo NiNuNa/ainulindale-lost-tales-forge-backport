@@ -31,6 +31,26 @@ public final class LostTalesChatMembersPacketTest {
                 null, name, 0, "", "", 0, "", "", 0, online);
     }
 
+    /** Each Discord server's members stand after all of the game's groups, the plain one too. */
+    @Test
+    public void discordServersStandAfterTheGamesGroups() {
+        LostTalesChatMembersPacket.Member discord = new LostTalesChatMembersPacket.Member(
+                UUID.randomUUID(), "Sam", null, "Sam", 0, "", "", 0,
+                LostTalesChatMembersPacket.DISCORD_GROUP_PREFIX + "100", "Arda", 0, true);
+        LostTalesChatMembersPacket.Member moderator = new LostTalesChatMembersPacket.Member(
+                UUID.randomUUID(), "Mod", null, "Mod", 0, "", "", 0, "moderator",
+                "Moderator", 2, true);
+        LostTalesChatMembersPacket.Member plain = account("Alex", true);
+        LostTalesChatMembersPacket.Member absent = account("Zed", false);
+        List<LostTalesChatMembersPacket.Member> members =
+                new ArrayList<LostTalesChatMembersPacket.Member>(
+                        Arrays.asList(absent, discord, plain, moderator));
+        Collections.sort(members, LostTalesChatMembersPacket.ORDER);
+        assertEquals(Arrays.asList(moderator, plain, discord, absent), members);
+        assertTrue(LostTalesChatMembersPacket.isDiscordGroup(discord.getGroupKey()));
+        assertFalse(LostTalesChatMembersPacket.isDiscordGroup("moderator"));
+    }
+
     @Test
     public void membersRoundTripWhole() {
         UUID aldric = UUID.randomUUID();

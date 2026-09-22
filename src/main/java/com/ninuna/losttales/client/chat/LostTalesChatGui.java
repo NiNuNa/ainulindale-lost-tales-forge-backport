@@ -227,15 +227,39 @@ public final class LostTalesChatGui extends GuiChat
         if (!this.openAnimationStarted) {
             this.openAnimationStarted = true;
             ClientChatChannelViews.noteOpened();
+            ClientChatMembers.prefetch(tabsShowingMembers());
         }
+    }
+
+    /**
+     * The tabs of every window whose member list stands, each window's
+     * tab in front first: the lists worth asking for before any is shown.
+     */
+    private static List<ChatTab> tabsShowingMembers() {
+        List<ChatTab> fronts = new ArrayList<ChatTab>();
+        List<ChatTab> rest = new ArrayList<ChatTab>();
+        for (ChatWindow window : ChatWindowLayout.windows()) {
+            if (window.isMembersHidden()) {
+                continue;
+            }
+            ChatTab front = window.getActiveTab();
+            if (front != null) {
+                fronts.add(front);
+            }
+            for (ChatTab tab : ChatWindowFrame.visibleTabs(window)) {
+                if (!tab.equals(front)) {
+                    rest.add(tab);
+                }
+            }
+        }
+        fronts.addAll(rest);
+        return fronts;
     }
 
     @Override
     public void updateScreen() {
         super.updateScreen();
         syncChatIdentity();
-        this.bar.tickPickers();
-        this.toolStrip.tick();
         ClientChatChannelState.ensureAvailable();
         this.tabActions.syncSelection();
         if (isEmptyState()) {
@@ -350,6 +374,7 @@ public final class LostTalesChatGui extends GuiChat
         // takes a press that types nothing, so no symbol a keyboard
         // layout puts under Alt Gr is lost to the shortcut on its key.
         LostTalesKeyPress press = LostTalesKeyPress.read(typedChar, keyCode);
+        syncTypingFocus();
         if (handleSnapKey(press)) {
             return;
         }
@@ -396,8 +421,17 @@ public final class LostTalesChatGui extends GuiChat
             openSearch();
             return;
         }
-        if (this.toolStrip.isFocused()) {
+        // As with a menu's field, only the chat's own Ctrl shortcuts
+        // reach past the search field; the field keeps its editing keys.
+        if (this.toolStrip.isFocused()
+                && !(press.command && !ChatPopupMenu.isFieldCommand(press))) {
             handleSearchKey(typedChar, keyCode);
+            return;
+        }
+        // Escape closes an open picker before anything behind it.
+        ChatPickerPanel openPicker = this.bar.openPicker();
+        if (keyCode == Keyboard.KEY_ESCAPE && openPicker != null) {
+            openPicker.handleKeyTyped(typedChar, keyCode);
             return;
         }
         // Escape with nothing else open drops the reply before it closes
@@ -409,15 +443,15 @@ public final class LostTalesChatGui extends GuiChat
         }
         // Ctrl+N is the + control by keyboard, and Ctrl+Shift+A the
         // search panel: both mean something with nothing open, since
-        // both are ways back to a channel.
+        // both are ways back to a channel, and both are switches, as
+        // their controls are: pressed again, they put the menu away.
         if (press.isCommand(Keyboard.KEY_A) && press.shift) {
-            this.menus.openSearchPanel(ChatWindowLayout.windowOf(
-                    ClientChatChannelState.getSelected()), null,
-                    emptyPlusAnchor());
+            this.menus.toggleSearchPanel(ChatWindowLayout.windowOf(
+                    ClientChatChannelState.getSelected()), emptyPlusAnchor());
             return;
         }
         if (press.isCommand(Keyboard.KEY_N)) {
-            this.menus.openChannelMenu(emptyPlusAnchor());
+            this.menus.toggleChannelMenu(emptyPlusAnchor());
             return;
         }
         if (isEmptyState()) {
@@ -460,6 +494,15 @@ public final class LostTalesChatGui extends GuiChat
             return;
         }
         ChatPickerPanel picker = this.bar.openPicker();
+        if (picker != null && picker.isSearchFocused()
+                && (keyCode == Keyboard.KEY_RETURN
+                        || keyCode == Keyboard.KEY_NUMPADENTER)) {
+            ChatPickerPanel.Entry found = picker.firstFound();
+            if (found != null) {
+                choosePickerEntry(picker, found);
+            }
+            return;
+        }
         if (picker != null && picker.handleKeyTyped(typedChar, keyCode)) {
             return;
         }
@@ -526,6 +569,13 @@ public final class LostTalesChatGui extends GuiChat
         if (typed == null) {
             return;
         }
+        // The search takes the keys, so a menu's field or the picker's
+        // search that held them lets them go.
+        this.menus.close();
+        ChatPickerPanel picker = this.bar.openPicker();
+        if (picker != null) {
+            picker.releaseSearch();
+        }
         ChatSearch.open(typed.getId());
         this.toolStrip.setText(ChatSearch.query());
         focusSearch(true);
@@ -538,10 +588,32 @@ public final class LostTalesChatGui extends GuiChat
         focusSearch(false);
     }
 
-    /** The keys go to the search field or to the input, never to both. */
+    /** The keys go to the search field, or back to whichever field comes next. */
     private void focusSearch(boolean on) {
         this.toolStrip.focus(on);
-        this.inputField.setFocused(!on);
+        syncTypingFocus();
+    }
+
+    /**
+     * One field holds the keys, and only it shows the caret: an open
+     * menu's field before everything, then the message search, then the
+     * open picker's search, and the input bar when none of them does. A
+     * field that loses the keys to one before it lets them go.
+     */
+    private void syncTypingFocus() {
+        boolean menu = this.menus.isTyping();
+        ChatPickerPanel picker = this.bar.openPicker();
+        if (menu && this.toolStrip.isFocused()) {
+            this.toolStrip.focus(false);
+        }
+        if ((menu || this.toolStrip.isFocused()) && picker != null) {
+            picker.releaseSearch();
+        }
+        boolean elsewhere = menu || this.toolStrip.isFocused()
+                || picker != null && picker.isSearchFocused();
+        if (this.inputField.isFocused() == elsewhere) {
+            this.inputField.setFocused(!elsewhere);
+        }
     }
 
     /**
@@ -946,6 +1018,7 @@ public final class LostTalesChatGui extends GuiChat
         ClientChatChannelState.ensureAvailable();
         this.tabActions.syncSelection();
         this.bar.refreshPickers();
+        syncTypingFocus();
         // A reaction the message menu asked for opens the emoji picker
         // on that message, whichever way the menu entry was chosen.
         long reactTo = this.menus.takeReactionTarget();
@@ -1943,8 +2016,8 @@ public final class LostTalesChatGui extends GuiChat
         row.showRestore = !window.isLocked()
                 && (!ChatScreenMenus.restorableChannels().isEmpty()
                         || ChatScreenMenus.hasWhisperCandidates(this.mc));
-        row.closedUnread = row.showRestore
-                ? ChatScreenMenus.closedUnreadCount() : 0;
+        row.closedMark = row.showRestore ? ChatScreenMenus.closedMark()
+                : ChatIconMark.NONE;
         // The chevron says whether this row's own search panel is out,
         // so the control and the panel can never disagree about it.
         row.searchOpen = this.menus.isOpenFor(ChatScreenMenus.POPUP_SEARCH,
@@ -2235,17 +2308,8 @@ public final class LostTalesChatGui extends GuiChat
             return;
         }
         ChatPickerPanel.Entry entry = press.pickerEntry;
-        if (button == 0 && entry != null && picker == this.bar.emojiPicker()
-                && this.bar.emojiPicker().reactionTarget() != ChatMessageIds.NONE) {
-            // Opened to react to a message: the pick is the reaction,
-            // and nothing is written into the field.
-            ChatEmoji emoji = (ChatEmoji)entry.value;
-            sendReaction(this.bar.emojiPicker().reactionTarget(), emoji, true);
-            ChatEmojiUsageStore.recordUse(emoji);
-            this.bar.closePickers();
-        } else if (button == 0 && entry != null) {
-            this.completion.insertToken(picker.insertionText(entry));
-            this.inputField.setFocused(true);
+        if (button == 0 && entry != null) {
+            choosePickerEntry(picker, entry);
         } else if (button == 1 && picker == this.bar.emojiPicker()) {
             this.bar.emojiPicker().toggleFavoriteAt(barX, barY, barRight,
                     pickerAnchor);
@@ -2253,6 +2317,27 @@ public final class LostTalesChatGui extends GuiChat
             this.bar.markerPicker().toggleFavoriteAt(barX, barY, barRight,
                     pickerAnchor);
         }
+    }
+
+    /**
+     * A picker's cell chosen, by a click or by Enter in its search: an
+     * emoji picker opened to react to a message sends the reaction and
+     * writes nothing, and any other pick is written into the input,
+     * which then has the keys again.
+     */
+    private void choosePickerEntry(ChatPickerPanel picker,
+                                   ChatPickerPanel.Entry entry) {
+        if (picker == this.bar.emojiPicker()
+                && this.bar.emojiPicker().reactionTarget() != ChatMessageIds.NONE) {
+            ChatEmoji emoji = (ChatEmoji)entry.value;
+            sendReaction(this.bar.emojiPicker().reactionTarget(), emoji, true);
+            ChatEmojiUsageStore.recordUse(emoji);
+            this.bar.closePickers();
+            return;
+        }
+        this.completion.insertToken(picker.insertionText(entry));
+        picker.releaseSearch();
+        this.inputField.setFocused(true);
     }
 
     @Override
@@ -2320,17 +2405,25 @@ public final class LostTalesChatGui extends GuiChat
         }
         if (isEmptyState()) {
             // The + is the whole of the screen's furniture here; a click
-            // anywhere else is the player closing what is not there.
-            if (button == 0 && emptyStateContains(x, y)) {
+            // anywhere else is the player closing what is not there. A
+            // switch like every +: a press with its menu out puts it away.
+            if (button == 0 && emptyStateContains(x, y)
+                    && !menuClick.closed(ChatScreenMenus.POPUP_RESTORE, null)) {
                 this.menus.openRestorePopup(null, emptyPlusAnchor());
             }
             return;
         }
         ChatHover press = resolveHover(x, y);
         // A press anywhere but the tool strip hands the keys back to the
-        // input.
+        // input, and so does a press anywhere but an open picker.
         if (this.toolStrip.isFocused() && !press.is(ChatHover.Kind.TOOL_STRIP)) {
             leaveSearch();
+        }
+        ChatPickerPanel openPicker = this.bar.openPicker();
+        if (openPicker != null && !press.is(ChatHover.Kind.PICKER)
+                && !press.is(ChatHover.Kind.PICKER_CELL)
+                && !press.is(ChatHover.Kind.PICKER_LABEL)) {
+            openPicker.releaseSearch();
         }
         switch (press.kind) {
             case TOOL_STRIP:
@@ -2390,7 +2483,7 @@ public final class LostTalesChatGui extends GuiChat
                 : press.is(ChatHover.Kind.RESIZE) ? rowHoverAt(x, y) : null;
         if (onRow != null) {
             if (button == 0) {
-                handleRowClick(onRow, mouseX, mouseY, closedPopupKind);
+                handleRowClick(onRow, mouseX, mouseY, menuClick);
             } else if (button == 1) {
                 handleRowRightClick(onRow, mouseX);
             } else if (button == 2) {
@@ -2877,12 +2970,12 @@ public final class LostTalesChatGui extends GuiChat
      * A left press on one of the rows. Picking a tab also arms a drag;
      * the controls act at once. Shift marks the tab instead of picking
      * it, so several tabs of one row can be moved or closed together.
-     * {@code closedPopupKind} names the menu this same press has just
-     * closed, if any, so a control whose own menu was open reads as
-     * closing it rather than reopening it.
+     * {@code menuClick} says which menu this same press has just closed,
+     * if any, so a control whose own menu was open reads as closing it
+     * rather than reopening it.
      */
     private boolean handleRowClick(ChatHover press, int mouseX, int mouseY,
-                                   String closedPopupKind) {
+                                   ChatScreenMenus.Click menuClick) {
         ChatWindow window = press.window;
         ChatWindowFrame frame = press.frame;
         ChatChannelTabBar.Row row = press.row;
@@ -2971,9 +3064,10 @@ public final class LostTalesChatGui extends GuiChat
                 return true;
             case RESTORE:
                 // A switch like the search control beside it: a
-                // press with the list already out puts it away.
-                if (!ChatScreenMenus.POPUP_RESTORE.equals(
-                        closedPopupKind)) {
+                // press with this window's list already out puts it
+                // away, and one with another window's out moves it here.
+                if (!menuClick.closed(ChatScreenMenus.POPUP_RESTORE,
+                        window.getId())) {
                     this.menus.openRestorePopup(window.getId(),
                             this.menus.stripAnchor(frame, row, mouseX));
                 }
@@ -2982,8 +3076,8 @@ public final class LostTalesChatGui extends GuiChat
                 // The control is a switch: a press with its own
                 // panel already out has just closed it above, and
                 // only then does the press not open it again.
-                if (!ChatScreenMenus.POPUP_SEARCH.equals(
-                        closedPopupKind)) {
+                if (!menuClick.closed(ChatScreenMenus.POPUP_SEARCH,
+                        window.getId())) {
                     this.menus.openSearchPanel(window,
                             this.menus.stripAnchor(frame, row, mouseX),
                             null);

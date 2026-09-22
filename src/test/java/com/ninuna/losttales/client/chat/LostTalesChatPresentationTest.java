@@ -756,7 +756,7 @@ public final class LostTalesChatPresentationTest {
         assertNotNull(marker.recorded);
         assertEquals(id, marker.recorded.getPlayerId());
         assertEquals(ChatMentionColors.PLAYER_RGB, marker.color);
-        assertEquals(LostTalesColors.rgb(LostTalesColors.HONEY),
+        assertEquals(LostTalesColors.rgb(LostTalesColors.SEAFOAM),
                 ChatMentionColors.PLAYER_RGB);
     }
 

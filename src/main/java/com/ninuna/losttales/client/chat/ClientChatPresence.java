@@ -27,6 +27,11 @@ import org.lwjgl.input.Mouse;
  * and told as it changes. Do Not Disturb holds the mention cue silent in
  * the tabs that speak as the identity it was chosen for; mentions still
  * count and tint.
+ *
+ * <p>A choice shows on this player's own heads and lists at once, as
+ * everyone else will be shown it, and the member lists standing open are
+ * asked for afresh; the server's word replaces both the moment it
+ * comes.</p>
  */
 public final class ClientChatPresence {
     /** What the server said each account's identities show; what it left out is Offline. */
@@ -42,6 +47,11 @@ public final class ClientChatPresence {
     private static final Map<ChatPresenceIdentity, String> CHOSEN_LINES =
             new LinkedHashMap<ChatPresenceIdentity, String>();
     private static String serverKey = "";
+    /**
+     * Whether the server follows Discord members' own statuses, which it
+     * says with the chat access: only then does a member wear one.
+     */
+    private static boolean discordStatuses;
     /** Whether the choices still wait to be told to the server just joined. */
     private static boolean statePending;
     private static boolean idle;
@@ -155,6 +165,16 @@ public final class ClientChatPresence {
         return presence == null ? ChatPresence.OFFLINE : presence;
     }
 
+    /** Whether Discord members wear their Discord status on this server. */
+    public static synchronized boolean showsDiscordStatuses() {
+        return discordStatuses;
+    }
+
+    /** What the server says of Discord statuses, with the chat access. */
+    public static synchronized void setDiscordStatuses(boolean shown) {
+        discordStatuses = shown;
+    }
+
     /** The status this player chose for one of its identities. */
     public static synchronized ChatPresence chosen(ChatPresenceIdentity identity) {
         ChatPresence presence = identity == null ? null : CHOSEN.get(identity);
@@ -171,6 +191,9 @@ public final class ClientChatPresence {
         if (identity == null || presence == null || !presence.isChoosable()) {
             return;
         }
+        Minecraft minecraft = Minecraft.getMinecraft();
+        UUID self = minecraft == null || minecraft.thePlayer == null ? null
+                : minecraft.thePlayer.getUniqueID();
         String key;
         synchronized (ClientChatPresence.class) {
             if (presence == ChatPresence.ONLINE) {
@@ -181,9 +204,38 @@ public final class ClientChatPresence {
             idle = false;
             lastActivityNanos = System.nanoTime();
             key = serverKey;
+            showOwn(self, identity, presence);
         }
         ClientChatPresenceChoices.remember(key, identity, presence);
         send();
+        // The server has the choice before it hears the asks, so their
+        // answers already stand each group as the choice leaves it.
+        ClientChatMembers.askAgain();
+    }
+
+    /**
+     * What everyone else will be shown of one of this player's own
+     * identities, shown here at once rather than when the server says it
+     * back: Invisible as nothing, which reads as Offline.
+     */
+    private static void showOwn(UUID self, ChatPresenceIdentity identity,
+                                ChatPresence chosen) {
+        if (self == null) {
+            return;
+        }
+        Map<ChatPresenceIdentity, ChatPresence> shown = SHOWN.get(self);
+        ChatPresence seen = chosen.shownToOthers();
+        if (seen == ChatPresence.OFFLINE) {
+            if (shown != null) {
+                shown.remove(identity);
+            }
+            return;
+        }
+        if (shown == null) {
+            shown = new HashMap<ChatPresenceIdentity, ChatPresence>();
+            SHOWN.put(self, shown);
+        }
+        shown.put(identity, seen);
     }
 
     /**
@@ -300,6 +352,7 @@ public final class ClientChatPresence {
         SHOWN_LINES.clear();
         CHOSEN_LINES.clear();
         serverKey = "";
+        discordStatuses = false;
         statePending = false;
         idle = false;
         lastActivityNanos = 0L;

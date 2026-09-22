@@ -3,11 +3,13 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
+import com.ninuna.losttales.gui.style.LostTalesUiCornerCut;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatDeliveryMark;
+import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiRegionBlur;
@@ -17,6 +19,7 @@ import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import java.lang.reflect.Field;
 import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
@@ -170,7 +173,7 @@ final class LostTalesChatOverlayRenderer {
      * The opacity profile of a surface laid in one flat colour, as the
      * timestamp column is: the same at both ends.
      */
-    private static final float[] FLAT_WEIGHTS = {1.0F, 1.0F};
+    static final float[] FLAT_WEIGHTS = {1.0F, 1.0F};
 
     private static float[] backdropFadeWeights() {
         float[] weights = new float[BACKDROP_FADE_STEPS + 1];
@@ -1030,6 +1033,53 @@ final class LostTalesChatOverlayRenderer {
         }
     }
 
+    private static final FloatBuffer LOCAL_CLIP_MATRIX =
+            BufferUtils.createFloatBuffer(16);
+    private static final IntBuffer LOCAL_CLIP_BOX =
+            BufferUtils.createIntBuffer(16);
+
+    /**
+     * Narrows what is drawn to a rectangle given in the space the caller
+     * draws in — the matrix in force only scales and translates — and
+     * inside whatever clip already stands, so a picture cut in pieces
+     * inside a cut tab stays inside the tab. False when nothing of the
+     * rectangle shows, and then nothing is changed and there is nothing
+     * to end; otherwise ended with {@link #endVerticalClip}.
+     */
+    static boolean beginLocalClip(Minecraft minecraft, float left, float top,
+                                  float right, float bottom) {
+        LOCAL_CLIP_MATRIX.clear();
+        GL11.glGetFloat(GL11.GL_MODELVIEW_MATRIX, LOCAL_CLIP_MATRIX);
+        float scaleX = LOCAL_CLIP_MATRIX.get(0);
+        float scaleY = LOCAL_CLIP_MATRIX.get(5);
+        float shiftX = LOCAL_CLIP_MATRIX.get(12);
+        float shiftY = LOCAL_CLIP_MATRIX.get(13);
+        int factor = ChatWindowFrame.displayScaleFactor();
+        int x0 = (int)Math.round((shiftX + left * scaleX) * factor);
+        int x1 = (int)Math.round((shiftX + right * scaleX) * factor);
+        int y0 = minecraft.displayHeight
+                - (int)Math.round((shiftY + bottom * scaleY) * factor);
+        int y1 = minecraft.displayHeight
+                - (int)Math.round((shiftY + top * scaleY) * factor);
+        if (GL11.glIsEnabled(GL11.GL_SCISSOR_TEST)) {
+            LOCAL_CLIP_BOX.clear();
+            GL11.glGetInteger(GL11.GL_SCISSOR_BOX, LOCAL_CLIP_BOX);
+            int boxX = LOCAL_CLIP_BOX.get(0);
+            int boxY = LOCAL_CLIP_BOX.get(1);
+            x0 = Math.max(x0, boxX);
+            y0 = Math.max(y0, boxY);
+            x1 = Math.min(x1, boxX + LOCAL_CLIP_BOX.get(2));
+            y1 = Math.min(y1, boxY + LOCAL_CLIP_BOX.get(3));
+        }
+        if (x1 <= x0 || y1 <= y0) {
+            return false;
+        }
+        GL11.glPushAttrib(GL11.GL_SCISSOR_BIT | GL11.GL_ENABLE_BIT);
+        GL11.glEnable(GL11.GL_SCISSOR_TEST);
+        GL11.glScissor(x0, y0, x1 - x0, y1 - y0);
+        return true;
+    }
+
 
     private static void drawWindow(
             Minecraft minecraft, GuiNewChat chat, ChatWindowFrame frame,
@@ -1479,6 +1529,13 @@ final class LostTalesChatOverlayRenderer {
                             ? LostTalesChatPresentation.lineHoverFade(
                                     line.getChatLineID(), hoveredLine)
                             : 0.0F;
+                    // The surface the row's backdrops are recoloured on:
+                    // the band the row stands on, the open window's
+                    // panel or the feed line's own.
+                    int surfaceRgb = backdropRgb;
+                    int surfaceAlpha = 0;
+                    float[] surfaceWeights = BACKDROP_FADE_WEIGHTS;
+                    float surfaceShare = 1.0F;
                     if (open) {
                         // The open window has one panel behind every
                         // line, and a highlighted line is that panel in
@@ -1504,6 +1561,11 @@ final class LostTalesChatOverlayRenderer {
                                     panelRight, y, panelAlpha, backdropRgb,
                                     bandRgb);
                         }
+                        // The panel stays while a new line's words come
+                        // in, so the line's backdrops come in with them.
+                        surfaceRgb = bandRgb;
+                        surfaceAlpha = panelAlpha;
+                        surfaceShare = lineShare(line);
                         if (columns.shows()) {
                             // The line's row of the timestamp area wears
                             // the line's highlight too — a mention's tint,
@@ -1581,6 +1643,9 @@ final class LostTalesChatOverlayRenderer {
                                 y - rowHeight - headroom / scale,
                                 panelRight, y, alpha / 2, color,
                                 alignment.bandWeights());
+                        surfaceRgb = color;
+                        surfaceAlpha = alpha / 2;
+                        surfaceWeights = alignment.bandWeights();
                     }
                     if (!open && pinged && alignment.hasMentionBar()) {
                         // In the feed the bar stands on the edge the
@@ -1687,8 +1752,22 @@ final class LostTalesChatOverlayRenderer {
                             ? ChatLineHover.rowMotion(line.getChatLineID(),
                                     System.nanoTime())
                             : null;
+                    // The row's backdrops go down on its band before its
+                    // words, the band's curve carried into the row's own
+                    // units: the open window's band stands still while
+                    // the words slide in, and the feed's slides with them.
+                    float unit = rowPivot >= 0.0F ? rowScale : 1.0F;
+                    float origin = (open ? entry : 0.0F) + rowShift
+                            + (rowPivot >= 0.0F ? rowPivot * (1.0F - rowScale)
+                                    : 0.0F);
+                    ChatRunBackdrops.draw(font, component, line.getChatLineID(),
+                            new ChatRunBackdrops.Surface(surfaceRgb, surfaceAlpha,
+                                    surfaceWeights, (panelLeft - origin) / unit,
+                                    (panelRight - origin) / unit, surfaceShare),
+                            open, rowMotion);
                     LostTalesChatVisualStyle.drawFormatted(font,
-                            component, marker, 0, 0, alpha, open, rowMotion);
+                            component, marker, 0, 0, alpha, open, rowMotion,
+                            line.getChatLineID());
                     drawHead(minecraft, font, component,
                             HEAD_TOP_OFFSET, alpha, open);
                     if (open && ChatLayoutMarker.isHeaderRow(component)) {
@@ -4275,21 +4354,61 @@ final class LostTalesChatOverlayRenderer {
     private static void recolour(float curveLeft, float left, float top,
                                  float right, float bottom, int alpha,
                                  int fromRgb, int toRgb, float[] weights) {
+        recolour(curveLeft, left, right, top, right, bottom, alpha, fromRgb,
+                toRgb, weights);
+    }
+
+    /**
+     * As above, stopping at {@code drawRight} while the surface's curve
+     * runs on to {@code right}.
+     */
+    private static void recolour(float curveLeft, float left, float drawRight,
+                                 float top, float right, float bottom,
+                                 int alpha, int fromRgb, int toRgb,
+                                 float[] weights) {
         if (!canRecolour()) {
-            drawChatBackdrop(curveLeft, left, top, right, bottom, alpha,
-                    toRgb, GL11.GL_ONE_MINUS_SRC_ALPHA, weights);
+            drawChatBackdrop(curveLeft, left, drawRight, top, right, bottom,
+                    alpha, toRgb, GL11.GL_ONE_MINUS_SRC_ALPHA, weights);
             return;
         }
         try {
             GL14.glBlendEquation(GL14.GL_FUNC_REVERSE_SUBTRACT);
-            drawChatBackdrop(curveLeft, left, top, right, bottom, alpha,
-                    fromRgb, GL11.GL_ONE, weights);
+            drawChatBackdrop(curveLeft, left, drawRight, top, right, bottom,
+                    alpha, fromRgb, GL11.GL_ONE, weights);
             GL14.glBlendEquation(GL14.GL_FUNC_ADD);
-            drawChatBackdrop(curveLeft, left, top, right, bottom, alpha,
-                    toRgb, GL11.GL_ONE, weights);
+            drawChatBackdrop(curveLeft, left, drawRight, top, right, bottom,
+                    alpha, toRgb, GL11.GL_ONE, weights);
         } finally {
             GL14.glBlendEquation(GL14.GL_FUNC_ADD);
         }
+    }
+
+    /**
+     * A run's backdrop ({@link ChatRunBackdrops}): the surface under its
+     * row, from {@code left} to {@code right} and {@code top} to
+     * {@code bottom} in the row's own units, given {@code toRgb} in place
+     * as a line's band is, less its four corner pixels, so it reads
+     * rounded.
+     */
+    static void recolourRunBackdrop(ChatRunBackdrops.Surface surface,
+                                    float left, float top, float right,
+                                    float bottom, int toRgb) {
+        if (right - left < 2.0F || bottom - top < 2.0F
+                || (toRgb & 0xFFFFFF) == surface.rgb) {
+            return;
+        }
+        recolourPiece(surface, left + 1.0F, top, right - 1.0F, bottom, toRgb);
+        recolourPiece(surface, left, top + 1.0F, left + 1.0F, bottom - 1.0F,
+                toRgb);
+        recolourPiece(surface, right - 1.0F, top + 1.0F, right, bottom - 1.0F,
+                toRgb);
+    }
+
+    private static void recolourPiece(ChatRunBackdrops.Surface surface,
+                                      float left, float top, float right,
+                                      float bottom, int toRgb) {
+        recolour(surface.curveLeft, left, right, top, surface.curveRight,
+                bottom, surface.alpha, surface.rgb, toRgb, surface.weights);
     }
 
     /**
@@ -4432,11 +4551,14 @@ final class LostTalesChatOverlayRenderer {
                     // pixels wider than a head's, so it keeps the same
                     // clear pixels either side instead of eating into
                     // them. Centred in the line band exactly as an
-                    // inline emoji is.
-                    drawHeadMark(minecraft, mark, x + HEAD_LEFT_OFFSET,
-                            y - HEAD_TOP_OFFSET
-                                    + centredBoxTop(CONTENT_BOX_HEIGHT),
-                            ChatEmoji.SPRITE_SIZE, alpha);
+                    // inline emoji is, wearing the sphere of a voice
+                    // with a status in its own corner.
+                    float markX = x + HEAD_LEFT_OFFSET;
+                    float markY = y - HEAD_TOP_OFFSET
+                            + centredBoxTop(CONTENT_BOX_HEIGHT);
+                    drawHeadMark(minecraft, mark, markX, markY,
+                            ChatEmoji.SPRITE_SIZE, alpha, statusOf(marker),
+                            markX, markY, ChatEmoji.SPRITE_SIZE);
                     return;
                 }
                 drawFace(minecraft, marker, x + HEAD_LEFT_OFFSET, y,
@@ -4450,42 +4572,82 @@ final class LostTalesChatOverlayRenderer {
         }
     }
 
+    /** The status a head wears, or null for a voice that is never online. */
+    private static ChatPresence statusOf(ChatHeadMarker.Data head) {
+        return ChatPresenceMark.wears(head) ? ChatPresenceMark.presenceOf(head)
+                : null;
+    }
+
     /**
      * The mark standing for a head — the Discord mark, the console mark,
      * the Narrator's — drawn {@code size} pixels square at {@code x},
      * {@code y}, with the chat's one shadow under it: one texel to one
      * pixel beside a name, as large as the avatar in the timestamp area.
+     * A voice with a status wears its sphere as a face does, in the
+     * corner of the head's own square ({@code headX}, {@code headY},
+     * {@code headSize}), cut into the mark; {@code presence} is null for
+     * one without.
      */
     private static void drawHeadMark(final Minecraft minecraft,
                                      final ChatEmoji mark, final float x,
                                      final float y, final float size,
-                                     final int alpha) {
-        LostTalesUiFlatLayers.draw(alpha, x, y,
-                x + size + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                y + size + LostTalesChatVisualStyle.SHADOW_OFFSET,
+                                     final int alpha,
+                                     final ChatPresence presence,
+                                     final float headX, final float headY,
+                                     final float headSize) {
+        final LostTalesUiCornerCut cut = presence == null
+                ? LostTalesUiCornerCut.NONE
+                : ChatPresenceMark.cutFor(headX, headY, headSize);
+        LostTalesUiFlatLayers.draw(alpha, Math.min(x, headX),
+                Math.min(y, headY),
+                Math.max(x + size, headX + headSize
+                        + ChatPresenceMark.OVERHANG_X)
+                        + LostTalesChatVisualStyle.SHADOW_OFFSET,
+                Math.max(y + size, headY + headSize
+                        + ChatPresenceMark.OVERHANG_Y)
+                        + LostTalesChatVisualStyle.SHADOW_OFFSET,
                 new LostTalesUiFlatLayers.Layers() {
                     @Override
                     public void draw() {
-                        ChatEmojiRenderer.drawShadow(minecraft, mark,
-                                x + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                                y + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                                size, LostTalesChatVisualStyle.SHADOW,
-                                Math.round(alpha * LostTalesChatVisualStyle
-                                        .SHADOW_OPACITY));
-                        LostTalesUiFlatLayers.nextLayer();
-                        ChatEmojiRenderer.draw(minecraft, mark, x, y, size,
-                                alpha);
+                        ChatChannelIcons.drawEmojiLayers(minecraft, mark, x, y,
+                                size, alpha, false, cut);
+                        if (presence != null) {
+                            LostTalesUiFlatLayers.nextLayer();
+                            ChatPresenceMark.draw(headX, headY, headSize,
+                                    presence, alpha);
+                        }
                     }
                 });
+    }
+
+    /**
+     * A head drawn as an open window's avatar is, {@link ChatAvatar#SIZE}
+     * square at {@code x}, {@code y} in a space of {@code pixelsPerUnit}
+     * display pixels a unit: the face and its sphere, or the mark standing
+     * for it filling the square on the display's grid, with its sphere
+     * where its voice has a status. What an avatar and a member list's row
+     * are both drawn with.
+     */
+    static void drawAvatarHead(Minecraft minecraft, ChatHeadMarker.Data head,
+                               float x, float y, float pixelsPerUnit,
+                               int alpha) {
+        ChatEmoji mark = head.mark();
+        if (mark == null) {
+            drawFace(minecraft, head, x, y, ChatAvatar.SIZE, alpha);
+            return;
+        }
+        float markSize = ChatAvatar.markSize(pixelsPerUnit);
+        float inset = (ChatAvatar.SIZE - markSize) / 2.0F;
+        drawHeadMark(minecraft, mark, x + inset, y + inset, markSize, alpha,
+                statusOf(head), x, y, ChatAvatar.SIZE);
     }
 
     /**
      * A face {@code size} pixels square at {@code x}, {@code y}: its flat
      * shadow, the face, and — on a player's own head — the presence
      * sphere in the corner the face gives up for it; an NPC has no
-     * account to have one, and neither has the server, the client or the
-     * bridge. What the row's small head and an open window's avatar are
-     * both drawn by. A head drawn translucent is one picture
+     * account to have one. What the row's small head and an open window's
+     * avatar are both drawn by. A head drawn translucent is one picture
      * ({@link LostTalesUiFlatLayers}): the hat does not show the face
      * through it, nor the face its shadow.
      */
@@ -4608,10 +4770,6 @@ final class LostTalesChatOverlayRenderer {
                                     double clipLeft) {
         int reach = Math.min(rows.count() - 1, lastRow + 1);
         float left = panelLeft + columns.avatarX();
-        // A mark standing for a head fills the avatar's square on the
-        // display's grid, centred in it.
-        float markSize = ChatAvatar.markSize(stackPixelsPerUnit());
-        float markInset = (ChatAvatar.SIZE - markSize) / 2.0F;
         for (int lineIndex = firstLine; lineIndex < lines.size();
              lineIndex++) {
             int rowIndex = rowOfLine(lineIndex, dividerIndex);
@@ -4633,13 +4791,8 @@ final class LostTalesChatOverlayRenderer {
             int rowHeight = rows.height(rowIndex);
             float top = ChatAvatar.top(rowBottom - rowHeight, rowHeight,
                     rows.height(rowIndex - 1)) - glide.lift(lineIndex);
-            ChatEmoji mark = avatar.mark();
-            if (mark != null) {
-                drawHeadMark(minecraft, mark, left + markInset,
-                        top + markInset, markSize, alpha);
-            } else {
-                drawFace(minecraft, avatar, left, top, ChatAvatar.SIZE, alpha);
-            }
+            drawAvatarHead(minecraft, avatar, left, top, stackPixelsPerUnit(),
+                    alpha);
             // Where it answers the pointer: the avatar itself, its sphere
             // included; the rest of the area lights the row it stands by.
             float boxLeft = (float)Math.max(clipLeft, originX + left * scale);

@@ -1202,7 +1202,9 @@ public final class LostTalesChatService {
                         ChatChannelIconCatalog.current(),
                         ChatProfanityCatalog.serverWords())
                         .withDiscordLinks(
-                                LostTalesDiscordBridge.getInstance().linkedKeys()),
+                                LostTalesDiscordBridge.getInstance().linkedKeys())
+                        .withDiscordStatuses(LostTalesDiscordBridge.getInstance()
+                                .followsMemberStatuses()),
                 player);
         ChatIdentitySelection.sendState(player);
     }

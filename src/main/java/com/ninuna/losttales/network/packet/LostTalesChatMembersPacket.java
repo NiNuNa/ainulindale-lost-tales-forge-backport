@@ -45,6 +45,12 @@ public final class LostTalesChatMembersPacket implements IMessage {
     public static final int MAX_SKIN_ID_BYTES = 128;
     public static final int MAX_TITLE_BYTES = 256;
     public static final int MAX_GROUP_KEY_BYTES = 128;
+    /**
+     * What the group key of a Discord server's online members begins
+     * with, before the server's id: the list heads it with the Discord
+     * emoji and stands it after the game's own groups.
+     */
+    public static final String DISCORD_GROUP_PREFIX = "discord:";
     public static final int MAX_GROUP_NAME_BYTES = 128;
     private static final int MAX_MEMBER_BYTES = 16 + 5 + MAX_ACCOUNT_BYTES
             + 17 + 5 + MAX_NAME_BYTES + 4 + 5 + MAX_SKIN_ID_BYTES
@@ -173,8 +179,8 @@ public final class LostTalesChatMembersPacket implements IMessage {
     /**
      * The order a list stands its members in: those here first, by
      * group — a role's place, or a faction's name with Unaligned last, the
-     * ungrouped after every group — then by name; the absent after them,
-     * by name.
+     * ungrouped after every group, and each Discord server's members after
+     * all of the game's — then by name; the absent after them, by name.
      */
     public static final Comparator<Member> ORDER = new Comparator<Member>() {
         @Override
@@ -192,6 +198,10 @@ public final class LostTalesChatMembersPacket implements IMessage {
     };
 
     private static int compareGroups(Member one, Member other) {
+        boolean oneDiscord = isDiscordGroup(one.getGroupKey());
+        if (oneDiscord != isDiscordGroup(other.getGroupKey())) {
+            return oneDiscord ? 1 : -1;
+        }
         boolean oneGrouped = one.getGroupKey().length() > 0;
         boolean otherGrouped = other.getGroupKey().length() > 0;
         if (oneGrouped != otherGrouped) {
@@ -211,6 +221,11 @@ public final class LostTalesChatMembersPacket implements IMessage {
                 other.getGroupName().toLowerCase(Locale.ROOT));
         return byName != 0 ? byName
                 : one.getGroupKey().compareTo(other.getGroupKey());
+    }
+
+    /** Whether a group key names a Discord server's online members. */
+    public static boolean isDiscordGroup(String groupKey) {
+        return groupKey != null && groupKey.startsWith(DISCORD_GROUP_PREFIX);
     }
 
     private String channelId = "";

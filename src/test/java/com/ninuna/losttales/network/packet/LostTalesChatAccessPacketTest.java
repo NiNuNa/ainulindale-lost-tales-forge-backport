@@ -3,6 +3,7 @@ package com.ninuna.losttales.network.packet;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatRoleFixtures;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatChannelIconSpec;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatRoleSource;
 import com.ninuna.losttales.chat.profanity.ChatProfanityWords;
@@ -59,6 +60,19 @@ public final class LostTalesChatAccessPacketTest {
         assertEquals(LostTalesChatAccessPacket.allChannelIds(),
                 decoded.getReadableChannels());
         assertTrue(decoded.getProfanityWords().isEmpty());
+    }
+
+    /** Whether Discord members wear their status travels with the links. */
+    @Test
+    public void theDiscordStatusFlagRoundTrips() {
+        LostTalesChatAccessPacket decoded = roundTrip(new LostTalesChatAccessPacket(false, 0)
+                .withDiscordLinks(Arrays.asList("ooc", "faction:lotr:gondor"))
+                .withDiscordStatuses(true));
+        assertFalse(decoded.isMalformed());
+        assertEquals(Arrays.asList("ooc", "faction:lotr:gondor"), decoded.getDiscordLinks());
+        assertTrue(decoded.showsDiscordStatuses());
+        assertFalse(roundTrip(new LostTalesChatAccessPacket(false, 0))
+                .showsDiscordStatuses());
     }
 
     /** A payload that stops short of the whole layout is refused whole. */
@@ -142,7 +156,8 @@ public final class LostTalesChatAccessPacketTest {
     public void theCatalogueAndTheGatesRoundTrip() {
         ChatAccountRole moderator = ChatAccountRole.custom("moderator", "Moderator",
                 "Keeps the peace.", 0xA94B54, true, 15,
-                Collections.singletonList(ChatRoleSource.opLevel(1)));
+                Collections.singletonList(ChatRoleSource.opLevel(1)), null,
+                ChatChannelIconSpec.parse("emoji:bee"));
         ChatRoleCatalog catalog = ChatRoleCatalog.of(Arrays.asList(
                 ChatRoleFixtures.OPERATOR.withLook("Staff", "", 0x00FF00, true, 10),
                 moderator), null, null);
@@ -164,6 +179,10 @@ public final class LostTalesChatAccessPacketTest {
         assertEquals("Moderator", read.byId("moderator").getDisplayName());
         assertEquals("Moderator", read.byId("moderator").getDisplayName());
         assertEquals("Keeps the peace.", read.byId("moderator").getDisplayDescription());
+        assertEquals("emoji:bee", read.byId("moderator").getIcon().toText());
+        assertEquals("emoji:expressionless",
+                read.byId("operator").getIcon().toText());
+        assertEquals("emoji:purple_heart", read.byId("team").getIcon().toText());
         assertEquals(4, read.byId("moderator").bit());
         assertEquals("Staff", read.byId("operator").getDisplayName());
         assertEquals(0x00FF00, read.byId("operator").getColor());

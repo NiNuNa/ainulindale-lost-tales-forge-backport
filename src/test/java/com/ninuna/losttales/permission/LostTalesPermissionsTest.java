@@ -222,7 +222,7 @@ public final class LostTalesPermissionsTest {
     public void grantsNeverReachTheWire() {
         ChatRoleCatalog fromWire = ChatRoleCatalog.fromWire(
                 Arrays.asList(ChatAccountRole.fromWire("moderator", 1, "",
-                        "Moderator", "", 0xA94B54, true, false, 15)));
+                        "Moderator", "", 0xA94B54, true, false, 15, null)));
         assertTrue(fromWire.byId("moderator").getGrants().isEmpty());
         assertFalse(LostTalesPermissions.isGranted(
                 fromWire.byId("moderator").bit(),

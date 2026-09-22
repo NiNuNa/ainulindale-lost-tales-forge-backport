@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiTextField;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import java.util.ArrayList;
@@ -10,7 +11,6 @@ import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
-import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.resources.I18n;
 import org.lwjgl.input.Keyboard;
 
@@ -42,7 +42,7 @@ final class LostTalesMapSearchPrompt {
     private static final int MAX_RESULTS = 200;
     private static final int MAX_QUERY_LENGTH = 48;
 
-    private final GuiTextField queryField;
+    private final LostTalesUiTextField queryField;
     private final List<Entry> entries;
     private List<Entry> results;
     private String lastQuery = "";
@@ -53,7 +53,7 @@ final class LostTalesMapSearchPrompt {
             FontRenderer font, int screenWidth, int screenHeight,
             List<Entry> entries) {
         Layout layout = calculateLayout(screenWidth, screenHeight);
-        this.queryField = new GuiTextField(font,
+        this.queryField = new LostTalesUiTextField(font,
                 layout.field.x + 4, layout.field.y + 4,
                 Math.max(0, layout.field.width - 8),
                 Math.max(0, layout.field.height - 6));

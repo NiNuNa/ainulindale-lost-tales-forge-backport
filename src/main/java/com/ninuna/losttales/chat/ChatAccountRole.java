@@ -29,6 +29,11 @@ import java.util.Set;
  * <em>do</em> is the permissions the config grants it, read by
  * {@code LostTalesPermissions} against the permissions in force and
  * never sent to a client.</p>
+ *
+ * <p>A role wears an icon where its members are listed under it, as a
+ * channel wears one on its tab: one of the chat's emoji or an item's
+ * icon, written as a channel's is ({@link ChatChannelIconSpec}). A role
+ * given none wears the face a channel given none wears.</p>
  */
 public final class ChatAccountRole {
 
@@ -39,7 +44,8 @@ public final class ChatAccountRole {
 
     /** The absence of a role; never a bit. */
     public static final ChatAccountRole NONE = new ChatAccountRole("", -1, "", "", "", 0,
-            false, true, Integer.MAX_VALUE, Collections.<ChatRoleSource>emptyList(), null);
+            false, true, Integer.MAX_VALUE, Collections.<ChatRoleSource>emptyList(), null,
+            null);
     /**
      * A member of the Lost Tales team, recognised by account id in the
      * code and by nothing else. A vanity mark: it names nobody the server
@@ -49,7 +55,8 @@ public final class ChatAccountRole {
     public static final ChatAccountRole TEAM = new ChatAccountRole(TEAM_ID, 0,
             "chat.losttales.role.team", "", "",
             LostTalesColors.rgb(LostTalesColors.MULBERRY), false, true, 0,
-            Collections.<ChatRoleSource>emptyList(), null);
+            Collections.<ChatRoleSource>emptyList(), null,
+            ChatChannelIconSpec.parse("emoji:purple_heart"));
     private final String id;
     private final int bitIndex;
     private final String nameKey;
@@ -61,11 +68,13 @@ public final class ChatAccountRole {
     private final int rank;
     private final List<ChatRoleSource> sources;
     private final Set<String> grants;
+    /** The icon the role wears over its members; null for none chosen. */
+    private final ChatChannelIconSpec icon;
 
     ChatAccountRole(String id, int bitIndex, String nameKey, String name,
                     String description, int color, boolean mentionable,
                     boolean locked, int rank, List<ChatRoleSource> sources,
-                    Set<String> grants) {
+                    Set<String> grants, ChatChannelIconSpec icon) {
         this.id = id == null ? "" : id.trim().toLowerCase(Locale.ROOT);
         this.bitIndex = bitIndex;
         this.nameKey = nameKey == null ? "" : nameKey;
@@ -78,20 +87,22 @@ public final class ChatAccountRole {
         this.sources = sources == null ? Collections.<ChatRoleSource>emptyList()
                 : Collections.unmodifiableList(new ArrayList<ChatRoleSource>(sources));
         this.grants = Collections.unmodifiableSet(normalized(grants));
+        this.icon = icon;
     }
 
     /** The same role at another bit, which is the catalogue's to give. */
     ChatAccountRole withBit(int bitIndex) {
         return new ChatAccountRole(this.id, bitIndex, this.nameKey, this.name,
                 this.description, this.color, this.mentionable, this.locked, this.rank,
-                this.sources, this.grants);
+                this.sources, this.grants, this.icon);
     }
 
     /** The same role with another look; what an edit of a built-in changes. */
     public ChatAccountRole withLook(String name, String description, int color,
                                     boolean mentionable, int rank) {
         return new ChatAccountRole(this.id, this.bitIndex, this.nameKey, name, description,
-                color, mentionable, this.locked, rank, this.sources, this.grants);
+                color, mentionable, this.locked, rank, this.sources, this.grants,
+                this.icon);
     }
 
     /** A config-defined role that grants nothing, before the catalogue gives it a bit. */
@@ -106,8 +117,18 @@ public final class ChatAccountRole {
                                          int color, boolean mentionable, int rank,
                                          List<ChatRoleSource> sources,
                                          Set<String> grants) {
+        return custom(id, name, description, color, mentionable, rank, sources,
+                grants, null);
+    }
+
+    /** As above, wearing {@code icon} over its members; null for none chosen. */
+    public static ChatAccountRole custom(String id, String name, String description,
+                                         int color, boolean mentionable, int rank,
+                                         List<ChatRoleSource> sources,
+                                         Set<String> grants,
+                                         ChatChannelIconSpec icon) {
         return new ChatAccountRole(id, -1, "", name, description, color, mentionable,
-                false, rank, sources, grants);
+                false, rank, sources, grants, icon);
     }
 
     /**
@@ -116,9 +137,10 @@ public final class ChatAccountRole {
      */
     public static ChatAccountRole fromWire(String id, int bitIndex, String nameKey,
                                            String name, String description, int color,
-                                           boolean mentionable, boolean locked, int rank) {
+                                           boolean mentionable, boolean locked, int rank,
+                                           ChatChannelIconSpec icon) {
         return new ChatAccountRole(id, bitIndex, nameKey, name, description, color,
-                mentionable, locked, rank, null, null);
+                mentionable, locked, rank, null, null, icon);
     }
 
     public String getId() {
@@ -220,6 +242,11 @@ public final class ChatAccountRole {
         return this.color;
     }
 
+    /** The icon the role wears over its members; null for none chosen. */
+    public ChatChannelIconSpec getIcon() {
+        return this.icon;
+    }
+
     /* ---- The catalogue in force ---- */
 
     /** Every role in force, in precedence order, {@link #NONE} left out. */
@@ -257,7 +284,6 @@ public final class ChatAccountRole {
         return mask;
     }
 
-    /** Whether a mask only names roles the catalogue in force knows. */
     /**
      * Whether every bit of the mask names a role some catalogue in this
      * JVM knows. Both catalogues are asked: an integrated server shares

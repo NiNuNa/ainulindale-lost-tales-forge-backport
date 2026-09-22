@@ -53,6 +53,8 @@ import net.minecraft.util.StatCollector;
 
 /** Builds structured legacy chat components and records entry-animation time. */
 public final class LostTalesChatPresentation {
+    /** The colour a shared quest's name is drawn in: the palette's tone of vanilla gold. */
+    static final int QUEST_RGB = LostTalesColors.rgb(LostTalesColors.APRICOT);
     private static volatile long lastMessageNanos;
     /**
      * The newest message's own line id. What the entry animation picks
@@ -1370,6 +1372,15 @@ public final class LostTalesChatPresentation {
         return chipFade(messageId + ":+", hovered);
     }
 
+    /**
+     * As {@link #chipHoverFade}, for the backdrop of an element of the
+     * message {@code chatLineId}: every piece of it reads the same.
+     */
+    static float backdropHoverFade(int chatLineId, String element,
+                                   boolean hovered) {
+        return chipFade("backdrop:" + chatLineId + ":" + element, hovered);
+    }
+
     private static float chipFade(String key, boolean hovered) {
         if (!Motions.enabled()) {
             return hovered ? 1.0F : 0.0F;
@@ -1991,11 +2002,9 @@ public final class LostTalesChatPresentation {
         }
         ChatSystemLineClassifier.Kind kind =
                 ChatSystemLineClassifier.kindOf(component);
-        if (LostTalesConfig.enableChatPings) {
-            component = rewritePlayerNames(component, packet.getChannel(),
-                    localMentionNames(minecraft), localMentioned,
-                    packet.getNamedPlayers());
-        }
+        component = rewriteServerLine(component, packet.getChannel(),
+                localMentionNames(minecraft), localMentioned,
+                packet.getNamedPlayers());
         return asAnnouncement(component, kind);
     }
 
@@ -2087,18 +2096,15 @@ public final class LostTalesChatPresentation {
         // join — names them the way a typed mention does: @Name in the
         // mention's colour, the account on an out-of-character channel
         // and the active character's name on a character channel,
-        // answering to the pointer. A line naming this player highlights,
-        // and the cue sounds. The rewrite may hand back a fresh
-        // component; the fresh one is what is shown.
-        IChatComponent shown = message;
-        boolean mentioned = false;
-        if (LostTalesConfig.enableChatPings) {
-            boolean[] localMentioned = new boolean[1];
-            shown = rewritePlayerNames(message, channel,
-                    localMentionNames(minecraft), localMentioned,
-                    Collections.<ChatNamedPlayer>emptyList());
-            mentioned = localMentioned[0];
-        }
+        // answering to the pointer, and an achievement stands on its
+        // backdrop without its brackets. A line naming this player
+        // highlights, and the cue sounds. The rewrite may hand back a
+        // fresh component; the fresh one is what is shown.
+        boolean[] localMentioned = new boolean[1];
+        IChatComponent shown = rewriteServerLine(message, channel,
+                localMentionNames(minecraft), localMentioned,
+                Collections.<ChatNamedPlayer>emptyList());
+        boolean mentioned = localMentioned[0];
         // A join, a leave, a death or an achievement is a sentence the
         // server says, and ends as one.
         shown = asAnnouncement(shown,
@@ -2752,14 +2758,17 @@ public final class LostTalesChatPresentation {
     }
 
     /**
-     * Rewrites player names inside a system line into mentions: a
-     * component (or a translation's bare string argument) whose whole
-     * text is a name this client can place — the way an achievement, a
-     * join line or a death names its player — becomes {@code @Name},
-     * carrying the mention marker so it answers to the pointer exactly
-     * as a typed mention does. On the character channels the account's
-     * active role-playing character is named instead of the account,
-     * which is the identity every ordinary line there is signed with.
+     * A system line as the chat shows it. Every achievement it carries
+     * becomes one run of its name alone ({@link #unbracketedAchievement}),
+     * its backdrop standing where vanilla's and LOTR's square brackets
+     * were. With pings on, player names become mentions: a component (or
+     * a translation's bare string argument) whose whole text is a name
+     * this client can place — the way an achievement, a join line or a
+     * death names its player — becomes {@code @Name}, carrying the
+     * mention marker so it answers to the pointer exactly as a typed
+     * mention does. On the character channels the account's active
+     * role-playing character is named instead of the account, which is
+     * the identity every ordinary line there is signed with.
      *
      * <p>Returns the component to show, which may be a fresh one: a
      * translation caches the children it renders the first time
@@ -2770,15 +2779,21 @@ public final class LostTalesChatPresentation {
      * edited in place. {@code localMentioned[0]} is set when one of
      * this client's own names was among the replaced.</p>
      */
-    private static IChatComponent rewritePlayerNames(
+    private static IChatComponent rewriteServerLine(
             IChatComponent component, ChatChannel channel,
             List<String> localNames, boolean[] localMentioned,
             List<ChatNamedPlayer> named) {
         if (component == null) {
             return null;
         }
-        IChatComponent mention = asMention(component, channel, localNames,
-                localMentioned, named);
+        IChatComponent achievement = unbracketedAchievement(component);
+        if (achievement != null) {
+            return achievement;
+        }
+        IChatComponent mention = LostTalesConfig.enableChatPings
+                ? asMention(component, channel, localNames, localMentioned,
+                        named)
+                : null;
         if (mention != null) {
             return mention;
         }
@@ -2790,7 +2805,7 @@ public final class LostTalesChatPresentation {
                 continue;
             }
             IChatComponent sibling = (IChatComponent)value;
-            IChatComponent replaced = rewritePlayerNames(sibling, channel,
+            IChatComponent replaced = rewriteServerLine(sibling, channel,
                     localNames, localMentioned, named);
             if (replaced != sibling) {
                 @SuppressWarnings("unchecked")
@@ -2812,12 +2827,14 @@ public final class LostTalesChatPresentation {
         for (int index = 0; index < arguments.length; index++) {
             Object argument = arguments[index];
             if (argument instanceof IChatComponent) {
-                rewritten[index] = rewritePlayerNames(
+                rewritten[index] = rewriteServerLine(
                         (IChatComponent)argument, channel, localNames,
                         localMentioned, named);
             } else if (argument instanceof String) {
-                IChatComponent mentionOf = asMentionName((String)argument,
-                        channel, localNames, localMentioned, named);
+                IChatComponent mentionOf = LostTalesConfig.enableChatPings
+                        ? asMentionName((String)argument, channel, localNames,
+                                localMentioned, named)
+                        : null;
                 rewritten[index] = mentionOf != null ? mentionOf : argument;
             } else {
                 rewritten[index] = argument;
@@ -2847,6 +2864,31 @@ public final class LostTalesChatPresentation {
             }
         }
         return fresh;
+    }
+
+    /**
+     * An achievement as one run of its name alone, or null for a component
+     * that is none: vanilla and LOTR hand an achievement over as its name
+     * wrapped in square brackets, with the achievement's hover on the
+     * whole, and the chat sets it on its backdrop instead, which is its
+     * frame. The run keeps the achievement's own style, its colour and
+     * the hover its card and click read.
+     */
+    static IChatComponent unbracketedAchievement(IChatComponent component) {
+        if (component == null || component.getChatStyle() == null
+                || !ChatInteractions.isAchievement(component)) {
+            return null;
+        }
+        String name = component.getUnformattedText().trim();
+        if (name.startsWith("[")) {
+            name = name.substring(1);
+        }
+        if (name.endsWith("]")) {
+            name = name.substring(0, name.length() - 1);
+        }
+        ChatComponentText run = new ChatComponentText(name.trim());
+        run.setChatStyle(component.getChatStyle().createShallowCopy());
+        return run;
     }
 
     /**
@@ -3163,7 +3205,7 @@ public final class LostTalesChatPresentation {
                     ClientChatShowcaseStore.getQuest(showcaseId);
             if (quest == null) return false;
             appendShowcaseParts(root, kind, showcaseId, quest.title,
-                    EnumChatFormatting.GOLD, 0xD8B36A);
+                    EnumChatFormatting.GOLD, QUEST_RGB);
             return true;
         }
         ClientChatShowcaseStore.Marker marker =
@@ -3181,16 +3223,18 @@ public final class LostTalesChatPresentation {
         return true;
     }
 
+    /**
+     * A shared thing as a line shows it: its icon and its name, on the
+     * backdrop that frames the two ({@link ChatRunBackdrops}).
+     */
     private static void appendShowcaseParts(ChatComponentText root,
                                             ChatShareKind kind,
                                             int showcaseId, String name,
                                             EnumChatFormatting nearest,
                                             int rgb) {
-        root.appendSibling(ChatShowcaseMarker.createText(
-                kind, showcaseId, "[", nearest, rgb));
         root.appendSibling(ChatShowcaseMarker.createIcon(kind, showcaseId));
         root.appendSibling(ChatShowcaseMarker.createText(
-                kind, showcaseId, " " + name + "]", nearest, rgb));
+                kind, showcaseId, " " + name, nearest, rgb));
     }
 
     private static void appendStyledText(ChatComponentText root,

@@ -149,4 +149,16 @@ public final class DiscordMessageSanitizerTest {
         assertEquals(32, DiscordMessageSanitizer.inboundName(
                 name.toString()).length());
     }
+
+    /** A name is an account name in the chat, so it fits the account's 64 bytes. */
+    @Test
+    public void aNameFitsTheBytesAnAccountNameTakes() throws Exception {
+        StringBuilder name = new StringBuilder();
+        for (int index = 0; index < 32; index++) {
+            name.append('月');
+        }
+        String kept = DiscordMessageSanitizer.inboundName(name.toString());
+        assertEquals(21, kept.length());
+        assertEquals(63, kept.getBytes("UTF-8").length);
+    }
 }

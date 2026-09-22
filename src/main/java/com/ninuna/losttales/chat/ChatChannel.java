@@ -55,9 +55,10 @@ public final class ChatChannel {
     /**
      * Out-of-character conversation: everyone online reads it, speaking
      * as their account. Like any channel that allows it, it may be linked
-     * to Discord channels, and its tab then wears the Discord mark.
+     * to Discord channels, and its icon is then half its own and half
+     * Discord's.
      */
-    public static final ChatChannel OOC = register("ooc", "OOC", ChatPresentationMode.OUT_OF_CHARACTER,
+    public static final ChatChannel OOC = register("ooc", "Out of Character", ChatPresentationMode.OUT_OF_CHARACTER,
             ChatRecipientRule.GLOBAL, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.STEEL_BLUE), true);
     /** Staff channel: operators only, out of character; the wire id stays. */

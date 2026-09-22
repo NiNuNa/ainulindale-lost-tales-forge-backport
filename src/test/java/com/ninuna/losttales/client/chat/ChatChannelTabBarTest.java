@@ -392,20 +392,15 @@ public final class ChatChannelTabBarTest {
         assertEquals(0.0F, relaid.leg.value(), 0.0F);
     }
 
-    /**
-     * A tab's mentions are the count tile, as wide as the tile, with a
-     * {@code +} after the nine for more than it counts.
-     */
+    /** A tab's pings are the count tile; past nine it stays the nine. */
     @Test
-    public void aTabsMentionsAreItsCountTile() {
-        assertEquals(0, ChatChannelTabBar.pingBadgeWidth(null, 0));
-        assertEquals(com.ninuna.losttales.gui.style.LostTalesUiSheet.COUNT_3
-                        .getWidth(),
-                ChatChannelTabBar.pingBadgeWidth(null, 3));
+    public void aTabsPingsAreItsCountTile() {
+        assertEquals(com.ninuna.losttales.gui.style.LostTalesUiSheet.COUNT_3,
+                ChatIconMark.pings(3).sprite());
         assertEquals(com.ninuna.losttales.gui.style.LostTalesUiSheet.COUNT_9,
-                com.ninuna.losttales.gui.style.LostTalesUiSheet.countTile(42));
+                ChatIconMark.pings(42).sprite());
         assertEquals(com.ninuna.losttales.gui.style.LostTalesUiSheet.COUNT_1,
-                com.ninuna.losttales.gui.style.LostTalesUiSheet.countTile(1));
+                ChatIconMark.pings(1).sprite());
     }
 
     /** A tab standing at {@code fromLeft}, bound for {@code toLeft}. */
@@ -413,8 +408,7 @@ public final class ChatChannelTabBarTest {
                                             double toLeft, double toWidth) {
         ChatChannelTabBar.Tab tab = new ChatChannelTabBar.Tab(
                 ChatTab.of(com.ninuna.losttales.chat.ChatChannel.ALL), 0, null,
-                "Global", 30, 30, 0, 0, "", 0, false, false, 0, (int)toWidth,
-                -1, -1, -1, false);
+                "Global", 30, 30, false, 0, (int)toWidth, -1, -1, -1, false);
         tab.standAt(fromLeft, fromWidth, 1.0D / 3.0D);
         tab.toLeft = toLeft;
         tab.exactWidth = toWidth;

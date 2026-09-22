@@ -196,7 +196,7 @@ final class ChatChannelTabBar {
      */
     private static final double GLOW_SECONDS = 0.45D;
     private static final float GLOW_TINT = 0.45F;
-    /** Gap between the label and a counter, and between the counters. */
+    /** Gap between the name and the draft mark after it, and after the {@code +}. */
     private static final int COUNTER_GAP = 3;
     /**
      * The draft mark after a tab's counters while the tab holds unsent
@@ -208,10 +208,11 @@ final class ChatChannelTabBar {
     private static final int DRAFT_WIDTH =
             LostTalesUiSheet.DRAFT.getWidth();
     /**
-     * The Discord mark after a tab's counters while its channel is linked
-     * to Discord: it goes and comes with the counters.
+     * The mark after the {@code +} for what waits in the channels it
+     * would open: the ping tile or the white sphere, both this wide.
      */
-    private static final int DISCORD_MARK_WIDTH = ChatDiscordMark.WIDTH;
+    private static final int RESTORE_MARK_WIDTH =
+            LostTalesUiSheet.COUNT_1.getWidth();
     /** Hit square of a control inside the selected tab. */
     static final int CONTROL_SIZE = 7;
     static final int CONTROL_GAP = 2;
@@ -364,23 +365,12 @@ final class ChatChannelTabBar {
     /** The same line on the lifted pair, whose tips are honey. */
     private static final int TIP_LIFTED_RGB =
             LostTalesColors.rgb(LostTalesColors.HONEY);
-    /** The {@code +} after the nine tile, for more mentions than it counts. */
-    private static final int PING_PLUS_RGB =
-            LostTalesColors.rgb(LostTalesColors.CRIMSON);
-    private static final int UNREAD_COUNTER_RGB =
-            LostTalesColors.rgb(LostTalesColors.HONEY);
 
     private List<Tab> cachedTabs = Collections.emptyList();
     private List<ChatTab> cachedChannels = Collections.emptyList();
     private ChatTab cachedSelected;
     private final Map<ChatTab, String> cachedLabels =
             new HashMap<ChatTab, String>();
-    private final Map<ChatTab, Integer> cachedPings =
-            new HashMap<ChatTab, Integer>();
-    private final Map<ChatTab, Integer> cachedOther =
-            new HashMap<ChatTab, Integer>();
-    private final Map<ChatTab, Boolean> cachedDiscord =
-            new HashMap<ChatTab, Boolean>();
     private final Map<ChatTab, Boolean> cachedDraft =
             new HashMap<ChatTab, Boolean>();
     private final Map<ChatTab, Boolean> cachedMuted =
@@ -402,10 +392,9 @@ final class ChatChannelTabBar {
     private boolean cachedShowClose;
     private boolean cachedShowRestore;
     private boolean cachedWindowControls;
-    private int cachedClosedUnread;
-    /** {@code [n]} after the restore control, or empty. */
-    private String restoreBadge = "";
-    /** Width of the restore control together with its badge. */
+    /** What waits in the channels the {@code +} would open, marked after it. */
+    private ChatIconMark restoreMark = ChatIconMark.NONE;
+    /** Width of the restore control together with its mark. */
     private int restoreWidth;
     /** Right edge of the last tab, before the end controls. */
     private int tabsRight;
@@ -508,11 +497,6 @@ final class ChatChannelTabBar {
             new MotionTransition(MotionIds.CHAT_TAB_CONTROLS);
     private final MotionTransition closeShown =
             new MotionTransition(MotionIds.CHAT_TAB_CONTROLS);
-    /** How far the row shows its counters, which go all together. */
-    private final MotionTransition countersShown =
-            new MotionTransition(MotionIds.CHAT_TAB_CONTROLS);
-    /** Whether the row's width holds every tab's counters. */
-    private boolean countersFit = true;
     /**
      * The width the row's tabs keep after one was closed by its cross,
      * while the pointer stays on the row; NaN while none is held.
@@ -634,8 +618,8 @@ final class ChatChannelTabBar {
         boolean searchOpen;
         /** Whether this row's restore list is open right now. */
         boolean restoreOpen;
-        /** Unread lines waiting in closed channels, shown after the +. */
-        int closedUnread;
+        /** What waits unread in the closed channels, marked after the +. */
+        ChatIconMark closedMark = ChatIconMark.NONE;
         /** Whether this window is the one being dragged right now. */
         boolean moving;
         /**
@@ -1048,13 +1032,14 @@ final class ChatChannelTabBar {
                                 : LostTalesUiSheet.PLUS_HOVER,
                         step(this.restoreMotion, hovered, HitKind.RESTORE),
                         row.offsetX + this.restoreX, bottom);
-                if (this.restoreBadge.length() > 0) {
-                    // What waits behind the +, in the tabs' unread honey.
-                    LostTalesChatVisualStyle.drawColored(font, this.restoreBadge,
-                            row.offsetX + this.restoreX + PLUS_WIDTH
-                                    + COUNTER_GAP,
-                            centredInStrip(bottom, CAP_HEIGHT),
-                            UNREAD_COUNTER_RGB, scaled(0xFF));
+                if (!this.restoreMark.isNone()) {
+                    // What waits behind the +, marked as a tab's icon
+                    // marks it: the ping tile, else the white sphere.
+                    LostTalesUiSheet mark = this.restoreMark.sprite();
+                    mark.drawWithShadow(row.offsetX + this.restoreX
+                                    + PLUS_WIDTH + COUNTER_GAP,
+                            centredInStrip(bottom, mark.getHeight()),
+                            scaled(0xFF));
                 }
             }
             GL11.glPopMatrix();
@@ -1409,12 +1394,9 @@ final class ChatChannelTabBar {
             // never runs under a button.
             float closeFade = closeShare(row, selected);
             float cogFade = this.cogShown.clamped();
-            float countersFade = this.countersShown.clamped();
-            float draftFade = tab.draft
-                    ? this.draftShown.clamped() * countersFade : 0.0F;
+            float draftFade = tab.draft ? this.draftShown.clamped() : 0.0F;
             TabRoom room = roomFor(laidWidth, iconWidth(tab.tab),
-                    tab.labelWidth, drawnCountersWidth(tab,
-                            roomPhase(countersFade), roomPhase(draftFade)),
+                    tab.labelWidth, drawnDraftWidth(tab, roomPhase(draftFade)),
                     roomPhase(closeFade), roomPhase(cogFade));
             // A name the row has cut short is read whole by resting the
             // pointer on it: the marquee runs on the clock while the tab
@@ -1444,8 +1426,8 @@ final class ChatChannelTabBar {
                     this.rowClipBottom, true);
             try {
                 drawTabContents(font, tab, hovered, left, right,
-                        top + INTERIOR_TOP, room, inkPhase(countersFade),
-                        inkPhase(draftFade), labelRgb, textAlpha);
+                        top + INTERIOR_TOP, room, inkPhase(draftFade),
+                        labelRgb, textAlpha);
                 drawTabControls(tab, hovered, room, inkPhase(closeFade),
                         inkPhase(cogFade), left, top + INTERIOR_TOP,
                         textAlpha);
@@ -1459,18 +1441,18 @@ final class ChatChannelTabBar {
 
     /**
      * What stands inside a tab before its buttons, one clear row under
-     * the accent: the icon at its own size, the name's caps and the
-     * counters level with it. The selected tab's lift carries all of it
-     * up rather than re-centring it. All of it is cut where the buttons
-     * begin, sinking into that edge: a tab too narrow for its name gives
-     * the name up first, and the tab in front then its icon, so its cross
-     * ends where the icon stood.
+     * the accent: the icon at its own size, wearing its unread mark in
+     * its corner, the name's caps and the draft mark level with it. The
+     * selected tab's lift carries all of it up rather than re-centring
+     * it. All of it is cut where the buttons begin, sinking into that
+     * edge: a tab too narrow for its name gives the name up first, and
+     * the tab in front then its icon, so its cross ends where the icon
+     * stood.
      */
     private void drawTabContents(FontRenderer font, Tab tab, Hit hovered,
                                  float left, float right, int interiorTop,
-                                 TabRoom room, float countersShare,
-                                 float draftShare, int labelRgb,
-                                 int textAlpha) {
+                                 TabRoom room, float draftShare,
+                                 int labelRgb, int textAlpha) {
         // The words are drawn at whole coordinates inside a matrix moved
         // by whatever fraction of a pixel the tab stands on, since the
         // font draws at whole ones: the glyphs then land on the same
@@ -1484,28 +1466,28 @@ final class ChatChannelTabBar {
         if (tab.icon != null) {
             drawTabIcon(tab, textX, fraction, interiorTop, textAlpha, left,
                     contentRight);
-            textX += ChatChannelIcons.SIZE + ChatChannelIcons.GAP;
+            textX += ChatChannelIcons.SLOT + ChatChannelIcons.GAP;
         }
         // The name's room as the tab is drawn, fractions included, so
-        // where the name is cut and where the counters after it stand
+        // where the name is cut and where the draft mark after it stands
         // move with the tab's edge by the same fraction the edge moves.
         drawTabLabel(font, tab, textX, fraction, textY, labelRgb, textAlpha,
                 left, right, room.labelRoom);
-        drawTabCounters(font, tab, hovered, textX + fraction + room.labelRoom,
-                textY, textAlpha, countersShare, draftShare, left,
-                contentRight);
+        drawTabDraft(tab, hovered, textX + fraction + room.labelRoom, textY,
+                textAlpha, draftShare, left, contentRight);
     }
 
     /**
-     * The tab's icon at its own size, cut where the buttons begin once
-     * the tab is too narrow to hold it, sinking into that edge as a cut
-     * name does.
+     * The tab's icon at its own size, wearing its unread mark, cut where
+     * the buttons begin once the tab is too narrow to hold it, sinking
+     * into that edge as a cut name does.
      */
     private void drawTabIcon(final Tab tab, final int x, final float fraction,
                              int interiorTop, final int alpha, float tabLeft,
                              double contentRight) {
         double iconLeft = x + fraction;
-        double iconRight = iconLeft + ChatChannelIcons.SIZE;
+        double iconRight = iconLeft + ChatChannelIcons.SLOT;
+        final ChatIconMark mark = ChatIconMark.of(tab.tab);
         if (iconLeft >= contentRight) {
             return;
         }
@@ -1513,7 +1495,7 @@ final class ChatChannelTabBar {
         // A cut icon dims as it sinks into the edge, so its last pixels
         // never stand as a sliver beside the cross.
         final float visible = (float)Math.max(0.0D, Math.min(1.0D,
-                (contentRight - iconLeft) / ChatChannelIcons.SIZE));
+                (contentRight - iconLeft) / ChatChannelIcons.SLOT));
         LostTalesChatOverlayRenderer.FadingPainter painter =
                 new LostTalesChatOverlayRenderer.FadingPainter() {
                     @Override
@@ -1526,7 +1508,7 @@ final class ChatChannelTabBar {
                         GL11.glTranslatef(fraction, 0.0F, 0.0F);
                         try {
                             ChatChannelIcons.draw(Minecraft.getMinecraft(),
-                                    tab.tab, x, y, shown);
+                                    tab.tab, x, y, shown, mark);
                         } finally {
                             GL11.glPopMatrix();
                         }
@@ -1687,103 +1669,40 @@ final class ChatChannelTabBar {
     }
 
     /**
-     * The counters after the name's room, left to right, from the exact
-     * x the room ends at: laid on a display pixel and drawn at whole
-     * coordinates inside a matrix moved by the rest, like the name. The
-     * draft mark after them is a button and moves as one.
+     * The draft mark after the name's room, from the exact x the room
+     * ends at: laid on a display pixel and drawn at whole coordinates
+     * inside a matrix moved by the rest, like the name. It is a button
+     * and moves as one.
      */
-    private void drawTabCounters(FontRenderer font, Tab tab, Hit hovered,
-                                 double exactX, int textY, int textAlpha,
-                                 float countersShare, float draftShare,
-                                 float tabLeft, double contentRight) {
-        int counterAlpha = Math.round(textAlpha * countersShare);
+    private void drawTabDraft(Tab tab, Hit hovered, double exactX, int textY,
+                              int textAlpha, float draftShare, float tabLeft,
+                              double contentRight) {
         int draftAlpha = Math.round(textAlpha * draftShare);
-        boolean counters = (tab.pingCount > 0
-                || tab.otherText.length() > 0 || tab.discord)
-                && counterAlpha >= LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA;
-        boolean draft = draftAlpha >= LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA;
-        if (!counters && !draft) {
+        if (draftAlpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
             return;
         }
         double placed = snapped(exactX, displayStep());
-        int textX = (int)Math.floor(placed);
-        float fraction = (float)(placed - textX);
+        int textX = (int)Math.floor(placed) + COUNTER_GAP;
+        float fraction = (float)(placed - Math.floor(placed));
         // Cut where the buttons begin, as everything before them is: the
-        // counters going away slide under that edge as the name takes
-        // their room.
+        // mark going away slides under that edge as the name takes its
+        // room.
         boolean clipped = LostTalesChatOverlayRenderer.beginClip(
                 Minecraft.getMinecraft(), clipX(tabLeft), clipX(contentRight),
                 Double.NaN, this.rowClipBottom, true);
         GL11.glPushMatrix();
         GL11.glTranslatef(fraction, 0.0F, 0.0F);
         try {
-            if (tab.pingCount > 0) {
-                textX += COUNTER_GAP;
-                if (counters) {
-                    drawPingBadge(font, tab.pingCount, textX, textY,
-                            counterAlpha);
-                }
-                textX += tab.pingWidth;
-            }
-            if (tab.otherText.length() > 0) {
-                textX += COUNTER_GAP;
-                if (counters) {
-                    LostTalesChatVisualStyle.drawColored(font, tab.otherText,
-                            textX, textY, UNREAD_COUNTER_RGB, counterAlpha);
-                }
-                textX += tab.otherWidth;
-            }
-            if (tab.discord) {
-                textX += COUNTER_GAP;
-                if (counters) {
-                    // On the capitals, a row below their top, as the draft
-                    // mark stands.
-                    ChatDiscordMark.draw(textX, textY + 1, counterAlpha);
-                }
-                textX += DISCORD_MARK_WIDTH;
-            }
-            if (draft) {
-                textX += COUNTER_GAP;
-                // The mark's five rows on the capitals' seven, a row
-                // below their top.
-                LostTalesUiButton.drawGlyph(LostTalesUiSheet.DRAFT,
-                        LostTalesUiSheet.DRAFT_HOVER,
-                        step(tab.draftMotion, hovered, tab, HitKind.DRAFT),
-                        textX, textY + 1, draftAlpha);
-            }
+            // The mark's five rows on the capitals' seven, a row below
+            // their top.
+            LostTalesUiButton.drawGlyph(LostTalesUiSheet.DRAFT,
+                    LostTalesUiSheet.DRAFT_HOVER,
+                    step(tab.draftMotion, hovered, tab, HitKind.DRAFT),
+                    textX, textY + 1, draftAlpha);
         } finally {
             GL11.glPopMatrix();
             LostTalesChatOverlayRenderer.endVerticalClip(clipped);
         }
-    }
-
-    /**
-     * A tab's unread mentions as the sheet's crimson tile for their
-     * number, standing on the capitals as a messenger's mention badge
-     * does, with a crimson {@code +} after the nine for more than it
-     * counts.
-     */
-    private static void drawPingBadge(FontRenderer font, int count, int x,
-                                      int y, int alpha) {
-        LostTalesUiSheet.countTile(count).drawWithShadow(x, y, alpha);
-        if (count > MAX_TILE_COUNT) {
-            LostTalesChatVisualStyle.drawColored(font, "+",
-                    x + LostTalesUiSheet.COUNT_9.getWidth() + 1, y,
-                    PING_PLUS_RGB, alpha);
-        }
-    }
-
-    /** The highest count a tile shows by itself. */
-    private static final int MAX_TILE_COUNT = 9;
-
-    /** How wide a tab's mention badge is for {@code count}; none for none. */
-    static int pingBadgeWidth(FontRenderer font, int count) {
-        if (count <= 0) {
-            return 0;
-        }
-        int tile = LostTalesUiSheet.COUNT_1.getWidth();
-        return count > MAX_TILE_COUNT && font != null
-                ? tile + 1 + font.getStringWidth("+") : tile;
     }
 
     /**
@@ -2279,14 +2198,12 @@ final class ChatChannelTabBar {
     /**
      * Moves the buttons every tab gives up by width toward the row's
      * width as drawn: each crosses in or out on one short beat as the
-     * width passes its share, and the counters as the row can or cannot
-     * hold them.
+     * width passes its share.
      */
     private void advanceButtons(long now) {
         this.draftShown.advance(now, draftStands(this.sharedDrawn));
         this.cogShown.advance(now, cogStands(this.sharedDrawn));
         this.closeShown.advance(now, closeStands(this.sharedDrawn));
-        this.countersShown.advance(now, this.countersFit);
     }
 
     /**
@@ -2329,17 +2246,9 @@ final class ChatChannelTabBar {
         return selected ? 1.0F : this.closeShown.clamped();
     }
 
-    /**
-     * How much room a tab's counters and draft mark take as they are
-     * shown right now: each as far as the row shows it.
-     */
-    private static double drawnCountersWidth(Tab tab, float countersShare,
-                                             float draftShare) {
-        double counters = (tab.pingWidth > 0 ? COUNTER_GAP + tab.pingWidth
-                : 0) + (tab.otherWidth > 0 ? COUNTER_GAP + tab.otherWidth : 0)
-                + (tab.discord ? COUNTER_GAP + DISCORD_MARK_WIDTH : 0);
-        return counters * countersShare
-                + (tab.draft ? (COUNTER_GAP + DRAFT_WIDTH) * draftShare : 0.0D);
+    /** How much room a tab's draft mark takes as it is shown right now. */
+    private static double drawnDraftWidth(Tab tab, float draftShare) {
+        return tab.draft ? (COUNTER_GAP + DRAFT_WIDTH) * draftShare : 0.0D;
     }
 
     /** The row's tabs the hand is carrying, in row order. */
@@ -3070,18 +2979,14 @@ final class ChatChannelTabBar {
         }
         List<ChatTab> channels = row.tabs;
         int count = channels.size();
-        String badge = row.showRestore
-                ? ClientChatChannelViews.counterText(row.closedUnread) : "";
-        int badgeWidth = badge.length() == 0 ? 0
-                : COUNTER_GAP + font.getStringWidth(badge);
+        ChatIconMark restoreMark = row.showRestore ? row.closedMark
+                : ChatIconMark.NONE;
         // The restore control's run is reserved whether or not the + is
-        // showing, and with the widest badge it can carry: the very room
-        // the narrowest window is bounded by, so a window dragged to
-        // that bound shows every tab at its narrowest and nothing less,
-        // and the tabs never reflow as the + comes and goes.
-        int restoreRun = restoreRunWidth(COUNTER_GAP + font.getStringWidth(
-                ClientChatChannelViews.counterText(
-                        ClientChatChannelViews.MAX_UNREAD + 1)));
+        // showing, and with its mark: the very room the narrowest window
+        // is bounded by, so a window dragged to that bound shows every
+        // tab at its narrowest and nothing less, and the tabs never
+        // reflow as the + comes and goes.
+        int restoreRun = restoreRunWidth();
         int windowRun = windowControlsWidth(row.windowControls);
         int endControls = restoreRun + END_CONTROL_GAP + windowRun
                 + MIN_GRIP_WIDTH;
@@ -3096,18 +3001,9 @@ final class ChatChannelTabBar {
         this.tabsLimit = limit;
         double rowRoom = edge - endControls - row.left - SEARCH_RUN;
         int[] labelWidths = new int[count];
-        int[] counters = new int[count];
         for (int index = 0; index < count; index++) {
-            ChatTab channel = channels.get(index);
             labelWidths[index] = font.getStringWidth(
-                    this.cachedLabels.get(channel));
-            Boolean draft = this.cachedDraft.get(channel);
-            counters[index] = countersWidth(
-                    pingBadgeWidth(font, count(this.cachedPings, channel)),
-                    font.getStringWidth(ClientChatChannelViews.counterText(
-                            count(this.cachedOther, channel))),
-                    isTrue(this.cachedDiscord.get(channel)),
-                    draft != null && draft.booleanValue());
+                    this.cachedLabels.get(channels.get(index)));
         }
         int selectedIndex = 0;
         for (int index = 0; index < count; index++) {
@@ -3146,21 +3042,6 @@ final class ChatChannelTabBar {
                 width = Math.min(width, this.heldWidth);
             }
         }
-        // The whole pixels of that width are what the tab's contents
-        // are fitted into and what the hit test answers for; the
-        // fraction is drawn, between edges laid on display pixels.
-        int wholeWidth = (int)Math.round(width);
-        // The counters stand while every tab of the run holds its own
-        // inside the width; a badge the width cannot hold takes every
-        // badge off the row, fading, so the tabs stay one width.
-        int[] fixed = fixedWidths(channels, counters, true);
-        boolean countersFit = true;
-        for (int index = first; index <= last; index++) {
-            if (fixed[index] > wholeWidth) {
-                countersFit = false;
-            }
-        }
-        this.countersFit = countersFit;
         boolean firstSight = this.cachedChannels.isEmpty();
         List<Tab> tabs = new ArrayList<Tab>(count);
         Tab previous = null;
@@ -3179,17 +3060,9 @@ final class ChatChannelTabBar {
             // every few.
             String label = this.cachedLabels.get(channel);
             int labelWidth = labelWidths[index];
-            int pingCount = count(this.cachedPings, channel);
-            String otherText = ClientChatChannelViews.counterText(
-                    count(this.cachedOther, channel));
-            int pingWidth = pingBadgeWidth(font, pingCount);
-            int otherWidth = font.getStringWidth(otherText);
             ChatEmoji icon = ChatChannelIcons.iconOf(channel);
             int tabWidth = (int)Math.round(cursor + width) - x;
-            Boolean cachedDraftMark = this.cachedDraft.get(channel);
-            boolean draft = cachedDraftMark != null
-                    && cachedDraftMark.booleanValue();
-            boolean discord = isTrue(this.cachedDiscord.get(channel));
+            boolean draft = isTrue(this.cachedDraft.get(channel));
             // The buttons the tab shows once settled, for the hit test,
             // which answers for the places the tabs settle in: those the
             // width the row gives its tabs holds, the tab in front's
@@ -3197,24 +3070,20 @@ final class ChatChannelTabBar {
             float closeShare = !showClose ? 0.0F
                     : selected || closeStands(width) ? 1.0F : 0.0F;
             float cogShare = cogStands(width) ? 1.0F : 0.0F;
-            boolean draftShown = draft && countersFit && draftStands(width);
-            int settledCounters = countersFit ? countersWidth(pingWidth,
-                    otherWidth, discord, draftShown) : 0;
+            boolean draftShown = draft && draftStands(width);
             TabRoom settled = roomFor(tabWidth, iconWidth(channel), labelWidth,
-                    settledCounters, closeShare, cogShare);
+                    draftShown ? COUNTER_GAP + DRAFT_WIDTH : 0, closeShare,
+                    cogShare);
             int closeX = closeShare > 0.0F
                     ? x + (int)Math.floor(settled.closeLeft) : -1;
             int settingsX = cogShare > 0.0F
                     ? x + (int)Math.floor(settled.cogLeft) : -1;
             int draftX = draftShown ? draftLeft(x, icon != null,
-                    (int)Math.floor(settled.labelRoom), pingWidth,
-                    otherWidth, discord) : -1;
-            Boolean muted = this.cachedMuted.get(channel);
+                    (int)Math.floor(settled.labelRoom)) : -1;
             Tab built = new Tab(channel, index, icon, label, labelWidth,
-                    (int)Math.floor(settled.labelRoom), pingCount, pingWidth,
-                    otherText, otherWidth, discord, draft, x, tabWidth,
+                    (int)Math.floor(settled.labelRoom), draft, x, tabWidth,
                     settingsX, closeX, draftX,
-                    muted != null && muted.booleanValue());
+                    isTrue(this.cachedMuted.get(channel)));
             built.toLeft = cursor - row.left;
             built.exactWidth = width;
             Tab was = find(this.cachedTabs, channel);
@@ -3295,8 +3164,9 @@ final class ChatChannelTabBar {
         // tabs; everything that acts on the window itself stands with
         // the grip, against the row's right edge.
         this.showRestore = row.showRestore;
-        this.restoreBadge = row.showRestore ? badge : "";
-        this.restoreWidth = row.showRestore ? PLUS_WIDTH + badgeWidth : 0;
+        this.restoreMark = restoreMark;
+        this.restoreWidth = !row.showRestore ? 0 : PLUS_WIDTH
+                + (restoreMark.isNone() ? 0 : COUNTER_GAP + RESTORE_MARK_WIDTH);
         placeLeftRun();
         // The window's own controls hang from the row's right edge, past
         // the room the tabs and the restore run were given; the tabs'
@@ -3338,24 +3208,7 @@ final class ChatChannelTabBar {
         this.cachedShowClose = showClose;
         this.cachedWindowControls = row.windowControls;
         this.cachedShowRestore = row.showRestore;
-        this.cachedClosedUnread = row.closedUnread;
         return this.cachedTabs;
-    }
-
-    /**
-     * What a tab takes before its name and controls: its padding, its
-     * icon, and its counters while the row still shows them. What is
-     * left of a tab's width past this is the room its name and controls
-     * share.
-     */
-    private static int[] fixedWidths(List<ChatTab> channels, int[] counters,
-                                     boolean withCounters) {
-        int[] fixed = new int[channels.size()];
-        for (int index = 0; index < fixed.length; index++) {
-            fixed[index] = PADDING_X * 2 + iconWidth(channels.get(index))
-                    + (withCounters ? counters[index] : 0);
-        }
-        return fixed;
     }
 
     /**
@@ -3413,13 +3266,13 @@ final class ChatChannelTabBar {
      * {@code closeShare} and {@code cogShare} say — each a share from
      * nothing to whole as it fades — and before them, cut where they
      * begin, its padding, its icon ({@code iconWidth} with its gap, 0 for
-     * none), its name and its counters ({@code countersWidth} as shown).
+     * none), its name and its draft mark ({@code draftWidth} as shown).
      * A button fading hands its room to the name as it goes, so the name
      * glides into it. Fractions are kept: the name's cut and everything
      * after it move with the tab's edge by the fraction the edge moves.
      */
     static TabRoom roomFor(double width, int iconWidth, int labelWidth,
-                           double countersWidth, float closeShare,
+                           double draftWidth, float closeShare,
                            float cogShare) {
         double control = CONTROL_GAP + CONTROL_SIZE;
         double closeLeft = width - PADDING_X - CONTROL_SIZE;
@@ -3427,32 +3280,20 @@ final class ChatChannelTabBar {
         double contentRight = width - PADDING_X
                 - control * (closeShare + cogShare);
         double labelRoom = Math.max(0.0D, Math.min(labelWidth,
-                contentRight - PADDING_X - iconWidth - countersWidth));
+                contentRight - PADDING_X - iconWidth - draftWidth));
         return new TabRoom(closeLeft, cogLeft, contentRight, labelRoom);
     }
 
     /**
      * Where a tab's draft mark stands once the tab has settled: after
-     * the padding, the icon when it has one, the name's room and whichever
-     * counters stand before it, exactly as the draw lays them down.
-     * Whole pixels, for the hit test.
+     * the padding, the icon's slot when it has one and the name's room,
+     * exactly as the draw lays it down. Whole pixels, for the hit test.
      */
-    static int draftLeft(int tabLeft, boolean iconShown, int labelRoom,
-                         int pingWidth, int otherWidth, boolean discord) {
-        int x = tabLeft + PADDING_X
-                + (iconShown ? ChatChannelIcons.SIZE + ChatChannelIcons.GAP
+    static int draftLeft(int tabLeft, boolean iconShown, int labelRoom) {
+        return tabLeft + PADDING_X
+                + (iconShown ? ChatChannelIcons.SLOT + ChatChannelIcons.GAP
                         : 0)
-                + labelRoom;
-        if (pingWidth > 0) {
-            x += COUNTER_GAP + pingWidth;
-        }
-        if (otherWidth > 0) {
-            x += COUNTER_GAP + otherWidth;
-        }
-        if (discord) {
-            x += COUNTER_GAP + DISCORD_MARK_WIDTH;
-        }
-        return x + COUNTER_GAP;
+                + labelRoom + COUNTER_GAP;
     }
 
     /**
@@ -3466,14 +3307,15 @@ final class ChatChannelTabBar {
     }
 
     /**
-     * The narrowest a tab may be drawn: its padding around its icon, or
-     * around the cross the tab in front keeps, whichever is wider; the
-     * name and the other controls gone. What a row counts each tab at
-     * when asked whether one more fits.
+     * The narrowest a tab may be drawn: its padding around its icon and
+     * the room its mark reaches past it, or around the cross the tab in
+     * front keeps, whichever is wider; the name and the other controls
+     * gone. What a row counts each tab at when asked whether one more
+     * fits.
      */
     static int minimumTabWidth(ChatTab tab) {
         int icon = ChatChannelIcons.iconOf(tab) == null ? 0
-                : ChatChannelIcons.SIZE;
+                : ChatChannelIcons.SLOT;
         return PADDING_X * 2 + Math.max(icon, CONTROL_SIZE);
     }
 
@@ -3500,10 +3342,10 @@ final class ChatChannelTabBar {
         return null;
     }
 
-    /** Room the tab's icon takes before the label, with its gap. */
+    /** Room the tab's icon and its mark take before the label, with its gap. */
     private static int iconWidth(ChatTab tab) {
         return ChatChannelIcons.iconOf(tab) == null ? 0
-                : ChatChannelIcons.SIZE + ChatChannelIcons.GAP;
+                : ChatChannelIcons.SLOT + ChatChannelIcons.GAP;
     }
 
     private static int controlsWidth(boolean showClose) {
@@ -3526,25 +3368,23 @@ final class ChatChannelTabBar {
                         : 0);
     }
 
-    /** Room the hairline, the {@code +} and its badge take after the tabs. */
-    private static int restoreRunWidth(int badgeWidth) {
+    /**
+     * Room the hairline, the {@code +} and its mark take after the tabs,
+     * the mark's room kept whether or not one shows.
+     */
+    private static int restoreRunWidth() {
         return END_CONTROL_GAP + DIVIDER_WIDTH + END_CONTROL_GAP
-                + PLUS_WIDTH + badgeWidth;
+                + PLUS_WIDTH + COUNTER_GAP + RESTORE_MARK_WIDTH;
     }
 
     /**
      * Room a row keeps clear of its tabs however many there are: the
-     * restore control after the last tab, the window's own controls and
-     * the grip at the right end. The restore control is reserved with
-     * the widest badge the counter can produce, so the tabs do not
-     * reflow as the count behind the {@code +} changes and a row sized
-     * to fit stays fitting once something goes unread.
+     * restore control after the last tab with the room its mark takes,
+     * the window's own controls and the grip at the right end, so the
+     * tabs do not reflow as something behind the {@code +} goes unread.
      */
-    private static int endControlsWidth(ChatWindow window,
-                                        FontRenderer font) {
-        int badge = font.getStringWidth(ClientChatChannelViews.counterText(
-                ClientChatChannelViews.MAX_UNREAD + 1));
-        return restoreRunWidth(COUNTER_GAP + badge) + END_CONTROL_GAP
+    private static int endControlsWidth(ChatWindow window) {
+        return restoreRunWidth() + END_CONTROL_GAP
                 + windowControlsWidth(!window.isLocked())
                 + MIN_GRIP_WIDTH;
     }
@@ -3573,7 +3413,7 @@ final class ChatChannelTabBar {
         for (int index = 0; index < tabs.size(); index++) {
             widest = Math.max(widest, naturalWidth(font, tabs.get(index)));
         }
-        int rowWidth = SEARCH_RUN + endControlsWidth(window, font)
+        int rowWidth = SEARCH_RUN + endControlsWidth(window)
                 + TAB_GAP * (tabs.size() - 1)
                 + Math.min(DEFAULT_TAB_WIDTH, widest) * tabs.size();
         // The screen lays the row out two pixels inside the window's box
@@ -3585,19 +3425,13 @@ final class ChatChannelTabBar {
 
     /**
      * A tab's width with nothing given up: its padding, icon, whole
-     * name, counters and both controls. What every tab shows while the
+     * name, draft mark and both controls. What every tab shows while the
      * row has room, up to the default width.
      */
     private static int naturalWidth(FontRenderer font, ChatTab tab) {
         return PADDING_X * 2 + iconWidth(tab) + controlsWidth(true)
                 + font.getStringWidth(ClientChatChannelState.displayName(tab))
-                + countersWidth(
-                        pingBadgeWidth(font,
-                                ClientChatChannelViews.unreadPingCount(tab)),
-                        font.getStringWidth(ClientChatChannelViews.counterText(
-                                ClientChatChannelViews.unreadOtherCount(tab))),
-                        ClientChatChannelState.isLinkedToDiscord(tab),
-                        hasDraft(tab));
+                + (hasDraft(tab) ? COUNTER_GAP + DRAFT_WIDTH : 0);
     }
 
     /**
@@ -3619,12 +3453,11 @@ final class ChatChannelTabBar {
                 || window == null) {
             return 0;
         }
-        FontRenderer font = minecraft.fontRenderer;
         List<ChatTab> tabs = ChatWindowFrame.visibleTabs(window);
         if (tabs.isEmpty()) {
             return 0;
         }
-        int rowWidth = SEARCH_RUN + endControlsWidth(window, font)
+        int rowWidth = SEARCH_RUN + endControlsWidth(window)
                 + TAB_GAP * (tabs.size() - 1) + reservedRowWidth(tabs);
         return Math.max(ChatWindowPlacement.minChatWidth(minecraft),
                 ChatWindowPlacement.chatWidthForBox(
@@ -3640,11 +3473,6 @@ final class ChatChannelTabBar {
         return reservedRowWidth(minimum);
     }
 
-    private static int count(Map<ChatTab, Integer> counters, ChatTab tab) {
-        Integer value = counters.get(tab);
-        return value == null ? 0 : value.intValue();
-    }
-
     /** Refreshes the cache keys and reports whether the layout still holds. */
     private boolean isLayoutCurrent(FontRenderer font, Row row,
                                     boolean showClose) {
@@ -3657,46 +3485,27 @@ final class ChatChannelTabBar {
                 && showClose == this.cachedShowClose
                 && row.windowControls == this.cachedWindowControls
                 && row.showRestore == this.cachedShowRestore
-                && row.closedUnread == this.cachedClosedUnread
+                && row.closedMark.equals(this.restoreMark)
                 && row.tabs.equals(this.cachedChannels);
         for (int index = 0; index < row.tabs.size(); index++) {
             ChatTab tab = row.tabs.get(index);
             String label = ClientChatChannelState.displayName(tab);
-            int pings = ClientChatChannelViews.unreadPingCount(tab);
-            int other = ClientChatChannelViews.unreadOtherCount(tab);
             boolean muted = ChatWindowLayout.isMuted(tab);
             boolean draft = hasDraft(tab);
-            boolean discord = ClientChatChannelState.isLinkedToDiscord(tab);
             Boolean cachedMute = this.cachedMuted.get(tab);
             Boolean cachedDraftMark = this.cachedDraft.get(tab);
-            Boolean cachedDiscordMark = this.cachedDiscord.get(tab);
             if (!label.equals(this.cachedLabels.get(tab))
-                    || pings != count(this.cachedPings, tab)
-                    || other != count(this.cachedOther, tab)
                     || cachedMute == null
                     || muted != cachedMute.booleanValue()
                     || cachedDraftMark == null
-                    || draft != cachedDraftMark.booleanValue()
-                    || cachedDiscordMark == null
-                    || discord != cachedDiscordMark.booleanValue()) {
+                    || draft != cachedDraftMark.booleanValue()) {
                 this.cachedLabels.put(tab, label);
-                this.cachedPings.put(tab, Integer.valueOf(pings));
-                this.cachedOther.put(tab, Integer.valueOf(other));
                 this.cachedMuted.put(tab, Boolean.valueOf(muted));
                 this.cachedDraft.put(tab, Boolean.valueOf(draft));
-                this.cachedDiscord.put(tab, Boolean.valueOf(discord));
                 current = false;
             }
         }
         return current;
-    }
-
-    private static int countersWidth(int pingWidth, int otherWidth,
-                                     boolean discord, boolean draft) {
-        return (pingWidth > 0 ? COUNTER_GAP + pingWidth : 0)
-                + (otherWidth > 0 ? COUNTER_GAP + otherWidth : 0)
-                + (discord ? COUNTER_GAP + DISCORD_MARK_WIDTH : 0)
-                + (draft ? COUNTER_GAP + DRAFT_WIDTH : 0);
     }
 
     private static boolean isTrue(Boolean value) {
@@ -3732,7 +3541,6 @@ final class ChatChannelTabBar {
                 || window == null || candidates == null) {
             return true;
         }
-        FontRenderer font = minecraft.fontRenderer;
         List<ChatTab> tabs = new ArrayList<ChatTab>(
                 ChatWindowFrame.visibleTabs(window));
         for (ChatTab candidate : candidates) {
@@ -3754,7 +3562,7 @@ final class ChatChannelTabBar {
         // The row spans the window minus the two-pixel insets the screen
         // lays it out with.
         int rowWidth = box.width - 4 - SEARCH_RUN;
-        int available = rowWidth - endControlsWidth(window, font)
+        int available = rowWidth - endControlsWidth(window)
                 - TAB_GAP * (tabs.size() - 1);
         return reservedRowWidth(tabs) <= available;
     }
@@ -3782,14 +3590,6 @@ final class ChatChannelTabBar {
          */
         float marqueeOffset;
         double hoverSeconds;
-        /** Unread mentions, shown as the count tile; none for zero. */
-        final int pingCount;
-        final int pingWidth;
-        /** {@code [x]} other unread lines, or empty. */
-        final String otherText;
-        final int otherWidth;
-        /** Whether the tab's channel is linked to Discord and wears the mark. */
-        final boolean discord;
         /** Whether the tab holds unsent text and is not being typed in. */
         final boolean draft;
         /** Resting left edge before the row's horizontal motion. */
@@ -3864,21 +3664,14 @@ final class ChatChannelTabBar {
         final boolean muted;
 
         Tab(ChatTab tab, int rowIndex, ChatEmoji icon, String label,
-            int labelWidth, int labelRoom, int pingCount, int pingWidth,
-            String otherText, int otherWidth, boolean discord, boolean draft,
-            int x, int width, int settingsX, int closeX, int draftX,
-            boolean muted) {
+            int labelWidth, int labelRoom, boolean draft, int x, int width,
+            int settingsX, int closeX, int draftX, boolean muted) {
             this.tab = tab;
             this.rowIndex = rowIndex;
             this.icon = icon;
             this.label = label;
             this.labelWidth = labelWidth;
             this.labelRoom = labelRoom;
-            this.pingCount = pingCount;
-            this.pingWidth = pingWidth;
-            this.otherText = otherText;
-            this.otherWidth = otherWidth;
-            this.discord = discord;
             this.draft = draft;
             this.x = x;
             this.width = width;

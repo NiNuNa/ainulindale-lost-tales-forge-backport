@@ -2,6 +2,7 @@ package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.server.ChatMemberDirectory;
+import com.ninuna.losttales.chat.server.ChatMemberWatches;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
 import com.ninuna.losttales.network.server.LostTalesServerPacketDispatcher;
@@ -199,30 +200,23 @@ public final class LostTalesChatMembersRequestPacket implements IMessage {
                     new LostTalesServerTaskQueue.PlayerTask() {
                         @Override
                         public void run(EntityPlayerMP serverPlayer) {
-                            ChatChannel channel = message.getChannel();
-                            ChatMemberDirectory.Answer answer =
-                                    channel == ChatChannel.WHISPER
-                                            ? ChatMemberDirectory.answerForWhisper(
-                                                    serverPlayer,
-                                                    message.getPartnerAccount(),
-                                                    message.getPartnerIdentity(),
-                                                    message.getPartnerCharacterId(),
-                                                    message.getHeldCharacterId())
-                                            : ChatMemberDirectory.answerFor(
-                                                    serverPlayer, channel);
                             LostTalesChatMembersPacket full =
-                                    new LostTalesChatMembersPacket(channel,
-                                            message.getConversationKey(),
-                                            answer.members, answer.unlisted);
+                                    ChatMemberDirectory.listFor(serverPlayer,
+                                            message);
                             LostTalesNetworkHandler.CHANNEL.sendTo(
                                     full.getFingerprint()
                                             == message.getHeldFingerprint()
                                             ? LostTalesChatMembersPacket.unchanged(
-                                                    channel,
+                                                    message.getChannel(),
                                                     message.getConversationKey(),
                                                     full.getFingerprint())
                                             : full,
                                     serverPlayer);
+                            // Watched from here, so a change reaches the
+                            // list before its next ask.
+                            ChatMemberWatches.watch(serverPlayer.getUniqueID(),
+                                    message, full.getFingerprint(),
+                                    System.currentTimeMillis());
                         }
                     });
             return null;

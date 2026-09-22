@@ -390,18 +390,22 @@ final class ChatLineWrapper {
         }
     }
 
-    /** Width of one component as the renderer advances past it. */
+    /**
+     * Width of one component as the renderer advances past it, the
+     * padding of a backdrop it opens or closes included.
+     */
     static int partWidth(TextMetrics metrics, IChatComponent part) {
         // A head's slot and a plain gap declare their width rather
         // than spelling it out in spaces; the layout has to advance by
         // the same amount the renderer does, or a line breaks where
         // nothing is drawn.
+        int pads = ChatRunBackdrops.pads(part);
         int declared = ChatInlineIcons.declaredWidth(part);
         if (declared >= 0) {
-            return declared;
+            return declared + pads;
         }
         return metrics.width(part.getChatStyle().getFormattingCode()
-                + part.getUnformattedTextForChat());
+                + part.getUnformattedTextForChat()) + pads;
     }
 
     /** Glyph slots are single indivisible words, spaces or not. */
@@ -677,13 +681,18 @@ final class ChatLineWrapper {
                 }
                 String carried = activeFormatting(consumed);
                 String candidate = carried + remaining;
-                int candidateWidth = this.metrics.width(formatting + candidate);
+                // A piece of a run that wears a backdrop takes its
+                // padding wherever it lands, each piece a backdrop of its
+                // own.
+                int pads = ChatRunBackdrops.pads(part, candidate);
+                int candidateWidth = this.metrics.width(formatting + candidate)
+                        + pads;
                 if (this.used + candidateWidth <= this.width) {
                     place(copy(part, candidate), candidateWidth);
                     return;
                 }
                 int fit = fitLength(this.metrics, formatting, candidate,
-                        this.width - this.used) - carried.length();
+                        this.width - this.used - pads) - carried.length();
                 int breakAt = candidate.lastIndexOf(' ',
                         Math.min(candidate.length() - 1,
                                 fit + carried.length())) - carried.length();
@@ -711,7 +720,8 @@ final class ChatLineWrapper {
                 if (head.length() > 0) {
                     String piece = carried + head;
                     place(copy(part, piece),
-                            this.metrics.width(formatting + piece));
+                            this.metrics.width(formatting + piece)
+                                    + ChatRunBackdrops.pads(part, piece));
                     consumed += head;
                 }
                 newLine();
