@@ -25,9 +25,12 @@ import org.lwjgl.opengl.GL11;
  * caller stands in — the chat's holes — keeps working on the picture as
  * on anything else.</p>
  *
- * <p>An opaque picture needs none of this and is drawn once, as is.
- * Nested pictures are one picture: a picture drawn while another is being
- * drawn simply adds its layers to it.</p>
+ * <p>A picture of opaque layers at full opacity needs none of this and is
+ * drawn once, as is ({@link #draw}). One whose own layers are translucent
+ * in places — a sprite's painted hollows over its shadow — would show the
+ * layer under them even then, and is drawn flat whatever its opacity
+ * ({@link #drawFlat}). Nested pictures are one picture: a picture drawn
+ * while another is being drawn simply adds its layers to it.</p>
  */
 public final class LostTalesUiFlatLayers {
     /** Draws a picture's layers, bottom first, calling {@link #nextLayer} between them. */
@@ -69,6 +72,23 @@ public final class LostTalesUiFlatLayers {
             return;
         }
         if (active || alpha >= 255) {
+            layers.draw();
+            return;
+        }
+        drawFlat(left, top, right, bottom, layers);
+    }
+
+    /**
+     * Draws {@code layers} as one flat picture whatever its opacity, for
+     * layers translucent in places of their own; bounded as for
+     * {@link #draw}.
+     */
+    public static void drawFlat(float left, float top, float right,
+                                float bottom, Layers layers) {
+        if (layers == null) {
+            return;
+        }
+        if (active) {
             layers.draw();
             return;
         }

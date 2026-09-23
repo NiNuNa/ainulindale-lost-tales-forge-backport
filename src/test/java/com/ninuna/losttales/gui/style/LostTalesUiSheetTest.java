@@ -143,6 +143,11 @@ public final class LostTalesUiSheetTest {
             assertInkOrPreview(sheet, LostTalesUiSheet.FRAME_LIT_TOP_RIGHT);
             assertInkOrPreview(sheet, LostTalesUiSheet.FRAME_LIT_BOTTOM_LEFT);
             assertInkOrPreview(sheet, LostTalesUiSheet.FRAME_LIT_BOTTOM_RIGHT);
+            // So are a chat window frame's.
+            assertInkOrPreview(sheet, LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT);
+            assertInkOrPreview(sheet, LostTalesUiSheet.WINDOW_FRAME_TOP_RIGHT);
+            assertInkOrPreview(sheet, LostTalesUiSheet.WINDOW_FRAME_BOTTOM_LEFT);
+            assertInkOrPreview(sheet, LostTalesUiSheet.WINDOW_FRAME_BOTTOM_RIGHT);
         } finally {
             stream.close();
         }
@@ -221,6 +226,10 @@ public final class LostTalesUiSheetTest {
         assertSameSize(LostTalesUiSheet.CHEVRON_2, LostTalesUiSheet.CHEVRON_4);
         assertSameSize(LostTalesUiSheet.SEARCH, LostTalesUiSheet.SEARCH_HOVER);
         assertSameSize(LostTalesUiSheet.MEMBERS, LostTalesUiSheet.MEMBERS_HOVER);
+        assertSameSize(LostTalesUiSheet.COPY, LostTalesUiSheet.COPY_HOVER);
+        assertSameSize(LostTalesUiSheet.REPLY, LostTalesUiSheet.REPLY_HOVER);
+        assertSameSize(LostTalesUiSheet.FORWARD, LostTalesUiSheet.FORWARD_HOVER);
+        assertSameSize(LostTalesUiSheet.MORE, LostTalesUiSheet.MORE_HOVER);
         assertSameSize(LostTalesUiSheet.AREA, LostTalesUiSheet.AREA_HOVER);
         assertSameSize(LostTalesUiSheet.SPEECH_BUBBLE,
                 LostTalesUiSheet.SPEECH_BUBBLE_HOVER);
@@ -256,6 +265,14 @@ public final class LostTalesUiSheetTest {
                 LostTalesUiSheet.FRAME_LIT_BOTTOM_LEFT);
         assertSameSize(LostTalesUiSheet.FRAME_LIT_TOP_LEFT,
                 LostTalesUiSheet.FRAME_LIT_BOTTOM_RIGHT);
+        assertSameSize(LostTalesUiSheet.FRAME_LIT_TOP_LEFT,
+                LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT);
+        assertSameSize(LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT,
+                LostTalesUiSheet.WINDOW_FRAME_TOP_RIGHT);
+        assertSameSize(LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT,
+                LostTalesUiSheet.WINDOW_FRAME_BOTTOM_LEFT);
+        assertSameSize(LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT,
+                LostTalesUiSheet.WINDOW_FRAME_BOTTOM_RIGHT);
         // The tab controls share one square.
         assertEquals(LostTalesUiSheet.CLOSE.getWidth(),
                 LostTalesUiSheet.COG.getWidth());
@@ -319,5 +336,29 @@ public final class LostTalesUiSheetTest {
         int argb = sheet.getRGB(icon.getTextureU() + x,
                 icon.getTextureV() + y);
         return (argb >>> 24) > 0;
+    }
+
+    /**
+     * A crossing control's resting ink, laid once with its hollows and
+     * once alone, stands at the control's own opacity: laid at nothing
+     * first, the ink goes at the whole of it; laid whole first, no second
+     * pass.
+     */
+    @Test
+    public void theRestingInkStandsAtTheControlsOpacity() {
+        assertEquals(255, LostTalesUiSheet.inkOver(255, 100));
+        assertEquals(128, LostTalesUiSheet.inkOver(128, 0));
+        assertEquals(0, LostTalesUiSheet.inkOver(200, 200));
+        assertEquals(0, LostTalesUiSheet.inkOver(255, 255));
+        int[] alphas = {40, 128, 200, 255};
+        for (int alpha : alphas) {
+            for (int under = 0; under < alpha; under += 7) {
+                int ink = LostTalesUiSheet.inkOver(alpha, under);
+                float together = 1.0F - (1.0F - under / 255.0F)
+                        * (1.0F - ink / 255.0F);
+                assertEquals(alpha + " over " + under, alpha / 255.0F,
+                        together, 1.0F / 255.0F);
+            }
+        }
     }
 }

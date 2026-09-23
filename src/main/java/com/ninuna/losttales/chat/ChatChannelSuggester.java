@@ -99,23 +99,71 @@ public final class ChatChannelSuggester {
         return "#" + channel.getId();
     }
 
+    /** A channel link read out of text: the channel, where its word ends, where the link ends, and the message it names. */
+    public static final class Link {
+        public final ChatChannel channel;
+        /** The index just past the channel's word. */
+        public final int wordEnd;
+        /** The index just past the link: past the message id where one follows. */
+        public final int end;
+        /** The message the link names, or {@link ChatMessageIds#NONE} for the channel alone. */
+        public final long messageId;
+
+        Link(ChatChannel channel, int wordEnd, int end, long messageId) {
+            this.channel = channel;
+            this.wordEnd = wordEnd;
+            this.end = end;
+            this.messageId = messageId;
+        }
+    }
+
+    /**
+     * The channel link whose {@code #} stands at {@code hash}: the channel
+     * its word names ({@link #resolve}) and, where a slash and digits
+     * follow, the message they name. A whisper is named only by a link to
+     * one of its messages, {@code #Whisper/1234}: whispers are one
+     * conversation per person, so the word alone names none of them. Null
+     * where the word names no channel.
+     */
+    public static Link linkAt(String text, int hash) {
+        if (text == null || hash < 0 || hash >= text.length()
+                || text.charAt(hash) != '#') {
+            return null;
+        }
+        int end = wordEnd(text, hash + 1);
+        if (end <= hash + 1) {
+            return null;
+        }
+        String word = text.substring(hash + 1, end);
+        int linkEnd = messageIdEnd(text, end);
+        ChatChannel named = resolve(word);
+        if (named == null && linkEnd > end
+                && shownKey(ChatChannel.WHISPER).equals(word.toLowerCase(Locale.ROOT))) {
+            named = ChatChannel.WHISPER;
+        }
+        if (named == null) {
+            return null;
+        }
+        return new Link(named, end, linkEnd, linkEnd > end
+                ? Long.parseLong(text.substring(end + 1, linkEnd))
+                : ChatMessageIds.NONE);
+    }
+
     /**
      * A link to one message of a channel as it is typed and pasted:
      * {@code #Global/1234}, the channel by its shown name without its
-     * spaces — which {@link #resolve} reads back — and the server's id
-     * of the message. Null for a channel that cannot be named this way,
-     * or an id the server never gave.
+     * spaces — which {@link #linkAt} reads back — and the server's id of
+     * the message. Null for a channel that cannot be named this way, or
+     * an id the server never gave.
      */
     public static String messageLink(ChatChannel channel, long messageId) {
-        if (channel == null || channel == ChatChannel.WHISPER
-                || !ChatMessageIds.isServerId(messageId)) {
+        if (channel == null || !ChatMessageIds.isServerId(messageId)) {
             return null;
         }
         String name = channel.getDisplayName().replaceAll("\\s+", "");
-        if (name.length() == 0 || resolve(name) != channel) {
-            return null;
-        }
-        return "#" + name + "/" + messageId;
+        String link = "#" + name + "/" + messageId;
+        Link read = name.length() == 0 ? null : linkAt(link, 0);
+        return read == null || read.channel != channel ? null : link;
     }
 
     /**

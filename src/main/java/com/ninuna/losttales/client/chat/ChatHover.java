@@ -93,6 +93,8 @@ final class ChatHover {
 
     final Kind kind;
     ChatPopupMenu.Entry menuEntry;
+    /** Why the open menu's row under the pointer cannot be taken; empty for none. */
+    String menuTip = "";
     ChatWindow window;
     ChatWindowFrame frame;
     ChatChannelTabBar.Row row;
@@ -158,9 +160,12 @@ final class ChatHover {
             case PICKER_BUTTON:
             case JUMP_PILL:
             case REPLY_CHIP:
-            case MESSAGE_TOOLBAR:
             case SCROLLBAR:
                 return true;
+            case MESSAGE_TOOLBAR:
+                // A control that cannot be taken here only says why.
+                return this.frame == null
+                        || this.frame.toolbarWhy(this.toolbarKind).length() == 0;
             case STRIP:
                 // A strip moves its window only while the window is not
                 // locked; a locked one is inert.

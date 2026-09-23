@@ -86,9 +86,7 @@ public final class LostTalesChatClientHandler {
         ChatChannel channel = ChatSystemLineClassifier.classify(event.message);
         if (channel != null && LostTalesChatPresentation.receiveSystemLine(
                 event.message, channel,
-                !ChatSystemLineClassifier.isMentionCueSilent(event.message),
-                System.currentTimeMillis(),
-                LostTalesChatPresentation.takeBroadcastId(event.message))) {
+                !ChatSystemLineClassifier.isMentionCueSilent(event.message))) {
             event.setCanceled(true);
         }
     }

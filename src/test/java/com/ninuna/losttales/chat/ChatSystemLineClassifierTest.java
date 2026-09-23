@@ -166,4 +166,29 @@ public final class ChatSystemLineClassifierTest {
                 new ChatComponentText("plain text")));
         assertFalse(ChatSystemLineClassifier.isMentionCueSilent(null));
     }
+
+    /**
+     * Vanilla's notice to operators of somebody's command is a console
+     * line about who ran it, and its mention of a player stays quiet.
+     */
+    @Test
+    public void anOperatorsNoticeIsAConsoleLineAboutWhoRanTheCommand() {
+        ChatComponentTranslation opped = new ChatComponentTranslation(
+                "chat.type.admin", "Nils",
+                new ChatComponentTranslation("commands.op.success", "Steve"));
+        assertEquals(CONSOLE, ChatSystemLineClassifier.classify(opped));
+        assertTrue(ChatSystemLineClassifier.isAdminNotice(opped));
+        assertEquals("Nils", ChatSystemLineClassifier.adminNoticeActor(opped));
+        assertEquals("Server", ChatSystemLineClassifier.adminNoticeActor(
+                new ChatComponentTranslation("chat.type.admin",
+                        new ChatComponentText(" Server "), "x")));
+        assertTrue(ChatSystemLineClassifier.isMentionCueSilent(opped));
+        assertEquals("", ChatSystemLineClassifier.adminNoticeActor(
+                new ChatComponentTranslation("chat.type.admin")));
+        assertFalse(ChatSystemLineClassifier.isAdminNotice(
+                new ChatComponentText("[Nils: Opped Steve]")));
+        assertEquals("", ChatSystemLineClassifier.adminNoticeActor(
+                new ChatComponentTranslation("chat.type.announcement",
+                        "Nils", "hello")));
+    }
 }

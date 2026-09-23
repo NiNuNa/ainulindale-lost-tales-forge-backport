@@ -7,16 +7,18 @@ import java.util.UUID;
 /**
  * A player a line names, as the server knew them when the line was
  * said: the account and its id, and the identity it was playing — the
- * character's id and skin, or none for the account.
+ * character's id and skin, or none for the account. A Discord member is
+ * named the same way, by the id the chat knows them by and their
+ * nickname.
  *
- * <p>A live client turns an account name inside an achievement, a join
- * or a death into the player's character the way every line of theirs
- * is signed, from the appearances the server syncs for everyone
- * online. A line replayed from the history names players who may be
- * long gone, so the server records the answer beside the line, and the
- * replay reads it from there: the name to draw, and the head and names
- * a card about them shows. A mention of a player wears the one mention
- * colour whoever it names, so the record carries no colour.</p>
+ * <p>The server works out whom a line names — the players an
+ * achievement, a join or a death is about, whom a message's mentions
+ * reach — and sends the answer with the line, live and in every replay,
+ * so every client reads it from there: the name to draw, whether the
+ * line pings its reader, and the head and names a card about them shows,
+ * whether or not they are still here. A mention of a player wears the
+ * one mention colour whoever it names, so the record carries no
+ * colour.</p>
  */
 public final class ChatNamedPlayer {
     /** The most players one line names; a death names two. */

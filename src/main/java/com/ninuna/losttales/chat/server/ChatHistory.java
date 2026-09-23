@@ -486,6 +486,14 @@ public final class ChatHistory {
                 : entry.reactions.summaryFor(viewer);
     }
 
+    /** The players a kept message names, as the server resolved them; none for none kept. */
+    public static synchronized List<ChatNamedPlayer> namedPlayersOf(long messageId) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        return entry == null || entry.forOthers == null
+                ? Collections.<ChatNamedPlayer>emptyList()
+                : entry.forOthers.getNamedPlayers();
+    }
+
     /** The channel a kept message was said in, or null for none kept. */
     public static synchronized ChatChannel channelOf(long messageId) {
         Entry entry = ENTRIES.get(Long.valueOf(messageId));

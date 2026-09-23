@@ -662,19 +662,22 @@ final class LostTalesChatHoverCard {
     }
 
     /**
-     * Card target for a mentioned player: whoever this client can place
-     * under the account now, and otherwise the player as the line
-     * recorded them — the identity they were playing and its head — so a
-     * mention in an older line still opens its card after the player has
-     * gone, named as a live mention's card names them. Null when neither
-     * names anybody.
+     * Card target for a mentioned player: the player the line recorded,
+     * as they are now while this client knows them, and otherwise as the
+     * line recorded them — the identity they were playing and its head —
+     * so a mention still opens its card after the player has gone. A
+     * mention that recorded nobody is placed by its name. Null when
+     * neither names anybody.
      */
     static Target targetForMention(Minecraft minecraft,
                                    ChatMentionMarker.Data mention) {
-        Target placed = targetForAccount(minecraft, mention.account);
-        if (placed != null || mention.recorded == null
-                || mention.recorded.getPlayerId() == null) {
-            return placed;
+        UUID recordedId = mention.recorded == null ? null
+                : mention.recorded.getPlayerId();
+        if (recordedId == null) {
+            return targetForAccount(minecraft, mention.account);
+        }
+        if (ClientCharacterAppearanceCache.getAuthoritative(recordedId) != null) {
+            return placedTarget(minecraft, recordedId, mention.account);
         }
         return recordedTarget(minecraft, mention.recorded);
     }
@@ -707,7 +710,9 @@ final class LostTalesChatHoverCard {
     static Target recordedTarget(Minecraft minecraft,
                                  ChatNamedPlayer recorded) {
         boolean accountIdentity = recorded.getCharacterId() == null;
-        if (accountIdentity && minecraft != null) {
+        // A Discord member has no Minecraft account to fetch a skin for.
+        if (accountIdentity && minecraft != null
+                && !LostTalesChatMessagePacket.isDiscordSender(recorded.getPlayerId())) {
             LostTalesCharacterHeadIconRenderer.rememberAccountSkin(
                     minecraft, recorded.getPlayerId(), recorded.getAccount());
         }
@@ -725,9 +730,17 @@ final class LostTalesChatHoverCard {
     private static Target targetForAccount(Minecraft minecraft,
                                            String account) {
         UUID playerId = ChatChannelIcons.partnerId(minecraft, account);
-        if (playerId == null) {
-            return null;
-        }
+        return playerId == null ? null
+                : placedTarget(minecraft, playerId, account);
+    }
+
+    /**
+     * Card target for the player {@code playerId} under {@code account}
+     * as this client knows them now: the character the appearance sync
+     * knows for them, or the bare account.
+     */
+    private static Target placedTarget(Minecraft minecraft, UUID playerId,
+                                       String account) {
         CharacterAppearance appearance =
                 ClientCharacterAppearanceCache.getAuthoritative(playerId);
         boolean accountIdentity = appearance == null

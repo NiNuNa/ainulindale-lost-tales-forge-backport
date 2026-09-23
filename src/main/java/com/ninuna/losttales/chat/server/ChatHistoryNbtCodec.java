@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -110,11 +111,13 @@ public final class ChatHistoryNbtCodec {
 
     /**
      * Writes the entries oldest first, by message id, the console's
-     * events oldest first beside them, and the quarantine as it was read.
+     * events oldest first beside them with their reactions, and the
+     * quarantine as it was read.
      */
     public static void write(NBTTagCompound output,
                              Collection<ChatHistory.Entry> entries,
                              Collection<ChatConsoleEvent> consoleEvents,
+                             Map<Long, ChatReactions> consoleReactions,
                              Collection<NBTTagCompound> quarantinedEntries) {
         output.setInteger(TAG_DATA_VERSION, CURRENT_ROOT_DATA_VERSION);
         List<ChatHistory.Entry> ordered = new ArrayList<ChatHistory.Entry>();
@@ -150,13 +153,18 @@ public final class ChatHistoryNbtCodec {
                     Integer.valueOf(unwritable));
         }
         output.setTag(TAG_ENTRIES, list);
-        output.setTag(TAG_CONSOLE_EVENTS, writeConsoleEvents(consoleEvents));
+        output.setTag(TAG_CONSOLE_EVENTS, writeConsoleEvents(consoleEvents,
+                consoleReactions));
         output.setTag(TAG_QUARANTINE, writeQuarantine(quarantine));
     }
 
-    /** The console's events oldest first, by id, each whole. */
+    /**
+     * The console's events oldest first, by id, each whole, with its
+     * reactions in the layout an entry's take where it has any.
+     */
     private static NBTTagList writeConsoleEvents(
-            Collection<ChatConsoleEvent> events) {
+            Collection<ChatConsoleEvent> events,
+            Map<Long, ChatReactions> reactions) {
         List<ChatConsoleEvent> ordered = new ArrayList<ChatConsoleEvent>();
         if (events != null) {
             for (ChatConsoleEvent event : events) {
@@ -179,6 +187,11 @@ public final class ChatHistoryNbtCodec {
             if (event.getActorIdentity() != null) {
                 writeUuid(tag, TAG_EVENT_ACTOR_ID,
                         event.getActorIdentity().getPlayerId());
+            }
+            ChatReactions reacted = reactions == null ? null
+                    : reactions.get(Long.valueOf(event.getId()));
+            if (reacted != null && !reacted.isEmpty()) {
+                tag.setTag(TAG_REACTIONS, writeReactions(reacted));
             }
             list.appendTag(tag);
         }
@@ -316,6 +329,7 @@ public final class ChatHistoryNbtCodec {
         // and is written whole.
         repaired |= !safeSource.hasKey(TAG_CONSOLE_EVENTS, Constants.NBT.TAG_LIST);
         List<ChatConsoleEvent> events = new ArrayList<ChatConsoleEvent>();
+        Map<Long, ChatReactions> eventReactions = new HashMap<Long, ChatReactions>();
         Set<Long> seenEventIds = new HashSet<Long>();
         NBTTagList eventList = safeSource.getTagList(TAG_CONSOLE_EVENTS,
                 Constants.NBT.TAG_COMPOUND);
@@ -323,9 +337,15 @@ public final class ChatHistoryNbtCodec {
             NBTTagCompound raw = eventList.getCompoundTagAt(index);
             String[] failureReason = new String[1];
             ChatConsoleEvent event = readConsoleEvent(raw, failureReason);
-            if (event == null) {
+            // An event's reactions read as the newest entry layout reads
+            // them; ones that cannot be read whole take the event into
+            // the quarantine with them.
+            ChatReactions reactions = event == null ? null
+                    : readReactions(raw, FOREIGN_ENTRY_DATA_VERSION);
+            if (event == null || reactions == null) {
                 quarantinedEntries.add(createQuarantineEntry(
-                        failureReason[0], index, raw));
+                        event == null ? failureReason[0] : "invalid_reactions",
+                        index, raw));
                 repaired = true;
             } else if (!seenEventIds.add(Long.valueOf(event.getId()))) {
                 quarantinedEntries.add(createQuarantineEntry(
@@ -337,10 +357,14 @@ public final class ChatHistoryNbtCodec {
                 repaired = true;
             } else {
                 events.add(event);
+                if (!reactions.isEmpty()) {
+                    eventReactions.put(Long.valueOf(event.getId()), reactions);
+                }
             }
         }
         Collections.sort(events, EVENT_ORDER);
-        return ReadResult.success(entries, events, repaired, quarantinedEntries);
+        return ReadResult.success(entries, events, eventReactions, repaired,
+                quarantinedEntries);
     }
 
     static NBTTagCompound writeEntry(ChatHistory.Entry entry) {
@@ -764,6 +788,7 @@ public final class ChatHistoryNbtCodec {
     public static final class ReadResult {
         private final List<ChatHistory.Entry> entries;
         private final List<ChatConsoleEvent> consoleEvents;
+        private final Map<Long, ChatReactions> consoleReactions;
         private final boolean repaired;
         private final List<NBTTagCompound> quarantineEntries;
         private final boolean readOnly;
@@ -771,7 +796,9 @@ public final class ChatHistoryNbtCodec {
         private final NBTTagCompound originalData;
 
         private ReadResult(List<ChatHistory.Entry> entries,
-                           List<ChatConsoleEvent> consoleEvents, boolean repaired,
+                           List<ChatConsoleEvent> consoleEvents,
+                           Map<Long, ChatReactions> consoleReactions,
+                           boolean repaired,
                            List<NBTTagCompound> quarantineEntries,
                            boolean readOnly, int unsupportedVersion,
                            NBTTagCompound originalData) {
@@ -779,6 +806,8 @@ public final class ChatHistoryNbtCodec {
                     new ArrayList<ChatHistory.Entry>(entries));
             this.consoleEvents = Collections.unmodifiableList(
                     new ArrayList<ChatConsoleEvent>(consoleEvents));
+            this.consoleReactions = Collections.unmodifiableMap(
+                    new HashMap<Long, ChatReactions>(consoleReactions));
             this.repaired = repaired;
             this.quarantineEntries = Collections.unmodifiableList(
                     new ArrayList<NBTTagCompound>(quarantineEntries));
@@ -789,15 +818,17 @@ public final class ChatHistoryNbtCodec {
 
         private static ReadResult success(List<ChatHistory.Entry> entries,
                                           List<ChatConsoleEvent> consoleEvents,
+                                          Map<Long, ChatReactions> consoleReactions,
                                           boolean repaired,
                                           List<NBTTagCompound> quarantine) {
-            return new ReadResult(entries, consoleEvents, repaired, quarantine,
-                    false, -1, null);
+            return new ReadResult(entries, consoleEvents, consoleReactions,
+                    repaired, quarantine, false, -1, null);
         }
 
         private static ReadResult unsupported(NBTTagCompound original, int version) {
             return new ReadResult(Collections.<ChatHistory.Entry>emptyList(),
-                    Collections.<ChatConsoleEvent>emptyList(), false,
+                    Collections.<ChatConsoleEvent>emptyList(),
+                    Collections.<Long, ChatReactions>emptyMap(), false,
                     Collections.<NBTTagCompound>emptyList(), true, version,
                     (NBTTagCompound)original.copy());
         }
@@ -808,6 +839,11 @@ public final class ChatHistoryNbtCodec {
         }
 
         /** The console's kept events, oldest first. */
+        /** The reactions the console's events were saved with, by the event's id. */
+        public Map<Long, ChatReactions> getConsoleReactions() {
+            return this.consoleReactions;
+        }
+
         public List<ChatConsoleEvent> getConsoleEvents() {
             return this.consoleEvents;
         }

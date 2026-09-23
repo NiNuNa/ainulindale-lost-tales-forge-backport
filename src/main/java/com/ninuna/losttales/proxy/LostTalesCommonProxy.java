@@ -114,6 +114,7 @@ import com.ninuna.losttales.chat.moderation.ChatAuditLog;
 import com.ninuna.losttales.chat.server.ChatMessageIdAllocator;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.server.ChatConsoleCommandHandler;
+import com.ninuna.losttales.chat.server.ChatArrivals;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.server.ChatCommandContexts;
 import com.ninuna.losttales.chat.server.ChatConsoleStream;
@@ -201,6 +202,7 @@ public class LostTalesCommonProxy {
         MinecraftForge.EVENT_BUS.register(waystoneGenerationHandler);
         MinecraftForge.EVENT_BUS.register(new CharacterRoomWorldHandler());
         MinecraftForge.EVENT_BUS.register(new ChatConsoleCommandHandler());
+        MinecraftForge.EVENT_BUS.register(new ChatArrivals());
         MinecraftForge.TERRAIN_GEN_BUS.register(waystoneGenerationHandler);
         GameRegistry.registerWorldGenerator(
                 waystoneGenerationHandler, 1000);
@@ -415,6 +417,8 @@ public class LostTalesCommonProxy {
         // player's saved data registers its own again as it loads.
         LostTalesQuestRegistry.clearRuntimeQuests();
         LostTalesServerBroadcastHook.clear();
+        ChatArrivals.clear();
+        ChatConsoleCommandHandler.clear();
         DiscordGameEventRelay.clear();
         LostTalesDiscordBridge.getInstance().resetSession();
         ChatMemberDirectory.clear();
@@ -529,6 +533,8 @@ public class LostTalesCommonProxy {
         // player's saved data registers its own again as it loads.
         LostTalesQuestRegistry.clearRuntimeQuests();
         LostTalesServerBroadcastHook.clear();
+        ChatArrivals.clear();
+        ChatConsoleCommandHandler.clear();
         DiscordGameEventRelay.clear();
         LostTalesDiscordBridge.getInstance().resetSession();
         ChatMemberDirectory.clear();

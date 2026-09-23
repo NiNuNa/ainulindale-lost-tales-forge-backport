@@ -4,7 +4,6 @@ import com.ninuna.losttales.client.gui.animation.LostTalesGuiRegionBlur;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
-import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.MotionTransition;
 import java.util.ArrayList;
@@ -435,42 +434,9 @@ final class ChatSnapPreview {
         fillGlass(left, top, right, bottom, holes,
                 LostTalesChatVisualStyle.surfaceArgb(GLASS_SHARE
                         * surfaceShare));
-        int surface = LostTalesChatVisualStyle.surfaceArgb(surfaceShare);
-        // The ring's outermost corner pixels lie outside the frame's
-        // rounding, as a window's own do.
-        LostTalesChatOverlayRenderer.fillRect(left - ring + 1, top - ring,
-                right + ring - 1, top - ring + 1, surface);
-        LostTalesChatOverlayRenderer.fillRect(left - ring, top - ring + 1,
-                right + ring, top, surface);
-        LostTalesChatOverlayRenderer.fillRect(left - ring, top, left, bottom,
-                surface);
-        LostTalesChatOverlayRenderer.fillRect(right, top, right + ring,
-                bottom, surface);
-        LostTalesChatOverlayRenderer.fillRect(left - ring, bottom,
-                right + ring, bottom + ring - 1, surface);
-        LostTalesChatOverlayRenderer.fillRect(left - ring + 1,
-                bottom + ring - 1, right + ring - 1, bottom + ring, surface);
-        int alpha = Math.round(255.0F * Math.min(1.0F, opacity));
-        if (alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
-            return;
-        }
-        int edge = ChatWindowPlacement.FRAME_EDGE_WIDTH;
-        float span = bottom - top + edge;
-        LostTalesChatOverlayRenderer.drawTopEdge(left, right, top - edge,
-                alpha);
-        LostTalesChatOverlayRenderer.drawRightEdgeSegment(right, top, bottom,
-                top - edge, span, alpha);
-        LostTalesChatOverlayRenderer.drawLeftEdgeSegment(left - edge, top,
-                bottom, bottom, span, alpha);
-        LostTalesChatOverlayRenderer.drawBarBottomEdge(left, right, bottom,
-                alpha);
-        LostTalesChatVisualStyle.beginContent();
-        LostTalesUiFramedButton.drawCornerInk(
-                LostTalesUiSheet.FRAME_LIT_TOP_RIGHT,
-                right + ring - LostTalesUiFramedButton.CORNER, top - ring,
-                alpha);
-        LostTalesUiFramedButton.drawCornerInk(
-                LostTalesUiSheet.FRAME_LIT_BOTTOM_LEFT, left - ring,
-                bottom + ring - LostTalesUiFramedButton.CORNER, alpha);
+        LostTalesChatOverlayRenderer.drawFrameSurface(left, top, right,
+                bottom, LostTalesChatVisualStyle.surfaceArgb(surfaceShare));
+        LostTalesChatOverlayRenderer.drawFrameEdges(left, top, right, bottom,
+                Math.round(255.0F * Math.min(1.0F, opacity)));
     }
 }

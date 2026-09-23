@@ -20,11 +20,14 @@ import static org.junit.Assert.assertTrue;
 /**
  * The snap layouts: the parts of the screen a window fills, the layouts
  * a screen has room for, how a panel of them is laid out and answers
- * the pointer, the snap bar at the top of the screen, where the panel
- * under a fullscreen control opens, and the suggested layouts holding
- * the other windows. Without a Minecraft instance
- * the narrowest window is 166 wide and 90 tall, and a window keeps two
- * pixels inside the part of the screen it fills.
+ * the pointer, the snap bar at the top of the screen peeking and brought
+ * all the way down, where the panel under a fullscreen control opens,
+ * and the suggested layouts holding the other windows. Without a
+ * Minecraft instance the narrowest window is 166 wide and 88 tall, and a
+ * window keeps two pixels inside the part of the screen it fills. A panel
+ * wears a chat window's two-pixel frame inside its box, four clear pixels
+ * inside that. Motion is off, so every transition and follower lands at
+ * once.
  */
 public final class ChatSnapLayoutsTest {
     private static final double EPSILON = 1.0E-9D;
@@ -153,10 +156,10 @@ public final class ChatSnapLayoutsTest {
         ChatSnapLayouts.Panel panel = ChatSnapLayouts.lay(
                 Collections.<ChatSnapLayouts.Suggestion>emptyList(), layouts,
                 6, 100.0D, 2.0D, 960, 540);
-        assertEquals(318.0D, panel.box.width, EPSILON);
-        assertEquals(37.0D, panel.box.height, EPSILON);
+        assertEquals(320.0D, panel.box.width, EPSILON);
+        assertEquals(39.0D, panel.box.height, EPSILON);
         // The first layout's small screen starts inside the frame and
-        // the padding, at (105, 7); the fourth, the quarters, three
+        // the padding, at (106, 8); the fourth, the quarters, three
         // layouts on, after seven zones.
         assertEquals(0, panel.zoneAt(110.0D, 12.0D));
         assertEquals(7, panel.zoneAt(265.0D, 12.0D));
@@ -168,47 +171,88 @@ public final class ChatSnapLayoutsTest {
         assertEquals(ChatWindow.ScreenFill.NONE, panel.fillOf(-1));
         assertTrue(panel.companionsOf(0).isEmpty());
         // In rows of three the panel is two rows tall.
-        assertEquals(162, ChatSnapLayouts.panelWidth(6, 3));
-        assertEquals(54, ChatSnapLayouts.panelHeight(6, 3, 20));
+        assertEquals(164, ChatSnapLayouts.panelWidth(6, 3));
+        assertEquals(56, ChatSnapLayouts.panelHeight(6, 3, 20));
     }
 
     /**
-     * The snap bar drops in at the top centre while a carried window's
-     * pointer is within reach of it: on a zone it answers that part of
-     * the screen, on its padding none, and off it nothing, so the
-     * screen's own edges decide.
+     * A carried window's pointer near the top of the screen brings the
+     * snap bar out peeking, wherever along the top it is. While the bar
+     * peeks it answers nothing, so the screen's own edges decide, the
+     * top edge's band below the bar and the edge beside it included.
      */
     @Test
-    public void theSnapBarAnswersWhileThePointerIsNearTheTop() {
+    public void theSnapBarPeeksAsACarriedWindowNearsTheTop() {
         ChatSnapLayouts.Bar bar = new ChatSnapLayouts.Bar();
         assertNull(bar.follow(null, null, 480.0D, 300.0D, 960, 540));
-        // Centred: its left edge at (960 - 318) / 2 = 321, the first
-        // small screen at (326, 7).
-        assertEquals(ChatWindow.ScreenFill.LEFT,
-                bar.follow(null, null, 330.0D, 10.0D, 960, 540));
-        assertEquals(ChatWindow.ScreenFill.NONE,
-                bar.follow(null, null, 323.0D, 10.0D, 960, 540));
-        assertNull(bar.follow(null, null, 100.0D, 10.0D, 960, 540));
-        bar.hide();
-        assertNull(bar.follow(null, null, 480.0D, 300.0D, 960, 540));
+        assertEquals(ChatSnapLayouts.Bar.Stage.HIDDEN, bar.stage());
+        // All the way down the bar is 39 tall under a margin of 2, and
+        // the pointer brings it out 24 below that: above 65.
+        assertNull(bar.follow(null, null, 480.0D, 65.0D, 960, 540));
+        assertEquals(ChatSnapLayouts.Bar.Stage.HIDDEN, bar.stage());
+        assertNull(bar.follow(null, null, 100.0D, 64.0D, 960, 540));
+        assertEquals(ChatSnapLayouts.Bar.Stage.PEEKING, bar.stage());
+        // In the top edge's band under the peek nothing is touched yet,
+        // and the edge fills the whole screen.
+        assertNull(bar.follow(null, null, 480.0D, 12.0D, 960, 540));
+        assertNull(bar.follow(null, null, 480.0D, 9.0D, 960, 540));
+        assertNull(bar.follow(null, null, 480.0D, 9.0D, 960, 540));
+        assertEquals(ChatSnapLayouts.Bar.Stage.PEEKING, bar.stage());
+        assertEquals(ChatWindow.ScreenFill.FULL,
+                ChatWindowGestures.snapZoneAt(480.0D, 9.0D, 960, 540, true));
+        // Beside the bar the top edge is the screen's.
+        assertNull(bar.follow(null, null, 200.0D, 0.0D, 960, 540));
+        assertEquals(ChatSnapLayouts.Bar.Stage.PEEKING, bar.stage());
+        assertNull(bar.litLayout());
     }
 
     /**
-     * The bar reaches up to the screen's top edge: a pointer pressed
-     * against the edge above it points at the zone standing below it,
-     * the top one where a layout stacks two, and names that zone's
-     * layout; the padding there lands nowhere, and beside the bar the
-     * screen's own edge decides.
+     * The nearer the pointer comes to the bar, the further the peeking
+     * bar comes down: its frame and padding where the pointer brings it
+     * out, and half the top edge's snap band as the pointer reaches that
+     * line, never further, so the rest of the band still snaps as the
+     * edge does. Off to the side the pointer is further from it.
      */
     @Test
-    public void theSnapBarReachesUpToTheScreensTopEdge() {
-        ChatSnapLayouts.Bar bar = new ChatSnapLayouts.Bar();
-        // Layout k's small screen starts at 326 + 52k; the half with
+    public void thePeekDeepensAsThePointerNearsButLeavesTheTopEdgesBand() {
+        assertEquals(6, ChatSnapLayouts.Bar.PEEK);
+        assertEquals(8, ChatSnapLayouts.Bar.PEEK_MOST);
+        assertTrue(ChatSnapLayouts.Bar.PEEK_MOST
+                < ChatWindowGestures.SNAP_REACH);
+        // The bar of 960 by 540 spans 320 to 640 and comes out above 65.
+        assertEquals(ChatSnapLayouts.Bar.PEEK,
+                peekDepth(480.0D, 65.0D), EPSILON);
+        assertEquals(7.0D, peekDepth(480.0D, 36.5D), EPSILON);
+        assertEquals(ChatSnapLayouts.Bar.PEEK_MOST,
+                peekDepth(480.0D, 8.0D), EPSILON);
+        assertEquals(ChatSnapLayouts.Bar.PEEK_MOST,
+                peekDepth(480.0D, 0.0D), EPSILON);
+        double above = 0.0D;
+        for (int y = 64; y >= 0; y--) {
+            double depth = peekDepth(480.0D, y);
+            assertTrue(depth >= above);
+            assertTrue(depth <= ChatSnapLayouts.Bar.PEEK_MOST);
+            above = depth;
+        }
+        assertEquals(7.0D, peekDepth(320.0D - 28.5D, 5.0D), EPSILON);
+        assertEquals(ChatSnapLayouts.Bar.PEEK, peekDepth(100.0D, 0.0D),
+                EPSILON);
+    }
+
+    /**
+     * Touching what shows of the peeking bar brings it all the way down,
+     * and only then does it answer: on a zone that part of the screen
+     * and the zone's layout, on its padding none, and off it nothing.
+     * The screen's top edge above it points at the zone standing below
+     * the pointer; beside it the edge is the screen's.
+     */
+    @Test
+    public void touchingThePeekBringsTheBarAllTheWayDown() {
+        ChatSnapLayouts.Bar bar = revealed();
+        // Layout k's small screen starts at (326 + 52k, 8); the half with
         // two quarters is the third layout, the thirds the fifth.
-        assertEquals(ChatWindow.ScreenFill.LEFT,
-                bar.follow(null, null, 330.0D, 0.0D, 960, 540));
         assertEquals(ChatWindow.ScreenFill.TOP_RIGHT,
-                bar.follow(null, null, 460.0D, 0.5D, 960, 540));
+                bar.follow(null, null, 460.0D, 10.0D, 960, 540));
         assertArrayEquals(new ChatWindow.ScreenFill[] {
                         ChatWindow.ScreenFill.LEFT,
                         ChatWindow.ScreenFill.TOP_RIGHT,
@@ -216,10 +260,99 @@ public final class ChatSnapLayoutsTest {
                 bar.litLayout());
         assertTrue(bar.litCompanions().isEmpty());
         assertEquals(ChatWindow.ScreenFill.RIGHT_THIRD,
+                bar.follow(null, null, 570.0D, 10.0D, 960, 540));
+        assertEquals(ChatWindow.ScreenFill.NONE,
+                bar.follow(null, null, 323.0D, 10.0D, 960, 540));
+        assertEquals(ChatWindow.ScreenFill.LEFT,
+                bar.follow(null, null, 330.0D, 0.5D, 960, 540));
+        assertEquals(ChatWindow.ScreenFill.RIGHT_THIRD,
                 bar.follow(null, null, 570.0D, 0.0D, 960, 540));
         assertEquals(ChatWindow.ScreenFill.NONE,
                 bar.follow(null, null, 323.0D, 0.0D, 960, 540));
-        assertNull(bar.follow(null, null, 100.0D, 0.0D, 960, 540));
+        assertEquals(ChatSnapLayouts.Bar.Stage.REVEALED, bar.stage());
+        assertNull(bar.follow(null, null, 200.0D, 0.0D, 960, 540));
+    }
+
+    /**
+     * All the way down, the bar stays while the pointer is within its
+     * reach of it, on it or not; further off it peeks again, and only a
+     * touch brings it down once more.
+     */
+    @Test
+    public void theBarPeeksAgainOnceThePointerLeavesItsReach() {
+        ChatSnapLayouts.Bar bar = revealed();
+        // All the way down it spans 320 to 640 and 2 to 41.
+        assertNull(bar.follow(null, null, 296.0D, 20.0D, 960, 540));
+        assertNull(bar.follow(null, null, 480.0D, 64.0D, 960, 540));
+        assertEquals(ChatSnapLayouts.Bar.Stage.REVEALED, bar.stage());
+        assertNull(bar.follow(null, null, 295.5D, 20.0D, 960, 540));
+        assertEquals(ChatSnapLayouts.Bar.Stage.PEEKING, bar.stage());
+        assertNull(bar.follow(null, null, 330.0D, 12.0D, 960, 540));
+        assertNull(bar.follow(null, null, 330.0D, 10.0D, 960, 540));
+        assertEquals(ChatSnapLayouts.Bar.Stage.PEEKING, bar.stage());
+        assertEquals(ChatWindow.ScreenFill.NONE,
+                bar.follow(null, null, 330.0D, 3.0D, 960, 540));
+        assertEquals(ChatSnapLayouts.Bar.Stage.REVEALED, bar.stage());
+    }
+
+    /**
+     * The pointer leaving the top of the screen puts the bar away, and
+     * so does the carry ending; back at the top the bar peeks first,
+     * however near the edge the pointer comes.
+     */
+    @Test
+    public void leavingTheTopOfTheScreenPutsTheBarAway() {
+        ChatSnapLayouts.Bar bar = revealed();
+        assertNull(bar.follow(null, null, 330.0D, 65.0D, 960, 540));
+        assertEquals(ChatSnapLayouts.Bar.Stage.HIDDEN, bar.stage());
+        assertNull(bar.follow(null, null, 330.0D, 5.0D, 960, 540));
+        assertEquals(ChatSnapLayouts.Bar.Stage.PEEKING, bar.stage());
+        // The peek comes down past the pointer: touched.
+        assertEquals(ChatWindow.ScreenFill.NONE,
+                bar.follow(null, null, 330.0D, 5.0D, 960, 540));
+        assertEquals(ChatSnapLayouts.Bar.Stage.REVEALED, bar.stage());
+        bar.hide();
+        assertEquals(ChatSnapLayouts.Bar.Stage.HIDDEN, bar.stage());
+        assertNull(bar.litLayout());
+    }
+
+    /**
+     * The stage follows the pointer, where the bar rests all the way
+     * down and where it is drawn: away from its reach below, down once
+     * what is drawn of it is touched and for as long as the pointer
+     * stays within its reach, peeking anywhere else.
+     */
+    @Test
+    public void theBarsStageFollowsThePointer() {
+        LostTalesUiHitBox resting = new LostTalesUiHitBox(320.0D, 2.0D,
+                320.0D, 39.0D);
+        LostTalesUiHitBox peeking = new LostTalesUiHitBox(320.0D, -33.0D,
+                320.0D, 39.0D);
+        assertEquals(ChatSnapLayouts.Bar.Stage.HIDDEN,
+                ChatSnapLayouts.Bar.stageFor(ChatSnapLayouts.Bar.Stage.REVEALED,
+                        480.0D, 65.0D, resting, resting));
+        assertEquals(ChatSnapLayouts.Bar.Stage.PEEKING,
+                ChatSnapLayouts.Bar.stageFor(ChatSnapLayouts.Bar.Stage.HIDDEN,
+                        480.0D, 64.0D, resting, peeking));
+        assertEquals(ChatSnapLayouts.Bar.Stage.PEEKING,
+                ChatSnapLayouts.Bar.stageFor(ChatSnapLayouts.Bar.Stage.PEEKING,
+                        480.0D, 6.0D, resting, peeking));
+        assertEquals(ChatSnapLayouts.Bar.Stage.PEEKING,
+                ChatSnapLayouts.Bar.stageFor(ChatSnapLayouts.Bar.Stage.PEEKING,
+                        319.5D, 0.0D, resting, peeking));
+        assertEquals(ChatSnapLayouts.Bar.Stage.REVEALED,
+                ChatSnapLayouts.Bar.stageFor(ChatSnapLayouts.Bar.Stage.PEEKING,
+                        480.0D, 5.5D, resting, peeking));
+        assertEquals(ChatSnapLayouts.Bar.Stage.REVEALED,
+                ChatSnapLayouts.Bar.stageFor(ChatSnapLayouts.Bar.Stage.REVEALED,
+                        663.5D, 64.5D, resting, resting));
+        assertEquals(ChatSnapLayouts.Bar.Stage.PEEKING,
+                ChatSnapLayouts.Bar.stageFor(ChatSnapLayouts.Bar.Stage.REVEALED,
+                        664.0D, 20.0D, resting, resting));
+        // A peeking bar is not held down by its reach.
+        assertEquals(ChatSnapLayouts.Bar.Stage.PEEKING,
+                ChatSnapLayouts.Bar.stageFor(ChatSnapLayouts.Bar.Stage.PEEKING,
+                        480.0D, 20.0D, resting, peeking));
     }
 
     /**
@@ -358,11 +491,11 @@ public final class ChatSnapLayoutsTest {
         ChatSnapLayouts.Panel below = ChatSnapLayouts.Flyout.hangFrom(none,
                 layouts, new LostTalesUiHitBox(900.0D, 10.0D, 11.0D, 11.0D),
                 null, 960, 540);
-        assertBox(749, 23, 162, 68, below.box);
+        assertBox(747, 23, 164, 70, below.box);
         ChatSnapLayouts.Panel above = ChatSnapLayouts.Flyout.hangFrom(none,
                 layouts, new LostTalesUiHitBox(900.0D, 520.0D, 11.0D, 11.0D),
                 null, 960, 540);
-        assertBox(749, 450, 162, 68, above.box);
+        assertBox(747, 448, 164, 70, above.box);
         assertFalse(above.contains(900.0D, 525.0D));
     }
 
@@ -409,8 +542,8 @@ public final class ChatSnapLayoutsTest {
                 ChatSnapLayouts.suggested(layouts, "hand",
                         Arrays.asList("front", "behind")),
                 layouts, 8, 100.0D, 2.0D, 960, 540);
-        assertEquals(422.0D, panel.box.width, EPSILON);
-        // The first suggestion's small screen at (105, 7): the left half
+        assertEquals(424.0D, panel.box.width, EPSILON);
+        // The first suggestion's small screen at (106, 8): the left half
         // is the window in hand's, the right half the window in front's.
         assertEquals(0, panel.zoneAt(110.0D, 12.0D));
         assertEquals(0, panel.zoneAt(140.0D, 12.0D));
@@ -419,7 +552,7 @@ public final class ChatSnapLayoutsTest {
                 new HashMap<String, ChatWindow.ScreenFill>();
         halves.put("front", ChatWindow.ScreenFill.RIGHT);
         assertEquals(halves, panel.companionsOf(0));
-        // The second, one small screen on at (157, 7): zones 2 to 4.
+        // The second, one small screen on at (158, 8): zones 2 to 4.
         assertEquals(2, panel.zoneAt(190.0D, 25.0D));
         Map<String, ChatWindow.ScreenFill> stacked =
                 new HashMap<String, ChatWindow.ScreenFill>();
@@ -430,6 +563,27 @@ public final class ChatSnapLayoutsTest {
         assertEquals(6, panel.zoneAt(245.0D, 12.0D));
         assertTrue(panel.companionsOf(6).isEmpty());
         assertEquals(2, panel.step(0, ChatSnapKeys.Direction.RIGHT));
+    }
+
+    /**
+     * A bar on a screen of 960 by 540 brought all the way down: the
+     * pointer holds under its peek until the peek comes down to eight,
+     * then touches it at seven, on its padding above the first zone.
+     */
+    private static ChatSnapLayouts.Bar revealed() {
+        ChatSnapLayouts.Bar bar = new ChatSnapLayouts.Bar();
+        assertNull(bar.follow(null, null, 330.0D, 9.0D, 960, 540));
+        assertNull(bar.follow(null, null, 330.0D, 9.0D, 960, 540));
+        assertEquals(ChatSnapLayouts.Bar.Stage.PEEKING, bar.stage());
+        assertEquals(ChatWindow.ScreenFill.NONE,
+                bar.follow(null, null, 330.0D, 7.0D, 960, 540));
+        assertEquals(ChatSnapLayouts.Bar.Stage.REVEALED, bar.stage());
+        return bar;
+    }
+
+    /** How deep the bar of a 960 by 540 screen peeks for a pointer at ({@code x}, {@code y}). */
+    private static double peekDepth(double x, double y) {
+        return ChatSnapLayouts.Bar.peekDepth(x, y, 320.0D, 640.0D, 65.0D);
     }
 
     private static void assertBox(double left, double top, double width,

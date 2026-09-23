@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.emoji.ChatForeignEmoji;
 import java.math.BigInteger;
@@ -621,12 +622,14 @@ public final class DiscordJson {
 
     /**
      * The body of a game line: the text under the sender's name and,
-     * when given, a picture, pinging nobody. {@code content} is the line
-     * as it is to read on Discord — a reply's header and the message
-     * after it.
+     * when given, a picture, pinging exactly the Discord members
+     * {@code pinged} names and nobody else — no role, no {@code @everyone},
+     * no {@code @here}, whatever the text says. {@code content} is the
+     * line as it is to read on Discord — a reply's header and the message
+     * after it, its mentions of those members already written as theirs.
      */
     public static String webhookLineBody(String username, String avatarUrl,
-                                         String content) {
+                                         String content, List<String> pinged) {
         JsonObject body = new JsonObject();
         body.addProperty("content", content == null ? "" : content);
         String name = webhookUsername(username);
@@ -636,7 +639,17 @@ public final class DiscordJson {
         if (avatarUrl != null && avatarUrl.length() > 0) {
             body.addProperty("avatar_url", avatarUrl);
         }
-        body.add("allowed_mentions", noMentions());
+        JsonObject allowedMentions = noMentions();
+        if (pinged != null && !pinged.isEmpty()) {
+            JsonArray users = new JsonArray();
+            for (String userId : pinged) {
+                if (userId != null && userId.matches("\\d{1,20}")) {
+                    users.add(new JsonPrimitive(userId));
+                }
+            }
+            allowedMentions.add("users", users);
+        }
+        body.add("allowed_mentions", allowedMentions);
         return body.toString();
     }
 

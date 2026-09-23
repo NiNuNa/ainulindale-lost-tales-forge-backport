@@ -9,7 +9,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiSheet;
  * for anything else not yet read, or nothing. In a conversation with one
  * person every line not yet read is a ping, as a messenger's direct
  * messages are, so a whisper's tab counts them all on the tile. The tile
- * goes to nine; past nine it stays the nine.
+ * goes to nine; past nine it shows a plus.
  *
  * <p>It stands where a head's status sphere stands, two pixels past the
  * icon's right edge and one below its bottom, and the icon gives it its
@@ -21,6 +21,9 @@ import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 final class ChatIconMark {
     /** The tile's outline, row by row from its top: a plain rectangle. */
     static final int[] TILE_INK_LEFT = {0, 0, 0, 0, 0, 0, 0};
+    /** The tile's width, its left edge and a figure; the white sphere is as wide. */
+    static final int TILE_WIDTH = LostTalesUiSheet.COUNT_LEFT.getWidth()
+            + LostTalesUiSheet.COUNT_1.getWidth();
     /** Nothing waiting. */
     static final ChatIconMark NONE = new ChatIconMark(0, false);
     /** Something unread that pinged nobody. */
@@ -80,10 +83,24 @@ final class ChatIconMark {
         return this.pings;
     }
 
-    /** The mark's sprite: the tile for its count, or the white sphere. */
-    LostTalesUiSheet sprite() {
-        return this.pings > 0 ? LostTalesUiSheet.countTile(this.pings)
+    /**
+     * What the mark shows: the tile's figure for its count — one to nine,
+     * or the plus past nine — or the white sphere.
+     */
+    LostTalesUiSheet figure() {
+        return this.pings > 0 ? LostTalesUiSheet.countFigure(this.pings)
                 : LostTalesUiSheet.PRESENCE_SELECTED;
+    }
+
+    /** How wide the mark stands: the tile, or the sphere. */
+    int width() {
+        return this.pings > 0 ? TILE_WIDTH
+                : LostTalesUiSheet.PRESENCE_SELECTED.getWidth();
+    }
+
+    /** How tall the mark stands: the tile, or the sphere. */
+    int height() {
+        return figure().getHeight();
     }
 
     /** The mark's outline, row by row, as {@link LostTalesUiCornerCut#around} reads one. */
@@ -93,14 +110,12 @@ final class ChatIconMark {
 
     /** Where the mark's left edge stands on an icon drawn {@code iconSize} wide from {@code iconX}. */
     float markX(float iconX, float iconSize) {
-        return iconX + iconSize + ChatPresenceMark.OVERHANG_X
-                - sprite().getWidth();
+        return iconX + iconSize + ChatPresenceMark.OVERHANG_X - width();
     }
 
     /** Where the mark's top stands on an icon drawn {@code iconSize} tall from {@code iconY}. */
     float markY(float iconY, float iconSize) {
-        return iconY + iconSize + ChatPresenceMark.OVERHANG_Y
-                - sprite().getHeight();
+        return iconY + iconSize + ChatPresenceMark.OVERHANG_Y - height();
     }
 
     /** The corner an icon drawn at {@code iconX}, {@code iconY}, {@code iconSize} square gives the mark. */
@@ -126,9 +141,22 @@ final class ChatIconMark {
 
     /** The mark in the corner of an icon drawn at {@code iconX}, {@code iconY}, over the one shadow. */
     void draw(float iconX, float iconY, float iconSize, int alpha) {
-        if (!isNone()) {
-            sprite().drawWithShadow(markX(iconX, iconSize),
-                    markY(iconY, iconSize), alpha);
+        drawAt(markX(iconX, iconSize), markY(iconY, iconSize), alpha);
+    }
+
+    /**
+     * The mark with its top-left at ({@code x}, {@code y}), over the one
+     * shadow: the tile's left edge and its figure, or the sphere.
+     */
+    void drawAt(float x, float y, int alpha) {
+        if (isNone()) {
+            return;
+        }
+        if (this.pings > 0) {
+            LostTalesUiSheet.drawJoinedWithShadow(LostTalesUiSheet.COUNT_LEFT,
+                    figure(), x, y, alpha);
+        } else {
+            figure().drawWithShadow(x, y, alpha);
         }
     }
 }

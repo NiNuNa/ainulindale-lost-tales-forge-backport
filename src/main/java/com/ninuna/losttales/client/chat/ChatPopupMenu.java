@@ -113,9 +113,22 @@ final class ChatPopupMenu {
          * at a glance.
          */
         int labelColor = -1;
+        /**
+         * Why the row's action cannot be taken here, or empty for a row
+         * that can: such a row stands in its place, muted, answers no
+         * click, and says why under the pointer, so every menu of its kind
+         * keeps the same rows.
+         */
+        String unavailable = "";
 
         Entry(String id, String label) {
             this(id, label, false, false, false, -1, null);
+        }
+
+        /** The same entry, muted and closed for {@code reason}. */
+        Entry unavailable(String reason) {
+            this.unavailable = reason == null ? "" : reason;
+            return this;
         }
 
         /** The same entry with its label in the given colour. */
@@ -292,7 +305,7 @@ final class ChatPopupMenu {
     /** What the empty field reads while nothing has been typed. */
     private String filterPrompt = "";
     /** The icon the field opens with: the magnifier for a search. */
-    private LostTalesUiSheet fieldIcon = LostTalesUiSheet.SEARCH_LARGE;
+    private LostTalesUiSheet fieldIcon = LostTalesUiSheet.SEARCH;
     /** The keys of the shortcut shown beside it, or empty for none. */
     private int[] filterHint = NO_KEYS;
     private long filterNanos;
@@ -436,7 +449,7 @@ final class ChatPopupMenu {
               FontRenderer font, Anchor anchor, int screenWidth,
               int screenHeight, String searchPrompt, int[] searchHint) {
         open(kind, channel, entries, font, anchor, screenWidth, screenHeight,
-                searchPrompt, searchHint, LostTalesUiSheet.SEARCH_LARGE);
+                searchPrompt, searchHint, LostTalesUiSheet.SEARCH);
     }
 
     /**
@@ -453,7 +466,7 @@ final class ChatPopupMenu {
             close();
             return;
         }
-        this.fieldIcon = fieldIcon == null ? LostTalesUiSheet.SEARCH_LARGE
+        this.fieldIcon = fieldIcon == null ? LostTalesUiSheet.SEARCH
                 : fieldIcon;
         this.anchor = anchor;
         boolean samePlace = !this.kind.equals("") && this.kind.equals(kind);
@@ -739,7 +752,14 @@ final class ChatPopupMenu {
      *  display rows and the padding bands are nobody's. */
     Entry entryAt(double mouseX, double mouseY) {
         Entry entry = rowAt(mouseX, mouseY);
-        return entry == null || entry.header || entry.passive ? null : entry;
+        return entry == null || entry.header || entry.passive
+                || entry.unavailable.length() > 0 ? null : entry;
+    }
+
+    /** Why the row under the point cannot be taken, or empty for none. */
+    String unavailableAt(double mouseX, double mouseY) {
+        Entry entry = rowAt(mouseX, mouseY);
+        return entry == null ? "" : entry.unavailable;
     }
 
     /** The entry drawn under the point, whatever kind it is, or null. */
@@ -891,7 +911,9 @@ final class ChatPopupMenu {
             // hovered row is told by its highlight, and a row naming a
             // tab takes the tab's colour as it lights, as the tab's own
             // name does.
-            int labelRgb = entry.labelColor >= 0 ? entry.labelColor
+            int labelRgb = entry.unavailable.length() > 0
+                    ? LostTalesChatVisualStyle.asideRgb()
+                    : entry.labelColor >= 0 ? entry.labelColor
                     : LostTalesChatVisualStyle.IVORY;
             if (entry.icon != null) {
                 labelRgb = LostTalesChatVisualStyle.blend(labelRgb,

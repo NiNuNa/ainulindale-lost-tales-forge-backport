@@ -392,15 +392,15 @@ public final class ChatChannelTabBarTest {
         assertEquals(0.0F, relaid.leg.value(), 0.0F);
     }
 
-    /** A tab's pings are the count tile; past nine it stays the nine. */
+    /** A tab's pings are the count tile; past nine it shows the plus. */
     @Test
     public void aTabsPingsAreItsCountTile() {
         assertEquals(com.ninuna.losttales.gui.style.LostTalesUiSheet.COUNT_3,
-                ChatIconMark.pings(3).sprite());
-        assertEquals(com.ninuna.losttales.gui.style.LostTalesUiSheet.COUNT_9,
-                ChatIconMark.pings(42).sprite());
+                ChatIconMark.pings(3).figure());
+        assertEquals(com.ninuna.losttales.gui.style.LostTalesUiSheet.COUNT_MORE,
+                ChatIconMark.pings(42).figure());
         assertEquals(com.ninuna.losttales.gui.style.LostTalesUiSheet.COUNT_1,
-                ChatIconMark.pings(1).sprite());
+                ChatIconMark.pings(1).figure());
     }
 
     /** A tab standing at {@code fromLeft}, bound for {@code toLeft}. */

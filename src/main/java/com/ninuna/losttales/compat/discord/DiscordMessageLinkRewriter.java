@@ -66,17 +66,15 @@ final class DiscordMessageLinkRewriter {
             }
             boolean opensWord = hash == 0
                     || Character.isWhitespace(text.charAt(hash - 1));
-            int end = ChatChannelSuggester.wordEnd(text, hash + 1);
-            ChatChannel named = opensWord && end > hash + 1
-                    ? ChatChannelSuggester.resolve(text.substring(hash + 1, end))
-                    : null;
-            int linkEnd = named == null ? end
-                    : ChatChannelSuggester.messageIdEnd(text, end);
-            if (named == null || linkEnd == end) {
+            ChatChannelSuggester.Link link = opensWord
+                    ? ChatChannelSuggester.linkAt(text, hash) : null;
+            if (link == null || link.messageId == ChatMessageIds.NONE) {
                 cursor = hash + 1;
                 continue;
             }
-            long messageId = Long.parseLong(text.substring(end + 1, linkEnd));
+            ChatChannel named = link.channel;
+            int linkEnd = link.end;
+            long messageId = link.messageId;
             String url = ChatMessageIds.isServerId(messageId)
                     ? resolver.jumpUrl(named, messageId) : "";
             if (url == null || url.length() == 0) {

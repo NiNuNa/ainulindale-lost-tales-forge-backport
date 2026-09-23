@@ -6,6 +6,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.MotionTransition;
+import com.ninuna.losttales.client.motion.Motions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -115,6 +116,8 @@ final class ChatWindowFrame {
      * only while the view rests on the newest message.
      */
     double renderedScrollLines;
+    /** Whether the history is still on its way to where it was scrolled this frame. */
+    boolean historyMoving;
     /** Top of the input bar at rest, one chat line below the baseline. */
     private double restingBarTop;
     /** Chat scale the box was drawn at; sizes one empty line. */
@@ -192,16 +195,19 @@ final class ChatWindowFrame {
      * The hovered message's toolbar as drawn this frame, in screen GUI
      * pixels; width zero while none was drawn. Recorded from the draw
      * itself, like the jump button, so the click and the pixels cannot
-     * disagree. {@link #toolbarKinds} says which control each button
-     * is, left to right, one {@link #toolbarStride} apart, so a message
-     * offering fewer of them needs no separate bookkeeping.
+     * disagree. Its controls stand side by side from
+     * {@link #toolbarCellsLeft}, one {@link #toolbarCellWidth} each, in
+     * the order {@link #toolbarKinds} gives, and {@link #toolbarWhy} says
+     * of each why it cannot be taken on this message, or nothing.
      */
     float toolbarLeft;
     float toolbarTop;
     float toolbarRight;
     float toolbarBottom;
-    float toolbarStride;
+    float toolbarCellsLeft;
+    float toolbarCellWidth;
     int[] toolbarKinds = NO_KINDS;
+    String[] toolbarWhy = NO_REASONS;
     /** The message the toolbar belongs to, by chat line id. */
     int toolbarChatLineId;
     /**
@@ -210,18 +216,19 @@ final class ChatWindowFrame {
      * windows are drawn ({@link #noteHoveredControls}).
      */
     int hoveredToolbarKind = -1;
-    /** How far each toolbar control has lit, by kind, and on whose toolbar. */
     /**
-     * A beat per toolbar control. The react face and the reply arrow
-     * rise; copying is a decisive act, so its glyph answers like a
-     * switch. Kept per window rather than per message, and started
-     * afresh when the toolbar moves to another line.
+     * A beat per toolbar control, by kind. The react face, the reply
+     * arrow, the link and the menu's dots rise; copying is a decisive
+     * act, so its glyph answers like a switch. Kept per window rather
+     * than per message, and started afresh when the toolbar moves to
+     * another line.
      */
     private final LostTalesUiButtonMotion[] toolbarMotions =
             newToolbarMotions();
 
     private static LostTalesUiButtonMotion[] newToolbarMotions() {
-        LostTalesUiButtonMotion[] motions = new LostTalesUiButtonMotion[4];
+        LostTalesUiButtonMotion[] motions = new LostTalesUiButtonMotion[
+                LostTalesChatOverlayRenderer.TOOLBAR_KINDS.length + 1];
         for (int kind = 0; kind < motions.length; kind++) {
             motions[kind] = new LostTalesUiButtonMotion(
                     kind == LostTalesChatOverlayRenderer.TOOLBAR_COPY
@@ -233,8 +240,20 @@ final class ChatWindowFrame {
 
     /** The message the beats above belong to; another one starts them afresh. */
     private int toolbarFadesLineId;
+    /**
+     * The toolbar coming up: hidden while the history moves under the
+     * pointer, and brought in once it has rested on a message.
+     */
+    private final MotionTransition toolbarShow =
+            new MotionTransition(MotionIds.CHAT_TOOLBAR_SHOW);
+    /** Whether the toolbar waits for the pointer to rest before it comes up again. */
+    private boolean toolbarWaiting;
+    /** Since when the pointer has rested on {@link #toolbarRestLineId}; 0 while it has not. */
+    private long toolbarRestSince;
+    private int toolbarRestLineId;
 
     private static final int[] NO_KINDS = new int[0];
+    private static final String[] NO_REASONS = new String[0];
 
     /** Whether the point lies on the toolbar drawn this frame. */
     boolean toolbarContains(double x, double y) {
@@ -244,18 +263,78 @@ final class ChatWindowFrame {
                         this.toolbarBottom - this.toolbarTop);
     }
 
-    /** The control under the point, or -1 when the point is not on one. */
+    /**
+     * The control under the point, or -1 when the point is not on the
+     * toolbar. The frame's edge belongs to the control it runs beside,
+     * so the toolbar has no dead pixels.
+     */
     int toolbarKindAt(double x, double y) {
         if (!toolbarContains(x, y)) {
             return -1;
         }
-        // The gap after a button belongs to it, so the toolbar has no
-        // dead pixels between its buttons.
-        int index = (int)((x - this.toolbarLeft)
-                / Math.max(1.0F, this.toolbarStride));
+        int index = (int)Math.floor((x - this.toolbarCellsLeft)
+                / Math.max(0.001F, this.toolbarCellWidth));
         return this.toolbarKinds[Math.max(0,
                 Math.min(this.toolbarKinds.length - 1, index))];
     }
+
+    /**
+     * Where the square of the control {@code kind} starts on screen, as
+     * drawn this frame; the toolbar's own left for a control it does not
+     * hold.
+     */
+    float toolbarCellLeft(int kind) {
+        for (int index = 0; index < this.toolbarKinds.length; index++) {
+            if (this.toolbarKinds[index] == kind) {
+                return this.toolbarCellsLeft + index * this.toolbarCellWidth;
+            }
+        }
+        return this.toolbarLeft;
+    }
+
+    /** Why the control {@code kind} cannot be taken on the toolbar's message, or empty. */
+    String toolbarWhy(int kind) {
+        for (int index = 0; index < this.toolbarKinds.length
+                && index < this.toolbarWhy.length; index++) {
+            if (this.toolbarKinds[index] == kind) {
+                return this.toolbarWhy[index];
+            }
+        }
+        return "";
+    }
+
+    /**
+     * How far the toolbar over {@code hoveredLineId} has come up this
+     * frame, 0 to 1. While {@code historyMoving} the toolbar stays away,
+     * so it never jumps from message to message under a still pointer;
+     * once the history rests, it comes up after the pointer has rested
+     * on one message for the motion's rest, and fades in. Moving the
+     * pointer from message to message without a scroll moves it at once.
+     */
+    float toolbarShare(int hoveredLineId, boolean historyMoving, long nowNanos) {
+        if (historyMoving) {
+            this.toolbarWaiting = true;
+            this.toolbarRestSince = 0L;
+            this.toolbarShow.settle(false);
+            return 0.0F;
+        }
+        if (this.toolbarWaiting) {
+            if (hoveredLineId == 0 || hoveredLineId != this.toolbarRestLineId
+                    || this.toolbarRestSince == 0L) {
+                this.toolbarRestLineId = hoveredLineId;
+                this.toolbarRestSince = hoveredLineId == 0 ? 0L : nowNanos;
+                return 0.0F;
+            }
+            long rest = (long)(Motions.param(MotionIds.CHAT_TOOLBAR_SHOW,
+                    "rest", 150.0F) * 1000000.0F);
+            if (nowNanos - this.toolbarRestSince < rest) {
+                return 0.0F;
+            }
+            this.toolbarWaiting = false;
+        }
+        return this.toolbarShow.advance(nowNanos, true);
+    }
+
     /**
      * Starts the toolbar's fades afresh when it has moved to another
      * message, so a control lit on one message's toolbar does not come
@@ -374,7 +453,6 @@ final class ChatWindowFrame {
         return result;
     }
 
-    /** Drops frames of windows that no longer exist. */
     /**
      * Notes which of the windows' floating controls the pointer is on
      * this frame — a toolbar control by kind, or a jump-to-present
@@ -395,6 +473,7 @@ final class ChatWindowFrame {
         }
     }
 
+    /** Drops frames of windows that no longer exist. */
     static synchronized void prune(List<ChatWindow> windows) {
         if (FRAMES.size() <= windows.size()) {
             return;
@@ -587,17 +666,17 @@ final class ChatWindowFrame {
     /**
      * Moves the timestamp area's and the member list's motions on to
      * this instant, toward what the window asks of them — the list only
-     * while the window has the room for it. Called once a frame before
+     * while the window shows a conversation. Called once a frame before
      * the window is laid out; the first call stands them in their state.
      */
-    void advancePanels(ChatWindow window, boolean membersFit) {
+    void advancePanels(ChatWindow window, boolean showsConversation) {
         if (window == null) {
             return;
         }
         long now = System.nanoTime();
         this.areaMotion.advance(now, !window.isAreaHidden());
         this.membersMotion.advance(now, !window.isMembersHidden()
-                && membersFit);
+                && showsConversation);
     }
 
     /**

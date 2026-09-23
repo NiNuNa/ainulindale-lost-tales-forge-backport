@@ -269,6 +269,9 @@ public final class LostTalesChatService {
         if (replyToMessageId != ChatMessageIds.NONE) {
             reply = ChatHistory.quoteFor(replyToMessageId,
                     sender.getUniqueID(), channel, replyScope);
+            if (!reply.exists() && channel == ChatChannel.SERVER_CONSOLE) {
+                reply = consoleQuote(sender, replyToMessageId);
+            }
             if (!reply.exists()) {
                 sender.addChatMessage(new ChatComponentTranslation(
                         "chat.losttales.reply.unavailable"));
@@ -323,11 +326,12 @@ public final class LostTalesChatService {
                 // in. The client files it under that conversation's tab
                 // and shows it under no other.
                 .withScope(replyScope)
-                // The players its @names reach, as they are now: kept with
-                // the line, so a replay shows each mention as this one
-                // does, whether or not the player is still online.
-                .withNamedPlayers(LostTalesServerBroadcastHook
-                        .mentionedPlayers(message));
+                // Whom its @names reach among the conversation's members,
+                // here or gone, players or Discord members: kept with the
+                // line, so every client shows and pings the same people
+                // from the one record, live and in every replay.
+                .withNamedPlayers(ChatMentionTargets.of(sender, channel,
+                        whisperTarget, message));
 
         FMLLog.info("[losttales/chat/%s] <%s (%s)> %s%s%s",
                 channel.getId(), identityName, accountName, message,
@@ -393,7 +397,8 @@ public final class LostTalesChatService {
                             presentation.title),
                     DiscordAvatarUrl.forPlayer(sender),
                     DiscordMessageSanitizer.outbound(message),
-                    packet.getMessageId(), reply, sender.getUniqueID());
+                    packet.getMessageId(), reply, sender.getUniqueID(),
+                    packet.getNamedPlayers());
         }
     }
 
@@ -446,6 +451,11 @@ public final class LostTalesChatService {
         }
         int ivory = LostTalesColors.rgb(LostTalesColors.HUD_LABEL);
         long messageId = ChatMessageIdAllocator.next();
+        // Routed by the channel's own rule with no sender behind the
+        // line: everyone for a global channel, the operators for the
+        // staff channel, the faction's members for a faction binding.
+        ChatChannelPolicy.Routing routing = ChatChannelPolicy.route(null,
+                channel, null, factionScope == null ? "" : factionScope);
         // The member's Discord server stands where a character's title
         // does, in the tone of what is said about a line: Nils, of The
         // Shire.
@@ -456,15 +466,11 @@ public final class LostTalesChatService {
                 System.currentTimeMillis(), "", null, "", "", 0, true,
                 messageId, reply)
                 .withScope(factionScope == null ? "" : factionScope)
-                .withNamedPlayers(LostTalesServerBroadcastHook
-                        .mentionedPlayers(message));
+                .withNamedPlayers(ChatMentionTargets.ofDiscordLine(channel,
+                        factionScope, routing.recipients, message));
         FMLLog.info("[losttales/chat/%s] <%s (discord)> %s", channel.getId(),
                 displayName, message);
-        // Routed by the channel's own rule with no sender behind the
-        // line: everyone for a global channel, the operators for the
-        // staff channel, the faction's members for a faction binding.
-        deliver(packet, null, ChatChannelPolicy.route(null, channel, null,
-                        factionScope == null ? "" : factionScope),
+        deliver(packet, null, routing,
                 LostTalesChatMessagePacket.DISCORD_SENDER_ID, displayName);
         // Recorded under the member's own sender id, the same id a mute
         // names them by, so the audit and the moderation tools agree on
@@ -893,13 +899,30 @@ public final class LostTalesChatService {
                 || player.worldObj.isRemote) {
             return;
         }
+        if (!ChatForeignEmoji.isReactionKey(emojiName)) {
+            return;
+        }
         ChatChannel channel = ChatHistory.channelOf(messageId);
-        if (!ChatForeignEmoji.isReactionKey(emojiName) || channel == null) {
+        boolean consoleEntry = channel == null
+                && ChatConsoleStream.find(messageId) != null
+                && ChatChannelPolicy.readsConsole(player);
+        if (channel == null && !consoleEntry) {
             return;
         }
         ChatMuteEntry mute = activeMute(player);
         if (mute != null) {
             tellMuted(player, mute);
+            return;
+        }
+        if (consoleEntry) {
+            // An entry of the Server Console takes reactions from whoever
+            // reads the console, and they stay in the console: nothing of
+            // it crosses to Discord.
+            if (ChatConsoleStream.react(messageId, player.getUniqueID(),
+                    reactorName(player, ChatChannel.SERVER_CONSOLE), emojiName,
+                    add)) {
+                tellConsoleReactions(messageId);
+            }
             return;
         }
         ChatHistory.ReactionChange change = ChatHistory.react(messageId,
@@ -981,6 +1004,76 @@ public final class LostTalesChatService {
                         player);
             }
         }
+    }
+
+    /**
+     * The Server Console's kept entries, sent to a player who has come to
+     * read it while online — made an operator, given a role — as the ones
+     * a staff member is sent on joining: history to them, reactions and
+     * all. Entries the client already shows are shown once.
+     */
+    static void sendConsoleHistory(EntityPlayerMP player) {
+        List<ChatConsoleEvent> events = ChatConsoleStream.replay(0L);
+        for (IMessage packet : ChatLoginReplay.packets(
+                Collections.<LostTalesChatMessagePacket>emptyList(), events,
+                ChatMessageIdAllocator.next())) {
+            LostTalesNetworkHandler.CHANNEL.sendTo(packet, player);
+        }
+        for (ChatConsoleEvent event : events) {
+            if (!ChatConsoleStream.reactionsFor(event.getId(),
+                    player.getUniqueID()).isEmpty()) {
+                sendConsoleReactions(player, event.getId());
+            }
+        }
+    }
+
+    /** Every console reader online is sent an entry's reactions as they are shown them. */
+    private static void tellConsoleReactions(long entryId) {
+        MinecraftServer server = MinecraftServer.getServer();
+        if (server == null || server.getConfigurationManager() == null) {
+            return;
+        }
+        @SuppressWarnings("unchecked")
+        List<EntityPlayerMP> online =
+                server.getConfigurationManager().playerEntityList;
+        for (EntityPlayerMP player : online) {
+            if (player != null && ChatChannelPolicy.readsConsole(player)) {
+                sendConsoleReactions(player, entryId);
+            }
+        }
+    }
+
+    private static void sendConsoleReactions(EntityPlayerMP player, long entryId) {
+        LostTalesNetworkHandler.CHANNEL.sendTo(
+                new LostTalesChatReactionSyncPacket(entryId,
+                        ChatConsoleStream.reactionsFor(entryId,
+                                player.getUniqueID())),
+                player);
+    }
+
+    /**
+     * The quote of an entry of the Server Console, for a reply said in the
+     * console by someone who reads it: the Server's word, in the console's
+     * colour and with its head, and what the entry says. None where there
+     * is no such entry or the sender cannot read the console.
+     */
+    private static ChatReplyReference consoleQuote(EntityPlayerMP sender,
+                                                   long entryId) {
+        ChatConsoleEvent entry = ChatConsoleStream.find(entryId);
+        if (entry == null || !ChatChannelPolicy.readsConsole(sender)) {
+            return ChatReplyReference.NONE;
+        }
+        String actor = entry.getActor().trim();
+        boolean byServer = actor.length() == 0
+                || LostTalesServerBroadcastHook.SERVER_NAME.equalsIgnoreCase(actor);
+        String words = entry.getKind() == ChatConsoleEvent.Kind.COMMAND
+                ? actor + " used " + entry.getText()
+                : byServer ? entry.getText() : actor + " " + entry.getText();
+        return ChatReplyReference.of(entryId,
+                LostTalesServerBroadcastHook.SERVER_NAME,
+                ChatReplyReference.excerptOf(words),
+                ChatChannel.SERVER_CONSOLE.getDisplayColor())
+                .withHead(LostTalesChatMessagePacket.SERVER_SENDER_ID, true, "");
     }
 
     /** What the server knows of a player asking about a kept message, read live. */
@@ -1699,10 +1792,10 @@ public final class LostTalesChatService {
         long arrivalId = LostTalesServerBroadcastHook.takeJoinLine(
                 player.getCommandSenderName());
         if (ChatMessageIds.isServerId(arrivalId)) {
-            // The join line went out before the server listed the
-            // player, so it names nobody; now it names their account,
-            // as the out-of-character line it is, for everyone shown it
-            // later.
+            // The join line names its player from the moment it goes out
+            // (ChatArrivals); where the game's reading of their saved
+            // data went unseen, it names their account now, as the
+            // out-of-character line it is, for everyone shown it later.
             ChatHistory.namePlayer(arrivalId,
                     LostTalesServerBroadcastHook.namedAccount(player));
         } else {
@@ -1722,6 +1815,14 @@ public final class LostTalesChatService {
                 arrivalId);
         for (IMessage packet : packets) {
             LostTalesNetworkHandler.CHANNEL.sendTo(packet, player);
+        }
+        // The reactions on the entries replayed, after them, as a
+        // message's come with it.
+        for (ChatConsoleEvent event : events) {
+            if (!ChatConsoleStream.reactionsFor(event.getId(),
+                    player.getUniqueID()).isEmpty()) {
+                sendConsoleReactions(player, event.getId());
+            }
         }
         // One line per login, so a replay that went missing can be told
         // apart from one that was never sent.

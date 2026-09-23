@@ -38,7 +38,7 @@ public final class MotionIds {
     public static final String CHAT_ROW_APPEAR = "chat.row.appear";
     /** The snap assist's panes. */
     public static final String CHAT_SNAP_ASSIST = "chat.snap.assist";
-    /** The snap layouts' flyout and the snap bar. */
+    /** The snap layouts' flyout, and the snap bar's fade and its way down. */
     public static final String CHAT_SNAP_LAYOUTS = "chat.snap.layouts";
     /** The frosted preview of where a window will snap. */
     public static final String CHAT_SNAP_PREVIEW = "chat.snap.preview";
@@ -54,6 +54,8 @@ public final class MotionIds {
     public static final String CHAT_WINDOW_APPEAR = "chat.window.appear";
     /** The jump-to-present button flying in and out. */
     public static final String CHAT_JUMP_SHOW = "chat.jump.show";
+    /** A message's toolbar coming up once the history rests under the pointer. */
+    public static final String CHAT_TOOLBAR_SHOW = "chat.toolbar.show";
     /** A chevron control playing its run of frames. */
     public static final String CHAT_ICON_FLIP = "chat.icon.flip";
     /** The closed feed's lines rising for its typing row. */
@@ -66,6 +68,8 @@ public final class MotionIds {
     public static final String CHAT_SCROLLBAR_FADE = "chat.scrollbar.fade";
     /** A name cut short gliding home once the pointer leaves it. */
     public static final String CHAT_MARQUEE_RETURN = "chat.marquee.return";
+    /** The snap bar peeking further down as the pointer comes nearer it. */
+    public static final String CHAT_SNAP_BAR_PEEK = "chat.snap.bar.peek";
 
     /* ---- hud ---- */
 

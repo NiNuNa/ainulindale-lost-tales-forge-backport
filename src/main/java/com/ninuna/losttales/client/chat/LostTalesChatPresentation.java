@@ -2,7 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatSystemLineClassifier;
-import com.ninuna.losttales.chat.ChatBroadcastIdMarkers;
+import com.ninuna.losttales.chat.ChatBroadcastMarkers;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelSuggester;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
@@ -25,6 +25,8 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatUpdatePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatReactionSyncPacket;
+import com.ninuna.losttales.character.sync.CharacterAppearance;
+import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.client.motion.Motions;
 import java.util.ArrayList;
@@ -186,7 +188,7 @@ public final class LostTalesChatPresentation {
         boolean repliedTo = LostTalesConfig.enableChatPings
                 && repliesToLocalPlayer(minecraft, packet.getReply());
         boolean mentioned = repliedTo || (LostTalesConfig.enableChatPings
-                && isLocalPlayerMentioned(minecraft, packet.getMessage()));
+                && pingsLocalPlayer(packet));
         // A line of the server's own that carries its component — an
         // achievement with its hover, a death, a join — is shown from
         // that component the way the live line was, the players it
@@ -440,6 +442,45 @@ public final class LostTalesChatPresentation {
         long messageId = ClientChatMessageIds.messageIdOf(chatLineId);
         return ChatMessageIds.isServerId(messageId)
                 && ClientChatMessages.get(messageId) != null;
+    }
+
+    /**
+     * Why a line cannot be reacted to, or empty where it can: a line the
+     * server never named ({@link #unnamedReason}), the chat's emoji
+     * switched off, or a message this client no longer holds.
+     */
+    static String whyNotReactable(int chatLineId) {
+        if (isReactable(chatLineId)) {
+            return "";
+        }
+        String unnamed = unnamedReason(chatLineId);
+        return unnamed.length() > 0 ? unnamed : StatCollector.translateToLocal(
+                LostTalesConfig.enableChatEmojis
+                        ? "gui.losttales.chat.message.not_held"
+                        : "gui.losttales.chat.message.emoji_off");
+    }
+
+    /** Why a line cannot be answered, or empty where it can: a tab this player cannot talk in. */
+    static String whyNotRepliable(int chatLineId) {
+        return isRepliable(chatLineId) ? "" : StatCollector.translateToLocal(
+                "gui.losttales.chat.input.hint.read_only");
+    }
+
+    /**
+     * Why a line has no id the server gave it, so nobody else can be
+     * pointed at it: still on its way to the server, or only ever on this
+     * computer — the client's own notes, a countdown, another mod's word
+     * to this player alone, an NPC's speech. Empty for a line the server
+     * named.
+     */
+    static String unnamedReason(int chatLineId) {
+        if (ChatMessageIds.isServerId(ClientChatMessageIds.messageIdOf(chatLineId))) {
+            return "";
+        }
+        return StatCollector.translateToLocal(
+                ClientChatPendingEchoes.isPending(chatLineId)
+                        ? "gui.losttales.chat.message.sending"
+                        : "gui.losttales.chat.message.local_only");
     }
 
     /**
@@ -768,7 +809,7 @@ public final class LostTalesChatPresentation {
         // naming yourself pings you in this tab exactly as anywhere
         // else.
         boolean mentioned = LostTalesConfig.enableChatPings
-                && isLocalPlayerMentioned(minecraft, message);
+                && namesLocalPlayer(minecraft, message);
         int chatLineId = print(minecraft, packet, tab, mentioned);
         if (mentioned) {
             markPinged(chatLineId);
@@ -985,16 +1026,6 @@ public final class LostTalesChatPresentation {
     private static boolean receivingBeforeArrival;
 
     /**
-     * The server's id for the line being printed where the line's own id
-     * is this client's: a console entry's, which comes from the clock
-     * messages take theirs from, so the Console's read mark can move to
-     * it while the line stays this client's work. Set around the print
-     * by {@link #receiveConsoleEvent(ChatConsoleEvent, boolean,
-     * boolean)}; none for every other line.
-     */
-    private static long receivingServerId = ChatMessageIds.NONE;
-
-    /**
      * Stamps a line said before this player arrived as one the closed
      * feed has already let go: its arrival tick is set a whole fade back
      * in both of the game's lists, so the feed — which shows only what
@@ -1049,11 +1080,8 @@ public final class LostTalesChatPresentation {
             lastMessageNanos = System.nanoTime();
             lastMessageTab = tab;
         }
-        // What the view's read mark moves to once the line is seen: the
-        // line's own id, or the id of the console entry it shows.
-        long serverId = ChatMessageIds.isServerId(receivingServerId)
-                ? receivingServerId
-                : ClientChatMessageIds.messageIdOf(chatLineId);
+        // What the view's read mark moves to once the line is seen.
+        long serverId = ClientChatMessageIds.messageIdOf(chatLineId);
         ClientChatChannelViews.record(chatLineId, tab,
                 ClientChatChannelState.getSelected(), mentioned,
                 serverId, timestampMillis, receivingReplayed);
@@ -1095,23 +1123,44 @@ public final class LostTalesChatPresentation {
     }
 
     /**
-     * Whether the message names this player: any of their own names
-     * ({@link #localMentionNames}) in every channel alike, plus the
-     * name of every mentionable role they hold — in every channel too,
-     * since an operator is worth calling wherever the call is made — so
-     * {@code @Operator} reaches the operators and nobody else. Which
-     * roles the player holds is the server's word, sent with the chat
-     * access; nothing here is decided from the message.
+     * Whether a line the server sent names this player: the server says
+     * whom its mentions reach ({@link LostTalesChatMessagePacket#getNamedPlayers}),
+     * and one of them is this player's account, whichever of their
+     * characters it named; or it names a mentionable role they hold — in
+     * every channel, since an operator is worth calling wherever the call
+     * is made — so {@code @Operator} reaches the operators and nobody
+     * else. Which roles the player holds is the server's word too, sent
+     * with the chat access.
      */
-    private static boolean isLocalPlayerMentioned(
-            Minecraft minecraft, String message) {
+    private static boolean pingsLocalPlayer(LostTalesChatMessagePacket packet) {
+        for (ChatNamedPlayer named : packet.getNamedPlayers()) {
+            if (isLocalAccount(named.getPlayerId())) {
+                return true;
+            }
+        }
+        return ChatMentions.mentionsAny(packet.getMessage(), localRoleNames());
+    }
+
+    /**
+     * Whether text this client wrote itself, which never passed through
+     * the server, names this player: one of their own names
+     * ({@link #localMentionNames}) or a mentionable role they hold.
+     */
+    private static boolean namesLocalPlayer(Minecraft minecraft, String message) {
         List<String> names = localMentionNames(minecraft);
+        names.addAll(localRoleNames());
+        return ChatMentions.mentionsAny(message, names);
+    }
+
+    /** The mentionable roles this player holds, by the names a mention calls them. */
+    private static List<String> localRoleNames() {
+        List<String> names = new ArrayList<String>(2);
         for (ChatAccountRole role : ClientChatChannelState.localRoles()) {
             if (role.isMentionable()) {
                 names.add(role.getDisplayName());
             }
         }
-        return ChatMentions.mentionsAny(message, names);
+        return names;
     }
 
     /**
@@ -1947,35 +1996,19 @@ public final class LostTalesChatPresentation {
      * an achievement above all — names its player without addressing
      * them, so its mention stays visual. The highlight, the unread ping
      * count and the line's tint are the same either way.</p>
+     *
+     * <p>The marks the server stamped on the line are taken off it first
+     * ({@link ChatBroadcastMarkers}): the id it named the line by — a
+     * line it never named is named by this client alone — and the players
+     * the line names, which its mentions are made from.</p>
      */
     public static boolean receiveSystemLine(IChatComponent message,
                                             ChatChannel channel,
                                             boolean audibleMentionCue) {
+        long messageId = takeBroadcastId(message);
+        List<ChatNamedPlayer> named = takeNamedPlayers(message);
         return receiveSystemLine(message, channel, audibleMentionCue,
-                System.currentTimeMillis());
-    }
-
-    /** As above, stamped with the time the line was said rather than shown. */
-    public static boolean receiveSystemLine(IChatComponent message,
-                                            ChatChannel channel,
-                                            boolean audibleMentionCue,
-                                            long timestampMillis) {
-        return receiveSystemLine(message, channel, audibleMentionCue,
-                timestampMillis, ChatMessageIds.NONE);
-    }
-
-    /**
-     * As above, under the id the server named the line by, or
-     * {@link ChatMessageIds#NONE} for a line it never named, which is
-     * named by this client alone.
-     */
-    public static boolean receiveSystemLine(IChatComponent message,
-                                            ChatChannel channel,
-                                            boolean audibleMentionCue,
-                                            long timestampMillis,
-                                            long messageId) {
-        return receiveSystemLine(message, channel, audibleMentionCue,
-                timestampMillis, true, messageId);
+                System.currentTimeMillis(), messageId, named);
     }
 
     /**
@@ -2037,7 +2070,7 @@ public final class LostTalesChatPresentation {
      * the id run is the server's word to this client, not a part of
      * the line — or {@link ChatMessageIds#NONE} for a line without one.
      */
-    public static long takeBroadcastId(IChatComponent message) {
+    private static long takeBroadcastId(IChatComponent message) {
         if (message == null) {
             return ChatMessageIds.NONE;
         }
@@ -2053,7 +2086,7 @@ public final class LostTalesChatPresentation {
             if (click == null || click.getAction() != ClickEvent.Action.SUGGEST_COMMAND) {
                 continue;
             }
-            long id = ChatBroadcastIdMarkers.decode(click.getValue());
+            long id = ChatBroadcastMarkers.decode(click.getValue());
             if (id != ChatMessageIds.NONE) {
                 siblings.remove(index);
                 return id;
@@ -2063,17 +2096,71 @@ public final class LostTalesChatPresentation {
     }
 
     /**
-     * As above; {@code mayAnswerACommand} says whether a console line
-     * arriving while a command's answer is expected is taken as that
-     * answer. An entry of the Server Console never is: it is about
-     * a command, not the command's reply.
+     * Vanilla's notice to operators of what a command did, as a sentence
+     * in the console's own voice rather than grey italics in brackets:
+     * {@code Nils: Opped Steve.} The words are the notice's own.
+     */
+    static IChatComponent plainAdminNotice(IChatComponent notice) {
+        Object[] arguments = ((ChatComponentTranslation)notice).getFormatArgs();
+        if (arguments == null || arguments.length < 2) {
+            return notice;
+        }
+        ChatComponentTranslation plain = new ChatComponentTranslation(
+                "chat.losttales.console.admin", arguments[0], arguments[1]);
+        for (Object argument : arguments) {
+            if (argument instanceof IChatComponent) {
+                ((IChatComponent)argument).getChatStyle()
+                        .setParentStyle(plain.getChatStyle());
+            }
+        }
+        for (Object sibling : notice.getSiblings()) {
+            if (sibling instanceof IChatComponent) {
+                plain.appendSibling((IChatComponent)sibling);
+            }
+        }
+        return plain;
+    }
+
+    /**
+     * The players the server says a line names, taken off it as its id
+     * is, at most as many as a line may name; empty for a line the
+     * server stamped nothing on.
+     */
+    static List<ChatNamedPlayer> takeNamedPlayers(IChatComponent message) {
+        List<ChatNamedPlayer> named = new ArrayList<ChatNamedPlayer>();
+        List<?> siblings = message == null ? null : message.getSiblings();
+        for (int index = 0; siblings != null && index < siblings.size(); ) {
+            Object value = siblings.get(index);
+            ClickEvent click = value instanceof IChatComponent
+                    && ((IChatComponent)value).getChatStyle() != null
+                    ? ((IChatComponent)value).getChatStyle().getChatClickEvent()
+                    : null;
+            ChatNamedPlayer player = click == null
+                    || click.getAction() != ClickEvent.Action.SUGGEST_COMMAND
+                    ? null : ChatBroadcastMarkers.decodeNamed(click.getValue());
+            if (player == null) {
+                index++;
+                continue;
+            }
+            siblings.remove(index);
+            if (named.size() < ChatNamedPlayer.MAX_PER_LINE) {
+                named.add(player);
+            }
+        }
+        return named;
+    }
+
+    /**
+     * Shows a line the server sent, under {@code messageId}, naming the
+     * {@code named} players. A console line arriving while a command's
+     * answer is expected is that answer.
      */
     private static boolean receiveSystemLine(IChatComponent message,
                                              ChatChannel channel,
                                              boolean audibleMentionCue,
                                              long timestampMillis,
-                                             boolean mayAnswerACommand,
-                                             long messageId) {
+                                             long messageId,
+                                             List<ChatNamedPlayer> named) {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (message == null || channel == null || minecraft == null
                 || minecraft.ingameGUI == null) {
@@ -2085,8 +2172,10 @@ public final class LostTalesChatPresentation {
         ChatTab tab = ChatTab.of(channel);
         // A console line arriving while a command's answer is expected
         // is that answer: a line of the Server's own, shown where the
-        // command was typed and nowhere else.
-        ChatTab asked = mayAnswerACommand && channel == ChatChannel.CONSOLE
+        // command was typed and nowhere else. An operators' notice of
+        // somebody's command never is.
+        boolean adminNotice = ChatSystemLineClassifier.isAdminNotice(message);
+        ChatTab asked = channel == ChatChannel.CONSOLE && !adminNotice
                 ? commandOutputTab() : null;
         if (asked == null && !ChatWindowLayout.isOpen(tab)
                 && !ChatWindowLayout.isHidden(tab)) {
@@ -2101,9 +2190,9 @@ public final class LostTalesChatPresentation {
         // highlights, and the cue sounds. The rewrite may hand back a
         // fresh component; the fresh one is what is shown.
         boolean[] localMentioned = new boolean[1];
-        IChatComponent shown = rewriteServerLine(message, channel,
-                localMentionNames(minecraft), localMentioned,
-                Collections.<ChatNamedPlayer>emptyList());
+        IChatComponent shown = rewriteServerLine(adminNotice
+                        ? plainAdminNotice(message) : message, channel,
+                localMentionNames(minecraft), localMentioned, named);
         boolean mentioned = localMentioned[0];
         // A join, a leave, a death or an achievement is a sentence the
         // server says, and ends as one.
@@ -2195,18 +2284,19 @@ public final class LostTalesChatPresentation {
                             ? EnumChatFormatting.RED : null, false));
             body = line;
         }
+        // Under the entry's own id, on the clock messages take theirs
+        // from: a link, a reply and a reaction name it as they name a
+        // message.
         int chatLineId;
         receivingReplayed = replayed;
         receivingBeforeArrival = replayed && beforeArrival;
-        receivingServerId = event.getId();
         try {
             chatLineId = printServerLine(minecraft, console, body,
                     mentioned[0], event.getTimestampMillis(),
-                    ChatReplyReference.NONE, ChatMessageIds.NONE);
+                    ChatReplyReference.NONE, event.getId());
         } finally {
             receivingReplayed = false;
             receivingBeforeArrival = false;
-            receivingServerId = ChatMessageIds.NONE;
         }
         if (mentioned[0]) {
             markPinged(chatLineId);
@@ -2253,7 +2343,8 @@ public final class LostTalesChatPresentation {
         }
         int color = ChatMentionColors.PLAYER_RGB;
         return ChatMentionMarker.apply(text("@" + account,
-                nearestFormatting(color), false), color, account, null);
+                nearestFormatting(color), false), color, account,
+                knownNow(account));
     }
 
     /**
@@ -2915,12 +3006,15 @@ public final class LostTalesChatPresentation {
      * As above from a bare name, for a translation's string argument,
      * named as {@code channel} presents people: an out-of-character
      * channel by the account, an in-character one by the character.
-     * {@code named} is what the server recorded about the players a
-     * replayed line names, and a name it holds is named as the record
-     * says — as the identity they were when the line was said, whoever
-     * they play now or whether they are here at all. Any other name this
-     * client can place is named by the account's character right now,
-     * or by the account out of character.
+     * {@code named} is what the server said about the players the line
+     * names, live or replayed, and a name it holds is named as the server
+     * said — as the identity they were when the line was said, whoever
+     * they play now or whether they are here at all — and pings this
+     * player when it is their account, whichever of their characters it
+     * names. Any other name this client can place is named by the
+     * account's character right now, or by the account out of character,
+     * and carries who that is, so its card still opens once they have
+     * gone.
      */
     static IChatComponent asMentionName(String rawText,
                                                 ChatChannel channel,
@@ -2936,7 +3030,7 @@ public final class LostTalesChatPresentation {
                 == ChatPresentationMode.OUT_OF_CHARACTER;
         ChatNamedPlayer recorded = ChatNamedPlayer.find(named, text);
         if (recorded != null) {
-            if (local) {
+            if (local || isLocalAccount(recorded.getPlayerId())) {
                 localMentioned[0] = true;
             }
             int recordedColor = ChatMentionColors.PLAYER_RGB;
@@ -2966,8 +3060,39 @@ public final class LostTalesChatPresentation {
         ChatComponentText piece = text("@" + shown,
                 nearestFormatting(color), false);
         return account != null
-                ? ChatMentionMarker.apply(piece, color, account, null)
+                ? ChatMentionMarker.apply(piece, color, account,
+                        knownNow(account))
                 : ChatColorMarker.apply(piece, color);
+    }
+
+    /** Whether {@code playerId} is this client's own account. */
+    static boolean isLocalAccount(UUID playerId) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        return playerId != null && minecraft != null
+                && minecraft.thePlayer != null
+                && playerId.equals(minecraft.thePlayer.getUniqueID());
+    }
+
+    /**
+     * The player {@code account} is, as this client knows them right now:
+     * their id and the character they are playing. Null when this client
+     * cannot place them.
+     */
+    static ChatNamedPlayer knownNow(String account) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        UUID playerId = minecraft == null ? null
+                : ChatChannelIcons.partnerId(minecraft, account);
+        if (playerId == null) {
+            return null;
+        }
+        CharacterAppearance appearance =
+                ClientCharacterAppearanceCache.get(playerId);
+        if (appearance == null || !appearance.hasCharacter()) {
+            return ChatNamedPlayer.account(playerId, account);
+        }
+        return new ChatNamedPlayer(playerId, account,
+                appearance.getCharacterId(), appearance.getCharacterName(),
+                appearance.getSkinId());
     }
 
     private static boolean matchesAny(String text, List<String> names) {
@@ -3437,11 +3562,11 @@ public final class LostTalesChatPresentation {
             }
             boolean opensWord = hash == 0
                     || Character.isWhitespace(text.charAt(hash - 1));
-            int end = ChatChannelSuggester.wordEnd(text, hash + 1);
-            ChatChannel named = opensWord && end > hash + 1
-                    ? ChatChannelSuggester.resolve(text.substring(hash + 1, end))
-                    : null;
-            if (named == null) {
+            // A slash and digits after the name link to one message of
+            // the channel, by the id the server gave it.
+            ChatChannelSuggester.Link link = opensWord
+                    ? ChatChannelSuggester.linkAt(text, hash) : null;
+            if (link == null) {
                 cursor = hash + 1;
                 continue;
             }
@@ -3449,15 +3574,9 @@ public final class LostTalesChatPresentation {
                 appendMentions(root, text.substring(literalStart, hash),
                         channel);
             }
-            // A slash and digits after the name link to one message of
-            // the channel, by the id the server gave it.
-            int linkEnd = ChatChannelSuggester.messageIdEnd(text, end);
-            long messageId = linkEnd > end
-                    ? Long.parseLong(text.substring(end + 1, linkEnd))
-                    : ChatMessageIds.NONE;
-            appendChannelLink(root, named, 0, messageId);
-            literalStart = linkEnd;
-            cursor = linkEnd;
+            appendChannelLink(root, link.channel, 0, link.messageId);
+            literalStart = link.end;
+            cursor = link.end;
         }
         if (literalStart < text.length()) {
             appendMentions(root, text.substring(literalStart), channel);
@@ -3518,11 +3637,12 @@ public final class LostTalesChatPresentation {
     /**
      * Splits a run of message text so that every {@code @name} reaching
      * somebody is a piece of its own in that somebody's colour, and the
-     * words around it stay as they were typed. A player this client
-     * cannot place, gone since the line was said, still reaches them by
-     * what the server recorded then ({@link #buildingNamedPlayers}), so
-     * an older line's mention reads as it did live. A name that reaches
-     * nobody is left alone: it is only text with an at-sign in front.
+     * words around it stay as they were typed. Whom a name reaches is the
+     * server's word, kept with the line ({@link #buildingNamedPlayers}):
+     * the person it names, here or gone, a player or a Discord member,
+     * found by their whole name so a name of several words is one
+     * mention. A role is found by its name. A name that reaches nobody is
+     * left alone: it is only text with an at-sign in front.
      */
     private static void appendMentions(ChatComponentText root, String text,
                                        ChatChannel channel) {
@@ -3533,25 +3653,25 @@ public final class LostTalesChatPresentation {
             if (at < 0) {
                 break;
             }
+            ChatMentions.Hit hit = ChatMentions.nameAt(text, at,
+                    buildingNamedPlayers);
             int end = at + 1;
-            while (end < text.length() && ChatMentionColors
-                    .isMentionCharacter(text.charAt(end))) {
-                end++;
+            if (hit != null) {
+                end = hit.end;
+            } else {
+                while (end < text.length() && ChatMentionColors
+                        .isMentionCharacter(text.charAt(end))) {
+                    end++;
+                }
             }
             // The at-sign must open a word, so an address never becomes
             // a mention of whoever is named after it.
             boolean opensWord = at == 0 || !ChatMentionColors
                     .isMentionCharacter(text.charAt(at - 1));
+            String name = text.substring(at + 1, end);
+            ChatNamedPlayer recorded = hit == null ? null : hit.player;
             int color = opensWord && end > at + 1
-                    ? ChatMentionColors.colorOf(text.substring(at + 1, end))
-                    : -1;
-            // The player as the server recorded them with the line: a
-            // name this client cannot place any more is coloured by it,
-            // and every mention of a player carries it for the card.
-            ChatNamedPlayer recorded = opensWord && end > at + 1
-                    ? ChatNamedPlayer.find(buildingNamedPlayers,
-                            text.substring(at + 1, end))
-                    : null;
+                    ? ChatMentionColors.colorOf(name) : -1;
             if (color < 0 && recorded != null
                     && LostTalesConfig.enableChatPings) {
                 color = ChatMentionColors.PLAYER_RGB;
@@ -3566,18 +3686,16 @@ public final class LostTalesChatPresentation {
                 // the pointer: a player mention with their card on
                 // hover and the conversation on a click, a role mention
                 // with the role's card naming everyone holding it.
-                String name = text.substring(at + 1, end);
-                String account = ChatMentionColors.accountFor(name);
-                if (account == null && recorded != null) {
-                    account = recorded.getAccount();
-                }
+                String account = recorded != null ? recorded.getAccount()
+                        : ChatMentionColors.accountFor(name);
                 ChatAccountRole role = account == null
                         ? ChatMentionColors.roleFor(name) : null;
                 ChatComponentText piece = text(text.substring(at, end),
                         nearestFormatting(color), false);
                 if (account != null) {
-                    root.appendSibling(ChatMentionMarker.apply(
-                            piece, color, account, recorded));
+                    root.appendSibling(ChatMentionMarker.apply(piece, color,
+                            account, recorded != null ? recorded
+                                    : knownNow(account)));
                 } else if (role != null) {
                     root.appendSibling(ChatMentionMarker.applyRole(
                             piece, color, role));

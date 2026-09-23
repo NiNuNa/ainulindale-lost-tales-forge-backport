@@ -43,9 +43,11 @@ import org.lwjgl.opengl.GL11;
  * over those without a role under Online — then under the grey sphere and
  * Offline everyone else who may read it, by name, its count taking in
  * those an answer too long to list leaves out, who are counted on a line
- * of their own at the end. A whisper lists its two
- * people and the Client Console the player alone; a conversation with an
- * NPC lists the player and the NPC, whom this client adds itself
+ * of their own at the end. The Server stands in every
+ * conversation's list, since it can speak in every one. A whisper lists
+ * its two people and the Client Console the player; a conversation with
+ * an NPC lists the player and the NPC, and the Client Console the Client,
+ * whom this client adds itself, as the server knows nothing of either
  * ({@link #membersOf}).</p>
  *
  * <p>The rows are the chat's small text throughout: everything a row
@@ -61,12 +63,13 @@ import org.lwjgl.opengl.GL11;
  * right-click their menu, as on a name in a message.</p>
  *
  * <p>The list comes out and goes away with the button at the tool strip's
- * right end, sliding in from the window's right edge while the words give
- * it their room; a window too narrow to keep {@link #MIN_MESSAGE_WIDTH}
- * for its words keeps its list away. Its left edge is a handle: dragged,
+ * right end, and only with it, sliding in from the window's right edge
+ * while the words give it their room. Its left edge is a handle: dragged,
  * the list grows to a third of the window or narrows to its heads alone,
  * and a name its row cuts short slides along while the pointer rests on
- * it, as a tab's does.</p>
+ * it, as a tab's does. A window made narrower narrows its list with it,
+ * so the words keep {@link #MIN_MESSAGE_WIDTH} beside it, down to the
+ * heads alone; the list never leaves by itself.</p>
  */
 final class ChatMemberList {
     /** The list's own width in the chat's pixels, its separator included. */
@@ -79,7 +82,10 @@ final class ChatMemberList {
      * separator from the other side.
      */
     static final float EDGE_HANDLE = 4.0F;
-    /** The least room the words keep beside a list; narrower, the list stays away. */
+    /**
+     * The room the words keep beside a list: a narrower window narrows its
+     * list first, and once the list is down to its heads the words give way.
+     */
     static final int MIN_MESSAGE_WIDTH = 160;
     /** A member's row, in the list's units: the avatar-sized head and three clear rows above and below. */
     static final int ROW_HEIGHT = 22;
@@ -98,6 +104,9 @@ final class ChatMemberList {
     static final int HEADING_ICON_GAP = 3;
     /** What an NPC's own group is known by, before its faction's name. */
     static final String NPC_GROUP_PREFIX = "npc:";
+
+    /** What the heading of a group of those here stands behind. */
+    enum HeadingIcon { ONLINE, NPC, DISCORD, FACTION, ROLE }
     /** Clear space between the name's capitals and the title's, in the list's units. */
     static final int TITLE_GAP = 3;
     /** Clear space the names keep from the window's edge, in the list's units. */
@@ -196,21 +205,18 @@ final class ChatMemberList {
     }
 
     /**
-     * Whether a window whose words have {@code messageWidth} pixels keeps
-     * room for a list {@code width} wide.
-     */
-    static boolean fits(float messageWidth, float width) {
-        return messageWidth - width >= MIN_MESSAGE_WIDTH;
-    }
-
-    /**
      * Lays the list's width out for a window {@code windowWidth} of the
-     * chat's pixels wide: the width the player dragged it to, or its own,
-     * never past a third of the window nor narrower than its heads.
+     * chat's pixels wide whose words start {@code messageX} in: the width
+     * the player dragged it to, or its own, never past a third of the
+     * window nor past what leaves the words {@link #MIN_MESSAGE_WIDTH},
+     * and never narrower than its heads.
      */
-    static void measure(State state, ChatWindow window, float windowWidth) {
+    static void measure(State state, ChatWindow window, float windowWidth,
+                        float messageX) {
         state.minWidth = minWidth();
-        state.maxWidth = Math.max(state.minWidth, windowWidth * MAX_SHARE);
+        state.maxWidth = Math.max(state.minWidth, Math.min(
+                windowWidth * MAX_SHARE,
+                windowWidth - messageX - MIN_MESSAGE_WIDTH));
         double chosen = window == null ? 0.0D : window.getMembersWidth();
         state.width = clampWidth(chosen > 0.0D ? (float)chosen
                 : DEFAULT_WIDTH, state.minWidth, state.maxWidth);
@@ -236,20 +242,31 @@ final class ChatMemberList {
     }
 
     /**
-     * The members a tab's list shows: the server's answer, and in a
-     * conversation with an NPC the NPC too, whom the server knows nothing
-     * of, here and in the order the list keeps.
+     * The members a tab's list shows: the server's answer, and those the
+     * server knows nothing of — in a conversation with an NPC the NPC, and
+     * in the Client Console the Client, this computer's own voice there —
+     * in the order the list keeps.
      */
     static List<LostTalesChatMembersPacket.Member> membersOf(ChatTab tab,
             List<LostTalesChatMembersPacket.Member> answered) {
-        if (tab == null || !tab.isNpc()) {
+        boolean console = tab != null && tab.getChannel() == ChatChannel.CONSOLE;
+        if (tab == null || !(tab.isNpc() || console)) {
             return answered;
         }
         List<LostTalesChatMembersPacket.Member> members =
                 new ArrayList<LostTalesChatMembersPacket.Member>(answered);
-        members.add(npcOf(tab, answered));
+        members.add(console ? clientMember() : npcOf(tab, answered));
         Collections.sort(members, LostTalesChatMembersPacket.ORDER);
         return members;
+    }
+
+    /** The Client as the Client Console's list shows it: here, in the consoles' colour, with no status. */
+    static LostTalesChatMembersPacket.Member clientMember() {
+        int color = ChatChannel.CONSOLE.getDisplayColor();
+        return new LostTalesChatMembersPacket.Member(
+                LostTalesChatMessagePacket.CLIENT_SENDER_ID, "", null,
+                StatCollector.translateToLocal("chat.losttales.client.name"),
+                color, "", "", color, "", "", 0, true);
     }
 
     /**
@@ -382,7 +399,9 @@ final class ChatMemberList {
     static String nameOf(LostTalesChatMembersPacket.Member member) {
         return LostTalesChatMessagePacket.isServerSender(member.getPlayerId())
                 ? StatCollector.translateToLocal("chat.losttales.server.name")
-                : member.getName();
+                : LostTalesChatMessagePacket.isClientSender(member.getPlayerId())
+                        ? StatCollector.translateToLocal("chat.losttales.client.name")
+                        : member.getName();
     }
 
     /**
@@ -613,7 +632,7 @@ final class ChatMemberList {
             GL11.glTranslatef(rowsLeft, rowTop, 0.0F);
             GL11.glScalef(unit, unit, 1.0F);
             if (row.offline) {
-                drawHeadingSphere(LostTalesUiSheet.PRESENCE_OFFLINE, INSET,
+                drawHeadingMark(LostTalesUiSheet.PRESENCE_OFFLINE, INSET,
                         textTop, alpha);
                 textLeft += HEADING_ICON_SIZE + HEADING_ICON_GAP;
             } else if (row.groupOf != null) {
@@ -630,58 +649,78 @@ final class ChatMemberList {
     }
 
     /**
-     * The icon the heading of a group of those here stands behind, in an
-     * emoji's box at {@code x} beside capitals whose top is
-     * {@code textTop}: the green sphere over those without a role, a
-     * faction's banner as the Faction tab wears it, a role's own icon,
-     * the face an NPC's conversation wears over an NPC's group, and the
-     * Discord emoji over a Discord server's members.
+     * The icon over the group {@code groupKey} of those here, in a list
+     * that is {@code inCharacter} or not: the green sphere over the plain
+     * group, Online, in every list; the face an NPC's conversation wears
+     * over an NPC's own group; the Discord emoji over a Discord server's
+     * members; in character a faction's banner, out of character a role's
+     * own icon.
+     */
+    static HeadingIcon headingIconOf(String groupKey, boolean inCharacter) {
+        String group = groupKey == null ? "" : groupKey;
+        if (group.length() == 0) {
+            return HeadingIcon.ONLINE;
+        }
+        if (group.startsWith(NPC_GROUP_PREFIX)) {
+            return HeadingIcon.NPC;
+        }
+        if (LostTalesChatMembersPacket.isDiscordGroup(group)) {
+            return HeadingIcon.DISCORD;
+        }
+        return inCharacter ? HeadingIcon.FACTION : HeadingIcon.ROLE;
+    }
+
+    /**
+     * The icon the heading of a group of those here stands behind
+     * ({@link #headingIconOf}), in an emoji's box at {@code x} beside
+     * capitals whose top is {@code textTop}. A faction with no banner
+     * wears the Faction tab's emoji.
      */
     private static void drawHeadingIcon(Minecraft minecraft, ChatTab tab,
                                         LostTalesChatMembersPacket.Member first,
                                         int x, int textTop, int alpha) {
         int boxTop = textTop - LostTalesChatOverlayRenderer.ROW_TEXT_TOP;
         String group = first.getGroupKey();
-        if (group.startsWith(NPC_GROUP_PREFIX)) {
-            ChatInlineIcons.drawEmoji(minecraft, ChatEmoji.GRINNING, x, boxTop,
-                    HEADING_ICON_SIZE, alpha);
-            return;
-        }
-        if (LostTalesChatMembersPacket.isDiscordGroup(group)) {
-            ChatInlineIcons.drawEmoji(minecraft, ChatEmoji.DISCORD, x, boxTop,
-                    HEADING_ICON_SIZE, alpha);
-            return;
-        }
         ChatChannel channel = tab == null ? null : tab.getChannel();
-        if (channel != null && ChatRolePresentation.isInCharacter(channel)) {
-            ItemStack banner = group.length() == 0 ? null
-                    : LotrFactionBannerResolver.bannerFor(group);
-            if (banner != null) {
-                ChatInlineIcons.drawItem(minecraft, banner, x, boxTop,
-                        HEADING_ICON_SIZE, alpha);
-            } else {
-                ChatInlineIcons.drawEmoji(minecraft,
-                        ChatChannelIcons.iconOf(ChatChannel.FACTION), x, boxTop,
-                        HEADING_ICON_SIZE, alpha);
-            }
-            return;
+        switch (headingIconOf(group, channel != null
+                && ChatRolePresentation.isInCharacter(channel))) {
+            case ONLINE:
+                drawHeadingMark(LostTalesUiSheet.PRESENCE_ONLINE, x, textTop,
+                        alpha);
+                return;
+            case NPC:
+                ChatInlineIcons.drawEmoji(minecraft, ChatEmoji.GRINNING, x,
+                        boxTop, HEADING_ICON_SIZE, alpha);
+                return;
+            case DISCORD:
+                ChatInlineIcons.drawEmoji(minecraft, ChatEmoji.DISCORD, x,
+                        boxTop, HEADING_ICON_SIZE, alpha);
+                return;
+            case FACTION:
+                ItemStack banner = LotrFactionBannerResolver.bannerFor(group);
+                if (banner != null) {
+                    ChatInlineIcons.drawItem(minecraft, banner, x, boxTop,
+                            HEADING_ICON_SIZE, alpha);
+                } else {
+                    ChatInlineIcons.drawEmoji(minecraft,
+                            ChatChannelIcons.iconOf(ChatChannel.FACTION), x,
+                            boxTop, HEADING_ICON_SIZE, alpha);
+                }
+                return;
+            default:
+                drawRoleIcon(minecraft, ChatAccountRole.byId(group), x, boxTop,
+                        alpha);
         }
-        if (group.length() == 0) {
-            drawHeadingSphere(LostTalesUiSheet.PRESENCE_ONLINE, x, textTop,
-                    alpha);
-            return;
-        }
-        drawRoleIcon(minecraft, ChatAccountRole.byId(group), x, boxTop, alpha);
     }
 
-    /** A sphere at its own size, centred in the icon's box and on the capitals beside it. */
-    private static void drawHeadingSphere(LostTalesUiSheet sphere, int x,
-                                          int textTop, int alpha) {
-        sphere.drawWithShadow(x + LostTalesUiInk.centredStart(HEADING_ICON_SIZE,
-                        sphere.getWidth()),
+    /** A status mark at its own size, centred in the icon's box and on the capitals beside it. */
+    private static void drawHeadingMark(LostTalesUiSheet mark, int x,
+                                        int textTop, int alpha) {
+        mark.drawWithShadow(x + LostTalesUiInk.centredStart(HEADING_ICON_SIZE,
+                        mark.getWidth()),
                 textTop + LostTalesUiInk.centredStart(
                         LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT,
-                        sphere.getHeight()), alpha);
+                        mark.getHeight()), alpha);
     }
 
     /**

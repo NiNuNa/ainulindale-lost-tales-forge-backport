@@ -1,8 +1,10 @@
 package com.ninuna.losttales.network.packet;
 
+import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
+import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
@@ -166,7 +168,12 @@ public final class LostTalesChatConsoleSyncPacket implements IMessage {
         @Override
         public IMessage onMessage(final LostTalesChatConsoleSyncPacket message,
                                   MessageContext context) {
-            if (message == null || message.isMalformed()) {
+            if (message == null) {
+                return null;
+            }
+            if (message.isMalformed()) {
+                FMLLog.warning("[%s] A batch of Server Console entries from the server could not be read and was dropped",
+                        LostTalesMetaData.MOD_ID);
                 return null;
             }
             LostTalesMod.proxy.scheduleClientTask(new Runnable() {

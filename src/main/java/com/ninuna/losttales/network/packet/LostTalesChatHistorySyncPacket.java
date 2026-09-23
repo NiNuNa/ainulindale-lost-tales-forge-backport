@@ -1,6 +1,8 @@
 package com.ninuna.losttales.network.packet;
 
+import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.LostTalesMod;
+import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
@@ -136,7 +138,14 @@ public final class LostTalesChatHistorySyncPacket implements IMessage {
         @Override
         public IMessage onMessage(final LostTalesChatHistorySyncPacket message,
                                   MessageContext context) {
-            if (message == null || message.isMalformed()) {
+            if (message == null) {
+                return null;
+            }
+            if (message.isMalformed()) {
+                // A batch that cannot be read is lost whole; say so, or a
+                // history that never arrives leaves no trace.
+                FMLLog.warning("[%s] A batch of chat history from the server could not be read and was dropped",
+                        LostTalesMetaData.MOD_ID);
                 return null;
             }
             LostTalesMod.proxy.scheduleClientTask(new Runnable() {

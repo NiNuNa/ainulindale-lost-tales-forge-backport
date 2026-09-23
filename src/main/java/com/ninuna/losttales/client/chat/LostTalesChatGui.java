@@ -1042,10 +1042,13 @@ public final class LostTalesChatGui extends GuiChat
         this.hover = resolveHover(pointerX, pointerY);
         followSnapFlyout();
         // The floating controls light from the same answer, and so does
-        // a member list's row.
+        // a member list's row; a toolbar's menu button stays lit while
+        // the menu it opened is out.
+        boolean onToolbar = this.hover.is(ChatHover.Kind.MESSAGE_TOOLBAR);
         ChatWindowFrame.noteHoveredControls(
-                this.hover.is(ChatHover.Kind.MESSAGE_TOOLBAR)
-                        ? this.hover.frame : null, this.hover.toolbarKind,
+                onToolbar ? this.hover.frame : this.menus.toolbarMenuFrame(),
+                onToolbar ? this.hover.toolbarKind
+                        : LostTalesChatOverlayRenderer.TOOLBAR_MORE,
                 this.hover.is(ChatHover.Kind.JUMP_PILL)
                         ? this.hover.frame : null);
         for (ChatWindowFrame frame : ChatWindowFrame.drawnFrames()) {
@@ -1181,7 +1184,8 @@ public final class LostTalesChatGui extends GuiChat
      * controls behind them stay quiet.
      */
     private void drawHoverTipFor() {
-        if (this.hoverTip.length() > 0 && !this.menus.isOpen()
+        if (this.hoverTip.length() > 0
+                && (!this.menus.isOpen() || this.hover.is(ChatHover.Kind.MENU))
                 && !this.snapFlyout.isShown()) {
             drawHoverTip();
         }
@@ -1370,6 +1374,7 @@ public final class LostTalesChatGui extends GuiChat
             ChatHover hover = new ChatHover(entry != null
                     ? ChatHover.Kind.MENU_ENTRY : ChatHover.Kind.MENU);
             hover.menuEntry = entry;
+            hover.menuTip = this.menus.unavailableAt(x, y);
             return hover;
         }
         ChatSnapAssist.Card card = this.snapAssist.cardAt(x, y);
@@ -1634,21 +1639,24 @@ public final class LostTalesChatGui extends GuiChat
                         : tipFor(hover.tabHit, hover.window, hover.overGrip);
             case TOOL_STRIP:
                 return ChatToolStrip.tipFor(hover.stripPart, hover.window);
+            case MENU:
+                // A row the menu keeps in its place but cannot take says
+                // why.
+                return hover.menuTip;
             case EMPTY_PLUS:
                 return StatCollector.translateToLocal(
                         "gui.losttales.chat.tab.restore");
             case REPLY_CHIP:
                 return StatCollector.translateToLocal(
                         "gui.losttales.chat.message.cancel_reply");
-            case MESSAGE_TOOLBAR:
-                return StatCollector.translateToLocal(
-                        hover.toolbarKind
-                                == LostTalesChatOverlayRenderer.TOOLBAR_REACT
-                                ? "gui.losttales.chat.message.react"
-                                : hover.toolbarKind
-                                        == LostTalesChatOverlayRenderer.TOOLBAR_REPLY
-                                        ? "gui.losttales.chat.message.reply"
-                                        : "gui.losttales.chat.message.copy");
+            case MESSAGE_TOOLBAR: {
+                // A control that cannot be taken on this message says why.
+                String why = hover.frame == null ? ""
+                        : hover.frame.toolbarWhy(hover.toolbarKind);
+                return why.length() > 0 ? why
+                        : StatCollector.translateToLocal(
+                                toolbarLabelKey(hover.toolbarKind));
+            }
             case LINE:
                 // The button beside a message's reactions says what the
                 // toolbar's own React says.
@@ -1676,6 +1684,22 @@ public final class LostTalesChatGui extends GuiChat
                                 : "gui.losttales.chat.toolbar.collapse");
             default:
                 return "";
+        }
+    }
+
+    /** The words the message menu names a toolbar control by. */
+    private static String toolbarLabelKey(int kind) {
+        switch (kind) {
+            case LostTalesChatOverlayRenderer.TOOLBAR_REACT:
+                return "gui.losttales.chat.message.react";
+            case LostTalesChatOverlayRenderer.TOOLBAR_REPLY:
+                return "gui.losttales.chat.message.reply";
+            case LostTalesChatOverlayRenderer.TOOLBAR_LINK:
+                return "gui.losttales.chat.message.copy_link";
+            case LostTalesChatOverlayRenderer.TOOLBAR_MORE:
+                return "gui.losttales.chat.message.more";
+            default:
+                return "gui.losttales.chat.message.copy";
         }
     }
 
@@ -1960,10 +1984,8 @@ public final class LostTalesChatGui extends GuiChat
                     shown);
             LostTalesChatOverlayRenderer.drawWindowFrameSurface(this.mc,
                     frame, shown);
-            LostTalesChatOverlayRenderer.drawWindowLeftEdge(this.mc, frame,
+            LostTalesChatOverlayRenderer.drawWindowFrameEdges(this.mc, frame,
                     shown);
-            LostTalesChatOverlayRenderer.drawWindowTopRightEdges(this.mc,
-                    frame, shown);
             if (!window.getId().equals(activeBarId)) {
                 this.bar.drawRestingBar(frame, window);
             }
@@ -2567,7 +2589,7 @@ public final class LostTalesChatGui extends GuiChat
                     this.composer.cancelComposing(this.inputField);
                     return;
                 case MESSAGE_TOOLBAR:
-                    clickMessageToolbar(press);
+                    clickMessageToolbar(press, menuClick);
                     return;
                 case SCROLLBAR:
                     if (this.gestures.grabScrollbar(x, y)) {
@@ -2699,25 +2721,55 @@ public final class LostTalesChatGui extends GuiChat
     }
 
     /**
-     * The hovered message's own controls: reply to it, or copy it. The
-     * same two the message's menu offers, acting on the message the
-     * toolbar was drawn for rather than on whatever lies under the
-     * pointer now — the toolbar covers its own message, so the two
-     * agree, but the id is the one the draw recorded either way.
+     * The hovered message's own controls: react to it, reply to it, copy
+     * it or copy a link to it — the four the message's menu leads with —
+     * or open that menu, hanging from the control. Each acts on the
+     * message the toolbar was drawn for rather than on whatever lies
+     * under the pointer now, by the id the draw recorded. A control that
+     * cannot be taken on the message does nothing; its tip says why. The
+     * menu control is a switch: a press with its menu out, which
+     * {@code menuClick} closed, puts it away.
      */
-    private boolean clickMessageToolbar(ChatHover press) {
+    private boolean clickMessageToolbar(ChatHover press,
+                                        ChatScreenMenus.Click menuClick) {
         ChatWindowFrame frame = press.frame;
         if (frame == null || press.toolbarKind < 0) {
             return false;
         }
+        if (frame.toolbarWhy(press.toolbarKind).length() > 0) {
+            return true;
+        }
         int chatLineId = frame.toolbarChatLineId;
-        if (press.toolbarKind == LostTalesChatOverlayRenderer.TOOLBAR_REACT) {
-            openReactionPicker(ClientChatMessageIds.messageIdOf(chatLineId));
-        } else if (press.toolbarKind
-                == LostTalesChatOverlayRenderer.TOOLBAR_REPLY) {
-            replyToLine(frame, chatLineId);
-        } else if (LostTalesChatClipboard.copy(
-                messageTextOf(frame, chatLineId))) {
+        String copied = null;
+        switch (press.toolbarKind) {
+            case LostTalesChatOverlayRenderer.TOOLBAR_REACT:
+                openReactionPicker(ClientChatMessageIds.messageIdOf(chatLineId));
+                break;
+            case LostTalesChatOverlayRenderer.TOOLBAR_REPLY:
+                replyToLine(frame, chatLineId);
+                break;
+            case LostTalesChatOverlayRenderer.TOOLBAR_LINK:
+                copied = ChatScreenMenus.messageLinkFor(chatLineId);
+                break;
+            case LostTalesChatOverlayRenderer.TOOLBAR_MORE:
+                if (!menuClick.closedMessageMenu(chatLineId)) {
+                    float cellLeft = frame.toolbarCellLeft(press.toolbarKind);
+                    this.menus.openToolbarMessagePopup(frame, chatLineId,
+                            firstRowOf(frame.lines, chatLineId),
+                            ChatPopupMenu.Anchor.inward(
+                                    (int)Math.floor(cellLeft),
+                                    (int)Math.floor(frame.toolbarTop),
+                                    (int)Math.ceil(cellLeft
+                                            + frame.toolbarCellWidth),
+                                    (int)Math.ceil(frame.toolbarBottom),
+                                    frame, this.width, this.height));
+                }
+                break;
+            default:
+                copied = messageTextOf(frame, chatLineId);
+                break;
+        }
+        if (copied != null && LostTalesChatClipboard.copy(copied)) {
             showNotice(StatCollector.translateToLocal(
                     "gui.losttales.chat.copied"));
         }
@@ -3426,6 +3478,12 @@ public final class LostTalesChatGui extends GuiChat
                     : ClientChatChannelViews.tabOf(chatLineId);
             if (filedUnder != null) {
                 tab = filedUnder;
+            } else if (tab != null && tab.isWhisper()) {
+                // A whisper link names a conversation only its two
+                // people hold; there is no whisper tab to open for it.
+                showNotice(StatCollector.translateToLocal(
+                        "gui.losttales.chat.message.gone"));
+                return;
             }
         }
         if (tab == null) {

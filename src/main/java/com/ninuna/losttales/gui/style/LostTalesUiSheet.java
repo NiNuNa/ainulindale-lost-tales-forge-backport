@@ -11,7 +11,8 @@ import org.lwjgl.opengl.GL11;
  * The chat's own artwork, one sprite sheet: the four picker buttons and
  * the send button, the tab row's controls and their hover states, the
  * window's fullscreen control, the search fields' magnifiers, the tab
- * borders, the framed buttons' corners, the window grip, and the hatch
+ * borders, the framed buttons' corners and a chat window frame's, the
+ * window grip, and the hatch
  * laid over empty message rows. Each
  * constant is a cell of {@code textures/gui/chat.png} in
  * texels; the sheet is drawn 1:1 in GUI pixels, so a sprite's width and
@@ -70,72 +71,98 @@ public enum LostTalesUiSheet {
      * the window keeps its own size, pointing in while it fills the
      * screen, each with its lit artwork.
      */
-    FULLSCREEN(64, 18, 5, 5),
-    FULLSCREEN_HOVER(70, 18, 5, 5),
-    FULLSCREEN_EXIT(52, 18, 5, 5),
-    FULLSCREEN_EXIT_HOVER(58, 18, 5, 5),
+    FULLSCREEN(75, 26, 5, 5),
+    FULLSCREEN_HOVER(81, 26, 5, 5),
+    FULLSCREEN_EXIT(63, 26, 5, 5),
+    FULLSCREEN_EXIT_HOVER(69, 26, 5, 5),
     /**
      * The pen a tab wears while something is written in its input and
      * not yet sent, resting and lit: the draft mark, beside the
      * fullscreen controls on the sheet.
      */
-    DRAFT(76, 18, 4, 5),
-    DRAFT_HOVER(81, 18, 4, 5),
+    DRAFT(87, 26, 4, 5),
+    DRAFT_HOVER(92, 26, 4, 5),
     /**
      * A question mark and an exclamation mark, each in the chat's ivory
      * and in a colour of its own — the question green, the exclamation
      * crimson. Nothing draws them yet; they are here so the sheet and
      * these constants stay one description of the artwork.
      */
-    QUESTION(86, 18, 3, 5),
-    QUESTION_LIT(90, 18, 3, 5),
-    EXCLAMATION(94, 18, 1, 5),
-    EXCLAMATION_LIT(96, 18, 1, 5),
+    QUESTION(97, 26, 3, 5),
+    QUESTION_LIT(101, 26, 3, 5),
+    EXCLAMATION(102, 11, 1, 5),
+    EXCLAMATION_LIT(104, 11, 1, 5),
     /**
-     * The sphere a head wears for the presence of the identity it shows,
+     * The mark a head wears for the presence of the identity it shows,
      * at the head's bottom-right corner in a notch cut out of the head
-     * ({@link com.ninuna.losttales.client.chat.ChatPresenceMark}): green
-     * for Online, honey for Away, crimson for Do Not Disturb, and the
-     * muted one for Offline, which is what everyone else sees of
-     * Invisible. The ivory sphere is not a presence: it is the lit look a
-     * status row's sphere crosses to under the pointer in the head
+     * ({@link com.ninuna.losttales.client.chat.ChatPresenceMark}), each
+     * status a shape as well as a colour: the green sphere for Online, a
+     * honey crescent for Away, a crimson disc barred across for Do Not
+     * Disturb, and a muted ring for Offline, which is what everyone else
+     * sees of Invisible; the hollows are painted in, shaded plum at two
+     * thirds. The ivory sphere is not a presence: it is the lit look a
+     * status row's mark crosses to under the pointer in the head
      * button's menu.
      */
-    PRESENCE_SELECTED(52, 24, 5, 5),
-    PRESENCE_OFFLINE(58, 24, 5, 5),
-    PRESENCE_ONLINE(64, 24, 5, 5),
-    PRESENCE_AWAY(70, 24, 5, 5),
-    PRESENCE_BUSY(76, 24, 5, 5),
+    PRESENCE_SELECTED(17, 26, 5, 5),
+    PRESENCE_OFFLINE(23, 26, 5, 5),
+    PRESENCE_ONLINE(29, 26, 5, 5),
+    PRESENCE_AWAY(35, 26, 5, 5),
+    PRESENCE_BUSY(41, 26, 5, 5),
     /**
      * The member list's button: two people, one standing before the
      * other, with its lit cell to the right.
      */
-    MEMBERS(82, 24, 7, 5),
-    MEMBERS_HOVER(90, 24, 7, 5),
+    MEMBERS(47, 26, 7, 5),
+    MEMBERS_HOVER(55, 26, 7, 5),
     /**
-     * A tab's count of unread mentions, one to nine, each an ivory
-     * figure on a crimson tile as tall as the capitals, as a messenger's
-     * mention badge is.
+     * A hovered message's toolbar controls, each with its lit artwork:
+     * copy, a page with its corner turned down, and reply, an arrow
+     * curling back to the left.
      */
-    COUNT_1(52, 30, 5, 7),
-    COUNT_2(58, 30, 5, 7),
-    COUNT_3(64, 30, 5, 7),
-    COUNT_4(70, 30, 5, 7),
-    COUNT_5(76, 30, 5, 7),
-    COUNT_6(82, 30, 5, 7),
-    COUNT_7(88, 30, 5, 7),
-    COUNT_8(94, 30, 5, 7),
-    COUNT_9(100, 30, 5, 7),
+    COPY(45, 32, 4, 5),
+    COPY_HOVER(50, 32, 4, 5),
+    REPLY(55, 32, 4, 5),
+    REPLY_HOVER(60, 32, 4, 5),
     /**
-     * The magnifier a search field opens with, in two sizes: eight
-     * pixels for a field one chat row tall, ten for one as tall as the
-     * key icons it carries. Only the small one has lit artwork, which
-     * the search bar and the pickers cross to while their field takes
-     * the keys or the pointer is on it.
+     * An arrow curling on to the right, with its lit artwork: forwarding a
+     * message to another conversation. Nothing draws it yet, as there is
+     * no forwarding; it is here so the sheet and these constants stay one
+     * description of the artwork.
+     */
+    FORWARD(65, 32, 4, 5),
+    FORWARD_HOVER(70, 32, 4, 5),
+    /**
+     * The message toolbar's menu button, three dots in a row, with its
+     * lit artwork beneath it on the sheet: it opens the message's own
+     * menu, the one a right click opens.
+     */
+    MORE(36, 32, 8, 2),
+    MORE_HOVER(36, 35, 8, 2),
+    /**
+     * A tab's count of unread mentions, as a messenger's mention badge
+     * is: a crimson tile as tall as the capitals, built from its left
+     * edge and one figure after it — one to nine in ivory, or the plus
+     * past nine ({@link #drawJoinedWithShadow}).
+     */
+    COUNT_LEFT(52, 18, 1, 7),
+    COUNT_MORE(54, 18, 4, 7),
+    COUNT_1(59, 18, 4, 7),
+    COUNT_2(64, 18, 4, 7),
+    COUNT_3(69, 18, 4, 7),
+    COUNT_4(74, 18, 4, 7),
+    COUNT_5(79, 18, 4, 7),
+    COUNT_6(84, 18, 4, 7),
+    COUNT_7(89, 18, 4, 7),
+    COUNT_8(94, 18, 4, 7),
+    COUNT_9(99, 18, 4, 7),
+    /**
+     * The magnifier every search field opens with, and its lit artwork,
+     * which the search bar and the pickers cross to while their field
+     * takes the keys or the pointer is on it.
      */
     SEARCH(14, 17, 8, 8),
     SEARCH_HOVER(23, 17, 8, 8),
-    SEARCH_LARGE(33, 26, 8, 9),
     /**
      * A framed button's four corners, resting and lit: six-texel cells
      * whose innermost column and row are the frame's edges, stretched
@@ -151,6 +178,16 @@ public enum LostTalesUiSheet {
     FRAME_LIT_TOP_RIGHT(21, 79, 6, 6),
     FRAME_LIT_BOTTOM_LEFT(14, 86, 6, 6),
     FRAME_LIT_BOTTOM_RIGHT(21, 86, 6, 6),
+    /**
+     * A chat window's frame, its corners and, stretched as a framed
+     * button's are, its edges: the lit framed button's ink texel for
+     * texel, previewing the window's plum black behind it where a
+     * button's cells preview their plum grey.
+     */
+    WINDOW_FRAME_TOP_LEFT(28, 79, 6, 6),
+    WINDOW_FRAME_TOP_RIGHT(35, 79, 6, 6),
+    WINDOW_FRAME_BOTTOM_LEFT(28, 86, 6, 6),
+    WINDOW_FRAME_BOTTOM_RIGHT(35, 86, 6, 6),
     /** The favourite heart: plain, and filled in the palette's wine. */
     HEART(48, 11, 5, 5),
     HEART_FAVORITE(54, 11, 5, 5),
@@ -289,20 +326,39 @@ public enum LostTalesUiSheet {
 
     /**
      * A control that has both a resting and a hovered artwork, drawn a
-     * share of the way from one to the other: the resting sprite whole,
-     * with the hovered one laid over it as far as it has come. One
-     * shadow, from the resting sprite, since the two are the same shape
-     * and a second would darken it twice.
+     * share of the way from one to the other: the hovered artwork laid
+     * over the resting one as far as it has come, the resting ink whole
+     * under it while the resting hollows give way to the hovered ones
+     * ({@link #drawSplit}), so a lit control shows exactly its lit
+     * artwork's hollows and never the two stacked. One shadow, from the
+     * resting sprite, since the two are the same shape and a second would
+     * darken it twice; the picture is flat, so the hollows never show it.
      */
-    public static void drawPairWithShadow(LostTalesUiSheet resting,
-                                   LostTalesUiSheet hovered, float progress,
-                                   float x, float y, int alpha) {
-        resting.drawWithShadow(x, y, alpha);
-        int over = Math.round(alpha * Math.max(0.0F, Math.min(1.0F,
-                progress)));
-        if (over >= LostTalesUiInk.MIN_VISIBLE_ALPHA) {
-            hovered.draw(x, y, over);
-        }
+    public static void drawPairWithShadow(final LostTalesUiSheet resting,
+                                          final LostTalesUiSheet hovered,
+                                          final float progress, final float x,
+                                          final float y, final int alpha) {
+        drawFlatWithShadow(x, y, resting.width, resting.height,
+                new LostTalesUiFlatLayers.Layers() {
+                    @Override
+                    public void draw() {
+                        drawShadow(resting.u, resting.v, resting.width,
+                                resting.height, x, y, alpha);
+                        LostTalesUiFlatLayers.nextLayer();
+                        int over = Math.round(alpha * Math.max(0.0F,
+                                Math.min(1.0F, progress)));
+                        if (over < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
+                            LostTalesUiSheet.draw(resting.u, resting.v,
+                                    resting.width, resting.height, x, y,
+                                    alpha);
+                            return;
+                        }
+                        drawSplit(resting.u, resting.v, resting.width,
+                                resting.height, x, y, alpha, alpha - over);
+                        LostTalesUiSheet.draw(hovered.u, hovered.v,
+                                hovered.width, hovered.height, x, y, over);
+                    }
+                });
     }
 
     /**
@@ -310,13 +366,107 @@ public enum LostTalesUiSheet {
      * padlock's frames are addressed this way: they are a grid rather
      * than named cells, so they carry their own coordinates.
      */
-    public static void drawWithShadow(int u, int v, int width, int height,
-                               float x, float y, int alpha) {
-        drawShadow(u, v, width, height, x, y, alpha);
-        // The sprite stands over its shadow, so a translucent picture
+    public static void drawWithShadow(final int u, final int v,
+                                      final int width, final int height,
+                                      final float x, final float y,
+                                      final int alpha) {
+        drawFlatWithShadow(x, y, width, height,
+                new LostTalesUiFlatLayers.Layers() {
+                    @Override
+                    public void draw() {
+                        drawShadow(u, v, width, height, x, y, alpha);
+                        LostTalesUiFlatLayers.nextLayer();
+                        LostTalesUiSheet.draw(u, v, width, height, x, y,
+                                alpha);
+                    }
+                });
+    }
+
+    /**
+     * A sprite and its shadow as one flat picture: the sprite stands over
+     * its shadow, and its painted hollows — the translucent texels behind
+     * its ink, two thirds in the artwork — show what lies behind the
+     * picture exactly as painted, never the sprite's own shadow.
+     */
+    private static void drawFlatWithShadow(float x, float y, int width,
+                                           int height,
+                                           LostTalesUiFlatLayers.Layers layers) {
+        LostTalesUiFlatLayers.drawFlat(x, y,
+                x + width + LostTalesUiInk.SHADOW_OFFSET,
+                y + height + LostTalesUiInk.SHADOW_OFFSET, layers);
+    }
+
+    /**
+     * Any cell of the sheet with its ink at {@code inkAlpha} and its
+     * hollows — the translucent texels painted behind the ink — at
+     * {@code hollowAlpha}, no more than the ink: artwork crossing to other
+     * artwork laid over it lets its hollows give way to the other's while
+     * its ink stays whole under the other's ink.
+     */
+    public static void drawSplit(int u, int v, int width, int height,
+                                 float x, float y, int inkAlpha,
+                                 int hollowAlpha) {
+        int hollow = Math.max(0, Math.min(inkAlpha, hollowAlpha));
+        if (hollow >= LostTalesUiInk.MIN_VISIBLE_ALPHA) {
+            draw(u, v, width, height, x, y, hollow);
+        } else {
+            hollow = 0;
+        }
+        int ink = inkOver(inkAlpha, hollow);
+        if (ink < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
+            return;
+        }
+        // The ink alone, over itself where the whole cell was laid: the
+        // test sees texture and vertex alpha multiplied, so the threshold
+        // is scaled by the share the ink is drawn at.
+        boolean alphaTest = GL11.glIsEnabled(GL11.GL_ALPHA_TEST);
+        int alphaFunc = GL11.glGetInteger(GL11.GL_ALPHA_TEST_FUNC);
+        float alphaRef = GL11.glGetFloat(GL11.GL_ALPHA_TEST_REF);
+        GL11.glEnable(GL11.GL_ALPHA_TEST);
+        try {
+            GL11.glAlphaFunc(GL11.GL_GREATER, INK_THRESHOLD * ink / 255.0F);
+            draw(u, v, width, height, x, y, ink);
+        } finally {
+            GL11.glAlphaFunc(alphaFunc, alphaRef);
+            if (!alphaTest) {
+                GL11.glDisable(GL11.GL_ALPHA_TEST);
+            }
+        }
+    }
+
+    /**
+     * The opacity to lay a sprite's ink at over the same ink already laid
+     * at {@code under}, so the two together stand at {@code alpha}.
+     */
+    static int inkOver(int alpha, int under) {
+        float whole = Math.max(0, Math.min(255, alpha)) / 255.0F;
+        float laid = Math.max(0, Math.min(255, under)) / 255.0F;
+        if (laid >= 1.0F) {
+            return 0;
+        }
+        return Math.round(255.0F * Math.max(0.0F,
+                1.0F - (1.0F - whole) / (1.0F - laid)));
+    }
+
+    /**
+     * Two cells side by side, {@code first} from ({@code x}, {@code y})
+     * and {@code second} straight after it, their tops level, over one
+     * shadow for both as a single sprite casts it: how a count tile is
+     * drawn, its left edge and then its figure.
+     */
+    public static void drawJoinedWithShadow(LostTalesUiSheet first,
+                                            LostTalesUiSheet second, float x,
+                                            float y, int alpha) {
+        float secondX = x + first.width;
+        drawShadow(first.u, first.v, first.width, first.height, x, y, alpha);
+        drawShadow(second.u, second.v, second.width, second.height, secondX,
+                y, alpha);
+        // The cells stand over their shadow, so a translucent picture
         // does not show the one through the other.
         LostTalesUiFlatLayers.nextLayer();
-        draw(u, v, width, height, x, y, alpha);
+        draw(first.u, first.v, first.width, first.height, x, y, alpha);
+        draw(second.u, second.v, second.width, second.height, secondX, y,
+                alpha);
     }
 
     /** The shared drop shadow: the same cell, offset, in the shadow tone. */
@@ -418,11 +568,12 @@ public enum LostTalesUiSheet {
         return Math.round(alpha * Math.max(0.0F, Math.min(1.0F, ramp)));
     }
 
-    /** The count tile for {@code count}, one to nine; the nine past it. */
-    public static LostTalesUiSheet countTile(int count) {
-        LostTalesUiSheet[] tiles = {COUNT_1, COUNT_2, COUNT_3, COUNT_4,
+    /** The figure a count tile shows for {@code count}: one to nine, the plus past nine. */
+    public static LostTalesUiSheet countFigure(int count) {
+        LostTalesUiSheet[] figures = {COUNT_1, COUNT_2, COUNT_3, COUNT_4,
                 COUNT_5, COUNT_6, COUNT_7, COUNT_8, COUNT_9};
-        return tiles[Math.max(1, Math.min(tiles.length, count)) - 1];
+        return count > figures.length ? COUNT_MORE
+                : figures[Math.max(1, count) - 1];
     }
 
     /** The sprite at its own size, 1:1, at the given opacity. */
@@ -463,6 +614,58 @@ public enum LostTalesUiSheet {
             tessellator.addVertexWithUV(x, y, 0.0D, u0, v0);
             tessellator.draw();
         } finally {
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+        }
+    }
+
+    /**
+     * One row or one column of the sheet, {@code texels} texels from
+     * {@code (u, v)}, laid from ({@code x}, {@code y}) over {@code length}
+     * pixels along its run — a texel to a pixel across it, and along it
+     * too unless {@code length} stretches it, as a framed button's edges
+     * are stretched — its opacity running linearly from
+     * {@code startAlpha} at the run's start to {@code endAlpha} at its
+     * end: a column top to bottom, a row left to right. What a chat
+     * window's frame is drawn with, so it fades along its edges.
+     */
+    public static void drawFading(int u, int v, int texels, boolean column,
+                                  float x, float y, float length,
+                                  int startAlpha, int endAlpha) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        int start = Math.max(0, Math.min(255, startAlpha));
+        int end = Math.max(0, Math.min(255, endAlpha));
+        if (minecraft == null || texels <= 0 || length <= 0.0F
+                || Math.max(start, end) < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
+            return;
+        }
+        minecraft.getTextureManager().bindTexture(TEXTURE);
+        LostTalesUiInk.beginContent();
+        GL11.glShadeModel(GL11.GL_SMOOTH);
+        // The GUI's alpha test throws away nearly transparent fragments,
+        // which a fade's faint end is; off, the fade reaches nothing
+        // rather than stopping short.
+        GL11.glDisable(GL11.GL_ALPHA_TEST);
+        try {
+            float width = column ? 1.0F : length;
+            float height = column ? length : 1.0F;
+            float u0 = u / (float)SHEET_WIDTH;
+            float u1 = (u + (column ? 1 : texels)) / (float)SHEET_WIDTH;
+            float v0 = v / (float)SHEET_HEIGHT;
+            float v1 = (v + (column ? texels : 1)) / (float)SHEET_HEIGHT;
+            Tessellator tessellator = Tessellator.instance;
+            tessellator.startDrawingQuads();
+            tessellator.setColorRGBA_I(0xFFFFFF, column ? end : start);
+            tessellator.addVertexWithUV(x, y + height, 0.0D, u0, v1);
+            tessellator.setColorRGBA_I(0xFFFFFF, end);
+            tessellator.addVertexWithUV(x + width, y + height, 0.0D, u1, v1);
+            tessellator.setColorRGBA_I(0xFFFFFF, column ? start : end);
+            tessellator.addVertexWithUV(x + width, y, 0.0D, u1, v0);
+            tessellator.setColorRGBA_I(0xFFFFFF, start);
+            tessellator.addVertexWithUV(x, y, 0.0D, u0, v0);
+            tessellator.draw();
+        } finally {
+            GL11.glShadeModel(GL11.GL_FLAT);
+            GL11.glEnable(GL11.GL_ALPHA_TEST);
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
         }
     }

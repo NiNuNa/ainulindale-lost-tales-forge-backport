@@ -7,6 +7,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -135,7 +136,8 @@ public final class ChatConsoleStreamTest {
         kept.add(new ChatConsoleEvent(20L, 21L, ChatConsoleEvent.Kind.SERVER,
                 ChatConsoleEvent.Severity.INFO, "Server", "second again"));
         kept.add(null);
-        assertEquals(3, ChatConsoleStream.restore(kept));
+        assertEquals(3, ChatConsoleStream.restore(kept,
+                java.util.Collections.<Long, ChatReactions>emptyMap()));
         List<ChatConsoleEvent> replay = ChatConsoleStream.replay(0L);
         assertEquals(3, replay.size());
         assertEquals("first", replay.get(0).getText());
@@ -144,7 +146,7 @@ public final class ChatConsoleStreamTest {
         assertEquals(3, ChatConsoleStream.snapshot().size());
         assertTrue(ChatMessageIdAllocator.next() > 30L);
         // Restoring nothing changes nothing.
-        assertEquals(0, ChatConsoleStream.restore(null));
+        assertEquals(0, ChatConsoleStream.restore(null, null));
         assertEquals(3, ChatConsoleStream.size());
     }
 
@@ -153,5 +155,30 @@ public final class ChatConsoleStreamTest {
         ChatConsoleStream.record(new ChatConsoleEvent(id, id, ChatConsoleEvent.Kind.COMMAND,
                 ChatConsoleEvent.Severity.INFO, "Steve", text));
         return id;
+    }
+
+    /**
+     * An entry takes reactions as a message does, and loses them with
+     * itself when the ring moves past it.
+     */
+    @Test
+    public void anEntryTakesReactionsAndLosesThemWithItself() {
+        java.util.UUID reader = java.util.UUID.randomUUID();
+        ChatConsoleStream.record(new ChatConsoleEvent(5L, 5L,
+                ChatConsoleEvent.Kind.SERVER, ChatConsoleEvent.Severity.INFO,
+                "Server", "Server started"));
+        assertTrue(ChatConsoleStream.react(5L, reader, "Nils", "grinning", true));
+        assertFalse(ChatConsoleStream.react(5L, reader, "Nils", "grinning", true));
+        assertFalse(ChatConsoleStream.react(6L, reader, "Nils", "grinning", true));
+        assertEquals(1, ChatConsoleStream.reactionsFor(5L, reader)
+                .getReactions().size());
+        for (long id = 10L; id < 10L + ChatConsoleStream.MAX_EVENTS; id++) {
+            ChatConsoleStream.record(new ChatConsoleEvent(id, id,
+                    ChatConsoleEvent.Kind.SERVER, ChatConsoleEvent.Severity.INFO,
+                    "Server", "tick"));
+        }
+        assertNull(ChatConsoleStream.find(5L));
+        assertTrue(ChatConsoleStream.reactionsFor(5L, reader).isEmpty());
+        assertTrue(ChatConsoleStream.reactionsSnapshot().isEmpty());
     }
 }

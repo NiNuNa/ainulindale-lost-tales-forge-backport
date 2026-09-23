@@ -71,7 +71,8 @@ public final class ChatHistoryStorage {
             List<ChatHistory.Entry> entries = data.takeRestored();
             int kept = ChatHistory.restore(entries);
             List<ChatConsoleEvent> events = data.takeRestoredEvents();
-            int keptEvents = ChatConsoleStream.restore(events);
+            int keptEvents = ChatConsoleStream.restore(events,
+                    data.takeRestoredEventReactions());
             ChatHistory.attach(data);
             FMLLog.info("[%s] Restored %d of %d kept chat lines and %d of %d console events from the save (%d quarantined)",
                     LostTalesMetaData.MOD_ID, Integer.valueOf(kept),
@@ -93,7 +94,8 @@ public final class ChatHistoryStorage {
     public static void release() {
         ChatHistoryWorldData data = ChatHistory.attached();
         if (data != null) {
-            data.hold(ChatHistory.snapshot(), ChatConsoleStream.snapshot());
+            data.hold(ChatHistory.snapshot(), ChatConsoleStream.snapshot(),
+                    ChatConsoleStream.reactionsSnapshot());
         }
         ChatHistory.attach(null);
     }

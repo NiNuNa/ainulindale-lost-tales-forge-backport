@@ -3,6 +3,7 @@ package com.ninuna.losttales.compat.discord;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.util.List;
+import java.util.Collections;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -46,7 +47,7 @@ public final class DiscordJsonTest {
         assertEquals(80, DiscordJson.webhookUsername(longName.toString())
                 .length());
         JsonObject body = new JsonParser().parse(
-                DiscordJson.webhookLineBody("A@B", "", "hi"))
+                DiscordJson.webhookLineBody("A@B", "", "hi", Collections.<String>emptyList()))
                 .getAsJsonObject();
         assertEquals("A＠B", body.get("username").getAsString());
     }
@@ -317,7 +318,7 @@ public final class DiscordJsonTest {
     public void lineBodiesAreTextUnderTheSendersNameAndPicture() {
         JsonObject body = new JsonParser().parse(
                 DiscordJson.webhookLineBody("Aragorn, the Gondor Farmer",
-                        "https://heads/Aragorn", "-# header\n@everyone hi"))
+                        "https://heads/Aragorn", "-# header\n@everyone hi", Collections.<String>emptyList()))
                 .getAsJsonObject();
         assertEquals("Aragorn, the Gondor Farmer", body.get("username").getAsString());
         assertEquals("https://heads/Aragorn", body.get("avatar_url").getAsString());
@@ -328,17 +329,34 @@ public final class DiscordJsonTest {
                 .getAsJsonArray("parse").size());
     }
 
+    /**
+     * A line pinging Discord members allows exactly their ids and nothing
+     * Discord would read off the text itself: no role, no everyone.
+     */
+    @Test
+    public void aLineAllowsOnlyTheMembersItPings() {
+        JsonObject mentions = new JsonParser().parse(
+                DiscordJson.webhookLineBody("Aragorn", "", "<@123456789012345678> hi",
+                        java.util.Arrays.asList("123456789012345678", "role:1", "")))
+                .getAsJsonObject().getAsJsonObject("allowed_mentions");
+        assertEquals(0, mentions.getAsJsonArray("parse").size());
+        assertEquals(1, mentions.getAsJsonArray("users").size());
+        assertEquals("123456789012345678",
+                mentions.getAsJsonArray("users").get(0).getAsString());
+        assertFalse(mentions.has("roles"));
+    }
+
     @Test
     public void aBareLineNamesNobodyAndShowsNoPicture() {
         JsonObject body = new JsonParser().parse(
-                DiscordJson.webhookLineBody("", "", "hi")).getAsJsonObject();
+                DiscordJson.webhookLineBody("", "", "hi", Collections.<String>emptyList())).getAsJsonObject();
         assertFalse(body.has("username"));
         assertFalse(body.has("avatar_url"));
         assertFalse(body.has("embeds"));
         assertEquals("hi", body.get("content").getAsString());
         // Nothing at all still makes a well-formed body.
         assertEquals("", new JsonParser().parse(
-                DiscordJson.webhookLineBody(null, null, null))
+                DiscordJson.webhookLineBody(null, null, null, Collections.<String>emptyList()))
                 .getAsJsonObject().get("content").getAsString());
     }
 

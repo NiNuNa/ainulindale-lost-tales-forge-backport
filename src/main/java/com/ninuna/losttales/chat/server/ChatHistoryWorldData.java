@@ -3,7 +3,9 @@ package com.ninuna.losttales.chat.server;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
@@ -30,9 +32,13 @@ public final class ChatHistoryWorldData extends WorldSavedData {
             new ArrayList<ChatConsoleEvent>();
     private final List<NBTTagCompound> quarantinedEntries =
             new ArrayList<NBTTagCompound>();
+    /** The reactions of the console's events read from the save, by id. */
+    private final Map<Long, ChatReactions> restoredReactions =
+            new HashMap<Long, ChatReactions>();
     /** The snapshots the stopping server left to be written, or null. */
     private List<ChatHistory.Entry> held;
     private List<ChatConsoleEvent> heldEvents;
+    private Map<Long, ChatReactions> heldReactions;
 
     private boolean readOnlyForNewerVersion;
     private int unsupportedDataVersion = -1;
@@ -50,9 +56,11 @@ public final class ChatHistoryWorldData extends WorldSavedData {
     public synchronized void readFromNBT(NBTTagCompound compound) {
         this.restored.clear();
         this.restoredEvents.clear();
+        this.restoredReactions.clear();
         this.quarantinedEntries.clear();
         this.held = null;
         this.heldEvents = null;
+        this.heldReactions = null;
         this.readOnlyForNewerVersion = false;
         this.unsupportedDataVersion = -1;
         this.preservedNewerData = null;
@@ -66,6 +74,7 @@ public final class ChatHistoryWorldData extends WorldSavedData {
         }
         this.restored.addAll(result.getEntries());
         this.restoredEvents.addAll(result.getConsoleEvents());
+        this.restoredReactions.putAll(result.getConsoleReactions());
         this.quarantinedEntries.addAll(result.getQuarantineEntriesCopy());
         if (result.wasRepaired()) {
             markDirty();
@@ -82,6 +91,8 @@ public final class ChatHistoryWorldData extends WorldSavedData {
                 this.held != null ? this.held : ChatHistory.snapshot(),
                 this.heldEvents != null ? this.heldEvents
                         : ChatConsoleStream.snapshot(),
+                this.heldReactions != null ? this.heldReactions
+                        : ChatConsoleStream.reactionsSnapshot(),
                 this.quarantinedEntries);
     }
 
@@ -101,6 +112,14 @@ public final class ChatHistoryWorldData extends WorldSavedData {
         return Collections.unmodifiableList(events);
     }
 
+    /** The reactions of the console's events read from the save, by id; empty once taken. */
+    public synchronized Map<Long, ChatReactions> takeRestoredEventReactions() {
+        Map<Long, ChatReactions> reactions =
+                new HashMap<Long, ChatReactions>(this.restoredReactions);
+        this.restoredReactions.clear();
+        return reactions;
+    }
+
     /**
      * Keeps snapshots for the saves still to come: what the stopping
      * server calls before the live stores are cleared, so the last save
@@ -108,11 +127,14 @@ public final class ChatHistoryWorldData extends WorldSavedData {
      * them.
      */
     public synchronized void hold(List<ChatHistory.Entry> snapshot,
-                                  List<ChatConsoleEvent> events) {
+                                  List<ChatConsoleEvent> events,
+                                  Map<Long, ChatReactions> reactions) {
         this.held = snapshot == null ? null
                 : new ArrayList<ChatHistory.Entry>(snapshot);
         this.heldEvents = events == null ? null
                 : new ArrayList<ChatConsoleEvent>(events);
+        this.heldReactions = reactions == null ? null
+                : new HashMap<Long, ChatReactions>(reactions);
         markDirty();
     }
 

@@ -45,15 +45,18 @@ final class ChatInputBar {
     /** Clear rows between the bar's edges and what stands on it. */
     static final int CLEARANCE = 2;
     /**
-     * Height of the typing well: the icon's box with the strips' wide
-     * inset above and below it, one message row in its middle. The
-     * bar's framed buttons — the character button and the channel
-     * indicator — are the framed buttons' one height, a row inside the
-     * well at either end and centred on its middle; the bar's other
-     * buttons are shorter and centred on the same middle.
+     * Height of what stands on the bar: the framed buttons' one height,
+     * the channel indicator and the character button. The typing well
+     * stands in its middle, and the bar's other buttons are shorter and
+     * centred on the same middle.
      */
-    static final int CONTENT_HEIGHT =
-            ChatChannelIcons.SIZE + 2 * LostTalesUiFramedButton.WIDE_INSET;
+    static final int CONTENT_HEIGHT = LostTalesUiFramedButton.HEIGHT;
+    /**
+     * Height of the typing well: one message row, as every chat input box
+     * is (Nils), so what is typed stands exactly as it will once it is
+     * sent.
+     */
+    static final int WELL_HEIGHT = LostTalesChatOverlayRenderer.LINE_HEIGHT;
     /**
      * Height of the bar strip: the window's bottom rule, then what
      * stands on the bar with the clearance above and below it. The
@@ -65,7 +68,7 @@ final class ChatInputBar {
     private static final int INPUT_ANCHOR_BELOW_BAR = 14;
     /** The send button is the rightmost bar control. */
     private static final int SEND_BUTTON_INDEX = 0;
-    /** The bar's divider, as tall as the row's between window controls. */
+    /** The divider before the send button, as tall as the tab row's between window controls. */
     private static final int BAR_DIVIDER_HEIGHT =
             ChatChannelTabBar.END_CONTROL_SIZE;
     private static final int COUNTER_RGB =
@@ -75,14 +78,20 @@ final class ChatInputBar {
     static final float NOTICE_LIFETIME_MILLIS = 1400.0F;
     /**
      * Clear space between the things standing on the bar, and before
-     * the first of them. Measured in ink, like every other gap the chat
-     * keeps: what the eye reads as the gap is the space between the
+     * the first of them, save between its two framed buttons
+     * ({@link #BUTTON_GAP}). Measured in ink, like every other gap the
+     * chat keeps: what the eye reads as the gap is the space between the
      * pixels that were actually drawn, not between the boxes they were
      * drawn in. The character button's square is wider than the head
      * inside it and the indicator's is wider than its label, so both
      * are asked where their ink is rather than where their box is.
      */
     static final int BAR_GAP = 3;
+    /**
+     * Clear space between the channel indicator and the character button
+     * beside it, from frame to frame: the two read as one pair.
+     */
+    static final int BUTTON_GAP = 2;
     /**
      * The field is never narrower than this, however little room a
      * narrow window leaves between the indicator and the counter.
@@ -315,23 +324,27 @@ final class ChatInputBar {
     }
 
     /**
-     * Top of the typing well on a bar strip starting at {@code barTop}:
-     * the clearance below the rule, as tall as the indicator's frame
-     * beside it and level with it.
+     * Top of what stands on a bar strip starting at {@code barTop}, the
+     * framed buttons: the clearance below the rule.
      */
-    static int wellTopFor(int barTop) {
+    static int contentTopFor(int barTop) {
         return barTop + 1 + CLEARANCE;
     }
 
     /**
-     * {@link #barTextTop} for a bar strip starting at {@code barTop}: a
-     * message row centred in the well, and the text where a message row
-     * puts it.
+     * Top of the typing well on a bar strip starting at {@code barTop}:
+     * one message row, centred on the framed buttons beside it.
+     */
+    static int wellTopFor(int barTop) {
+        return contentTopFor(barTop) + (CONTENT_HEIGHT - WELL_HEIGHT) / 2;
+    }
+
+    /**
+     * {@link #barTextTop} for a bar strip starting at {@code barTop}: the
+     * text where a message row puts it, the well being one.
      */
     static int textTopFor(int barTop) {
-        return wellTopFor(barTop)
-                + (CONTENT_HEIGHT - LostTalesChatOverlayRenderer.LINE_HEIGHT) / 2
-                + LostTalesChatOverlayRenderer.ROW_TEXT_TOP;
+        return wellTopFor(barTop) + LostTalesChatOverlayRenderer.ROW_TEXT_TOP;
     }
 
     /** The anchor the pickers hang their buttons and panels from. */
@@ -529,9 +542,10 @@ final class ChatInputBar {
     /* ---- Drawing ---- */
 
     /**
-     * The active window's input bar in the chat's surface — the
-     * history's own colour at the same half opacity as the message
-     * backdrop, one flat stretch of it — exactly as wide as the window,
+     * The active window's input bar in the tool strip's surface — the
+     * tab in front's plum grey at two thirds, one flat stretch of it, so
+     * the history stands between two bands of one tone (Nils) — exactly
+     * as wide as the window,
      * with holes cut in it for the channel indicator's frame and the
      * typing well, and the empty field's hint in the well. The strip's
      * first row is the window's bottom rule, drawn with the window, so
@@ -549,17 +563,19 @@ final class ChatInputBar {
     /**
      * The bar's surface with its holes, the well in them, and the
      * window's frame beside and under the bar, which is the bar's own:
-     * its surface ring and the white edges over it, arriving with the
-     * bar's fly-in.
+     * its surface ring and the edges over it and its two bottom
+     * corners, arriving with the bar's fly-in.
      */
     private void drawBarSurface(ChatWindowFrame frame, IndicatorFit fit,
                                 ChatInputLine line, int barRight) {
         int wellTop = wellTopFor(this.top);
-        int wellBottom = wellTop + CONTENT_HEIGHT;
+        int wellBottom = wellTop + WELL_HEIGHT;
         int barBottom = this.top + ChatWindowPlacement.INPUT_HEIGHT;
         int frameTop = indicatorFrameTop();
         float opacity = fadedShare(LostTalesChatVisualStyle.chatOpacity(this.mc));
-        int surface = LostTalesChatVisualStyle.surfaceArgb(opacity);
+        int surface = LostTalesChatVisualStyle.argb(
+                LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB,
+                Math.round(LostTalesChatVisualStyle.INSET_ALPHA * opacity));
         // Up to the indicator's frame plain; the indicator's frame, then
         // up to the divider around the character button's frame where
         // the tab has one — each frame's corner pixels are the bar's,
@@ -592,7 +608,9 @@ final class ChatInputBar {
         drawWell(line, wellTop, wellBottom,
                 LostTalesChatVisualStyle.insetArgb(opacity));
         // The frame's surface beside and under the bar, a frame wide, in
-        // the bar's own surface; the white edges lie over it.
+        // the bar's own surface, the colour it runs beside (Nils), the
+        // row the window's bottom rule stands on included; the frame's
+        // edges lie over it.
         int ring = ChatWindowPlacement.FRAME_WIDTH;
         LostTalesChatOverlayRenderer.fillRect(this.left - ring, this.top,
                 this.left, barBottom, surface);
@@ -605,16 +623,14 @@ final class ChatInputBar {
         LostTalesChatOverlayRenderer.fillRect(this.left - ring + 1,
                 barBottom + ring - 1, barRight + ring - 1, barBottom + ring,
                 surface);
-        drawBarLeftEdge(frame, this.left, this.top);
-        drawBarRightEdge(frame, barRight, this.top);
-        // The frame's white bottom row, just below the bar, and its
-        // brightest corner closed as a lit framed button's is, rounded and
-        // shaded over the two edges' ends.
-        LostTalesChatOverlayRenderer.drawBarBottomEdge(this.left, barRight,
-                barBottom, faded(255));
-        LostTalesUiFramedButton.drawCornerInk(LostTalesUiSheet.FRAME_LIT_BOTTOM_LEFT,
-                this.left - ring, barBottom + ring - LostTalesUiFramedButton.CORNER,
-                faded(255));
+        // The frame's edges beside and under the bar and its two bottom
+        // corners, on the whole window's ramps: the window's box reaches
+        // as far above the bar's foot here as it does on screen.
+        if (frame != null) {
+            LostTalesChatOverlayRenderer.drawFrameEdgesBelow(this.left,
+                    barBottom - (float)(frame.boxBottom - frame.boxTop),
+                    barRight, barBottom, this.top, faded(255));
+        }
     }
 
     /**
@@ -719,15 +735,15 @@ final class ChatInputBar {
     }
 
     /**
-     * The typing well: the stretch between the two dividers, in a
-     * surface of its own a step darker than the bar, the way the
-     * timestamp column is a step darker than the panel. It fills the
-     * hole the bar leaves for it rather than lying over the bar, so the
-     * line being typed reads as a place of its own in one flat colour.
-     * It is as tall as the indicator's frame beside it and holds one
-     * message row in its middle, laying out everything the field draws
-     * — the text, the caret, the selection wash and the previews — as a
-     * message row does.
+     * The typing well: the stretch between the two dividers, two clear
+     * pixels inside each, in a surface of its own a step darker than the
+     * bar, the way the timestamp column is a step darker than the panel.
+     * It fills the hole the bar leaves for it rather than lying over the
+     * bar, so the line being typed reads as a place of its own in one
+     * flat colour. It is as tall as the indicator's frame beside it and
+     * holds one message row in its middle, laying out everything the
+     * field draws — the text, the caret, the selection wash and the
+     * previews — as a message row does.
      */
     private static void drawWell(ChatInputLine line, int top, int bottom,
                                  int argb) {
@@ -756,41 +772,6 @@ final class ChatInputBar {
                 StatCollector.translateToLocal(key), line.fieldRight - x);
         LostTalesChatVisualStyle.drawColored(this.font, "§o" + hint, x,
                 barTextTop(), LostTalesChatVisualStyle.asideRgb(), faded(255));
-    }
-
-    /**
-     * The bar's stretch of the window's left frame edge, just outside the
-     * bar, on the same ramp as the window's own stretch above it: full on
-     * the frame's bottom row, gone on its top row.
-     */
-    private static void drawBarLeftEdge(ChatWindowFrame frame, int barLeft,
-                                        int barTop) {
-        if (frame == null) {
-            return;
-        }
-        float barBottom = barTop + ChatWindowPlacement.INPUT_HEIGHT;
-        LostTalesChatOverlayRenderer.drawLeftEdgeSegment(
-                barLeft - ChatWindowPlacement.FRAME_EDGE_WIDTH, barTop,
-                barBottom, barBottom, (float)(frame.boxBottom - frame.boxTop)
-                        + ChatWindowPlacement.FRAME_EDGE_WIDTH, faded(255));
-    }
-
-    /**
-     * The bar's stretch of the window's right frame edge, just outside
-     * the bar, on the same ramp as the window's own stretch above it: the
-     * ramp runs down from the frame's top-right corner, so beside the bar
-     * it is at its faintest, and gone on the frame's bottom row.
-     */
-    private static void drawBarRightEdge(ChatWindowFrame frame, int barRight,
-                                         int barTop) {
-        if (frame == null) {
-            return;
-        }
-        float rampSpan = (float)(frame.boxBottom - frame.boxTop)
-                + ChatWindowPlacement.FRAME_EDGE_WIDTH;
-        float barBottom = barTop + ChatWindowPlacement.INPUT_HEIGHT;
-        LostTalesChatOverlayRenderer.drawRightEdgeSegment(barRight, barTop,
-                barBottom, barBottom - rampSpan, rampSpan, faded(255));
     }
 
     /**
@@ -948,7 +929,7 @@ final class ChatInputBar {
 
     /**
      * Left edge of the character button's frame on the selected tab's
-     * bar: a bar gap past the channel indicator's frame.
+     * bar: {@link #BUTTON_GAP} past the channel indicator's frame.
      */
     int characterButtonLeft() {
         return characterButtonLeft(indicatorFit(this.right));
@@ -956,7 +937,7 @@ final class ChatInputBar {
 
     /** As above on the bar laid out in {@code fit}. */
     private static int characterButtonLeft(IndicatorFit fit) {
-        return fit.frameRight + BAR_GAP;
+        return fit.frameRight + BUTTON_GAP;
     }
 
     /** Top of the character button's frame: the bar's framed buttons' top. */
@@ -986,13 +967,9 @@ final class ChatInputBar {
         return framedButtonTop();
     }
 
-    /**
-     * Top of the bar's framed buttons: centred on the typing well, a
-     * row inside it at either end.
-     */
+    /** Top of the bar's framed buttons, the typing well centred on them. */
     private int framedButtonTop() {
-        return wellTopFor(this.top)
-                + (CONTENT_HEIGHT - LostTalesUiFramedButton.HEIGHT) / 2;
+        return contentTopFor(this.top);
     }
 
     /**
@@ -1013,10 +990,10 @@ final class ChatInputBar {
     private IndicatorFit indicatorFit(int barRight, ChatTab channel) {
         int frameLeft = indicatorLeft();
         // What stands between the indicator and the field: the
-        // character button, a bar gap past the frame, where the tab
+        // character button, a button gap past the frame, where the tab
         // has one.
         int trailing = hasCharacterButton(channel)
-                ? BAR_GAP + CHARACTER_BUTTON_SIZE : 0;
+                ? BUTTON_GAP + CHARACTER_BUTTON_SIZE : 0;
         int iconLeft = frameLeft + LostTalesUiFramedButton.WIDE_INSET;
         boolean icon = ChatChannelIcons.iconOf(channel) != null;
         int iconRight = icon ? iconLeft + ChatChannelIcons.SIZE : iconLeft;
@@ -1291,12 +1268,13 @@ final class ChatInputBar {
 
     /**
      * The bar's dividers, each the hairline the tab row parts a window's
-     * controls with, at the same height: one on either side of the
-     * typing well — after the channel indicator and before the counter
-     * — and one between the send button and the buttons that put
-     * something into the message, in the gap the bar's slots already
-     * leave, so sending reads as its own act rather than as one more
-     * insert.
+     * controls with: one on either side of the typing well — after the
+     * character button and before the counter — from the well's top to
+     * its bottom, as the timestamp area's separator runs down its panel;
+     * and one between the send button and the buttons that put something
+     * into the message, in the gap the bar's slots already leave, at the
+     * tab row's height, so sending reads as its own act rather than as
+     * one more insert.
      */
     void drawDividers(int barRight) {
         drawDividers(inputLine(barRight), barRight);
@@ -1306,20 +1284,21 @@ final class ChatInputBar {
         int insertRight = barSlotLeft(barRight, SEND_BUTTON_INDEX + 1)
                 + ChatPickerPanel.BUTTON_SIZE;
         int sendLeft = barSlotLeft(barRight, SEND_BUTTON_INDEX);
-        drawBarDivider(line.leftDividerX);
-        drawBarDivider(line.rightDividerX);
+        int wellTop = wellTopFor(this.top);
+        drawBarDivider(line.leftDividerX, wellTop, WELL_HEIGHT);
+        drawBarDivider(line.rightDividerX, wellTop, WELL_HEIGHT);
         // One pixel in the gap between the inserts and the send button,
-        // the odd pixel left.
+        // the odd pixel left, centred on the buttons.
         drawBarDivider(insertRight + LostTalesUiInk.centredStart(
-                sendLeft - insertRight, 1));
+                        sendLeft - insertRight, 1),
+                barControlTop() + (ChatPickerPanel.BUTTON_SIZE
+                        - BAR_DIVIDER_HEIGHT) / 2, BAR_DIVIDER_HEIGHT);
     }
 
-    /** One of the bar's dividers, centred on its controls. */
-    private void drawBarDivider(int x) {
-        LostTalesChatVisualStyle.drawDivider(x,
-                barControlTop() + (ChatPickerPanel.BUTTON_SIZE
-                        - BAR_DIVIDER_HEIGHT) / 2,
-                BAR_DIVIDER_HEIGHT, faded(LostTalesChatVisualStyle.DIVIDER_ALPHA));
+    /** One of the bar's dividers, {@code height} rows from {@code top}. */
+    private void drawBarDivider(int x, int top, int height) {
+        LostTalesChatVisualStyle.drawDivider(x, top, height,
+                faded(LostTalesChatVisualStyle.DIVIDER_ALPHA));
     }
 
     /**

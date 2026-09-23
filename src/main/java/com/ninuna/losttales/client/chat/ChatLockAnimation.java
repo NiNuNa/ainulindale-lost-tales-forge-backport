@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiEasing;
 import com.ninuna.losttales.client.motion.Motions;
@@ -60,6 +61,12 @@ final class ChatLockAnimation {
     private static final int OPEN_HOVER_U = 77;
     private static final int SHUT_HOVER_U = 93;
 
+    /**
+     * How far past the lock's box the pose may carry the lock or its
+     * shadow: what the flat picture they are drawn as reaches.
+     */
+    private static final int POSE_ROOM = 3;
+
     /** Room the turn needs: the widest frame by the tallest. */
     static final int WIDTH = 9;
     static final int HEIGHT = 8;
@@ -119,44 +126,74 @@ final class ChatLockAnimation {
      * The control's padlock at {@code (x, top)}. {@code top} is the top
      * of the {@link #WIDTH} by {@link #HEIGHT} box the turn is drawn in.
      */
-    void draw(int x, int top, boolean locked, boolean hovered, int alpha) {
-        Pose pose = advance(locked, hovered, System.nanoTime());
-        int frame = Math.round((FRAMES.length - 1) * this.swing);
-        // The shadow first, trailing the pose rather than moving with it
-        // and turning less than it does: it is cast on the strip, not
-        // carried by the lock.
+    void draw(final int x, final int top, boolean locked, boolean hovered,
+              final int alpha) {
+        final Pose pose = advance(locked, hovered, System.nanoTime());
+        final int frame = Math.round((FRAMES.length - 1) * this.swing);
+        final int lit = Math.round(alpha * this.hoverFade);
+        final int shut = Math.round(lit * this.swing);
+        // One flat picture, the lock over its shadow, so the lock's
+        // painted hollows show what lies behind it and never its own
+        // shadow; its box reaches past the lock's for the pose's squash,
+        // lean and trailing shadow.
+        LostTalesUiFlatLayers.drawFlat(x - POSE_ROOM, top - POSE_ROOM,
+                x + WIDTH + POSE_ROOM, top + HEIGHT + POSE_ROOM,
+                new LostTalesUiFlatLayers.Layers() {
+                    @Override
+                    public void draw() {
+                        drawLockShadow(pose, frame, x, top, alpha);
+                        LostTalesUiFlatLayers.nextLayer();
+                        drawLock(pose, frame, x, top, alpha, lit, shut);
+                    }
+                });
+    }
+
+    /**
+     * The lock's shadow, trailing the pose rather than moving with it and
+     * turning less than it does: it is cast on the strip, not carried by
+     * the lock.
+     */
+    private static void drawLockShadow(Pose pose, int frame, int x, int top,
+                                       int alpha) {
         int shadowAlpha = LostTalesChatVisualStyle.shadowAlpha(alpha);
-        if (shadowAlpha > 0) {
-            LostTalesSilhouetteRenderState.begin(
-                    LostTalesChatVisualStyle.SHADOW);
-            try {
-                begin(pose, x, top, true);
-                try {
-                    drawFrame(frame, RESTING_U, x, top, shadowAlpha);
-                } finally {
-                    end();
-                }
-            } finally {
-                LostTalesSilhouetteRenderState.end();
-            }
+        if (shadowAlpha <= 0) {
+            return;
         }
+        LostTalesSilhouetteRenderState.begin(LostTalesChatVisualStyle.SHADOW);
+        try {
+            begin(pose, x, top, true);
+            try {
+                drawFrame(frame, RESTING_U, x, top, shadowAlpha);
+            } finally {
+                end();
+            }
+        } finally {
+            LostTalesSilhouetteRenderState.end();
+        }
+    }
+
+    /**
+     * The resting colourway always, with the hovered one laid over it as
+     * far as the pointer has brought it ({@code lit}): the lock crosses to
+     * its lit tones rather than swapping to them, as every other control
+     * the chat draws in two states does. Green under the open padlock,
+     * wine under the shut one: the shut colourway is laid over the open
+     * one as far as the shackle has come ({@code shut}), so the two cross
+     * over with the swing. Each colourway's hollows give way to the next
+     * one's, so no two stack, while its ink stays whole under the ink
+     * laid over it.
+     */
+    private static void drawLock(Pose pose, int frame, int x, int top,
+                                 int alpha, int lit, int shut) {
         begin(pose, x, top, false);
         try {
-            // The resting colourway always, with the hovered one laid
-            // over it as far as the pointer has brought it: the lock
-            // crosses to its lit tones rather than swapping to them, as
-            // every other control the chat draws in two states does.
-            drawFrame(frame, RESTING_U, x, top, alpha);
-            int lit = Math.round(alpha * this.hoverFade);
             if (lit < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+                drawFrame(frame, RESTING_U, x, top, alpha);
                 return;
             }
-            // Green under the open padlock, wine under the shut one: the
-            // shut colourway is laid over the open one as far as the
-            // shackle has come, so the two cross over with the swing.
-            drawFrame(frame, OPEN_HOVER_U, x, top, lit);
-            drawFrame(frame, SHUT_HOVER_U, x, top,
-                    Math.round(lit * this.swing));
+            drawFrameSplit(frame, RESTING_U, x, top, alpha, alpha - lit);
+            drawFrameSplit(frame, OPEN_HOVER_U, x, top, lit, lit - shut);
+            drawFrame(frame, SHUT_HOVER_U, x, top, shut);
         } finally {
             end();
         }
@@ -191,6 +228,14 @@ final class ChatLockAnimation {
         int[] cell = FRAMES[Math.max(0, Math.min(FRAMES.length - 1, frame))];
         LostTalesUiSheet.draw(block + cell[0], cell[1], cell[2], cell[3], x,
                 top + HEIGHT - cell[3], alpha);
+    }
+
+    /** A frame with its ink at {@code ink} and its hollows at {@code hollow}. */
+    private static void drawFrameSplit(int frame, int block, float x,
+                                       float top, int ink, int hollow) {
+        int[] cell = FRAMES[Math.max(0, Math.min(FRAMES.length - 1, frame))];
+        LostTalesUiSheet.drawSplit(block + cell[0], cell[1], cell[2], cell[3],
+                x, top + HEIGHT - cell[3], ink, hollow);
     }
 
     /**

@@ -96,23 +96,51 @@ public final class LostTalesChatRoleMaskTest {
                 0xFFFFFF, 0xFFFFFF, "hello", 1L, "", null, "", "", 0x80);
     }
 
+    /**
+     * A client decodes a line before the server's roles reach it, so a
+     * role bit it does not know yet is carried, not refused: the roles are
+     * read where the line is shown, and an unknown bit is ignored there.
+     */
     @Test
-    public void unknownRoleBitsOnTheWireAreMalformed() {
+    public void aRoleThisSideDoesNotKnowYetStillDecodes() {
+        int roles = ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR);
         LostTalesChatMessagePacket roled = new LostTalesChatMessagePacket(
                 ChatChannel.OOC, UUID.randomUUID(), "Steve", "Steve", "",
-                0xFFFFFF, 0xFFFFFF, "hello", 1L, "", null, "", "",
-                ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR));
+                0xFFFFFF, 0xFFFFFF, "hello", 1L, "", null, "", "", roles);
         ByteBuf buffer = Unpooled.buffer();
         roled.toBytes(buffer);
-        // The mask is the int ahead of the three id tails: a bit no role
-        // occupies, planted there, is refused.
-        buffer.setInt(buffer.writerIndex() - scopeTailBytes("") - 4
-                - 3 * LostTalesChatMessagePacket.IDENTITY_ID_TAIL_BYTES,
-                0x40000000 | ChatRoleFixtures.OPERATOR.bit());
+        ChatRoleCatalog.resetToBuiltIn();
         LostTalesChatMessagePacket decoded = new LostTalesChatMessagePacket();
         decoded.fromBytes(buffer);
-        assertTrue(decoded.isMalformed());
-        assertEquals(0, decoded.getRoles());
+        assertFalse(decoded.isMalformed());
+        assertEquals(roles, decoded.getRoles());
+    }
+
+    /**
+     * The login replay reaches a client that has only its built-in roles:
+     * the server's arrive in the same moment and are put in place a tick
+     * later. A batch holding an operator's line is read whole, not
+     * dropped with every other line in it.
+     */
+    @Test
+    public void aReplayWithAnOperatorsLineSurvivesAClientWithoutTheRolesYet() {
+        java.util.List<LostTalesChatMessagePacket> lines =
+                new java.util.ArrayList<LostTalesChatMessagePacket>();
+        lines.add(new LostTalesChatMessagePacket(
+                ChatChannel.OOC, UUID.randomUUID(), "Steve", "Steve", "",
+                0xFFFFFF, 0xFFFFFF, "hello", 1L, "", null, "", "",
+                ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR)));
+        lines.add(new LostTalesChatMessagePacket(
+                ChatChannel.ALL, UUID.randomUUID(), "Alex", "Alex", "",
+                0xFFFFFF, 0xFFFFFF, "hi", 2L, ""));
+        ByteBuf buffer = Unpooled.buffer();
+        new LostTalesChatHistorySyncPacket(lines, 3L).toBytes(buffer);
+        ChatRoleCatalog.resetToBuiltIn();
+        LostTalesChatHistorySyncPacket decoded =
+                new LostTalesChatHistorySyncPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals(2, decoded.getMessages().size());
     }
 
     @Test

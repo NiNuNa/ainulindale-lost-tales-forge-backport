@@ -327,7 +327,9 @@ public final class LostTalesConfig {
     public static boolean discordGateway = true;
     public static boolean discordSlashCommands = true;
     /** List the members of the linked Discord channels, with their Discord status. */
-    public static boolean discordMemberList = false;
+    public static boolean discordMemberList = true;
+    /** Let a player's line ping the Discord members its mentions name. */
+    public static boolean discordPingMembers = true;
     /** How the profanity list's words read in what the bridge posts: a {@link ChatProfanityMode} name. */
     public static String discordProfanityFilter = ChatProfanityMode.OFF.name();
 
@@ -1162,6 +1164,12 @@ public final class LostTalesConfig {
                     CATEGORY_DISCORD,
                     discordMemberList,
                     "Server only: show everyone who can see a linked Discord channel in the member list of the game channel it is linked to, under their Discord server's name while they are online and under Offline otherwise, and let them and their lines wear their Discord status. A player is told only about the members of channels linked to what they can read. Needs gateway, and the Server Members and Presence intents switched on for the bot in the Discord developer portal; if Discord refuses them, the bridge goes on without the member lists."
+            );
+            discordPingMembers = config.getBoolean(
+                    "pingMembers",
+                    CATEGORY_DISCORD,
+                    discordPingMembers,
+                    "Server only: let a player's line ping the Discord members its mentions name, in the linked Discord channels those members can see: at most five a post, never a role, @everyone or @here. A Discord code typed into a line never pings anyone. Needs memberList."
             );
             Property discordProfanityProperty = config.get(
                     CATEGORY_DISCORD, "profanityFilter", discordProfanityFilter,

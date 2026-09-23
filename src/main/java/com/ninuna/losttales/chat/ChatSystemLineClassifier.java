@@ -60,10 +60,16 @@ public final class ChatSystemLineClassifier {
             "lotr.travellingTrader.depart",
     };
     /**
+     * Vanilla's notice to every operator of what a command did:
+     * {@code [Server: Opped Nils]}, its first argument the name of whoever
+     * ran the command.
+     */
+    private static final String ADMIN_NOTICE_KEY = "chat.type.admin";
+    /**
      * Lines whose mention of a player is the server announcing them, not
      * somebody addressing them: the name still highlights, but the cue
      * stays silent — an achievement is not a conversation waiting for an
-     * answer.
+     * answer, and nor is an operator's notice.
      */
     private static final String[] SILENT_MENTION_KEYS = ACHIEVEMENT_KEYS;
 
@@ -135,10 +141,33 @@ public final class ChatSystemLineClassifier {
         return Kind.OTHER;
     }
 
+    /** Whether the line is vanilla's notice to operators of what a command did. */
+    public static boolean isAdminNotice(IChatComponent message) {
+        return ADMIN_NOTICE_KEY.equals(translationKey(message));
+    }
+
+    /**
+     * Who ran the command an operators' notice is about — its first
+     * argument, the command sender's name — or empty for any other line.
+     */
+    public static String adminNoticeActor(IChatComponent message) {
+        if (!isAdminNotice(message)) {
+            return "";
+        }
+        Object[] arguments = ((ChatComponentTranslation)message).getFormatArgs();
+        if (arguments == null || arguments.length == 0 || arguments[0] == null) {
+            return "";
+        }
+        return arguments[0] instanceof IChatComponent
+                ? ((IChatComponent)arguments[0]).getUnformattedText().trim()
+                : String.valueOf(arguments[0]).trim();
+    }
+
     /** Whether a mention inside the line highlights without sounding. */
     public static boolean isMentionCueSilent(IChatComponent message) {
         String key = translationKey(message);
-        return key != null && contains(SILENT_MENTION_KEYS, key);
+        return key != null && (contains(SILENT_MENTION_KEYS, key)
+                || ADMIN_NOTICE_KEY.equals(key));
     }
 
     /** The root component's translation key, or null for anything else. */

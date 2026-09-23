@@ -58,9 +58,16 @@ public final class ChatChannelSuggesterTest {
         // What it spells resolves back to the channel it names.
         assertSame(ChatChannel.OOC, ChatChannelSuggester.resolve("OutofCharacter"));
         assertSame(ChatChannel.OOC, ChatChannelSuggester.resolve("OOC"));
-        // A whisper cannot be linked to, and neither can a line the
-        // server never named.
-        assertNull(ChatChannelSuggester.messageLink(ChatChannel.WHISPER, 12L));
+        // A whisper's message is linked like any other, though the word
+        // alone names no whisper; a line the server never named cannot be
+        // linked to.
+        assertEquals("#Whisper/12",
+                ChatChannelSuggester.messageLink(ChatChannel.WHISPER, 12L));
+        assertSame(ChatChannel.WHISPER,
+                ChatChannelSuggester.linkAt("#Whisper/12", 0).channel);
+        assertEquals(12L, ChatChannelSuggester.linkAt("see #Whisper/12 now", 4).messageId);
+        assertNull(ChatChannelSuggester.linkAt("#Whisper", 0));
+        assertNull(ChatChannelSuggester.resolve("Whisper"));
         assertNull(ChatChannelSuggester.messageLink(ChatChannel.ALL, 0L));
         assertNull(ChatChannelSuggester.messageLink(ChatChannel.ALL, -4L));
         assertNull(ChatChannelSuggester.messageLink(null, 12L));

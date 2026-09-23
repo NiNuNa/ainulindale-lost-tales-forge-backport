@@ -85,7 +85,7 @@
     "curve": "ease_in_out"
   },
   "chat.snap.layouts": {
-    "about": "The snap layouts' flyout and the snap bar coming and going.",
+    "about": "The snap layouts' flyout coming and going, the snap bar fading in and out, and the bar coming all the way down from its peek once the pointer touches it, and back.",
     "duration": 180,
     "curve": "ease_in_out"
   },
@@ -124,6 +124,12 @@
     "duration": 180,
     "curve": "ease_in_out"
   },
+  "chat.toolbar.show": {
+    "about": "A message's toolbar coming up after a scroll: it stays away while the history moves, waits until the pointer has rested on one message for 'rest' milliseconds, then fades in. The rest is the pointer's, so the Animations settings leave it as it is.",
+    "duration": 120,
+    "curve": "ease_out",
+    "params": { "rest": 150 }
+  },
   "chat.icon.flip": {
     "about": "A chevron control playing its run of frames between open and closed.",
     "duration": 180,
@@ -149,5 +155,9 @@
   "chat.marquee.return": {
     "about": "A name cut short gliding home once the pointer leaves it.",
     "follow": 0.1
+  },
+  "chat.snap.bar.peek": {
+    "about": "The snap bar peeking further down from the top of the screen as a carried window's pointer comes nearer it, and back up: most of the way in this many seconds.",
+    "follow": 0.06
   }
 }

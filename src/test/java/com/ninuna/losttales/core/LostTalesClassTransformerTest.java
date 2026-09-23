@@ -535,6 +535,13 @@ public final class LostTalesClassTransformerTest {
         AbstractInsnNode fourth = nextCode(third);
         assertEquals(Opcodes.ASTORE, fourth.getOpcode());
         assertEquals(1, ((org.objectweb.asm.tree.VarInsnNode)fourth).var);
+        // A line handed back as nothing is not sent: the method returns.
+        AbstractInsnNode fifth = nextCode(fourth);
+        assertEquals(Opcodes.ALOAD, fifth.getOpcode());
+        assertEquals(1, ((org.objectweb.asm.tree.VarInsnNode)fifth).var);
+        AbstractInsnNode sixth = nextCode(fifth);
+        assertEquals(Opcodes.IFNONNULL, sixth.getOpcode());
+        assertEquals(Opcodes.RETURN, nextCode(sixth).getOpcode());
     }
 
     @Test

@@ -128,4 +128,23 @@ public final class ChatScreenMenusTest {
         assertEquals(1, none.size());
         assertFalse(none.get(0).header);
     }
+
+    /**
+     * A message's menu button is a switch: the press that put that
+     * message's menu away says so, and no other menu's closing does.
+     */
+    @Test
+    public void aPressThatClosedAMessagesMenuSaysWhichMessage() {
+        ChatScreenMenus.Click closed = new ChatScreenMenus.Click(false,
+                ChatScreenMenus.POPUP_MESSAGE, null, 42, null);
+        assertTrue(closed.closedMessageMenu(42));
+        assertFalse(closed.closedMessageMenu(41));
+        assertFalse(closed.closedMessageMenu(0));
+        ChatScreenMenus.Click other = new ChatScreenMenus.Click(false,
+                ChatScreenMenus.POPUP_SETTINGS, "w1", 0, null);
+        assertFalse(other.closedMessageMenu(42));
+        ChatScreenMenus.Click none = new ChatScreenMenus.Click(false, "", null,
+                0, null);
+        assertFalse(none.closedMessageMenu(0));
+    }
 }

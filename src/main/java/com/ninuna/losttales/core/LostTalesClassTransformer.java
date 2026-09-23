@@ -3493,7 +3493,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
      * every line sent to one player passes, to call
      * {@code LostTalesServerBroadcastHook.onPlayerLine}, which records
      * a command's answer under the tab it was typed in and hands the
-     * component back. Idempotent, and never fails the game.
+     * component back to be sent — or nothing, for a line this player is
+     * not sent, and the method returns there. Idempotent, and never fails
+     * the game.
      */
     private static byte[] transformEntityPlayerMpChatLine(byte[] basicClass) {
         try {
@@ -3520,6 +3522,11 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                                 + "Lnet/minecraft/util/IChatComponent;)"
                                 + "Lnet/minecraft/util/IChatComponent;"));
                 hook.add(new VarInsnNode(Opcodes.ASTORE, 1));
+                LabelNode send = new LabelNode();
+                hook.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                hook.add(new JumpInsnNode(Opcodes.IFNONNULL, send));
+                hook.add(new InsnNode(Opcodes.RETURN));
+                hook.add(send);
                 method.instructions.insert(hook);
                 System.setProperty(PLAYER_LINE_ACTIVE_PROPERTY, "true");
                 info("Patched player chat lines to keep a command's "

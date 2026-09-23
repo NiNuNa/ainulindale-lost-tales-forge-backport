@@ -44,11 +44,11 @@ public final class ChatIconMarkTest {
         ClientChatChannelViews.record(-1, global, selected, false);
         assertSame(ChatIconMark.UNREAD, ChatIconMark.of(global));
         assertSame(LostTalesUiSheet.PRESENCE_SELECTED,
-                ChatIconMark.of(global).sprite());
+                ChatIconMark.of(global).figure());
         ClientChatChannelViews.record(-2, global, selected, true);
         ClientChatChannelViews.record(-3, global, selected, true);
         assertEquals(2, ChatIconMark.of(global).pingCount());
-        assertSame(LostTalesUiSheet.COUNT_2, ChatIconMark.of(global).sprite());
+        assertSame(LostTalesUiSheet.COUNT_2, ChatIconMark.of(global).figure());
     }
 
     @Test
@@ -65,10 +65,16 @@ public final class ChatIconMarkTest {
                 .pingCount());
     }
 
+    /** Past nine the tile shows the plus, and keeps its width. */
     @Test
-    public void pastNineTheTileStaysTheNine() {
-        assertSame(LostTalesUiSheet.COUNT_9, ChatIconMark.pings(42).sprite());
-        assertSame(LostTalesUiSheet.COUNT_1, ChatIconMark.pings(1).sprite());
+    public void pastNineTheTileShowsThePlus() {
+        assertSame(LostTalesUiSheet.COUNT_MORE, ChatIconMark.pings(42).figure());
+        assertSame(LostTalesUiSheet.COUNT_MORE, ChatIconMark.pings(10).figure());
+        assertSame(LostTalesUiSheet.COUNT_9, ChatIconMark.pings(9).figure());
+        assertSame(LostTalesUiSheet.COUNT_1, ChatIconMark.pings(1).figure());
+        assertEquals(ChatIconMark.TILE_WIDTH, ChatIconMark.pings(42).width());
+        assertEquals(LostTalesUiSheet.PRESENCE_SELECTED.getWidth(),
+                ChatIconMark.TILE_WIDTH);
         assertTrue(ChatIconMark.pings(0).isNone());
     }
 
@@ -112,16 +118,21 @@ public final class ChatIconMarkTest {
         assertEquals(6.0F, cut.cutFrom(9), 0.0F);
     }
 
-    /** The outline the tile's cut is built from is every count tile's own. */
+    /**
+     * The outline the tile's cut is built from is the sheet's: the tile's
+     * left edge and every figure after it are as tall as the outline, and
+     * each starts on its first column in every row, so a tile is one
+     * solid rectangle whatever it counts.
+     */
     @Test
     public void theTilesOutlineIsTheSheets() throws Exception {
         BufferedImage sheet = readSheet();
-        LostTalesUiSheet[] tiles = {
+        LostTalesUiSheet[] tiles = {LostTalesUiSheet.COUNT_LEFT,
                 LostTalesUiSheet.COUNT_1, LostTalesUiSheet.COUNT_2,
                 LostTalesUiSheet.COUNT_3, LostTalesUiSheet.COUNT_4,
                 LostTalesUiSheet.COUNT_5, LostTalesUiSheet.COUNT_6,
                 LostTalesUiSheet.COUNT_7, LostTalesUiSheet.COUNT_8,
-                LostTalesUiSheet.COUNT_9};
+                LostTalesUiSheet.COUNT_9, LostTalesUiSheet.COUNT_MORE};
         for (LostTalesUiSheet tile : tiles) {
             assertEquals(tile.toString(), ChatIconMark.TILE_INK_LEFT.length,
                     tile.getHeight());

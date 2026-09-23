@@ -1,7 +1,9 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.event.HoverEvent;
 import net.minecraft.util.IChatComponent;
@@ -17,9 +19,11 @@ import net.minecraft.util.IChatComponent;
  * has anything a spoiler hides. The pointer lights a backdrop one shade
  * and turns its words ivory, where any other run is underlined.
  *
- * <p>A backdrop is the surface under its row given another colour in
- * place, never a layer laid over it, as every highlight in the chat is.
- * It frames what it stands under, so a share and an achievement wear no
+ * <p>A backdrop is laid over whatever its row stands on — the window's
+ * band, a mention's tint, the typing well — at {@link #OPACITY} of its
+ * words' own opacity, so it fades and comes in with them and a little of
+ * what lies behind shows through, as through Discord's mention pill. It
+ * frames what it stands under, so a share and an achievement wear no
  * square brackets. Its padding is part of the run's width, so wrapping,
  * drawing and every hit test make room for it alike. A run that opens a
  * backdrop has two pixels before it, and a run that closes one has two
@@ -36,34 +40,11 @@ final class ChatRunBackdrops {
     static final int BOTTOM = LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT + 2;
     /** A player mention's backdrop. */
     static final int PLAYER_RGB = LostTalesColors.rgb(LostTalesColors.SLATE_BLUE);
+    /** How opaque a backdrop is against its words. */
+    static final float OPACITY = 2.0F / 3.0F;
 
     /** What a run's backdrop stands for. */
     enum Kind { NONE, PLAYER, ROLE, LINK, SHARE, ACHIEVEMENT }
-
-    /**
-     * The surface under a row, which its backdrops are recoloured on: its
-     * colour, its opacity and how that thins across it, from
-     * {@code curveLeft} to {@code curveRight} in the row's own units, and
-     * how far the row has come in, which its backdrops come in with.
-     */
-    static final class Surface {
-        final int rgb;
-        final int alpha;
-        final float[] weights;
-        final float curveLeft;
-        final float curveRight;
-        final float share;
-
-        Surface(int rgb, int alpha, float[] weights, float curveLeft, float curveRight,
-                float share) {
-            this.rgb = rgb & 0xFFFFFF;
-            this.alpha = alpha;
-            this.weights = weights;
-            this.curveLeft = curveLeft;
-            this.curveRight = curveRight;
-            this.share = Math.max(0.0F, Math.min(1.0F, share));
-        }
-    }
 
     /** One backdrop laid out on a row: its edges, the words they ride on, its colour and its light. */
     private static final class Pill {
@@ -243,15 +224,16 @@ final class ChatRunBackdrops {
 
     /**
      * Draws the backdrops of one row in its text space, the text's top at
-     * zero, before anything of the row is drawn over them: each run that
-     * wears one, from the run that opens it to the one that closes it or
-     * the row's end. In a row the pointer moves, a backdrop's edges ride
-     * the words at either end of it, so it stretches as the gaps between
-     * them open.
+     * zero, before its words: each run that wears one, from the run that
+     * opens it to the one that closes it or the row's end, on a surface
+     * of {@code surfaceRgb} under words drawn at {@code wordsAlpha}. In a
+     * row the pointer moves, a backdrop's edges ride the words at either
+     * end of it, so it stretches as the gaps between them open.
      */
     static void draw(FontRenderer font, IChatComponent row, int chatLineId,
-                     Surface surface, boolean chatOpen, ChatRowMotion motion) {
-        if (font == null || row == null || surface == null || surface.alpha <= 0) {
+                     int surfaceRgb, int wordsAlpha, boolean chatOpen,
+                     ChatRowMotion motion) {
+        if (font == null || row == null || wordsAlpha <= 0) {
             return;
         }
         boolean colours = LostTalesChatVisualStyle.chatColoursEnabled();
@@ -273,13 +255,13 @@ final class ChatRunBackdrops {
                 continue;
             }
             if (ChatStampMarker.isMarker(part) || ChatReactionMarker.isAddButton(part)) {
-                pill = finish(pill, surface, motion, words);
+                pill = finish(pill, wordsAlpha, motion, words);
                 cursor += ChatInlineIcons.declaredWidth(part);
                 continue;
             }
             ChatReactionMarker.Data reaction = ChatReactionMarker.decode(part);
             if (reaction != null) {
-                pill = finish(pill, surface, motion, words);
+                pill = finish(pill, wordsAlpha, motion, words);
                 cursor += reaction.width;
                 continue;
             }
@@ -292,13 +274,13 @@ final class ChatRunBackdrops {
                 word += LostTalesChatVisualStyle.wordsIn(part);
             }
             if (kindOf(part) == Kind.NONE) {
-                pill = finish(pill, surface, motion, words);
+                pill = finish(pill, wordsAlpha, motion, words);
             } else {
                 if (pill == null || before > 0) {
-                    pill = finish(pill, surface, motion, words);
+                    pill = finish(pill, wordsAlpha, motion, words);
                     int wordsRgb = LostTalesChatVisualStyle.runRgb(part);
                     pill = new Pill(cursor + before - PAD, firstWord,
-                            backdropRgb(part, wordsRgb, surface.rgb, colours),
+                            backdropRgb(part, wordsRgb, surfaceRgb, colours),
                             litShare(chatLineId, part));
                 }
                 // Two clear pixels past the run's last ink: its last
@@ -309,16 +291,17 @@ final class ChatRunBackdrops {
                 pill.right = cursor + before + ink + PAD;
                 pill.lastWord = Math.max(pill.firstWord, word - 1);
                 if (after > 0) {
-                    pill = finish(pill, surface, motion, words);
+                    pill = finish(pill, wordsAlpha, motion, words);
                 }
             }
             cursor += before + width + after;
         }
-        finish(pill, surface, motion, words);
+        finish(pill, wordsAlpha, motion, words);
     }
 
     /** Draws a laid-out backdrop, if there is one; answers null, the row's next one not yet begun. */
-    private static Pill finish(Pill pill, Surface surface, ChatRowMotion motion, int words) {
+    private static Pill finish(Pill pill, int wordsAlpha, ChatRowMotion motion,
+                               int words) {
         if (pill == null || pill.right <= pill.left) {
             return null;
         }
@@ -328,10 +311,37 @@ final class ChatRunBackdrops {
             left += motion.wordX(pill.firstWord, words);
             right += motion.wordX(pill.lastWord, words);
         }
-        int lit = LostTalesChatVisualStyle.blend(pill.rgb,
-                LostTalesChatVisualStyle.lighterShadeOf(pill.rgb), pill.lit);
-        LostTalesChatOverlayRenderer.recolourRunBackdrop(surface, left, TOP, right, BOTTOM,
-                LostTalesChatVisualStyle.blend(surface.rgb, lit, surface.share));
+        fill(left, TOP, right, BOTTOM, LostTalesChatVisualStyle.blend(pill.rgb,
+                LostTalesChatVisualStyle.lighterShadeOf(pill.rgb), pill.lit),
+                wordsAlpha);
         return null;
+    }
+
+    /**
+     * Lays a backdrop from {@code left} to {@code right} and {@code top} to
+     * {@code bottom} over what is already drawn there, in {@code rgb} at
+     * {@link #OPACITY} of {@code wordsAlpha}, less its four corner pixels
+     * so it reads rounded.
+     */
+    static void fill(float left, float top, float right, float bottom,
+                     int rgb, int wordsAlpha) {
+        int alpha = Math.round(Math.max(0, Math.min(255, wordsAlpha)) * OPACITY);
+        if (right - left < 2.0F || bottom - top < 2.0F || alpha <= 0) {
+            return;
+        }
+        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(false);
+        tessellator.setColorRGBA_I(rgb & 0xFFFFFF, alpha);
+        quad(tessellator, left + 1.0F, top, right - 1.0F, bottom);
+        quad(tessellator, left, top + 1.0F, left + 1.0F, bottom - 1.0F);
+        quad(tessellator, right - 1.0F, top + 1.0F, right, bottom - 1.0F);
+        LostTalesSkyrimUiStyle.endQuads(tessellator, false);
+    }
+
+    private static void quad(Tessellator tessellator, float left, float top,
+                             float right, float bottom) {
+        tessellator.addVertex(left, bottom, 0.0D);
+        tessellator.addVertex(right, bottom, 0.0D);
+        tessellator.addVertex(right, top, 0.0D);
+        tessellator.addVertex(left, top, 0.0D);
     }
 }

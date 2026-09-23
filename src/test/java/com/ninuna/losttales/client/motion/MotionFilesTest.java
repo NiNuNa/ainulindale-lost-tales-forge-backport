@@ -27,8 +27,8 @@ public final class MotionFilesTest {
     private static final List<String> FOLLOWERS = Arrays.asList(
             MotionIds.UI_BUTTON_LIT, MotionIds.CHAT_SCROLL,
             MotionIds.CHAT_HOVER_FADE, MotionIds.CHAT_SCROLLBAR_FADE,
-            MotionIds.CHAT_MARQUEE_RETURN, MotionIds.SCREEN_JOURNAL_SCROLL,
-            MotionIds.SCREEN_DIALOGUE_GLIDE);
+            MotionIds.CHAT_MARQUEE_RETURN, MotionIds.CHAT_SNAP_BAR_PEEK,
+            MotionIds.SCREEN_JOURNAL_SCROLL, MotionIds.SCREEN_DIALOGUE_GLIDE);
     private static final List<String> BUTTONS = Arrays.asList(
             MotionIds.UI_BUTTON_LIFT, MotionIds.UI_BUTTON_TURN,
             MotionIds.UI_BUTTON_SNAP);
@@ -167,6 +167,7 @@ public final class MotionFilesTest {
         params.put(MotionIds.SCREEN_OPEN,
                 new String[] {"start_x", "start_y", "start_scale"});
         params.put(MotionIds.SCREEN_CONTROL_BAR, new String[] {"delay", "travel"});
+        params.put(MotionIds.CHAT_TOOLBAR_SHOW, new String[] {"rest"});
         params.put(MotionIds.MAP_POPUP_OPEN, new String[] {"travel", "start_scale"});
         for (Map.Entry<String, String[]> entry : params.entrySet()) {
             for (String name : entry.getValue()) {

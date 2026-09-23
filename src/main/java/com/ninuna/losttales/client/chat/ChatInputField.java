@@ -407,14 +407,14 @@ final class ChatInputField extends GuiTextField {
                 break;
             }
             boolean opensWord = hash == 0 || Character.isWhitespace(text.charAt(hash - 1));
-            int end = ChatChannelSuggester.wordEnd(text, hash + 1);
-            ChatChannel named = opensWord && end > hash + 1
-                    ? ChatChannelSuggester.resolve(text.substring(hash + 1, end)) : null;
-            if (named == null) {
+            ChatChannelSuggester.Link link = opensWord
+                    ? ChatChannelSuggester.linkAt(text, hash) : null;
+            if (link == null) {
                 cursor = hash + 1;
                 continue;
             }
-            int linkEnd = ChatChannelSuggester.messageIdEnd(text, end);
+            ChatChannel named = link.channel;
+            int linkEnd = link.end;
             int style = ChatInputStyles.styleAt(styles, hash);
             if ((style & ChatMarkdown.Span.CODE) == 0) {
                 int color = ClientChatChannelState.displayColor(named);
@@ -433,24 +433,12 @@ final class ChatInputField extends GuiTextField {
     }
 
     /**
-     * The typing well under the field, which a backdrop is recoloured on:
-     * the bar's inset surface, in one flat colour.
+     * A backdrop from {@code left} to {@code right} over the well, the
+     * field's text top at {@code top}, fading with the field's words.
      */
-    private ChatRunBackdrops.Surface wellSurface() {
-        int argb = LostTalesChatVisualStyle.insetArgb(ChatInputBar.fadedShare(
-                LostTalesChatVisualStyle.chatOpacity(Minecraft.getMinecraft())));
-        return new ChatRunBackdrops.Surface(argb, argb >>> 24,
-                LostTalesChatOverlayRenderer.FLAT_WEIGHTS,
-                this.xPosition - ChatRunBackdrops.PAD,
-                this.xPosition + getWidth() + ChatRunBackdrops.PAD, 1.0F);
-    }
-
-    /** A backdrop from {@code left} to {@code right} on the well, the field's text top at {@code top}. */
-    private static void drawBackdrop(ChatRunBackdrops.Surface well, int left,
-                                     int right, int top, int rgb) {
-        LostTalesChatOverlayRenderer.recolourRunBackdrop(well, left,
-                top + ChatRunBackdrops.TOP, right, top + ChatRunBackdrops.BOTTOM,
-                rgb);
+    private static void drawBackdrop(int left, int right, int top, int rgb) {
+        ChatRunBackdrops.fill(left, top + ChatRunBackdrops.TOP, right,
+                top + ChatRunBackdrops.BOTTOM, rgb, ChatInputBar.faded(255));
     }
 
     /**
@@ -814,7 +802,6 @@ final class ChatInputField extends GuiTextField {
         if (!found.backdrops) {
             return;
         }
-        ChatRunBackdrops.Surface well = wellSurface();
         for (int start = from; start < to; start++) {
             // A link begins here, or began before the field scrolled
             // past its start and still wears its backdrop from the edge.
@@ -831,8 +818,9 @@ final class ChatInputField extends GuiTextField {
             int right = end <= to ? displayedX(text, resolved, from, end) - 1
                     : displayedX(text, resolved, from, to);
             int rgb = found.players[start] ? ChatRunBackdrops.PLAYER_RGB
-                    : LostTalesColors.darkestShade(found.colors[start], well.rgb);
-            drawBackdrop(well, left + displayedX(text, resolved, from, start),
+                    : LostTalesColors.darkestShade(found.colors[start],
+                            LostTalesChatVisualStyle.SURFACE_RGB);
+            drawBackdrop(left + displayedX(text, resolved, from, start),
                     left + right, top, rgb);
             start = end - 1;
         }
@@ -934,9 +922,9 @@ final class ChatInputField extends GuiTextField {
             return x + preview.width;
         }
         int start = x;
-        ChatRunBackdrops.Surface well = wellSurface();
-        drawBackdrop(well, start, start + preview.width - 1, y,
-                LostTalesColors.darkestShade(preview.rgb, well.rgb));
+        drawBackdrop(start, start + preview.width - 1, y,
+                LostTalesColors.darkestShade(preview.rgb,
+                        LostTalesChatVisualStyle.SURFACE_RGB));
         x += ChatRunBackdrops.PAD;
         int slot = slotWidth(preview.kind);
         float boxX = ChatInlineIcons.boxLeft(x, slot);

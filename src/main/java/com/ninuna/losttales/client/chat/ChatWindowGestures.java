@@ -52,10 +52,10 @@ final class ChatWindowGestures {
      *  of its row — the same in every direction. Less than a tab row,
      *  so a run comes free before the pointer has crossed a whole row
      *  of the window it is leaving. */
-    static final int DETACH_DISTANCE = 14;
+    static final int DETACH_DISTANCE = 20;
     /** The reach, measured the same way, within which the row a run was
      *  torn out of takes it back. */
-    static final int RETURN_DISTANCE = 9;
+    static final int RETURN_DISTANCE = 12;
     /** How far above or below a row's band a carried run may still be
      *  offered to it. */
     static final int DOCK_BAND_SLACK = 7;
@@ -1361,8 +1361,10 @@ final class ChatWindowGestures {
                 this.screenWidth);
         double pointerY = ChatWindowPlacement.preciseMouseY(this.mc,
                 this.screenHeight);
-        // On the snap bar its zones decide, and its padding lands the
-        // window nowhere; anywhere else the screen's edges and corners.
+        // On the snap bar all the way down, and on the top edge above
+        // it, its zones decide, and its padding lands the window nowhere;
+        // anywhere else, the bar peeking included, the screen's edges and
+        // corners.
         ChatWindow.ScreenFill onBar = this.snapBar.follow(this.mc,
                 window.getId(), pointerX, pointerY, this.screenWidth,
                 this.screenHeight);
@@ -1694,6 +1696,15 @@ final class ChatWindowGestures {
         int pointerX;
         /** Since when the pointer has been pressed against a screen edge past the strip; 0 while not. */
         long againstEdgeSince;
+        /**
+         * Whether the tabs last came out by resting against a screen edge.
+         * The row they left then takes them back only once the pointer is
+         * on the strip itself: at the edge the pointer cannot get further
+         * away than the reach that would take them back.
+         */
+        boolean tornAtEdge;
+        /** Whether this frame's answer to {@link #hasLeftItsRow} came from the edge rest. */
+        boolean leavingAtEdge;
         /** Window row the tab would dock into at the current pointer. */
         String targetWindowId;
         int targetIndex = -1;
@@ -1815,10 +1826,15 @@ final class ChatWindowGestures {
             // one pointer and a tab torn off at that row's edge is not
             // handed straight back on the next frame, flashing a window
             // up and taking it away again. Only that row asks: a row a
-            // tab has never left has nothing to guard against.
+            // tab has never left has nothing to guard against. Tabs that
+            // came out against a screen edge come back only onto the
+            // strip itself, since the edge keeps the pointer within the
+            // reach back in.
+            int stripOff = stripOverhang(row, mouseX);
             if (window.getId().equals(drag.leftRowId)
-                    && pulledBeyond(stripOverhang(row, mouseX), bandOff,
-                            RETURN_DISTANCE)) {
+                    && (drag.tornAtEdge ? stripOff > 0 || bandOff > 0
+                            : pulledBeyond(stripOff, bandOff,
+                                    RETURN_DISTANCE))) {
                 continue;
             }
             // Where the carried run itself stands over this row: its
@@ -1954,6 +1970,8 @@ final class ChatWindowGestures {
             return false;
         }
         drag.detachedWindowId = null;
+        drag.againstEdgeSince = 0L;
+        drag.tornAtEdge = false;
         // The window the tabs rode in is gone, and its landing with it.
         this.snapPreview.reset();
         this.snapBar.hide();
@@ -2022,15 +2040,22 @@ final class ChatWindowGestures {
      * plainly on its way out as carried above or below it, and the two
      * overhangs are one pull, so a diagonal carry needs the same travel
      * as a straight one. It is the pointer that is measured on every
-     * side — not the run, whose end tabs rest touching the room's very
-     * edges, so measuring it made a sideways pull start counting from
-     * the first pixel of the drag while an upward one still had the
-     * band to cross. Leaving costs the full pull, coming back a shorter
+     * side, not the run: the run's end tabs rest against the room's very
+     * edges, so a sideways pull measured on the run would count from the
+     * first pixel of the drag while an upward one still had the band to
+     * cross. Leaving costs the full pull, coming back a shorter
      * reach, and between the two lies a band where nothing happens at
      * all — which is what keeps the two answers from arguing about one
      * pointer.
+     *
+     * <p>Against the screen's sides or its foot the pull stops short
+     * however far the hand goes, so resting there past the strip is pull
+     * enough. Not against its top: a strip at the top of the screen lets
+     * its tabs go downward, as a maximised browser's does, and a tab
+     * pushed up only goes on sliding along its row.</p>
      */
     private boolean hasLeftItsRow(TabDrag drag, int mouseX, int mouseY) {
+        drag.leavingAtEdge = false;
         ChatWindow window = ChatWindowLayout.windowOf(drag.tab);
         ChatWindowFrame frame = window == null ? null
                 : ChatWindowFrame.of(window);
@@ -2045,10 +2070,7 @@ final class ChatWindowGestures {
         if (pulledBeyond(dx, dy, DETACH_DISTANCE)) {
             return true;
         }
-        // Against a screen edge the pull stops short however far the
-        // hand goes, so resting there past the strip is pull enough.
-        boolean againstEdge = (dy > 0 && (mouseY <= 0
-                || mouseY >= this.screenHeight - 1))
+        boolean againstEdge = (dy > 0 && mouseY >= this.screenHeight - 1)
                 || (dx > 0 && (mouseX <= 0 || mouseX >= this.screenWidth - 1));
         long now = System.nanoTime();
         if (!againstEdge) {
@@ -2058,7 +2080,8 @@ final class ChatWindowGestures {
         if (drag.againstEdgeSince == 0L) {
             drag.againstEdgeSince = now;
         }
-        return now - drag.againstEdgeSince >= EDGE_TEAR_NANOS;
+        drag.leavingAtEdge = now - drag.againstEdgeSince >= EDGE_TEAR_NANOS;
+        return drag.leavingAtEdge;
     }
 
     /**
@@ -2085,6 +2108,8 @@ final class ChatWindowGestures {
         drag.leftRowId = source == null ? drag.sourceWindowId
                 : source.getId();
         drag.detachedWindowId = window.getId();
+        drag.tornAtEdge = drag.leavingAtEdge;
+        drag.againstEdgeSince = 0L;
         // It appears under the pointer on a quick fade rather than in a
         // frame.
         ChatWindowFrame.of(window).beginAppearing();

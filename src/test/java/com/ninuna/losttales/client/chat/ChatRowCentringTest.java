@@ -151,23 +151,28 @@ public final class ChatRowCentringTest {
         assertEquals(0.0F, (half * 2.0F) % 1.0F, 0.0F);
     }
 
+    /**
+     * The toolbar is drawn at the chat's small size, centred on its row's
+     * capitals, the odd display pixel up, on whole display pixels.
+     */
     @Test
     public void theToolbarStandsOnItsRowsCapitals() {
-        int size = LostTalesChatOverlayRenderer.TOOLBAR_BUTTON_SIZE;
-        // A framed button: an emoji's box, then two clear pixels, the ink
-        // and a ring of surface either side of it.
-        assertEquals(BOX + 8, size);
+        // An emoji's box, two clear pixels round it, the frame's edge.
+        assertEquals(BOX + 8, LostTalesChatOverlayRenderer.TOOLBAR_HEIGHT);
         int rowBottom = 100;
-        int top = LostTalesChatOverlayRenderer.toolbarTop(rowBottom, LINE);
-        // Taller than the row, so centred on its capitals and half a pixel
-        // up: four rows above the row, two below it.
-        assertEquals(84, top);
-        assertEquals(4, rowBottom - LINE - top);
-        assertEquals(2, top + size - rowBottom);
-        // Its react button's emoji stands exactly where a row's does.
-        assertEquals(rowBottom - LINE + TEXT_TOP
-                        + LostTalesChatOverlayRenderer.centredBoxTop(BOX),
-                top + (size - BOX) / 2);
+        int capsTop = rowBottom - LINE + TEXT_TOP;
+        // GUI scale 2: words two display pixels a pixel, the toolbar one.
+        float top = LostTalesChatOverlayRenderer.toolbarTop(rowBottom, LINE,
+                2, 1, 2.0F);
+        assertEquals(capsTop - 1.0F, top, 0.0F);
+        // Eighteen display pixels round fourteen of capitals: two either side.
+        assertEquals(0.0F, (top * 2.0F) % 1.0F, 0.0F);
+        // GUI scale 3: thirty-six round twenty-one, eight above and seven
+        // below, on whole display pixels.
+        float third = LostTalesChatOverlayRenderer.toolbarTop(rowBottom, LINE,
+                3, 2, 3.0F);
+        assertEquals(capsTop * 3.0F - 8.0F, third * 3.0F, 0.001F);
+        assertEquals(0.0F, Math.abs(Math.round(third * 3.0F) - third * 3.0F), 0.001F);
     }
 
     @Test

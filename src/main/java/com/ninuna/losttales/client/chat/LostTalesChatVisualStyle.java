@@ -201,6 +201,8 @@ final class LostTalesChatVisualStyle {
      * strength. Anything under this is not drawn at all.
      */
     static final int MIN_VISIBLE_ALPHA = LostTalesUiInk.MIN_VISIBLE_ALPHA;
+    /** How much of its opacity a control that cannot be taken here is drawn at. */
+    static final float UNAVAILABLE_OPACITY = 0.5F;
 
     private LostTalesChatVisualStyle() {}
 

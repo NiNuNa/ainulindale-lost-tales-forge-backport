@@ -2,6 +2,8 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
+import java.nio.charset.Charset;
+import java.util.Base64;
 import java.util.Locale;
 import java.util.UUID;
 import net.minecraft.event.ClickEvent;
@@ -10,35 +12,28 @@ import net.minecraft.util.IChatComponent;
 
 /**
  * Marks an {@code @mention} inside a message: it carries the mention's
- * exact RGB and whom it reaches — an account, or a role — so the
- * renderer colours it and a click opens the right card. A player
- * mention also carries the player as the server recorded them with the
- * line, when it did: their id, the identity they were playing and its
- * skin, so the card still opens once they have gone. A mention answers
- * to the pointer the way a sender's name does. Same mechanism as
+ * exact RGB and whom it reaches — a player, or a role — so the renderer
+ * colours it and a click opens the right card. A player mention also
+ * carries the player as the server recorded them with the line, when it
+ * did: their id, the identity they were playing and its skin, so the
+ * card still opens once they have gone. A mention answers to the
+ * pointer the way a sender's name does. Same mechanism as
  * {@link ChatColorMarker}: the click event is the carrier, and it
- * survives vanilla's wrapped-chat component copies.
+ * survives vanilla's wrapped-chat component copies. Every name rides in
+ * base64, as a channel link's tab does, so a name holding any character
+ * at all — a Discord nickname may hold anything — reads back whole.
  */
 final class ChatMentionMarker {
     private static final String PREFIX = "losttales-chat-mention:";
-    /**
-     * Marks the target as a role rather than an account. Safe as a
-     * discriminator: an account name never holds a colon, so no account
-     * can collide with it.
-     */
-    private static final String ROLE_TARGET_PREFIX = "role:";
-    /**
-     * Opens the recorded player after the account, and parts their
-     * fields. An account name, a UUID and a skin id never hold it; the
-     * identity's name, which might, comes last.
-     */
-    private static final char RECORD_SEPARATOR = '|';
+    private static final String PLAYER = "p";
+    private static final String ROLE = "r";
+    private static final Charset UTF_8 = Charset.forName("UTF-8");
 
     private ChatMentionMarker() {}
 
     /**
      * A player mention; {@code recorded} is the player as the line names
-     * them, or null where the line recorded nobody.
+     * them, or null where nobody could place them.
      */
     static ChatComponentText apply(ChatComponentText component, int color,
                                    String account, ChatNamedPlayer recorded) {
@@ -46,8 +41,8 @@ final class ChatMentionMarker {
             component.setChatStyle(component.getChatStyle()
                     .setChatClickEvent(new ClickEvent(
                             ClickEvent.Action.SUGGEST_COMMAND,
-                            PREFIX + colorHex(color) + ":" + account
-                                    + recordOf(recorded))));
+                            PREFIX + colorHex(color) + ":" + PLAYER + ":"
+                                    + encode(account) + recordOf(recorded))));
         }
         return component;
     }
@@ -59,8 +54,8 @@ final class ChatMentionMarker {
             component.setChatStyle(component.getChatStyle()
                     .setChatClickEvent(new ClickEvent(
                             ClickEvent.Action.SUGGEST_COMMAND,
-                            PREFIX + colorHex(color) + ":"
-                                    + ROLE_TARGET_PREFIX + role.getId())));
+                            PREFIX + colorHex(color) + ":" + ROLE + ":"
+                                    + encode(role.getId()))));
         }
         return component;
     }
@@ -76,23 +71,35 @@ final class ChatMentionMarker {
                 || value == null || !value.startsWith(PREFIX)) {
             return null;
         }
-        String body = value.substring(PREFIX.length());
-        int separator = body.indexOf(':');
-        if (separator != 6 || body.length() <= 7) {
+        String[] fields = value.substring(PREFIX.length()).split(":", -1);
+        if (fields.length < 3 || fields[0].length() != 6) {
             return null;
         }
         try {
-            int color = Integer.parseInt(body.substring(0, separator), 16)
-                    & 0xFFFFFF;
-            String target = body.substring(separator + 1);
-            int record = target.indexOf(RECORD_SEPARATOR);
-            if (record < 0) {
-                return new Data(color, target, null);
+            int color = Integer.parseInt(fields[0], 16) & 0xFFFFFF;
+            String target = decodeText(fields[2]);
+            if (target.length() == 0) {
+                return null;
             }
-            String account = target.substring(0, record);
-            return new Data(color, account,
-                    parseRecord(account, target.substring(record + 1)));
-        } catch (NumberFormatException ignored) {
+            if (ROLE.equals(fields[1]) && fields.length == 3) {
+                return new Data(color, target, null, true);
+            }
+            if (!PLAYER.equals(fields[1])) {
+                return null;
+            }
+            if (fields.length == 3) {
+                return new Data(color, target, null, false);
+            }
+            if (fields.length != 7) {
+                return null;
+            }
+            UUID playerId = UUID.fromString(fields[3]);
+            UUID characterId = fields[4].length() == 0 ? null
+                    : UUID.fromString(fields[4]);
+            return new Data(color, target, new ChatNamedPlayer(playerId,
+                    target, characterId, decodeText(fields[6]),
+                    decodeText(fields[5])), false);
+        } catch (IllegalArgumentException malformed) {
             return null;
         }
     }
@@ -122,29 +129,20 @@ final class ChatMentionMarker {
         if (recorded == null || recorded.getPlayerId() == null) {
             return "";
         }
-        return RECORD_SEPARATOR + recorded.getPlayerId().toString()
-                + RECORD_SEPARATOR + (recorded.getCharacterId() == null ? ""
+        return ":" + recorded.getPlayerId() + ":"
+                + (recorded.getCharacterId() == null ? ""
                         : recorded.getCharacterId().toString())
-                + RECORD_SEPARATOR + recorded.getSkinId().replace(
-                        RECORD_SEPARATOR, ' ')
-                + RECORD_SEPARATOR + recorded.getIdentityName();
+                + ":" + encode(recorded.getSkinId())
+                + ":" + encode(recorded.getIdentityName());
     }
 
-    /** The recorded player read back, or null for anything malformed. */
-    private static ChatNamedPlayer parseRecord(String account, String text) {
-        String[] fields = text.split("\\|", 4);
-        if (fields.length != 4) {
-            return null;
-        }
-        try {
-            UUID playerId = UUID.fromString(fields[0]);
-            UUID characterId = fields[1].length() == 0 ? null
-                    : UUID.fromString(fields[1]);
-            return new ChatNamedPlayer(playerId, account, characterId,
-                    fields[3], fields[2]);
-        } catch (IllegalArgumentException malformed) {
-            return null;
-        }
+    private static String encode(String text) {
+        return Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(text.getBytes(UTF_8));
+    }
+
+    private static String decodeText(String field) {
+        return new String(Base64.getUrlDecoder().decode(field), UTF_8);
     }
 
     /**
@@ -154,6 +152,7 @@ final class ChatMentionMarker {
      */
     static final class Data {
         final int color;
+        /** The player's account, or the role's id for a role mention. */
         final String account;
         /**
          * The player as the server recorded them with the line: what the
@@ -161,32 +160,34 @@ final class ChatMentionMarker {
          * Null for a role and for a line that recorded nobody.
          */
         final ChatNamedPlayer recorded;
+        private final boolean role;
 
-        private Data(int color, String account, ChatNamedPlayer recorded) {
+        private Data(int color, String account, ChatNamedPlayer recorded,
+                     boolean role) {
             this.color = color;
             this.account = account;
             this.recorded = recorded;
+            this.role = role;
         }
 
         /** Whether the mention is of a role rather than of a player. */
         boolean isRole() {
-            return this.account.startsWith(ROLE_TARGET_PREFIX);
+            return this.role;
         }
 
         /**
-         * The targeted role, or null for an account mention. Every real
+         * The targeted role, or null for a player mention. Every real
          * role answers, not only the mentionable ones: a worn-only role
          * like the Lost Tales Team mark carries the marker for its card
          * even though nothing can address it.
          */
         ChatAccountRole role() {
-            if (!this.account.startsWith(ROLE_TARGET_PREFIX)) {
+            if (!this.role) {
                 return null;
             }
-            ChatAccountRole role = ChatAccountRole.byId(
-                    this.account.substring(ROLE_TARGET_PREFIX.length())
-                            .toLowerCase(Locale.ROOT));
-            return role.isNone() ? null : role;
+            ChatAccountRole found = ChatAccountRole.byId(
+                    this.account.toLowerCase(Locale.ROOT));
+            return found.isNone() ? null : found;
         }
     }
 }

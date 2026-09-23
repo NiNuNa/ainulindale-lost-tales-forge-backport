@@ -47,10 +47,13 @@ public final class ChatWindowPlacement {
      *  and with it the trailing strip), never what is operated. That
      *  asymmetry is a decision, not an oversight.</p> */
     public static final int INPUT_HEIGHT = ChatInputBar.HEIGHT;
-    /** The white edge of a window's frame: one pixel just outside its box. */
+    /**
+     * The edge of a window's frame, a lit framed button's: one pixel just
+     * outside its box.
+     */
     static final int FRAME_EDGE_WIDTH = 1;
     /**
-     * The window frame's whole width: its white edge, and a pixel of the
+     * The window frame's whole width: its edge, and a pixel of the
      * window's own surface just outside that, lying under the edge as a
      * framed button's surface lies under its frame — all of it over
      * nothing of the window's own. Placement keeps that room for it, so

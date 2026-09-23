@@ -79,6 +79,32 @@ public final class ChatMemberListTest {
                 + ChatMemberList.GROUP_GAP, rows.get(2).top);
     }
 
+    /**
+     * The plain group, Online, wears the green sphere in every list, in
+     * character too; a faction wears its banner, a role its own icon, an
+     * NPC's group the NPC's face and a Discord server the Discord emoji.
+     */
+    @Test
+    public void theOnlineHeadingWearsTheGreenSphereInEveryList() {
+        assertEquals(ChatMemberList.HeadingIcon.ONLINE,
+                ChatMemberList.headingIconOf("", true));
+        assertEquals(ChatMemberList.HeadingIcon.ONLINE,
+                ChatMemberList.headingIconOf("", false));
+        assertEquals(ChatMemberList.HeadingIcon.ONLINE,
+                ChatMemberList.headingIconOf(null, true));
+        assertEquals(ChatMemberList.HeadingIcon.FACTION,
+                ChatMemberList.headingIconOf("lotr:gondor", true));
+        assertEquals(ChatMemberList.HeadingIcon.ROLE,
+                ChatMemberList.headingIconOf("operator", false));
+        assertEquals(ChatMemberList.HeadingIcon.NPC,
+                ChatMemberList.headingIconOf(
+                        ChatMemberList.NPC_GROUP_PREFIX + "gondor", true));
+        assertEquals(ChatMemberList.HeadingIcon.DISCORD,
+                ChatMemberList.headingIconOf(
+                        LostTalesChatMembersPacket.DISCORD_GROUP_PREFIX + "123",
+                        true));
+    }
+
     @Test
     public void anAbsentMembersHeadReadsOffline() {
         LostTalesChatMembersPacket.Member here = member("Aldric", "gondor", true);
@@ -90,15 +116,6 @@ public final class ChatMemberListTest {
                 ChatPresenceMark.presenceOf(ChatMemberList.headOf(away)));
     }
 
-    @Test
-    public void theListStandsWhereTheWordsKeepTheirRoom() {
-        float width = ChatMemberList.DEFAULT_WIDTH;
-        assertTrue(ChatMemberList.fits(width
-                + ChatMemberList.MIN_MESSAGE_WIDTH, width));
-        assertFalse(ChatMemberList.fits(width
-                + ChatMemberList.MIN_MESSAGE_WIDTH - 1, width));
-    }
-
     /**
      * The list takes the width its edge was dragged to, within a third of
      * its window and never narrower than its heads; a window that chose
@@ -107,20 +124,43 @@ public final class ChatMemberListTest {
     @Test
     public void theListsWidthIsBoundedByItsHeadsAndAThirdOfTheWindow() {
         ChatMemberList.State state = new ChatMemberList.State();
-        ChatMemberList.measure(state, null, 600.0F);
+        ChatMemberList.measure(state, null, 600.0F, 38.0F);
         assertEquals(ChatMemberList.DEFAULT_WIDTH, state.width, 0.001F);
         assertEquals(200.0F, state.maxWidth, 0.001F);
         ChatWindow window = new ChatWindow("w");
         window.setMembersWidth(150.5D);
-        ChatMemberList.measure(state, window, 600.0F);
+        ChatMemberList.measure(state, window, 600.0F, 38.0F);
         assertEquals(150.5F, state.width, 0.001F);
         // A narrower window holds the list to a third of itself.
-        ChatMemberList.measure(state, window, 300.0F);
+        ChatMemberList.measure(state, window, 300.0F, 38.0F);
         assertEquals(100.0F, state.width, 0.001F);
         // Dragged past its heads, it stops at them.
         window.setMembersWidth(1.0D);
-        ChatMemberList.measure(state, window, 600.0F);
+        ChatMemberList.measure(state, window, 600.0F, 38.0F);
         assertEquals(ChatMemberList.minWidth(), state.width, 0.001F);
+    }
+
+    /**
+     * A window made narrower narrows its list so the words keep their
+     * room beside it, and once the list is down to its heads it stays
+     * there: it never leaves the window by itself.
+     */
+    @Test
+    public void aNarrowerWindowNarrowsItsListDownToItsHeads() {
+        ChatMemberList.State state = new ChatMemberList.State();
+        ChatWindow window = new ChatWindow("w");
+        window.setMembersWidth(150.0D);
+        float messageX = 38.0F;
+        float roomy = messageX + ChatMemberList.MIN_MESSAGE_WIDTH + 90.0F;
+        ChatMemberList.measure(state, window, roomy, messageX);
+        assertEquals(90.0F, state.width, 0.001F);
+        ChatMemberList.measure(state, window, roomy - 30.0F, messageX);
+        assertEquals(60.0F, state.width, 0.001F);
+        ChatMemberList.measure(state, window, 120.0F, messageX);
+        assertEquals(ChatMemberList.minWidth(), state.width, 0.001F);
+        // Wide again, the list is the width it was dragged to.
+        ChatMemberList.measure(state, window, 900.0F, messageX);
+        assertEquals(150.0F, state.width, 0.001F);
     }
 
     @Test

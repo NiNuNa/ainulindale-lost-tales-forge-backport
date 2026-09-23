@@ -7,6 +7,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiCornerCut;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatDeliveryMark;
 import com.ninuna.losttales.chat.ChatPresence;
@@ -63,7 +64,7 @@ import org.lwjgl.opengl.GL14;
  */
 final class LostTalesChatOverlayRenderer {
     /** Width of the solid bar a mention wears on the window's left edge. */
-    private static final float MENTION_BAR_WIDTH = 1.0F;
+    static final float MENTION_BAR_WIDTH = 2.0F;
     /** The unread divider's rule and date: the palette's red. */
     private static final int UNREAD_DIVIDER_RGB =
             LostTalesColors.rgb(LostTalesColors.CRIMSON);
@@ -360,14 +361,13 @@ final class LostTalesChatOverlayRenderer {
         // The timestamp area and the member list glide in and out before
         // anything reads their width: the lines are laid out against it.
         // The list takes the width its edge was dragged to, within a third
-        // of the window, and stands while the words keep their least room
-        // beside it.
+        // of the window and the words' least room beside it, and narrows
+        // with the window down to its heads rather than leaving.
         float windowChatWidth = chatWidth / chat.func_146244_h() + 6.0F;
-        ChatMemberList.measure(frame.members, window, windowChatWidth);
-        frame.advancePanels(window, view != null
-                && ChatMemberList.fits(windowChatWidth - ChatTimestampColumn
-                        .of(frame, minecraft.fontRenderer).messageX(),
-                        frame.members.width));
+        ChatMemberList.measure(frame.members, window, windowChatWidth,
+                ChatTimestampColumn.of(frame, minecraft.fontRenderer)
+                        .messageX());
+        frame.advancePanels(window, view != null);
         // The unread divider opens a run of its own under it while it
         // stands, so the window lays its lines out knowing where it is.
         Integer unread = view == null ? null
@@ -410,11 +410,15 @@ final class LostTalesChatOverlayRenderer {
         // the eye.
         ClientChatChannelViews.holdPosition(view, frame);
         double roomLines = frame.roomLines();
+        double scrollTarget = view == null ? 0.0D
+                : ClientChatChannelViews.getScroll(view, frame.contentRows(),
+                        roomLines);
         double scroll = view == null ? 0.0D
-                : ClientChatChannelViews.renderedScroll(view,
-                        ClientChatChannelViews.getScroll(view,
-                                frame.contentRows(), roomLines));
+                : ClientChatChannelViews.renderedScroll(view, scrollTarget);
         frame.renderedScrollLines = scroll;
+        // The history is on its way to where it was scrolled: the toolbar
+        // waits for it to rest.
+        frame.historyMoving = Math.abs(scroll - scrollTarget) > 0.001D;
         frame.drawn = true;
         if (view != null) {
             // A conversation of a scoped channel read for the first time
@@ -475,10 +479,12 @@ final class LostTalesChatOverlayRenderer {
      * The window's bottom hairline, drawn by the chat screen after the
      * bar so it lies over the edge shade: one GUI pixel tall exactly
      * like the top rule — the bar strip's first row, mirroring the tab
-     * strip whose last row is the top rule. Between the baseline and
-     * this row lies the window's trailing strip, one line of always
-     * visible room the typing line lives in; the message clip ends on
-     * the baseline, so no message ever enters the strip.
+     * strip whose last row is the top rule. Behind it the row wears the
+     * input bar's surface, the colour it touches (Nils), so the bar runs
+     * up under the rule. Between the baseline and this row lies the
+     * window's trailing strip, one line of always visible room the
+     * typing line lives in; the message clip ends on the baseline, so no
+     * message ever enters the strip.
      */
     static void drawBottomRule(Minecraft minecraft, ChatWindowFrame frame,
                                LostTalesGuiAnimationSample opening) {
@@ -492,9 +498,11 @@ final class LostTalesChatOverlayRenderer {
         float right = left + (float)(frame.boxRight - frame.boxLeft);
         float top = (float)frame.drawnBaseline()
                 + ChatWindowPlacement.lineHeight(minecraft);
-        drawBackdropRow(left, top, right, top + 1.0F,
-                Math.round(backdropRowAlpha(minecraft)
-                        * opening.getOpacity()));
+        fillRect(left, top, right, top + 1.0F, LostTalesChatVisualStyle.argb(
+                LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB,
+                Math.round(LostTalesChatVisualStyle.INSET_ALPHA
+                        * LostTalesChatVisualStyle.chatOpacity(minecraft)
+                        * opening.getOpacity())));
         drawRule(left, right, top, top + 1.0F,
                 Math.round(255.0F * opening.getOpacity()));
     }
@@ -594,9 +602,11 @@ final class LostTalesChatOverlayRenderer {
             return;
         }
         ChatFeedAlignment alignment = ChatFeedAlignment.current();
-        int room = MathHelper.ceiling_float_int(chatWidth / scale);
         float panelLeft = -columns.messageX();
-        float panelRight = panelLeft + room + 6.0F;
+        float panelRight = panelLeft
+                + MathHelper.ceiling_float_int(chatWidth / scale) + 6.0F;
+        // The row stands between the feed's edge gaps, as its lines do.
+        int room = (int)ChatTimestampColumn.feedRowRoom(panelRight - panelLeft);
         LostTalesUiSheet bubble = LostTalesUiSheet.SPEECH_BUBBLE;
         // Each conversation's prefix and words, as far as the row holds.
         List<String> prefixes = new ArrayList<String>();
@@ -1250,6 +1260,11 @@ final class LostTalesChatOverlayRenderer {
         // thinning with the game's chat opacity as the panel does.
         int columnAlpha = Math.round(LostTalesChatVisualStyle.INSET_ALPHA
                 * opacity * opening.getOpacity());
+        // The window's frame runs a frame wide outside the history's
+        // sides, here in the history's own units.
+        float ringLeft = panelLeft - ChatWindowPlacement.FRAME_WIDTH / scale;
+        float ringRight = windowRight
+                + ChatWindowPlacement.FRAME_WIDTH / scale;
         // Whether the history reaches the room's top, where the topmost
         // line owns the head-room under the row.
         boolean reachesTop = totalHeight >= roomUnscaled - 0.01F;
@@ -1282,11 +1297,15 @@ final class LostTalesChatOverlayRenderer {
         ToolbarPlace toolbar = open ? placeToolbar(minecraft, lines,
                 firstLine, lastRow, dividerIndex, rows, glide, stackBase,
                 opacity, opening) : null;
-        int[] toolbarKinds = toolbar == null ? new int[0]
-                : offeredToolbar(toolbar.chatLineId);
+        float toolbarShare = frame.toolbarShare(toolbar == null ? 0
+                : toolbar.chatLineId, frame.historyMoving, System.nanoTime());
+        if (toolbarShare <= 0.0F) {
+            toolbar = null;
+        }
+        float toolbarScale = LostTalesChatVisualStyle.stackSmallScale();
         // Clear of the scrollbar's track at the panel's right edge.
         float toolbarLeft = panelRight - 1.0F - SCROLLBAR_WIDTH
-                - TOOLBAR_GAP - toolbarWidth(toolbarKinds.length);
+                - TOOLBAR_GAP - toolbarWidth() * toolbarScale;
         boolean jumpShown = open && advanceJumpButton(frame, scrollLines);
         // Centred across the panel, on a whole pixel, the odd one left.
         int jumpWidth = jumpButtonWidth(minecraft.fontRenderer);
@@ -1294,10 +1313,11 @@ final class LostTalesChatOverlayRenderer {
                 - jumpWidth) / 2.0F);
         float jumpTop = jumpButtonTop(frame, bottomEdge, originY, scale);
         Holes holes = new Holes();
-        for (int index = 0; index < toolbarKinds.length; index++) {
-            holes.add(toolbarLeft + index * TOOLBAR_STRIDE,
-                    toolbar.top + offset, TOOLBAR_BUTTON_SIZE,
-                    TOOLBAR_BUTTON_SIZE, CONTROL_DEPTH, 1.0F);
+        if (toolbar != null) {
+            holes.add(toolbarLeft, toolbar.top + offset,
+                    toolbarWidth() * toolbarScale,
+                    TOOLBAR_HEIGHT * toolbarScale, CONTROL_DEPTH,
+                    toolbarScale);
         }
         if (jumpShown) {
             holes.add(jumpLeft, jumpTop, jumpWidth, JUMP_BUTTON_HEIGHT,
@@ -1343,6 +1363,21 @@ final class LostTalesChatOverlayRenderer {
                                     LostTalesChatVisualStyle.SURFACE_RGB,
                                     columnAlpha));
                 }
+                // The window's frame beside the history, in the colour it
+                // touches (Nils): the timestamp area's, or the panel's
+                // own left end; on the right the member list's while it
+                // is out, else the panel's own colour at its full
+                // strength rather than where it has thinned out to
+                // nothing (Nils). A highlighted line recolours its
+                // stretches with its row.
+                int areaArgb = LostTalesChatVisualStyle.argb(
+                        LostTalesChatVisualStyle.SURFACE_RGB, columnAlpha);
+                int panelArgb = LostTalesChatVisualStyle.argb(
+                        LostTalesChatVisualStyle.backdropRgb(), panelAlpha);
+                fillRect(ringLeft, topEdge, panelLeft, bottomEdge,
+                        columns.shows() ? areaArgb : panelArgb);
+                fillRect(windowRight, topEdge, ringRight, bottomEdge,
+                        panelRight < windowRight ? areaArgb : panelArgb);
                 // Rows the history does not reach: hatched, so the
                 // region reads as holding no messages rather than as a
                 // gap. The hatch hangs from the panel's top and stops
@@ -1529,13 +1564,10 @@ final class LostTalesChatOverlayRenderer {
                             ? LostTalesChatPresentation.lineHoverFade(
                                     line.getChatLineID(), hoveredLine)
                             : 0.0F;
-                    // The surface the row's backdrops are recoloured on:
-                    // the band the row stands on, the open window's
-                    // panel or the feed line's own.
+                    // The colour the row stands on — the open window's
+                    // band or the feed line's own — which the row's
+                    // backdrops take care never to be.
                     int surfaceRgb = backdropRgb;
-                    int surfaceAlpha = 0;
-                    float[] surfaceWeights = BACKDROP_FADE_WEIGHTS;
-                    float surfaceShare = 1.0F;
                     if (open) {
                         // The open window has one panel behind every
                         // line, and a highlighted line is that panel in
@@ -1561,11 +1593,7 @@ final class LostTalesChatOverlayRenderer {
                                     panelRight, y, panelAlpha, backdropRgb,
                                     bandRgb);
                         }
-                        // The panel stays while a new line's words come
-                        // in, so the line's backdrops come in with them.
                         surfaceRgb = bandRgb;
-                        surfaceAlpha = panelAlpha;
-                        surfaceShare = lineShare(line);
                         if (columns.shows()) {
                             // The line's row of the timestamp area wears
                             // the line's highlight too — a mention's tint,
@@ -1588,12 +1616,32 @@ final class LostTalesChatOverlayRenderer {
                                             .selectedReplyHighlightRgb(),
                                     hoverFade);
                             if (areaRgb != LostTalesChatVisualStyle.SURFACE_RGB) {
-                                recolour(panelLeft, panelLeft,
+                                // The window's frame beside the area takes
+                                // the row's highlight with it.
+                                recolour(ringLeft, ringLeft,
                                         y - rowHeight - headroom / scale,
                                         messageLeft, y, columnAlpha,
                                         LostTalesChatVisualStyle.SURFACE_RGB,
                                         areaRgb, FLAT_WEIGHTS);
                             }
+                        } else if (bandRgb != backdropRgb) {
+                            // With no timestamp area, the window's frame
+                            // beside the line takes the line's band as the
+                            // panel's own left end wears it.
+                            recolour(ringLeft, ringLeft,
+                                    y - rowHeight - headroom / scale,
+                                    panelLeft, y, panelAlpha, backdropRgb,
+                                    bandRgb, FLAT_WEIGHTS);
+                        }
+                        if (bandRgb != backdropRgb
+                                && panelRight >= windowRight) {
+                            // On the right the frame wears the panel at
+                            // its full strength, and the line's band there
+                            // the same way.
+                            recolour(windowRight, windowRight,
+                                    y - rowHeight - headroom / scale,
+                                    ringRight, y, panelAlpha, backdropRgb,
+                                    bandRgb, FLAT_WEIGHTS);
                         }
                         if (pinged) {
                             // A mention also wears a solid bar on the
@@ -1644,8 +1692,6 @@ final class LostTalesChatOverlayRenderer {
                                 panelRight, y, alpha / 2, color,
                                 alignment.bandWeights());
                         surfaceRgb = color;
-                        surfaceAlpha = alpha / 2;
-                        surfaceWeights = alignment.bandWeights();
                     }
                     if (!open && pinged && alignment.hasMentionBar()) {
                         // In the feed the bar stands on the edge the
@@ -1716,7 +1762,9 @@ final class LostTalesChatOverlayRenderer {
                     GL11.glEnable(GL11.GL_BLEND);
                     IChatComponent component = line.func_151461_a();
                     float rowShift = feedRowShift(font, component, alignment,
-                            unscaledWidth, rowPivot, rowScale);
+                            ChatTimestampColumn.feedRowRoom(
+                                    windowRight - panelLeft),
+                            rowPivot, rowScale);
                     if (open && ChatReplyMarker.isQuoteRow(component)) {
                         drawQuoteSpine(y, rowScale, alpha);
                     }
@@ -1752,19 +1800,11 @@ final class LostTalesChatOverlayRenderer {
                             ? ChatLineHover.rowMotion(line.getChatLineID(),
                                     System.nanoTime())
                             : null;
-                    // The row's backdrops go down on its band before its
-                    // words, the band's curve carried into the row's own
-                    // units: the open window's band stands still while
-                    // the words slide in, and the feed's slides with them.
-                    float unit = rowPivot >= 0.0F ? rowScale : 1.0F;
-                    float origin = (open ? entry : 0.0F) + rowShift
-                            + (rowPivot >= 0.0F ? rowPivot * (1.0F - rowScale)
-                                    : 0.0F);
+                    // The row's backdrops go down over its band before its
+                    // words, riding the words as they slide in and fading
+                    // with them.
                     ChatRunBackdrops.draw(font, component, line.getChatLineID(),
-                            new ChatRunBackdrops.Surface(surfaceRgb, surfaceAlpha,
-                                    surfaceWeights, (panelLeft - origin) / unit,
-                                    (panelRight - origin) / unit, surfaceShare),
-                            open, rowMotion);
+                            surfaceRgb, alpha, open, rowMotion);
                     LostTalesChatVisualStyle.drawFormatted(font,
                             component, marker, 0, 0, alpha, open, rowMotion,
                             line.getChatLineID());
@@ -1945,6 +1985,7 @@ final class LostTalesChatOverlayRenderer {
             frame.toolbarRight = 0.0F;
             frame.toolbarBottom = 0.0F;
             frame.toolbarKinds = new int[0];
+            frame.toolbarWhy = new String[0];
             frame.toolbarChatLineId = 0;
             frame.jumpPillLeft = 0.0F;
             frame.jumpPillTop = 0.0F;
@@ -1961,9 +2002,9 @@ final class LostTalesChatOverlayRenderer {
                         try {
                             GL11.glTranslatef(0.0F, offset, 0.0F);
                             drawMessageToolbar(frame, toolbar.chatLineId,
-                                    toolbarKinds, toolbarLeft, toolbar.top,
-                                    controlAlpha, originX,
-                                    originY + stackOffset, scale);
+                                    toolbarLeft, toolbar.top, toolbarScale,
+                                    Math.round(controlAlpha * toolbarShare),
+                                    originX, originY + stackOffset, scale);
                         } finally {
                             GL11.glPopMatrix();
                         }
@@ -2034,14 +2075,18 @@ final class LostTalesChatOverlayRenderer {
 
     /**
      * Where the hovered message's toolbar starts, for the message's
-     * topmost row ending at {@code rowBottom}: its buttons are taller than
-     * a row, so the toolbar is centred on the row's capitals, half a pixel
-     * above their middle, and its react button's emoji stands exactly
-     * where an emoji in the row stands.
+     * topmost row ending at {@code rowBottom}, drawn at the chat's small
+     * size: centred on the row's capitals, the odd display pixel up, and
+     * on whole display pixels, measured with the words drawn at
+     * {@code wordsPixels} and the toolbar at {@code smallPixels} display
+     * pixels to one of their own, {@code unitPixels} to one of the
+     * stack's.
      */
-    static int toolbarTop(int rowBottom, int rowHeight) {
+    static float toolbarTop(int rowBottom, int rowHeight, int wordsPixels,
+                            int smallPixels, float unitPixels) {
+        int spare = GLYPH_CAP_HEIGHT * wordsPixels - TOOLBAR_HEIGHT * smallPixels;
         return rowBottom - rowHeight + ROW_TEXT_TOP
-                + Math.floorDiv(GLYPH_CAP_HEIGHT - TOOLBAR_BUTTON_SIZE, 2);
+                + Math.floorDiv(spare, 2) / Math.max(0.001F, unitPixels);
     }
 
     /**
@@ -2991,47 +3036,42 @@ final class LostTalesChatOverlayRenderer {
     }
 
     /**
-     * Edge of one toolbar button's square: the framed buttons' one
-     * height, an emoji's box with the frame's inset either side.
+     * One control of the toolbar, square, in the toolbar's own pixels: an
+     * emoji's box with the framed buttons' clear pixels round it. The
+     * controls stand side by side inside one frame.
      */
-    static final int TOOLBAR_BUTTON_SIZE = LostTalesUiFramedButton.HEIGHT;
-    /** Clear pixels between two of the toolbar's buttons, and after the last. */
+    static final int TOOLBAR_CELL = LostTalesUiInk.ICON_SIZE
+            + 2 * LostTalesUiFramedButton.PADDING;
+    /** The toolbar's height in its own pixels: a control and the frame's edge above and below it. */
+    static final int TOOLBAR_HEIGHT = TOOLBAR_CELL + 2 * LostTalesUiFramedButton.EDGE;
+    /** Clear pixels between the toolbar and the scrollbar's track. */
     static final int TOOLBAR_GAP = 2;
-    /** From one toolbar button's left edge to the next one's. */
-    static final int TOOLBAR_STRIDE = TOOLBAR_BUTTON_SIZE + TOOLBAR_GAP;
     /** Answer the message. */
     static final int TOOLBAR_REPLY = 1;
     /** Take a copy of the message. */
     static final int TOOLBAR_COPY = 2;
     /** React to the message. */
     static final int TOOLBAR_REACT = 3;
+    /** Take a link to the message. */
+    static final int TOOLBAR_LINK = 4;
+    /** Open the message's menu, the one a right click on it opens. */
+    static final int TOOLBAR_MORE = 5;
     /**
-     * The reply glyph's pixels, row by row: an arrow turning back on
-     * itself, its head three pixel steps down to a point at the left, the
-     * shaft through the head's middle row and the tail turning up behind.
+     * The toolbar's controls, left to right, on every message alike, the
+     * menu's last as on a messenger's bar: one that cannot be taken on a
+     * message stands muted in its place and says why under the pointer.
      */
-    private static final String[] REPLY_GLYPH = {
-            "..#..#",
-            ".##..#",
-            "######",
-            ".##...",
-            "..#..."};
+    static final int[] TOOLBAR_KINDS = {TOOLBAR_REACT, TOOLBAR_REPLY,
+            TOOLBAR_COPY, TOOLBAR_LINK, TOOLBAR_MORE};
     /**
-     * The copy glyph's pixels: two leaves, the one behind an outline open
-     * at the corner the one in front covers.
+     * The link glyph's pixels: two rings of a chain holding each other,
+     * standing in until the link's own artwork is drawn.
      */
-    private static final String[] COPY_GLYPH = {
-            "...#####",
-            ".......#",
-            "######.#",
-            "#....#.#",
-            "#....###",
-            "#....#..",
-            "######.."};
-    private static final int REPLY_GLYPH_WIDTH = REPLY_GLYPH[0].length();
-    private static final int REPLY_GLYPH_HEIGHT = REPLY_GLYPH.length;
-    private static final int COPY_GLYPH_WIDTH = COPY_GLYPH[0].length();
-    private static final int COPY_GLYPH_HEIGHT = COPY_GLYPH.length;
+    private static final String[] LINK_GLYPH = {
+            ".##..##.",
+            "#..##..#",
+            "#..##..#",
+            ".##..##."};
 
     /** Where the hovered message's toolbar stands, in the stack's units, and whose it is. */
     private static final class ToolbarPlace {
@@ -3103,8 +3143,13 @@ final class LostTalesChatOverlayRenderer {
             // The stack walks upward, so the last row found is the
             // message's topmost.
             int rowBottom = -(rows.top(rowIndex) - Math.round(stackBase));
+            int factor = ChatWindowFrame.displayScaleFactor();
+            float chat = LostTalesChatVisualStyle.chatScale();
             place = new ToolbarPlace(toolbarTop(rowBottom,
-                    rows.height(rowIndex)) - glide.lift(lineIndex),
+                    rows.height(rowIndex),
+                    LostTalesChatVisualStyle.rowPixels(chat, factor, 0),
+                    LostTalesChatVisualStyle.rowPixels(chat, factor, -1),
+                    factor * chat) - glide.lift(lineIndex),
                     line.getChatLineID());
         }
         return place;
@@ -3194,115 +3239,187 @@ final class LostTalesChatOverlayRenderer {
     }
 
     /**
-     * The controls a message's toolbar offers, left to right: React for a
-     * message the server named, Reply for one somebody may answer, and
-     * Copy always, so a console notice shows Copy alone.
+     * Why each of the toolbar's controls cannot be taken on the message
+     * drawn on {@code chatLineId}, in {@link #TOOLBAR_KINDS}' order;
+     * empty for one that can. Copy and the menu always can.
      */
-    private static int[] offeredToolbar(int chatLineId) {
-        List<Integer> offered = new ArrayList<Integer>(3);
-        if (LostTalesChatPresentation.isReactable(chatLineId)) {
-            offered.add(Integer.valueOf(TOOLBAR_REACT));
+    private static String[] toolbarReasons(int chatLineId) {
+        String[] why = new String[TOOLBAR_KINDS.length];
+        for (int index = 0; index < why.length; index++) {
+            int kind = TOOLBAR_KINDS[index];
+            why[index] = kind == TOOLBAR_REACT
+                    ? LostTalesChatPresentation.whyNotReactable(chatLineId)
+                    : kind == TOOLBAR_REPLY
+                            ? LostTalesChatPresentation.whyNotRepliable(chatLineId)
+                            : kind == TOOLBAR_LINK
+                                    ? ChatScreenMenus.whyNotLinkable(chatLineId)
+                                    : "";
         }
-        if (LostTalesChatPresentation.isRepliable(chatLineId)) {
-            offered.add(Integer.valueOf(TOOLBAR_REPLY));
-        }
-        offered.add(Integer.valueOf(TOOLBAR_COPY));
-        int[] kinds = new int[offered.size()];
-        for (int index = 0; index < kinds.length; index++) {
-            kinds[index] = offered.get(index).intValue();
-        }
-        return kinds;
+        return why;
     }
 
-    /** The width of a toolbar of {@code count} buttons, the gaps between them included. */
-    static int toolbarWidth(int count) {
-        return count <= 0 ? 0
-                : count * TOOLBAR_BUTTON_SIZE + (count - 1) * TOOLBAR_GAP;
+    /** The toolbar's width in its own pixels: its controls and the frame's edge either side. */
+    static int toolbarWidth() {
+        return TOOLBAR_KINDS.length * TOOLBAR_CELL
+                + 2 * LostTalesUiFramedButton.EDGE;
     }
 
     /**
      * The hovered message's own controls, at the top right of it: react
-     * to it, reply to it and copy it — what the message's menu offers,
-     * where the pointer already is — each a framed button standing in the
-     * hole the history left for it, lit under the pointer.
+     * to it, reply to it, copy it and copy a link to it — what the
+     * message's menu offers, where the pointer already is — and open that
+     * menu for the rest, side by side
+     * inside one frame standing in the hole the history left for it, as
+     * Discord's message bar does. Each control's own stretch of the bar's
+     * surface lights under the pointer, beside the others rather than
+     * over the bar, and its glyph moves inside it; the frame lights with
+     * whichever control is lit. A control that cannot be taken on this
+     * message stands muted and never lights. The whole bar is drawn at
+     * the chat's small size, {@code small} of the stack's units to one
+     * of its own.
      *
      * <p>Drawn in the stack's space, so it rides the scroll with the
      * message it belongs to: {@code top} is the row's place before the
      * slide, the caller translates by the slide and {@code originY}
-     * includes it. The buttons are taller than the row and reach past it;
-     * while the pointer is on one, the message it belongs to stays the
-     * hovered one. The screen rectangle is recorded on the frame, so the
-     * click resolves against exactly what was drawn.</p>
+     * includes it. While the pointer is on the bar, the message it
+     * belongs to stays the hovered one. The screen rectangle is recorded
+     * on the frame, so the click resolves against exactly what was
+     * drawn.</p>
      */
     private static void drawMessageToolbar(ChatWindowFrame frame,
-                                           int chatLineId, int[] kinds,
-                                           float left, float top,
+                                           int chatLineId, float left,
+                                           float top, float small,
                                            int alpha, float originX,
                                            float originY, float scale) {
-        if (alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA
-                || kinds.length == 0) {
+        if (alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
             return;
         }
         long now = System.nanoTime();
         frame.startToolbarFades(chatLineId);
+        String[] why = toolbarReasons(chatLineId);
+        int width = toolbarWidth();
+        int edge = LostTalesUiFramedButton.EDGE;
         int surfaceAlpha = Math.round(alpha
                 * LostTalesChatVisualStyle.INSET_ALPHA / 255.0F);
-        for (int index = 0; index < kinds.length; index++) {
-            int kind = kinds[index];
-            float buttonLeft = left + index * TOOLBAR_STRIDE;
-            LostTalesUiButtonMotion motion = frame.toolbarMotion(kind, now);
-            float lit = motion.lit();
-            LostTalesUiFramedButton.drawSurface(buttonLeft, top,
-                    TOOLBAR_BUTTON_SIZE, TOOLBAR_BUTTON_SIZE, lit,
-                    surfaceAlpha);
-            // The frame keeps its place and the glyph moves inside it,
-            // as every other framed button in the chat does.
-            LostTalesUiButton.beginPose(motion, buttonLeft, top,
-                    TOOLBAR_BUTTON_SIZE, TOOLBAR_BUTTON_SIZE);
-            try {
-                if (kind == TOOLBAR_REACT) {
-                    // The input bar's own emoji button, lit as the button
-                    // is: the same control, aimed at this message.
-                    LostTalesUiSheet.drawPairWithShadow(LostTalesUiSheet.EMOJI,
-                            LostTalesUiSheet.EMOJI_HOVER, lit,
-                            buttonLeft + (TOOLBAR_BUTTON_SIZE
-                                    - LostTalesUiSheet.EMOJI.getWidth()) / 2,
-                            top + (TOOLBAR_BUTTON_SIZE
-                                    - LostTalesUiSheet.EMOJI.getHeight()) / 2,
-                            alpha);
-                } else if (kind == TOOLBAR_REPLY) {
-                    drawPixelGlyph(REPLY_GLYPH,
-                            buttonLeft + (TOOLBAR_BUTTON_SIZE
-                                    - REPLY_GLYPH_WIDTH) / 2,
-                            top + (TOOLBAR_BUTTON_SIZE - REPLY_GLYPH_HEIGHT) / 2,
-                            LostTalesChatVisualStyle.IVORY, alpha);
-                } else {
-                    drawPixelGlyph(COPY_GLYPH, buttonLeft + (TOOLBAR_BUTTON_SIZE
-                                    - COPY_GLYPH_WIDTH) / 2,
-                            top + (TOOLBAR_BUTTON_SIZE - COPY_GLYPH_HEIGHT) / 2,
-                            LostTalesChatVisualStyle.IVORY, alpha);
-                }
-            } finally {
-                LostTalesUiButton.endPose();
-            }
-            LostTalesUiFramedButton.drawInk(buttonLeft, top, TOOLBAR_BUTTON_SIZE,
-                    TOOLBAR_BUTTON_SIZE, lit, alpha);
+        float[] lit = new float[TOOLBAR_KINDS.length];
+        LostTalesUiButtonMotion[] motions =
+                new LostTalesUiButtonMotion[TOOLBAR_KINDS.length];
+        float frameLit = 0.0F;
+        for (int index = 0; index < TOOLBAR_KINDS.length; index++) {
+            motions[index] = frame.toolbarMotion(TOOLBAR_KINDS[index], now);
+            lit[index] = why[index].length() > 0 ? 0.0F : motions[index].lit();
+            frameLit = Math.max(frameLit, lit[index]);
         }
+        GL11.glPushMatrix();
+        try {
+            GL11.glTranslatef(left, top, 0.0F);
+            GL11.glScalef(small, small, 1.0F);
+            // The frame's edge in the frame's own light, then each
+            // control's square in its own, side by side.
+            int edgeArgb = LostTalesUiInk.argb(
+                    LostTalesUiFramedButton.surfaceRgb(frameLit), surfaceAlpha);
+            fillRect(1.0F, 0.0F, width - 1.0F, edge, edgeArgb);
+            fillRect(0.0F, edge, edge, TOOLBAR_HEIGHT - edge, edgeArgb);
+            fillRect(width - edge, edge, width, TOOLBAR_HEIGHT - edge,
+                    edgeArgb);
+            fillRect(1.0F, TOOLBAR_HEIGHT - edge, width - 1.0F,
+                    TOOLBAR_HEIGHT, edgeArgb);
+            for (int index = 0; index < TOOLBAR_KINDS.length; index++) {
+                float cellLeft = edge + index * TOOLBAR_CELL;
+                fillRect(cellLeft, edge, cellLeft + TOOLBAR_CELL,
+                        edge + TOOLBAR_CELL, LostTalesUiInk.argb(
+                                LostTalesUiFramedButton.surfaceRgb(lit[index]),
+                                surfaceAlpha));
+            }
+            for (int index = 0; index < TOOLBAR_KINDS.length; index++) {
+                float cellLeft = edge + index * TOOLBAR_CELL;
+                boolean open = why[index].length() == 0;
+                if (!open) {
+                    // A control that cannot be taken stands still, muted.
+                    drawToolbarGlyph(TOOLBAR_KINDS[index], cellLeft, edge,
+                            0.0F, false, Math.round(alpha
+                                    * LostTalesChatVisualStyle.UNAVAILABLE_OPACITY));
+                    continue;
+                }
+                LostTalesUiButton.beginPose(motions[index], cellLeft, edge,
+                        TOOLBAR_CELL, TOOLBAR_CELL);
+                try {
+                    drawToolbarGlyph(TOOLBAR_KINDS[index], cellLeft, edge,
+                            lit[index], true, alpha);
+                } finally {
+                    LostTalesUiButton.endPose();
+                }
+            }
+            LostTalesUiFramedButton.drawInk(0.0F, 0.0F, width,
+                    TOOLBAR_HEIGHT, frameLit, alpha);
+        } finally {
+            GL11.glPopMatrix();
+        }
+        float unit = small * scale;
         frame.toolbarLeft = originX + left * scale;
         frame.toolbarTop = originY + top * scale;
-        frame.toolbarRight = originX + (left + toolbarWidth(kinds.length))
-                * scale;
-        frame.toolbarBottom = originY + (top + TOOLBAR_BUTTON_SIZE) * scale;
-        frame.toolbarStride = TOOLBAR_STRIDE * scale;
-        frame.toolbarKinds = kinds;
+        frame.toolbarRight = frame.toolbarLeft + width * unit;
+        frame.toolbarBottom = frame.toolbarTop + TOOLBAR_HEIGHT * unit;
+        frame.toolbarCellsLeft = frame.toolbarLeft + edge * unit;
+        frame.toolbarCellWidth = TOOLBAR_CELL * unit;
+        frame.toolbarKinds = TOOLBAR_KINDS;
+        frame.toolbarWhy = why;
         frame.toolbarChatLineId = chatLineId;
     }
 
     /**
-     * A glyph drawn from its own pixels — {@link #REPLY_GLYPH},
-     * {@link #COPY_GLYPH} — its ink from {@code (x, y)} in {@code rgb},
-     * over the chat's one shadow: the same pixels a pixel down and right
-     * in the shadow tone, at the shadow's share of {@code alpha}.
+     * One control's glyph centred in its square at {@code (left, top)},
+     * crossing to its lit artwork as far as {@code lit}: the input bar's
+     * own emoji button for React, the sheet's reply arrow, copy page and
+     * menu dots, and the link glyph in ivory; muted where the control
+     * cannot be taken.
+     */
+    private static void drawToolbarGlyph(int kind, float left, float top,
+                                         float lit, boolean open, int alpha) {
+        if (kind == TOOLBAR_LINK) {
+            drawPixelGlyph(LINK_GLYPH,
+                    left + LostTalesUiInk.centredStart(TOOLBAR_CELL,
+                            LINK_GLYPH[0].length()),
+                    top + LostTalesUiInk.centredStart(TOOLBAR_CELL,
+                            LINK_GLYPH.length),
+                    open ? LostTalesChatVisualStyle.IVORY
+                            : LostTalesChatVisualStyle.asideRgb(),
+                    alpha);
+            return;
+        }
+        LostTalesUiSheet resting;
+        LostTalesUiSheet hovered;
+        switch (kind) {
+            case TOOLBAR_REACT:
+                resting = LostTalesUiSheet.EMOJI;
+                hovered = LostTalesUiSheet.EMOJI_HOVER;
+                break;
+            case TOOLBAR_REPLY:
+                resting = LostTalesUiSheet.REPLY;
+                hovered = LostTalesUiSheet.REPLY_HOVER;
+                break;
+            case TOOLBAR_COPY:
+                resting = LostTalesUiSheet.COPY;
+                hovered = LostTalesUiSheet.COPY_HOVER;
+                break;
+            default:
+                resting = LostTalesUiSheet.MORE;
+                hovered = LostTalesUiSheet.MORE_HOVER;
+                break;
+        }
+        LostTalesUiSheet.drawPairWithShadow(resting, hovered, lit,
+                left + LostTalesUiInk.centredStart(TOOLBAR_CELL,
+                        resting.getWidth()),
+                top + LostTalesUiInk.centredStart(TOOLBAR_CELL,
+                        resting.getHeight()),
+                alpha);
+    }
+
+    /**
+     * A glyph drawn from its own pixels — {@link #LINK_GLYPH} — its ink
+     * from {@code (x, y)} in {@code rgb}, over the chat's one shadow: the
+     * same pixels a pixel down and right in the shadow tone, at the
+     * shadow's share of {@code alpha}.
      */
     private static void drawPixelGlyph(String[] rows, float x, float y,
                                        int rgb, int alpha) {
@@ -3344,10 +3461,9 @@ final class LostTalesChatOverlayRenderer {
 
     /**
      * The history's own backdrop for one row: the same plum black at the
-     * same opacity, fading out to the right the same way. A window's
-     * rules stand on this rather than on whatever is behind the window,
-     * so a hairline reads as the window's edge instead of as a line
-     * across the world.
+     * same opacity, fading out to the right the same way. The empty
+     * screen's strip stands on it, so its hairlines read as the chat's
+     * edges instead of as lines across the world.
      */
     static void drawBackdropRow(float left, float top, float right,
                                 float bottom, int alpha) {
@@ -3356,30 +3472,9 @@ final class LostTalesChatOverlayRenderer {
     }
 
     /**
-     * As above with the stretch from {@code holeLeft} to
-     * {@code holeRight} left out — where the selected tab stands on the
-     * row — the band's curve still running the whole width.
-     */
-    static void drawBackdropRowAround(float left, float top, float right,
-                                      float bottom, int alpha,
-                                      float holeLeft, float holeRight) {
-        int rgb = LostTalesChatVisualStyle.backdropRgb();
-        if (holeRight <= holeLeft || holeRight <= left || holeLeft >= right) {
-            drawChatBackdrop(left, top, right, bottom, alpha, rgb);
-            return;
-        }
-        drawChatBackdrop(left, left, Math.max(left, holeLeft), top, right,
-                bottom, alpha, rgb, GL11.GL_ONE_MINUS_SRC_ALPHA,
-                BACKDROP_FADE_WEIGHTS);
-        drawChatBackdrop(left, Math.min(right, holeRight), right, top, right,
-                bottom, alpha, rgb, GL11.GL_ONE_MINUS_SRC_ALPHA,
-                BACKDROP_FADE_WEIGHTS);
-    }
-
-    /**
-     * The opacity a window's backdrop is drawn at, before the opening
-     * fade is applied to it. Both rules ask here, so the row each of
-     * them stands on is the same one the messages between them lie on.
+     * The opacity the chat's backdrop is drawn at, before any opening
+     * fade is applied to it: the empty screen's strip asks here, so it
+     * stands on the same backdrop a window's messages lie on.
      */
     static int backdropRowAlpha(Minecraft minecraft) {
         float opacity = LostTalesChatVisualStyle.chatOpacity(minecraft);
@@ -3992,13 +4087,16 @@ final class LostTalesChatOverlayRenderer {
     }
 
     /**
-     * The surface the window's frame lies on above the input bar: a ring
-     * a frame wide just outside the window's box — the rows over it,
-     * corners included, and the columns beside it down to the bar — in
-     * the colour and opacity its tab row and bar are filled with, so the
-     * white edge drawn over its inner pixel lies on it as a framed
-     * button's frame lies on its surface. The stretch beside and under
-     * the bar is the bar's, drawn with it.
+     * The surface the window's frame lies on over the tab strip and the
+     * tool strip: a ring a frame wide just outside the window's box — the
+     * rows over it, corners included, and the columns beside the two
+     * strips — each stretch in the colour of what it runs beside, as that
+     * was drawn this frame (Nils): the tab strip's over and beside the
+     * strip, the tool strip's beside it and beside the rows the two rules
+     * around it stand on, which it takes rather than their thinning
+     * backdrop. The frame's edge drawn over its inner pixel lies on it as
+     * a framed button's frame lies on its surface. The history draws its
+     * own stretch, following its highlighted lines, and the bar its own.
      */
     static void drawWindowFrameSurface(Minecraft minecraft,
                                        ChatWindowFrame frame,
@@ -4007,182 +4105,324 @@ final class LostTalesChatOverlayRenderer {
                 || opening == null) {
             return;
         }
-        int surface = LostTalesChatVisualStyle.surfaceArgb(
-                opening.getOpacity()
-                        * LostTalesChatVisualStyle.chatOpacity(minecraft));
+        ChatChannelTabBar strip = frame.tabBar;
         int ring = ChatWindowPlacement.FRAME_WIDTH;
         float left = (float)frame.drawnLeft();
         float right = left + (float)(frame.boxRight - frame.boxLeft);
         float top = (float)(frame.boxTop + frame.motionY);
-        float barTop = (float)frame.barTop();
+        float stripRule = (float)frame.tabRowBottom() - 1.0F;
+        float historyTop = (float)frame.historyTop();
         // The ring's outermost corner pixels lie outside the frame's
         // rounding, as a framed button's footprint corners do.
         fillRect(left - ring + 1, top - ring, right + ring - 1,
-                top - ring + 1, surface);
-        fillRect(left - ring, top - ring + 1, right + ring, top, surface);
-        fillRect(left - ring, top, left, barTop, surface);
-        fillRect(right, top, right + ring, barTop, surface);
+                top - ring + 1, strip.drawnStripArgb);
+        fillRect(left - ring, top - ring + 1, right + ring, top,
+                strip.drawnStripArgb);
+        fillFrameSides(left, right, top, stripRule, strip.drawnStripArgb,
+                strip.drawnStripArgb);
+        fillFrameSides(left, right, stripRule, historyTop,
+                strip.drawnToolArgb, strip.drawnToolArgb);
     }
 
     /**
-     * The stretch of the window's left frame edge above the input bar:
-     * one pixel of ivory just outside its left border, over nothing of the
-     * window's own, part of one linear ramp that is strongest at the
-     * frame's bottom-left corner and gone at its top-left one. The
-     * stretch beside the bar belongs to the bar and is drawn with it, as
-     * is the bottom edge; both ride the bar's entrance.
+     * The frame's surface beside the window's box from {@code from} to
+     * {@code to}: {@code leftArgb} a frame wide left of {@code left},
+     * {@code rightArgb} right of {@code right}.
      */
-    static void drawWindowLeftEdge(Minecraft minecraft, ChatWindowFrame frame,
-                                   LostTalesGuiAnimationSample opening) {
+    private static void fillFrameSides(float left, float right, float from,
+                                       float to, int leftArgb,
+                                       int rightArgb) {
+        int ring = ChatWindowPlacement.FRAME_WIDTH;
+        fillRect(left - ring, from, left, to, leftArgb);
+        fillRect(right, from, right + ring, to, rightArgb);
+    }
+
+    /**
+     * The window's own part of its frame's edges, down to its input
+     * bar ({@link #drawFrameEdgesAbove}): the top edge, the two top
+     * corners and the side edges' stretches above the bar. The bar draws
+     * the rest with itself ({@link #drawFrameEdgesBelow}), so it rides
+     * the bar's entrance.
+     */
+    static void drawWindowFrameEdges(Minecraft minecraft,
+                                     ChatWindowFrame frame,
+                                     LostTalesGuiAnimationSample opening) {
         if (minecraft == null || frame == null || !frame.drawn
                 || opening == null) {
             return;
         }
-        int alpha = Math.round(255.0F * opening.getOpacity());
-        if (alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
-            return;
-        }
-        float top = (float)(frame.boxTop + frame.motionY);
-        // The ramp runs between the frame's two rows, a frame's width
-        // below the box and above it.
-        float rampBottom = (float)(frame.boxBottom + frame.motionY);
-        drawLeftEdgeSegment((float)frame.drawnLeft()
-                        - ChatWindowPlacement.FRAME_EDGE_WIDTH, top,
-                (float)frame.barTop(), rampBottom,
-                rampBottom - (top - ChatWindowPlacement.FRAME_EDGE_WIDTH),
-                alpha);
-    }
-
-    /**
-     * One stretch of a window's left frame edge: a one-pixel column from
-     * {@code top} to {@code bottom} whose per-row opacity follows the
-     * window's whole ramp — {@code alpha} at {@code rampBottom}, nothing
-     * {@code rampSpan} above it — so the window's part and the bar's
-     * part read as one unbroken edge.
-     */
-    static void drawLeftEdgeSegment(float x, float top, float bottom,
-                                    float rampBottom, float rampSpan,
-                                    int alpha) {
-        if (bottom <= top || rampSpan <= 0.0F
-                || alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
-            return;
-        }
-        int topAlpha = rampAlpha(alpha, rampBottom, rampSpan, top);
-        int bottomAlpha = rampAlpha(alpha, rampBottom, rampSpan, bottom);
-        if (Math.max(topAlpha, bottomAlpha)
-                < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
-            return;
-        }
-        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
-        // Same winding as the backdrop: the GUI pass culls back faces.
-        tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY,
-                bottomAlpha);
-        tessellator.addVertex(x, bottom, 0.0D);
-        tessellator.addVertex(x + 1.0F, bottom, 0.0D);
-        tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, topAlpha);
-        tessellator.addVertex(x + 1.0F, top, 0.0D);
-        tessellator.addVertex(x, top, 0.0D);
-        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
+        float left = (float)frame.drawnLeft();
+        drawFrameEdgesAbove(left, (float)(frame.boxTop + frame.motionY),
+                left + (float)(frame.boxRight - frame.boxLeft),
+                (float)(frame.boxBottom + frame.motionY),
+                (float)frame.barTop(),
+                Math.round(255.0F * opening.getOpacity()));
     }
 
     /** The ramp's opacity at {@code y}; clamped, linear. */
-    private static int rampAlpha(int alpha, float rampBottom, float rampSpan,
-                                 float y) {
+    static int rampAlpha(int alpha, float rampBottom, float rampSpan,
+                         float y) {
         float share = 1.0F - (rampBottom - y) / rampSpan;
         return Math.round(alpha
                 * Math.max(0.0F, Math.min(1.0F, share)));
     }
 
     /**
-     * The window's top frame edge and the stretch of its right edge
-     * above the input bar: the left and bottom edges' mirror. One pixel
-     * of ivory just outside the top border and one just outside the
-     * right, over nothing of the window's own, each on a linear ramp
-     * strongest at the frame's top-right corner and gone at the far
-     * corner — the top-left for the top edge, the bottom-right for the
-     * right edge. The corners are rounded as a framed button's are: the
-     * brightest, the top-right, closes with the lit frame's own corner
-     * artwork over the two edges' ends, and the faded top-left is left
-     * open. The right edge's stretch beside the bar belongs to the bar
-     * and is drawn with it.
+     * The surface of a chat window's frame round the box {@code left} to
+     * {@code right} by {@code top} to {@code bottom}: a ring
+     * {@link ChatWindowPlacement#FRAME_WIDTH} wide just outside the box,
+     * in {@code surface}, its four outermost corner pixels left out, as a
+     * framed button's footprint corners are. What the snap preview wears;
+     * a window draws the same ring in two parts, its own and its bar's,
+     * which fly in apart.
      */
-    static void drawWindowTopRightEdges(Minecraft minecraft,
-                                        ChatWindowFrame frame,
-                                        LostTalesGuiAnimationSample opening) {
-        if (minecraft == null || frame == null || !frame.drawn
-                || opening == null) {
-            return;
-        }
-        int alpha = Math.round(255.0F * opening.getOpacity());
-        if (alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+    static void drawFrameSurface(float left, float top, float right,
+                                 float bottom, int surface) {
+        int ring = ChatWindowPlacement.FRAME_WIDTH;
+        fillRect(left - ring + 1, top - ring, right + ring - 1,
+                top - ring + 1, surface);
+        fillRect(left - ring, top - ring + 1, right + ring, top, surface);
+        fillRect(left - ring, top, left, bottom, surface);
+        fillRect(right, top, right + ring, bottom, surface);
+        fillRect(left - ring, bottom, right + ring, bottom + ring - 1,
+                surface);
+        fillRect(left - ring + 1, bottom + ring - 1, right + ring - 1,
+                bottom + ring, surface);
+    }
+
+    /**
+     * The edges of a chat window's frame round the box {@code left} to
+     * {@code right} by {@code top} to {@code bottom}, at {@code alpha}: a
+     * lit framed button's frame, its edges and corners drawn from the
+     * window frame's own cells, which carry that frame's ink texel for
+     * texel ({@link #drawFrameEdge}, {@link #drawFrameCorner}),
+     * one pixel just outside each side, over the ring's inner pixel. It
+     * differs from the button's only in fading: the left and bottom edges
+     * are strongest at the bottom-left corner and the top and right ones
+     * at the top-right, each fading linearly to nothing at the far corner,
+     * and the corners fade with them. What the snap preview and the snap
+     * panels wear; a window draws the same edges in two parts, its own
+     * and its bar's, which fly in apart.
+     */
+    static void drawFrameEdges(float left, float top, float right,
+                               float bottom, int alpha) {
+        float split = bottom - CORNER_ARM;
+        drawFrameEdgesAbove(left, top, right, bottom, split, alpha);
+        drawFrameEdgesBelow(left, top, right, bottom, split, alpha);
+    }
+
+    /**
+     * The upper part of a frame's edges round the box {@code left} to
+     * {@code right} by {@code top} to {@code bottom}: the top edge between
+     * its corners, the two top corners, and the side edges from under the
+     * corners down to {@code split}, all on the whole frame's ramps.
+     */
+    static void drawFrameEdgesAbove(float left, float top, float right,
+                                    float bottom, float split, int alpha) {
+        if (alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA
+                || right <= left || bottom <= top) {
             return;
         }
         int edge = ChatWindowPlacement.FRAME_EDGE_WIDTH;
-        float left = (float)frame.drawnLeft();
-        float right = left + (float)(frame.boxRight - frame.boxLeft);
-        float top = (float)(frame.boxTop + frame.motionY);
+        int ring = ChatWindowPlacement.FRAME_WIDTH;
+        int cell = LostTalesUiFramedButton.CORNER;
+        int arm = CORNER_ARM;
+        float span = bottom - top + edge;
         float edgeTop = top - edge;
-        drawTopEdge(left, right, edgeTop, alpha);
-        drawRightEdgeSegment(right, top, (float)frame.barTop(), edgeTop,
-                (float)(frame.boxBottom - frame.boxTop) + edge, alpha);
-        LostTalesUiFramedButton.drawCornerInk(LostTalesUiSheet.FRAME_LIT_TOP_RIGHT,
-                right + ChatWindowPlacement.FRAME_WIDTH
-                        - LostTalesUiFramedButton.CORNER,
-                top - ChatWindowPlacement.FRAME_WIDTH, alpha);
+        float between = right - left - 2 * arm;
+        drawFrameEdge(false, false, left + arm, edgeTop, between,
+                edgeAlphaAt(alpha, right, left, left + arm),
+                edgeAlphaAt(alpha, right, left, right - arm));
+        drawFrameEdge(true, false, left - edge, top + arm, split - top - arm,
+                rampAlpha(alpha, bottom, span, top + arm),
+                rampAlpha(alpha, bottom, span, split));
+        drawFrameEdge(true, true, right, top + arm, split - top - arm,
+                rampDownAlpha(alpha, edgeTop, span, top + arm),
+                rampDownAlpha(alpha, edgeTop, span, split));
+        drawFrameCorner(LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT, left - ring,
+                top - ring, false, false,
+                rampAlpha(alpha, bottom, span, top),
+                rampAlpha(alpha, bottom, span, top + arm),
+                edgeAlphaAt(alpha, right, left, left),
+                edgeAlphaAt(alpha, right, left, left + arm));
+        drawFrameCorner(LostTalesUiSheet.WINDOW_FRAME_TOP_RIGHT,
+                right + ring - cell, top - ring, true, false,
+                rampDownAlpha(alpha, edgeTop, span, top),
+                rampDownAlpha(alpha, edgeTop, span, top + arm),
+                edgeAlphaAt(alpha, right, left, right),
+                edgeAlphaAt(alpha, right, left, right - arm));
     }
 
     /**
-     * The top frame edge: one pixel row, ivory at the right, fading
-     * linearly to nothing at the left — the bottom edge's mirror.
+     * The lower part of a frame's edges round the box {@code left} to
+     * {@code right} by {@code top} to {@code bottom}: the side edges from
+     * {@code split} down to the bottom corners, the bottom edge between
+     * them, and the two bottom corners, all on the whole frame's ramps.
      */
-    static void drawTopEdge(float left, float right, float top, int alpha) {
-        int safeAlpha = Math.max(0, Math.min(255, alpha));
-        if (safeAlpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA
-                || right <= left) {
+    static void drawFrameEdgesBelow(float left, float top, float right,
+                                    float bottom, float split, int alpha) {
+        if (alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA
+                || right <= left || bottom <= top) {
             return;
         }
-        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
-        // Same winding as the backdrop: the GUI pass culls back faces.
-        tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, 0);
-        tessellator.addVertex(left, top + 1.0F, 0.0D);
-        tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, safeAlpha);
-        tessellator.addVertex(right, top + 1.0F, 0.0D);
-        tessellator.addVertex(right, top, 0.0D);
-        tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, 0);
-        tessellator.addVertex(left, top, 0.0D);
-        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
+        int edge = ChatWindowPlacement.FRAME_EDGE_WIDTH;
+        int ring = ChatWindowPlacement.FRAME_WIDTH;
+        int cell = LostTalesUiFramedButton.CORNER;
+        int arm = CORNER_ARM;
+        float span = bottom - top + edge;
+        float edgeTop = top - edge;
+        drawFrameEdge(true, false, left - edge, split, bottom - arm - split,
+                rampAlpha(alpha, bottom, span, split),
+                rampAlpha(alpha, bottom, span, bottom - arm));
+        drawFrameEdge(true, true, right, split, bottom - arm - split,
+                rampDownAlpha(alpha, edgeTop, span, split),
+                rampDownAlpha(alpha, edgeTop, span, bottom - arm));
+        drawFrameEdge(false, true, left + arm, bottom, right - left - 2 * arm,
+                edgeAlphaAt(alpha, left, right, left + arm),
+                edgeAlphaAt(alpha, left, right, right - arm));
+        drawFrameCorner(LostTalesUiSheet.WINDOW_FRAME_BOTTOM_LEFT, left - ring,
+                bottom + ring - cell, false, true,
+                rampAlpha(alpha, bottom, span, bottom),
+                rampAlpha(alpha, bottom, span, bottom - arm),
+                edgeAlphaAt(alpha, left, right, left),
+                edgeAlphaAt(alpha, left, right, left + arm));
+        drawFrameCorner(LostTalesUiSheet.WINDOW_FRAME_BOTTOM_RIGHT,
+                right + ring - cell, bottom + ring - cell, true, true,
+                rampDownAlpha(alpha, edgeTop, span, bottom),
+                rampDownAlpha(alpha, edgeTop, span, bottom - arm),
+                edgeAlphaAt(alpha, left, right, right),
+                edgeAlphaAt(alpha, left, right, right - arm));
     }
 
     /**
-     * One stretch of a window's right frame edge: a one-pixel column
-     * from {@code top} to {@code bottom} whose per-row opacity follows
-     * the window's whole ramp — {@code alpha} at {@code rampTop},
-     * nothing {@code rampSpan} below it — so the window's part and the
-     * bar's part read as one unbroken edge.
+     * How far each corner's artwork runs along the two edges it joins:
+     * from the box's corner, where the frame's ring ends, to the corner
+     * cell's inner side. The edges stop there and the corner draws on, so
+     * no pixel of the frame lies twice.
      */
-    static void drawRightEdgeSegment(float x, float top, float bottom,
-                                     float rampTop, float rampSpan,
-                                     int alpha) {
-        if (bottom <= top || rampSpan <= 0.0F
-                || alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
-            return;
+    static final int CORNER_ARM = LostTalesUiFramedButton.CORNER
+            - ChatWindowPlacement.FRAME_WIDTH;
+
+    /**
+     * Where the frame's edges run across a corner cell: a texel in from
+     * its outer sides, past the ring's outer pixel.
+     */
+    static final int EDGE_LINE = ChatWindowPlacement.FRAME_WIDTH
+            - ChatWindowPlacement.FRAME_EDGE_WIDTH;
+
+    /**
+     * A texel's index across a frame's corner cell, {@code depth} texels
+     * in from the cell's outer side: counted from the cell's start on a
+     * side it starts on, from its end on one it ends on ({@code far}).
+     */
+    static int cornerTexel(boolean far, int depth) {
+        return far ? LostTalesUiFramedButton.CORNER - 1 - depth : depth;
+    }
+
+    /**
+     * The opacity of a corner's rounding pixel: the mean of the two arm
+     * pixels beside it, the first of each arm, each at its centre on the
+     * arm's fade from its near opacity to its far one.
+     */
+    static int bendAlpha(int sideNear, int sideFar, int crossNear,
+                         int crossFar) {
+        float first = 0.5F / CORNER_ARM;
+        return Math.round((sideNear + (sideFar - sideNear) * first
+                + crossNear + (crossFar - crossNear) * first) / 2.0F);
+    }
+
+    /**
+     * One corner of a chat window's frame: the window frame's corner cell
+     * {@code corner}, the lit framed button's corner ink for ink, its
+     * cell's top-left at
+     * ({@code cellX}, {@code cellY}), on the frame's right for
+     * {@code right} and at its foot for {@code bottom}. Only its ink is
+     * drawn — an arm on the side edge, an arm on the top or bottom edge
+     * (the cross arm) and the rounding pixel in the bend — each on the
+     * frame's ramps rather than at one opacity: the side arm fading from
+     * {@code sideNear} at the bend to {@code sideFar} at its other end,
+     * the cross arm from {@code crossNear} to {@code crossFar}, the
+     * rounding pixel at the mean of the two pixels beside it. The lit
+     * corners stand at the ramps' full ends and the faded ones at their
+     * empty ends, so every corner of the frame is one shape.
+     */
+    static void drawFrameCorner(LostTalesUiSheet corner, float cellX,
+                                float cellY, boolean right, boolean bottom,
+                                int sideNear, int sideFar, int crossNear,
+                                int crossFar) {
+        int ring = ChatWindowPlacement.FRAME_WIDTH;
+        int u = corner.getTextureU();
+        int v = corner.getTextureV();
+        // Each arm runs along the edges' line between the box's corner, a
+        // ring in, and the cell's inner side.
+        int column = cornerTexel(right, EDGE_LINE);
+        int row = cornerTexel(bottom, EDGE_LINE);
+        int sideFirst = bottom ? 0 : ring;
+        int crossFirst = right ? 0 : ring;
+        LostTalesUiSheet.drawFading(u + column, v + sideFirst, CORNER_ARM,
+                true, cellX + column, cellY + sideFirst, CORNER_ARM,
+                bottom ? sideFar : sideNear, bottom ? sideNear : sideFar);
+        LostTalesUiSheet.drawFading(u + crossFirst, v + row, CORNER_ARM,
+                false, cellX + crossFirst, cellY + row, CORNER_ARM,
+                right ? crossFar : crossNear, right ? crossNear : crossFar);
+        // The rounding pixel stands in the box's corner, diagonally inside
+        // the bend, beside each arm's first pixel.
+        int bendColumn = cornerTexel(right, ring);
+        int bendRow = cornerTexel(bottom, ring);
+        int bend = bendAlpha(sideNear, sideFar, crossNear, crossFar);
+        LostTalesUiSheet.drawFading(u + bendColumn, v + bendRow, 1, true,
+                cellX + bendColumn, cellY + bendRow, 1.0F, bend, bend);
+    }
+
+    /**
+     * The window frame's corner cell an edge is stretched from, as a
+     * framed button stretches its own: the top and bottom edges from
+     * their left corner's innermost column, the sides from their top
+     * corner's innermost row. {@code side} picks a side over a top or
+     * bottom edge, {@code far} the right side or the bottom edge.
+     */
+    static LostTalesUiSheet edgeCorner(boolean side, boolean far) {
+        if (side) {
+            return far ? LostTalesUiSheet.WINDOW_FRAME_TOP_RIGHT
+                    : LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT;
         }
-        int topAlpha = rampDownAlpha(alpha, rampTop, rampSpan, top);
-        int bottomAlpha = rampDownAlpha(alpha, rampTop, rampSpan, bottom);
-        if (Math.max(topAlpha, bottomAlpha)
-                < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
-            return;
+        return far ? LostTalesUiSheet.WINDOW_FRAME_BOTTOM_LEFT
+                : LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT;
+    }
+
+    /**
+     * One stretch of a frame's edge, drawn as a lit framed button draws
+     * that edge: the texel of its corner cell's innermost column or row
+     * that lies on the edges' line ({@link #edgeCorner}), stretched from
+     * ({@code x}, {@code y}) over {@code length} pixels — down a side
+     * ({@code side}) or rightward along the top or bottom edge — and
+     * fading from {@code startAlpha} to {@code endAlpha}. {@code far} is
+     * the right side or the bottom edge.
+     */
+    static void drawFrameEdge(boolean side, boolean far, float x, float y,
+                              float length, int startAlpha, int endAlpha) {
+        LostTalesUiSheet corner = edgeCorner(side, far);
+        int innermost = LostTalesUiFramedButton.CORNER - 1;
+        int line = cornerTexel(far, EDGE_LINE);
+        LostTalesUiSheet.drawFading(
+                corner.getTextureU() + (side ? line : innermost),
+                corner.getTextureV() + (side ? innermost : line), 1, side,
+                x, y, length, startAlpha, endAlpha);
+    }
+
+    /**
+     * A horizontal frame edge's opacity at {@code x}, for an edge fading
+     * linearly from {@code alpha} at {@code full} to nothing at
+     * {@code gone}: the top edge from its right end to its left, the
+     * bottom edge from its left end to its right.
+     */
+    static int edgeAlphaAt(int alpha, float full, float gone, float x) {
+        float span = Math.abs(gone - full);
+        if (span <= 0.0F) {
+            return 0;
         }
-        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
-        // Same winding as the backdrop: the GUI pass culls back faces.
-        tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY,
-                bottomAlpha);
-        tessellator.addVertex(x, bottom, 0.0D);
-        tessellator.addVertex(x + 1.0F, bottom, 0.0D);
-        tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, topAlpha);
-        tessellator.addVertex(x + 1.0F, top, 0.0D);
-        tessellator.addVertex(x, top, 0.0D);
-        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
+        return Math.round(alpha * Math.max(0.0F,
+                Math.min(1.0F, 1.0F - Math.abs(x - full) / span)));
     }
 
     /** The downward ramp's opacity at {@code y}; clamped, linear. */
@@ -4191,31 +4431,6 @@ final class LostTalesChatOverlayRenderer {
         float share = 1.0F - (y - rampTop) / rampSpan;
         return Math.round(alpha
                 * Math.max(0.0F, Math.min(1.0F, share)));
-    }
-
-    /**
-     * The bottom frame edge a window's input bar carries just below it:
-     * ivory at the left, fading linearly to nothing at the right. Drawn
-     * by the bar — active or inactive — inside the bar's own transform,
-     * so it enters with the bar's fly-in.
-     */
-    static void drawBarBottomEdge(float left, float right, float top,
-                                  int alpha) {
-        int safeAlpha = Math.max(0, Math.min(255, alpha));
-        if (safeAlpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA
-                || right <= left) {
-            return;
-        }
-        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
-        // Same winding as the backdrop: the GUI pass culls back faces.
-        tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, safeAlpha);
-        tessellator.addVertex(left, top + 1.0F, 0.0D);
-        tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, 0);
-        tessellator.addVertex(right, top + 1.0F, 0.0D);
-        tessellator.addVertex(right, top, 0.0D);
-        tessellator.setColorRGBA_I(LostTalesChatVisualStyle.IVORY, safeAlpha);
-        tessellator.addVertex(left, top, 0.0D);
-        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
     }
 
     /** A flat quad at fractional edges; {@code Gui.drawRect} is whole. */
@@ -4381,34 +4596,6 @@ final class LostTalesChatOverlayRenderer {
         } finally {
             GL14.glBlendEquation(GL14.GL_FUNC_ADD);
         }
-    }
-
-    /**
-     * A run's backdrop ({@link ChatRunBackdrops}): the surface under its
-     * row, from {@code left} to {@code right} and {@code top} to
-     * {@code bottom} in the row's own units, given {@code toRgb} in place
-     * as a line's band is, less its four corner pixels, so it reads
-     * rounded.
-     */
-    static void recolourRunBackdrop(ChatRunBackdrops.Surface surface,
-                                    float left, float top, float right,
-                                    float bottom, int toRgb) {
-        if (right - left < 2.0F || bottom - top < 2.0F
-                || (toRgb & 0xFFFFFF) == surface.rgb) {
-            return;
-        }
-        recolourPiece(surface, left + 1.0F, top, right - 1.0F, bottom, toRgb);
-        recolourPiece(surface, left, top + 1.0F, left + 1.0F, bottom - 1.0F,
-                toRgb);
-        recolourPiece(surface, right - 1.0F, top + 1.0F, right, bottom - 1.0F,
-                toRgb);
-    }
-
-    private static void recolourPiece(ChatRunBackdrops.Surface surface,
-                                      float left, float top, float right,
-                                      float bottom, int toRgb) {
-        recolour(surface.curveLeft, left, right, top, surface.curveRight,
-                bottom, surface.alpha, surface.rgb, toRgb, surface.weights);
     }
 
     /**

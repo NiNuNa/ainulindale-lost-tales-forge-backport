@@ -10,22 +10,23 @@ import java.util.UUID;
 import net.minecraft.util.StatCollector;
 
 /**
- * The sphere a head wears for the presence of the identity it shows —
- * the account, or the one character the head is — at the head's
- * bottom-right corner the way a messenger's status dot sits on an
- * avatar: green for Online, honey for Away, crimson for Do Not Disturb,
- * and the muted sphere for Offline, which is also what everyone else
- * sees of Invisible.
+ * The mark a head wears for the presence of the identity it shows — the
+ * account, or the one character the head is — at the head's bottom-right
+ * corner the way a messenger's status dot sits on an avatar, each status
+ * a shape as well as a colour, so it reads without the colour: the green
+ * sphere for Online, a honey crescent for Away, a crimson disc barred
+ * across for Do Not Disturb, and a muted ring for Offline, which is also
+ * what everyone else sees of Invisible.
  *
- * <p>The head is <em>cut</em> at the sphere's corner rather than painted
- * over: {@link #beginHeadCut} takes the sphere's shape grown by a pixel
- * up, down, left and right away from every layer of the head while it
- * is drawn ({@link LostTalesUiCornerCut}), and the sphere is drawn in it.
- * What is taken follows the sphere's round outline, not its box: the
- * clear pixel runs along the sides the sphere has ink on, and the head
- * keeps the pixels off the sphere's rounded corner. The sphere stands two
- * pixels past the head's right edge and one below its bottom, a pixel
- * higher than it is far in.</p>
+ * <p>The head is <em>cut</em> at the mark's corner rather than painted
+ * over: {@link #beginHeadCut} takes the mark's shape grown by a pixel up,
+ * down, left and right away from every layer of the head while it is
+ * drawn ({@link LostTalesUiCornerCut}), and the mark is drawn in it. What
+ * is taken follows the round outline every mark shares, not its box: the
+ * clear pixel runs along the sides the mark has ink on, and the head
+ * keeps the pixels off its rounded corner. The mark stands two pixels
+ * past the head's right edge and one below its bottom, a pixel higher
+ * than it is far in.</p>
  *
  * <p>Every voice that can be online wears one ({@link #hasStatus}): a
  * player's account and characters, the server, which is online while it
@@ -38,31 +39,31 @@ import net.minecraft.util.StatCollector;
  * characters spoke.</p>
  */
 public final class ChatPresenceMark {
-    /** The sphere's size on screen: the sheet's own, one texel to one pixel. */
+    /** A mark's size on screen: the sheet's own, one texel to one pixel. */
     public static final int SIZE = 5;
-    /** How far the sphere's left edge stands short of the head's right edge. */
+    /** How far the mark's left edge stands short of the head's right edge. */
     public static final int INSET_X = 3;
     /** How far its top edge stands short of the head's bottom edge: one more. */
     public static final int INSET_Y = INSET_X + 1;
     /**
-     * How far the sphere stands past the head's own edges. A head that
+     * How far the mark stands past the head's own edges. A head that
      * wears one is laid out as this much wider and taller: the head and
-     * its sphere are one icon, so a name beside it keeps its clear space
-     * from the sphere rather than from the face.
+     * its mark are one icon, so a name beside it keeps its clear space
+     * from the mark rather than from the face.
      */
     public static final int OVERHANG_X = SIZE - INSET_X;
     public static final int OVERHANG_Y = SIZE - INSET_Y;
     /**
-     * The sphere's outline, row by row from its top: the column each
-     * row's ink starts at. Round: its top and bottom rows are a pixel in
-     * from its sides ({@code ChatPresenceMarkTest} reads the sheet to
-     * hold it).
+     * The outline every mark shares, and the ivory sphere with them, row
+     * by row from its top: the column each row's ink starts at. Round:
+     * its top and bottom rows are a pixel in from its sides
+     * ({@code ChatPresenceMarkTest} reads the sheet to hold it).
      */
     static final int[] SPHERE_INK_LEFT = {1, 0, 0, 0, 1};
 
     private ChatPresenceMark() {}
 
-    /** The cut a head drawn at {@code headX}, {@code headY}, {@code headSize} square gives its sphere. */
+    /** The cut a head drawn at {@code headX}, {@code headY}, {@code headSize} square gives its mark. */
     public static LostTalesUiCornerCut cutFor(float headX, float headY,
                                               float headSize) {
         return LostTalesUiCornerCut.around(headX + headSize - INSET_X,
@@ -71,7 +72,7 @@ public final class ChatPresenceMark {
 
     /**
      * Opens the cut a head drawn at {@code headX}, {@code headY},
-     * {@code headSize} square gives its sphere. Always ended in a
+     * {@code headSize} square gives its mark. Always ended in a
      * {@code finally} with {@link #endHeadCut}.
      */
     public static void beginHeadCut(float headX, float headY,
@@ -99,7 +100,7 @@ public final class ChatPresenceMark {
     }
 
     /**
-     * Draws the sphere on a head drawn at {@code headX}, {@code headY},
+     * Draws the mark on a head drawn at {@code headX}, {@code headY},
      * {@code headSize} square, with the chat's one shadow under it.
      */
     public static void draw(float headX, float headY, float headSize,
@@ -107,15 +108,15 @@ public final class ChatPresenceMark {
         if (alpha <= 0) {
             return;
         }
-        sphereOf(presence).drawWithShadow(headX + headSize - INSET_X,
+        markOf(presence).drawWithShadow(headX + headSize - INSET_X,
                 headY + headSize - INSET_Y, alpha);
     }
 
     /**
-     * The sphere a presence wears: the muted one for Offline, for
+     * The mark a presence wears: the muted ring for Offline, for
      * Invisible, which nobody else is ever shown, and for none at all.
      */
-    public static LostTalesUiSheet sphereOf(ChatPresence presence) {
+    public static LostTalesUiSheet markOf(ChatPresence presence) {
         if (presence == ChatPresence.ONLINE) {
             return LostTalesUiSheet.PRESENCE_ONLINE;
         }
@@ -128,7 +129,7 @@ public final class ChatPresenceMark {
     }
 
     /**
-     * Whether a head wears a sphere and gives up its corner: the head of
+     * Whether a head wears a mark and gives up its corner: the head of
      * a voice with a status on its own line, and never the head a reply's
      * quote wears.
      */

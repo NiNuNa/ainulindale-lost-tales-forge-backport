@@ -647,7 +647,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
             this.tabId = LostTalesPacketCodec.readUtf8String(buffer,
                     MAX_TAB_ID_BYTES);
             LostTalesPacketCodec.requireFinished(buffer);
-            validate();
+            validate(false);
         } catch (RuntimeException exception) {
             this.malformed = true;
             this.bodyJson = "";
@@ -867,7 +867,22 @@ public final class LostTalesChatMessagePacket implements IMessage {
     }
 
     private void validate() {
-        if (ChatChannel.fromId(this.channelId) == null
+        validate(true);
+    }
+
+    /**
+     * The checks a line must pass. {@code known} adds the two that ask
+     * this side's lists of channels and roles, which the sending side
+     * always has. A client decodes a line as it arrives, which can be
+     * before the server's own channels and roles reach it (they come in
+     * the same moment but are put in place on the next tick), so it
+     * checks the line's shape alone: a channel it cannot place is skipped
+     * where the line is shown, and a role bit it does not know is ignored
+     * where the roles are read.
+     */
+    private void validate(boolean known) {
+        if ((known ? ChatChannel.fromId(this.channelId) == null
+                        : this.channelId.trim().length() == 0)
                 || this.senderId == null
                 || this.identityName.length() == 0
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
@@ -899,7 +914,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 || (ChatChannel.fromId(this.channelId) == ChatChannel.WHISPER
                         && this.partner.length() == 0)
                 || this.timestampMillis <= 0L
-                || !ChatAccountRole.isValidMask(this.roles)
+                || (known && !ChatAccountRole.isValidMask(this.roles))
                 || this.showcases.size() > ChatShareTokenParser.MAX_TOKENS
                 || ChatShowcase.serializedBytes(this.showcases)
                         > ChatShowcase.MAX_TOTAL_BYTES) {

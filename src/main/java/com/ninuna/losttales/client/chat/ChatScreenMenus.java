@@ -117,15 +117,28 @@ final class ChatScreenMenus {
          * other menu.
          */
         final String closedWindowId;
+        /** The message whose menu this click closed, by chat line id; zero for any other menu. */
+        final int closedChatLineId;
         /** A command a row asked the screen to send, or null. */
         final String command;
 
         Click(boolean consumed, String closedKind, String closedWindowId,
-              String command) {
+              int closedChatLineId, String command) {
             this.consumed = consumed;
             this.closedKind = closedKind;
             this.closedWindowId = closedWindowId;
+            this.closedChatLineId = closedChatLineId;
             this.command = command;
+        }
+
+        /**
+         * Whether this click put away the menu of the message drawn on
+         * {@code chatLineId}: the press on that message's own menu button
+         * that must not open it again.
+         */
+        boolean closedMessageMenu(int chatLineId) {
+            return POPUP_MESSAGE.equals(this.closedKind) && chatLineId != 0
+                    && chatLineId == this.closedChatLineId;
         }
 
         /**
@@ -170,6 +183,8 @@ final class ChatScreenMenus {
     private String menuMessageText = "";
     /** The line the message menu was opened over. */
     private int menuChatLineId;
+    /** The window whose message toolbar opened the message menu, or null for a right click. */
+    private ChatWindowFrame menuToolbarFrame;
     /** Window a restore popup was opened from. */
     private String restoreWindowId;
     /** Window the open window-settings menu belongs to, or null. */
@@ -247,6 +262,11 @@ final class ChatScreenMenus {
         return this.popup.entryAt(mouseX, mouseY);
     }
 
+    /** Why the open menu's row under the point cannot be taken, or empty. */
+    String unavailableAt(double mouseX, double mouseY) {
+        return this.popup.unavailableAt(mouseX, mouseY);
+    }
+
     void scrollBy(double rows) {
         this.popup.scrollBy(rows);
     }
@@ -316,12 +336,14 @@ final class ChatScreenMenus {
     /** An entry acts and closes the menu; an outside press continues behind it. */
     Click click(double mouseX, double mouseY, int button) {
         if (!this.popup.isOpen()) {
-            return new Click(false, "", null, null);
+            return new Click(false, "", null, 0, null);
         }
         String closedKind = this.popup.kind();
         String closedWindowId = POPUP_SEARCH.equals(closedKind)
                 || POPUP_RESTORE.equals(closedKind)
                 ? this.restoreWindowId : null;
+        int closedChatLineId = POPUP_MESSAGE.equals(closedKind)
+                ? this.menuChatLineId : 0;
         ChatPopupMenu.Entry entry = this.popup.entryAt(mouseX, mouseY);
         boolean inside = this.popup.contains(mouseX, mouseY);
         this.pendingCommand = null;
@@ -330,11 +352,11 @@ final class ChatScreenMenus {
             // showing it: closing here would close the question along
             // with the menu that asked it.
             return new Click(true, closedKind, closedWindowId,
-                    this.pendingCommand);
+                    closedChatLineId, this.pendingCommand);
         }
         this.popup.close();
         return new Click(inside, closedKind, closedWindowId,
-                this.pendingCommand);
+                closedChatLineId, this.pendingCommand);
     }
 
     /**
@@ -998,14 +1020,57 @@ final class ChatScreenMenus {
                                 this.screenWidth),
                         (float)ChatWindowPlacement.preciseMouseY(this.mc,
                                 this.screenHeight));
-        int chatLineId = band == null || band.lines == null
+        if (band == null || band.lines == null
                 || band.viewIndex >= band.lines.size()
-                || band.lines.get(band.viewIndex) == null
-                ? 0 : band.lines.get(band.viewIndex).getChatLineID();
+                || band.lines.get(band.viewIndex) == null) {
+            return false;
+        }
+        this.menuToolbarFrame = null;
+        openMessagePopup(text, band.lines.get(band.viewIndex).getChatLineID(),
+                band.lines, band.viewIndex, pointerAnchor(mouseX, mouseY));
+        return true;
+    }
+
+    /**
+     * The same menu opened from a message's toolbar, over the message the
+     * toolbar was drawn for — its first drawn row {@code row} of
+     * {@code frame}'s lines — rather than whatever lies under the pointer,
+     * which may be the row above; it hangs from the control's box toward
+     * the middle of the window.
+     */
+    boolean openToolbarMessagePopup(ChatWindowFrame frame, int chatLineId,
+                                    int row, ChatPopupMenu.Anchor anchor) {
+        if (frame == null || row < 0 || row >= frame.lines.size()) {
+            return false;
+        }
+        String text = LostTalesChatClipboard.messageTextOf(frame.lines, row);
+        if (text.length() == 0) {
+            return false;
+        }
+        openMessagePopup(text, chatLineId, frame.lines, row, anchor);
+        this.menuToolbarFrame = frame;
+        return true;
+    }
+
+    /**
+     * The window whose message toolbar opened the menu that is out, or
+     * null: the toolbar's menu button stays lit while its menu is out.
+     */
+    ChatWindowFrame toolbarMenuFrame() {
+        return messageMenuChatLineId() != 0 ? this.menuToolbarFrame : null;
+    }
+
+    /**
+     * Opens the message menu for the message drawn on {@code chatLineId},
+     * whose words are {@code text} and one of whose drawn rows is
+     * {@code viewIndex} of {@code lines}, hanging from {@code anchor}.
+     */
+    private void openMessagePopup(String text, int chatLineId,
+                                  List<ChatLine> lines, int viewIndex,
+                                  ChatPopupMenu.Anchor anchor) {
         this.menuMessageText = text;
         this.menuChatLineId = chatLineId;
-        this.menuMessageId = band == null ? ChatMessageIds.NONE
-                : ClientChatMessageIds.messageIdOf(chatLineId);
+        this.menuMessageId = ClientChatMessageIds.messageIdOf(chatLineId);
         // Who the message is resolved from the packet it was built of,
         // not from the drawn rows: a grouped continuation has no header
         // row to read a name off, and its sender still owns it. Only a
@@ -1021,40 +1086,30 @@ final class ChatScreenMenus {
                             remembered.packet.getSenderId());
             this.menuMessageSenderId = remembered.packet.getSenderId();
         } else {
-            this.menuMessageAccount = band == null ? ""
-                    : messageAccount(band.lines, band.viewIndex, chatLineId);
-            this.menuMessageIdentity = band == null ? ""
-                    : messageIdentity(band.lines, band.viewIndex, chatLineId);
-            this.menuMessageFromDiscord = band != null
-                    && isFromDiscord(band.lines, chatLineId);
+            this.menuMessageAccount = messageAccount(lines, viewIndex,
+                    chatLineId);
+            this.menuMessageIdentity = messageIdentity(lines, viewIndex,
+                    chatLineId);
+            this.menuMessageFromDiscord = isFromDiscord(lines, chatLineId);
             this.menuMessageSenderId = null;
         }
         List<ChatPopupMenu.Entry> entries =
                 new ArrayList<ChatPopupMenu.Entry>();
-        // Any line in a tab that takes messages can be answered: one
-        // the server named by its id, any other by its words.
-        // A message the server named can be reacted to, as on Discord.
-        if (LostTalesChatPresentation.isReactable(chatLineId)) {
-            entries.add(new ChatPopupMenu.Entry(ENTRY_REACT,
-                    StatCollector.translateToLocal(
-                            "gui.losttales.chat.message.react")));
-        }
-        if (LostTalesChatPresentation.isRepliable(chatLineId)) {
-            entries.add(new ChatPopupMenu.Entry(ENTRY_REPLY,
-                    StatCollector.translateToLocal(
-                            "gui.losttales.chat.message.reply")));
-        }
+        // Every line offers the same actions in the same places, as the
+        // hover toolbar does; one that cannot be taken on this line
+        // stands muted and says why. A line the server named can be
+        // reacted to and linked to by its id; any line in a tab that
+        // takes messages can be answered, by its id or by its words.
+        entries.add(action(ENTRY_REACT, "gui.losttales.chat.message.react",
+                LostTalesChatPresentation.whyNotReactable(chatLineId)));
+        entries.add(action(ENTRY_REPLY, "gui.losttales.chat.message.reply",
+                LostTalesChatPresentation.whyNotRepliable(chatLineId)));
         entries.add(new ChatPopupMenu.Entry(ENTRY_COPY,
                 StatCollector.translateToLocal(
                         "gui.losttales.chat.message.copy")));
-        // A message the server named can be linked to from any other
-        // message, by its id, the way a messenger's message link is
-        // pasted; a whisper's cannot, since nobody else may follow it.
-        if (messageLinkFor(chatLineId) != null) {
-            entries.add(new ChatPopupMenu.Entry(ENTRY_COPY_LINK,
-                    StatCollector.translateToLocal(
-                            "gui.losttales.chat.message.copy_link")));
-        }
+        entries.add(action(ENTRY_COPY_LINK,
+                "gui.losttales.chat.message.copy_link",
+                whyNotLinkable(chatLineId)));
         // Your own words are yours to correct or take back. The server
         // decides that too — this only offers what it would allow. An
         // operator may take anyone's words back, but never rewrite them:
@@ -1079,9 +1134,8 @@ final class ChatScreenMenus {
                     .withLabelColor(OPERATOR_ACTION_COLOR));
         }
         this.popup.open(POPUP_MESSAGE, ClientChatChannelViews.tabOf(chatLineId),
-                entries, this.font, pointerAnchor(mouseX, mouseY),
-                this.screenWidth, this.screenHeight);
-        return true;
+                entries, this.font, anchor, this.screenWidth,
+                this.screenHeight);
     }
 
     /**
@@ -1095,10 +1149,32 @@ final class ChatScreenMenus {
         return target;
     }
 
+    /** A message action's row: open, or muted with {@code why} it cannot be taken. */
+    private static ChatPopupMenu.Entry action(String id, String labelKey,
+                                              String why) {
+        ChatPopupMenu.Entry entry = new ChatPopupMenu.Entry(id,
+                StatCollector.translateToLocal(labelKey));
+        return why.length() == 0 ? entry : entry.unavailable(why);
+    }
+
+    /**
+     * Why the message drawn on {@code chatLineId} cannot be linked to, or
+     * empty where it can: a line the server never named, or one of a
+     * channel a link cannot spell.
+     */
+    static String whyNotLinkable(int chatLineId) {
+        if (messageLinkFor(chatLineId) != null) {
+            return "";
+        }
+        String unnamed = LostTalesChatPresentation.unnamedReason(chatLineId);
+        return unnamed.length() > 0 ? unnamed : StatCollector.translateToLocal(
+                "gui.losttales.chat.message.not_linkable");
+    }
+
     /**
      * The link that names the message drawn on {@code chatLineId} —
      * {@code #Channel/<server id>} — or null for a line the server never
-     * named, a whisper, or a channel a link cannot spell.
+     * named, or a channel a link cannot spell.
      */
     static String messageLinkFor(int chatLineId) {
         long messageId = ClientChatMessageIds.messageIdOf(chatLineId);
@@ -1324,7 +1400,7 @@ final class ChatScreenMenus {
                     StatCollector.translateToLocal(presence.labelKey()), false,
                     chosen == presence
                             ? LostTalesColors.rgb(LostTalesColors.HONEY) : -1, null)
-                    .withSprite(ChatPresenceMark.sphereOf(presence),
+                    .withSprite(ChatPresenceMark.markOf(presence),
                             LostTalesUiSheet.PRESENCE_SELECTED, false));
         }
         String line = ClientChatPresence.chosenLine(speaker);
@@ -1462,7 +1538,19 @@ final class ChatScreenMenus {
      */
     private boolean canModerateMessage() {
         return ChatMessageIds.isServerId(this.menuMessageId)
-                && ClientChatChannelState.canModerate();
+                && ClientChatChannelState.canModerate()
+                && !isConsoleEntry();
+    }
+
+    /**
+     * Whether the message is an entry of the Server Console: the server's
+     * record of what happened, which nobody takes back.
+     */
+    private boolean isConsoleEntry() {
+        ChatTab tab = ClientChatChannelViews.tabOf(this.menuChatLineId);
+        return tab != null && tab.getChannel() == ChatChannel.SERVER_CONSOLE
+                && LostTalesChatMessagePacket.isServerSender(
+                        this.menuMessageSenderId);
     }
 
     /**

@@ -16,14 +16,18 @@ import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
+import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
@@ -92,7 +96,7 @@ final class ChatInputCompletion {
             Collections.emptyList();
     private int mentionRevision;
     private long mentionBuiltNanos;
-    private ChatChannel mentionChannel;
+    private ChatTab mentionTab;
 
     ChatInputCompletion(ChatNoticeSink notices) {
         this.notices = notices;
@@ -696,19 +700,21 @@ final class ChatInputCompletion {
     /* ---- Mention candidates ---- */
 
     /**
-     * One candidate per online player, shaped for the selected channel,
-     * rebuilt on an interval rather than per keystroke or frame.
+     * One candidate per person the conversation in front has, as its
+     * member list shows them, rebuilt on an interval rather than per
+     * keystroke or frame.
      */
     private List<ChatMentionCandidate> mentionCandidates() {
-        ChatChannel channel = ClientChatChannelState.getSelectedChannel();
+        ChatTab tab = ClientChatChannelState.getSelected();
         long now = System.nanoTime();
-        if (channel == this.mentionChannel && this.mentionBuiltNanos != 0L
+        if (tab != null && tab.equals(this.mentionTab)
+                && this.mentionBuiltNanos != 0L
                 && now - this.mentionBuiltNanos < MENTION_REFRESH_NANOS) {
             return this.mentionCandidates;
         }
         this.mentionBuiltNanos = now;
-        this.mentionChannel = channel;
-        List<ChatMentionCandidate> built = buildMentionCandidates(channel);
+        this.mentionTab = tab;
+        List<ChatMentionCandidate> built = buildMentionCandidates(tab);
         if (!sameCandidates(built, this.mentionCandidates)) {
             this.mentionCandidates = built;
             this.mentionRevision++;
@@ -716,11 +722,23 @@ final class ChatInputCompletion {
         return this.mentionCandidates;
     }
 
-    /** The live player list and appearance cache, handed to the pure builder. */
-    private List<ChatMentionCandidate> buildMentionCandidates(
-            ChatChannel channel) {
+    /**
+     * The conversation's member list, the live player list and the
+     * appearance cache, handed to the pure builder. A list not asked for
+     * yet is asked for here, so the names come in while the player types.
+     */
+    private List<ChatMentionCandidate> buildMentionCandidates(ChatTab tab) {
         if (this.mc.thePlayer == null) {
             return new ArrayList<ChatMentionCandidate>();
+        }
+        List<LostTalesChatMembersPacket.Member> members =
+                Collections.<LostTalesChatMembersPacket.Member>emptyList();
+        if (tab != null) {
+            ClientChatMembers.requestIfDue(tab);
+            ClientChatMembers.Answer answer = ClientChatMembers.of(tab);
+            if (answer != null) {
+                members = answer.members;
+            }
         }
         Map<String, CharacterAppearance> byAccount =
                 new HashMap<String, CharacterAppearance>();
@@ -750,33 +768,29 @@ final class ChatInputCompletion {
                 this.mc.thePlayer.getCommandSenderName(),
                 active == null ? "" : active.getName(),
                 active == null ? null : active.getCharacterId(),
-                online, byAccount);
+                members, online, byAccount);
     }
 
     /**
-     * The candidates for a channel: the mentionable roles first, since
-     * addressing a whole group is never buried under a list of names;
-     * then the player themself; then everyone else online, alphabetical.
-     * A player is displayed and inserted by the active character's name
-     * wherever one is known — the identity every channel signs lines
-     * with by default — and by the account name otherwise; both names
-     * remain searchable aliases. The stable key is the player's UUID
-     * from the appearance sync where one is known, so an account and
-     * its character never appear as two entries; the character's own id
-     * rides along, so the row is coloured and faced by the synced
-     * appearance rather than by a name.
+     * The candidates for a conversation: the mentionable roles first,
+     * since addressing a whole group is never buried under a list of
+     * names; then the player themself; then everyone else the
+     * conversation's member list shows here — and anyone online it has
+     * not reached yet — alphabetical; then those it shows absent, players
+     * and Discord members alike, alphabetical, since a mention reaches
+     * them too. The Server and an NPC are nobody to mention, and neither
+     * are the player's own other characters. A player is displayed and
+     * inserted by the name the conversation knows them by — their
+     * character's, or their account's — and both names remain searchable
+     * aliases. The stable key is the player's id, with the character's
+     * where they are listed as one, so an account and its character never
+     * appear as two entries; the ids ride along, so the row is coloured
+     * and faced by the synced appearance rather than by a name.
      */
     static List<ChatMentionCandidate> mentionCandidatesFor(
             UUID selfId, String selfAccount,
-            String selfCharacter, List<String> onlineAccounts,
-            Map<String, CharacterAppearance> appearancesByAccount) {
-        return mentionCandidatesFor(selfId, selfAccount, selfCharacter, null,
-                onlineAccounts, appearancesByAccount);
-    }
-
-    static List<ChatMentionCandidate> mentionCandidatesFor(
-            UUID selfId, String selfAccount,
             String selfCharacter, UUID selfCharacterId,
+            List<LostTalesChatMembersPacket.Member> members,
             List<String> onlineAccounts,
             Map<String, CharacterAppearance> appearancesByAccount) {
         List<ChatMentionCandidate> result =
@@ -792,11 +806,32 @@ final class ChatInputCompletion {
                 selfAccount, selfCharacter,
                 selfId == null ? "" : selfId.toString(),
                 selfCharacterId == null ? "" : selfCharacterId.toString()));
-        List<ChatMentionCandidate> others =
-                new ArrayList<ChatMentionCandidate>();
+        List<ChatMentionCandidate> here = new ArrayList<ChatMentionCandidate>();
+        List<ChatMentionCandidate> absent = new ArrayList<ChatMentionCandidate>();
+        Set<String> listedAccounts = new HashSet<String>();
+        for (LostTalesChatMembersPacket.Member member : members) {
+            if (member == null || member.isNpc()
+                    || member.getPlayerId() == null
+                    || member.getPlayerId().equals(selfId)
+                    || LostTalesChatMessagePacket.isSystemSender(
+                            member.getPlayerId())) {
+                continue;
+            }
+            listedAccounts.add(member.getAccount().toLowerCase(Locale.ROOT));
+            String character = member.getCharacterId() == null ? ""
+                    : member.getName();
+            (member.isOnline() ? here : absent).add(candidate(
+                    member.getPlayerId() + (member.getCharacterId() == null
+                            ? "" : ":" + member.getCharacterId()),
+                    member.getAccount(), character,
+                    member.getPlayerId().toString(),
+                    member.getCharacterId() == null ? ""
+                            : member.getCharacterId().toString()));
+        }
         for (String account : onlineAccounts) {
             if (account == null || account.trim().length() == 0
-                    || account.equalsIgnoreCase(selfAccount)) {
+                    || account.equalsIgnoreCase(selfAccount)
+                    || listedAccounts.contains(account.toLowerCase(Locale.ROOT))) {
                 continue;
             }
             CharacterAppearance appearance = appearancesByAccount.get(
@@ -804,24 +839,29 @@ final class ChatInputCompletion {
             String key = appearance == null
                     ? "account:" + account.toLowerCase(Locale.ROOT)
                     : appearance.getPlayerId().toString();
-            others.add(candidate(key, account, appearance == null
+            here.add(candidate(key, account, appearance == null
                     ? "" : appearance.getCharacterName(),
                     appearance == null ? ""
                             : appearance.getPlayerId().toString(),
                     appearance == null || appearance.getCharacterId() == null
                             ? "" : appearance.getCharacterId().toString()));
         }
-        Collections.sort(others, new Comparator<ChatMentionCandidate>() {
-            @Override
-            public int compare(ChatMentionCandidate left,
-                               ChatMentionCandidate right) {
-                return left.getDisplayName().compareToIgnoreCase(
-                        right.getDisplayName());
-            }
-        });
-        result.addAll(others);
+        Collections.sort(here, BY_DISPLAY_NAME);
+        Collections.sort(absent, BY_DISPLAY_NAME);
+        result.addAll(here);
+        result.addAll(absent);
         return result;
     }
+
+    private static final Comparator<ChatMentionCandidate> BY_DISPLAY_NAME =
+            new Comparator<ChatMentionCandidate>() {
+                @Override
+                public int compare(ChatMentionCandidate left,
+                                   ChatMentionCandidate right) {
+                    return left.getDisplayName().compareToIgnoreCase(
+                            right.getDisplayName());
+                }
+            };
 
     private static ChatMentionCandidate candidate(
             String key, String account, String character,

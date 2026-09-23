@@ -19,6 +19,14 @@ import net.minecraftforge.event.CommandEvent;
  * is issued, whether or not it then succeeds: the attempt is the fact.
  */
 public final class ChatConsoleCommandHandler {
+    /**
+     * How long after a command is recorded vanilla's notice to operators
+     * about it counts as about that command: the two happen on one tick.
+     */
+    private static final long NOTICE_MILLIS = 1000L;
+    /** Who ran the command recorded last, and when. */
+    private static String lastActor = "";
+    private static long lastRecordedMillis;
 
     @SubscribeEvent
     public void onCommand(CommandEvent event) {
@@ -43,5 +51,31 @@ public final class ChatConsoleCommandHandler {
                 ChatConsoleEvent.Severity.INFO, actor,
                 ChatConsoleStream.describeCommand(event.command.getCommandName(),
                         event.parameters), context);
+        noteRecorded(actor, System.currentTimeMillis());
+        // A command may make somebody an operator, or no longer one, or
+        // change who reads the console: the watcher looks this tick.
+        LostTalesChatRoleRosterWatcher.checkSoon();
+    }
+
+    static synchronized void noteRecorded(String actor, long now) {
+        lastActor = actor;
+        lastRecordedMillis = now;
+    }
+
+    /**
+     * Whether the console recorded a command {@code actor} ran a moment
+     * ago: the command vanilla's notice to operators is then about, which
+     * a reader of the console is not told twice.
+     */
+    static synchronized boolean recordedJustNow(String actor, long now) {
+        return actor != null && actor.length() > 0
+                && actor.equalsIgnoreCase(lastActor)
+                && now - lastRecordedMillis <= NOTICE_MILLIS;
+    }
+
+    /** Cleared with the rest of the server's chat state. */
+    public static synchronized void clear() {
+        lastActor = "";
+        lastRecordedMillis = 0L;
     }
 }

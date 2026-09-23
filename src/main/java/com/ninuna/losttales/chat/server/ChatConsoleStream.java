@@ -1,14 +1,18 @@
 package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.chat.ChatConsoleEvent;
+import com.ninuna.losttales.chat.ChatReactionSummary;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * The Server Console's memory: the last {@link #MAX_EVENTS}
@@ -21,6 +25,11 @@ import java.util.Locale;
  * {@code LostTalesChatService}'s decision, made from the
  * {@code chat.console.read} capability at the moment of sending and
  * again at the moment of replay.
+ *
+ * <p>An entry is a line of the Server Console like any other: its id
+ * comes from the clock messages take theirs from, so a link, a reply and
+ * a reaction name it as they name a message, and its reactions are kept
+ * here beside it and saved with it.</p>
  *
  * <p>Commands are described here too, and described carefully: what a
  * command was and who ran it is what the console is for, while what it
@@ -38,6 +47,9 @@ public final class ChatConsoleStream {
 
     private static final LinkedHashMap<Long, ChatConsoleEvent> EVENTS =
             new LinkedHashMap<Long, ChatConsoleEvent>();
+    /** The reactions on kept entries, by the entry's id; an entry nobody reacted to has none here. */
+    private static final Map<Long, ChatReactions> REACTIONS =
+            new HashMap<Long, ChatReactions>();
 
     private ChatConsoleStream() {}
 
@@ -56,12 +68,13 @@ public final class ChatConsoleStream {
 
     /**
      * Hands the save's kept events back to the stream as the server
-     * starts, oldest first, each under its own id: one already held
-     * stays as it is. The id allocator moves past the newest, so no
-     * event said from here on shares an id with a kept one. Answers how
-     * many were taken.
+     * starts, oldest first, each under its own id with the reactions it
+     * was saved with: one already held stays as it is. The id allocator
+     * moves past the newest, so no event said from here on shares an id
+     * with a kept one. Answers how many were taken.
      */
-    public static synchronized int restore(Collection<ChatConsoleEvent> events) {
+    public static synchronized int restore(Collection<ChatConsoleEvent> events,
+                                           Map<Long, ChatReactions> reactions) {
         int kept = 0;
         long newest = 0L;
         if (events != null) {
@@ -78,6 +91,10 @@ public final class ChatConsoleStream {
                     continue;
                 }
                 EVENTS.put(id, event);
+                ChatReactions saved = reactions == null ? null : reactions.get(id);
+                if (saved != null && !saved.isEmpty()) {
+                    REACTIONS.put(id, saved);
+                }
                 kept++;
                 newest = Math.max(newest, id.longValue());
             }
@@ -92,10 +109,66 @@ public final class ChatConsoleStream {
         return new ArrayList<ChatConsoleEvent>(EVENTS.values());
     }
 
+    /** The kept entries' reactions, by id, each a copy: what the save writes beside them. */
+    public static synchronized Map<Long, ChatReactions> reactionsSnapshot() {
+        Map<Long, ChatReactions> copies = new HashMap<Long, ChatReactions>();
+        for (Map.Entry<Long, ChatReactions> kept : REACTIONS.entrySet()) {
+            ChatReactions copy = new ChatReactions();
+            for (Map.Entry<String, Map<UUID, String>> kind
+                    : kept.getValue().snapshot().entrySet()) {
+                for (Map.Entry<UUID, String> reactor : kind.getValue().entrySet()) {
+                    copy.restore(kind.getKey(), reactor.getKey(), reactor.getValue());
+                }
+            }
+            copies.put(kept.getKey(), copy);
+        }
+        return copies;
+    }
+
+    /** The kept entry {@code id} names, or null for none kept. */
+    public static synchronized ChatConsoleEvent find(long id) {
+        return EVENTS.get(Long.valueOf(id));
+    }
+
+    /**
+     * Adds or takes back one reaction to a kept entry, as a reaction to
+     * a message is kept ({@link ChatReactions#set}); answers whether
+     * anything changed. Who may react — whoever reads the console — is
+     * the caller's to ask.
+     */
+    public static synchronized boolean react(long id, UUID reactor, String name,
+                                             String emoji, boolean add) {
+        Long key = Long.valueOf(id);
+        if (!EVENTS.containsKey(key)) {
+            return false;
+        }
+        ChatReactions reactions = REACTIONS.get(key);
+        if (reactions == null) {
+            reactions = new ChatReactions();
+        }
+        if (!reactions.set(emoji, reactor, name, add)) {
+            return false;
+        }
+        if (reactions.isEmpty()) {
+            REACTIONS.remove(key);
+        } else {
+            REACTIONS.put(key, reactions);
+        }
+        ChatHistory.changed();
+        return true;
+    }
+
+    /** The reactions on a kept entry as {@code viewer} is shown them; none for none kept. */
+    public static synchronized ChatReactionSummary reactionsFor(long id, UUID viewer) {
+        ChatReactions reactions = REACTIONS.get(Long.valueOf(id));
+        return reactions == null ? ChatReactionSummary.EMPTY
+                : reactions.summaryFor(viewer);
+    }
+
     private static void trim() {
         while (EVENTS.size() > MAX_EVENTS) {
             Iterator<Long> oldest = EVENTS.keySet().iterator();
-            oldest.next();
+            REACTIONS.remove(oldest.next());
             oldest.remove();
         }
     }
@@ -180,6 +253,7 @@ public final class ChatConsoleStream {
     /** Cleared with the rest of the server's chat state. */
     public static synchronized void clear() {
         EVENTS.clear();
+        REACTIONS.clear();
     }
 
     /** Test and diagnostics hook. */

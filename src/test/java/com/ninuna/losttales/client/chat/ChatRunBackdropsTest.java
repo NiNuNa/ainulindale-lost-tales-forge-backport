@@ -75,6 +75,22 @@ public final class ChatRunBackdropsTest {
                 link(ChatChannelLinkMarker.MESSAGE_SEPARATOR, 1234L)));
         assertEquals(0, ChatRunBackdrops.padBefore(link(ChatChannelLinkMarker.ICON_SLOT, 1234L)));
         assertEquals(PAD, ChatRunBackdrops.padAfter(link(ChatChannelLinkMarker.ICON_SLOT, 1234L)));
+        // A link to one of this client's own lines, as the Server Console's
+        // "used /command in #Channel" names the command, is one element
+        // too: the same three pieces, one backdrop.
+        ChatComponentText localName = ChatChannelLinkMarker.apply(
+                new ChatComponentText("#Global"), 0x64B082, "global", 42);
+        ChatComponentText localArrow = ChatChannelLinkMarker.apply(
+                new ChatComponentText(ChatChannelLinkMarker.MESSAGE_SEPARATOR),
+                0x64B082, "global", 42);
+        ChatComponentText localSlot = ChatChannelLinkMarker.apply(
+                new ChatComponentText(ChatChannelLinkMarker.ICON_SLOT),
+                0x64B082, "global", 42);
+        assertEquals(PAD, ChatRunBackdrops.padBefore(localName));
+        assertEquals(0, ChatRunBackdrops.padAfter(localName));
+        assertEquals(0, ChatRunBackdrops.pads(localArrow));
+        assertEquals(0, ChatRunBackdrops.padBefore(localSlot));
+        assertEquals(PAD, ChatRunBackdrops.padAfter(localSlot));
         // A share: its icon opens, its name closes; the backdrop is their frame.
         IChatComponent icon = ChatShowcaseMarker.createIcon(ChatShareKind.ITEM, 3);
         IChatComponent name = ChatShowcaseMarker.createText(ChatShareKind.ITEM, 3,

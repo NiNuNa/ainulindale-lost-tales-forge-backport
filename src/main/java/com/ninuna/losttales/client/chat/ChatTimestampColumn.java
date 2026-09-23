@@ -8,7 +8,7 @@ import net.minecraft.client.gui.FontRenderer;
  * (unscaled) pixels measured from the window's left edge:
  *
  * <pre>
- * edge | 5 | avatar | 5 | separator | 5 | message
+ * edge | 7 | avatar | 7 | separator | 5 | message
  * </pre>
  *
  * <p>The area holds what stands beside a group of messages, the way
@@ -21,9 +21,10 @@ import net.minecraft.client.gui.FontRenderer;
  * <p>The area is the avatar with {@link #AVATAR_GAP} clear pixels either
  * side, its presence sphere included — or, where that is narrower, the
  * widest time the font can write at the small size, {@code 12:59 PM},
- * as it is drawn, leaning in italics and with its shadow, and a clear
- * display pixel either side ({@link #timeRoom}): five pixels either side
- * of the avatar at GUI scale 2, six at 3, eight at 4. It never changes
+ * as it is drawn, leaning in italics and with its shadow, with
+ * {@link #TIME_GAP} clear pixels and a display pixel either side
+ * ({@link #timeRoom}): seven pixels either side of the avatar at GUI
+ * scale 2, eight at 3, ten at 4. It never changes
  * width as the clock turns, and the avatar and the times stand centred
  * in it, the odd pixel on the separator's side. The gaps are what the
  * eye sees, so they are measured in ink: the window's frame stands just
@@ -46,11 +47,16 @@ import net.minecraft.client.gui.FontRenderer;
  * about where the message content starts.</p>
  */
 final class ChatTimestampColumn {
-    /** The closed feed's gap at its edge. */
-    static final int EDGE_GAP = 3;
+    /**
+     * The closed feed's gap at its edge: a mention's bar and two clear
+     * pixels past it.
+     */
+    static final int EDGE_GAP = 4;
     static final int SEPARATOR_WIDTH = 1;
     /** The fewest clear pixels either side of the avatar, its sphere included. */
-    static final int AVATAR_GAP = 5;
+    static final int AVATAR_GAP = 7;
+    /** The fewest clear pixels either side of the widest time, past its display pixel. */
+    static final int TIME_GAP = 2;
     /** Clear pixels between the separator and the words. */
     static final int WORDS_GAP = 5;
     /** The narrowest the area is: the avatar and its gaps. */
@@ -111,6 +117,17 @@ final class ChatTimestampColumn {
         return FEED;
     }
 
+    /**
+     * The width the closed feed's rows stand in, on a band
+     * {@code bandWidth} wide whose rows start {@link #EDGE_GAP} in: the
+     * band less the edge gap at either end, so a row standing against the
+     * right edge keeps the clear pixels a row at the left keeps, and a
+     * centred row stands on the band's middle.
+     */
+    static float feedRowRoom(float bandWidth) {
+        return bandWidth - 2 * EDGE_GAP;
+    }
+
     /** Whether any of the area stands in the window. */
     boolean shows() {
         return this.enabled && this.share > 0.0F;
@@ -133,13 +150,13 @@ final class ChatTimestampColumn {
     /**
      * The room a time needs in the area, in the chat's pixels: its
      * footprint of {@code footprint} font pixels drawn at
-     * {@code smallScale}, and one clear display pixel either side, on a
-     * display drawing {@code displayPixelsPerPixel} of its pixels to one
-     * of the chat's.
+     * {@code smallScale}, then {@link #TIME_GAP} clear pixels and one
+     * display pixel either side, on a display drawing
+     * {@code displayPixelsPerPixel} of its pixels to one of the chat's.
      */
     static float timeRoom(int footprint, float smallScale,
                           float displayPixelsPerPixel) {
-        return footprint * smallScale
+        return footprint * smallScale + 2 * TIME_GAP
                 + 2.0F / Math.max(0.001F, displayPixelsPerPixel);
     }
 

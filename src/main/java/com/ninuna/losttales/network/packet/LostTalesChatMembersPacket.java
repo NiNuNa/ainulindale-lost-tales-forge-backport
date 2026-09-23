@@ -300,9 +300,11 @@ public final class LostTalesChatMembersPacket implements IMessage {
                 throw new LostTalesPacketCodec.DecodeException(
                         "invalid chat members packet size");
             }
+            // The channel is only read here: a channel this client does not
+            // know yet is the handler's to skip, not a malformed answer.
             String channel = LostTalesPacketCodec.readUtf8String(buffer,
                     MAX_CHANNEL_ID_BYTES);
-            if (ChatChannel.fromId(channel) == null) {
+            if (channel.trim().length() == 0) {
                 throw new LostTalesPacketCodec.DecodeException(
                         "members of no channel");
             }

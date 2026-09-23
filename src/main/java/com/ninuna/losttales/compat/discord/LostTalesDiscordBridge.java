@@ -7,6 +7,7 @@ import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatDeliveryMark;
 import com.ninuna.losttales.chat.ChatEpithet;
 import com.ninuna.losttales.chat.ChatMessageIds;
+import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.chat.ChatReplyReference;
@@ -263,6 +264,7 @@ public final class LostTalesDiscordBridge {
     private final DiscordGuildDirectory directory = new DiscordGuildDirectory();
     /** Who is in the Discord servers of the linked channels, while their members are listed. */
     private final DiscordMemberDirectory members = new DiscordMemberDirectory();
+    private final DiscordPingBudget pingBudget = new DiscordPingBudget();
     /** What each player has been told of those members' statuses. Server thread. */
     private final DiscordMemberStatuses memberStatuses = new DiscordMemberStatuses();
     /** Set when Discord refused the member intents, for the next tick to tell everyone. */
@@ -549,13 +551,15 @@ public final class LostTalesDiscordBridge {
     public void relayToDiscord(ChatChannel channel, String factionId,
                                String username, String avatarUrl,
                                String message, long messageId,
-                               ChatReplyReference reply, UUID senderId) {
+                               ChatReplyReference reply, UUID senderId,
+                               List<ChatNamedPlayer> named) {
         Worker running = this.worker;
         if (running == null || !running.posts || message == null
                 || message.length() == 0) {
             return;
         }
         long queuedAt = System.currentTimeMillis();
+        List<ChatNamedPlayer> pings = pingsOf(senderId, named, queuedAt);
         List<Outbound> copies = new ArrayList<Outbound>();
         // Each id is looked up in the bindings of the worker it is
         // queued for, so it names the entry it was taken from.
@@ -564,7 +568,8 @@ public final class LostTalesDiscordBridge {
                 copies.add(new Outbound(Outbound.Kind.POST, username,
                         avatarUrl, message, messageId,
                         reply == null ? ChatReplyReference.NONE : reply, null,
-                        binding.id(), channel, factionId, senderId, queuedAt));
+                        binding.id(), channel, factionId, senderId, queuedAt,
+                        "", pings));
             }
         }
         if (!copies.isEmpty() && !enqueueOutbound(running, copies)) {
@@ -634,10 +639,43 @@ public final class LostTalesDiscordBridge {
         }
         ChatChannel channel = ChatHistory.channelOf(messageId);
         if (channel != null) {
+            // The members the line named keep their mentions, which an
+            // edit never pings again.
             enqueueOutbound(new Outbound(Outbound.Kind.EDIT, "", "",
                     message, messageId, ChatReplyReference.NONE, null,
-                    "", channel, ChatHistory.factionScopeOf(messageId)));
+                    "", channel, ChatHistory.factionScopeOf(messageId), null,
+                    0L, "", discordMembersOf(ChatHistory.namedPlayersOf(messageId))));
         }
+    }
+
+    /**
+     * The Discord members a player's line pings: those it names, while
+     * the option is on and the player has the budget for them
+     * ({@link DiscordPingBudget}); none otherwise.
+     */
+    private List<ChatNamedPlayer> pingsOf(UUID senderId, List<ChatNamedPlayer> named,
+                                          long now) {
+        List<ChatNamedPlayer> members = discordMembersOf(named);
+        if (members.isEmpty() || !LostTalesConfig.discordPingMembers
+                || !this.pingBudget.spend(senderId, Math.min(members.size(),
+                        DiscordMentions.MOST_PINGS), now)) {
+            return Collections.<ChatNamedPlayer>emptyList();
+        }
+        return members;
+    }
+
+    /** The Discord members among the players a line names. */
+    private static List<ChatNamedPlayer> discordMembersOf(List<ChatNamedPlayer> named) {
+        List<ChatNamedPlayer> members = new ArrayList<ChatNamedPlayer>();
+        if (named != null) {
+            for (ChatNamedPlayer player : named) {
+                if (player != null && LostTalesChatMessagePacket
+                        .discordUserIdOf(player.getPlayerId()).length() > 0) {
+                    members.add(player);
+                }
+            }
+        }
+        return members;
     }
 
     /**
@@ -1012,7 +1050,8 @@ public final class LostTalesDiscordBridge {
                 copies.add(new Outbound(Outbound.Kind.POST, username, avatarUrl,
                         text, messageId, reply, null, binding.id(),
                         origin.getChannel(), origin.getFactionScope(), null,
-                        System.currentTimeMillis(), originChannelId));
+                        System.currentTimeMillis(), originChannelId,
+                        Collections.<ChatNamedPlayer>emptyList()));
             }
         }
         if (!copies.isEmpty()) {
@@ -1672,6 +1711,7 @@ public final class LostTalesDiscordBridge {
     public void resetSession() {
         this.directory.clear();
         this.memberStatuses.clear();
+        this.pingBudget.clear();
         this.commandGuilds.clear();
         this.linkResults.clear();
         DiscordLinkCodes.clear();
@@ -2068,13 +2108,19 @@ public final class LostTalesDiscordBridge {
          * is never posted back into; empty for a line from the game.
          */
         final String originChannelId;
+        /**
+         * The Discord members a player's line names, written as their
+         * mentions where they can see the channel; a post pings them, an
+         * edit does not. Empty for anything else.
+         */
+        final List<ChatNamedPlayer> pings;
 
         Outbound(Kind kind, String username, String avatarUrl,
                  String message, long messageId, ChatReplyReference reply,
                  DiscordNotice notice, String bindingKey, ChatChannel channel,
                  String factionScope) {
             this(kind, username, avatarUrl, message, messageId, reply, notice,
-                    bindingKey, channel, factionScope, null, 0L, "");
+                    bindingKey, channel, factionScope, null, 0L);
         }
 
         Outbound(Kind kind, String username, String avatarUrl,
@@ -2084,7 +2130,8 @@ public final class LostTalesDiscordBridge {
                  String factionScope, UUID senderId,
                  long queuedAtMillis) {
             this(kind, username, avatarUrl, message, messageId, reply, notice,
-                    bindingKey, channel, factionScope, senderId, queuedAtMillis, "");
+                    bindingKey, channel, factionScope, senderId, queuedAtMillis, "",
+                    Collections.<ChatNamedPlayer>emptyList());
         }
 
         Outbound(Kind kind, String username, String avatarUrl,
@@ -2092,7 +2139,8 @@ public final class LostTalesDiscordBridge {
                  ChatReplyReference reply, DiscordNotice notice,
                  String bindingKey, ChatChannel channel,
                  String factionScope, UUID senderId,
-                 long queuedAtMillis, String originChannelId) {
+                 long queuedAtMillis, String originChannelId,
+                 List<ChatNamedPlayer> pings) {
             this.kind = kind;
             this.username = username;
             this.avatarUrl = avatarUrl;
@@ -2106,6 +2154,8 @@ public final class LostTalesDiscordBridge {
             this.senderId = senderId;
             this.queuedAtMillis = queuedAtMillis;
             this.originChannelId = originChannelId == null ? "" : originChannelId;
+            this.pings = pings == null ? Collections.<ChatNamedPlayer>emptyList()
+                    : pings;
         }
 
         /** Whether this is a player's line whose sender is told how its post goes. */
@@ -3396,12 +3446,11 @@ public final class LostTalesDiscordBridge {
                 return 0L;
             } else if (next.kind == Outbound.Kind.POST) {
                 header = replyHeader(next, webhook);
+                DiscordMentions.Post post = postFor(next, webhook);
                 reply = DiscordHttp.postWebhook(webhook,
                         DiscordJson.webhookLineBody(next.username,
-                                next.avatarUrl, header
-                                        + DiscordMessageLinkRewriter.outbound(
-                                                filtered(next.message),
-                                                outboundResolver(webhook))));
+                                next.avatarUrl, header + post.content,
+                                post.pinged));
             } else {
                 DiscordMessageLinks.Copy copy = copyThrough(next, webhook);
                 if (copy == null || (next.kind == Outbound.Kind.EDIT
@@ -3411,9 +3460,7 @@ public final class LostTalesDiscordBridge {
                 reply = next.kind == Outbound.Kind.EDIT
                         ? DiscordHttp.editWebhookMessage(webhook, copy.discordId,
                                 DiscordJson.webhookLineEditBody(copy.header
-                                        + DiscordMessageLinkRewriter.outbound(
-                                                filtered(next.message),
-                                                outboundResolver(webhook))))
+                                        + postFor(next, webhook).content))
                         : DiscordHttp.deleteWebhookMessage(webhook, copy.discordId);
             }
             // What the reply says of the webhook's bucket, a limit's own
@@ -3572,6 +3619,29 @@ public final class LostTalesDiscordBridge {
         }
 
         /**
+         * A line as one webhook's Discord channel is to read it: its words
+         * through the profanity filter, its message links pointing into
+         * that channel, every Discord code in it broken, and each Discord
+         * member it pings who can see that channel written as their
+         * mention ({@link DiscordMentions}).
+         */
+        private DiscordMentions.Post postFor(Outbound next, String webhook) {
+            String text = DiscordMessageLinkRewriter.outbound(
+                    filtered(next.message), outboundResolver(webhook));
+            String channelId = next.pings.isEmpty() || !followsMemberStatuses()
+                    ? "" : channelOfWebhook(webhook);
+            return DiscordMentions.rewrite(text, next.pings,
+                    channelId.length() == 0 ? Collections.<String>emptySet()
+                            : members.usersSeeing(Collections.singletonList(channelId)));
+        }
+
+        /** The Discord channel a webhook posts into; empty while Discord has not said. */
+        private String channelOfWebhook(String webhookUrl) {
+            DiscordJson.ChannelInfo info = webhookInfo(webhookUrl);
+            return info == null || info.channelId == null ? "" : info.channelId;
+        }
+
+        /**
          * The guild and channel the webhook posts to, asked of the
          * webhook's own URL; null while Discord has not said. The
          * liveness rule, reply headers, jump links and typing all go by
@@ -3580,12 +3650,6 @@ public final class LostTalesDiscordBridge {
          * A 401 or 404 means the webhook is gone or its URL is wrong,
          * and is not asked again.
          */
-        /** The Discord channel a webhook posts into; empty while Discord has not said. */
-        private String channelOfWebhook(String webhookUrl) {
-            DiscordJson.ChannelInfo info = webhookInfo(webhookUrl);
-            return info == null || info.channelId == null ? "" : info.channelId;
-        }
-
         private DiscordJson.ChannelInfo webhookInfo(String webhookUrl) {
             if (this.webhookInfos.containsKey(webhookUrl)) {
                 return this.webhookInfos.get(webhookUrl);

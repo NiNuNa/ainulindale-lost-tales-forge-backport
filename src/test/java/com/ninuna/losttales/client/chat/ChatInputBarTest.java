@@ -73,8 +73,8 @@ public final class ChatInputBarTest {
      * Every framed button standing in a row of controls is one height:
      * an icon's box with the inset above and below it. The character
      * button is that square with the head centred, the wide inset on
-     * every side, and the bar's framed buttons stand a whole row inside
-     * the well at either end so they centre on the bar exactly.
+     * every side, and the typing well is as tall as the bar's framed
+     * buttons, so the three stand level.
      */
     @Test
     public void theFramedButtonsShareOneHeight() {
@@ -84,7 +84,7 @@ public final class ChatInputBarTest {
         assertEquals(LostTalesChatOverlayRenderer.CONTENT_BOX_HEIGHT
                 + 2 * LostTalesUiFramedButton.INSET, LostTalesUiFramedButton.HEIGHT);
         assertEquals(LostTalesUiFramedButton.HEIGHT,
-                LostTalesChatOverlayRenderer.TOOLBAR_BUTTON_SIZE);
+                LostTalesChatOverlayRenderer.TOOLBAR_HEIGHT);
         assertEquals(LostTalesUiFramedButton.HEIGHT, ChatReactionMarker.HEIGHT);
         assertEquals(ChatReactionMarker.ICON + 2 * ChatReactionMarker.PAD,
                 ChatReactionMarker.HEIGHT);
@@ -93,7 +93,23 @@ public final class ChatInputBarTest {
         assertEquals(LostTalesChatOverlayRenderer.HEAD_SIZE
                         + 2 * LostTalesUiFramedButton.WIDE_INSET,
                 ChatInputBar.CHARACTER_BUTTON_SIZE);
-        assertEquals(2, ChatInputBar.CONTENT_HEIGHT - LostTalesUiFramedButton.HEIGHT);
+        assertEquals(LostTalesUiFramedButton.HEIGHT, ChatInputBar.CONTENT_HEIGHT);
+    }
+
+    /**
+     * The bar's spacing: two clear rows between the rule and what stands
+     * on the bar and two between it and the bar's foot, the window's
+     * frame running just below; three clear pixels before the channel
+     * indicator and after the character button, and two between the two
+     * framed buttons.
+     */
+    @Test
+    public void theBarKeepsTwoRowsAboveAndBelowAndTwoPixelsBetweenItsFramedButtons() {
+        assertEquals(2, ChatInputBar.CLEARANCE);
+        assertEquals(1 + 2 + LostTalesUiFramedButton.HEIGHT + 2,
+                ChatInputBar.HEIGHT);
+        assertEquals(3, ChatInputBar.BAR_GAP);
+        assertEquals(2, ChatInputBar.BUTTON_GAP);
     }
 
     /**
@@ -107,25 +123,28 @@ public final class ChatInputBarTest {
     @Test
     public void theWellLaysItsContentOutLikeAMessageRow() {
         int barTop = 100;
+        int contentTop = ChatInputBar.contentTopFor(barTop);
         int wellTop = ChatInputBar.wellTopFor(barTop);
-        int wellBottom = wellTop + ChatInputBar.CONTENT_HEIGHT;
+        int wellBottom = wellTop + ChatInputBar.WELL_HEIGHT;
         int textTop = ChatInputBar.textTopFor(barTop);
         int caretTop = ChatInputField.caretTop(textTop);
         int caretBottom = caretTop + (int)ChatInlineIcons.CONTENT_SIZE;
-        // The well stands the clearance below the rule and as far above
-        // the bar's bottom, the window's frame running just below it; and
-        // it is the icon's box with the wide inset above and below, a row
-        // taller at either end than the framed buttons beside it.
-        assertEquals(1 + ChatInputBar.CLEARANCE, wellTop - barTop);
-        assertEquals(ChatInputBar.CLEARANCE,
-                barTop + ChatInputBar.HEIGHT - wellBottom);
-        assertEquals(ChatChannelIcons.SIZE + 2 * LostTalesUiFramedButton.WIDE_INSET,
-                ChatInputBar.CONTENT_HEIGHT);
+        // The framed buttons stand the clearance below the rule and as far
+        // above the bar's bottom, the window's frame running just below it.
+        assertEquals(1 + ChatInputBar.CLEARANCE, contentTop - barTop);
+        assertEquals(ChatInputBar.CLEARANCE, barTop + ChatInputBar.HEIGHT
+                - (contentTop + ChatInputBar.CONTENT_HEIGHT));
+        assertEquals(LostTalesUiFramedButton.HEIGHT, ChatInputBar.CONTENT_HEIGHT);
         assertEquals(ChatInputBar.HEIGHT, ChatWindowPlacement.INPUT_HEIGHT);
-        // A message row stands in the well's middle, and its text where
-        // a message row puts it: the caret a row inside the message row.
-        int rowTop = wellTop + (ChatInputBar.CONTENT_HEIGHT
-                - LostTalesChatOverlayRenderer.LINE_HEIGHT) / 2;
+        // The well is one message row, as every chat input box is, centred
+        // on the framed buttons: three rows clear above it and below it.
+        assertEquals(LostTalesChatOverlayRenderer.LINE_HEIGHT,
+                ChatInputBar.WELL_HEIGHT);
+        assertEquals(3, wellTop - contentTop);
+        assertEquals(3, contentTop + ChatInputBar.CONTENT_HEIGHT - wellBottom);
+        // Its text stands where a message row puts it: the caret a row
+        // inside the message row.
+        int rowTop = wellTop;
         assertEquals(LostTalesChatOverlayRenderer.ROW_TEXT_TOP,
                 textTop - rowTop);
         assertEquals(1, caretTop - rowTop);

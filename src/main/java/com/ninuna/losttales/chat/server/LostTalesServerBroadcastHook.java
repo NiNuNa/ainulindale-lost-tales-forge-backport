@@ -3,9 +3,8 @@ package com.ninuna.losttales.chat.server;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.identity.PlayableIdentityResolver;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
-import com.ninuna.losttales.chat.ChatBroadcastIdMarkers;
+import com.ninuna.losttales.chat.ChatBroadcastMarkers;
 import com.ninuna.losttales.chat.ChatChannel;
-import com.ninuna.losttales.chat.ChatMentions;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
@@ -18,7 +17,6 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import cpw.mods.fml.common.FMLLog;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -35,21 +33,25 @@ import net.minecraft.util.IChatComponent;
 
 /**
  * Where every server-wide line passes on its way out — an achievement,
- * a death, a join or a leave, {@code /say} — patched by the coremod into
- * the head of {@code ServerConfigurationManager.sendChatMsg}, and where
- * every line sent to one player passes, patched into the head of
+ * a death, a join or a leave, {@code /say}, another mod's announcement —
+ * patched by the coremod into the head of
+ * {@code ServerConfigurationManager.sendChatMsg}, and where every line
+ * sent to one player passes, patched into the head of
  * {@code EntityPlayerMP.addChatMessage}. Three things happen to a
  * server-wide line here: a join or a leave is made to name the account
  * rather than the character the game's display name gives, since it is
  * out-of-character news about an account ({@link #namingTheAccount});
- * a line that will land in a shared channel — an achievement, a death
- * or anything else everyone sees in Global, a join or a leave in OOC —
- * is given a message id of the server's own, carried as an empty run on
- * the component and recorded in the chat history under the Server's
- * name, so a reply to it on any client names the same message and a
- * click on the quote finds it; and the Discord relay is told, with that
- * id, so the embed it posts is linked to the line. A line sent to one
- * player that answers a command they typed is recorded the same way,
+ * the line is given a message id of the server's own and recorded in
+ * the chat history under the Server's name, so a reply, a reaction or a
+ * link to it names the same message on every client; and the Discord
+ * relay is told, with that id, so the embed it posts is linked to the
+ * line. The id rides the component as an empty run, and beside it a run
+ * for each player the line names ({@link ChatBroadcastMarkers}), so a
+ * mention in the line reaches the right person on every client and
+ * still opens their card once they have gone. A line the game hands
+ * each player on its own that is still shared news, as LOTR's
+ * travelling trader is, gets one record and one id for every copy. A
+ * line sent to one player that answers a command they typed is recorded
  * for that account alone, under the tab the command was typed in
  * ({@link #onPlayerLine}), so the answer comes back with the rest of the
  * tab's history. A line is never delayed or refused: whatever fails,
@@ -77,14 +79,24 @@ public final class LostTalesServerBroadcastHook {
             new LinkedHashMap<String, JoinLine>();
     /** What vanilla's display name suggests on a click, before the account. */
     private static final String WHISPER_SUGGESTION = "/msg ";
+    /**
+     * How long a shared line handed to each player on its own keeps its
+     * id for the next copy. The copies go out in one loop, on one tick.
+     */
+    private static final long SHARED_COPY_MILLIS = 1000L;
+    /** More shared lines going out at once than this is more than a tick holds. */
+    private static final int MAX_SHARED_COPIES = 16;
+    /** The shared lines whose copies are going out, by their chat JSON. */
+    private static final Map<String, SharedCopy> SHARED_COPIES =
+            new LinkedHashMap<String, SharedCopy>();
 
     private LostTalesServerBroadcastHook() {}
 
     /**
      * Sees a line about to be broadcast and hands back the one to send:
-     * a join or a leave naming the account, and any line of a shared
-     * channel with an id run appended. The relay is told after, with the
-     * id; the run is empty, so the relay reads the line's words as they
+     * a join or a leave naming the account, with its id and its named
+     * players appended as empty runs. The relay is told after, with the
+     * id; the runs are empty, so the relay reads the line's words as they
      * go out.
      */
     public static IChatComponent onBroadcast(IChatComponent message) {
@@ -96,7 +108,7 @@ public final class LostTalesServerBroadcastHook {
         try {
             line = namingTheAccount(message);
             ChatChannel channel = ChatSystemLineClassifier.classify(line);
-            if (channel == ChatChannel.ALL || channel == ChatChannel.OOC) {
+            if (channel != null) {
                 messageId = stamp(line, channel);
             }
         } catch (Throwable throwable) {
@@ -162,12 +174,17 @@ public final class LostTalesServerBroadcastHook {
 
     /**
      * Sees a line about to be sent to one player and hands back the one
-     * to send: the same component, with an id run appended when the
-     * line answers a command the player typed from a chat tab — their
-     * running command's context names the tab — and is then recorded
-     * for that account alone under that tab. Any other line to one
-     * player — a countdown, a notice, another mod's word — passes
-     * unrecorded, as it did before.
+     * to send, or null for one this player is not sent. Vanilla's notice
+     * to operators of what a command did — {@code [Server: Opped Nils]} —
+     * is not sent to a reader of the Server Console when the console has
+     * just recorded that command: it holds it already. A shared line the
+     * game hands each player on its own is stamped as a broadcast is, once
+     * for all its copies. A line that answers a command the player typed
+     * from a chat tab — their running command's context names the tab —
+     * gets an id and its named players and is recorded for that account
+     * alone under that tab. Any other line to one player — a countdown, a
+     * notice, another mod's word — passes unrecorded: it is this player's
+     * alone.
      */
     public static IChatComponent onPlayerLine(EntityPlayerMP player,
                                               IChatComponent message) {
@@ -177,9 +194,22 @@ public final class LostTalesServerBroadcastHook {
         try {
             UUID account = player.getUniqueID();
             if (account == null
-                    || (player.worldObj != null && player.worldObj.isRemote)
-                    || ChatSystemLineClassifier.classify(message)
-                            != ChatChannel.CONSOLE) {
+                    || (player.worldObj != null && player.worldObj.isRemote)) {
+                return message;
+            }
+            if (ChatSystemLineClassifier.isAdminNotice(message)
+                    && ChatConsoleCommandHandler.recordedJustNow(
+                            ChatSystemLineClassifier.adminNoticeActor(message),
+                            System.currentTimeMillis())
+                    && ChatChannelPolicy.readsConsole(player)) {
+                return null;
+            }
+            ChatChannel shared = ChatSystemLineClassifier.classify(message);
+            if (shared == ChatChannel.ALL || shared == ChatChannel.OOC) {
+                stampCopy(message, shared);
+                return message;
+            }
+            if (shared != ChatChannel.CONSOLE) {
                 return message;
             }
             String tabId = ChatCommandContexts.answerLine(account,
@@ -188,12 +218,15 @@ public final class LostTalesServerBroadcastHook {
                 return message;
             }
             ChatChannel channel = ChatTabIds.channelOf(tabId);
+            if (channel == null) {
+                channel = ChatChannel.CONSOLE;
+            }
             List<UUID> self = Collections.singletonList(account);
-            long messageId = record(message,
-                    channel == null ? ChatChannel.CONSOLE : channel, tabId,
-                    self, ChatHistory.Audience.accounts(self, false));
+            List<ChatNamedPlayer> named = namedPlayers(message, channel);
+            long messageId = record(message, channel, tabId, self,
+                    ChatHistory.Audience.accounts(self, false), named);
             if (messageId != ChatMessageIds.NONE) {
-                mark(message, messageId);
+                mark(message, messageId, named);
             }
         } catch (Throwable throwable) {
             logOnce("keep", throwable);
@@ -204,25 +237,22 @@ public final class LostTalesServerBroadcastHook {
     /**
      * Gives a server-wide line of {@code channel} an id and records it
      * for everyone online: they are the ones who can be shown it, so they
-     * are the ones who may reply to it by that id. Answers the id, or
-     * none for a line that could not be recorded.
+     * are the ones who may reply to it by that id. A line of an open
+     * channel may be shown to anyone who comes later; one filed in the
+     * Client Console, which is each player's own, only to those it was
+     * sent to. Answers the id, or none for a line that could not be
+     * recorded.
      */
     private static long stamp(IChatComponent message, ChatChannel channel) {
-        MinecraftServer server = MinecraftServer.getServer();
-        if (server == null || server.getConfigurationManager() == null
-                || server.getConfigurationManager().playerEntityList == null) {
+        List<UUID> recipients = onlineAccounts();
+        if (recipients == null) {
             return ChatMessageIds.NONE;
         }
-        List<UUID> recipients = new ArrayList<UUID>();
-        @SuppressWarnings("unchecked")
-        List<EntityPlayerMP> online = server.getConfigurationManager().playerEntityList;
-        for (EntityPlayerMP player : online) {
-            if (player != null && player.getUniqueID() != null) {
-                recipients.add(player.getUniqueID());
-            }
-        }
+        List<ChatNamedPlayer> named = namedPlayers(message, channel);
         long messageId = record(message, channel, "", recipients,
-                ChatHistory.Audience.everyone());
+                channel == ChatChannel.CONSOLE
+                        ? ChatHistory.Audience.accounts(recipients, false)
+                        : ChatHistory.Audience.everyone(), named);
         if (messageId == ChatMessageIds.NONE) {
             return ChatMessageIds.NONE;
         }
@@ -230,8 +260,70 @@ public final class LostTalesServerBroadcastHook {
                 == ChatSystemLineClassifier.Kind.JOIN) {
             noteJoinLine(joinerAccount(message), messageId);
         }
-        mark(message, messageId);
+        mark(message, messageId, named);
         return messageId;
+    }
+
+    /**
+     * Stamps one copy of a shared line the game hands each player on its
+     * own: the first copy is recorded as a broadcast is, and every copy
+     * after it within the same moment wears that record's id and names.
+     */
+    private static void stampCopy(IChatComponent message, ChatChannel channel) {
+        String json = componentJson(message);
+        if (json.length() == 0) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        SharedCopy copy;
+        synchronized (SHARED_COPIES) {
+            copy = SHARED_COPIES.get(json);
+            if (copy != null && now - copy.stampedMillis > SHARED_COPY_MILLIS) {
+                SHARED_COPIES.remove(json);
+                copy = null;
+            }
+        }
+        if (copy != null) {
+            mark(message, copy.messageId, copy.named);
+            return;
+        }
+        List<ChatNamedPlayer> named = namedPlayers(message, channel);
+        List<UUID> recipients = onlineAccounts();
+        if (recipients == null) {
+            return;
+        }
+        long messageId = record(message, channel, "", recipients,
+                ChatHistory.Audience.everyone(), named);
+        if (messageId == ChatMessageIds.NONE) {
+            return;
+        }
+        mark(message, messageId, named);
+        synchronized (SHARED_COPIES) {
+            SHARED_COPIES.put(json, new SharedCopy(messageId, named, now));
+            Iterator<String> oldest = SHARED_COPIES.keySet().iterator();
+            while (SHARED_COPIES.size() > MAX_SHARED_COPIES && oldest.hasNext()) {
+                oldest.next();
+                oldest.remove();
+            }
+        }
+    }
+
+    /** The ids of everyone online, or null with no server to ask. */
+    private static List<UUID> onlineAccounts() {
+        MinecraftServer server = MinecraftServer.getServer();
+        if (server == null || server.getConfigurationManager() == null
+                || server.getConfigurationManager().playerEntityList == null) {
+            return null;
+        }
+        List<UUID> accounts = new ArrayList<UUID>();
+        @SuppressWarnings("unchecked")
+        List<EntityPlayerMP> online = server.getConfigurationManager().playerEntityList;
+        for (EntityPlayerMP player : online) {
+            if (player != null && player.getUniqueID() != null) {
+                accounts.add(player.getUniqueID());
+            }
+        }
+        return accounts;
     }
 
     /**
@@ -249,7 +341,8 @@ public final class LostTalesServerBroadcastHook {
      */
     private static long record(IChatComponent message, ChatChannel channel,
                                String tabId, List<UUID> recipients,
-                               ChatHistory.Audience audience) {
+                               ChatHistory.Audience audience,
+                               List<ChatNamedPlayer> named) {
         MinecraftServer server = MinecraftServer.getServer();
         if (server == null || server.getConfigurationManager() == null
                 || server.getConfigurationManager().playerEntityList == null) {
@@ -260,8 +353,6 @@ public final class LostTalesServerBroadcastHook {
             return ChatMessageIds.NONE;
         }
         long messageId = ChatMessageIdAllocator.next();
-        @SuppressWarnings("unchecked")
-        List<EntityPlayerMP> online = server.getConfigurationManager().playerEntityList;
         LostTalesChatMessagePacket record = new LostTalesChatMessagePacket(
                 channel, LostTalesChatMessagePacket.SERVER_SENDER_ID,
                 SERVER_NAME, SERVER_NAME, "",
@@ -269,21 +360,32 @@ public final class LostTalesServerBroadcastHook {
                 ChatChannel.CONSOLE.getDisplayColor(), text,
                 System.currentTimeMillis(), "", null, "", "", 0, true,
                 messageId, ChatReplyReference.NONE, "")
-                .withServerBody(componentJson(message),
-                        namedPlayers(text, online, channel.getPresentation()
-                                == ChatPresentationMode.OUT_OF_CHARACTER))
+                .withServerBody(componentJson(message), named)
                 .withTabId(tabId);
         ChatHistory.record(messageId, LostTalesChatMessagePacket.SERVER_SENDER_ID,
                 SERVER_NAME, null, record, recipients, audience);
         return messageId;
     }
 
-    /** The id run appended to a recorded line: the server's word to every client. */
-    private static void mark(IChatComponent message, long messageId) {
+    /**
+     * The runs appended to a recorded line, the server's word to every
+     * client: its id, and each player it names.
+     */
+    private static void mark(IChatComponent message, long messageId,
+                             List<ChatNamedPlayer> named) {
+        appendMark(message, ChatBroadcastMarkers.value(messageId));
+        for (ChatNamedPlayer player : named) {
+            String value = ChatBroadcastMarkers.namedValue(player);
+            if (value != null) {
+                appendMark(message, value);
+            }
+        }
+    }
+
+    private static void appendMark(IChatComponent message, String value) {
         ChatComponentText mark = new ChatComponentText("");
         mark.setChatStyle(mark.getChatStyle().setChatClickEvent(new ClickEvent(
-                ClickEvent.Action.SUGGEST_COMMAND,
-                ChatBroadcastIdMarkers.value(messageId))));
+                ClickEvent.Action.SUGGEST_COMMAND, value)));
         message.appendSibling(mark);
     }
 
@@ -311,6 +413,9 @@ public final class LostTalesServerBroadcastHook {
     /** Cleared with the rest of the server's chat state. */
     public static synchronized void clear() {
         JOIN_LINES.clear();
+        synchronized (SHARED_COPIES) {
+            SHARED_COPIES.clear();
+        }
     }
 
     /** Keeps a join line for the login replay of the account it announces. */
@@ -385,17 +490,27 @@ public final class LostTalesServerBroadcastHook {
     }
 
     /**
-     * Every online player the line names, whole: by their account where
-     * {@code asAccounts} (a line of an out-of-character channel), else as
-     * the identity they are playing, the name their own Global line would
-     * be signed with; so a replay names them as the live line did. The
-     * player a join line announces is not listed yet when it goes out;
-     * their login replay names them on it ({@link ChatHistory#namePlayer}).
+     * Every player the line names, whole: by their account on an
+     * out-of-character channel, else as the identity they are playing,
+     * the name their own Global line would be signed with; so the line
+     * names them the same on every client and in every replay. The player
+     * a join line announces is not listed among those online yet when it
+     * goes out, so they are found among those arriving
+     * ({@link ChatArrivals}).
      */
-    private static List<ChatNamedPlayer> namedPlayers(String text,
-                                                      List<EntityPlayerMP> online,
-                                                      boolean asAccounts) {
+    private static List<ChatNamedPlayer> namedPlayers(IChatComponent message,
+                                                      ChatChannel channel) {
         List<ChatNamedPlayer> named = new ArrayList<ChatNamedPlayer>();
+        MinecraftServer server = MinecraftServer.getServer();
+        if (server == null || server.getConfigurationManager() == null
+                || server.getConfigurationManager().playerEntityList == null) {
+            return named;
+        }
+        String text = ChatMessageValidator.cleaned(message.getUnformattedText());
+        boolean asAccounts = channel.getPresentation()
+                == ChatPresentationMode.OUT_OF_CHARACTER;
+        @SuppressWarnings("unchecked")
+        List<EntityPlayerMP> online = server.getConfigurationManager().playerEntityList;
         for (EntityPlayerMP player : online) {
             if (named.size() >= ChatNamedPlayer.MAX_PER_LINE) {
                 break;
@@ -407,37 +522,13 @@ public final class LostTalesServerBroadcastHook {
                 named.add(asAccounts ? namedAccount(player) : namedPlayer(player));
             }
         }
-        return named;
-    }
-
-    /**
-     * The online players a message's {@code @names} reach, each as a
-     * line names them ({@link #namedPlayer}): kept with the message, so
-     * a replay shows every mention the live line showed, the players
-     * long gone included. Only a player the message names is resolved,
-     * and at most {@link ChatNamedPlayer#MAX_PER_LINE} are kept.
-     */
-    public static List<ChatNamedPlayer> mentionedPlayers(String message) {
-        MinecraftServer server = MinecraftServer.getServer();
-        if (message == null || message.indexOf('@') < 0 || server == null
-                || server.getConfigurationManager() == null
-                || server.getConfigurationManager().playerEntityList == null) {
-            return Collections.emptyList();
-        }
-        @SuppressWarnings("unchecked")
-        List<EntityPlayerMP> online =
-                server.getConfigurationManager().playerEntityList;
-        List<ChatNamedPlayer> named = new ArrayList<ChatNamedPlayer>();
-        for (EntityPlayerMP player : online) {
-            if (named.size() >= ChatNamedPlayer.MAX_PER_LINE) {
-                break;
-            }
-            // Their account or their character's name, as a mention
-            // of either reaches them.
-            if (player != null && ChatMentions.mentionsAny(message,
-                    Arrays.asList(accountOf(player),
-                            player.getDisplayName()))) {
-                named.add(namedPlayer(player));
+        if (ChatSystemLineClassifier.kindOf(message)
+                == ChatSystemLineClassifier.Kind.JOIN
+                && named.size() < ChatNamedPlayer.MAX_PER_LINE) {
+            ChatNamedPlayer joiner = ChatArrivals.take(joinerAccount(message));
+            if (joiner != null
+                    && ChatNamedPlayer.find(named, joiner.getAccount()) == null) {
+                named.add(joiner);
             }
         }
         return named;
@@ -482,6 +573,20 @@ public final class LostTalesServerBroadcastHook {
             failureLogged = true;
             FMLLog.warning("[LostTales] Could not %s a server broadcast: %s",
                     what, throwable);
+        }
+    }
+
+    /** A shared line handed to each player on its own, while its copies go out. */
+    private static final class SharedCopy {
+        final long messageId;
+        final List<ChatNamedPlayer> named;
+        final long stampedMillis;
+
+        SharedCopy(long messageId, List<ChatNamedPlayer> named,
+                   long stampedMillis) {
+            this.messageId = messageId;
+            this.named = named;
+            this.stampedMillis = stampedMillis;
         }
     }
 

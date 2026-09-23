@@ -71,6 +71,11 @@ import net.minecraft.world.storage.IPlayerFileData;
  * player's own console is the player alone, and a whisper is its two
  * people ({@link #answerForWhisper}).</p>
  *
+ * <p>The Server is a member of every conversation, here for as long as
+ * anybody can read it: it can speak in every one of them, if only to
+ * answer a command typed there. In character it stands among the
+ * Unaligned, as a character of no faction does.</p>
+ *
  * <p>While the server lists Discord members, everyone who can see a
  * Discord channel linked to the conversation is a member too: under their
  * Discord server's name while online, after all of the game's own groups,
@@ -153,10 +158,10 @@ public final class ChatMemberDirectory {
      * The members of {@code channel}'s conversation as {@code viewer}
      * reads it, grouped and ordered as the list stands them, at most
      * {@link LostTalesChatMembersPacket#MAX_MEMBERS}: the viewer alone in
-     * a private console, the server itself among the Server Console's
-     * readers, and none for a channel the viewer may not read, or for the
-     * whisper channel, whose conversations are asked for by their two
-     * people ({@link #answerForWhisper}).
+     * a private console, the Server in every conversation, and none for a
+     * channel the viewer may not read, or for the whisper channel, whose
+     * conversations are asked for by their two people
+     * ({@link #answerForWhisper}).
      */
     public static Answer answerFor(EntityPlayerMP viewer, ChatChannel channel) {
         if (viewer == null || channel == null || channel == ChatChannel.WHISPER
@@ -169,10 +174,12 @@ public final class ChatMemberDirectory {
             RoleplayCharacter speaking = inCharacter
                     ? ChatIdentitySelection.character(viewer) : null;
             List<LostTalesChatMembersPacket.Member> alone =
-                    new ArrayList<LostTalesChatMembersPacket.Member>(1);
+                    new ArrayList<LostTalesChatMembersPacket.Member>(2);
             alone.add(isShown(viewer, speaking)
                     ? present(viewer, speaking, channel, inCharacter)
                     : absentAs(viewer, speaking, channel).member);
+            alone.add(serverMember(inCharacter));
+            Collections.sort(alone, LostTalesChatMembersPacket.ORDER);
             return new Answer(alone, 0);
         }
         Party party = channel.getAccess() == ChatChannelAccess.PARTY_MEMBERSHIP
@@ -204,11 +211,9 @@ public final class ChatMemberDirectory {
             present.add(present(member, character, channel, inCharacter));
             presentKeys.add(keyOf(member, character));
         }
-        if (channel == ChatChannel.SERVER_CONSOLE) {
-            // The server speaks in its console as a voice of its own,
-            // and is online for as long as anybody can read it.
-            present.add(serverMember());
-        }
+        // The server speaks in every conversation as a voice of its own,
+        // and is online for as long as anybody can read it.
+        present.add(serverMember(inCharacter));
         List<Absentee> absent = absenteesOf(viewer, channel, party, factionId,
                 inCharacter);
         RoleplayCharacter viewerAs = inCharacter
@@ -277,6 +282,7 @@ public final class ChatMemberDirectory {
         } else {
             absent.add(absentAs(viewer, held, channel));
         }
+        present.add(serverMember(true));
         String named = partnerAccount == null ? "" : partnerAccount.trim();
         if (named.length() > 0) {
             EntityPlayerMP online = server.getConfigurationManager()
@@ -634,15 +640,19 @@ public final class ChatMemberDirectory {
     }
 
     /**
-     * The server as a member of its console: online, in the console's
+     * The Server as a member of a conversation: online, in the consoles'
      * grey, named as its lines are named. The client writes the name in
-     * its own language; this one sorts it.
+     * its own language; this one sorts it. In character it stands where a
+     * character of no faction does, among the Unaligned; out of character
+     * with those of no role.
      */
-    private static LostTalesChatMembersPacket.Member serverMember() {
+    private static LostTalesChatMembersPacket.Member serverMember(boolean inCharacter) {
         int color = LostTalesColors.rgb(LostTalesColors.ROSE_GRAY);
+        String group = inCharacter ? ChatChannelPolicy.factionOf(null) : "";
         return new LostTalesChatMembersPacket.Member(
                 LostTalesChatMessagePacket.SERVER_SENDER_ID, SERVER_NAME, null,
-                SERVER_NAME, color, "", "", color, "", "", 0, true);
+                SERVER_NAME, color, "", "", color, group,
+                inCharacter ? factionName(group) : "", 0, true);
     }
 
     /**

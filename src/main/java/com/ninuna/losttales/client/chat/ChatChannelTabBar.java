@@ -35,10 +35,9 @@ import org.lwjgl.opengl.GL11;
  * length leaves the artwork undistorted. Switching is a hard cut: the
  * picked tab is forward the frame it is picked, however the pick
  * happened — a click, the keyboard, or a command bringing the console
- * forward — so nothing sweeps across the tabs between. A tab with
- * unread messages carries textual counters after its name:
- * {@code [p]} pings in salmon, then {@code [x]} other unread lines in
- * honey; a muted tab is drawn dim and italic. The channel's colour runs
+ * forward — so nothing sweeps across the tabs between. What waits
+ * unread in a tab sits in its icon's corner ({@link ChatIconMark}); a
+ * muted tab is drawn dim and italic. The channel's colour runs
  * across each tab's face two rows under that line, full at the centre
  * and fading to nothing at both ends.
  *
@@ -79,7 +78,7 @@ import org.lwjgl.opengl.GL11;
  *
  * <p>A tab being dragged is one of the row's own tabs throughout: its
  * top rises a pixel off the row as it is picked up, its feet staying on
- * the rule, and the tab in front warms to its lifted contours; it leans
+ * the rule, and the tab in front crosses to its lifted contours; it leans
  * toward the pointer where it stands and changes places with a neighbour
  * as it passes them, so the row always reads as it will once the button
  * comes up. Nothing is ever drawn floating free of the strip, and no
@@ -211,8 +210,7 @@ final class ChatChannelTabBar {
      * The mark after the {@code +} for what waits in the channels it
      * would open: the ping tile or the white sphere, both this wide.
      */
-    private static final int RESTORE_MARK_WIDTH =
-            LostTalesUiSheet.COUNT_1.getWidth();
+    private static final int RESTORE_MARK_WIDTH = ChatIconMark.TILE_WIDTH;
     /** Hit square of a control inside the selected tab. */
     static final int CONTROL_SIZE = 7;
     static final int CONTROL_GAP = 2;
@@ -321,6 +319,13 @@ final class ChatChannelTabBar {
     /** The search bar's well, cut out of the tool strip; null for none. */
     private LostTalesUiHitBox toolStripHole;
     /**
+     * The colours the strip and the tool strip were drawn in this frame,
+     * each at the window's edge: the window's frame takes them where it
+     * runs beside each, so its surface is always the colour it touches.
+     */
+    int drawnStripArgb;
+    int drawnToolArgb;
+    /**
      * Clear space either side of the search button: the window's frame
      * edge, this, the button, this again, and then the first tab.
      */
@@ -359,12 +364,12 @@ final class ChatChannelTabBar {
     /** The line joining a resting tab's border tips. */
     private static final int TIP_RGB =
             LostTalesColors.rgb(LostTalesColors.ROSE_BEIGE);
-    /** The same line on a hovered or selected tab. */
+    /**
+     * The same line on a hovered, selected or lifted tab: the lifted pair's
+     * tips wear the lit tones too.
+     */
     private static final int TIP_LIT_RGB =
             LostTalesColors.rgb(LostTalesColors.IVORY);
-    /** The same line on the lifted pair, whose tips are honey. */
-    private static final int TIP_LIFTED_RGB =
-            LostTalesColors.rgb(LostTalesColors.HONEY);
 
     private List<Tab> cachedTabs = Collections.emptyList();
     private List<ChatTab> cachedChannels = Collections.emptyList();
@@ -934,11 +939,12 @@ final class ChatChannelTabBar {
         LostTalesUiHitBox search = searchBox(row.left, bottom);
         int searchLeft = row.offsetX + (int)search.left;
         int searchTop = (int)search.top;
+        this.drawnStripArgb = LostTalesChatVisualStyle.surfaceArgb(
+                surfaceShare());
         drawStripAround(row, drawnTabs, row.offsetX + row.left - STRIP_INSET,
                 rowTop(bottom), stripRight, bottom - 1, searchLeft,
                 searchTop, searchLeft + SEARCH_SIZE,
-                searchTop + SEARCH_SIZE,
-                LostTalesChatVisualStyle.surfaceArgb(surfaceShare()));
+                searchTop + SEARCH_SIZE, this.drawnStripArgb);
         // Everything else the strip draws stops short of the rule it
         // ends on: a sprite's shadow falls a pixel down and right, and
         // the rule is a hairline the window is bounded by, not something
@@ -1035,10 +1041,9 @@ final class ChatChannelTabBar {
                 if (!this.restoreMark.isNone()) {
                     // What waits behind the +, marked as a tab's icon
                     // marks it: the ping tile, else the white sphere.
-                    LostTalesUiSheet mark = this.restoreMark.sprite();
-                    mark.drawWithShadow(row.offsetX + this.restoreX
+                    this.restoreMark.drawAt(row.offsetX + this.restoreX
                                     + PLUS_WIDTH + COUNTER_GAP,
-                            centredInStrip(bottom, mark.getHeight()),
+                            centredInStrip(bottom, this.restoreMark.height()),
                             scaled(0xFF));
                 }
             }
@@ -1088,9 +1093,9 @@ final class ChatChannelTabBar {
             LostTalesChatOverlayRenderer.endVerticalClip(clipped);
         }
         // The window's top rule: the strip's last row, over the tabs
-        // and controls, the exact width of the strip. It stands on one
-        // row of the history's own backdrop, as the bottom rule does, so
-        // both edges of a window read the same way. Where the selected
+        // and controls, the exact width of the strip. Behind it the row
+        // wears the tool strip's surface, the colour it touches (Nils),
+        // so the tool strip runs up under the rule. Where the selected
         // tab stands, neither is drawn: the tab's own surface takes that
         // stretch of the row, joining the tool strip under it, and the
         // rule's two pieces are full where they meet the feet of the
@@ -1106,12 +1111,19 @@ final class ChatChannelTabBar {
             selectedRight = selectedLeft + drawnWidth(row, selectedTab)
                     + 2 * SELECTED_FOOT;
         }
-        LostTalesChatOverlayRenderer.drawBackdropRowAround(
-                row.offsetX + row.left - STRIP_INSET, bottom - 1,
-                stripRight, bottom,
-                scaled(LostTalesChatOverlayRenderer.backdropRowAlpha(
-                        Minecraft.getMinecraft())),
-                selectedLeft, selectedRight);
+        float ruleLeft = row.offsetX + row.left - STRIP_INSET;
+        int ruleRowArgb = toolSurfaceArgb();
+        if (selectedRight <= selectedLeft || selectedRight <= ruleLeft
+                || selectedLeft >= stripRight) {
+            LostTalesChatOverlayRenderer.fillRect(ruleLeft, bottom - 1,
+                    stripRight, bottom, ruleRowArgb);
+        } else {
+            LostTalesChatOverlayRenderer.fillRect(ruleLeft, bottom - 1,
+                    Math.max(ruleLeft, selectedLeft), bottom, ruleRowArgb);
+            LostTalesChatOverlayRenderer.fillRect(
+                    Math.min(stripRight, selectedRight), bottom - 1,
+                    stripRight, bottom, ruleRowArgb);
+        }
         LostTalesChatOverlayRenderer.drawRuleAround(
                 row.offsetX + row.left - STRIP_INSET, stripRight,
                 bottom - 1, bottom, scaled(0xFF), selectedLeft,
@@ -1156,21 +1168,17 @@ final class ChatChannelTabBar {
         // that read its history rather than pick a tab, empty for now,
         // and a handle on the window like the strip above it.
         // Its last row is a rule of its own — the window's top rule,
-        // which the history's clip and its top shade hang from — on one
-        // row of the history's backdrop, as the strip's rule stands.
+        // which the history's clip and its top shade hang from — on the
+        // tool strip's own surface, which runs under it, as it runs under
+        // the strip's rule (Nils).
         float stripLeft = row.offsetX + row.left - STRIP_INSET;
         int toolBottom = bottom + ChatWindowPlacement.TOOL_STRIP_HEIGHT;
-        // It glows with a tab just put down, as the tab does: the tab in
-        // front joins it in one surface, so the two light as one.
-        int toolArgb = LostTalesChatVisualStyle.argb(
-                LostTalesChatVisualStyle.blend(
-                        LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB,
-                        this.toolGlowRgb, this.toolGlow * GLOW_TINT),
-                scaled(TAB_SURFACE_ALPHA));
+        int toolArgb = toolSurfaceArgb();
+        this.drawnToolArgb = toolArgb;
         LostTalesUiHitBox hole = this.toolStripHole;
         if (hole == null) {
             LostTalesChatOverlayRenderer.fillRect(stripLeft, bottom, stripRight,
-                    toolBottom - 1, toolArgb);
+                    toolBottom, toolArgb);
         } else {
             // The search bar's well is a hole in the strip: the surface
             // round it in four pieces, nothing under the well itself.
@@ -1185,16 +1193,26 @@ final class ChatChannelTabBar {
             LostTalesChatOverlayRenderer.fillRect(holeRight, holeTop, stripRight,
                     holeBottom, toolArgb);
             LostTalesChatOverlayRenderer.fillRect(stripLeft, holeBottom, stripRight,
-                    toolBottom - 1, toolArgb);
+                    toolBottom, toolArgb);
         }
-        LostTalesChatOverlayRenderer.drawBackdropRow(stripLeft,
-                toolBottom - 1, stripRight, toolBottom,
-                scaled(LostTalesChatOverlayRenderer.backdropRowAlpha(
-                        Minecraft.getMinecraft())));
         LostTalesChatOverlayRenderer.drawRule(stripLeft, stripRight,
                 toolBottom - 1, toolBottom, scaled(0xFF));
         regions.addWindow(row.offsetX + row.left - STRIP_INSET,
                 rowTop(bottom), (int)Math.ceil(stripRight), toolBottom);
+    }
+
+    /**
+     * The tool strip's surface as it stands this frame: the selected
+     * tab's plum grey at two thirds, glowing with a tab just put down as
+     * the tab does, so the tab in front and the strip light as one; the
+     * rows the strip's two rules stand on wear it too.
+     */
+    private int toolSurfaceArgb() {
+        return LostTalesChatVisualStyle.argb(
+                LostTalesChatVisualStyle.blend(
+                        LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB,
+                        this.toolGlowRgb, this.toolGlow * GLOW_TINT),
+                scaled(TAB_SURFACE_ALPHA));
     }
 
     /** How far a tab's top stands risen off the row this frame, on the display's grid. */
@@ -1872,8 +1890,7 @@ final class ChatChannelTabBar {
         if (selected) {
             leftPiece = LostTalesUiSheet.TAB_SELECTED_LEFT;
             rightPiece = LostTalesUiSheet.TAB_SELECTED_RIGHT;
-            tipRgb = LostTalesChatVisualStyle.blend(TIP_LIT_RGB,
-                    TIP_LIFTED_RGB, warmed);
+            tipRgb = TIP_LIT_RGB;
         } else {
             leftPiece = LostTalesUiSheet.TAB_LEFT;
             rightPiece = LostTalesUiSheet.TAB_RIGHT;

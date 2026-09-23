@@ -4,8 +4,10 @@ import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.chat.ChatMentionCandidate;
 import com.ninuna.losttales.chat.ChatNameSuggester;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
+import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
+import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -193,6 +195,14 @@ final class ChatNameSuggestionBox {
                                  int x, int y) {
         UUID account = accountId(candidate);
         if (minecraft == null || account == null) {
+            return;
+        }
+        if (LostTalesChatMessagePacket.isDiscordSender(account)) {
+            // A Discord member has no head: the Discord mark stands in
+            // its place at its own size, centred on the head's box.
+            int inset = (ChatEmoji.SPRITE_SIZE - ICON_SIZE) / 2;
+            ChatInlineIcons.drawEmoji(minecraft, ChatEmoji.DISCORD,
+                    x - inset, y - inset, ChatEmoji.SPRITE_SIZE, 255);
             return;
         }
         int shadow = LostTalesChatVisualStyle.shadowAlpha(255);
