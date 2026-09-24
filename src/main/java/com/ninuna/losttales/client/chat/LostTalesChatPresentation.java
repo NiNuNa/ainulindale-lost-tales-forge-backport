@@ -4,6 +4,7 @@ import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatSystemLineClassifier;
 import com.ninuna.losttales.chat.ChatBroadcastMarkers;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatTabIds;
 import com.ninuna.losttales.chat.ChatChannelSuggester;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatEpithet;
@@ -52,6 +53,7 @@ import net.minecraft.util.IChatComponent;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.StatCollector;
+import com.ninuna.losttales.party.sync.PartyInvitationNotice;
 
 /** Builds structured legacy chat components and records entry-animation time. */
 public final class LostTalesChatPresentation {
@@ -1539,7 +1541,6 @@ public final class LostTalesChatPresentation {
         hoveredComponent = null;
         hoveredLine = null;
         hoveredSenderRow = null;
-        LostTalesChatHoverCard.unpin();
         hoveredIndex = -1;
         pendingJumpChatLineId = 0;
         lastCommandEchoTab = null;
@@ -1565,7 +1566,6 @@ public final class LostTalesChatPresentation {
         hoveredComponent = null;
         hoveredLine = null;
         hoveredSenderRow = null;
-        LostTalesChatHoverCard.unpin();
         hoveredIndex = -1;
         pendingJumpChatLineId = 0;
         lastCommandEchoTab = null;
@@ -2175,7 +2175,7 @@ public final class LostTalesChatPresentation {
         // command was typed and nowhere else. An operators' notice of
         // somebody's command never is.
         boolean adminNotice = ChatSystemLineClassifier.isAdminNotice(message);
-        ChatTab asked = channel == ChatChannel.CONSOLE && !adminNotice
+        ChatTab asked = channel == ChatChannel.CLIENT_CONSOLE && !adminNotice
                 ? commandOutputTab() : null;
         if (asked == null && !ChatWindowLayout.isOpen(tab)
                 && !ChatWindowLayout.isHidden(tab)) {
@@ -2193,7 +2193,10 @@ public final class LostTalesChatPresentation {
         IChatComponent shown = rewriteServerLine(adminNotice
                         ? plainAdminNotice(message) : message, channel,
                 localMentionNames(minecraft), localMentioned, named);
-        boolean mentioned = localMentioned[0];
+        // An invitation to a party is addressed to its reader.
+        boolean mentioned = localMentioned[0]
+                || (LostTalesConfig.enableChatPings
+                        && PartyInvitationNotice.isNotice(message));
         // A join, a leave, a death or an achievement is a sentence the
         // server says, and ends as one.
         shown = asAnnouncement(shown,
@@ -2267,6 +2270,8 @@ public final class LostTalesChatPresentation {
         IChatComponent body;
         if (event.getKind() == ChatConsoleEvent.Kind.COMMAND) {
             body = commandNotice(minecraft, event, mentioned);
+        } else if (event.getReport() != null) {
+            body = reportNotice(minecraft, event, mentioned);
         } else {
             // What happened, said plainly: who did it as a mention, then
             // the words as a sentence; a warning in red. The server's own
@@ -2291,9 +2296,11 @@ public final class LostTalesChatPresentation {
         receivingReplayed = replayed;
         receivingBeforeArrival = replayed && beforeArrival;
         try {
+            // A report quotes the message it is about, as a reply does.
             chatLineId = printServerLine(minecraft, console, body,
                     mentioned[0], event.getTimestampMillis(),
-                    ChatReplyReference.NONE, event.getId());
+                    event.getReport() == null ? ChatReplyReference.NONE
+                            : event.getReport().quote(), event.getId());
         } finally {
             receivingReplayed = false;
             receivingBeforeArrival = false;
@@ -2304,6 +2311,37 @@ public final class LostTalesChatPresentation {
                 playPingSound(minecraft, console);
             }
         }
+    }
+
+    /**
+     * The words of a report entry: who reported, where the message was
+     * said as a link to it, the reason and the reporter's note. The
+     * message itself stands above as the entry's quote. A report counts
+     * as a mention for everyone reading the console (Nils, 2026-09-24).
+     */
+    private static IChatComponent reportNotice(Minecraft minecraft,
+                                               ChatConsoleEvent event,
+                                               boolean[] mentioned) {
+        ChatConsoleEvent.Report report = event.getReport();
+        IChatComponent reporter = actorMention(localMentionNames(minecraft),
+                event.getActor(), event.getActorIdentity(), mentioned);
+        ChatComponentText where = new ChatComponentText("");
+        ChatChannelSuggester.Link link =
+                ChatChannelSuggester.linkAt(report.getLink(), 0);
+        if (link != null) {
+            appendChannelLink(where, link.channel, link.scope, 0,
+                    link.messageId);
+        } else {
+            where.appendSibling(text(report.getLink(), null, false));
+        }
+        IChatComponent reason = text(StatCollector.translateToLocal(
+                report.getReason().langKey()), null, false);
+        mentioned[0] = true;
+        return report.getNote().length() == 0
+                ? sentence("chat.losttales.console.report", reporter, where,
+                        reason)
+                : sentence("chat.losttales.console.report.note", reporter,
+                        where, reason, text(report.getNote(), null, false));
     }
 
     /**
@@ -2806,7 +2844,7 @@ public final class LostTalesChatPresentation {
         // command was typed quoting it; otherwise it is filed in the
         // Console. Rebuilt in place, so it keeps its turn in the history.
         ChatTab asked = commandOutputTab();
-        ChatTab tab = asked != null ? asked : ChatTab.of(ChatChannel.CONSOLE);
+        ChatTab tab = asked != null ? asked : ChatTab.of(ChatChannel.CLIENT_CONSOLE);
         IChatComponent body = line.func_151461_a();
         LostTalesChatMessagePacket packet = clientPacket(tab, body, now,
                 asked != null ? commandEchoQuote() : ChatReplyReference.NONE);
@@ -3546,9 +3584,9 @@ public final class LostTalesChatPresentation {
 
     /**
      * The channel pass over one run of body text: a word behind a
-     * {@code #} that names a channel — {@code #ooc}, {@code #Global} —
-     * is drawn as {@code #Name} in the channel's colour and links to
-     * its tab; every other word goes on to the mention pass.
+     * {@code #} that names a conversation — {@code #ooc},
+     * {@code #gondor} — is drawn as {@code #Name} in its colour and
+     * links to its tab; every other word goes on to the mention pass.
      */
     private static void appendChannelsAndMentions(ChatComponentText root,
                                                   String text,
@@ -3574,7 +3612,8 @@ public final class LostTalesChatPresentation {
                 appendMentions(root, text.substring(literalStart, hash),
                         channel);
             }
-            appendChannelLink(root, link.channel, 0, link.messageId);
+            appendChannelLink(root, link.channel, link.scope, 0,
+                    link.messageId);
             literalStart = link.end;
             cursor = link.end;
         }
@@ -3592,10 +3631,14 @@ public final class LostTalesChatPresentation {
      * any of them answers the click.
      */
     static void appendChannelLink(ChatComponentText root, ChatChannel named,
-                                  int chatLineId, long messageId) {
-        int color = ClientChatChannelState.displayColor(named);
+                                  String scope, int chatLineId,
+                                  long messageId) {
+        ChatTab tab = ChatTab.of(named, scope);
+        // A whisper link names no tab: only its two people hold the
+        // message, and the click finds it by its id.
         appendChannelLink(root, "#" + ClientChatChannelState.displayName(
-                ChatTab.of(named)), color, ChatTab.of(named).id(),
+                named, scope), ClientChatChannelState.displayColor(named, scope),
+                tab == null ? ChatTabIds.WHISPER_PREFIX : tab.id(),
                 chatLineId, messageId);
     }
 

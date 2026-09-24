@@ -24,6 +24,7 @@ import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
+import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 
 /**
  * The tabs of one chat window, laid out the way a browser lays out
@@ -1115,12 +1116,12 @@ final class ChatChannelTabBar {
         int ruleRowArgb = toolSurfaceArgb();
         if (selectedRight <= selectedLeft || selectedRight <= ruleLeft
                 || selectedLeft >= stripRight) {
-            LostTalesChatOverlayRenderer.fillRect(ruleLeft, bottom - 1,
+            LostTalesUiInk.fillRect(ruleLeft, bottom - 1,
                     stripRight, bottom, ruleRowArgb);
         } else {
-            LostTalesChatOverlayRenderer.fillRect(ruleLeft, bottom - 1,
+            LostTalesUiInk.fillRect(ruleLeft, bottom - 1,
                     Math.max(ruleLeft, selectedLeft), bottom, ruleRowArgb);
-            LostTalesChatOverlayRenderer.fillRect(
+            LostTalesUiInk.fillRect(
                     Math.min(stripRight, selectedRight), bottom - 1,
                     stripRight, bottom, ruleRowArgb);
         }
@@ -1177,7 +1178,7 @@ final class ChatChannelTabBar {
         this.drawnToolArgb = toolArgb;
         LostTalesUiHitBox hole = this.toolStripHole;
         if (hole == null) {
-            LostTalesChatOverlayRenderer.fillRect(stripLeft, bottom, stripRight,
+            LostTalesUiInk.fillRect(stripLeft, bottom, stripRight,
                     toolBottom, toolArgb);
         } else {
             // The search bar's well is a hole in the strip: the surface
@@ -1186,13 +1187,13 @@ final class ChatChannelTabBar {
             float holeTop = (float) hole.top;
             float holeRight = (float) (hole.left + hole.width);
             float holeBottom = (float) (hole.top + hole.height);
-            LostTalesChatOverlayRenderer.fillRect(stripLeft, bottom, stripRight,
+            LostTalesUiInk.fillRect(stripLeft, bottom, stripRight,
                     holeTop, toolArgb);
-            LostTalesChatOverlayRenderer.fillRect(stripLeft, holeTop, holeLeft,
+            LostTalesUiInk.fillRect(stripLeft, holeTop, holeLeft,
                     holeBottom, toolArgb);
-            LostTalesChatOverlayRenderer.fillRect(holeRight, holeTop, stripRight,
+            LostTalesUiInk.fillRect(holeRight, holeTop, stripRight,
                     holeBottom, toolArgb);
-            LostTalesChatOverlayRenderer.fillRect(stripLeft, holeBottom, stripRight,
+            LostTalesUiInk.fillRect(stripLeft, holeBottom, stripRight,
                     toolBottom, toolArgb);
         }
         LostTalesChatOverlayRenderer.drawRule(stripLeft, stripRight,
@@ -1321,17 +1322,17 @@ final class ChatChannelTabBar {
                 float cutTop = holeTop + (corner ? 1.0F : 0.0F);
                 float cutBottom = holeBottom - (corner ? 1.0F : 0.0F);
                 if (Math.min(cover, cutTop) > top) {
-                    LostTalesChatOverlayRenderer.fillRect(from, top, to,
+                    LostTalesUiInk.fillRect(from, top, to,
                             Math.min(cover, cutTop), argb);
                 }
                 if (cover > Math.max(top, cutBottom)) {
-                    LostTalesChatOverlayRenderer.fillRect(from,
+                    LostTalesUiInk.fillRect(from,
                             Math.max(top, cutBottom), to, cover, argb);
                 }
                 continue;
             }
             if (cover > top) {
-                LostTalesChatOverlayRenderer.fillRect(from, top, to, cover,
+                LostTalesUiInk.fillRect(from, top, to, cover,
                         argb);
             }
         }
@@ -1914,16 +1915,16 @@ final class ChatChannelTabBar {
         // never read as another tone than the span between them, since
         // both are this same paint.
         float shapeTop = top - raised;
-        LostTalesChatOverlayRenderer.fillRect(left + 1, shapeTop, right - 1,
+        LostTalesUiInk.fillRect(left + 1, shapeTop, right - 1,
                 shapeTop + 1,
                 LostTalesChatVisualStyle.argb(surfaceRgb, interiorAlpha));
-        LostTalesChatOverlayRenderer.fillRect(left, shapeTop + 1, right,
+        LostTalesUiInk.fillRect(left, shapeTop + 1, right,
                 top + height,
                 LostTalesChatVisualStyle.argb(surfaceRgb, interiorAlpha));
         if (spanRight > spanLeft) {
             // The tips are the pieces' innermost lit columns, one pixel
             // outside the span, so the line meets both without a gap.
-            LostTalesChatOverlayRenderer.fillRect(spanLeft,
+            LostTalesUiInk.fillRect(spanLeft,
                     shapeTop + TIP_ROW, spanRight, shapeTop + TIP_ROW + 1,
                     LostTalesChatVisualStyle.argb(tipRgb, spriteAlpha));
         }
@@ -2033,6 +2034,141 @@ final class ChatChannelTabBar {
         GL11.glEnable(GL11.GL_ALPHA_TEST);
         GL11.glEnable(GL11.GL_TEXTURE_2D);
         GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+    }
+
+    /* ---- A small window's title strip: one tab ---- */
+
+    /**
+     * Clear space between a small window's frame edge and its one tab, as
+     * between a chat window's frame edge and its search button.
+     */
+    static final int LONE_TAB_MARGIN = SEARCH_MARGIN;
+
+    /**
+     * Where the one tab of a small window's title strip stands and what
+     * it shows: the name cut to the room the strip leaves it, and its
+     * cross, which closes the window.
+     */
+    static final class LoneTab {
+        final float left;
+        final float right;
+        final int top;
+        final String label;
+        final int labelWidth;
+        final boolean icon;
+        final LostTalesUiHitBox closeBox;
+
+        LoneTab(float left, float right, int top, String label,
+                int labelWidth, boolean icon, LostTalesUiHitBox closeBox) {
+            this.left = left;
+            this.right = right;
+            this.top = top;
+            this.label = label;
+            this.labelWidth = labelWidth;
+            this.icon = icon;
+            this.closeBox = closeBox;
+        }
+
+        /**
+         * The bottom of the tab's surface: the selected tab's pieces reach
+         * the strip's rule row. Its top row is a pixel narrower each side,
+         * as every tab's is.
+         */
+        int bottom() {
+            return this.top + LostTalesUiSheet.TAB_SELECTED_LEFT.getHeight();
+        }
+    }
+
+    /**
+     * Lays out a small window's one tab in the strip from {@code stripLeft}
+     * to {@code stripRight} ending on {@code rowBottom}: the tab in front
+     * of a chat window's row, holding an icon when {@code icon}, the
+     * name and its cross, as wide as they need and no wider than the
+     * strip leaves it.
+     */
+    static LoneTab layOutLoneTab(FontRenderer font, float stripLeft,
+                                 float stripRight, int rowBottom,
+                                 String label, boolean icon) {
+        int iconWidth = icon ? ChatChannelIcons.SLOT + ChatChannelIcons.GAP
+                : 0;
+        int controls = CONTROL_GAP + CONTROL_SIZE;
+        float left = stripLeft + LONE_TAB_MARGIN;
+        float room = Math.max(0.0F, stripRight - LONE_TAB_MARGIN - left
+                - PADDING_X * 2 - iconWidth - controls);
+        String shown = font.getStringWidth(label) <= room ? label
+                : LostTalesSkyrimUiStyle.trimToWidth(font, label,
+                        (int)Math.floor(room));
+        int labelWidth = font.getStringWidth(shown);
+        float right = left + PADDING_X * 2 + iconWidth + labelWidth + controls;
+        int top = tabTop(rowBottom, true);
+        double closeLeft = snappedLeft(right - PADDING_X - CONTROL_SIZE,
+                displayStep());
+        return new LoneTab(left, right, top, shown, labelWidth, icon,
+                tabControlBox(closeLeft, top));
+    }
+
+    /**
+     * The strip a small window's one tab needs to show {@code label}
+     * whole beside its cross, and its icon when {@code icon}: what a
+     * window opening at its content's own size is at least as wide as.
+     */
+    static int loneTabWidth(FontRenderer font, String label, boolean icon) {
+        int iconWidth = icon ? ChatChannelIcons.SLOT + ChatChannelIcons.GAP
+                : 0;
+        return LONE_TAB_MARGIN * 2 + PADDING_X * 2 + iconWidth
+                + font.getStringWidth(label) + CONTROL_GAP + CONTROL_SIZE;
+    }
+
+    /**
+     * Draws a small window's one tab, laid out by {@link #layOutLoneTab},
+     * and the strip's rule under it: the selected tab's shape, the
+     * accent in {@code accentRgb} across its face, the {@code icon}
+     * glyph centred in the icon's slot, the name in the accent's colour
+     * and the cross, stepped by {@code closeMotion}. The rule runs the
+     * strip's width, hanging from the tab's feet as a chat window's does.
+     */
+    static void drawLoneTab(FontRenderer font, LoneTab tab, float stripLeft,
+                            float stripRight, int rowBottom,
+                            LostTalesUiSheet icon, int accentRgb,
+                            LostTalesUiButtonMotion closeMotion, int alpha) {
+        if (alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+            return;
+        }
+        LostTalesChatOverlayRenderer.drawRuleAround(stripLeft, stripRight,
+                rowBottom - 1, rowBottom, alpha, tab.left - SELECTED_FOOT,
+                tab.right + SELECTED_FOOT);
+        drawTabShape(tab.left, tab.right, tab.top, 0.0F, true, 1.0F, 0.0F,
+                accentRgb, 0.0F, alpha,
+                Math.round(TAB_SURFACE_ALPHA * alpha / 255.0F));
+        drawAccent(tab.left + BORDER_WIDTH, tab.right - BORDER_WIDTH,
+                tab.top + ACCENT_ROW, accentRgb, alpha);
+        int wholeLeft = (int)Math.floor(tab.left);
+        float fraction = tab.left - wholeLeft;
+        int interiorTop = tab.top + INTERIOR_TOP;
+        int textX = wholeLeft + PADDING_X;
+        LostTalesChatVisualStyle.beginContent();
+        if (tab.icon && icon != null) {
+            GL11.glPushMatrix();
+            GL11.glTranslatef(fraction, 0.0F, 0.0F);
+            try {
+                icon.drawWithShadow(textX + LostTalesUiInk.centredStart(
+                                ChatChannelIcons.SIZE, icon.getWidth()),
+                        centredInInterior(interiorTop, icon.getHeight()),
+                        alpha);
+            } finally {
+                GL11.glPopMatrix();
+            }
+            textX += ChatChannelIcons.SLOT + ChatChannelIcons.GAP;
+        }
+        drawWords(font, tab.label, textX, fraction,
+                centredInInterior(interiorTop, CAP_HEIGHT), accentRgb, alpha);
+        LostTalesUiButton.drawGlyph(LostTalesUiSheet.CLOSE,
+                LostTalesUiSheet.CLOSE_HOVER, closeMotion,
+                (float)tab.closeBox.left
+                        + (CONTROL_SIZE - LostTalesUiSheet.CLOSE.getWidth()) / 2,
+                (int)tab.closeBox.top
+                        + (CONTROL_SIZE - LostTalesUiSheet.CLOSE.getHeight()) / 2,
+                alpha);
     }
 
     /**

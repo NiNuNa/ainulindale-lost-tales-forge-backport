@@ -60,7 +60,7 @@ public final class LostTalesChatCommandContextPacketTest {
     public void aBadPayloadIsMalformedAndEmpty() {
         // Trailing bytes after the id.
         ByteBuf trailing = Unpooled.buffer();
-        new LostTalesChatCommandContextPacket("all").toBytes(trailing);
+        new LostTalesChatCommandContextPacket("global").toBytes(trailing);
         trailing.writeByte(7);
         LostTalesChatCommandContextPacket decoded =
                 new LostTalesChatCommandContextPacket();

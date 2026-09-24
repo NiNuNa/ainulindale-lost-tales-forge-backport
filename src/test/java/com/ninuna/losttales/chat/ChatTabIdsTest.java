@@ -10,8 +10,8 @@ public final class ChatTabIdsTest {
 
     @Test
     public void aTabIdNamesItsChannelOrNone() {
-        assertEquals(ChatChannel.ALL, ChatTabIds.channelOf("all"));
-        assertEquals(ChatChannel.ALL, ChatTabIds.channelOf(" ALL "));
+        assertEquals(ChatChannel.GLOBAL, ChatTabIds.channelOf("global"));
+        assertEquals(ChatChannel.GLOBAL, ChatTabIds.channelOf(" GLOBAL "));
         assertEquals(ChatChannel.FACTION, ChatTabIds.channelOf("faction|in:gondor"));
         assertEquals(ChatChannel.OOC, ChatTabIds.channelOf("ooc|own:abc"));
         assertNull(ChatTabIds.channelOf("whisper:Alex"));

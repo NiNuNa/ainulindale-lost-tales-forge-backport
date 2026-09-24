@@ -23,7 +23,7 @@ import java.util.UUID;
  * as it hands every channel theirs; cleared with the rest of the
  * server's chat state. Who is shown an event is
  * {@code LostTalesChatService}'s decision, made from the
- * {@code chat.console.read} capability at the moment of sending and
+ * {@code chat.server_console.read} capability at the moment of sending and
  * again at the moment of replay.
  *
  * <p>An entry is a line of the Server Console like any other: its id

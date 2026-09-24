@@ -23,40 +23,29 @@ import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
 import net.minecraft.util.StatCollector;
 import org.lwjgl.opengl.GL11;
+import java.util.Locale;
 
 /**
- * The bounded player card: opened by a click on the head or name of a
- * chat line, or on a mention, and shown in brief under the pointer for
- * the identity the head button speaks as. A chat line supplies its
- * snapshotted identity; the details — race, starting faction, gender,
- * age, and biography — come from the public appearance the
- * server already synced for that player, and are only shown when they
- * describe the character the line names. An NPC's head and name carry
- * the same card — the portrait, the name in its faction's colour, and
- * the faction its speech was captured with — so an NPC reads as a player
- * that happens not to exist.
+ * The bounded player card: opened in a small window of its own by a
+ * click on the head or name of a chat line, on a mention or on a member,
+ * and shown in brief under the pointer for the identity the head button
+ * speaks as. A chat line supplies its snapshotted identity; the details —
+ * race, starting faction, gender, age, and biography — come from the
+ * public appearance the server already synced for that player, and are
+ * only shown when they describe the character the line names. An NPC's
+ * head and name carry the same card — the portrait, the name in its
+ * faction's colour, and the faction its speech was captured with — so an
+ * NPC reads as a player that happens not to exist.
  */
 final class LostTalesChatHoverCard {
     /** A status line reads in italics. */
-    private static final String STATUS_STYLE = "\u00a7o";
-    /**
-     * The card a click opened, standing where it was opened until a
-     * click elsewhere, Escape or the screen closing takes it down; null
-     * while none is. It shows the person in full, the way a messenger's
-     * profile opens from a name.
-     */
-    private static Target pinned;
-    private static int pinnedX;
-    private static int pinnedY;
-    /** The pinned card's rectangle as last drawn, for the click that closes it. */
-    private static int pinnedLeft;
-    private static int pinnedTop;
-    private static int pinnedRight;
-    private static int pinnedBottom;
-    private static final int PADDING = 6;
+    private static final String STATUS_STYLE = "§o";
+    static final int PADDING = 6;
     private static final int HEAD_SIZE = 16;
-    private static final int MIN_WIDTH = 118;
-    private static final int MAX_WIDTH = 210;
+    /** The gap between the head and the words beside it. */
+    private static final int HEAD_GAP = 6;
+    static final int MIN_WIDTH = 118;
+    static final int MAX_WIDTH = 210;
     /** Text width a biography may push the card out to before wrapping. */
     private static final int DESCRIPTION_WIDTH = 170;
     private static final int MAX_DESCRIPTION_LINES = 4;
@@ -71,80 +60,83 @@ final class LostTalesChatHoverCard {
     /**
      * The brief card of the identity a tab speaks as: what the head
      * button shows on hover, so who the roleplaying channels speak as
-     * is read the way anyone else in the chat is. Nothing while a
-     * clicked card stands open.
+     * is read the way anyone else in the chat is.
      */
     static void drawForIdentity(Minecraft minecraft, ChatTab tab, int mouseX,
                                 int mouseY, int screenWidth, int screenHeight) {
-        if (pinned != null || minecraft == null || minecraft.thePlayer == null) {
+        if (minecraft == null || minecraft.thePlayer == null
+                || minecraft.fontRenderer == null) {
             return;
         }
         ClientChatSignature.Signature signature = ClientChatSignature.of(tab);
         ChatPresenceIdentity speaker = ClientChatPresence.speakerOf(tab);
-        drawCard(minecraft, new Target(minecraft.thePlayer.getUniqueID(),
+        Laid laid = layOut(minecraft, new Target(
+                        minecraft.thePlayer.getUniqueID(),
                         signature.accountLine, speaker.getCharacterId(),
                         signature.skinId, signature.identityName, "",
                         signature.accountName, signature.nameColor),
-                mouseX, mouseY, screenWidth, screenHeight, false);
-    }
-
-    /**
-     * Opens {@code target}'s full card at the pointer, where it stays
-     * until {@link #unpin()}.
-     */
-    static void pin(Target target, int mouseX, int mouseY) {
-        pinned = target;
-        pinnedX = mouseX;
-        pinnedY = mouseY;
-        pinnedLeft = pinnedRight = pinnedTop = pinnedBottom = 0;
-    }
-
-    static void unpin() {
-        pinned = null;
-    }
-
-    static boolean isPinned() {
-        return pinned != null;
-    }
-
-    /** Whether a GUI point lies on the clicked card as it was last drawn. */
-    static boolean pinnedContains(double mouseX, double mouseY) {
-        return pinned != null && contains((float)mouseX, (float)mouseY,
-                pinnedLeft, pinnedTop, pinnedRight, pinnedBottom);
-    }
-
-    /** The clicked card in full, where the click opened it. */
-    static void drawPinned(Minecraft minecraft, int screenWidth,
-                           int screenHeight) {
-        if (pinned != null) {
-            drawCard(minecraft, pinned, pinnedX, pinnedY, screenWidth,
-                    screenHeight, true);
+                false, 0, Math.max(40, screenWidth - 8));
+        int x = cardX(mouseX, laid.width, screenWidth);
+        int y = cardY(mouseY, laid.height, screenHeight);
+        GL11.glPushMatrix();
+        try {
+            GL11.glTranslatef(0.0F, 0.0F, 300.0F);
+            LostTalesChatVisualStyle.drawPopup(x, y, x + laid.width,
+                    y + laid.height, 1.0F);
+            drawLaid(minecraft, laid, x, y, 255);
+        } finally {
+            GL11.glPopMatrix();
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+            GL11.glEnable(GL11.GL_ALPHA_TEST);
         }
     }
 
     /**
-     * Lays the card out as a name line followed by detail lines, then
-     * draws it. The name line reads {@code Character (Account)} for a
-     * character identity and just {@code Account} otherwise; every detail
-     * line is omitted rather than shown empty when the value is unknown.
-     * The brief card — the hover — stops after the title, the command a
-     * Server line answers and the roles held; the {@code full} card a
-     * click opens goes on to the character's race, faction, gender, age
-     * and biography.
+     * A card laid out and ready to draw: its name row, its detail rows and
+     * which of them are drawn their own way, and the size it takes.
      */
-    private static void drawCard(Minecraft minecraft, Target target,
-                                 int mouseX, int mouseY,
-                                 int screenWidth, int screenHeight,
-                                 boolean full) {
-        if (minecraft.fontRenderer == null) {
-            return;
+    static final class Laid {
+        final Target target;
+        String name = "";
+        String suffix = "";
+        int nameWidth;
+        int nameColor;
+        final List<String> lines = new ArrayList<String>(8);
+        int titleRow = -1;
+        int statusRow = -1;
+        int commandRow = -1;
+        /** A role card's holders: the rows from here, this many. */
+        int memberStart = -1;
+        int memberRows;
+        boolean head = true;
+        int width;
+        int height;
+        int textWidth;
+
+        Laid(Target target) {
+            this.target = target;
         }
+    }
+
+    /**
+     * Lays the card out: a name row followed by detail rows. The name row
+     * reads {@code Character (Account)} for a character identity and just
+     * {@code Account} otherwise; every detail row is left out rather than
+     * shown empty when the value is unknown. The brief card stops after
+     * the title, the command a Server line answers and the roles held; the
+     * {@code full} card goes on to the character's race, faction, gender,
+     * age and biography. {@code width} fixes the card's width, a window's;
+     * at 0 the card takes the width its rows want, up to
+     * {@code maxWidth}.
+     */
+    static Laid layOut(Minecraft minecraft, Target target, boolean full,
+                       int width, int maxWidth) {
         if (target.role != null) {
-            drawRoleCard(minecraft, target.role, mouseX, mouseY,
-                    screenWidth, screenHeight, full);
-            return;
+            return layOutRole(minecraft.fontRenderer, target, full, width,
+                    maxWidth);
         }
         FontRenderer font = minecraft.fontRenderer;
+        Laid laid = new Laid(target);
         CharacterAppearance details = detailsFor(target);
         String name = LostTalesChatVisualStyle.removeColorCodes(
                 target.identityName).trim();
@@ -159,21 +151,22 @@ final class LostTalesChatHoverCard {
             suffix = "";
         }
         String title = cleanBracketed(target.title);
-        List<String> lines = new ArrayList<String>(8);
+        List<String> lines = laid.lines;
         if (title.length() > 0) {
+            laid.titleRow = lines.size();
             lines.add(title);
         }
         // What the identity says of itself, as it says it, under its name.
         String statusLine = ClientChatProfanity.filter(target.statusLine());
-        int statusRow = -1;
         if (statusLine.length() > 0) {
-            statusRow = lines.size();
+            laid.statusRow = lines.size();
             lines.add(statusLine);
         }
         // The Server's card says what it is answering: the command the
         // line under the pointer was the answer to, as inline code.
-        int commandRow = addDetail(lines, COMMAND_LABEL_KEY, target.note)
-                ? lines.size() - 1 : -1;
+        if (addDetail(lines, COMMAND_LABEL_KEY, target.note)) {
+            laid.commandRow = lines.size() - 1;
+        }
         // The roles the identity wears, whichever channel the line was
         // said in: an account its own, a character the account's and its
         // own. A role not worn on an in-character line is still held, and
@@ -213,188 +206,171 @@ final class LostTalesChatHoverCard {
             description = details == null ? "" : details.getDescription();
         }
 
-        int contentWidth = font.getStringWidth(name + suffix);
-        for (int index = 0; index < lines.size(); index++) {
-            contentWidth = Math.max(contentWidth, index == statusRow
-                    ? ChatInlineText.width(font, lines.get(index), STATUS_STYLE)
-                    : font.getStringWidth(lines.get(index)));
+        if (width > 0) {
+            laid.width = width;
+        } else {
+            int contentWidth = font.getStringWidth(name + suffix);
+            for (int index = 0; index < lines.size(); index++) {
+                contentWidth = Math.max(contentWidth, index == laid.statusRow
+                        ? ChatInlineText.width(font, lines.get(index),
+                                STATUS_STYLE)
+                        : font.getStringWidth(lines.get(index)));
+            }
+            if (description.length() > 0) {
+                contentWidth = Math.max(contentWidth, Math.min(
+                        font.getStringWidth(description), DESCRIPTION_WIDTH));
+            }
+            laid.width = Math.min(Math.max(MIN_WIDTH, Math.min(MAX_WIDTH,
+                    PADDING + HEAD_SIZE + HEAD_GAP + contentWidth + PADDING)),
+                    maxWidth);
         }
+        laid.textWidth = Math.max(0, laid.width - PADDING - HEAD_SIZE
+                - HEAD_GAP - PADDING);
         if (description.length() > 0) {
-            contentWidth = Math.max(contentWidth, Math.min(
-                    font.getStringWidth(description), DESCRIPTION_WIDTH));
-        }
-        int width = Math.max(MIN_WIDTH,
-                Math.min(MAX_WIDTH, PADDING + HEAD_SIZE + 6
-                        + contentWidth + PADDING));
-        width = Math.min(width, Math.max(40, screenWidth - 8));
-        int textWidth = width - PADDING - HEAD_SIZE - 6 - PADDING;
-        if (description.length() > 0) {
-            appendDescription(font, lines, description, textWidth);
+            appendDescription(font, lines, description, laid.textWidth);
         }
         int nameWidth = font.getStringWidth(name);
-        if (nameWidth + font.getStringWidth(suffix) > textWidth) {
+        if (nameWidth + font.getStringWidth(suffix) > laid.textWidth) {
             // The account suffix gives way before the name does.
             suffix = LostTalesSkyrimUiStyle.trimToWidth(font, suffix,
-                    Math.max(0, textWidth - nameWidth));
-            name = LostTalesSkyrimUiStyle.trimToWidth(font, name, textWidth);
+                    Math.max(0, laid.textWidth - nameWidth));
+            name = LostTalesSkyrimUiStyle.trimToWidth(font, name,
+                    laid.textWidth);
             nameWidth = font.getStringWidth(name);
         }
-        int lineCount = 1 + lines.size();
-        int height = Math.max(HEAD_SIZE + PADDING * 2,
-                PADDING * 2 + lineCount * font.FONT_HEIGHT);
-        int x = cardX(mouseX, width, screenWidth);
-        int y = cardY(mouseY, height, screenHeight);
-        if (full) {
-            rememberPinnedBounds(x, y, width, height);
-        }
-
-        GL11.glPushMatrix();
-        try {
-            GL11.glTranslatef(0.0F, 0.0F, 300.0F);
-            LostTalesChatVisualStyle.drawPopup(x, y, x + width, y + height,
-                    1.0F);
-            drawHead(minecraft, target, x + PADDING, y + PADDING);
-            int textX = x + PADDING + HEAD_SIZE + 6;
-            int textY = y + PADDING;
-            drawColored(font, name, textX, textY, target.nameColor);
-            if (suffix.length() > 0) {
-                drawColored(font, suffix, textX + nameWidth, textY,
-                        LostTalesSkyrimUiStyle.TEXT_MUTED);
-            }
-            textY += font.FONT_HEIGHT;
-            for (int index = 0; index < lines.size(); index++) {
-                String line = LostTalesSkyrimUiStyle.trimToWidth(font,
-                        lines.get(index), textWidth);
-                if (index == 0 && title.length() > 0) {
-                    LostTalesChatVisualStyle.drawPlain(font, line,
-                            textX, textY, 255);
-                } else if (index == statusRow) {
-                    // What the identity says of itself, as it says it:
-                    // italic words and their emojis.
-                    ChatInlineText.draw(minecraft, font,
-                            ChatInlineText.trimToWidth(font, lines.get(index),
-                                    STATUS_STYLE, textWidth),
-                            STATUS_STYLE, textX, textY,
-                            LostTalesChatVisualStyle.asideRgb(), 255);
-                } else if (index == commandRow) {
-                    drawCommandDetail(font, target.note, textX, textY,
-                            textWidth);
-                } else {
-                    drawColored(font, line, textX, textY,
-                            LostTalesSkyrimUiStyle.TEXT_MUTED);
-                }
-                textY += font.FONT_HEIGHT;
-            }
-        } finally {
-            GL11.glPopMatrix();
-            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
-            GL11.glEnable(GL11.GL_ALPHA_TEST);
-        }
+        laid.name = name;
+        laid.suffix = suffix;
+        laid.nameWidth = nameWidth;
+        laid.nameColor = target.nameColor;
+        laid.height = Math.max(HEAD_SIZE + PADDING * 2,
+                PADDING * 2 + (1 + lines.size()) * font.FONT_HEIGHT);
+        return laid;
     }
 
     /**
      * The card of a mentioned role: {@code @Name} in the role's colour,
-     * what the role is, and — on the {@code full} card a click opens —
-     * the online accounts holding it, the server's own roster, sent
-     * with the chat access, so the list is its word and not a guess
-     * from who happened to speak.
+     * what the role is, and — on the {@code full} card — the online
+     * accounts holding it, the server's own roster, sent with the chat
+     * access, so the list is its word and not a guess from who happened
+     * to speak.
      */
-    private static void drawRoleCard(Minecraft minecraft,
-                                     ChatAccountRole role, int mouseX,
-                                     int mouseY, int screenWidth,
-                                     int screenHeight, boolean full) {
-        if (minecraft.fontRenderer == null) {
-            return;
-        }
-        FontRenderer font = minecraft.fontRenderer;
-        String name = "@" + role.getDisplayName();
+    private static Laid layOutRole(FontRenderer font, Target target,
+                                   boolean full, int width, int maxWidth) {
+        ChatAccountRole role = target.role;
+        Laid laid = new Laid(target);
+        laid.head = false;
+        laid.name = "@" + role.getDisplayName();
+        laid.nameWidth = font.getStringWidth(laid.name);
+        laid.nameColor = role.getColor();
         String description = role.getDisplayDescription();
         List<String> members = full
                 ? ClientChatChannelState.roleHolders(role)
                 : java.util.Collections.<String>emptyList();
         String membersLabel = StatCollector.translateToLocal(
                 "gui.losttales.chat.card.role.members");
-
-        int contentWidth = font.getStringWidth(name);
-        if (full) {
-            contentWidth = Math.max(contentWidth,
-                    font.getStringWidth(membersLabel));
+        if (width > 0) {
+            laid.width = width;
+        } else {
+            int contentWidth = laid.nameWidth;
+            if (full) {
+                contentWidth = Math.max(contentWidth,
+                        font.getStringWidth(membersLabel));
+            }
+            if (description.length() > 0) {
+                contentWidth = Math.max(contentWidth, Math.min(
+                        font.getStringWidth(description), DESCRIPTION_WIDTH));
+            }
+            for (int index = 0; index < members.size()
+                    && index < MAX_ROLE_MEMBER_LINES; index++) {
+                contentWidth = Math.max(contentWidth,
+                        font.getStringWidth("  " + members.get(index)));
+            }
+            laid.width = Math.min(Math.max(MIN_WIDTH,
+                    Math.min(MAX_WIDTH, PADDING * 2 + contentWidth)),
+                    maxWidth);
         }
-        if (description.length() > 0) {
-            contentWidth = Math.max(contentWidth, Math.min(
-                    font.getStringWidth(description), DESCRIPTION_WIDTH));
-        }
-        for (int index = 0; index < members.size()
-                && index < MAX_ROLE_MEMBER_LINES; index++) {
-            contentWidth = Math.max(contentWidth,
-                    font.getStringWidth("  " + members.get(index)));
-        }
-        int width = Math.max(MIN_WIDTH,
-                Math.min(MAX_WIDTH, PADDING * 2 + contentWidth));
-        width = Math.min(width, Math.max(40, screenWidth - 8));
-        int textWidth = width - PADDING * 2;
-
-        List<String> lines = new ArrayList<String>(8);
+        laid.textWidth = Math.max(0, laid.width - PADDING * 2);
+        List<String> lines = laid.lines;
         if (description.length() > 0) {
             @SuppressWarnings("unchecked")
             List<String> wrapped = font.listFormattedStringToWidth(
-                    description, Math.max(20, textWidth));
+                    description, Math.max(20, laid.textWidth));
             int count = Math.min(wrapped.size(), MAX_DESCRIPTION_LINES);
             for (int index = 0; index < count; index++) {
                 lines.add(wrapped.get(index).trim());
             }
         }
-        int memberStart = lines.size() + 1;
         if (full) {
             lines.add(membersLabel);
             if (members.isEmpty()) {
                 lines.add("  " + StatCollector.translateToLocal(
                         "gui.losttales.chat.card.role.nobody"));
             } else {
-                int shown = Math.min(members.size(), MAX_ROLE_MEMBER_LINES);
-                for (int index = 0; index < shown; index++) {
+                laid.memberStart = lines.size();
+                laid.memberRows = Math.min(members.size(),
+                        MAX_ROLE_MEMBER_LINES);
+                for (int index = 0; index < laid.memberRows; index++) {
                     lines.add("  " + members.get(index));
                 }
-                if (members.size() > shown) {
+                if (members.size() > laid.memberRows) {
                     lines.add("  " + StatCollector.translateToLocalFormatted(
                             "gui.losttales.chat.card.role.more",
-                            Integer.valueOf(members.size() - shown)));
+                            Integer.valueOf(members.size() - laid.memberRows)));
                 }
             }
         }
+        laid.height = PADDING * 2 + (1 + lines.size()) * font.FONT_HEIGHT;
+        return laid;
+    }
 
-        int height = PADDING * 2 + (1 + lines.size()) * font.FONT_HEIGHT;
-        int x = cardX(mouseX, width, screenWidth);
-        int y = cardY(mouseY, height, screenHeight);
-        if (full) {
-            rememberPinnedBounds(x, y, width, height);
+    /**
+     * Draws a laid-out card with its top left at {@code x}, {@code y}, on
+     * whatever surface stands under it: the head, the name row, and the
+     * detail rows, each its own way.
+     */
+    static void drawLaid(Minecraft minecraft, Laid laid, int x, int y,
+                         int alpha) {
+        FontRenderer font = minecraft.fontRenderer;
+        int textX = x + PADDING + (laid.head ? HEAD_SIZE + HEAD_GAP : 0);
+        int textY = y + PADDING;
+        if (laid.head) {
+            drawHead(minecraft, laid.target, x + PADDING, y + PADDING);
         }
-        GL11.glPushMatrix();
-        try {
-            GL11.glTranslatef(0.0F, 0.0F, 300.0F);
-            LostTalesChatVisualStyle.drawPopup(x, y, x + width, y + height,
-                    1.0F);
-            int textX = x + PADDING;
-            int textY = y + PADDING;
-            drawColored(font, name, textX, textY, role.getColor());
-            textY += font.FONT_HEIGHT;
-            for (int index = 0; index < lines.size(); index++) {
-                String line = LostTalesSkyrimUiStyle.trimToWidth(font,
-                        lines.get(index), textWidth);
-                // The holders read as the people they are; everything
-                // else stays the card's muted grey.
-                boolean member = !members.isEmpty() && index >= memberStart
-                        && index < memberStart + Math.min(members.size(),
-                                MAX_ROLE_MEMBER_LINES);
+        LostTalesChatVisualStyle.beginContent();
+        drawColored(font, laid.name, textX, textY, laid.nameColor, alpha);
+        if (laid.suffix.length() > 0) {
+            drawColored(font, laid.suffix, textX + laid.nameWidth, textY,
+                    LostTalesSkyrimUiStyle.TEXT_MUTED, alpha);
+        }
+        textY += font.FONT_HEIGHT;
+        for (int index = 0; index < laid.lines.size(); index++) {
+            String line = LostTalesSkyrimUiStyle.trimToWidth(font,
+                    laid.lines.get(index), laid.textWidth);
+            if (index == laid.titleRow) {
+                LostTalesChatVisualStyle.drawPlain(font, line, textX, textY,
+                        alpha);
+            } else if (index == laid.statusRow) {
+                // What the identity says of itself, as it says it: italic
+                // words and their emojis.
+                ChatInlineText.draw(minecraft, font,
+                        ChatInlineText.trimToWidth(font, laid.lines.get(index),
+                                STATUS_STYLE, laid.textWidth),
+                        STATUS_STYLE, textX, textY,
+                        LostTalesChatVisualStyle.asideRgb(), alpha);
+            } else if (index == laid.commandRow) {
+                drawCommandDetail(font, laid.target.note, textX, textY,
+                        laid.textWidth, alpha);
+            } else {
+                // A role card's holders read as the people they are;
+                // everything else stays the card's muted grey.
+                boolean member = laid.memberStart >= 0
+                        && index >= laid.memberStart
+                        && index < laid.memberStart + laid.memberRows;
                 drawColored(font, line, textX, textY, member
-                        ? role.getColor()
-                        : LostTalesSkyrimUiStyle.TEXT_MUTED);
-                textY += font.FONT_HEIGHT;
+                        ? laid.nameColor : LostTalesSkyrimUiStyle.TEXT_MUTED,
+                        alpha);
             }
-        } finally {
-            GL11.glPopMatrix();
-            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
-            GL11.glEnable(GL11.GL_ALPHA_TEST);
+            textY += font.FONT_HEIGHT;
         }
     }
 
@@ -431,17 +407,20 @@ final class LostTalesChatHoverCard {
      * it shows one.
      */
     private static void drawCommandDetail(FontRenderer font, String command,
-                                          int x, int y, int width) {
+                                          int x, int y, int width,
+                                          int alpha) {
         String label = LostTalesSkyrimUiStyle.trimToWidth(font,
                 StatCollector.translateToLocal(COMMAND_LABEL_KEY) + ": ",
                 width);
-        drawColored(font, label, x, y, LostTalesSkyrimUiStyle.TEXT_MUTED);
+        drawColored(font, label, x, y, LostTalesSkyrimUiStyle.TEXT_MUTED,
+                alpha);
         int labelWidth = font.getStringWidth(label);
         String code = LostTalesSkyrimUiStyle.trimToWidth(font,
                 command == null ? "" : command.trim(), width - labelWidth);
         if (code.length() > 0) {
             drawColored(font, EnumChatFormatting.ITALIC + code,
-                    x + labelWidth, y, LostTalesChatVisualStyle.asideRgb());
+                    x + labelWidth, y, LostTalesChatVisualStyle.asideRgb(),
+                    alpha);
         }
     }
 
@@ -468,15 +447,6 @@ final class LostTalesChatHoverCard {
             }
             lines.add(line);
         }
-    }
-
-    /** Where the clicked card was last drawn, for the click that closes it. */
-    private static void rememberPinnedBounds(int x, int y, int width,
-                                             int height) {
-        pinnedLeft = x;
-        pinnedTop = y;
-        pinnedRight = x + width;
-        pinnedBottom = y + height;
     }
 
     /**
@@ -906,10 +876,10 @@ final class LostTalesChatHoverCard {
     }
 
     private static void drawColored(FontRenderer font, String text,
-                                    int x, int y, int color) {
+                                    int x, int y, int color, int alpha) {
         LostTalesChatVisualStyle.drawColored(font,
                 LostTalesChatVisualStyle.removeColorCodes(text),
-                x, y, color, 255);
+                x, y, color, alpha);
     }
 
     /** Whether the point lies between two corners, whichever way round they are given. */
@@ -1060,6 +1030,37 @@ final class LostTalesChatHoverCard {
         static Target forRole(ChatAccountRole role) {
             return new Target(null, false, false, null, "", "", "", "",
                     role.getColor(), role, "");
+        }
+
+        /**
+         * Who the card is about, so a person has one card: a role, an
+         * NPC, an account, or one character of it.
+         */
+        String key() {
+            if (this.role != null) {
+                return "role:" + this.role.getId();
+            }
+            String who = this.playerId == null ? "" : this.playerId.toString();
+            if (this.npcIdentity) {
+                return "npc:" + who + "|" + this.skinId;
+            }
+            if (this.accountIdentity) {
+                return "account:" + who;
+            }
+            return "character:" + who + "|" + (this.characterId != null
+                    ? this.characterId.toString()
+                    : LostTalesChatVisualStyle.removeColorCodes(
+                            this.identityName).trim().toLowerCase(Locale.ROOT));
+        }
+
+        /** The name the card's window goes by: the person's, or the role's mention. */
+        String windowTitle() {
+            if (this.role != null) {
+                return "@" + this.role.getDisplayName();
+            }
+            String name = LostTalesChatVisualStyle.removeColorCodes(
+                    this.identityName).trim();
+            return name.length() > 0 ? name : this.accountName.trim();
         }
 
         /**

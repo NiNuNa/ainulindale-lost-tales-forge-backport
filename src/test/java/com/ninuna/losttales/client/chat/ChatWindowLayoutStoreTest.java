@@ -53,8 +53,8 @@ public final class ChatWindowLayoutStoreTest {
     @Test
     public void rememberedConversationsRoundTripPerPlace() {
         ChatWindowLayoutStore.load(Arrays.asList(
-                "window w1 locked=false x=0.00 y=0.00 active=console tabs=console",
-                "window w2 locked=false x=0.00 y=100.00 active=all tabs=all,ooc",
+                "window w1 locked=false x=0.00 y=0.00 active=client_console tabs=client_console",
+                "window w2 locked=false x=0.00 y=100.00 active=global tabs=global,ooc",
                 "conversation\tserver:a\tw2\twhisper:Steve|Aldric",
                 "closedconversation\tserver:a\twhisper:Bob",
                 "conversation\tworld:My World\tw2\twhisper:Sam|Sam Gamgee"));
@@ -75,8 +75,8 @@ public final class ChatWindowLayoutStoreTest {
     public void aWindowFillingTheScreenRoundTrips() {
         ChatWindowLayoutStore.load(Arrays.asList(
                 "window w1 locked=false x=10.00 y=20.00 lines=6.00"
-                        + " fill=full active=console tabs=console,admin",
-                "window w2 locked=false x=0.00 y=100.00 active=all tabs=all",
+                        + " fill=full active=client_console tabs=client_console,operator",
+                "window w2 locked=false x=0.00 y=100.00 active=global tabs=global",
                 "window w3 locked=false x=0.00 y=50.00 fill=top_right"
                         + " active=ooc tabs=ooc",
                 "window w4 locked=false x=0.00 y=60.00 fill=sideways"
@@ -123,14 +123,14 @@ public final class ChatWindowLayoutStoreTest {
         // Trade has a window of its own, so where it went is the point
         // and not merely that it is somewhere.
         List<String> lines = Arrays.asList(
-                "window w1 x=0.00 y=0.00 active=all tabs=all",
+                "window w1 x=0.00 y=0.00 active=global tabs=global",
                 "window w2 x=50.00 y=50.00 active=trade tabs=trade");
         ChatWindowLayoutStore.load(lines);
 
         ChatChannel.installDefined(Collections.singletonList(
                 new ChatChannelDescriptor("trade", "Trade",
                         ChatPresentationMode.IN_CHARACTER,
-                        ChatRecipientRule.GLOBAL, ChatChannelAccess.NONE,
+                        ChatRecipientRule.EVERYONE, ChatChannelAccess.NONE,
                         0xC9A227, false)), null);
         ChatChannel trade = ChatChannel.fromId("trade");
         assertNotNull(trade);
@@ -192,7 +192,7 @@ public final class ChatWindowLayoutStoreTest {
             File own = ChatWindowLayoutStore.fileFor(folder, steve);
             String trading =
                     "window w3 locked=false x=50.00 y=50.00 active=trade tabs=trade";
-            write(own, "window w1 locked=false x=0.00 y=0.00 active=all tabs=all\n"
+            write(own, "window w1 locked=false x=0.00 y=0.00 active=global tabs=global\n"
                     + trading + "\n"
                     + "feed x=0.00 y=100.00\n");
             ChatWindowLayoutStore.initialize(folder, steve);
@@ -208,7 +208,7 @@ public final class ChatWindowLayoutStoreTest {
             ChatChannel.installDefined(Collections.singletonList(
                     new ChatChannelDescriptor("trade", "Trade",
                             ChatPresentationMode.IN_CHARACTER,
-                            ChatRecipientRule.GLOBAL, ChatChannelAccess.NONE,
+                            ChatRecipientRule.EVERYONE, ChatChannelAccess.NONE,
                             0xC9A227, false)), null);
             ChatWindowLayoutStore.reloadForNewChannels();
             assertTrue("the window is back with its channel",
@@ -260,24 +260,24 @@ public final class ChatWindowLayoutStoreTest {
     @Test
     public void aLayoutThePlayerHasMovedIsNotReplacedByTheFile() {
         ChatWindowLayoutStore.load(Collections.singletonList(
-                "window w1 x=0.00 y=0.00 active=all tabs=all,trade"));
+                "window w1 x=0.00 y=0.00 active=global tabs=global,trade"));
         // The store marks the layout moved through this listener; a save
         // with no file behind it writes nothing.
         ChatWindowLayout.setChangeListener(null);
         ChatWindowLayoutStore.initialize(null);
         ChatWindowLayoutStore.load(Collections.singletonList(
-                "window w1 x=0.00 y=0.00 active=all tabs=all,trade"));
-        ChatWindowLayout.close(ChatChannel.ALL);
+                "window w1 x=0.00 y=0.00 active=global tabs=global,trade"));
+        ChatWindowLayout.close(ChatChannel.GLOBAL);
 
         ChatChannel.installDefined(Collections.singletonList(
                 new ChatChannelDescriptor("trade", "Trade",
                         ChatPresentationMode.IN_CHARACTER,
-                        ChatRecipientRule.GLOBAL, ChatChannelAccess.NONE,
+                        ChatRecipientRule.EVERYONE, ChatChannelAccess.NONE,
                         0xC9A227, false)), null);
         ChatWindowLayoutStore.reloadForNewChannels();
 
         assertFalse("the closed channel stays closed",
-                ChatWindowLayout.isOpen(ChatChannel.ALL));
+                ChatWindowLayout.isOpen(ChatChannel.GLOBAL));
     }
 
     /**
@@ -310,10 +310,10 @@ public final class ChatWindowLayoutStoreTest {
         ChatWindowLayout.detach(ChatChannel.PARTY, 62.5D, 8.0D);
         ChatWindowLayout.moveTab(ChatChannel.FACTION, "w3", 1);
         ChatWindowLayout.setLocked("w3", true);
-        ChatWindowLayout.close(ChatChannel.ADMIN);
+        ChatWindowLayout.close(ChatChannel.OPERATOR);
         ChatWindowLayout.setMuted(ChatChannel.OOC, true);
         ChatWindowLayout.setPingsMuted(ChatTab.of(ChatChannel.PARTY), true);
-        ChatWindowLayout.setHidden(ChatTab.of(ChatChannel.ADMIN), true);
+        ChatWindowLayout.setHidden(ChatTab.of(ChatChannel.OPERATOR), true);
         ChatWindowLayout.setActiveTab(ChatChannel.OOC);
         ChatWindowLayout.setPosition("w2", 3.0D, 97.5D, true);
         ChatWindowLayout.setFeedPosition(12.25D, 88.0D, true);
@@ -323,15 +323,15 @@ public final class ChatWindowLayoutStoreTest {
         assertTrue(lines.contains("feed x=12.25 y=88.00"));
         assertTrue(lines.contains("toolbar collapsed=true"));
         assertTrue(lines.contains("window w1 locked=false x=0.00 y=0.00 "
-                + "active=console tabs=console,server_console"));
+                + "active=client_console tabs=client_console,server_console"));
         assertTrue(lines.contains("window w2 locked=false x=3.00 y=97.50 "
-                + "active=ooc tabs=all,proximity,ooc"));
+                + "active=ooc tabs=global,proximity,ooc"));
         assertTrue(lines.contains("window w3 locked=true x=62.50 y=8.00 "
                 + "active=faction link=w2:above tabs=party,faction"));
-        assertTrue(lines.contains("closed admin"));
+        assertTrue(lines.contains("closed operator"));
         assertTrue(lines.contains("muted ooc"));
         assertTrue(lines.contains("noping party"));
-        assertTrue(lines.contains("hidden admin"));
+        assertTrue(lines.contains("hidden operator"));
 
         ChatWindowLayout.reset();
         ChatWindowLayoutStore.load(lines);
@@ -339,7 +339,7 @@ public final class ChatWindowLayoutStoreTest {
         assertEquals(12.25D, ChatWindowLayout.feedOffsetX(), 0.0001D);
         assertEquals(88.0D, ChatWindowLayout.feedOffsetY(), 0.0001D);
         ChatWindow w2 = ChatWindowLayout.window("w2");
-        assertEquals(Arrays.asList(ChatChannel.ALL, ChatChannel.PROXIMITY,
+        assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.PROXIMITY,
                 ChatChannel.OOC), w2.getChannels());
         assertEquals(3.0D, w2.getOffsetX(), 0.0001D);
         assertEquals(97.5D, w2.getOffsetY(), 0.0001D);
@@ -355,13 +355,13 @@ public final class ChatWindowLayoutStoreTest {
         assertTrue(w3.isLinkedAbove());
         assertEquals(62.5D, w3.getOffsetX(), 0.0001D);
         assertEquals(8.0D, w3.getOffsetY(), 0.0001D);
-        assertEquals(Collections.singletonList(ChatChannel.ADMIN),
+        assertEquals(Collections.singletonList(ChatChannel.OPERATOR),
                 ChatWindowLayout.closedChannels());
         assertTrue(ChatWindowLayout.isMuted(ChatChannel.OOC));
         assertFalse(ChatWindowLayout.isPingsMuted(ChatChannel.OOC));
         assertTrue(ChatWindowLayout.isPingsMuted(ChatChannel.PARTY));
         assertFalse(ChatWindowLayout.isMuted(ChatChannel.PARTY));
-        assertTrue(ChatWindowLayout.isHidden(ChatChannel.ADMIN));
+        assertTrue(ChatWindowLayout.isHidden(ChatChannel.OPERATOR));
         assertFalse(ChatWindowLayout.isHidden(ChatChannel.OOC));
         assertEquals(lines, ChatWindowLayoutStore.describe());
     }
@@ -371,15 +371,15 @@ public final class ChatWindowLayoutStoreTest {
         ChatWindowLayoutStore.load(Arrays.asList(
                 "# comment",
                 "",
-                "window w1 locked=maybe active=nope tabs=all,,unknown,ooc",
+                "window w1 locked=maybe active=nope tabs=global,,unknown,ooc",
                 "window w2 x=abc y=12 tabs=party,party",
                 "window  badid tabs=faction",
                 "window w9",
                 "closed",
-                "closed admin extra",
-                "closed admin",
+                "closed operator extra",
+                "closed operator",
                 "muted nothing",
-                "muted console",
+                "muted client_console",
                 "muted faction",
                 "input y=40 x=oops",
                 "feed y=40 x=oops",
@@ -392,12 +392,12 @@ public final class ChatWindowLayoutStoreTest {
         assertEquals("w1", main.getId());
         assertEquals(0.0D, main.getOffsetX(), 0.0D);
         assertEquals(0.0D, main.getOffsetY(), 0.0D);
-        // Unknown ids dropped, unplaced channels appended, Admin closed.
-        assertEquals(Arrays.asList(ChatChannel.ALL, ChatChannel.OOC,
+        // Unknown ids dropped, unplaced channels appended, Operator closed.
+        assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.OOC,
                 ChatChannel.PROXIMITY, ChatChannel.FACTION,
-                ChatChannel.CONSOLE, ChatChannel.SERVER_CONSOLE),
+                ChatChannel.CLIENT_CONSOLE, ChatChannel.SERVER_CONSOLE),
                 main.getChannels());
-        assertEquals(ChatChannel.ALL, main.getActiveChannel());
+        assertEquals(ChatChannel.GLOBAL, main.getActiveChannel());
         assertEquals(2, ChatWindowLayout.windows().size());
         ChatWindow w2 = ChatWindowLayout.window("w2");
         assertNotNull(w2);
@@ -405,9 +405,9 @@ public final class ChatWindowLayoutStoreTest {
                 w2.getChannels());
         assertEquals(0.0D, w2.getOffsetX(), 0.0D);
         assertEquals(12.0D, w2.getOffsetY(), 0.0D);
-        assertEquals(Collections.singletonList(ChatChannel.ADMIN),
+        assertEquals(Collections.singletonList(ChatChannel.OPERATOR),
                 ChatWindowLayout.closedChannels());
-        assertTrue(ChatWindowLayout.isMuted(ChatChannel.CONSOLE));
+        assertTrue(ChatWindowLayout.isMuted(ChatChannel.CLIENT_CONSOLE));
         // An older file's feed-only mute reads as today's mute.
         assertTrue(ChatWindowLayout.isMuted(ChatChannel.FACTION));
     }
@@ -421,8 +421,8 @@ public final class ChatWindowLayoutStoreTest {
     @Test
     public void aStoredConversationOfAScopedChannelIsDropped() {
         ChatWindowLayoutStore.load(Arrays.asList(
-                "window w1 x=0.00 y=100.00 active=all "
-                        + "tabs=all,faction,faction|own:"
+                "window w1 x=0.00 y=100.00 active=global "
+                        + "tabs=global,faction,faction|own:"
                         + "00000000-0000-0000-0000-0000000000c1,"
                         + "faction|in:lotr:gondor"));
         ChatWindow window = ChatWindowLayout.window("w1");
@@ -450,7 +450,7 @@ public final class ChatWindowLayoutStoreTest {
     @Test
     public void aDrivenOutAreaAndAPutAwayListRoundTrip() {
         ChatWindowLayoutStore.load(Arrays.asList(
-                "window w1 locked=false x=0.00 y=0.00 area=hidden members=hidden active=all tabs=all",
+                "window w1 locked=false x=0.00 y=0.00 area=hidden members=hidden active=global tabs=global",
                 "window w2 locked=false x=0.00 y=100.00 active=ooc tabs=ooc"));
         assertTrue(ChatWindowLayout.window("w1").isAreaHidden());
         assertTrue(ChatWindowLayout.window("w1").isMembersHidden());

@@ -1039,6 +1039,16 @@ final class ChatWindowFrame {
     }
 
     /**
+     * Pixels of stack a page key moves: the window's room less a line,
+     * so the line at the edge a page leaves is the first of the next,
+     * and never less than a line.
+     */
+    double pagePixels() {
+        return Math.max(LostTalesChatOverlayRenderer.LINE_HEIGHT,
+                roomUnscaled() - LostTalesChatOverlayRenderer.LINE_HEIGHT);
+    }
+
+    /**
      * The furthest the view may scroll: the offset that stands the
      * oldest row on the window's top edge, which is what the clamp
      * holds every offset to. Unbounded while the window has not been
@@ -1124,6 +1134,12 @@ final class ChatWindowFrame {
      */
     double historyTop() {
         return this.stackTop - ChatWindowPlacement.HISTORY_TOP_MARGIN;
+    }
+
+    /** The window's box as it is drawn this frame, opening motion included. */
+    LostTalesUiHitBox drawnBox() {
+        return new LostTalesUiHitBox(drawnLeft(), this.boxTop + this.motionY,
+                this.boxRight - this.boxLeft, this.boxBottom - this.boxTop);
     }
 
     /**

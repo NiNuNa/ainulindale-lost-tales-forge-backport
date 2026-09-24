@@ -21,7 +21,7 @@ import static org.junit.Assert.assertTrue;
 public final class LostTalesChatSendPacketQuoteSourceTest {
 
     private static LostTalesChatSendPacket quoting(int source) {
-        return new LostTalesChatSendPacket(ChatChannel.ALL, "which one?",
+        return new LostTalesChatSendPacket(ChatChannel.GLOBAL, "which one?",
                 null, "", LostTalesChatSendPacket.IDENTITY_DEFAULT, null,
                 ChatMessageIds.NONE, "", 7L, null, "Server",
                 "Unknown command", source);
@@ -65,7 +65,7 @@ public final class LostTalesChatSendPacketQuoteSourceTest {
     @Test
     public void aSourceWithoutAQuoteIsDropped() {
         LostTalesChatSendPacket plain = new LostTalesChatSendPacket(
-                ChatChannel.ALL, "hello", null, "",
+                ChatChannel.GLOBAL, "hello", null, "",
                 LostTalesChatSendPacket.IDENTITY_DEFAULT, null,
                 ChatMessageIds.NONE, "", 7L, null, "", "",
                 LostTalesChatSendPacket.QUOTE_SYSTEM);

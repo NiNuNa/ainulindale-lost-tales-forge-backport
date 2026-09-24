@@ -6,6 +6,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiCornerCut;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
+import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.chat.ChatChannel;
@@ -498,7 +499,7 @@ final class LostTalesChatOverlayRenderer {
         float right = left + (float)(frame.boxRight - frame.boxLeft);
         float top = (float)frame.drawnBaseline()
                 + ChatWindowPlacement.lineHeight(minecraft);
-        fillRect(left, top, right, top + 1.0F, LostTalesChatVisualStyle.argb(
+        LostTalesUiInk.fillRect(left, top, right, top + 1.0F, LostTalesChatVisualStyle.argb(
                 LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB,
                 Math.round(LostTalesChatVisualStyle.INSET_ALPHA
                         * LostTalesChatVisualStyle.chatOpacity(minecraft)
@@ -1358,7 +1359,7 @@ final class LostTalesChatOverlayRenderer {
                     // The panel stops at the separator, so the two lie
                     // side by side, never one over the other. It thins
                     // with the game's chat opacity as the panel does.
-                    fillRect(panelLeft, topEdge, messageLeft, bottomEdge,
+                    LostTalesUiInk.fillRect(panelLeft, topEdge, messageLeft, bottomEdge,
                             LostTalesChatVisualStyle.argb(
                                     LostTalesChatVisualStyle.SURFACE_RGB,
                                     columnAlpha));
@@ -1374,9 +1375,9 @@ final class LostTalesChatOverlayRenderer {
                         LostTalesChatVisualStyle.SURFACE_RGB, columnAlpha);
                 int panelArgb = LostTalesChatVisualStyle.argb(
                         LostTalesChatVisualStyle.backdropRgb(), panelAlpha);
-                fillRect(ringLeft, topEdge, panelLeft, bottomEdge,
+                LostTalesUiInk.fillRect(ringLeft, topEdge, panelLeft, bottomEdge,
                         columns.shows() ? areaArgb : panelArgb);
-                fillRect(windowRight, topEdge, ringRight, bottomEdge,
+                LostTalesUiInk.fillRect(windowRight, topEdge, ringRight, bottomEdge,
                         panelRight < windowRight ? areaArgb : panelArgb);
                 // Rows the history does not reach: hatched, so the
                 // region reads as holding no messages rather than as a
@@ -1650,7 +1651,7 @@ final class LostTalesChatOverlayRenderer {
                             // the bar says it at a glance from across the
                             // window. It stands with the panel, still while
                             // the line's text slides in.
-                            fillRect(panelLeft, y - rowHeight - headroom / scale,
+                            LostTalesUiInk.fillRect(panelLeft, y - rowHeight - headroom / scale,
                                     panelLeft + MENTION_BAR_WIDTH, y,
                                     (alpha << 24) | mentionRgb);
                         }
@@ -1701,7 +1702,7 @@ final class LostTalesChatOverlayRenderer {
                         float barLeft = alignment == ChatFeedAlignment.RIGHT
                                 ? panelRight - MENTION_BAR_WIDTH
                                 : panelLeft;
-                        fillRect(barLeft, y - rowHeight - headroom / scale,
+                        LostTalesUiInk.fillRect(barLeft, y - rowHeight - headroom / scale,
                                 barLeft + MENTION_BAR_WIDTH, y,
                                 (alpha << 24) | mentionRgb);
                     }
@@ -2535,13 +2536,13 @@ final class LostTalesChatOverlayRenderer {
             // and one below it, so the rule opens toward the date the
             // way Discord's does.
             int cap = (alpha << 24) | rgb;
-            fillRect(gapLeft - pixel, ruleTop - pixel, gapLeft, ruleTop,
+            LostTalesUiInk.fillRect(gapLeft - pixel, ruleTop - pixel, gapLeft, ruleTop,
                     cap);
-            fillRect(gapLeft - pixel, ruleTop + pixel, gapLeft,
+            LostTalesUiInk.fillRect(gapLeft - pixel, ruleTop + pixel, gapLeft,
                     ruleTop + 2.0F * pixel, cap);
-            fillRect(gapRight, ruleTop - pixel, gapRight + pixel, ruleTop,
+            LostTalesUiInk.fillRect(gapRight, ruleTop - pixel, gapRight + pixel, ruleTop,
                     cap);
-            fillRect(gapRight, ruleTop + pixel, gapRight + pixel,
+            LostTalesUiInk.fillRect(gapRight, ruleTop + pixel, gapRight + pixel,
                     ruleTop + 2.0F * pixel, cap);
             GL11.glPushMatrix();
             try {
@@ -2649,10 +2650,10 @@ final class LostTalesChatOverlayRenderer {
         float thumbBottom = bottomEdge - travel
                 * Math.max(0.0F, Math.min(1.0F, offset / reach));
         float thumbTop = thumbBottom - thumbHeight;
-        fillRect(left, topEdge, right, bottomEdge,
+        LostTalesUiInk.fillRect(left, topEdge, right, bottomEdge,
                 (Math.round(alpha * 0.35F) << 24)
                         | LostTalesChatVisualStyle.SURFACE_RGB);
-        fillRect(left, thumbTop, right, thumbBottom,
+        LostTalesUiInk.fillRect(left, thumbTop, right, thumbBottom,
                 (alpha << 24)
                         | LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB);
         frame.scrollbarLeft = originX + (left - 2.0F) * scale;
@@ -3028,7 +3029,7 @@ final class LostTalesChatOverlayRenderer {
         float badgeLeft = badgeRight - textWidth - 3.0F;
         float badgeTop = buttonTop - 2.0F;
         float badgeBottom = badgeTop + 9.0F;
-        fillRect(badgeLeft, badgeTop, badgeRight, badgeBottom,
+        LostTalesUiInk.fillRect(badgeLeft, badgeTop, badgeRight, badgeBottom,
                 (alpha << 24) | UNREAD_DIVIDER_RGB);
         LostTalesChatVisualStyle.drawColored(minecraft.fontRenderer, text,
                 Math.round(badgeLeft) + 2, Math.round(badgeTop) + 1,
@@ -3318,15 +3319,15 @@ final class LostTalesChatOverlayRenderer {
             // control's square in its own, side by side.
             int edgeArgb = LostTalesUiInk.argb(
                     LostTalesUiFramedButton.surfaceRgb(frameLit), surfaceAlpha);
-            fillRect(1.0F, 0.0F, width - 1.0F, edge, edgeArgb);
-            fillRect(0.0F, edge, edge, TOOLBAR_HEIGHT - edge, edgeArgb);
-            fillRect(width - edge, edge, width, TOOLBAR_HEIGHT - edge,
+            LostTalesUiInk.fillRect(1.0F, 0.0F, width - 1.0F, edge, edgeArgb);
+            LostTalesUiInk.fillRect(0.0F, edge, edge, TOOLBAR_HEIGHT - edge, edgeArgb);
+            LostTalesUiInk.fillRect(width - edge, edge, width, TOOLBAR_HEIGHT - edge,
                     edgeArgb);
-            fillRect(1.0F, TOOLBAR_HEIGHT - edge, width - 1.0F,
+            LostTalesUiInk.fillRect(1.0F, TOOLBAR_HEIGHT - edge, width - 1.0F,
                     TOOLBAR_HEIGHT, edgeArgb);
             for (int index = 0; index < TOOLBAR_KINDS.length; index++) {
                 float cellLeft = edge + index * TOOLBAR_CELL;
-                fillRect(cellLeft, edge, cellLeft + TOOLBAR_CELL,
+                LostTalesUiInk.fillRect(cellLeft, edge, cellLeft + TOOLBAR_CELL,
                         edge + TOOLBAR_CELL, LostTalesUiInk.argb(
                                 LostTalesUiFramedButton.surfaceRgb(lit[index]),
                                 surfaceAlpha));
@@ -3453,7 +3454,7 @@ final class LostTalesChatOverlayRenderer {
                         && pixels.charAt(column) == '#') {
                     column++;
                 }
-                fillRect(x + start, y + row, x + column, y + row + 1.0F,
+                LostTalesUiInk.fillRect(x + start, y + row, x + column, y + row + 1.0F,
                         argb);
             }
         }
@@ -3792,17 +3793,17 @@ final class LostTalesChatOverlayRenderer {
     /** The clock's pixels, seven rows round, from {@code (x, y)}. */
     private static void drawClockPixels(float x, float y, int argb) {
         // The rim.
-        fillRect(x + 2.0F, y, x + 5.0F, y + 1.0F, argb);
-        fillRect(x + 1.0F, y + 1.0F, x + 2.0F, y + 2.0F, argb);
-        fillRect(x + 5.0F, y + 1.0F, x + 6.0F, y + 2.0F, argb);
-        fillRect(x, y + 2.0F, x + 1.0F, y + 5.0F, argb);
-        fillRect(x + 6.0F, y + 2.0F, x + 7.0F, y + 5.0F, argb);
-        fillRect(x + 1.0F, y + 5.0F, x + 2.0F, y + 6.0F, argb);
-        fillRect(x + 5.0F, y + 5.0F, x + 6.0F, y + 6.0F, argb);
-        fillRect(x + 2.0F, y + 6.0F, x + 5.0F, y + 7.0F, argb);
+        LostTalesUiInk.fillRect(x + 2.0F, y, x + 5.0F, y + 1.0F, argb);
+        LostTalesUiInk.fillRect(x + 1.0F, y + 1.0F, x + 2.0F, y + 2.0F, argb);
+        LostTalesUiInk.fillRect(x + 5.0F, y + 1.0F, x + 6.0F, y + 2.0F, argb);
+        LostTalesUiInk.fillRect(x, y + 2.0F, x + 1.0F, y + 5.0F, argb);
+        LostTalesUiInk.fillRect(x + 6.0F, y + 2.0F, x + 7.0F, y + 5.0F, argb);
+        LostTalesUiInk.fillRect(x + 1.0F, y + 5.0F, x + 2.0F, y + 6.0F, argb);
+        LostTalesUiInk.fillRect(x + 5.0F, y + 5.0F, x + 6.0F, y + 6.0F, argb);
+        LostTalesUiInk.fillRect(x + 2.0F, y + 6.0F, x + 5.0F, y + 7.0F, argb);
         // The hands, at a quarter past.
-        fillRect(x + 3.0F, y + 2.0F, x + 4.0F, y + 4.0F, argb);
-        fillRect(x + 4.0F, y + 3.0F, x + 5.0F, y + 4.0F, argb);
+        LostTalesUiInk.fillRect(x + 3.0F, y + 2.0F, x + 4.0F, y + 4.0F, argb);
+        LostTalesUiInk.fillRect(x + 4.0F, y + 3.0F, x + 5.0F, y + 4.0F, argb);
     }
 
     /**
@@ -4068,8 +4069,8 @@ final class LostTalesChatOverlayRenderer {
                 LostTalesChatVisualStyle.asideRgb(), alpha);
         // The bend: the two strokes meet corner to corner, a pixel of
         // rounding where they turn.
-        fillRect(left + pixel, bend, right, bend + pixel, argb);
-        fillRect(left, bend + pixel, left + pixel, rowBottom, argb);
+        LostTalesUiInk.fillRect(left + pixel, bend, right, bend + pixel, argb);
+        LostTalesUiInk.fillRect(left, bend + pixel, left + pixel, rowBottom, argb);
     }
 
     /**
@@ -4114,9 +4115,9 @@ final class LostTalesChatOverlayRenderer {
         float historyTop = (float)frame.historyTop();
         // The ring's outermost corner pixels lie outside the frame's
         // rounding, as a framed button's footprint corners do.
-        fillRect(left - ring + 1, top - ring, right + ring - 1,
+        LostTalesUiInk.fillRect(left - ring + 1, top - ring, right + ring - 1,
                 top - ring + 1, strip.drawnStripArgb);
-        fillRect(left - ring, top - ring + 1, right + ring, top,
+        LostTalesUiInk.fillRect(left - ring, top - ring + 1, right + ring, top,
                 strip.drawnStripArgb);
         fillFrameSides(left, right, top, stripRule, strip.drawnStripArgb,
                 strip.drawnStripArgb);
@@ -4133,16 +4134,17 @@ final class LostTalesChatOverlayRenderer {
                                        float to, int leftArgb,
                                        int rightArgb) {
         int ring = ChatWindowPlacement.FRAME_WIDTH;
-        fillRect(left - ring, from, left, to, leftArgb);
-        fillRect(right, from, right + ring, to, rightArgb);
+        LostTalesUiInk.fillRect(left - ring, from, left, to, leftArgb);
+        LostTalesUiInk.fillRect(right, from, right + ring, to, rightArgb);
     }
 
     /**
      * The window's own part of its frame's edges, down to its input
-     * bar ({@link #drawFrameEdgesAbove}): the top edge, the two top
-     * corners and the side edges' stretches above the bar. The bar draws
-     * the rest with itself ({@link #drawFrameEdgesBelow}), so it rides
-     * the bar's entrance.
+     * bar ({@link LostTalesUiWindowFrame#drawEdgesAbove}): the top edge,
+     * the two top corners and the side edges' stretches above the bar.
+     * The bar draws the rest with itself
+     * ({@link LostTalesUiWindowFrame#drawEdgesBelow}), so it rides the
+     * bar's entrance.
      */
     static void drawWindowFrameEdges(Minecraft minecraft,
                                      ChatWindowFrame frame,
@@ -4152,301 +4154,12 @@ final class LostTalesChatOverlayRenderer {
             return;
         }
         float left = (float)frame.drawnLeft();
-        drawFrameEdgesAbove(left, (float)(frame.boxTop + frame.motionY),
+        LostTalesUiWindowFrame.drawEdgesAbove(left,
+                (float)(frame.boxTop + frame.motionY),
                 left + (float)(frame.boxRight - frame.boxLeft),
                 (float)(frame.boxBottom + frame.motionY),
                 (float)frame.barTop(),
                 Math.round(255.0F * opening.getOpacity()));
-    }
-
-    /** The ramp's opacity at {@code y}; clamped, linear. */
-    static int rampAlpha(int alpha, float rampBottom, float rampSpan,
-                         float y) {
-        float share = 1.0F - (rampBottom - y) / rampSpan;
-        return Math.round(alpha
-                * Math.max(0.0F, Math.min(1.0F, share)));
-    }
-
-    /**
-     * The surface of a chat window's frame round the box {@code left} to
-     * {@code right} by {@code top} to {@code bottom}: a ring
-     * {@link ChatWindowPlacement#FRAME_WIDTH} wide just outside the box,
-     * in {@code surface}, its four outermost corner pixels left out, as a
-     * framed button's footprint corners are. What the snap preview wears;
-     * a window draws the same ring in two parts, its own and its bar's,
-     * which fly in apart.
-     */
-    static void drawFrameSurface(float left, float top, float right,
-                                 float bottom, int surface) {
-        int ring = ChatWindowPlacement.FRAME_WIDTH;
-        fillRect(left - ring + 1, top - ring, right + ring - 1,
-                top - ring + 1, surface);
-        fillRect(left - ring, top - ring + 1, right + ring, top, surface);
-        fillRect(left - ring, top, left, bottom, surface);
-        fillRect(right, top, right + ring, bottom, surface);
-        fillRect(left - ring, bottom, right + ring, bottom + ring - 1,
-                surface);
-        fillRect(left - ring + 1, bottom + ring - 1, right + ring - 1,
-                bottom + ring, surface);
-    }
-
-    /**
-     * The edges of a chat window's frame round the box {@code left} to
-     * {@code right} by {@code top} to {@code bottom}, at {@code alpha}: a
-     * lit framed button's frame, its edges and corners drawn from the
-     * window frame's own cells, which carry that frame's ink texel for
-     * texel ({@link #drawFrameEdge}, {@link #drawFrameCorner}),
-     * one pixel just outside each side, over the ring's inner pixel. It
-     * differs from the button's only in fading: the left and bottom edges
-     * are strongest at the bottom-left corner and the top and right ones
-     * at the top-right, each fading linearly to nothing at the far corner,
-     * and the corners fade with them. What the snap preview and the snap
-     * panels wear; a window draws the same edges in two parts, its own
-     * and its bar's, which fly in apart.
-     */
-    static void drawFrameEdges(float left, float top, float right,
-                               float bottom, int alpha) {
-        float split = bottom - CORNER_ARM;
-        drawFrameEdgesAbove(left, top, right, bottom, split, alpha);
-        drawFrameEdgesBelow(left, top, right, bottom, split, alpha);
-    }
-
-    /**
-     * The upper part of a frame's edges round the box {@code left} to
-     * {@code right} by {@code top} to {@code bottom}: the top edge between
-     * its corners, the two top corners, and the side edges from under the
-     * corners down to {@code split}, all on the whole frame's ramps.
-     */
-    static void drawFrameEdgesAbove(float left, float top, float right,
-                                    float bottom, float split, int alpha) {
-        if (alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA
-                || right <= left || bottom <= top) {
-            return;
-        }
-        int edge = ChatWindowPlacement.FRAME_EDGE_WIDTH;
-        int ring = ChatWindowPlacement.FRAME_WIDTH;
-        int cell = LostTalesUiFramedButton.CORNER;
-        int arm = CORNER_ARM;
-        float span = bottom - top + edge;
-        float edgeTop = top - edge;
-        float between = right - left - 2 * arm;
-        drawFrameEdge(false, false, left + arm, edgeTop, between,
-                edgeAlphaAt(alpha, right, left, left + arm),
-                edgeAlphaAt(alpha, right, left, right - arm));
-        drawFrameEdge(true, false, left - edge, top + arm, split - top - arm,
-                rampAlpha(alpha, bottom, span, top + arm),
-                rampAlpha(alpha, bottom, span, split));
-        drawFrameEdge(true, true, right, top + arm, split - top - arm,
-                rampDownAlpha(alpha, edgeTop, span, top + arm),
-                rampDownAlpha(alpha, edgeTop, span, split));
-        drawFrameCorner(LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT, left - ring,
-                top - ring, false, false,
-                rampAlpha(alpha, bottom, span, top),
-                rampAlpha(alpha, bottom, span, top + arm),
-                edgeAlphaAt(alpha, right, left, left),
-                edgeAlphaAt(alpha, right, left, left + arm));
-        drawFrameCorner(LostTalesUiSheet.WINDOW_FRAME_TOP_RIGHT,
-                right + ring - cell, top - ring, true, false,
-                rampDownAlpha(alpha, edgeTop, span, top),
-                rampDownAlpha(alpha, edgeTop, span, top + arm),
-                edgeAlphaAt(alpha, right, left, right),
-                edgeAlphaAt(alpha, right, left, right - arm));
-    }
-
-    /**
-     * The lower part of a frame's edges round the box {@code left} to
-     * {@code right} by {@code top} to {@code bottom}: the side edges from
-     * {@code split} down to the bottom corners, the bottom edge between
-     * them, and the two bottom corners, all on the whole frame's ramps.
-     */
-    static void drawFrameEdgesBelow(float left, float top, float right,
-                                    float bottom, float split, int alpha) {
-        if (alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA
-                || right <= left || bottom <= top) {
-            return;
-        }
-        int edge = ChatWindowPlacement.FRAME_EDGE_WIDTH;
-        int ring = ChatWindowPlacement.FRAME_WIDTH;
-        int cell = LostTalesUiFramedButton.CORNER;
-        int arm = CORNER_ARM;
-        float span = bottom - top + edge;
-        float edgeTop = top - edge;
-        drawFrameEdge(true, false, left - edge, split, bottom - arm - split,
-                rampAlpha(alpha, bottom, span, split),
-                rampAlpha(alpha, bottom, span, bottom - arm));
-        drawFrameEdge(true, true, right, split, bottom - arm - split,
-                rampDownAlpha(alpha, edgeTop, span, split),
-                rampDownAlpha(alpha, edgeTop, span, bottom - arm));
-        drawFrameEdge(false, true, left + arm, bottom, right - left - 2 * arm,
-                edgeAlphaAt(alpha, left, right, left + arm),
-                edgeAlphaAt(alpha, left, right, right - arm));
-        drawFrameCorner(LostTalesUiSheet.WINDOW_FRAME_BOTTOM_LEFT, left - ring,
-                bottom + ring - cell, false, true,
-                rampAlpha(alpha, bottom, span, bottom),
-                rampAlpha(alpha, bottom, span, bottom - arm),
-                edgeAlphaAt(alpha, left, right, left),
-                edgeAlphaAt(alpha, left, right, left + arm));
-        drawFrameCorner(LostTalesUiSheet.WINDOW_FRAME_BOTTOM_RIGHT,
-                right + ring - cell, bottom + ring - cell, true, true,
-                rampDownAlpha(alpha, edgeTop, span, bottom),
-                rampDownAlpha(alpha, edgeTop, span, bottom - arm),
-                edgeAlphaAt(alpha, left, right, right),
-                edgeAlphaAt(alpha, left, right, right - arm));
-    }
-
-    /**
-     * How far each corner's artwork runs along the two edges it joins:
-     * from the box's corner, where the frame's ring ends, to the corner
-     * cell's inner side. The edges stop there and the corner draws on, so
-     * no pixel of the frame lies twice.
-     */
-    static final int CORNER_ARM = LostTalesUiFramedButton.CORNER
-            - ChatWindowPlacement.FRAME_WIDTH;
-
-    /**
-     * Where the frame's edges run across a corner cell: a texel in from
-     * its outer sides, past the ring's outer pixel.
-     */
-    static final int EDGE_LINE = ChatWindowPlacement.FRAME_WIDTH
-            - ChatWindowPlacement.FRAME_EDGE_WIDTH;
-
-    /**
-     * A texel's index across a frame's corner cell, {@code depth} texels
-     * in from the cell's outer side: counted from the cell's start on a
-     * side it starts on, from its end on one it ends on ({@code far}).
-     */
-    static int cornerTexel(boolean far, int depth) {
-        return far ? LostTalesUiFramedButton.CORNER - 1 - depth : depth;
-    }
-
-    /**
-     * The opacity of a corner's rounding pixel: the mean of the two arm
-     * pixels beside it, the first of each arm, each at its centre on the
-     * arm's fade from its near opacity to its far one.
-     */
-    static int bendAlpha(int sideNear, int sideFar, int crossNear,
-                         int crossFar) {
-        float first = 0.5F / CORNER_ARM;
-        return Math.round((sideNear + (sideFar - sideNear) * first
-                + crossNear + (crossFar - crossNear) * first) / 2.0F);
-    }
-
-    /**
-     * One corner of a chat window's frame: the window frame's corner cell
-     * {@code corner}, the lit framed button's corner ink for ink, its
-     * cell's top-left at
-     * ({@code cellX}, {@code cellY}), on the frame's right for
-     * {@code right} and at its foot for {@code bottom}. Only its ink is
-     * drawn — an arm on the side edge, an arm on the top or bottom edge
-     * (the cross arm) and the rounding pixel in the bend — each on the
-     * frame's ramps rather than at one opacity: the side arm fading from
-     * {@code sideNear} at the bend to {@code sideFar} at its other end,
-     * the cross arm from {@code crossNear} to {@code crossFar}, the
-     * rounding pixel at the mean of the two pixels beside it. The lit
-     * corners stand at the ramps' full ends and the faded ones at their
-     * empty ends, so every corner of the frame is one shape.
-     */
-    static void drawFrameCorner(LostTalesUiSheet corner, float cellX,
-                                float cellY, boolean right, boolean bottom,
-                                int sideNear, int sideFar, int crossNear,
-                                int crossFar) {
-        int ring = ChatWindowPlacement.FRAME_WIDTH;
-        int u = corner.getTextureU();
-        int v = corner.getTextureV();
-        // Each arm runs along the edges' line between the box's corner, a
-        // ring in, and the cell's inner side.
-        int column = cornerTexel(right, EDGE_LINE);
-        int row = cornerTexel(bottom, EDGE_LINE);
-        int sideFirst = bottom ? 0 : ring;
-        int crossFirst = right ? 0 : ring;
-        LostTalesUiSheet.drawFading(u + column, v + sideFirst, CORNER_ARM,
-                true, cellX + column, cellY + sideFirst, CORNER_ARM,
-                bottom ? sideFar : sideNear, bottom ? sideNear : sideFar);
-        LostTalesUiSheet.drawFading(u + crossFirst, v + row, CORNER_ARM,
-                false, cellX + crossFirst, cellY + row, CORNER_ARM,
-                right ? crossFar : crossNear, right ? crossNear : crossFar);
-        // The rounding pixel stands in the box's corner, diagonally inside
-        // the bend, beside each arm's first pixel.
-        int bendColumn = cornerTexel(right, ring);
-        int bendRow = cornerTexel(bottom, ring);
-        int bend = bendAlpha(sideNear, sideFar, crossNear, crossFar);
-        LostTalesUiSheet.drawFading(u + bendColumn, v + bendRow, 1, true,
-                cellX + bendColumn, cellY + bendRow, 1.0F, bend, bend);
-    }
-
-    /**
-     * The window frame's corner cell an edge is stretched from, as a
-     * framed button stretches its own: the top and bottom edges from
-     * their left corner's innermost column, the sides from their top
-     * corner's innermost row. {@code side} picks a side over a top or
-     * bottom edge, {@code far} the right side or the bottom edge.
-     */
-    static LostTalesUiSheet edgeCorner(boolean side, boolean far) {
-        if (side) {
-            return far ? LostTalesUiSheet.WINDOW_FRAME_TOP_RIGHT
-                    : LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT;
-        }
-        return far ? LostTalesUiSheet.WINDOW_FRAME_BOTTOM_LEFT
-                : LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT;
-    }
-
-    /**
-     * One stretch of a frame's edge, drawn as a lit framed button draws
-     * that edge: the texel of its corner cell's innermost column or row
-     * that lies on the edges' line ({@link #edgeCorner}), stretched from
-     * ({@code x}, {@code y}) over {@code length} pixels — down a side
-     * ({@code side}) or rightward along the top or bottom edge — and
-     * fading from {@code startAlpha} to {@code endAlpha}. {@code far} is
-     * the right side or the bottom edge.
-     */
-    static void drawFrameEdge(boolean side, boolean far, float x, float y,
-                              float length, int startAlpha, int endAlpha) {
-        LostTalesUiSheet corner = edgeCorner(side, far);
-        int innermost = LostTalesUiFramedButton.CORNER - 1;
-        int line = cornerTexel(far, EDGE_LINE);
-        LostTalesUiSheet.drawFading(
-                corner.getTextureU() + (side ? line : innermost),
-                corner.getTextureV() + (side ? innermost : line), 1, side,
-                x, y, length, startAlpha, endAlpha);
-    }
-
-    /**
-     * A horizontal frame edge's opacity at {@code x}, for an edge fading
-     * linearly from {@code alpha} at {@code full} to nothing at
-     * {@code gone}: the top edge from its right end to its left, the
-     * bottom edge from its left end to its right.
-     */
-    static int edgeAlphaAt(int alpha, float full, float gone, float x) {
-        float span = Math.abs(gone - full);
-        if (span <= 0.0F) {
-            return 0;
-        }
-        return Math.round(alpha * Math.max(0.0F,
-                Math.min(1.0F, 1.0F - Math.abs(x - full) / span)));
-    }
-
-    /** The downward ramp's opacity at {@code y}; clamped, linear. */
-    static int rampDownAlpha(int alpha, float rampTop, float rampSpan,
-                             float y) {
-        float share = 1.0F - (y - rampTop) / rampSpan;
-        return Math.round(alpha
-                * Math.max(0.0F, Math.min(1.0F, share)));
-    }
-
-    /** A flat quad at fractional edges; {@code Gui.drawRect} is whole. */
-    static void fillRect(float left, float top, float right,
-                                 float bottom, int argb) {
-        int alpha = argb >>> 24;
-        if (alpha <= 0 || right <= left || bottom <= top) {
-            return;
-        }
-        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(false);
-        tessellator.setColorRGBA_I(argb & 0xFFFFFF, alpha);
-        tessellator.addVertex(left, bottom, 0.0D);
-        tessellator.addVertex(right, bottom, 0.0D);
-        tessellator.addVertex(right, top, 0.0D);
-        tessellator.addVertex(left, top, 0.0D);
-        LostTalesSkyrimUiStyle.endQuads(tessellator, false);
     }
 
     /**

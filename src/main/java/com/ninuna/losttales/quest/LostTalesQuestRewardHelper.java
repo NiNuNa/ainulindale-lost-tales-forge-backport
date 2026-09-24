@@ -8,7 +8,6 @@ import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.util.EnumChatFormatting;
 /** Grants simple optional quest rewards using systems available in Minecraft 1.7.10. */
 public final class LostTalesQuestRewardHelper {
 
@@ -28,7 +27,8 @@ public final class LostTalesQuestRewardHelper {
         boolean granted = grantRewardMap(player, quest.getRewards());
         granted = grantOptionalRewards(player, quest, progress, granted);
         if (granted) {
-            player.addChatMessage(new net.minecraft.util.ChatComponentText(EnumChatFormatting.DARK_AQUA + "[Lost Tales] " + EnumChatFormatting.RESET + EnumChatFormatting.GOLD + "Quest rewards received."));
+            player.addChatMessage(new net.minecraft.util.ChatComponentTranslation(
+                    "chat.losttales.quest.note.rewards"));
         }
         return granted;
     }

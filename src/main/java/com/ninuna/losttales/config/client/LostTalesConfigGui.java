@@ -126,22 +126,15 @@ public class LostTalesConfigGui extends GuiConfig {
         elements.add(group("quickLoot", "losttales.config.category.client.quickLoot", pick(client,
                 "quickLootHudMaxRows")));
         elements.add(group("questHud", "losttales.config.category.client.questHud", pick(client,
-                "questHudMaxObjectives", "questHudMaxTrackedQuests", "questHudObjectiveLineCount",
+                "questHudMaxTrackedQuests", "questHudObjectiveLineCount",
                 "showQuestHudNotifications", "showNativeLotrQuestTracker",
                 "enableQuestDialogue",
                 "showWorldQuestMarkers", "showDiscoveredWorldMapMarkers",
                 "worldQuestMarkerMaxDistance", "showQuestChatFeedback", "playQuestSounds")));
-        elements.add(group("chat", "losttales.config.category.client.chat", pick(client,
-                "enableChatEmojis", "convertChatEmoticons",
-                "chatProfanityFilter",
-                "enableChatMessageGrouping", "enableChatBackgroundBlur",
-                "enableChatPings", "chatPingSound",
-                "chatFeedAlignment", "chatSpeakerSize",
-                "chatFeedSpeakerSize", "chatFeedMessageSize",
-                "chatQuoteSize", "chatFeedQuoteSize", "hideHudWhileChatting",
-                "chatHistoryLines",
-                "sendChatTypingStatus", "showChatTypingIndicators",
-                "enableNpcChatStyling", "showChatSpeechBubbles")));
+        // The chat's own Chat Settings window holds every chat option but
+        // the history's length, which is a safety bound.
+        elements.add(group("chat", "losttales.config.category.client.chat",
+                pick(client, "chatHistoryLines")));
         elements.add(group("motion",
                 "losttales.config.category.client.motion",
                 pick(client, "animations", "animationSpeed",
@@ -214,8 +207,8 @@ public class LostTalesConfigGui extends GuiConfig {
                 }
             }
         }
-        // The chat's own windows set these, and nothing else shows them.
-        used.addAll(LostTalesConfig.CHAT_WINDOW_KEYS);
+        // The chat's Chat Settings sets these, and nothing else shows them.
+        used.addAll(LostTalesConfig.CHAT_SETTINGS_KEYS);
         for (IConfigElement element : source) {
             if (element != null && !used.contains(element.getName())) {
                 result.add(element);

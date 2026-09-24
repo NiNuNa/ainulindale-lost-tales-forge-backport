@@ -99,14 +99,14 @@ public final class ChatScreenMenusTest {
     @Test
     public void theSearchPanelListsOpenTabsAndClosedChannelsAndNothingElse() {
         ChatScreenMenus menus = new ChatScreenMenus(null, null, null);
-        List<ChatPopupMenu.Entry> entries = menus.searchEntries("");
+        List<ChatMenu.Entry> entries = menus.searchEntries("");
         assertFalse(entries.isEmpty());
         int openTabs = 0;
         for (ChatWindow window : ChatWindowLayout.windows()) {
             openTabs += ChatWindowFrame.visibleTabs(window).size();
         }
         int rows = 0;
-        for (ChatPopupMenu.Entry entry : entries) {
+        for (ChatMenu.Entry entry : entries) {
             if (entry.header) {
                 continue;
             }
@@ -123,28 +123,31 @@ public final class ChatScreenMenusTest {
         // and the restorable channels, and nothing else.
         assertEquals(openTabs + ChatScreenMenus.restorableChannels().size(),
                 rows);
-        // A filter matching nothing keeps the panel open with one plain row.
-        List<ChatPopupMenu.Entry> none = menus.searchEntries("zzzz-nothing");
+        // A filter matching nothing keeps the window open with one plain row.
+        List<ChatMenu.Entry> none = menus.searchEntries("zzzz-nothing");
         assertEquals(1, none.size());
         assertFalse(none.get(0).header);
     }
 
     /**
-     * A message's menu button is a switch: the press that put that
-     * message's menu away says so, and no other menu's closing does.
+     * A menu's control is a switch for the thing it was pressed for: a
+     * message is the same one by its line whatever was read off it, a
+     * window's search by the window, and the empty screen's by null.
      */
     @Test
-    public void aPressThatClosedAMessagesMenuSaysWhichMessage() {
-        ChatScreenMenus.Click closed = new ChatScreenMenus.Click(false,
-                ChatScreenMenus.POPUP_MESSAGE, null, 42, null);
-        assertTrue(closed.closedMessageMenu(42));
-        assertFalse(closed.closedMessageMenu(41));
-        assertFalse(closed.closedMessageMenu(0));
-        ChatScreenMenus.Click other = new ChatScreenMenus.Click(false,
-                ChatScreenMenus.POPUP_SETTINGS, "w1", 0, null);
-        assertFalse(other.closedMessageMenu(42));
-        ChatScreenMenus.Click none = new ChatScreenMenus.Click(false, "", null,
-                0, null);
-        assertFalse(none.closedMessageMenu(0));
+    public void aMenuIsAboutTheSameThingByItsLineOrWhatItEquals() {
+        ChatScreenMenus.MessageAim one = new ChatScreenMenus.MessageAim(42,
+                7L, "hello", "Steve", "", false, null, null, null);
+        ChatScreenMenus.MessageAim again = new ChatScreenMenus.MessageAim(42,
+                7L, "hello there", "Steve", "Aragorn", false, null, null,
+                "w1");
+        ChatScreenMenus.MessageAim other = new ChatScreenMenus.MessageAim(43,
+                8L, "hello", "Steve", "", false, null, null, null);
+        assertTrue(ChatScreenMenus.sameAbout(one, again));
+        assertFalse(ChatScreenMenus.sameAbout(one, other));
+        assertTrue(ChatScreenMenus.sameAbout("w1", "w1"));
+        assertFalse(ChatScreenMenus.sameAbout("w1", "w2"));
+        assertTrue(ChatScreenMenus.sameAbout(null, null));
+        assertFalse(ChatScreenMenus.sameAbout("w1", null));
     }
 }

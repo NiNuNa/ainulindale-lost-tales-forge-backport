@@ -183,7 +183,7 @@ final class DiscordCopyLiveness {
     }
 
     /**
-     * The game's {@code #Channel/<id>} for a Discord jump link to a
+     * The game's {@code #<code name>/<id>} for a Discord jump link to a
      * message in {@code discordChannelId}, or empty: the message is one
      * {@link #inboundTarget} finds, the linked Discord message is its
      * copy in that very channel, and the link is named in the message's
@@ -199,7 +199,8 @@ final class DiscordCopyLiveness {
                 links.discordIdOf(target, CHANNEL_PREFIX + discordChannelId))) {
             return "";
         }
-        String link = ChatChannelSuggester.messageLink(places.channelOf(target), target);
+        String link = ChatChannelSuggester.messageLink(places.channelOf(target),
+                places.factionScopeOf(target), target);
         return link == null ? "" : link;
     }
 

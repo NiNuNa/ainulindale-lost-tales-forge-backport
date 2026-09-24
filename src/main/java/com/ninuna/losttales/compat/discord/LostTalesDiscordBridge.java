@@ -3,6 +3,7 @@ package com.ninuna.losttales.compat.discord;
 import com.google.gson.JsonObject;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatCodeNames;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatDeliveryMark;
 import com.ninuna.losttales.chat.ChatEpithet;
@@ -1083,7 +1084,7 @@ public final class LostTalesDiscordBridge {
      * How a Discord line's jump links are spelled for the game: a link
      * to a message the bridge carried either way, in a Discord channel
      * one of {@code bound}'s bindings reads into that message's own game
-     * channel, becomes {@code #Channel/<id>}; any other stays the URL it
+     * channel, becomes {@code #<code name>/<id>}; any other stays the URL it
      * is.
      */
     private DiscordMessageLinkRewriter.Resolver linkResolver(
@@ -1490,25 +1491,27 @@ public final class LostTalesDiscordBridge {
 
     /**
      * The name a link's game channel reads by: the channel's own
-     * ({@code OOC}, {@code Global}), or a faction's for a Faction link.
+     * ({@code Out of Character}, {@code Global}), or a faction's for a
+     * faction's chat ({@code Gondor}).
      */
     public static String gameChannelName(String key) {
         String value = key == null ? "" : key.trim();
-        int colon = value.indexOf(DiscordChannelBinding.SCOPE_SEPARATOR);
-        if (colon >= 0) {
-            String faction = LotrCharacterAdapter.getInstance()
-                    .getFactionDisplayName(value.substring(colon + 1));
-            return faction == null || faction.length() == 0
-                    ? value.substring(colon + 1) : faction;
+        ChatCodeNames.Named named = ChatCodeNames.parse(value);
+        if (named == null) {
+            return value;
         }
-        ChatChannel channel = ChatChannel.fromId(value);
-        return channel == null ? value : channel.getDisplayName();
+        if (named.channel != ChatChannel.FACTION) {
+            return named.channel.getDisplayName();
+        }
+        String faction = LotrCharacterAdapter.getInstance()
+                .getFactionDisplayName(named.scope);
+        return faction == null || faction.length() == 0 ? value : faction;
     }
 
     /**
-     * The game channels linked to Discord now, by link key — a channel's
-     * id, or {@code faction:<id>} for one faction's chat — whose icons the
-     * clients split with Discord's. A link switched off, or one whose
+     * The game channels linked to Discord now, by their code names
+     * ({@code global}, {@code gondor}), whose icons the clients split
+     * with Discord's. A link switched off, or one whose
      * channel may not leave the game, splits nothing.
      */
     public List<String> linkedKeys() {

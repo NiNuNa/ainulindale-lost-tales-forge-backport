@@ -111,7 +111,7 @@ public final class ChatEmojiMarkerTest {
 
     private static LostTalesChatMessagePacket packet(String message) {
         return new LostTalesChatMessagePacket(
-                ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
+                ChatChannel.GLOBAL, UUID.randomUUID(), "Arathorn",
                 "RangerOfTheNorth", "Ranger", 0x55AA55, 0x336633,
                 message, 123456789L, "losttales:human_ranger_male_2");
     }

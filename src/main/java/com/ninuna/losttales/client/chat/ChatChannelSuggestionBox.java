@@ -11,15 +11,17 @@ import net.minecraft.client.gui.FontRenderer;
 
 /**
  * The list a typed {@code #} opens over the input: the channels the
- * prefix names, each with its icon and its {@code #name} in its own
+ * prefix names, each with its icon and its {@code #Name} in its own
  * colour, exactly as the emoji and mention lists open on {@code :}
- * and {@code @}. Picking one writes the channel's token into the
- * message, which is drawn as a link to the channel.
+ * and {@code @}. Picking one writes the channel's code name into the
+ * message ({@code #gondor} for the Faction tab read as Gondor), which
+ * is drawn as a link to the channel.
  */
 final class ChatChannelSuggestionBox {
     static final int MAX_ROWS = 8;
     private static final int ROW_HEIGHT = 11;
-    private static final int PADDING = 2;
+    /** The rows stand two pixels inside the frame's ink, as a framed button's content does. */
+    private static final int PADDING = LostTalesChatVisualStyle.POPUP_INSET;
     private static final int ICON_SIZE = 8;
     private static final int ICON_GAP = 3;
     /**
@@ -52,7 +54,8 @@ final class ChatChannelSuggestionBox {
         this.query = found;
         if (changed) {
             this.matches = ChatChannelSuggester.matches(found.prefix,
-                    channels, MAX_ROWS);
+                    channels, ClientChatChannelState.scopeKeyRead(
+                            ChatChannel.FACTION), MAX_ROWS);
             if (this.selectedIndex >= this.matches.size()) {
                 this.selectedIndex = 0;
             }
@@ -143,17 +146,17 @@ final class ChatChannelSuggestionBox {
             ChatChannel channel = this.matches.get(row);
             // The channel's emoji as its tab wears it, half Discord's
             // while it is linked, over the one shadow.
-            ChatChannelIcons.drawChannelEmoji(minecraft, channel, inputX + 4,
-                    rowTop + 1, ICON_SIZE, 255);
+            ChatChannelIcons.drawChannelEmoji(minecraft, channel,
+                    inputX + PADDING, rowTop + 1, ICON_SIZE, 255);
             LostTalesChatVisualStyle.drawColored(font, label(channel),
-                    inputX + 4 + ICON_SIZE + ICON_GAP, rowTop + 2,
+                    inputX + PADDING + ICON_SIZE + ICON_GAP, rowTop + 2,
                     ClientChatChannelState.displayColor(channel), 255);
         }
     }
 
-    /** What a row reads: the channel's shown name behind the hash. */
+    /** What a row reads: the channel's shown name behind the hash, a faction's for the Faction tab. */
     static String label(ChatChannel channel) {
-        return "#" + channel.getDisplayName();
+        return "#" + ClientChatChannelState.displayName(channel);
     }
 
     private int boxWidth(FontRenderer font) {
@@ -161,7 +164,7 @@ final class ChatChannelSuggestionBox {
         for (ChatChannel channel : this.matches) {
             widest = Math.max(widest, font.getStringWidth(label(channel)));
         }
-        return PADDING * 2 + 4 + ICON_SIZE + ICON_GAP + widest + 4;
+        return PADDING + ICON_SIZE + ICON_GAP + widest + PADDING;
     }
 
     private int boxTop(int screenHeight) {

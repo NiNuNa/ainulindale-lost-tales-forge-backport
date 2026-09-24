@@ -325,7 +325,7 @@ public final class ChatLineWrapperTest {
     public void realMessagesPutTheirBodyUnderTheirSender() {
         IChatComponent message = LostTalesChatPresentation.build(
                 new LostTalesChatMessagePacket(
-                        ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
+                        ChatChannel.GLOBAL, UUID.randomUUID(), "Arathorn",
                         "Ranger", "", 0x55AA55, 0x336633,
                         "The road goes ever on and on, down from the "
                                 + "door where it began.", 1L,
@@ -371,12 +371,12 @@ public final class ChatLineWrapperTest {
     public void groupedMessagesKeepTheBodyIndentWithoutAHeaderRow() {
         LostTalesChatMessagePacket packet =
                 new LostTalesChatMessagePacket(
-                        ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
+                        ChatChannel.GLOBAL, UUID.randomUUID(), "Arathorn",
                         "Ranger", "", 0x55AA55, 0x336633,
                         "and on, down from the door where it began.",
                         1L, "losttales:human_ranger_male_2");
         IChatComponent grouped = LostTalesChatPresentation.build(packet,
-                ChatTab.of(ChatChannel.ALL), new int[0], true);
+                ChatTab.of(ChatChannel.GLOBAL), new int[0], true);
         for (int state = 0; state < 2; state++) {
             boolean chatOpen = state == 1;
             List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
@@ -410,10 +410,10 @@ public final class ChatLineWrapperTest {
                 + "name long enough to wrap around the window";
         IChatComponent line = LostTalesChatPresentation.build(
                 new LostTalesChatMessagePacket(
-                        ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
+                        ChatChannel.GLOBAL, UUID.randomUUID(), "Arathorn",
                         "Ranger", "", 0x55AA55, 0x336633, command, 1L,
                         "losttales:human_ranger_male_2"),
-                ChatTab.of(ChatChannel.ALL), new int[0], false,
+                ChatTab.of(ChatChannel.GLOBAL), new int[0], false,
                 ChatBodyKind.COMMAND);
         for (int state = 0; state < 2; state++) {
             boolean chatOpen = state == 1;
@@ -519,7 +519,7 @@ public final class ChatLineWrapperTest {
     public void theBodyChevronIsDrawnButNeverReadBack() {
         IChatComponent message = LostTalesChatPresentation.build(
                 new LostTalesChatMessagePacket(
-                        ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
+                        ChatChannel.GLOBAL, UUID.randomUUID(), "Arathorn",
                         "Ranger", "", 0x55AA55, 0x336633, "Halt.", 1L,
                         "losttales:human_ranger_male_2"));
         List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
@@ -579,7 +579,7 @@ public final class ChatLineWrapperTest {
     public void anOpenWindowStandsTheHeadAsTheAvatarAndDropsTheBrackets() {
         IChatComponent message = LostTalesChatPresentation.build(
                 new LostTalesChatMessagePacket(
-                        ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
+                        ChatChannel.GLOBAL, UUID.randomUUID(), "Arathorn",
                         "Ranger", "", 0x55AA55, 0x336633, "Well met.",
                         1L, "losttales:human_ranger_male_2"));
         List<IChatComponent> open = ChatLineWrapper.wrap(METRICS,
@@ -616,7 +616,7 @@ public final class ChatLineWrapperTest {
     @Test
     public void anOpenWindowsNameRowEndsOnItsTime() {
         LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
-                ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
+                ChatChannel.GLOBAL, UUID.randomUUID(), "Arathorn",
                 "Ranger", "", 0x55AA55, 0x336633, "Well met.",
                 1L, "losttales:human_ranger_male_2");
         IChatComponent message = LostTalesChatPresentation.build(packet);
@@ -640,7 +640,7 @@ public final class ChatLineWrapperTest {
             assertEquals(-1, stampAt(runs(row)));
         }
         IChatComponent grouped = LostTalesChatPresentation.build(packet,
-                ChatTab.of(ChatChannel.ALL), new int[0], true);
+                ChatTab.of(ChatChannel.GLOBAL), new int[0], true);
         for (IChatComponent row : ChatLineWrapper.wrap(METRICS, grouped,
                 200, true, 1.0F, 1.0F, 1.0F, stamp)) {
             assertEquals(-1, stampAt(runs(row)));
@@ -657,7 +657,7 @@ public final class ChatLineWrapperTest {
     public void aTimeWithNoRoomBesideTheNameTakesARowOfItsOwn() {
         IChatComponent message = LostTalesChatPresentation.build(
                 new LostTalesChatMessagePacket(
-                        ChatChannel.ALL, UUID.randomUUID(), "Arathorn",
+                        ChatChannel.GLOBAL, UUID.randomUUID(), "Arathorn",
                         "Ranger", "", 0x55AA55, 0x336633, "Well met.",
                         1L, "losttales:human_ranger_male_2"));
         List<IChatComponent> open = ChatLineWrapper.wrap(METRICS, message,

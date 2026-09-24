@@ -14,6 +14,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import net.minecraft.client.Minecraft;
+import net.minecraft.util.StatCollector;
 
 /**
  * Builds the journal and HUD view without transferring quest ownership.
@@ -151,7 +152,7 @@ public final class ClientQuestCatalog {
                 objectives.add(new ClientQuestEntry.Objective(
                         LostTalesQuestObjectiveTextHelper.buildObjectiveLine(
                                 progress, objective, progress != null,
-                                completedAtEnd, false, false), current, target,
+                                completedAtEnd), current, target,
                         current >= target, objective.isOptional()));
             }
         }
@@ -191,6 +192,23 @@ public final class ClientQuestCatalog {
         result.addAll(LostTalesQuestObjectiveSelection
                 .getProgressibleObjectives(quest, progress));
         return result;
+    }
+
+    /**
+     * A category's name, translated where the code chose it: the word a
+     * category is filed under is its key, {@code Tutorials} as
+     * {@code gui.losttales.quest.category.tutorials}; a faction's own
+     * name stands as it is.
+     */
+    public static String categoryName(String category) {
+        if (category == null || category.length() == 0) {
+            return StatCollector.translateToLocal("gui.losttales.quest.category.misc");
+        }
+        String key = "gui.losttales.quest.category."
+                + category.toLowerCase(Locale.ROOT).replace(' ', '_')
+                        .replace("-", "");
+        return StatCollector.canTranslate(key)
+                ? StatCollector.translateToLocal(key) : category;
     }
 
     private static String category(LostTalesQuestDefinition quest) {

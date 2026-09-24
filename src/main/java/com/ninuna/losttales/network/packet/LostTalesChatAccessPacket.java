@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatCodeNames;
 import com.ninuna.losttales.chat.ChatRecipientRule;
 import com.ninuna.losttales.chat.ChatPresentationMode;
 import com.ninuna.losttales.chat.ChatChannelScope;
@@ -82,8 +83,8 @@ public final class LostTalesChatAccessPacket implements IMessage {
     private static final int MAX_OWN_CHARACTERS = 32;
     /** The most channels a statement names as linked to Discord. */
     public static final int MAX_DISCORD_LINKS = 64;
-    /** A link key's longest: {@code faction:} and a faction's id. */
-    private static final int MAX_DISCORD_LINK_BYTES = 96;
+    /** A link key's longest: a code name. */
+    private static final int MAX_DISCORD_LINK_BYTES = ChatCodeNames.MAX_LENGTH;
     /** The Proximity radius's own upper bound in the server's config. */
     public static final int MAX_PROXIMITY_RADIUS = 512;
 
@@ -114,7 +115,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
         return Collections.unmodifiableList(ids);
     }
 
-    private boolean adminAccess;
+    private boolean operatorAccess;
     private int roleMask;
     private List<RoleHolder> roleHolders = Collections.emptyList();
     /**
@@ -167,9 +168,9 @@ public final class LostTalesChatAccessPacket implements IMessage {
     /** The words the server adds to the chat's profanity list. */
     private ChatProfanityWords profanityWords = ChatProfanityWords.NONE;
     /**
-     * The game channels linked to Discord now, by their link key: a
-     * channel's id, or {@code faction:<id>} for one faction's chat. What
-     * a linked channel's split icon reads.
+     * The game channels linked to Discord now, by their code names
+     * ({@code global}, {@code gondor}). What a linked channel's split
+     * icon reads.
      */
     private List<String> discordLinks = Collections.emptyList();
     /**
@@ -181,49 +182,49 @@ public final class LostTalesChatAccessPacket implements IMessage {
 
     public LostTalesChatAccessPacket() {}
 
-    public LostTalesChatAccessPacket(boolean adminAccess) {
-        this(adminAccess, 0);
+    public LostTalesChatAccessPacket(boolean operatorAccess) {
+        this(operatorAccess, 0);
     }
 
-    public LostTalesChatAccessPacket(boolean adminAccess, int roleMask) {
-        this(adminAccess, roleMask, Collections.<RoleHolder>emptyList());
+    public LostTalesChatAccessPacket(boolean operatorAccess, int roleMask) {
+        this(operatorAccess, roleMask, Collections.<RoleHolder>emptyList());
     }
 
-    public LostTalesChatAccessPacket(boolean adminAccess, int roleMask,
+    public LostTalesChatAccessPacket(boolean operatorAccess, int roleMask,
                                      List<RoleHolder> roleHolders) {
-        this(adminAccess, roleMask, roleHolders, Collections.<UUID>emptyList());
+        this(operatorAccess, roleMask, roleHolders, Collections.<UUID>emptyList());
     }
 
-    public LostTalesChatAccessPacket(boolean adminAccess, int roleMask,
+    public LostTalesChatAccessPacket(boolean operatorAccess, int roleMask,
                                      List<RoleHolder> roleHolders,
                                      List<UUID> mutedSenders) {
-        this(adminAccess, roleMask, roleHolders, mutedSenders,
+        this(operatorAccess, roleMask, roleHolders, mutedSenders,
                 ChatRoleCatalog.current().roles(), allChannelIds(), allChannelIds());
     }
 
-    public LostTalesChatAccessPacket(boolean adminAccess, int roleMask,
+    public LostTalesChatAccessPacket(boolean operatorAccess, int roleMask,
                                      List<RoleHolder> roleHolders,
                                      List<UUID> mutedSenders,
                                      List<ChatAccountRole> catalog,
                                      List<String> readableChannels,
                                      List<String> sendableChannels) {
-        this(adminAccess, roleMask, roleHolders, mutedSenders, catalog,
+        this(operatorAccess, roleMask, roleHolders, mutedSenders, catalog,
                 readableChannels, sendableChannels, false, false);
     }
 
-    public LostTalesChatAccessPacket(boolean adminAccess, int roleMask,
+    public LostTalesChatAccessPacket(boolean operatorAccess, int roleMask,
                                      List<RoleHolder> roleHolders,
                                      List<UUID> mutedSenders,
                                      List<ChatAccountRole> catalog,
                                      List<String> readableChannels,
                                      List<String> sendableChannels,
                                      boolean canModerate, boolean canEditServerConfig) {
-        this(adminAccess, roleMask, roleHolders, mutedSenders, catalog,
+        this(operatorAccess, roleMask, roleHolders, mutedSenders, catalog,
                 readableChannels, sendableChannels, canModerate, canEditServerConfig,
                 Collections.<String>emptyList());
     }
 
-    public LostTalesChatAccessPacket(boolean adminAccess, int roleMask,
+    public LostTalesChatAccessPacket(boolean operatorAccess, int roleMask,
                                      List<RoleHolder> roleHolders,
                                      List<UUID> mutedSenders,
                                      List<ChatAccountRole> catalog,
@@ -231,13 +232,13 @@ public final class LostTalesChatAccessPacket implements IMessage {
                                      List<String> sendableChannels,
                                      boolean canModerate, boolean canEditServerConfig,
                                      List<String> capabilities) {
-        this(adminAccess, roleMask, roleHolders, mutedSenders, catalog,
+        this(operatorAccess, roleMask, roleHolders, mutedSenders, catalog,
                 readableChannels, sendableChannels, canModerate,
                 canEditServerConfig, capabilities, roleMask,
                 Collections.<UUID, Integer>emptyMap(), 0);
     }
 
-    public LostTalesChatAccessPacket(boolean adminAccess, int roleMask,
+    public LostTalesChatAccessPacket(boolean operatorAccess, int roleMask,
                                      List<RoleHolder> roleHolders,
                                      List<UUID> mutedSenders,
                                      List<ChatAccountRole> catalog,
@@ -248,7 +249,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
                                      int accountRoleMask,
                                      Map<UUID, Integer> characterRoleMasks,
                                      int proximityRadius) {
-        this(adminAccess, roleMask, roleHolders, mutedSenders, catalog,
+        this(operatorAccess, roleMask, roleHolders, mutedSenders, catalog,
                 readableChannels, sendableChannels, canModerate,
                 canEditServerConfig, capabilities, accountRoleMask,
                 characterRoleMasks, proximityRadius,
@@ -257,7 +258,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
     }
 
     /** The whole statement, see the class comment. */
-    public LostTalesChatAccessPacket(boolean adminAccess, int roleMask,
+    public LostTalesChatAccessPacket(boolean operatorAccess, int roleMask,
                                      List<RoleHolder> roleHolders,
                                      List<UUID> mutedSenders,
                                      List<ChatAccountRole> catalog,
@@ -294,7 +295,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
             }
         }
         this.capabilities = Collections.unmodifiableList(held);
-        this.adminAccess = adminAccess;
+        this.operatorAccess = operatorAccess;
         this.canModerate = canModerate;
         this.canEditServerConfig = canEditServerConfig;
         this.roleMask = roleMask;
@@ -388,7 +389,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
                 throw new LostTalesPacketCodec.DecodeException(
                         "invalid chat access packet size");
             }
-            this.adminAccess = buffer.readBoolean();
+            this.operatorAccess = buffer.readBoolean();
             int roleMask = buffer.readInt();
             int holderCount = buffer.readUnsignedShort();
             if (holderCount > MAX_HOLDERS) {
@@ -587,7 +588,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.discordStatuses = statuses;
         } catch (RuntimeException exception) {
             this.malformed = true;
-            this.adminAccess = false;
+            this.operatorAccess = false;
             this.roleMask = 0;
             this.roleHolders = Collections.emptyList();
             this.mutedSenders = Collections.emptyList();
@@ -694,7 +695,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
 
     @Override
     public void toBytes(ByteBuf buffer) {
-        buffer.writeBoolean(this.adminAccess);
+        buffer.writeBoolean(this.operatorAccess);
         buffer.writeInt(this.roleMask);
         buffer.writeShort(this.roleHolders.size());
         for (RoleHolder holder : this.roleHolders) {
@@ -798,8 +799,8 @@ public final class LostTalesChatAccessPacket implements IMessage {
 
     /**
      * The same statement naming the game channels linked to Discord:
-     * each a channel's id or {@code faction:<id>}, at most
-     * {@link #MAX_DISCORD_LINKS}, a key that is none of these left out.
+     * each by its code name, at most {@link #MAX_DISCORD_LINKS}, a key
+     * that is no code name left out.
      */
     public LostTalesChatAccessPacket withDiscordLinks(List<String> keys) {
         List<String> kept = new ArrayList<String>();
@@ -827,14 +828,14 @@ public final class LostTalesChatAccessPacket implements IMessage {
     /** Whether Discord members wear their Discord status on this server. */
     public boolean showsDiscordStatuses() { return this.discordStatuses; }
 
-    /** A link key: a channel's id, or {@code faction:} and a faction's id. */
+    /** A link key: a code name, lower case letters, digits and underscores. */
     static boolean isLinkKey(String key) {
         return key != null && key.length() > 0
                 && key.length() <= MAX_DISCORD_LINK_BYTES
-                && key.matches("[a-z0-9_]+(?::[a-z0-9_.:-]+)?");
+                && key.matches("[a-z0-9_]+");
     }
 
-    public boolean hasAdminAccess() { return this.adminAccess; }
+    public boolean hasOperatorAccess() { return this.operatorAccess; }
     /** The roles the server says this player holds, as a bit set. */
     public int getRoleMask() { return this.roleMask; }
     /** Every online account holding a role, as the server states it. */

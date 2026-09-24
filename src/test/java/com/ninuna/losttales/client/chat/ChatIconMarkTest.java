@@ -38,7 +38,7 @@ public final class ChatIconMarkTest {
 
     @Test
     public void pingsComeBeforeTheSphereAndNothingReadWearsNone() {
-        ChatTab global = ChatTab.of(ChatChannel.ALL);
+        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
         ChatTab selected = ChatTab.of(ChatChannel.OOC);
         assertTrue(ChatIconMark.of(global).isNone());
         ClientChatChannelViews.record(-1, global, selected, false);
@@ -53,7 +53,7 @@ public final class ChatIconMarkTest {
 
     @Test
     public void severalChannelsTogetherAddTheirPings() {
-        ChatTab global = ChatTab.of(ChatChannel.ALL);
+        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
         ChatTab proximity = ChatTab.of(ChatChannel.PROXIMITY);
         ChatTab selected = ChatTab.of(ChatChannel.OOC);
         ClientChatChannelViews.record(-1, proximity, selected, false);

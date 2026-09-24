@@ -41,7 +41,7 @@ public enum ELostTalesSubCommand {
             "config <list|get|set|reload> ...",
             "config", "cfg"),
     DISCORD(new LostTalesCommandDiscord(),
-            "discord <list|bind|unbind|reload> ...",
+            "discord <list|link|unlink|reload> ...",
             "discord"),
     ROLE(new LostTalesCommandRole(),
             "role <list|assign|unassign|create|edit|delete> ...",

@@ -31,7 +31,7 @@ public final class LostTalesChatMessagePacketTabIdTest {
         assertEquals("faction|in:gondor",
                 answer.withNameColor(0x123456).getTabId());
         // A player's line keeps none, whatever it is handed.
-        assertEquals("", line(ALICE, "Aldric").withTabId("all").getTabId());
+        assertEquals("", line(ALICE, "Aldric").withTabId("global").getTabId());
         // Nor an id that would not be a context, nor one past the bound.
         assertEquals("", answer.withTabId("two\nlines").getTabId());
         StringBuilder wide = new StringBuilder();
@@ -57,7 +57,7 @@ public final class LostTalesChatMessagePacketTabIdTest {
     }
 
     private static LostTalesChatMessagePacket line(UUID sender, String name) {
-        return new LostTalesChatMessagePacket(ChatChannel.ALL, sender, name,
+        return new LostTalesChatMessagePacket(ChatChannel.GLOBAL, sender, name,
                 name, "", 0, 0, "words", 1000000L, "", null, "", "", 0,
                 true, 7L, ChatReplyReference.NONE, "");
     }

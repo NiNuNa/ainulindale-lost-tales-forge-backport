@@ -263,7 +263,12 @@ final class ChatInputField extends GuiTextField {
      * ({@link #drawCaretShadow}, {@link #drawCaretBar}).
      */
     static void drawCaret(int x, int textTop) {
-        LostTalesUiCaret.draw(x, caretTop(textTop), CONTENT_HEIGHT, 0xFF);
+        drawCaret(x, textTop, 0xFF);
+    }
+
+    /** As above at {@code alpha} (0-255): a field in a window fading in or out. */
+    static void drawCaret(int x, int textTop, int alpha) {
+        LostTalesUiCaret.draw(x, caretTop(textTop), CONTENT_HEIGHT, alpha);
     }
 
     /**
@@ -413,11 +418,11 @@ final class ChatInputField extends GuiTextField {
                 cursor = hash + 1;
                 continue;
             }
-            ChatChannel named = link.channel;
             int linkEnd = link.end;
             int style = ChatInputStyles.styleAt(styles, hash);
             if ((style & ChatMarkdown.Span.CODE) == 0) {
-                int color = ClientChatChannelState.displayColor(named);
+                int color = ClientChatChannelState.displayColor(link.channel,
+                        link.scope);
                 for (int index = hash; index < linkEnd; index++) {
                     colors[index] = color;
                 }

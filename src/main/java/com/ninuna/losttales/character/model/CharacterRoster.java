@@ -76,8 +76,15 @@ public class CharacterRoster {
         this.unlockedSlotCount = clampUnlockedSlotCount(Math.max(unlockedSlotCount, minimumForExistingCharacters));
     }
 
-    public boolean unlockNextSlot() {
-        if (this.unlockedSlotCount >= MAX_SLOTS) {
+    /**
+     * Opens the next slot when {@code slotIndex}, just filled, was the
+     * last open one, so an empty slot is always there to fill until all
+     * are open. Making a character and claiming a lore character both
+     * fill one. Answers whether a slot opened.
+     */
+    public boolean unlockNextSlotAfter(int slotIndex) {
+        if (slotIndex != this.unlockedSlotCount - 1
+                || this.unlockedSlotCount >= MAX_SLOTS) {
             return false;
         }
         this.unlockedSlotCount++;

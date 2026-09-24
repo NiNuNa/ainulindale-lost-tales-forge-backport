@@ -395,6 +395,7 @@ public final class LoreCharacterTransferCoordinator {
                 if (!roster.addCharacter(character)) {
                     return CharacterErrorId.SLOT_OCCUPIED;
                 }
+                roster.unlockNextSlotAfter(transaction.getTargetSlot());
                 // A claim only adds the character; the player selects it
                 // when they choose to, like any other character.
                 roster.incrementRevision();
@@ -501,7 +502,8 @@ public final class LoreCharacterTransferCoordinator {
         return RoleplayCharacter.builder(characterId, ownerId)
                 .slot(slotIndex).name(definition.getName())
                 .race(appearance.getRaceId()).gender(appearance.getGenderId())
-                .skin(appearance.getSkinId()).age(18).startingFaction(faction)
+                .skin(appearance.getSkinId()).age(definition.getAge())
+                .startingFaction(faction)
                 .createdAt(System.currentTimeMillis())
                 .startingWaypoint(waypoint)
                 .description(definition.getDescription())

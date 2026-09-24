@@ -2,6 +2,8 @@ package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
+import com.ninuna.losttales.chat.ChatReplyReference;
+import com.ninuna.losttales.chat.ChatReportReason;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
@@ -102,6 +104,14 @@ public final class ChatHistoryNbtCodec {
     private static final String TAG_EVENT_ACTOR_ID = "ActorId";
     private static final String TAG_EVENT_TEXT = "Text";
     private static final String TAG_EVENT_CONTEXT = "Context";
+    private static final String TAG_EVENT_REPORT = "Report";
+    private static final String TAG_REPORT_REASON = "Reason";
+    private static final String TAG_REPORT_NOTE = "Note";
+    private static final String TAG_REPORT_MESSAGE = "MessageId";
+    private static final String TAG_REPORT_AUTHOR = "Author";
+    private static final String TAG_REPORT_AUTHOR_COLOR = "AuthorColor";
+    private static final String TAG_REPORT_EXCERPT = "Excerpt";
+    private static final String TAG_REPORT_LINK = "Link";
     static final int MAX_CONSOLE_EVENTS = ChatConsoleStream.MAX_EVENTS;
 
     /** The most accounts one entry may name before it is quarantined. */
@@ -188,6 +198,9 @@ public final class ChatHistoryNbtCodec {
                 writeUuid(tag, TAG_EVENT_ACTOR_ID,
                         event.getActorIdentity().getPlayerId());
             }
+            if (event.getReport() != null) {
+                tag.setTag(TAG_EVENT_REPORT, writeReport(event.getReport()));
+            }
             ChatReactions reacted = reactions == null ? null
                     : reactions.get(Long.valueOf(event.getId()));
             if (reacted != null && !reacted.isEmpty()) {
@@ -235,8 +248,60 @@ public final class ChatHistoryNbtCodec {
         UUID actorId = readUuid(raw, TAG_EVENT_ACTOR_ID);
         ChatNamedPlayer actorIdentity = actorId == null ? null
                 : ChatNamedPlayer.account(actorId, actor);
+        ChatConsoleEvent.Report report = null;
+        if (raw.hasKey(TAG_EVENT_REPORT, Constants.NBT.TAG_COMPOUND)) {
+            report = readReport(raw.getCompoundTag(TAG_EVENT_REPORT));
+            if (report == null) {
+                failureReason[0] = "invalid_report";
+                return null;
+            }
+        }
+        if ((kind == ChatConsoleEvent.Kind.REPORT) != (report != null)) {
+            failureReason[0] = "invalid_report";
+            return null;
+        }
         return new ChatConsoleEvent(id, raw.getLong(TAG_EVENT_TIMESTAMP),
-                kind, severity, actor, text, context, actorIdentity);
+                kind, severity, actor, text, context, actorIdentity, report);
+    }
+
+    private static NBTTagCompound writeReport(ChatConsoleEvent.Report report) {
+        NBTTagCompound tag = new NBTTagCompound();
+        tag.setString(TAG_REPORT_REASON, report.getReason().name());
+        tag.setString(TAG_REPORT_NOTE, report.getNote());
+        tag.setLong(TAG_REPORT_MESSAGE, report.getMessageId());
+        tag.setString(TAG_REPORT_AUTHOR, report.getAuthor());
+        tag.setInteger(TAG_REPORT_AUTHOR_COLOR, report.getAuthorColor());
+        tag.setString(TAG_REPORT_EXCERPT, report.getExcerpt());
+        tag.setString(TAG_REPORT_LINK, report.getLink());
+        return tag;
+    }
+
+    /** A report as the save holds it, or null when the save cannot vouch for it. */
+    private static ChatConsoleEvent.Report readReport(NBTTagCompound raw) {
+        ChatReportReason reason = null;
+        for (ChatReportReason known : ChatReportReason.values()) {
+            if (known.name().equals(raw.getString(TAG_REPORT_REASON))) {
+                reason = known;
+            }
+        }
+        String note = raw.getString(TAG_REPORT_NOTE);
+        String author = raw.getString(TAG_REPORT_AUTHOR);
+        String excerpt = raw.getString(TAG_REPORT_EXCERPT);
+        String link = raw.getString(TAG_REPORT_LINK);
+        if (reason == null || !raw.hasKey(TAG_REPORT_MESSAGE, Constants.NBT.TAG_LONG)
+                || note.length() > ChatConsoleEvent.Report.MAX_NOTE_LENGTH
+                || author.length() > ChatConsoleEvent.Report.MAX_AUTHOR_LENGTH
+                || excerpt.length() > ChatReplyReference.MAX_EXCERPT_CHARACTERS
+                || link.length() > ChatConsoleEvent.Report.MAX_LINK_LENGTH) {
+            return null;
+        }
+        try {
+            return new ChatConsoleEvent.Report(reason, note,
+                    raw.getLong(TAG_REPORT_MESSAGE), author,
+                    raw.getInteger(TAG_REPORT_AUTHOR_COLOR), excerpt, link);
+        } catch (IllegalArgumentException unfit) {
+            return null;
+        }
     }
 
     private static ChatConsoleEvent.Kind kindOf(String name) {

@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatSystemLineClassifier;
+import com.ninuna.losttales.config.LostTalesConfig;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.eventhandler.EventPriority;
@@ -15,6 +16,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ChatLine;
 import net.minecraft.client.gui.GuiChat;
 import net.minecraft.client.gui.GuiMainMenu;
+import net.minecraft.util.ChatComponentTranslation;
+import net.minecraft.util.IChatComponent;
 import net.minecraftforge.client.event.ClientChatReceivedEvent;
 import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
@@ -83,6 +86,13 @@ public final class LostTalesChatClientHandler {
         if (event == null || event.isCanceled() || event.message == null) {
             return;
         }
+        if (!LostTalesConfig.showQuestChatFeedback
+                && isQuestNote(event.message)) {
+            // A quest's passing word (tracking, a marker found, rewards)
+            // is this player's to switch off; a refusal always shows.
+            event.setCanceled(true);
+            return;
+        }
         ChatChannel channel = ChatSystemLineClassifier.classify(event.message);
         if (channel != null && LostTalesChatPresentation.receiveSystemLine(
                 event.message, channel,
@@ -90,6 +100,16 @@ public final class LostTalesChatClientHandler {
             event.setCanceled(true);
         }
     }
+
+    /** Whether a line is one of a quest's passing words, {@code chat.losttales.quest.note.*}. */
+    static boolean isQuestNote(IChatComponent message) {
+        return message instanceof ChatComponentTranslation
+                && ((ChatComponentTranslation)message).getKey()
+                        .startsWith(QUEST_NOTE_PREFIX);
+    }
+
+    /** The lang keys of a quest's passing words. */
+    private static final String QUEST_NOTE_PREFIX = "chat.losttales.quest.note.";
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void renderChat(RenderGameOverlayEvent.Pre event) {
@@ -172,7 +192,7 @@ public final class LostTalesChatClientHandler {
                 this.watchedHead = messages.isEmpty()
                         ? null : messages.get(0);
             }
-            ChatTab console = ChatTab.of(ChatChannel.CONSOLE);
+            ChatTab console = ChatTab.of(ChatChannel.CLIENT_CONSOLE);
             if (!ChatWindowLayout.isOpen(console)
                     && !ChatWindowLayout.isHidden(console)) {
                 ChatWindowLayout.openTab(console,

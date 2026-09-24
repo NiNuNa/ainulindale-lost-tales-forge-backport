@@ -115,7 +115,7 @@ public final class LostTalesDiscordBridgeIntakeTest {
         List<String> kept = Arrays.asList("111", "222", "333");
         DiscordChannelBindings next = bound(
                 "ooc=BIDIRECTIONAL;channel=111;webhook=" + HOOK_A,
-                "all=DISABLED;channel=222;webhook=" + HOOK_B);
+                "global=DISABLED;channel=222;webhook=" + HOOK_B);
         assertEquals(Arrays.asList("222", "333"),
                 LostTalesDiscordBridge.topicsLeft(kept, next, true));
         assertEquals("no topic kept at all", kept,
@@ -125,7 +125,7 @@ public final class LostTalesDiscordBridgeIntakeTest {
                         false));
         DiscordChannelBindings same = bound(
                 "ooc=BIDIRECTIONAL;channel=111;webhook=" + HOOK_A,
-                "all=GAME_TO_DISCORD;channel=222;webhook=" + HOOK_B,
+                "global=GAME_TO_DISCORD;channel=222;webhook=" + HOOK_B,
                 "proximity=GAME_TO_DISCORD;channel=333;webhook=" + HOOK_B + "-p");
         assertTrue(LostTalesDiscordBridge.topicsLeft(kept, same, true).isEmpty());
     }

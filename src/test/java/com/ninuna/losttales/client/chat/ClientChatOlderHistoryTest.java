@@ -14,7 +14,7 @@ import static org.junit.Assert.assertEquals;
  * changed nothing in its time or the game's own list has no room left.
  */
 public final class ClientChatOlderHistoryTest {
-    private static final ChatTab GLOBAL = ChatTab.of(ChatChannel.ALL);
+    private static final ChatTab GLOBAL = ChatTab.of(ChatChannel.GLOBAL);
     private static final ChatTab OOC = ChatTab.of(ChatChannel.OOC);
     private static final long NOW = 1000L * 1000000L;
     private static final int ROOMY = 1000;

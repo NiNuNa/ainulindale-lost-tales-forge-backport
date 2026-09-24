@@ -6,8 +6,8 @@ import com.ninuna.losttales.compat.lotr.LotrQuestReference;
 import com.ninuna.losttales.compat.lotr.LotrQuestShareAdapter;
 import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
-import java.util.Map;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.util.StatCollector;
 
 /** Builds a bounded, server-authoritative preview for one active quest. */
 public final class LostTalesQuestShareResolver {
@@ -33,7 +33,7 @@ public final class LostTalesQuestShareResolver {
         }
         return ChatShowcase.quest(tokenIndex, reference, quest.getTitle(),
                 category(quest), objective(quest, progress), rewards(quest),
-                true);
+                quest.canStartFromShare());
     }
 
     private static String objective(LostTalesQuestDefinition quest,
@@ -50,7 +50,7 @@ public final class LostTalesQuestShareResolver {
                 text.append("; ");
             }
             text.append(LostTalesQuestObjectiveTextHelper.buildObjectiveLine(
-                    progress, objective, true, false, false, false));
+                    progress, objective, true, false));
             if (text.length() >= ChatShowcase.MAX_QUEST_OBJECTIVE_BYTES - 8) {
                 break;
             }
@@ -60,18 +60,10 @@ public final class LostTalesQuestShareResolver {
     }
 
     private static String rewards(LostTalesQuestDefinition quest) {
-        if (quest.getRewards().isEmpty()) {
-            return "No listed reward";
-        }
-        StringBuilder text = new StringBuilder();
-        for (Map.Entry<String, String> reward : quest.getRewards().entrySet()) {
-            if (text.length() > 0) {
-                text.append("; ");
-            }
-            text.append(prettify(reward.getKey())).append(": ")
-                    .append(reward.getValue());
-        }
-        return bounded(text.toString(), ChatShowcase.MAX_QUEST_REWARD_BYTES);
+        String rewards = LostTalesQuestRewardText.summary(quest.getRewards());
+        return bounded(rewards.length() == 0
+                ? StatCollector.translateToLocal("gui.losttales.quest.reward.pending")
+                : rewards, ChatShowcase.MAX_QUEST_REWARD_BYTES);
     }
 
     private static String category(LostTalesQuestDefinition quest) {
@@ -82,12 +74,6 @@ public final class LostTalesQuestShareResolver {
         if (id.contains("faction")) return "Factions";
         if (id.contains("story") || id.contains("main")) return "Main Story";
         return "Regional";
-    }
-
-    private static String prettify(String value) {
-        String text = value == null ? "Reward" : value.replace('_', ' ');
-        return text.length() == 0 ? "Reward"
-                : Character.toUpperCase(text.charAt(0)) + text.substring(1);
     }
 
     private static String bounded(String value, int maximum) {

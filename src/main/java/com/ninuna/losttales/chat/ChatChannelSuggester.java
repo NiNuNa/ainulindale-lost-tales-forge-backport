@@ -6,17 +6,16 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Channels named in a message the way Discord names them: {@code #}
- * and the channel, {@code #ooc}, {@code #Global}. A channel is written
- * by its id or by its shown name without spaces, either way it reads
- * as a link to the channel. What is typed behind a {@code #} is the
- * query the completion list answers, exactly as {@code @} opens the
- * mention list. No client dependency: the rules are the same on both
+ * Channels named in a message the way Discord names them: {@code #} and
+ * the channel's code name ({@link ChatCodeNames}), {@code #ooc},
+ * {@code #global}, {@code #gondor} for Gondor's chat. A channel is written
+ * one way only, in links to one message too ({@code #ooc/1234}); the chat
+ * draws it with the channel's shown name. What is typed behind a {@code #}
+ * is the query the completion list answers, exactly as {@code @} opens
+ * the mention list. No client dependency: the rules are the same on both
  * sides and testable without a game.
  */
 public final class ChatChannelSuggester {
-    private static final int MAX_PREFIX_LENGTH = 24;
-
     private ChatChannelSuggester() {}
 
     /**
@@ -34,7 +33,7 @@ public final class ChatChannelSuggester {
             index--;
         }
         if (index < 0 || text.charAt(index) != '#'
-                || clamped - index - 1 > MAX_PREFIX_LENGTH) {
+                || clamped - index - 1 > ChatCodeNames.MAX_LENGTH) {
             return null;
         }
         if (index > 0 && !Character.isWhitespace(text.charAt(index - 1))) {
@@ -45,23 +44,26 @@ public final class ChatChannelSuggester {
     }
 
     /**
-     * The channels the prefix opens, in the order given: a channel
-     * whose id or shown name starts with it, an empty prefix every one.
+     * The channels the prefix opens, in the order given: a channel whose
+     * code name or shown name starts with it, an empty prefix every one.
+     * The Faction channel stands for the faction {@code factionScope}
+     * names, and is left out while it names none.
      */
     public static List<ChatChannel> matches(String prefix,
                                             List<ChatChannel> channels,
-                                            int limit) {
+                                            String factionScope, int limit) {
         if (prefix == null || channels == null || limit <= 0) {
             return Collections.emptyList();
         }
         String query = prefix.toLowerCase(Locale.ROOT);
         List<ChatChannel> result = new ArrayList<ChatChannel>();
         for (ChatChannel channel : channels) {
-            if (channel == null) {
+            String word = channel == null ? null
+                    : ChatCodeNames.of(channel, scopeFor(channel, factionScope));
+            if (word == null || channel == ChatChannel.WHISPER) {
                 continue;
             }
-            if (channel.getId().toLowerCase(Locale.ROOT).startsWith(query)
-                    || shownKey(channel).startsWith(query)) {
+            if (word.startsWith(query) || shownKey(channel).startsWith(query)) {
                 result.add(channel);
                 if (result.size() >= limit) {
                     break;
@@ -72,36 +74,20 @@ public final class ChatChannelSuggester {
     }
 
     /**
-     * The channel a word behind a {@code #} names — by id, or by its
-     * shown name without spaces, case aside — or null for a word that
-     * names none.
+     * What is written for a channel: {@code #} and its code name, the
+     * faction {@code factionScope} names for the Faction channel. Null
+     * where the channel has no code name.
      */
-    public static ChatChannel resolve(String word) {
-        if (word == null || word.length() == 0
-                || word.length() > MAX_PREFIX_LENGTH) {
-            return null;
-        }
-        String key = word.toLowerCase(Locale.ROOT);
-        ChatChannel byId = ChatChannel.fromId(key);
-        if (byId != null && byId != ChatChannel.WHISPER) {
-            return byId;
-        }
-        for (ChatChannel channel : ChatChannel.presentationOrder()) {
-            if (shownKey(channel).equals(key)) {
-                return channel;
-            }
-        }
-        return null;
+    public static String token(ChatChannel channel, String factionScope) {
+        String word = ChatCodeNames.of(channel, scopeFor(channel, factionScope));
+        return word == null ? null : "#" + word;
     }
 
-    /** What is written after the {@code #} for a channel: its id. */
-    public static String token(ChatChannel channel) {
-        return "#" + channel.getId();
-    }
-
-    /** A channel link read out of text: the channel, where its word ends, where the link ends, and the message it names. */
+    /** A channel link read out of text: the conversation, where its word ends, where the link ends, and the message it names. */
     public static final class Link {
         public final ChatChannel channel;
+        /** The faction's id for a link to a faction's chat; empty otherwise. */
+        public final String scope;
         /** The index just past the channel's word. */
         public final int wordEnd;
         /** The index just past the link: past the message id where one follows. */
@@ -109,8 +95,10 @@ public final class ChatChannelSuggester {
         /** The message the link names, or {@link ChatMessageIds#NONE} for the channel alone. */
         public final long messageId;
 
-        Link(ChatChannel channel, int wordEnd, int end, long messageId) {
+        Link(ChatChannel channel, String scope, int wordEnd, int end,
+             long messageId) {
             this.channel = channel;
+            this.scope = scope;
             this.wordEnd = wordEnd;
             this.end = end;
             this.messageId = messageId;
@@ -118,12 +106,12 @@ public final class ChatChannelSuggester {
     }
 
     /**
-     * The channel link whose {@code #} stands at {@code hash}: the channel
-     * its word names ({@link #resolve}) and, where a slash and digits
-     * follow, the message they name. A whisper is named only by a link to
-     * one of its messages, {@code #Whisper/1234}: whispers are one
-     * conversation per person, so the word alone names none of them. Null
-     * where the word names no channel.
+     * The channel link whose {@code #} stands at {@code hash}: the
+     * conversation its word names and, where a slash and digits follow,
+     * the message they name. A whisper is named only by a link to one of
+     * its messages, {@code #whisper/1234}: whispers are one conversation
+     * per person, so the word alone names none of them. Null where the
+     * word names no channel.
      */
     public static Link linkAt(String text, int hash) {
         if (text == null || hash < 0 || hash >= text.length()
@@ -134,36 +122,31 @@ public final class ChatChannelSuggester {
         if (end <= hash + 1) {
             return null;
         }
-        String word = text.substring(hash + 1, end);
+        ChatCodeNames.Named named = ChatCodeNames.parse(
+                text.substring(hash + 1, end));
         int linkEnd = messageIdEnd(text, end);
-        ChatChannel named = resolve(word);
-        if (named == null && linkEnd > end
-                && shownKey(ChatChannel.WHISPER).equals(word.toLowerCase(Locale.ROOT))) {
-            named = ChatChannel.WHISPER;
-        }
-        if (named == null) {
+        if (named == null
+                || (named.channel == ChatChannel.WHISPER && linkEnd == end)) {
             return null;
         }
-        return new Link(named, end, linkEnd, linkEnd > end
-                ? Long.parseLong(text.substring(end + 1, linkEnd))
-                : ChatMessageIds.NONE);
+        return new Link(named.channel, named.scope, end, linkEnd,
+                linkEnd > end ? Long.parseLong(text.substring(end + 1, linkEnd))
+                        : ChatMessageIds.NONE);
     }
 
     /**
-     * A link to one message of a channel as it is typed and pasted:
-     * {@code #Global/1234}, the channel by its shown name without its
-     * spaces — which {@link #linkAt} reads back — and the server's id of
-     * the message. Null for a channel that cannot be named this way, or
-     * an id the server never gave.
+     * A link to one message as it is typed and pasted: {@code #ooc/1234},
+     * the conversation's code name and the server's id of the message.
+     * Null for a conversation without a code name, or an id the server
+     * never gave.
      */
-    public static String messageLink(ChatChannel channel, long messageId) {
-        if (channel == null || !ChatMessageIds.isServerId(messageId)) {
+    public static String messageLink(ChatChannel channel, String scope,
+                                     long messageId) {
+        String word = ChatCodeNames.of(channel, scope);
+        if (word == null || !ChatMessageIds.isServerId(messageId)) {
             return null;
         }
-        String name = channel.getDisplayName().replaceAll("\\s+", "");
-        String link = "#" + name + "/" + messageId;
-        Link read = name.length() == 0 ? null : linkAt(link, 0);
-        return read == null || read.channel != channel ? null : link;
+        return "#" + word + "/" + messageId;
     }
 
     /**
@@ -196,15 +179,20 @@ public final class ChatChannelSuggester {
         return end;
     }
 
+    /** The characters a channel word is made of. */
+    public static boolean isNameCharacter(char character) {
+        return Character.isLetterOrDigit(character) || character == '_';
+    }
+
+    /** The scope a channel's code name needs: the faction for the Faction channel alone. */
+    private static String scopeFor(ChatChannel channel, String factionScope) {
+        return channel == ChatChannel.FACTION ? factionScope : "";
+    }
+
+    /** The shown name without its spaces: what the completion list also matches. */
     private static String shownKey(ChatChannel channel) {
         return channel.getDisplayName().toLowerCase(Locale.ROOT)
                 .replace(" ", "");
-    }
-
-    /** The characters a channel word is made of; {@code &} for a server's own channel name holding one. */
-    public static boolean isNameCharacter(char character) {
-        return Character.isLetterOrDigit(character) || character == '_'
-                || character == '&';
     }
 
     public static final class Query {

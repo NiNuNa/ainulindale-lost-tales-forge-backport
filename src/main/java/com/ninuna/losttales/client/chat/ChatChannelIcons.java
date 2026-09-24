@@ -632,7 +632,7 @@ final class ChatChannelIcons {
         }
         // By the channel itself rather than a name, so a channel a server
         // defines falls through to the same face every unknown one wears.
-        if (channel == ChatChannel.ALL) {
+        if (channel == ChatChannel.GLOBAL) {
             return ChatEmoji.SLIGHT_SMILE;
         }
         if (channel == ChatChannel.PROXIMITY) {
@@ -648,10 +648,10 @@ final class ChatChannelIcons {
         if (channel == ChatChannel.PARTY) {
             return ChatEmoji.JOY;
         }
-        if (channel == ChatChannel.ADMIN) {
+        if (channel == ChatChannel.OPERATOR) {
             return ChatEmoji.EXPRESSIONLESS;
         }
-        if (channel == ChatChannel.CONSOLE
+        if (channel == ChatChannel.CLIENT_CONSOLE
                 || channel == ChatChannel.SERVER_CONSOLE) {
             return ChatEmoji.CONSOLE;
         }

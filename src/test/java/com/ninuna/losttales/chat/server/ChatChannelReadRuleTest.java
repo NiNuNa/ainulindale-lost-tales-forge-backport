@@ -55,9 +55,9 @@ public final class ChatChannelReadRuleTest {
     public void aStaffChannelWithoutAGateIsTheOperators() {
         ChatChannelGates open = ChatChannelGates.defaults();
         assertTrue(ChatChannelPolicy.canRead(reader(true, false, 0),
-                ChatChannel.ADMIN, 0, open));
+                ChatChannel.OPERATOR, 0, open));
         assertFalse(ChatChannelPolicy.canRead(reader(false, true, 0),
-                ChatChannel.ADMIN, 0, open));
+                ChatChannel.OPERATOR, 0, open));
     }
 
     @Test
@@ -80,14 +80,14 @@ public final class ChatChannelReadRuleTest {
         Set<String> heralds = Collections.singleton("herald");
         Map<ChatChannel, ChatChannelGates.Gate> configured =
                 new HashMap<ChatChannel, ChatChannelGates.Gate>();
-        configured.put(ChatChannel.ALL, new ChatChannelGates.Gate(heralds, null));
+        configured.put(ChatChannel.GLOBAL, new ChatChannelGates.Gate(heralds, null));
         configured.put(ChatChannel.OOC, new ChatChannelGates.Gate(heralds, null));
         ChatChannelGates gates = ChatChannelGates.of(configured);
 
         assertTrue(ChatChannelPolicy.canRead(reader(false, false, 0),
-                ChatChannel.ALL, heraldBit, gates));
+                ChatChannel.GLOBAL, heraldBit, gates));
         assertFalse(ChatChannelPolicy.canRead(reader(false, false, heraldBit),
-                ChatChannel.ALL, 0, gates));
+                ChatChannel.GLOBAL, 0, gates));
         assertTrue(ChatChannelPolicy.canRead(reader(false, false, heraldBit),
                 ChatChannel.OOC, 0, gates));
         assertFalse(ChatChannelPolicy.canRead(reader(false, false, 0),

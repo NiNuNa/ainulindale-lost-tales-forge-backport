@@ -8,9 +8,14 @@ import lotr.common.LOTRPlayerData;
 import lotr.common.quest.LOTRMiniQuest;
 import net.minecraft.entity.player.EntityPlayer;
 
-/** Validates unified tracking requests against LOTR's authoritative state. */
-public final class LotrQuestTrackingAdapter {
-    private LotrQuestTrackingAdapter() {}
+/**
+ * The journal's requests about a LOTR quest, checked against LOTR's own
+ * state: tracking one, giving one up, and clearing a finished or failed
+ * one out of History. Giving up and clearing call what LOTR's own quest
+ * book calls.
+ */
+public final class LotrQuestJournalAdapter {
+    private LotrQuestJournalAdapter() {}
 
     public static boolean pin(EntityPlayer player, String reference,
             LostTalesQuestPlayerData lostTalesData) {
@@ -67,17 +72,54 @@ public final class LotrQuestTrackingAdapter {
         }
     }
 
-    public static String displayName(EntityPlayer player, String reference) {
+    /**
+     * Gives up a LOTR quest the player is on. Answers whether it was one
+     * they are on; a failed quest is cleared, not given up.
+     */
+    public static boolean abandon(EntityPlayer player, String reference,
+            LostTalesQuestPlayerData lostTalesData) {
         LOTRMiniQuest quest = findActive(player, reference);
         if (quest == null) {
-            return "LOTR quest";
+            return false;
         }
-        String giver = quest.entityNameFull;
-        if (giver == null || giver.length() == 0) {
-            giver = quest.entityName;
+        remove(player, quest, false, reference, lostTalesData);
+        return true;
+    }
+
+    /**
+     * Clears a finished or failed LOTR quest out of the player's History.
+     * Answers whether there was one; a quest still running is not
+     * cleared.
+     */
+    public static boolean clear(EntityPlayer player, String reference,
+            LostTalesQuestPlayerData lostTalesData) {
+        UUID questId = LotrQuestReference.parse(reference);
+        LOTRPlayerData data = player == null || questId == null
+                ? null : LOTRLevelData.getData(player);
+        if (data == null) {
+            return false;
         }
-        return giver == null || giver.length() == 0
-                ? "LOTR quest" : "quest from " + giver;
+        LOTRMiniQuest finished = data.getMiniQuestForID(questId, true);
+        if (finished != null) {
+            remove(player, finished, true, reference, lostTalesData);
+            return true;
+        }
+        // A failed quest stays in LOTR's list of running ones until it is
+        // cleared.
+        LOTRMiniQuest failed = data.getMiniQuestForID(questId, false);
+        if (failed != null && failed.isFailed()) {
+            remove(player, failed, false, reference, lostTalesData);
+            return true;
+        }
+        return false;
+    }
+
+    /** Removes the quest from LOTR's list, which tells the client, and stops tracking it. */
+    private static void remove(EntityPlayer player, LOTRMiniQuest quest,
+            boolean completedList, String reference,
+            LostTalesQuestPlayerData lostTalesData) {
+        unpin(player, reference, lostTalesData);
+        LOTRLevelData.getData(player).removeMiniQuest(quest, completedList);
     }
 
     private static LOTRMiniQuest findActive(EntityPlayer player,

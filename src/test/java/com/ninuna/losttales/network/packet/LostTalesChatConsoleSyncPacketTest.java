@@ -2,6 +2,7 @@ package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
+import com.ninuna.losttales.chat.ChatReportReason;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import java.util.ArrayList;
@@ -14,6 +15,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /** Console entries cross whole, in order, and a bad one refuses the batch. */
 public final class LostTalesChatConsoleSyncPacketTest {
@@ -57,8 +59,10 @@ public final class LostTalesChatConsoleSyncPacketTest {
         buffer.writeByte(ChatConsoleEvent.Severity.INFO.ordinal());
         LostTalesPacketCodec.writeUtf8String(buffer, "Steve", 256);
         LostTalesPacketCodec.writeUtf8String(buffer, "/gamemode 1", 2048);
-        LostTalesPacketCodec.writeUtf8String(buffer, "all\u0001", 2048);
+        LostTalesPacketCodec.writeUtf8String(buffer, "global\u0001", 2048);
         buffer.writeBoolean(false);
+        buffer.writeBoolean(false);
+        buffer.writeLong(Long.MIN_VALUE);
         LostTalesChatConsoleSyncPacket decoded = new LostTalesChatConsoleSyncPacket();
         decoded.fromBytes(buffer);
         assertTrue(decoded.isMalformed());
@@ -92,6 +96,50 @@ public final class LostTalesChatConsoleSyncPacketTest {
                 "Alex", "/gamemode 1", "",
                 ChatNamedPlayer.account(steve, "Steve"))
                 .getActorIdentity());
+    }
+
+    /**
+     * A report crosses with its entry whole: the reason, the note, and
+     * the message it is about, its speaker, their colour, its words and
+     * its link. A report on any other kind of entry is no entry at all.
+     */
+    @Test
+    public void aReportCrossesWithItsEntry() {
+        ChatConsoleEvent.Report report = new ChatConsoleEvent.Report(
+                ChatReportReason.HARASSMENT, "kept at it\nfor an hour",
+                1757522000000L, "Aldric", 0xA94B54, "you again", "#gondor/1757522000000");
+        assertEquals("line breaks never reach the log",
+                "kept at it for an hour", report.getNote());
+        ChatConsoleEvent entry = new ChatConsoleEvent(12L, 6000L,
+                ChatConsoleEvent.Kind.REPORT, ChatConsoleEvent.Severity.NOTICE,
+                "Steve", "reported a message", "", null, report);
+        ByteBuf buffer = Unpooled.buffer();
+        new LostTalesChatConsoleSyncPacket(Arrays.asList(entry)).toBytes(buffer);
+        LostTalesChatConsoleSyncPacket decoded = new LostTalesChatConsoleSyncPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        ChatConsoleEvent.Report read = decoded.getEvents().get(0).getReport();
+        assertEquals(ChatReportReason.HARASSMENT, read.getReason());
+        assertEquals("kept at it for an hour", read.getNote());
+        assertEquals(1757522000000L, read.getMessageId());
+        assertEquals("Aldric", read.getAuthor());
+        assertEquals(0xA94B54, read.getAuthorColor());
+        assertEquals("you again", read.getExcerpt());
+        assertEquals("#gondor/1757522000000", read.getLink());
+        assertEquals(1757522000000L, read.quote().getMessageId());
+        try {
+            new ChatConsoleEvent(13L, 6000L, ChatConsoleEvent.Kind.WARNING,
+                    ChatConsoleEvent.Severity.NOTICE, "Steve", "odd", "",
+                    null, report);
+            fail("only a report entry carries a report");
+        } catch (IllegalArgumentException expected) {
+        }
+        try {
+            new ChatConsoleEvent(14L, 6000L, ChatConsoleEvent.Kind.REPORT,
+                    ChatConsoleEvent.Severity.NOTICE, "Steve", "odd", "");
+            fail("a report entry carries its report");
+        } catch (IllegalArgumentException expected) {
+        }
     }
 
     @Test

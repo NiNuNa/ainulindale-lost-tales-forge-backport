@@ -131,6 +131,7 @@ import net.minecraft.client.resources.IReloadableResourceManager;
 import lotr.client.render.entity.LOTRRenderBreeMan;
 import net.minecraftforge.common.MinecraftForge;
 import software.bernie.geckolib3.renderers.geo.GeoArmorRenderer;
+import com.ninuna.losttales.client.chat.ChatPartyInvitationAnswers;
 
 public class LostTalesClientProxy extends LostTalesCommonProxy {
 
@@ -574,7 +575,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
             ChatWindowLayoutStore.reloadForNewChannels();
             ClientChatChannelState.setChannelGates(
                     packet.getReadableChannels(), packet.getSendableChannels());
-            ClientChatChannelState.setAdminAccess(packet.hasAdminAccess());
+            ClientChatChannelState.setOperatorAccess(packet.hasOperatorAccess());
             ClientChatChannelState.setCapabilities(packet.getCapabilities());
             ClientChatChannelState.setCanModerate(packet.canModerate());
             ClientChatChannelState.setCanEditServerConfig(
@@ -736,6 +737,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
             return;
         }
         ClientPartyStateCache.acceptOperation(packet.toFeedback());
+        ChatPartyInvitationAnswers.onResult(packet.toFeedback());
     }
 
 }

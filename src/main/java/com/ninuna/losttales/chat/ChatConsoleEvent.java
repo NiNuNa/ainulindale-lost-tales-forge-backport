@@ -25,7 +25,9 @@ public final class ChatConsoleEvent {
         /** The server itself: started or stopped, a bridge came up. */
         SERVER,
         /** Something the mod could not do and staff should know about. */
-        WARNING;
+        WARNING,
+        /** A player reported a message to staff; the entry carries the {@link Report}. */
+        REPORT;
 
         /** The kind at that ordinal, or null for none. */
         public static Kind fromOrdinal(int ordinal) {
@@ -76,6 +78,8 @@ public final class ChatConsoleEvent {
      * server's own console, or by a client that said nothing.
      */
     private final String context;
+    /** What was reported, for a {@link Kind#REPORT} entry; null for every other. */
+    private final Report report;
 
     public ChatConsoleEvent(long id, long timestampMillis, Kind kind,
                             Severity severity, String actor, String text) {
@@ -95,9 +99,25 @@ public final class ChatConsoleEvent {
     public ChatConsoleEvent(long id, long timestampMillis, Kind kind,
                             Severity severity, String actor, String text,
                             String context, ChatNamedPlayer actorIdentity) {
+        this(id, timestampMillis, kind, severity, actor, text, context,
+                actorIdentity, null);
+    }
+
+    /**
+     * As above with what a player reported: a {@link Kind#REPORT} entry
+     * carries its report, and no other entry carries one.
+     */
+    public ChatConsoleEvent(long id, long timestampMillis, Kind kind,
+                            Severity severity, String actor, String text,
+                            String context, ChatNamedPlayer actorIdentity,
+                            Report report) {
         if (kind == null || severity == null) {
             throw new IllegalArgumentException("a console event has a kind and a severity");
         }
+        if ((kind == Kind.REPORT) != (report != null)) {
+            throw new IllegalArgumentException("a report entry carries its report, and only it");
+        }
+        this.report = report;
         this.id = id;
         this.timestampMillis = timestampMillis;
         this.kind = kind;
@@ -144,10 +164,87 @@ public final class ChatConsoleEvent {
     public String getText() { return this.text; }
     /** The tab a command was typed in, or empty; see {@link #context}. */
     public String getContext() { return this.context; }
+    /** What was reported, for a report entry; null for every other. */
+    public Report getReport() { return this.report; }
 
     private static String clip(String value, int maximum) {
         String text = value == null ? "" : value.trim();
         return text.length() > maximum ? text.substring(0, maximum) : text;
+    }
+
+    /**
+     * What a player reported: the reason, their note, and the message as
+     * the server holds it — its id, the name its speaker was shown by
+     * and that name's colour, the start of its words, and the link that
+     * names it ({@code #ooc/1234}). The server builds it from its own
+     * record of the message; the reporter's client sends only the id,
+     * the reason and the note.
+     */
+    public static final class Report {
+        public static final int MAX_NOTE_LENGTH = 64;
+        public static final int MAX_AUTHOR_LENGTH = 64;
+        /** A code name, a slash and a server id: {@code #} + 24 + {@code /} + 18. */
+        public static final int MAX_LINK_LENGTH = 44;
+        /** The mark Minecraft's formatting codes start with. */
+        private static final char FORMATTING_MARK = '\u00a7';
+
+        private final ChatReportReason reason;
+        private final String note;
+        private final long messageId;
+        private final String author;
+        private final int authorColor;
+        private final String excerpt;
+        private final String link;
+
+        public Report(ChatReportReason reason, String note, long messageId,
+                      String author, int authorColor, String excerpt,
+                      String link) {
+            if (reason == null || !ChatMessageIds.isServerId(messageId)) {
+                throw new IllegalArgumentException("a report names a reason and a message");
+            }
+            this.reason = reason;
+            this.note = printable(clip(note, MAX_NOTE_LENGTH));
+            this.messageId = messageId;
+            this.author = printable(clip(author, MAX_AUTHOR_LENGTH));
+            this.authorColor = authorColor;
+            this.excerpt = printable(clip(excerpt,
+                    ChatReplyReference.MAX_EXCERPT_CHARACTERS));
+            this.link = clip(link, MAX_LINK_LENGTH);
+            if (this.author.length() == 0 || !isContext(this.link)) {
+                throw new IllegalArgumentException("a report names who said it and where");
+            }
+        }
+
+        public ChatReportReason getReason() { return this.reason; }
+        /** The reporter's own words, or empty. */
+        public String getNote() { return this.note; }
+        public long getMessageId() { return this.messageId; }
+        public String getAuthor() { return this.author; }
+        public int getAuthorColor() { return this.authorColor; }
+        public String getExcerpt() { return this.excerpt; }
+        /** The message's link as it is typed: {@code #ooc/1234}. */
+        public String getLink() { return this.link; }
+
+        /** The reported message as a reply's quote shows it, jumping to it on a click. */
+        public ChatReplyReference quote() {
+            return ChatReplyReference.of(this.messageId, this.author,
+                    this.excerpt, this.authorColor);
+        }
+
+        /**
+         * The text on one line, with nothing that could break a line or a
+         * log, and no formatting code to dress one player's words as
+         * another's.
+         */
+        private static String printable(String value) {
+            StringBuilder kept = new StringBuilder(value.length());
+            for (int index = 0; index < value.length(); index++) {
+                char character = value.charAt(index);
+                kept.append(character < ' ' || character == FORMATTING_MARK
+                        ? ' ' : character);
+            }
+            return kept.toString();
+        }
     }
 
     @Override

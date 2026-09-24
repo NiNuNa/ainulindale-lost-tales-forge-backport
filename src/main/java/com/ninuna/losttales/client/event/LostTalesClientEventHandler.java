@@ -94,6 +94,7 @@ import com.ninuna.losttales.compat.lotr.LotrRaceProfileAdapter;
 import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
 import com.ninuna.losttales.client.chat.ClientChatMembers;
 import com.ninuna.losttales.client.chat.ClientChatPresence;
+import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.network.FMLNetworkEvent.ClientConnectedToServerEvent;
@@ -125,6 +126,8 @@ import net.minecraftforge.client.event.sound.PlaySoundEvent17;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.world.WorldEvent;
+import com.ninuna.losttales.client.chat.ChatPartyInvitationAnswers;
+import com.ninuna.losttales.client.chat.ChatSmallWindowPlacements;
 
 public class LostTalesClientEventHandler implements IResourceManagerReloadListener {
 
@@ -190,6 +193,8 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         ClientCharacterCreationCatalogCache.clear();
         ClientLoreCharacterCache.clear();
         ClientPartyStateCache.clear();
+        ChatPartyInvitationAnswers.clear();
+        ChatSmallWindowPlacements.forgetOpen();
         ClientPartyMemberStatusCache.clear();
         ClientPartyTrackingCache.clear();
         // Words over a head belong to the world they were spoken in.
@@ -565,10 +570,16 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
                     event.target);
             if (conversation != null) {
                 minecraft.displayGuiScreen(conversation);
+            } else {
+                // With the conversation screen switched off, the person's
+                // words go to the chat and the quest is taken or handed in.
+                LostTalesQuestDialogueHooks.answerWithoutScreen(event.target);
             }
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException failed) {
             // A conversation that cannot be built is no conversation;
             // the interaction itself is untouched.
+            FMLLog.warning("[%s] A quest conversation could not be built: %s",
+                    LostTalesMetaData.MOD_ID, failed.toString());
         }
     }
 

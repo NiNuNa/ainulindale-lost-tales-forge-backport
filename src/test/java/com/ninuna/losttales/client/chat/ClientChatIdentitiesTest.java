@@ -24,7 +24,7 @@ public final class ClientChatIdentitiesTest {
     private static final UUID ARAGORN = UUID.fromString("b0000000-0000-0000-0000-00000000000b");
     private static final UUID LEGOLAS = UUID.fromString("c0000000-0000-0000-0000-00000000000c");
 
-    private final ChatTab global = ChatTab.of(ChatChannel.ALL);
+    private final ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
     private final ChatTab proximity = ChatTab.of(ChatChannel.PROXIMITY);
     private final ChatTab ooc = ChatTab.of(ChatChannel.OOC);
 
@@ -44,7 +44,7 @@ public final class ClientChatIdentitiesTest {
     public void selectionAppliesToEveryRoleplayingChannelAndNeverToAccountChannels() {
         roster(ARAGORN, ARAGORN, LEGOLAS);
         ClientChatIdentities.select(identityOf(LEGOLAS));
-        for (ChatChannel channel : new ChatChannel[] {ChatChannel.ALL, ChatChannel.PROXIMITY,
+        for (ChatChannel channel : new ChatChannel[] {ChatChannel.GLOBAL, ChatChannel.PROXIMITY,
                 ChatChannel.FACTION, ChatChannel.PARTY, ChatChannel.WHISPER}) {
             ChatTab tab = channel == ChatChannel.WHISPER
                     ? ChatTab.whisper("Steve", "Steve", LEGOLAS.toString()) : ChatTab.of(channel);
@@ -52,7 +52,7 @@ public final class ClientChatIdentitiesTest {
             assertEquals(LEGOLAS, ClientChatIdentities.wireCharacterId(tab));
         }
         assertEquals(LEGOLAS, ClientChatIdentities.effectiveFor(ChatTab.npc("Guard")).characterId);
-        for (ChatChannel channel : new ChatChannel[] {ChatChannel.OOC, ChatChannel.ADMIN, ChatChannel.CONSOLE}) {
+        for (ChatChannel channel : new ChatChannel[] {ChatChannel.OOC, ChatChannel.OPERATOR, ChatChannel.CLIENT_CONSOLE}) {
             assertTrue(ClientChatIdentities.effectiveFor(ChatTab.of(channel)).account);
             assertEquals(LostTalesChatSendPacket.IDENTITY_ACCOUNT,
                     ClientChatIdentities.wireKind(ChatTab.of(channel)));

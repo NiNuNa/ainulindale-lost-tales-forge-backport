@@ -618,14 +618,15 @@ final class ChatInputCompletion {
         refreshNameSuggestions();
     }
 
-    /** Replaces the {@code #prefix} at the cursor with the channel's token. */
+    /** Replaces the {@code #prefix} at the cursor with the channel's code name. */
     private void acceptChannelSuggestion(ChatChannel channel) {
         ChatChannelSuggester.Query query = this.channelSuggestions.getQuery();
-        if (channel == null || query == null) {
+        String token = channel == null ? null : ChatChannelSuggester.token(
+                channel, ClientChatChannelState.scopeKeyRead(ChatChannel.FACTION));
+        if (token == null || query == null) {
             return;
         }
-        replaceAtCursor(query.hashIndex,
-                ChatChannelSuggester.token(channel) + " ");
+        replaceAtCursor(query.hashIndex, token + " ");
         refreshChannelSuggestions();
     }
 

@@ -7,27 +7,29 @@ import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.StatCollector;
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 
 /**
  * Emoji browser on the shared picker frame: a Favorites section
  * (right-click a cell to toggle), a Frequently Used section, and the full
  * grid, each collapsible, with a shortcode tooltip on hover. Selection
  * returns the emoji; inserting its shortcode is the chat screen's job.
+ * The bar's emoji picker inserts; a second one, in the Reactions window,
+ * reacts to the message it is aimed at.
  */
 final class ChatEmojiPicker extends ChatPickerPanel {
     static final int FREQUENT_LIMIT = 6;
     private static final int CELL_SIZE = 14;
     private static final int COLUMNS = 6;
     /**
-     * The message the picker was opened to react to, or NONE while it
-     * inserts into the field. Closing the picker ends it, so a picker
-     * opened from its own button always inserts.
+     * The message a pick reacts to, or NONE while the picker inserts into
+     * the field. Only the Reactions window's picker is ever aimed; closing
+     * it ends the aim.
      */
     private long reactionTarget = ChatMessageIds.NONE;
 
-    /** Opens the picker so the next pick reacts to {@code messageId}. */
-    void openForReaction(long messageId) {
-        setOpen(true);
+    /** Aims the picker at {@code messageId}: every pick reacts to it. */
+    void aimAt(long messageId) {
         this.reactionTarget = messageId;
     }
 
@@ -37,15 +39,20 @@ final class ChatEmojiPicker extends ChatPickerPanel {
     }
 
     @Override
-    void setOpen(boolean open) {
-        super.setOpen(open);
-        if (!open) {
-            this.reactionTarget = ChatMessageIds.NONE;
-        }
+    void closed() {
+        super.closed();
+        this.reactionTarget = ChatMessageIds.NONE;
+    }
+
+    /** The Reactions window comes back with the chat aimed where it was. */
+    @Override
+    Object sessionState() {
+        long target = reactionTarget();
+        return target == ChatMessageIds.NONE ? null : Long.valueOf(target);
     }
 
     @Override
-    int columns() {
+    int naturalColumns() {
         return COLUMNS;
     }
 
@@ -104,7 +111,7 @@ final class ChatEmojiPicker extends ChatPickerPanel {
 
     @Override
     void drawEntry(Minecraft minecraft, Entry entry, int x, int y,
-                   int alpha, boolean hovered) {
+                   int width, int alpha, boolean hovered) {
         ChatEmoji emoji = (ChatEmoji)entry.value;
         // Lifted a pixel under the pointer, like the strip's buttons.
         ChatInlineIcons.drawEmoji(minecraft, emoji,
@@ -169,21 +176,13 @@ final class ChatEmojiPicker extends ChatPickerPanel {
         return LostTalesUiSheet.EMOJI_HOVER;
     }
 
-    /** The emoji cell under the mouse while the picker is open, else null. */
-    ChatEmoji emojiAt(double mouseX, double mouseY,
-                      int screenWidth, int screenHeight) {
-        Entry entry = entryAt(mouseX, mouseY, screenWidth, screenHeight);
-        return entry == null ? null : (ChatEmoji)entry.value;
-    }
-
-    /** Right-click favoriting; true when a cell was toggled. */
-    boolean toggleFavoriteAt(double mouseX, double mouseY,
-                             int screenWidth, int screenHeight) {
-        ChatEmoji emoji = emojiAt(mouseX, mouseY, screenWidth, screenHeight);
-        if (emoji == null) {
+    /** Right-click favoriting of the cell under the point; true when one was toggled. */
+    boolean toggleFavoriteAt(LostTalesUiHitBox box, double x, double y) {
+        Entry entry = entryAt(box, x, y);
+        if (entry == null) {
             return false;
         }
-        ChatEmojiUsageStore.toggleFavorite(emoji);
+        ChatEmojiUsageStore.toggleFavorite((ChatEmoji)entry.value);
         return true;
     }
 }

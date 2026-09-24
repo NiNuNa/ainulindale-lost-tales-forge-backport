@@ -4,6 +4,7 @@ import java.util.HashMap;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelAccess;
+import com.ninuna.losttales.chat.ChatCodeNames;
 import com.ninuna.losttales.chat.ChatRoleConfig;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatChannelGates;
@@ -36,7 +37,7 @@ public final class ClientChatChannelState {
     /** How often an unavailable faction-name lookup is retried. */
     private static final long FACTION_NAME_RETRY_NANOS = 5000L * 1000000L;
 
-    private static ChatTab selected = ChatTab.of(ChatChannel.ALL);
+    private static ChatTab selected = ChatTab.of(ChatChannel.GLOBAL);
     /** Conversations remembered for their partner's colour; oldest go first. */
     private static final int MAX_PARTNER_COLORS = 64;
     private static final LinkedHashMap<ChatTab, Integer> PARTNER_COLORS =
@@ -55,11 +56,17 @@ public final class ClientChatChannelState {
      */
     private static final LinkedHashMap<ChatTab, UUID> PARTNER_CHARACTER_IDS =
             new LinkedHashMap<ChatTab, UUID>();
-    private static String cachedFactionId = "";
-    private static String cachedFactionName = "";
-    private static long cachedFactionNanos;
-    /** Server-stated operator status; the Admin tab exists only with it. */
-    private static boolean adminAccess;
+    /**
+     * LOTR's name for each faction asked about, by faction id. An empty
+     * name is one LOTR could not give; it is asked again after a while
+     * ({@link #FACTION_NAMES_ASKED}) rather than every frame.
+     */
+    private static final HashMap<String, String> FACTION_NAMES =
+            new HashMap<String, String>();
+    private static final HashMap<String, Long> FACTION_NAMES_ASKED =
+            new HashMap<String, Long>();
+    /** Server-stated operator status; the Operator tab exists only with it. */
+    private static boolean operatorAccess;
     /**
      * Every capability the server says this player holds, by id. The
      * menus ask this rather than a flag of their own, so a capability
@@ -215,7 +222,7 @@ public final class ClientChatChannelState {
             order = getOpenTabs();
         }
         if (order.isEmpty()) {
-            order.add(ChatTab.of(ChatChannel.ALL));
+            order.add(ChatTab.of(ChatChannel.GLOBAL));
         }
         return order;
     }
@@ -432,7 +439,7 @@ public final class ClientChatChannelState {
      */
     private static java.util.Set<String> seededGates(boolean read) {
         ChatChannelGates seeded = ChatRoleConfig.parseGates(
-                new String[] {ChatRoleConfig.DEFAULT_ADMIN_GATE},
+                new String[] {ChatRoleConfig.DEFAULT_OPERATOR_GATE},
                 ChatRoleCatalog.builtIn(), ChatRoleConfig.SILENT);
         java.util.Set<String> open = new java.util.HashSet<String>();
         for (ChatChannel channel : ChatChannel.values()) {
@@ -513,7 +520,27 @@ public final class ClientChatChannelState {
         if (tab.isWhisper() && !tab.isNpc()) {
             return partnerNameColor(tab);
         }
-        return displayColor(tab.getChannel());
+        return displayColor(tab.getChannel(), tab.getOwnerKey());
+    }
+
+    /**
+     * The colour of one conversation: for a faction's chat that faction's
+     * own, whichever faction is read now, so a link or a line names the
+     * faction it was said in; the channel's colour for every other.
+     */
+    public static synchronized int displayColor(ChatChannel channel,
+                                                String scope) {
+        if (isFaction(channel, scope)) {
+            return LotrFactionColors.forFactionId(scope,
+                    channel.getDisplayColor());
+        }
+        return displayColor(channel);
+    }
+
+    /** Whether a channel and scope name one faction's chat rather than the Faction tab. */
+    private static boolean isFaction(ChatChannel channel, String scope) {
+        return channel == ChatChannel.FACTION && scope != null
+                && scope.length() > 0;
     }
 
     /**
@@ -629,8 +656,11 @@ public final class ClientChatChannelState {
         return channel.getDisplayColor();
     }
 
-    /** Visible label for a tab: the partner's name for a whisper —
-     *  the identity their last line wore, when one is remembered. */
+    /**
+     * Visible label for a tab: the partner's name for a whisper — the
+     * identity their last line wore, when one is remembered — and for
+     * one faction's conversation that faction's name.
+     */
     public static synchronized String displayName(ChatTab tab) {
         if (tab == null) {
             return "";
@@ -642,18 +672,27 @@ public final class ClientChatChannelState {
             return remembered != null ? remembered
                     : tab.getPartnerIdentity();
         }
-        return displayName(tab.getChannel());
+        return displayName(tab.getChannel(), tab.getOwnerKey());
+    }
+
+    /**
+     * The name of one conversation: for a faction's chat that faction's
+     * name ("Gondor"), whichever faction is read now; the channel's name
+     * ({@link #displayName(ChatChannel)}) for every other.
+     */
+    public static synchronized String displayName(ChatChannel channel,
+                                                  String scope) {
+        return isFaction(channel, scope)
+                ? factionName(scope, channel.getDisplayName())
+                : displayName(channel);
     }
 
     /**
      * Visible label for a channel. Faction shows the LOTR faction name
      * ("Gondor") of the identity its tab speaks as, so the tab, indicator
-     * and message prefix all agree and follow the chat identity; the
-     * logical channel id is untouched. The LOTR lookup is cached per
-     * faction id, and an unavailable lookup is retried on an interval
-     * rather than every frame, falling back to the catalogue name.
-     * Party shows its leader's name ("Aldric's Party") while the chat
-     * identity is in one, since a party has no name of its own.
+     * and message prefix all agree and follow the chat identity. Party
+     * shows its leader's name ("Aldric's Party") while the chat identity
+     * is in one, since a party has no name of its own.
      */
     public static synchronized String displayName(ChatChannel channel) {
         if (channel == null) {
@@ -668,30 +707,36 @@ public final class ClientChatChannelState {
         if (channel != ChatChannel.FACTION) {
             return channel.getDisplayName();
         }
-        String factionId = wornFactionId(channel);
-        if (factionId.length() == 0) {
-            return channel.getDisplayName();
+        return factionName(wornFactionId(channel), channel.getDisplayName());
+    }
+
+    /**
+     * A faction's name as LOTR gives it ("Gondor"), or {@code fallback}
+     * while LOTR cannot say. Unaligned's name is this mod's own lang
+     * entry, since LOTR ships none.
+     */
+    public static synchronized String factionName(String factionId,
+                                                  String fallback) {
+        if (factionId == null || factionId.length() == 0) {
+            return fallback;
         }
         if (LotrCharacterAdapter.UNALIGNED_FACTION_ID.equals(factionId)) {
-            // Unaligned's name is this mod's own lang entry, since LOTR
-            // ships none; nothing to ask LOTR for.
             return StatCollector.translateToLocal("lotr.faction.UNALIGNED.name");
         }
         long now = System.nanoTime();
-        if (!factionId.equals(cachedFactionId)
-                || (cachedFactionName.length() == 0
-                        && now - cachedFactionNanos
-                        > FACTION_NAME_RETRY_NANOS)) {
+        String known = FACTION_NAMES.get(factionId);
+        Long asked = FACTION_NAMES_ASKED.get(factionId);
+        if (known == null || (known.length() == 0 && asked != null
+                && now - asked.longValue() > FACTION_NAME_RETRY_NANOS)) {
             String name = LotrCharacterAdapter.getInstance()
                     .getFactionDisplayName(factionId);
             String plain = name == null ? null
                     : EnumChatFormatting.getTextWithoutFormattingCodes(name);
-            cachedFactionId = factionId;
-            cachedFactionName = plain == null ? "" : plain.trim();
-            cachedFactionNanos = now;
+            known = plain == null ? "" : plain.trim();
+            FACTION_NAMES.put(factionId, known);
+            FACTION_NAMES_ASKED.put(factionId, Long.valueOf(now));
         }
-        return cachedFactionName.length() == 0
-                ? channel.getDisplayName() : cachedFactionName;
+        return known.length() == 0 ? fallback : known;
     }
 
     /**
@@ -758,7 +803,7 @@ public final class ClientChatChannelState {
 
     /**
      * Replaces the server's statement of which channels are linked to
-     * Discord, by link key: a channel's id, or {@code faction:<id>}.
+     * Discord, by code name ({@code global}, {@code gondor}).
      */
     public static synchronized void setDiscordLinks(java.util.Collection<String> keys) {
         DISCORD_LINKS.clear();
@@ -776,12 +821,9 @@ public final class ClientChatChannelState {
             return false;
         }
         ChatChannel channel = tab.getChannel();
-        if (channel == ChatChannel.FACTION) {
-            String faction = scopeKeyRead(channel);
-            return faction.length() > 0 && DISCORD_LINKS.contains(
-                    "faction:" + faction.toLowerCase(java.util.Locale.ROOT));
-        }
-        return DISCORD_LINKS.contains(channel.getId());
+        String name = ChatCodeNames.of(channel,
+                channel == ChatChannel.FACTION ? scopeKeyRead(channel) : "");
+        return name != null && DISCORD_LINKS.contains(name);
     }
 
     /** The server's Proximity radius in blocks; zero until it says. */
@@ -941,13 +983,13 @@ public final class ClientChatChannelState {
     }
 
     /** Applies the server's statement of Operator-channel access. */
-    public static synchronized void setAdminAccess(boolean access) {
-        adminAccess = access;
+    public static synchronized void setOperatorAccess(boolean access) {
+        operatorAccess = access;
         ensureAvailable();
     }
 
-    public static synchronized boolean hasAdminAccess() {
-        return adminAccess;
+    public static synchronized boolean hasOperatorAccess() {
+        return operatorAccess;
     }
 
     /** Applies the server's statement of whether this player may moderate. */
@@ -1059,14 +1101,13 @@ public final class ClientChatChannelState {
     }
 
     public static synchronized void clear() {
-        selected = ChatTab.of(ChatChannel.ALL);
+        selected = ChatTab.of(ChatChannel.GLOBAL);
         PARTNER_COLORS.clear();
         PARTNER_NAMES.clear();
         PARTNER_CHARACTER_IDS.clear();
-        cachedFactionId = "";
-        cachedFactionName = "";
-        cachedFactionNanos = 0L;
-        adminAccess = false;
+        FACTION_NAMES.clear();
+        FACTION_NAMES_ASKED.clear();
+        operatorAccess = false;
         canModerate = false;
         canEditServerConfig = false;
         capabilities = java.util.Collections.emptySet();
@@ -1196,7 +1237,7 @@ public final class ClientChatChannelState {
      * all, the catalogue default.
      */
     private static ChatTab fallbackTab() {
-        ChatTab global = ChatTab.of(ChatChannel.ALL);
+        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
         if (isSelectable(global) && canSend(global)) {
             return global;
         }
@@ -1213,6 +1254,6 @@ public final class ClientChatChannelState {
         if (!open.isEmpty()) {
             return open.get(0);
         }
-        return canSend(ChatChannel.ALL) ? global : ooc;
+        return canSend(ChatChannel.GLOBAL) ? global : ooc;
     }
 }

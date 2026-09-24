@@ -1,223 +1,77 @@
 package com.ninuna.losttales.quest;
 
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
-import java.util.Map;
+import net.minecraft.util.StatCollector;
+
 /**
- * Shared readable objective text used by both the journal and the HUD tracker.
- *
- * Keeping this tiny helper in the common quest package avoids duplicating the
- * same legacy-friendly formatting rules across multiple 1.7.10 GUI classes.
+ * An objective's words, shared by the journal, the HUD tracker, quest
+ * conversations, quest cards in the chat and missive letters. An
+ * objective written without a description gets words made from its
+ * kind and target. Works on both sides: a dedicated server words a
+ * shared quest in its own language.
  */
 public final class LostTalesQuestObjectiveTextHelper {
     private LostTalesQuestObjectiveTextHelper() {}
 
-    public static String buildObjectiveLine(LostTalesQuestProgress progress, LostTalesQuestObjectiveDefinition objective, boolean currentStage, boolean questCompleted, boolean includeCheckbox, boolean includeDetails) {
+    /** An objective's words with how far along it is, {@code (2/5)}, and whether it is optional. */
+    public static String buildObjectiveLine(LostTalesQuestProgress progress,
+            LostTalesQuestObjectiveDefinition objective, boolean currentStage,
+            boolean questCompleted) {
         if (objective == null) {
-            return includeCheckbox ? "- [ ] Objective" : "Objective";
+            return describe(null);
         }
+        String line = describe(objective) + " ("
+                + getObjectiveProgress(progress, objective, currentStage, questCompleted)
+                + "/" + getObjectiveTargetCount(objective) + ")";
+        return objective.isOptional() ? line + " "
+                + StatCollector.translateToLocal("gui.losttales.quest.objective.optional")
+                : line;
+    }
 
-        int target = getObjectiveTargetCount(objective);
-        int current = questCompleted ? target : currentStage && progress != null ? progress.getObjectiveProgress(objective.getId()) : 0;
-        if (current > target) {
-            current = target;
-        }
-
-        StringBuilder line = new StringBuilder();
-        if (includeCheckbox) {
-            line.append(current >= target ? "- [x] " : "- [ ] ");
+    /** An objective's own description, or words made from its kind and target. */
+    public static String describe(LostTalesQuestObjectiveDefinition objective) {
+        if (objective == null) {
+            return StatCollector.translateToLocal("gui.losttales.quest.objective.generic");
         }
         String description = objective.getDescription();
-        line.append(description == null || description.length() == 0 ? buildFallbackObjectiveText(objective) : description);
-        line.append(" (").append(current).append('/').append(target).append(')');
-
-        if (includeDetails) {
-            String details = buildObjectiveParamSummary(objective);
-            if (details.length() > 0) {
-                line.append(" - ").append(details);
-            }
+        if (description != null && description.length() > 0) {
+            return description;
         }
-        if (objective.isOptional()) {
-            line.append(" optional");
-        }
-        return line.toString();
-    }
-
-    private static String buildFallbackObjectiveText(LostTalesQuestObjectiveDefinition objective) {
-        if (objective == null) {
-            return "Objective";
-        }
-        int target = getObjectiveTargetCount(objective);
-        String type = objective.getType() == null ? "" : objective.getType();
-        switch (LostTalesQuestObjectiveType.of(type)) {
+        LostTalesQuestObjectiveType type = LostTalesQuestObjectiveType.of(objective);
+        String count = String.valueOf(getObjectiveTargetCount(objective));
+        switch (type) {
             case GOTO:
-                return "Travel to the destination.";
-            case GATHER: {
-                String item = firstNonEmpty(objective.getParam("item", ""), objective.getParam("itemId", ""), objective.getParam("target", ""));
-                return "Gather " + target + (item.length() > 0 ? " " + prettifyResourceName(item) : " item" + (target == 1 ? "" : "s")) + ".";
-            }
-            case CRAFT: {
-                String item = firstNonEmpty(objective.getParam("item", ""), objective.getParam("itemId", ""), objective.getParam("target", ""));
-                return "Craft " + target + (item.length() > 0 ? " " + prettifyResourceName(item) : " item" + (target == 1 ? "" : "s")) + ".";
-            }
-            case KILL: {
-                String entity = firstNonEmpty(objective.getParam("entity", ""), objective.getParam("entityId", ""), objective.getParam("target", ""), objective.getParam("group", ""));
-                return "Defeat " + target + (entity.length() > 0 ? " " + prettifyResourceName(entity) : " enem" + (target == 1 ? "y" : "ies")) + ".";
-            }
+                return translate("goto");
+            case GATHER:
+            case CRAFT:
+                return translate(type.canonicalName(), count, itemName(objective));
+            case KILL:
+                return translate("kill", count, targetName(objective,
+                        getObjectiveTargetCount(objective) == 1 ? "enemy" : "enemies",
+                        "entity", "entityId", "target", "group"));
             case TALK: {
-                String who = objectiveEntityName(objective);
-                return "Speak to " + (who.length() > 0 ? who : "the person named") + ".";
+                String who = targetName(objective, "", "entity", "entityId", "npc", "target");
+                return who.length() == 0 ? translate("talk.anyone") : translate("talk", who);
             }
             case DELIVER: {
-                String who = objectiveEntityName(objective);
-                String item = firstNonEmpty(objective.getParam("item", ""), objective.getParam("itemId", ""));
-                return "Bring " + (who.length() > 0 ? who + " " : "")
-                        + target + (item.length() > 0 ? " " + prettifyResourceName(item) : " item" + (target == 1 ? "" : "s")) + ".";
+                String who = targetName(objective, "", "entity", "entityId", "npc", "target");
+                return who.length() == 0 ? translate("deliver.anyone", count, itemName(objective))
+                        : translate("deliver", who, count, itemName(objective));
             }
             default:
-                return getReadableObjectiveType(type);
+                return typeName(objective.getType());
         }
     }
 
-    /** Who a talk or delivery objective names, prettified; empty for none. */
-    private static String objectiveEntityName(
-            LostTalesQuestObjectiveDefinition objective) {
-        String entity = firstNonEmpty(objective.getParam("entity", ""),
-                objective.getParam("entityId", ""),
-                objective.getParam("npc", ""),
-                objective.getParam("target", ""));
-        if (entity.length() == 0) {
-            return "";
+    /** An objective kind's name, {@code Defeat} for {@code kill}; the word itself for a kind this mod does not know. */
+    public static String typeName(String type) {
+        LostTalesQuestObjectiveType known = LostTalesQuestObjectiveType.of(type);
+        if (known != LostTalesQuestObjectiveType.UNKNOWN) {
+            return translate("type." + known.canonicalName());
         }
-        // A selector may list several spellings of the same person; the
-        // first is the one written for a reader.
-        int comma = entity.indexOf(',');
-        return prettifyResourceName(comma < 0 ? entity
-                : entity.substring(0, comma));
-    }
-
-    private static String prettifyResourceName(String value) {
-        if (value == null) {
-            return "";
-        }
-        String text = value.trim();
-        int colon = text.indexOf(':');
-        if (colon >= 0 && colon + 1 < text.length()) {
-            text = text.substring(colon + 1);
-        }
-        int at = text.indexOf('@');
-        if (at >= 0) {
-            text = text.substring(0, at);
-        }
-        text = text.replace('-', ' ').replace('_', ' ');
-        return text;
-    }
-
-    public static String getReadableObjectiveType(String type) {
-        if (type == null || type.length() == 0) {
-            return "Objective";
-        }
-        switch (LostTalesQuestObjectiveType.of(type)) {
-            case GOTO:
-                return "Travel";
-            case GATHER:
-                return "Gather";
-            case CRAFT:
-                return "Craft";
-            case KILL:
-                return "Defeat";
-            case TALK:
-                return "Speak";
-            case DELIVER:
-                return "Deliver";
-            default:
-                return Character.toUpperCase(type.charAt(0)) + type.substring(1);
-        }
-    }
-
-    public static String buildObjectiveParamSummary(LostTalesQuestObjectiveDefinition objective) {
-        if (objective == null || objective.getParams().isEmpty()) {
-            return "";
-        }
-
-        String type = objective.getType() == null ? "" : objective.getType();
-        if (LostTalesQuestObjectiveType.GOTO.is(objective)) {
-            String x = objective.getParam("x", "?");
-            String y = objective.getParam("y", "?");
-            String z = objective.getParam("z", "?");
-            String radius = objective.getParam("radius", "");
-            String dimension = objective.getParam("dimension", "");
-            String marker = firstNonEmpty(objective.getParam("marker", ""), objective.getParam("markerId", ""), objective.getParam("mapMarker", ""));
-
-            StringBuilder text = new StringBuilder();
-            if (marker.length() > 0) {
-                text.append("Marker ").append(marker);
-            }
-            if (!"?".equals(x) || !"?".equals(y) || !"?".equals(z)) {
-                if (text.length() > 0) {
-                    text.append(" @ ");
-                } else {
-                    text.append("Location ");
-                }
-                text.append(x).append(", ").append(y).append(", ").append(z);
-            }
-            if (dimension.length() > 0) {
-                text.append(" in ").append(dimension);
-            }
-            if (radius.length() > 0) {
-                text.append(" within ").append(radius).append(" blocks");
-            }
-            return text.toString();
-        }
-
-        if (LostTalesQuestObjectiveType.GATHER.is(objective)
-                || LostTalesQuestObjectiveType.CRAFT.is(objective)) {
-            String item = firstNonEmpty(objective.getParam("item", ""), objective.getParam("itemId", ""), objective.getParam("target", ""));
-            if (item.length() > 0) {
-                return "Item " + item;
-            }
-            String tag = firstNonEmpty(objective.getParam("tag", ""), objective.getParam("ore", ""), objective.getParam("oreDict", ""), objective.getParam("oredict", ""));
-            return tag.length() == 0 ? "" : "Tag " + tag;
-        }
-
-        if (LostTalesQuestObjectiveType.of(objective).isNpcVisit()) {
-            String who = firstNonEmpty(objective.getParam("entity", ""),
-                    objective.getParam("entityId", ""),
-                    objective.getParam("npc", ""),
-                    objective.getParam("target", ""));
-            String item = firstNonEmpty(objective.getParam("item", ""),
-                    objective.getParam("itemId", ""));
-            StringBuilder text = new StringBuilder();
-            if (who.length() > 0) {
-                text.append("Recipient ").append(who);
-            }
-            if (item.length() > 0) {
-                text.append(text.length() > 0 ? ", item " : "Item ").append(item);
-            }
-            return text.toString();
-        }
-
-        if (LostTalesQuestObjectiveType.KILL.is(objective)) {
-            String entity = firstNonEmpty(objective.getParam("entity", ""), objective.getParam("entityId", ""), objective.getParam("target", ""));
-            String group = firstNonEmpty(objective.getParam("tag", ""), objective.getParam("group", ""));
-            String radius = objective.getParam("radius", "");
-            String text = entity.length() > 0 ? "Target " + entity : group.length() > 0 ? "Group " + group : "";
-            if (radius.length() > 0) {
-                text += (text.length() == 0 ? "" : ", ") + "within " + radius + " blocks";
-            }
-            return text;
-        }
-
-        StringBuilder builder = new StringBuilder();
-        for (Map.Entry<String, String> entry : objective.getParams().entrySet()) {
-            if ("count".equalsIgnoreCase(entry.getKey())) {
-                continue;
-            }
-            if (builder.length() > 0) {
-                builder.append(", ");
-            }
-            builder.append(entry.getKey()).append('=').append(entry.getValue());
-        }
-        return builder.toString();
+        String word = type == null ? "" : type.trim();
+        return word.length() == 0 ? describe(null)
+                : Character.toUpperCase(word.charAt(0)) + word.substring(1);
     }
 
     public static int getObjectiveTargetCount(LostTalesQuestObjectiveDefinition objective) {
@@ -240,10 +94,56 @@ public final class LostTalesQuestObjectiveTextHelper {
         return Math.min(current, target);
     }
 
-    private static String firstNonEmpty(String... values) {
-        if (values == null) {
-            return "";
+    /** The item a gathering, crafting or delivery asks for, by its name; "item" or "items" for none named. */
+    private static String itemName(LostTalesQuestObjectiveDefinition objective) {
+        String item = firstNonEmpty(objective.getParam("item", ""),
+                objective.getParam("itemId", ""), objective.getParam("target", ""));
+        if (item.length() > 0) {
+            return LostTalesQuestRewardText.itemPhrase(item);
         }
+        return translate(getObjectiveTargetCount(objective) == 1 ? "noun.item" : "noun.items");
+    }
+
+    /**
+     * Who or what the objective names in the first of those params: its
+     * entity name where the game has one, else the id made readable. A
+     * selector may list several spellings of the same target; the first
+     * is the one written for a reader. {@code noun} names none at all.
+     */
+    private static String targetName(LostTalesQuestObjectiveDefinition objective,
+            String noun, String... params) {
+        String[] values = new String[params.length];
+        for (int i = 0; i < params.length; i++) {
+            values[i] = objective.getParam(params[i], "");
+        }
+        String target = firstNonEmpty(values);
+        int comma = target.indexOf(',');
+        if (comma >= 0) {
+            target = target.substring(0, comma).trim();
+        }
+        if (target.length() == 0) {
+            return noun.length() == 0 ? "" : translate("noun." + noun);
+        }
+        String key = "entity." + target + ".name";
+        if (StatCollector.canTranslate(key)) {
+            return StatCollector.translateToLocal(key);
+        }
+        int colon = target.indexOf(':');
+        if (colon >= 0 && colon + 1 < target.length()) {
+            target = target.substring(colon + 1);
+        }
+        int at = target.indexOf('@');
+        if (at >= 0) {
+            target = target.substring(0, at);
+        }
+        return target.replace('-', ' ').replace('_', ' ');
+    }
+
+    private static String translate(String key, Object... args) {
+        return StatCollector.translateToLocalFormatted("gui.losttales.quest.objective." + key, args);
+    }
+
+    private static String firstNonEmpty(String... values) {
         for (String value : values) {
             if (value != null && value.trim().length() > 0) {
                 return value.trim();

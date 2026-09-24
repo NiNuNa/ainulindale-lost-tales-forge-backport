@@ -12,7 +12,7 @@ import net.minecraft.entity.player.EntityPlayerMP;
 
 import java.util.Locale;
 
-/** Client-to-server tracking request from the unified quest journal. */
+/** A request about one quest, from the journal or a quest conversation. */
 public class LostTalesQuestActionPacket implements IMessage {
     public static final String ACTION_PIN = "pin";
     public static final String ACTION_UNPIN = "unpin";
@@ -22,6 +22,12 @@ public class LostTalesQuestActionPacket implements IMessage {
      * at all, so a forged id abandons nothing.
      */
     public static final String ACTION_ABANDON = "abandon";
+    /**
+     * Clearing a finished or failed Middle-earth quest out of History.
+     * The server looks the quest up in LOTR's own lists, so a forged id
+     * clears nothing, and a Lost Tales quest's History is never cleared.
+     */
+    public static final String ACTION_CLEAR = "clear";
     /**
      * Taking a quest that was offered in conversation. The client names
      * the quest; the server checks that somebody the quest names as its
@@ -62,6 +68,18 @@ public class LostTalesQuestActionPacket implements IMessage {
         }
     }
 
+    public boolean isMalformed() {
+        return this.malformed;
+    }
+
+    public String getAction() {
+        return this.action;
+    }
+
+    public String getQuestId() {
+        return this.questId;
+    }
+
     @Override
     public void toBytes(ByteBuf buffer) {
         LostTalesPacketCodec.writeUtf8String(
@@ -83,12 +101,14 @@ public class LostTalesQuestActionPacket implements IMessage {
     private static boolean isKnownAction(String action) {
         return ACTION_PIN.equals(action) || ACTION_UNPIN.equals(action)
                 || ACTION_ABANDON.equals(action)
+                || ACTION_CLEAR.equals(action)
                 || ACTION_ACCEPT.equals(action)
                 || ACTION_HAND_IN.equals(action);
     }
 
     private static boolean hasValidIdentifierUsage(String action, String identifier) {
         if (ACTION_PIN.equals(action) || ACTION_ABANDON.equals(action)
+                || ACTION_CLEAR.equals(action)
                 || ACTION_ACCEPT.equals(action)
                 || ACTION_HAND_IN.equals(action)) {
             return identifier.length() > 0;
@@ -107,6 +127,8 @@ public class LostTalesQuestActionPacket implements IMessage {
             }
         } else if (ACTION_ABANDON.equals(action)) {
             LostTalesQuestManager.abandonOwnQuest(player, questId);
+        } else if (ACTION_CLEAR.equals(action)) {
+            LostTalesQuestManager.clearFinishedQuest(player, questId);
         } else if (ACTION_ACCEPT.equals(action)) {
             LostTalesQuestManager.acceptFromConversation(player, questId);
         } else if (ACTION_HAND_IN.equals(action)) {
@@ -122,12 +144,12 @@ public class LostTalesQuestActionPacket implements IMessage {
                 return null;
             }
 
-            final String action = message.action;
-            final String questId = message.questId;
+            final String action = message.getAction();
+            final String questId = message.getQuestId();
             LostTalesServerPacketDispatcher.submit(
                     player,
                     LostTalesRequestRateLimiter.RequestType.QUEST_ACTION,
-                    message.malformed,
+                    message.isMalformed(),
                     "LostTalesQuestActionPacket",
                     new LostTalesServerTaskQueue.PlayerTask() {
                         @Override

@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.input;
 
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.KeyBinding;
 import org.lwjgl.input.Keyboard;
 
@@ -78,8 +79,23 @@ public final class LostTalesInputBinding {
                 return "L Ctrl";
             case Keyboard.KEY_RCONTROL:
                 return "R Ctrl";
+            case Keyboard.KEY_LMETA:
+            case Keyboard.KEY_RMETA:
+                // Cmd on a Mac, where it gives the shortcuts Ctrl gives
+                // elsewhere; the system key anywhere else.
+                return Minecraft.isRunningOnMac ? "Cmd" : "Meta";
             case Keyboard.KEY_RETURN:
                 return "Enter";
+            case Keyboard.KEY_BACK:
+                return "Backspace";
+            case Keyboard.KEY_HOME:
+                return "Home";
+            case Keyboard.KEY_END:
+                return "End";
+            case Keyboard.KEY_PRIOR:
+                return "PgUp";
+            case Keyboard.KEY_NEXT:
+                return "PgDn";
             case Keyboard.KEY_ESCAPE:
                 return "Esc";
             case Keyboard.KEY_SPACE:

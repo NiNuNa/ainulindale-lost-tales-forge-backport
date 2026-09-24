@@ -37,13 +37,13 @@ public final class ChatChannelIconConfigTest {
     @Test
     public void anEntryPutsAnIconOnAChannel() {
         Map<String, ChatChannelIconSpec> icons = parse(
-                "admin=item:minecraft:iron_sword",
+                "operator=item:minecraft:iron_sword",
                 "Party = emoji:joy",
                 "ooc=slight_smile");
 
         assertEquals(3, icons.size());
         assertEquals(ChatChannelIconSpec.parse("item:minecraft:iron_sword"),
-                icons.get(ChatChannel.ADMIN.getId()));
+                icons.get(ChatChannel.OPERATOR.getId()));
         assertEquals(ChatChannelIconSpec.parse("emoji:joy"),
                 icons.get(ChatChannel.PARTY.getId()));
         assertEquals(ChatChannelIconSpec.parse("emoji:slight_smile"),
@@ -54,7 +54,7 @@ public final class ChatChannelIconConfigTest {
     @Test
     public void aChannelTheFileDefinesMayWearOne() {
         ChatChannel.installDefined(ChatRoleConfig.parseChannelDefinitions(
-                new String[] {"trade=name:Trade;rule:global"}, this.collector),
+                new String[] {"trade=name:Trade;rule:everyone"}, this.collector),
                 new ChatChannel.Warnings() {
                     @Override
                     public void warn(String message) {
@@ -79,9 +79,9 @@ public final class ChatChannelIconConfigTest {
 
     @Test
     public void textThatIsNoIconIsReported() {
-        assertTrue(parse("admin=item:").isEmpty());
-        assertTrue(parse("admin=").isEmpty());
-        assertTrue(parse("admin").isEmpty());
+        assertTrue(parse("operator=item:").isEmpty());
+        assertTrue(parse("operator=").isEmpty());
+        assertTrue(parse("operator").isEmpty());
         assertEquals(3, this.warnings.size());
         for (String warning : this.warnings) {
             assertTrue(warning, warning.contains("no icon"));
@@ -90,7 +90,7 @@ public final class ChatChannelIconConfigTest {
 
     @Test
     public void anEmojiThisBuildDoesNotHaveIsReported() {
-        assertTrue(parse("admin=emoji:no_such_face").isEmpty());
+        assertTrue(parse("operator=emoji:no_such_face").isEmpty());
         assertEquals(1, this.warnings.size());
         assertTrue(this.warnings.get(0).contains("does not have"));
     }
@@ -98,32 +98,32 @@ public final class ChatChannelIconConfigTest {
     @Test
     public void aChannelNamedTwiceKeepsItsFirstIcon() {
         Map<String, ChatChannelIconSpec> icons = parse(
-                "admin=emoji:joy", "admin=emoji:smile");
+                "operator=emoji:joy", "operator=emoji:smile");
         assertEquals(1, icons.size());
         assertEquals(ChatChannelIconSpec.parse("emoji:joy"),
-                icons.get(ChatChannel.ADMIN.getId()));
+                icons.get(ChatChannel.OPERATOR.getId()));
         assertEquals(1, this.warnings.size());
         assertTrue(this.warnings.get(0).contains("twice"));
     }
 
     @Test
     public void blankLinesAndCommentsAreSkippedInSilence() {
-        assertTrue(parse("", "   ", "# admin=emoji:joy").isEmpty());
+        assertTrue(parse("", "   ", "# operator=emoji:joy").isEmpty());
         assertTrue(this.warnings.isEmpty());
     }
 
     @Test
     public void theCatalogueTakesWhatWasParsed() {
-        ChatChannelIconCatalog.install(parse("admin=item:minecraft:iron_sword"));
+        ChatChannelIconCatalog.install(parse("operator=item:minecraft:iron_sword"));
         assertEquals(ChatChannelIconSpec.parse("item:minecraft:iron_sword"),
-                ChatChannelIconCatalog.current().get(ChatChannel.ADMIN.getId()));
+                ChatChannelIconCatalog.current().get(ChatChannel.OPERATOR.getId()));
 
         ChatChannelIconCatalog.install(Collections.<String, ChatChannelIconSpec>emptyMap());
         assertTrue(ChatChannelIconCatalog.current().isEmpty());
 
         ChatChannelIconCatalog.install(null);
         assertTrue(ChatChannelIconCatalog.current().isEmpty());
-        assertFalse(ChatChannelIconCatalog.current().containsKey("admin"));
+        assertFalse(ChatChannelIconCatalog.current().containsKey("operator"));
     }
 
     private Map<String, ChatChannelIconSpec> parse(String... entries) {

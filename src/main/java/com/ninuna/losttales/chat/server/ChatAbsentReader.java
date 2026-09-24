@@ -68,7 +68,7 @@ final class ChatAbsentReader implements ChatChannelPolicy.Reader {
 
     @Override
     public boolean readsConsole() {
-        LostTalesCapability capability = LostTalesCapability.CHAT_CONSOLE_READ;
+        LostTalesCapability capability = LostTalesCapability.CHAT_SERVER_CONSOLE_READ;
         int level = opLevel();
         return LostTalesPermissions.decide(
                 level != ChatAccountRoleResolver.NOT_OPERATOR

@@ -8,14 +8,13 @@ import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
  * is taken from, and a press acts on.
  *
  * <p>The screen finds it once per frame from the top of what is drawn
- * down, in the order a press is handled: the card a click opened, the
- * open menu, the snap layouts, the completion lists, the open picker, a
- * window's edge,
- * the tab rows, the bar's controls, anything else painted above the
- * lines, a window's own controls, the runs of the lines, and the window
- * itself. Only the control found sees the pointer. Everything under it
- * is asked with the pointer {@link #AWAY}, so nothing lights beneath a
- * menu and nothing under it answers a press.</p>
+ * down, in the order a press is handled: snap assist, the snap layouts,
+ * the completion lists, the small windows front to back, a window's
+ * edge, the tab rows, the bar's controls, anything else painted above
+ * the lines, a window's own controls, the runs of the lines, and the
+ * window itself. Only the control found sees the pointer. Everything
+ * under it is asked with the pointer {@link #AWAY}, so nothing lights
+ * beneath a small window and nothing under it answers a press.</p>
  */
 final class ChatHover {
     /**
@@ -28,11 +27,9 @@ final class ChatHover {
     enum Kind {
         /** Nothing of the chat's. */
         NONE,
-        /** The card a click opened. */
-        CARD,
-        /** A row of the open menu that does something. */
+        /** A row of a menu's window that does something. */
         MENU_ENTRY,
-        /** The open menu's own panel: a header, a display row, padding. */
+        /** A menu's window where no row answers: a header, a display row, the field, padding. */
         MENU,
         /** The snap layouts under a fullscreen control: a zone, or the panel round them. */
         SNAP_LAYOUT,
@@ -44,11 +41,19 @@ final class ChatHover {
         SUGGESTION,
         /** An open completion list's own padding. */
         SUGGESTIONS,
-        /** A cell of the open picker. */
+        /** The band just outside a small window, which resizes it. */
+        SMALL_WINDOW_RESIZE,
+        /** The cross on a small window's strip. */
+        SMALL_WINDOW_CLOSE,
+        /** A small window's strip, which moves it. */
+        SMALL_WINDOW_STRIP,
+        /** A small window's content where nothing of it answers. */
+        SMALL_WINDOW,
+        /** A cell of a picker's window. */
         PICKER_CELL,
-        /** A section label of the open picker that folds. */
+        /** A section label of a picker's window that folds. */
         PICKER_LABEL,
-        /** The open picker's own panel: search row, gaps, scrollbar. */
+        /** A picker's window's own content: search row, gaps, scrollbar. */
         PICKER,
         /** The border just outside an unlocked window. */
         RESIZE,
@@ -92,8 +97,8 @@ final class ChatHover {
     static final ChatHover NONE = new ChatHover(Kind.NONE);
 
     final Kind kind;
-    ChatPopupMenu.Entry menuEntry;
-    /** Why the open menu's row under the pointer cannot be taken; empty for none. */
+    ChatMenu.Entry menuEntry;
+    /** Why the menu's row under the pointer cannot be taken; empty for none. */
     String menuTip = "";
     ChatWindow window;
     ChatWindowFrame frame;
@@ -103,6 +108,10 @@ final class ChatHover {
     ChatToolStrip.Part stripPart;
     /** Whether the pointer is on the grip's own glyph. */
     boolean overGrip;
+    /** On a small window, the window; null anywhere else. */
+    ChatSmallWindow smallWindow;
+    /** On a small window's resize band, the edge. */
+    ChatWindowGestures.ResizeEdge smallEdge;
     ChatPickerPanel picker;
     ChatPickerPanel.Entry pickerEntry;
     ChatInputCompletion.Slot suggestion;
@@ -151,6 +160,8 @@ final class ChatHover {
             case SUGGESTION:
             case PICKER_CELL:
             case PICKER_LABEL:
+            case SMALL_WINDOW_CLOSE:
+            case SMALL_WINDOW_STRIP:
             case TAB_ROW:
             case OTHER_BAR:
             case CHARACTER_BUTTON:
@@ -192,6 +203,9 @@ final class ChatHover {
     LostTalesMapCursor.Pose pose() {
         if (this.kind == Kind.RESIZE && this.resize != null) {
             return ChatWindowGestures.cursorPose(this.resize.edge);
+        }
+        if (this.kind == Kind.SMALL_WINDOW_RESIZE && this.smallEdge != null) {
+            return ChatWindowGestures.cursorPose(this.smallEdge);
         }
         if (this.kind == Kind.MEMBER_LIST_EDGE) {
             return LostTalesMapCursor.Pose.RESIZE_HORIZONTAL;

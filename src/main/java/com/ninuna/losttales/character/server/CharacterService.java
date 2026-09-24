@@ -242,11 +242,7 @@ public final class CharacterService {
             return CharacterOperationResult.failure(CharacterErrorId.INTERNAL_ERROR, roster);
         }
 
-        boolean createdInHighestUnlockedSlot =
-                creation.getSlotIndex() == roster.getUnlockedSlotCount() - 1;
-        if (createdInHighestUnlockedSlot) {
-            roster.unlockNextSlot();
-        }
+        roster.unlockNextSlotAfter(creation.getSlotIndex());
         // A new character only joins the roster. The player stays on the
         // identity they are playing and selects the character when they
         // choose to, through the ordinary switch and its safeguards.

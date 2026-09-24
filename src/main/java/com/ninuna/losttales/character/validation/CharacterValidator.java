@@ -19,6 +19,7 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import java.text.Normalizer;
 import java.util.Locale;
 import java.util.UUID;
+import com.ninuna.losttales.character.lore.LoreCharacterRegistry;
 
 /** Centralized authoritative validation for character-management operations. */
 public final class CharacterValidator {
@@ -117,6 +118,12 @@ public final class CharacterValidator {
                 ChatProfanityCatalog.effective())) {
             return CharacterAppearanceValidationResult.failure(
                     CharacterErrorId.INVALID_NAME_PROFANE);
+        }
+        // A lore character's name is theirs: whoever claims them plays by
+        // it, and nobody else takes it.
+        if (LoreCharacterRegistry.getByName(normalizedName) != null) {
+            return CharacterAppearanceValidationResult.failure(
+                    CharacterErrorId.NAME_RESERVED);
         }
         String normalizedNameKey = normalizeNameKey(normalizedName);
         for (RoleplayCharacter existing : roster.getCharacters()) {
@@ -316,13 +323,19 @@ public final class CharacterValidator {
     /**
      * What a character says about itself: a description as stored (see
      * {@link #normalizeDescription}) and an age. Creation and a later
-     * edit hold both to these bounds.
+     * edit hold both to these bounds, and a description to the words a
+     * name may not hold.
      */
     public static CharacterValidationResult validateProfile(String description,
                                                             int age) {
         if (!isValidDescription(description)) {
             return CharacterValidationResult.failure(
                     CharacterErrorId.INVALID_DESCRIPTION);
+        }
+        if (ChatProfanityFilter.hasListedWord(description,
+                ChatProfanityCatalog.effective())) {
+            return CharacterValidationResult.failure(
+                    CharacterErrorId.INVALID_DESCRIPTION_PROFANE);
         }
         if (age < MIN_AGE || age > MAX_AGE) {
             return CharacterValidationResult.failure(CharacterErrorId.INVALID_AGE);

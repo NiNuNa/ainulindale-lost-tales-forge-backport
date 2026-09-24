@@ -72,12 +72,12 @@ public final class ChatConsoleStreamTest {
         assertEquals(ChatConsoleEvent.MAX_TEXT_LENGTH, clipped.getText().length());
         assertEquals("", clipped.getActor());
         // Only a command has a context, and only a printable one.
-        assertEquals("all", new ChatConsoleEvent(1L, 1L, ChatConsoleEvent.Kind.COMMAND,
-                ChatConsoleEvent.Severity.INFO, "a", "/x", " all ").getContext());
+        assertEquals("global", new ChatConsoleEvent(1L, 1L, ChatConsoleEvent.Kind.COMMAND,
+                ChatConsoleEvent.Severity.INFO, "a", "/x", " global ").getContext());
         assertEquals("", new ChatConsoleEvent(1L, 1L, ChatConsoleEvent.Kind.SERVER,
-                ChatConsoleEvent.Severity.INFO, "a", "started", "all").getContext());
+                ChatConsoleEvent.Severity.INFO, "a", "started", "global").getContext());
         assertEquals("", new ChatConsoleEvent(1L, 1L, ChatConsoleEvent.Kind.COMMAND,
-                ChatConsoleEvent.Severity.INFO, "a", "/x", "all\nooc").getContext());
+                ChatConsoleEvent.Severity.INFO, "a", "/x", "global\nooc").getContext());
         assertEquals("", new ChatConsoleEvent(1L, 1L, ChatConsoleEvent.Kind.COMMAND,
                 ChatConsoleEvent.Severity.INFO, "a", "/x", null).getContext());
         assertEquals(ChatConsoleEvent.Kind.WARNING, ChatConsoleEvent.Kind.fromOrdinal(5));

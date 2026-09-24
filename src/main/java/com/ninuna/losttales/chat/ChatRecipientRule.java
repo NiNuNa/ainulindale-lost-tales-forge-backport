@@ -1,15 +1,16 @@
 package com.ninuna.losttales.chat;
 
-/** Server routing strategies currently used by Lost Tales chat channels. */
+/** How the server decides who hears a channel's lines. */
 public enum ChatRecipientRule {
-    GLOBAL,
+    /** Everyone online: Global and Out of Character. */
+    EVERYONE,
     PROXIMITY,
     PARTY,
     FACTION,
     /** Only the sender: a private console that echoes back to its author. */
     SELF,
     /**
-     * Everyone holding {@code chat.console.read}: the server's own
+     * Everyone holding {@code chat.server_console.read}: the server's own
      * console, one stream shared by the staff who may watch it. The rule
      * names a capability rather than a role, because reading the
      * server's doings is something the code grants, not something a

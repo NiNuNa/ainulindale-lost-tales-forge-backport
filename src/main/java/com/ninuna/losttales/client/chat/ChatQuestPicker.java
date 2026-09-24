@@ -18,6 +18,7 @@ import net.minecraft.util.StatCollector;
  * active quests are grouped by the same natural categories as the journal.
  */
 final class ChatQuestPicker extends ChatPickerPanel {
+    /** A row's width where the window first opens; it stretches with the window. */
     private static final int ROW_WIDTH = 116;
     private static final int ROW_HEIGHT = 12;
     private static final long REFRESH_INTERVAL_NANOS = 500L * 1000000L;
@@ -35,8 +36,13 @@ final class ChatQuestPicker extends ChatPickerPanel {
     }
 
     @Override
-    int columns() {
+    int naturalColumns() {
         return 1;
+    }
+
+    @Override
+    boolean stretchesCells() {
+        return true;
     }
 
     @Override
@@ -77,12 +83,12 @@ final class ChatQuestPicker extends ChatPickerPanel {
 
     @Override
     void drawEntry(Minecraft minecraft, Entry entry, int x, int y,
-                   int alpha, boolean hovered) {
+                   int width, int alpha, boolean hovered) {
         ChatShareCandidates.QuestEntry quest =
                 (ChatShareCandidates.QuestEntry)entry.value;
         LostTalesUiSheet.QUEST.drawWithShadow(x + 1, y + 1, alpha);
         String label = LostTalesSkyrimUiStyle.trimToWidth(
-                minecraft.fontRenderer, quest.label(), ROW_WIDTH - 18);
+                minecraft.fontRenderer, quest.label(), width - 18);
         LostTalesChatVisualStyle.drawPlain(minecraft.fontRenderer, label,
                 x + 15, y + 2, hovered ? alpha : Math.min(alpha, 220));
     }

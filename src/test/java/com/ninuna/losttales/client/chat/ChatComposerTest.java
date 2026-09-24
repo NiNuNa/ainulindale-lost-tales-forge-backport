@@ -22,7 +22,7 @@ public final class ChatComposerTest {
     @Before
     public void selectGlobal() {
         ClientChatChannelState.clear();
-        ClientChatChannelState.select(ChatChannel.ALL);
+        ClientChatChannelState.select(ChatChannel.GLOBAL);
     }
 
     @After
@@ -35,7 +35,7 @@ public final class ChatComposerTest {
         ChatComposer composer = new ChatComposer();
         assertFalse(composer.isReplying());
         assertFalse(composer.replyReference().exists());
-        composer.startReply(ChatTab.of(ChatChannel.ALL), 42L, "Beren",
+        composer.startReply(ChatTab.of(ChatChannel.GLOBAL), 42L, "Beren",
                 "the road is clear", null);
         assertTrue(composer.isReplying());
         ChatReplyReference reference = composer.replyReference();
@@ -46,7 +46,7 @@ public final class ChatComposerTest {
         assertFalse(composer.isReplying());
         assertFalse(composer.replyReference().exists());
         composer.onTabSelected(ChatTab.of(ChatChannel.OOC));
-        ClientChatChannelState.select(ChatChannel.ALL);
+        ClientChatChannelState.select(ChatChannel.GLOBAL);
         assertFalse(composer.isReplying());
     }
 
@@ -59,7 +59,7 @@ public final class ChatComposerTest {
     @Test
     public void aLocalIdAnchorsAReplyForThisClientAlone() {
         ChatComposer composer = new ChatComposer();
-        composer.startReply(ChatTab.of(ChatChannel.ALL), -7L, "Bilbo", "x",
+        composer.startReply(ChatTab.of(ChatChannel.GLOBAL), -7L, "Bilbo", "x",
                 null);
         assertTrue(composer.isReplying());
         ChatReplyReference reference = composer.replyReference();
@@ -67,7 +67,7 @@ public final class ChatComposerTest {
         assertEquals(-7L, reference.getMessageId());
         assertEquals("Bilbo", reference.getAuthor());
         assertEquals("x", reference.getExcerpt());
-        composer.startReply(ChatTab.of(ChatChannel.ALL), -8L, "", "x", null);
+        composer.startReply(ChatTab.of(ChatChannel.GLOBAL), -8L, "", "x", null);
         assertFalse(composer.isReplying());
         assertEquals(ChatReplyReference.NONE, composer.replyReference());
     }
@@ -80,7 +80,7 @@ public final class ChatComposerTest {
     @Test
     public void anUnnamedLineIsAnsweredByItsWords() {
         ChatComposer composer = new ChatComposer();
-        composer.startReply(ChatTab.of(ChatChannel.ALL), ChatMessageIds.NONE,
+        composer.startReply(ChatTab.of(ChatChannel.GLOBAL), ChatMessageIds.NONE,
                 "System", "Bilbo has just earned the achievement [Taking Inventory]",
                 null);
         assertTrue(composer.isReplying());
@@ -92,7 +92,7 @@ public final class ChatComposerTest {
         assertEquals("Bilbo has just earned the achievement [Taking Inventory]",
                 reference.getExcerpt());
         composer.cancelReply();
-        composer.startReply(ChatTab.of(ChatChannel.ALL), ChatMessageIds.NONE,
+        composer.startReply(ChatTab.of(ChatChannel.GLOBAL), ChatMessageIds.NONE,
                 "", "words with nobody behind them", null);
         assertFalse(composer.isReplying());
         assertEquals(ChatReplyReference.NONE, composer.replyReference());
@@ -108,7 +108,7 @@ public final class ChatComposerTest {
     public void aQuoteWearsTheHeadOfTheLineItAnswers() {
         UUID self = UUID.randomUUID();
         ChatComposer composer = new ChatComposer();
-        composer.startReply(ChatTab.of(ChatChannel.ALL), -7L, "Aldric",
+        composer.startReply(ChatTab.of(ChatChannel.GLOBAL), -7L, "Aldric",
                 "/warp home", head(ChatHeadMarker.encode(self, false,
                         UUID.randomUUID(), "skin", "Aldric", 0xFCECD1,
                         0x64B082)));
@@ -120,7 +120,7 @@ public final class ChatComposerTest {
         assertEquals(0x64B082, reference.getAuthorColor());
 
         UUID npc = UUID.randomUUID();
-        composer.startReply(ChatTab.of(ChatChannel.ALL), -9L, "Barliman",
+        composer.startReply(ChatTab.of(ChatChannel.GLOBAL), -9L, "Barliman",
                 "Welcome", head(ChatHeadMarker.encodeNpc(npc,
                         "lotr:textures/entity/bree.png", "Barliman", 0xFCECD1,
                         0xC3A79C)));
@@ -129,7 +129,7 @@ public final class ChatComposerTest {
         assertEquals(npc, reference.getSenderId());
         assertEquals("lotr:textures/entity/bree.png", reference.getSkinId());
 
-        composer.startReply(ChatTab.of(ChatChannel.ALL), ChatMessageIds.NONE,
+        composer.startReply(ChatTab.of(ChatChannel.GLOBAL), ChatMessageIds.NONE,
                 "Server", "Unknown command", head(ChatHeadMarker.encode(
                         LostTalesChatMessagePacket.SERVER_SENDER_ID, true,
                         null, "", "Server", 0xFCECD1, 0x9C807E)));
@@ -173,9 +173,9 @@ public final class ChatComposerTest {
     @Test
     public void anEditPutsAReplyDownAndIsForgottenWithItsMessage() {
         ChatComposer composer = new ChatComposer();
-        composer.startReply(ChatTab.of(ChatChannel.ALL), 42L, "Beren", "x",
+        composer.startReply(ChatTab.of(ChatChannel.GLOBAL), 42L, "Beren", "x",
                 null);
-        composer.startEdit(ChatTab.of(ChatChannel.ALL), 43L);
+        composer.startEdit(ChatTab.of(ChatChannel.GLOBAL), 43L);
         assertTrue(composer.isEditing());
         assertFalse(composer.isReplying());
         assertEquals(43L, composer.editingMessageId());
@@ -189,8 +189,8 @@ public final class ChatComposerTest {
     @Test
     public void composingBelongsToTheTabItStartedIn() {
         ChatComposer composer = new ChatComposer();
-        composer.startEdit(ChatTab.of(ChatChannel.ALL), 43L);
-        composer.onTabSelected(ChatTab.of(ChatChannel.ALL));
+        composer.startEdit(ChatTab.of(ChatChannel.GLOBAL), 43L);
+        composer.onTabSelected(ChatTab.of(ChatChannel.GLOBAL));
         assertTrue(composer.isEditing());
         composer.onTabSelected(ChatTab.of(ChatChannel.OOC));
         assertFalse(composer.isEditing());

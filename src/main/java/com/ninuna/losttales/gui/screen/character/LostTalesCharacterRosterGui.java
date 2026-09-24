@@ -59,6 +59,19 @@ public final class LostTalesCharacterRosterGui extends GuiScreen
     private static final int PANEL_HEIGHT_MIN = 120;
     /** The button row's band at the foot of the screen. */
     private static final int BUTTON_ROW_BAND = 44;
+    /** A second row's height, gap included. */
+    private static final int BUTTON_ROW_STEP = 24;
+    private static final int ACTION_COUNT = 4;
+    private static final int ACTION_WIDTH = 90;
+    private static final int ACTION_GAP = 4;
+    private static final int SIDE_BUTTON_WIDTH = 80;
+    /**
+     * The narrowest screen one row fits: Back, the four actions and Cape,
+     * with their margins and gaps.
+     */
+    private static final int ONE_ROW_WIDTH = 8 + SIDE_BUTTON_WIDTH + ACTION_GAP
+            + ACTION_WIDTH * ACTION_COUNT + ACTION_GAP * (ACTION_COUNT - 1)
+            + ACTION_GAP + SIDE_BUTTON_WIDTH + 8;
     /** Below this the detail line under the grid is dropped. */
     private static final int DETAILS_MIN_PANEL = 200;
     /** A tile still has to hold a name and a line under it. */
@@ -83,6 +96,10 @@ public final class LostTalesCharacterRosterGui extends GuiScreen
     private GuiButton deleteButton;
     private GuiButton refreshButton;
     private GuiButton capeButton;
+    /** Whether the actions stand in a row of their own over Back and Cape. */
+    private boolean twoRows;
+    /** Each action button's width: the full width, or less on a very narrow screen. */
+    private int actionWidth = ACTION_WIDTH;
 
     public LostTalesCharacterRosterGui(GuiScreen parent) {
         this.parent = parent;
@@ -91,23 +108,34 @@ public final class LostTalesCharacterRosterGui extends GuiScreen
     @Override
     public void initGui() {
         this.buttonList.clear();
+        // One row where it fits: Back, the four actions in the middle,
+        // Cape. A narrower screen takes two rows, the actions over Back
+        // and Cape, so no button runs into another; where even the
+        // actions' own row is too narrow they narrow, and their words
+        // are shortened to fit.
         int y = this.height - 34;
-        this.primaryButton = new GuiButton(BUTTON_PRIMARY, this.width / 2 - 186, y, 90, 20, "");
-        this.deleteButton = new GuiButton(BUTTON_DELETE, this.width / 2 - 92, y, 90, 20,
+        this.twoRows = this.width < ONE_ROW_WIDTH;
+        this.actionWidth = Math.min(ACTION_WIDTH, (this.width - 16
+                - ACTION_GAP * (ACTION_COUNT - 1)) / ACTION_COUNT);
+        int actionsY = this.twoRows ? y - BUTTON_ROW_STEP : y;
+        int left = (this.width - this.actionWidth * ACTION_COUNT
+                - ACTION_GAP * (ACTION_COUNT - 1)) / 2;
+        this.primaryButton = actionButton(BUTTON_PRIMARY, 0, left, actionsY, "");
+        this.deleteButton = actionButton(BUTTON_DELETE, 1, left, actionsY,
                 I18n.format("gui.losttales.character.delete"));
-        this.buttonList.add(new GuiButton(BUTTON_LORE_CHARACTERS,
-                this.width / 2 + 2, y, 90, 20,
-                I18n.format("gui.losttales.lore.open")));
-        this.refreshButton = new GuiButton(BUTTON_REFRESH, this.width / 2 + 96, y, 90, 20,
+        this.buttonList.add(actionButton(BUTTON_LORE_CHARACTERS, 2, left,
+                actionsY, I18n.format("gui.losttales.lore.open")));
+        this.refreshButton = actionButton(BUTTON_REFRESH, 3, left, actionsY,
                 I18n.format("gui.losttales.character.refresh"));
         this.buttonList.add(this.primaryButton);
         this.buttonList.add(this.deleteButton);
         this.buttonList.add(this.refreshButton);
-        this.buttonList.add(new GuiButton(BUTTON_BACK, 8, y, 80, 20,
+        this.buttonList.add(new GuiButton(BUTTON_BACK, 8, y, SIDE_BUTTON_WIDTH, 20,
                 I18n.format("gui.back")));
         // The cape editor edits the identity being played; offered from the
         // roster while that identity is the one selected here.
-        this.capeButton = new GuiButton(BUTTON_CAPE, this.width - 88, y, 80, 20,
+        this.capeButton = new GuiButton(BUTTON_CAPE,
+                this.width - 8 - SIDE_BUTTON_WIDTH, y, SIDE_BUTTON_WIDTH, 20,
                 I18n.format("gui.losttales.character.cape.button"));
         this.buttonList.add(this.capeButton);
 
@@ -117,6 +145,23 @@ public final class LostTalesCharacterRosterGui extends GuiScreen
         }
         ensureSelection();
         updateButtonState();
+    }
+
+    private GuiButton actionButton(int id, int index, int left, int y,
+                                   String label) {
+        return new GuiButton(id, left + (this.actionWidth + ACTION_GAP) * index,
+                y, this.actionWidth, 20, fitAction(label));
+    }
+
+    /** An action's words, shortened when its button is narrower than they are. */
+    private String fitAction(String label) {
+        return LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj, label,
+                this.actionWidth - 6);
+    }
+
+    /** The band the buttons take at the foot of the screen: one row's, or two. */
+    private int buttonBand() {
+        return this.twoRows ? BUTTON_ROW_BAND + BUTTON_ROW_STEP : BUTTON_ROW_BAND;
     }
 
     @Override
@@ -202,21 +247,21 @@ public final class LostTalesCharacterRosterGui extends GuiScreen
 
         boolean played = isPlayed(snapshot, selected);
         if (played) {
-            this.primaryButton.displayString = I18n.format("gui.losttales.character.active");
+            this.primaryButton.displayString = fitAction(I18n.format("gui.losttales.character.active"));
             this.primaryButton.enabled = false;
         } else if (selected != null) {
-            this.primaryButton.displayString = I18n.format("gui.losttales.character.select");
+            this.primaryButton.displayString = fitAction(I18n.format("gui.losttales.character.select"));
             this.primaryButton.enabled = !pending;
         } else if (isDefaultRowSelected()) {
             // The world has not minted the record yet; there is nothing
             // to switch to, and the account is already what is played.
-            this.primaryButton.displayString = I18n.format("gui.losttales.character.active");
+            this.primaryButton.displayString = fitAction(I18n.format("gui.losttales.character.active"));
             this.primaryButton.enabled = false;
         } else if (state == CharacterSlotState.UNLOCKED) {
-            this.primaryButton.displayString = I18n.format("gui.losttales.character.create");
+            this.primaryButton.displayString = fitAction(I18n.format("gui.losttales.character.create"));
             this.primaryButton.enabled = !pending;
         } else {
-            this.primaryButton.displayString = I18n.format("gui.losttales.character.unavailable");
+            this.primaryButton.displayString = fitAction(I18n.format("gui.losttales.character.unavailable"));
             this.primaryButton.enabled = false;
         }
         // The account's own identity is always there; the server refuses
@@ -290,7 +335,7 @@ public final class LostTalesCharacterRosterGui extends GuiScreen
         // scaled height at or above 240 and no higher, and a panel with a
         // fixed floor runs under the row on every window that short.
         int panelHeight = Math.max(PANEL_HEIGHT_MIN,
-                this.height - panelY - BUTTON_ROW_BAND);
+                this.height - panelY - buttonBand());
         LostTalesSkyrimUiStyle.drawPanel(panelX, panelY, panelWidth, panelHeight);
 
         this.gap = 8;
@@ -320,7 +365,7 @@ public final class LostTalesCharacterRosterGui extends GuiScreen
 
         if (this.statusMessage.length() > 0) {
             drawCenteredString(this.fontRendererObj, this.statusMessage, this.width / 2,
-                    this.height - 48,
+                    this.height - buttonBand() - 4,
                     this.statusError ? LostTalesSkyrimUiStyle.RED : LostTalesSkyrimUiStyle.GREEN);
         }
         super.drawScreen(mouseX, mouseY, partialTicks);

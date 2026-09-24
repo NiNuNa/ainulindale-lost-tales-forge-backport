@@ -17,7 +17,9 @@ import org.junit.Test;
 
 /**
  * A name holding a word the chat filters is refused, by the bundled list
- * and by the words the server adds; the reason is its own error.
+ * and by the words the server adds; the reason is its own error. A
+ * description is held to the same words, and a lore character's name is
+ * nobody else's.
  */
 public final class CharacterNameProfanityValidationTest {
 
@@ -52,6 +54,24 @@ public final class CharacterNameProfanityValidationTest {
         assertTrue(validate("Aldric of Bree").isValid());
         assertTrue("assassin holds no listed word", validate("Assassin").isValid());
         assertTrue(validate("Scunthorpe").isValid());
+    }
+
+    @Test
+    public void aListedWordInADescriptionIsRefused() {
+        assertEquals(CharacterErrorId.INVALID_DESCRIPTION_PROFANE,
+                CharacterValidator.validateProfile("A shitty ranger.", 30)
+                        .getErrorId());
+        assertTrue(CharacterValidator.validateProfile(
+                "A ranger of the North.", 30).isValid());
+    }
+
+    @Test
+    public void aLoreCharactersNameIsReservedHoweverItIsWritten() {
+        assertEquals(CharacterErrorId.NAME_RESERVED,
+                validate("Glorfindel").getErrorId());
+        assertEquals(CharacterErrorId.NAME_RESERVED,
+                validate("eomer").getErrorId());
+        assertTrue(validate("Glorfin").isValid());
     }
 
     private static CharacterAppearanceValidationResult validate(String name) {

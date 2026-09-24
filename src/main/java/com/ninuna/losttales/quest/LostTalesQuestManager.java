@@ -1,7 +1,7 @@
 package com.ninuna.losttales.quest;
 
 import com.ninuna.losttales.compat.lotr.LotrQuestReference;
-import com.ninuna.losttales.compat.lotr.LotrQuestTrackingAdapter;
+import com.ninuna.losttales.compat.lotr.LotrQuestJournalAdapter;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerCatalog;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
@@ -13,6 +13,7 @@ import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesMapMarkerDiscoveryPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
+import com.ninuna.losttales.quest.progress.LostTalesQuestHistoryEntry;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import com.ninuna.losttales.util.LostTalesDimensionHelper;
 import com.ninuna.losttales.world.map.waypoint.LostTalesMapMarkerWaypointUnlockHelper;
@@ -29,8 +30,8 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.util.ChatComponentText;
-import net.minecraft.util.EnumChatFormatting;
+import net.minecraft.util.ChatComponentTranslation;
+import net.minecraft.util.IChatComponent;
 /** Server-side helper methods for basic quest state changes and objective progress. */
 public final class LostTalesQuestManager {
 
@@ -57,7 +58,7 @@ public final class LostTalesQuestManager {
         }
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
         if (data == null) {
-            sendQuestChat(player, EnumChatFormatting.RED + "Quest data is not available.");
+            sendQuestChat(player, "chat.losttales.quest.no_data");
             return StartResult.NO_PLAYER_DATA;
         }
         data.rememberDynamicQuestDefinition(quest);
@@ -72,39 +73,39 @@ public final class LostTalesQuestManager {
     private static StartResult startQuestInternal(EntityPlayer player, String questId, LostTalesQuestStartSource source, long timeLimitTicks) {
         LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(questId);
         if (quest == null) {
-            sendQuestChat(player, EnumChatFormatting.RED + "Unknown quest: " + questId);
+            sendQuestChat(player, "chat.losttales.quest.unknown", questId);
             return StartResult.UNKNOWN_QUEST;
         }
 
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
         if (data == null) {
-            sendQuestChat(player, EnumChatFormatting.RED + "Quest data is not available.");
+            sendQuestChat(player, "chat.losttales.quest.no_data");
             return StartResult.NO_PLAYER_DATA;
         }
         if (data.isQuestActive(questId)) {
-            sendQuestChat(player, EnumChatFormatting.YELLOW + "Quest already active: " + EnumChatFormatting.WHITE + quest.getTitle());
+            sendQuestChat(player, "chat.losttales.quest.already_active", quest.getTitle());
             return StartResult.ALREADY_ACTIVE;
         }
-        if (data.isQuestCompleted(questId) && !quest.isRepeatable()) {
-            sendQuestChat(player, EnumChatFormatting.YELLOW + "Quest already completed: " + EnumChatFormatting.WHITE + quest.getTitle());
-            return StartResult.ALREADY_COMPLETED;
-        }
-        if (data.getQuestHistoryEntry(questId) != null
-                && !data.getQuestHistoryEntry(questId).isCompleted()
-                && !quest.isRestartable()) {
-            sendQuestChat(player, EnumChatFormatting.YELLOW
-                    + "This quest cannot be restarted: "
-                    + EnumChatFormatting.WHITE + quest.getTitle());
+        LostTalesQuestHistoryEntry history = data.getQuestHistoryEntry(questId);
+        if (!quest.mayTakeAgain(history)) {
+            if (history != null && history.isCompleted()) {
+                sendQuestChat(player, "chat.losttales.quest.already_completed",
+                        quest.getTitle());
+                return StartResult.ALREADY_COMPLETED;
+            }
+            sendQuestChat(player, "chat.losttales.quest.not_restartable",
+                    quest.getTitle());
             return StartResult.RESTART_NOT_ALLOWED;
         }
         if (!canStartFromSource(quest, source)) {
-            sendQuestChat(player, EnumChatFormatting.RED + "This quest cannot be started from here.");
+            sendQuestChat(player, "chat.losttales.quest.wrong_start");
             return StartResult.START_NOT_ALLOWED;
         }
         if (LostTalesConfig.enableQuestPrerequisites) {
-            String failureReason = LostTalesQuestPrerequisiteHelper.getFailureReason(quest, player, data);
-            if (failureReason != null) {
-                sendQuestChat(player, EnumChatFormatting.RED + failureReason);
+            IChatComponent refusal = LostTalesQuestPrerequisiteHelper.refusalOf(
+                    quest, player, data);
+            if (refusal != null) {
+                player.addChatMessage(refusal);
                 return StartResult.REQUIREMENTS_NOT_MET;
             }
         }
@@ -119,7 +120,6 @@ public final class LostTalesQuestManager {
         if (LostTalesConfig.autoRevealQuestMarkersOnStart) {
             revealQuestMarkers(player, quest, false);
         }
-        playQuestSound(player, "random.orb", 0.35F, 1.0F);
 
         if (player instanceof EntityPlayerMP) {
             EntityPlayerMP serverPlayer = (EntityPlayerMP) player;
@@ -172,7 +172,6 @@ public final class LostTalesQuestManager {
         if (changed) {
             revealQuestMarkers(player, quest, false);
             grantQuestRewards(player, quest, progress);
-            playQuestSound(player, "random.levelup", 0.45F, 1.0F);
             syncToClient(player);
         }
         return changed;
@@ -182,7 +181,7 @@ public final class LostTalesQuestManager {
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
         boolean changed = data != null && data.resetQuest(questId);
         if (changed) {
-            sendQuestChat(player, EnumChatFormatting.YELLOW + "Quest reset: " + questTitle(questId));
+            sendQuestChat(player, "chat.losttales.quest.note.reset", questTitle(questId));
             syncToClient(player);
         }
         return changed;
@@ -193,7 +192,7 @@ public final class LostTalesQuestManager {
         long worldTime = player == null || player.worldObj == null ? 0L
                 : player.worldObj.getTotalWorldTime();
         boolean changed = data != null && data.abandonQuest(questId,
-                "Abandoned by the player.", worldTime);
+                "gui.losttales.quest.reason.abandoned", worldTime);
         if (changed) {
             syncToClient(player);
         }
@@ -204,22 +203,51 @@ public final class LostTalesQuestManager {
     /**
      * A player giving up a quest of their own, asked for from the
      * journal. The id off the wire names nothing on its own: the quest
-     * has to be one this player is on right now, and a LOTR quest is
-     * refused outright, since LOTR owns whether and how its own quests
-     * end. Answers whether anything changed.
+     * has to be one this player is on right now. A LOTR quest is given
+     * up the way LOTR's own quest book gives it up. Answers whether
+     * anything changed.
      */
     public static boolean abandonOwnQuest(EntityPlayerMP player,
                                           String questId) {
         if (player == null || questId == null || questId.length() == 0
-                || player.worldObj == null || player.worldObj.isRemote
-                || LotrQuestReference.isLotrQuest(questId)) {
+                || player.worldObj == null || player.worldObj.isRemote) {
             return false;
         }
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
-        if (data == null || !data.isQuestActive(questId)) {
+        if (data == null) {
             return false;
         }
-        return abandonQuest(player, questId);
+        if (LotrQuestReference.isLotrQuest(questId)) {
+            boolean abandoned = LotrQuestJournalAdapter.abandon(player,
+                    questId, data);
+            if (abandoned) {
+                syncToClient(player);
+            }
+            return abandoned;
+        }
+        return data.isQuestActive(questId) && abandonQuest(player, questId);
+    }
+
+    /**
+     * A player clearing a finished or failed LOTR quest out of their
+     * History, asked for from the journal. A Lost Tales quest's History
+     * stays: it decides whether the quest may be taken again. Answers
+     * whether anything changed.
+     */
+    public static boolean clearFinishedQuest(EntityPlayerMP player,
+                                             String questId) {
+        if (player == null || player.worldObj == null
+                || player.worldObj.isRemote
+                || !LotrQuestReference.isLotrQuest(questId)) {
+            return false;
+        }
+        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
+        boolean cleared = data != null
+                && LotrQuestJournalAdapter.clear(player, questId, data);
+        if (cleared) {
+            syncToClient(player);
+        }
+        return cleared;
     }
 
     /**
@@ -227,7 +255,8 @@ public final class LostTalesQuestManager {
      * re-derived here: the quest has to exist, be one this build talks
      * about, and name a giver the player is actually standing beside —
      * so a client that opened no conversation, or named another quest,
-     * starts nothing. Answers whether the quest started.
+     * starts nothing. The giver is marked on the map as touching them
+     * marks them. Answers whether the quest started.
      */
     public static boolean acceptFromConversation(EntityPlayerMP player,
                                                  String questId) {
@@ -236,8 +265,18 @@ public final class LostTalesQuestManager {
                 || !LostTalesQuestDialogue.of(quest).isOffered()) {
             return false;
         }
-        return startQuest(player, quest.getId(),
+        String giverSelector = firstNonEmptyParam(quest.getInteraction(),
+                "entity", "entityId", "npc", "target");
+        Entity giver = giverSelector.length() == 0 ? null
+                : nearbyEntity(player, Collections.singleton(giverSelector));
+        boolean marked = giver != null
+                && revealQuestGiverMarker(player, quest, giver, false);
+        boolean started = startQuest(player, quest.getId(),
                 LostTalesQuestStartSource.INTERACTION) == StartResult.STARTED;
+        if (marked && !started) {
+            syncToClient(player);
+        }
+        return started;
     }
 
     /**
@@ -303,6 +342,12 @@ public final class LostTalesQuestManager {
                 }
             }
         }
+        return nearbyEntity(player, selectors);
+    }
+
+    /** Somebody one of {@code selectors} names within conversation reach of the player, or null. */
+    private static Entity nearbyEntity(EntityPlayerMP player,
+                                       Set<String> selectors) {
         if (selectors.isEmpty()) {
             return null;
         }
@@ -334,10 +379,10 @@ public final class LostTalesQuestManager {
             return false;
         }
         boolean changed = LotrQuestReference.isLotrQuest(questId)
-                ? LotrQuestTrackingAdapter.pin(player, questId, data)
+                ? LotrQuestJournalAdapter.pin(player, questId, data)
                 : data.setPinnedQuestId(questId);
         if (changed) {
-            sendQuestChat(player, EnumChatFormatting.AQUA + "Tracking quest: " + questTitle(questId));
+            sendQuestChat(player, "chat.losttales.quest.note.tracking", questTitle(questId));
             syncToClient(player);
         }
         return changed;
@@ -350,8 +395,8 @@ public final class LostTalesQuestManager {
         }
         boolean changed = data.clearPinnedQuestId();
         if (changed) {
-            LotrQuestTrackingAdapter.clearNativeTracking(player);
-            sendQuestChat(player, EnumChatFormatting.AQUA + "Stopped tracking all quests.");
+            LotrQuestJournalAdapter.clearNativeTracking(player);
+            sendQuestChat(player, "chat.losttales.quest.note.untracked_all");
             syncToClient(player);
         }
         return changed;
@@ -363,10 +408,10 @@ public final class LostTalesQuestManager {
             return false;
         }
         boolean changed = LotrQuestReference.isLotrQuest(questId)
-                ? LotrQuestTrackingAdapter.unpin(player, questId, data)
+                ? LotrQuestJournalAdapter.unpin(player, questId, data)
                 : data.unpinQuestId(questId);
         if (changed) {
-            sendQuestChat(player, EnumChatFormatting.AQUA + "Stopped tracking quest: " + questTitle(questId));
+            sendQuestChat(player, "chat.losttales.quest.note.untracked", questTitle(questId));
             syncToClient(player);
         }
         return changed;
@@ -400,7 +445,7 @@ public final class LostTalesQuestManager {
     public static boolean revealQuestMarkers(EntityPlayer player, String questId) {
         LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(questId);
         if (quest == null) {
-            sendQuestChat(player, EnumChatFormatting.RED + "Unknown quest: " + questId);
+            sendQuestChat(player, "chat.losttales.quest.unknown", questId);
             return false;
         }
         boolean changed = revealQuestMarkers(player, quest, true);
@@ -455,7 +500,8 @@ public final class LostTalesQuestManager {
             changed |= data.discoverDynamicMarker(marker);
         }
         if (changed) {
-            sendQuestChat(player, EnumChatFormatting.AQUA + "Quest giver marker discovered: " + EnumChatFormatting.WHITE + getEntityMarkerName(target, quest));
+            sendQuestChat(player, "chat.losttales.quest.note.marked",
+                    getEntityMarkerName(target, quest));
             if (sync) {
                 syncToClient(player);
             }
@@ -494,7 +540,7 @@ public final class LostTalesQuestManager {
             changed |= data.discoverDynamicMarker(marker);
         }
         if (changed) {
-            sendQuestChat(player, EnumChatFormatting.AQUA + "Quest marker discovered: " + EnumChatFormatting.WHITE + name);
+            sendQuestChat(player, "chat.losttales.quest.note.marked", name);
             if (sync) {
                 syncToClient(player);
             }
@@ -513,7 +559,7 @@ public final class LostTalesQuestManager {
             if (player instanceof EntityPlayerMP) {
                 ensureLotrWaypointsForDiscoveredMapMarkers((EntityPlayerMP) player);
             }
-            sendQuestChat(player, EnumChatFormatting.YELLOW + "Map marker forgotten: " + EnumChatFormatting.WHITE + markerId);
+            sendQuestChat(player, "chat.losttales.quest.note.unmarked", markerId);
             syncToClient(player);
         }
         return changed;
@@ -533,16 +579,16 @@ public final class LostTalesQuestManager {
                     addLotrWaypointForDiscoveredMarker(player, bundledMarker);
                 }
             } else {
-                sendQuestChat(player, EnumChatFormatting.YELLOW + "Map marker is not discovered yet: " + markerId);
+                sendQuestChat(player, "chat.losttales.quest.marker_unknown", markerId);
                 return false;
             }
         }
         if (bundledMarker == null && !knownDynamicMarker) {
-            sendQuestChat(player, EnumChatFormatting.YELLOW + "Tracking experimental marker id: " + markerId);
+            sendQuestChat(player, "chat.losttales.quest.note.tracking_marker_id", markerId);
         }
         boolean changed = data.setPinnedMapMarkerId(markerId);
         if (changed) {
-            sendQuestChat(player, EnumChatFormatting.AQUA + "Tracking map marker: " + markerId);
+            sendQuestChat(player, "chat.losttales.quest.note.tracking_marker", markerId);
             syncToClient(player);
         }
         return changed;
@@ -555,7 +601,7 @@ public final class LostTalesQuestManager {
         }
         boolean changed = data.clearPinnedMapMarkerId();
         if (changed) {
-            sendQuestChat(player, EnumChatFormatting.AQUA + "Stopped tracking map marker.");
+            sendQuestChat(player, "chat.losttales.quest.note.untracked_marker");
             syncToClient(player);
         }
         return changed;
@@ -737,9 +783,8 @@ public final class LostTalesQuestManager {
                 }
                 int wanted = getObjectiveTargetCount(objective);
                 if (countMatchingInventoryItems(player, objective) < wanted) {
-                    sendQuestChat(player, EnumChatFormatting.YELLOW
-                            + "You do not carry everything "
-                            + quest.getTitle() + " asks for yet.");
+                    sendQuestChat(player, "chat.losttales.quest.missing_items",
+                            quest.getTitle());
                     continue;
                 }
                 if (removeMatchingInventoryItems(player, objective, wanted)) {
@@ -910,9 +955,8 @@ public final class LostTalesQuestManager {
                 continue;
             }
             String questId = progress.getQuestId();
-            if (data.failQuest(questId, "Time limit expired.", worldTime)) {
+            if (data.failQuest(questId, "gui.losttales.quest.reason.expired", worldTime)) {
                 changed = true;
-                playQuestSound(player, "random.break", 0.3F, 0.8F);
             }
         }
         return changed;
@@ -1048,7 +1092,6 @@ public final class LostTalesQuestManager {
         boolean changed = now != before;
         if (changed) {
             if (before < target && now >= target) {
-                playQuestSound(player, "random.orb", 0.35F, 1.25F);
             }
             evaluateStageProgress(player, quest.getId());
         }
@@ -1070,7 +1113,6 @@ public final class LostTalesQuestManager {
 
         data.setObjectiveProgress(quest.getId(), objective.getId(), clamped);
         if (before < target && clamped >= target) {
-            playQuestSound(player, "random.orb", 0.35F, 1.25F);
         }
         evaluateStageProgress(player, quest.getId());
         return true;
@@ -1105,7 +1147,6 @@ public final class LostTalesQuestManager {
             LostTalesQuestStageDefinition nextStage = stages.get(nextStageIndex);
             boolean changed = data.setQuestStage(questId, nextStageIndex, nextStage.getId());
             if (changed) {
-                playQuestSound(player, "random.orb", 0.35F, 1.05F);
                 if (scanProgressibleGatherObjectives(player, quest)) {
                     evaluateStageProgress(player, questId);
                 }
@@ -1123,7 +1164,6 @@ public final class LostTalesQuestManager {
         if (completed) {
             revealQuestMarkers(player, quest, false);
             grantQuestRewards(player, quest, completedProgress);
-            playQuestSound(player, "random.levelup", 0.45F, 1.0F);
         }
         return completed;
     }
@@ -1156,7 +1196,7 @@ public final class LostTalesQuestManager {
         }
 
         if (changed && notify) {
-            sendQuestChat(player, EnumChatFormatting.AQUA + "Map marker hints revealed: " + EnumChatFormatting.WHITE + revealed.toString());
+            sendQuestChat(player, "chat.losttales.quest.note.hints", revealed.toString());
         }
         return changed;
     }
@@ -1218,7 +1258,7 @@ public final class LostTalesQuestManager {
             return LostTalesConfig.allowQuestInteractionStarts && quest.canStartFromInteraction();
         }
         if (source == LostTalesQuestStartSource.SHARED) {
-            return true;
+            return quest.canStartFromShare();
         }
         return false;
     }
@@ -1300,7 +1340,7 @@ public final class LostTalesQuestManager {
             return;
         }
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
-        LotrQuestTrackingAdapter.prune(player, data);
+        LotrQuestJournalAdapter.prune(player, data);
         LostTalesNetworkHandler.CHANNEL.sendTo(LostTalesQuestSyncPacket.fromPlayerData(data), player);
     }
 
@@ -1326,7 +1366,6 @@ public final class LostTalesQuestManager {
                 data.setObjectiveProgress(quest.getId(), objective.getId(), inventoryCount);
                 changed = true;
                 if (before < target && inventoryCount >= target) {
-                    playQuestSound(player, "random.orb", 0.35F, 1.25F);
                 }
             }
         }
@@ -1444,9 +1483,11 @@ public final class LostTalesQuestManager {
         return dx * dx + dy * dy + dz * dz <= radius * radius;
     }
 
-    private static String questTitle(String questId) {
+    /** A quest as a chat line names it: its title, or "a Middle-earth quest" for one of LOTR's. */
+    private static Object questTitle(String questId) {
         if (LotrQuestReference.isLotrQuest(questId)) {
-            return "LOTR quest";
+            return new ChatComponentTranslation(
+                    "chat.losttales.quest.middle_earth_quest");
         }
         LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(questId);
         return quest == null ? questId : quest.getTitle();
@@ -1462,18 +1503,18 @@ public final class LostTalesQuestManager {
         }
     }
 
-    private static void sendQuestChat(EntityPlayer player, String message) {
-        if (!LostTalesConfig.showQuestChatFeedback || player == null || player.worldObj == null || player.worldObj.isRemote || message == null || message.length() == 0) {
+    /**
+     * A quest's word to one player, said by the Server in their Client
+     * Console. Whether a {@code chat.losttales.quest.note.*} line shows is
+     * the player's own setting, read on their side; refusals always do.
+     */
+    private static void sendQuestChat(EntityPlayer player, String key,
+                                      Object... args) {
+        if (player == null || player.worldObj == null
+                || player.worldObj.isRemote) {
             return;
         }
-        player.addChatMessage(new ChatComponentText(EnumChatFormatting.DARK_AQUA + "[Lost Tales] " + EnumChatFormatting.RESET + message));
-    }
-
-    private static void playQuestSound(EntityPlayer player, String soundName, float volume, float pitch) {
-        if (!LostTalesConfig.playQuestSounds || player == null || player.worldObj == null || player.worldObj.isRemote) {
-            return;
-        }
-        player.worldObj.playSoundAtEntity(player, soundName, volume, pitch);
+        player.addChatMessage(new ChatComponentTranslation(key, args));
     }
 
     private static int parseInt(String value, int fallback) {

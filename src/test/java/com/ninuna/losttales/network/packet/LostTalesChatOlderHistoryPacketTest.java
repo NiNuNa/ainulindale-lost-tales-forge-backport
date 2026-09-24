@@ -32,9 +32,9 @@ public final class LostTalesChatOlderHistoryPacketTest {
     @Test
     public void aRequestNamesTheChannelAndTheLineToReachBackFrom() {
         LostTalesChatOlderHistoryPacket decoded = roundTrip(
-                new LostTalesChatOlderHistoryPacket(ChatChannel.ALL, "", 42L));
+                new LostTalesChatOlderHistoryPacket(ChatChannel.GLOBAL, "", 42L));
         assertFalse(decoded.isMalformed());
-        assertEquals(ChatChannel.ALL, decoded.getChannel());
+        assertEquals(ChatChannel.GLOBAL, decoded.getChannel());
         assertEquals("", decoded.getScopeValue());
         assertEquals(42L, decoded.getBeforeMessageId());
         LostTalesChatOlderHistoryPacket scoped = roundTrip(
@@ -46,7 +46,7 @@ public final class LostTalesChatOlderHistoryPacketTest {
     @Test
     public void aScopedChannelNeedsItsConversationAndAPlainOneRefusesOne() {
         assertRefused(ChatChannel.FACTION, "", 42L);
-        assertRefused(ChatChannel.ALL, GONDOR, 42L);
+        assertRefused(ChatChannel.GLOBAL, GONDOR, 42L);
     }
 
     @Test
@@ -57,15 +57,15 @@ public final class LostTalesChatOlderHistoryPacketTest {
                         "whisper:Steve|Aldric|own:abc", 42L));
         assertFalse(whisper.isMalformed());
         assertEquals("whisper:Steve|Aldric|own:abc", whisper.getScopeValue());
-        assertRefused(ChatChannel.ALL, "", ChatMessageIds.NONE);
-        assertRefused(ChatChannel.ALL, "", -3L);
+        assertRefused(ChatChannel.GLOBAL, "", ChatMessageIds.NONE);
+        assertRefused(ChatChannel.GLOBAL, "", -3L);
         assertRefused(null, "", 42L);
     }
 
     @Test
     public void bytesThatBreakTheRuleDecodeAsMalformed() {
         ByteBuf buffer = Unpooled.buffer();
-        LostTalesPacketCodec.writeUtf8String(buffer, "all", 64);
+        LostTalesPacketCodec.writeUtf8String(buffer, "global", 64);
         LostTalesPacketCodec.writeUtf8String(buffer, "", 128);
         buffer.writeLong(0L);
         LostTalesChatOlderHistoryPacket decoded = new LostTalesChatOlderHistoryPacket();
@@ -74,7 +74,7 @@ public final class LostTalesChatOlderHistoryPacketTest {
         assertEquals(ChatMessageIds.NONE, decoded.getBeforeMessageId());
         // Trailing bytes are a malformed payload too.
         ByteBuf trailing = Unpooled.buffer();
-        new LostTalesChatOlderHistoryPacket(ChatChannel.ALL, "", 42L).toBytes(trailing);
+        new LostTalesChatOlderHistoryPacket(ChatChannel.GLOBAL, "", 42L).toBytes(trailing);
         trailing.writeByte(1);
         LostTalesChatOlderHistoryPacket extra = new LostTalesChatOlderHistoryPacket();
         extra.fromBytes(trailing);

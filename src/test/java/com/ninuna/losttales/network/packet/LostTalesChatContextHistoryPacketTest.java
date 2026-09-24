@@ -57,7 +57,7 @@ public final class LostTalesChatContextHistoryPacketTest {
     @Test
     public void anUnscopedChannelIsRefused() {
         try {
-            new LostTalesChatContextHistoryPacket(ChatChannel.ALL, GONDOR, 0L);
+            new LostTalesChatContextHistoryPacket(ChatChannel.GLOBAL, GONDOR, 0L);
             throw new AssertionError("an unscoped channel is not a conversation");
         } catch (IllegalArgumentException refused) {
             assertTrue(refused.getMessage().contains("context history"));

@@ -8,7 +8,7 @@ import java.util.regex.Pattern;
 
 /**
  * Links to messages, translated at the bridge. In the game a message is
- * linked to as {@code #Channel/<id>}, the server's own id; on Discord a
+ * linked to as {@code #<code name>/<id>}, the server's own id; on Discord a
  * message is linked to by its jump URL,
  * {@code https://discord.com/channels/<guild>/<channel>/<message>}. A
  * line crossing the bridge has each link spelled the way the other side
@@ -38,7 +38,7 @@ final class DiscordMessageLinkRewriter {
         String jumpUrl(ChatChannel channel, long messageId);
 
         /**
-         * The game's {@code #Channel/<id>} for the Discord message, or
+         * The game's {@code #<code name>/<id>} for the Discord message, or
          * empty when the bridge never carried it, or the channel is not
          * bound to any of the game's.
          */
@@ -46,7 +46,7 @@ final class DiscordMessageLinkRewriter {
     }
 
     /**
-     * A game line for Discord: every {@code #Channel/<id>} the bridge
+     * A game line for Discord: every {@code #<code name>/<id>} the bridge
      * can place becomes the message's bare jump URL, which Discord draws
      * as its own link to a message — the channel's name and a bubble,
      * as a link pasted on Discord is drawn; a masked link would read as
@@ -95,7 +95,7 @@ final class DiscordMessageLinkRewriter {
 
     /**
      * A Discord line for the game: every jump URL the bridge carried
-     * the message of becomes {@code #Channel/<id>}; every other stays
+     * the message of becomes {@code #<code name>/<id>}; every other stays
      * the URL it is, which the chat shows as a link.
      */
     static String inbound(String text, Resolver resolver) {

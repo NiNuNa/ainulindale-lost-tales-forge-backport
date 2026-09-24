@@ -46,7 +46,7 @@ public final class ChatChannelDefinitionBoundsTest {
     public void aNameTooLongToCarryIsCutAndReported() {
         List<ChatChannelDescriptor> defined = ChatRoleConfig
                 .parseChannelDefinitions(new String[] {
-                        "trade=name:A Very Long Channel Name Indeed;rule:global"
+                        "trade=name:A Very Long Channel Name Indeed;rule:everyone"
                 }, this.collector);
 
         assertEquals(1, defined.size());
@@ -60,7 +60,7 @@ public final class ChatChannelDefinitionBoundsTest {
         int over = ChatChannel.MAX_DEFINED_CHANNELS + 3;
         String[] entries = new String[over];
         for (int index = 0; index < over; index++) {
-            entries[index] = "chan" + index + "=rule:global";
+            entries[index] = "chan" + index + "=rule:everyone";
         }
 
         List<ChatChannelDescriptor> defined =
@@ -77,7 +77,7 @@ public final class ChatChannelDefinitionBoundsTest {
         // server routes with. A gate keyed by instance would stop
         // matching, and a channel with no gate is open to everybody.
         ChatChannelDescriptor descriptor = ChatRoleConfig
-                .parseChannelDefinitions(new String[] { "trade=rule:global" },
+                .parseChannelDefinitions(new String[] { "trade=rule:everyone" },
                         this.collector).get(0);
         ChatChannel.installDefined(
                 Collections.singletonList(descriptor), null);
@@ -104,31 +104,31 @@ public final class ChatChannelDefinitionBoundsTest {
     @Test
     public void installingAChannelSetLeavesTheBuiltInsAlone() {
         ChatChannel.installDefined(ChatRoleConfig.parseChannelDefinitions(
-                new String[] { "trade=rule:global" }, this.collector), null);
+                new String[] { "trade=rule:everyone" }, this.collector), null);
 
         assertNotNull(ChatChannel.fromId("trade"));
-        assertNotNull(ChatChannel.fromId("all"));
+        assertNotNull(ChatChannel.fromId("global"));
         assertNotNull(ChatChannel.fromId("whisper"));
 
         // A later set replaces the previous one rather than adding to it.
         ChatChannel.installDefined(ChatRoleConfig.parseChannelDefinitions(
-                new String[] { "market=rule:global" }, this.collector), null);
+                new String[] { "market=rule:everyone" }, this.collector), null);
 
         assertNotNull(ChatChannel.fromId("market"));
         assertEquals(null, ChatChannel.fromId("trade"));
-        assertNotNull(ChatChannel.fromId("all"));
+        assertNotNull(ChatChannel.fromId("global"));
     }
 
     @Test
     public void aBuiltInIdIsNotAConfigsToTake() {
-        ChatChannel builtIn = ChatChannel.fromId("all");
+        ChatChannel builtIn = ChatChannel.fromId("global");
         ChatChannel.installDefined(Collections.singletonList(
-                new ChatChannelDescriptor("all", "Stolen",
+                new ChatChannelDescriptor("global", "Stolen",
                         ChatPresentationMode.IN_CHARACTER,
-                        ChatRecipientRule.GLOBAL, ChatChannelAccess.NONE,
+                        ChatRecipientRule.EVERYONE, ChatChannelAccess.NONE,
                         0xFFFFFF, false)), this.channelWarnings());
 
-        assertEquals(builtIn, ChatChannel.fromId("all"));
+        assertEquals(builtIn, ChatChannel.fromId("global"));
         assertFalse(this.warnings.isEmpty());
     }
 

@@ -195,7 +195,7 @@ public final class ChatMemberListTest {
             // Anywhere else, the answer is the list.
             List<LostTalesChatMembersPacket.Member> answered = Arrays.asList(me);
             assertTrue(answered == ChatMemberList.membersOf(
-                    ChatTab.of(ChatChannel.ALL), answered));
+                    ChatTab.of(ChatChannel.GLOBAL), answered));
         } finally {
             ChatChannelIcons.forgetPortraits();
         }

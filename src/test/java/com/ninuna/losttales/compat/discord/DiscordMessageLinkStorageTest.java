@@ -125,7 +125,7 @@ public final class DiscordMessageLinkStorageTest {
     private static long say(String text) {
         long id = ChatMessageIdAllocator.next();
         ChatHistory.record(id, ALICE, "Aldric", null,
-                new LostTalesChatMessagePacket(ChatChannel.ALL, ALICE, "Aldric",
+                new LostTalesChatMessagePacket(ChatChannel.GLOBAL, ALICE, "Aldric",
                         "alice", "", 0, 0, text, 1000000L, "", null, "", "", 0,
                         false, id, ChatReplyReference.NONE, ""),
                 Arrays.asList(ALICE), ChatHistory.Audience.everyone());

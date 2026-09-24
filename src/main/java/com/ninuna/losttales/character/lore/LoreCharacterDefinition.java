@@ -4,19 +4,24 @@ package com.ninuna.losttales.character.lore;
 public final class LoreCharacterDefinition {
 
     public static final int CURRENT_DATA_VERSION = 1;
+    /** The age of a lore character whose file gives none. */
+    public static final int DEFAULT_AGE = 18;
 
     private final int dataVersion;
     private final String id;
     private final String name;
     private final String description;
+    private final int age;
     private final Appearance appearance;
 
     public LoreCharacterDefinition(int dataVersion, String id, String name,
-                                   String description, Appearance appearance) {
+                                   String description, int age,
+                                   Appearance appearance) {
         this.dataVersion = dataVersion;
         this.id = id == null ? "" : id;
         this.name = name == null ? "" : name;
         this.description = description == null ? "" : description;
+        this.age = age;
         this.appearance = appearance;
     }
 
@@ -34,6 +39,10 @@ public final class LoreCharacterDefinition {
 
     public String getDescription() {
         return this.description;
+    }
+
+    public int getAge() {
+        return this.age;
     }
 
     public boolean hasAppearance() {

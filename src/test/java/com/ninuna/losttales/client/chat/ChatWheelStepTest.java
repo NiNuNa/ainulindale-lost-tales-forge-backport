@@ -32,7 +32,7 @@ public final class ChatWheelStepTest {
         assertEquals(1, ChatWheelStep.menuRows(ChatWheelStep.lines(120, true)));
         // A picker: a menu row's height per line, whatever a message row
         // measures.
-        assertEquals(ChatPopupMenu.ROW_HEIGHT, ChatWheelStep.PICKER_LINE_PIXELS);
+        assertEquals(ChatMenu.ROW_HEIGHT, ChatWheelStep.PICKER_LINE_PIXELS);
         assertEquals(22, ChatWheelStep.pickerPixels(ChatWheelStep.lines(120, false)));
         assertEquals(11, ChatWheelStep.pickerPixels(ChatWheelStep.lines(120, true)));
     }

@@ -67,15 +67,25 @@ public final class LostTalesConfig {
     public static final Set<String> CLIENT_CATEGORIES = Collections.unmodifiableSet(
             new HashSet<String>(Arrays.asList(CATEGORY_CLIENT)));
     /**
-     * The client options the chat sets from its own windows' menus — the
-     * colours behind the cog — and saves the moment they are chosen. The
+     * The client options the chat sets in its own Chat Settings window
+     * and saves the moment they are chosen: every chat option but the
+     * history's length, a safety bound (Nils, 2026-09-24, S2 a). The
      * Config Screen leaves them to the chat: they stay in the client
      * file, and are shown nowhere else.
      */
-    public static final Set<String> CHAT_WINDOW_KEYS = Collections.unmodifiableSet(
+    public static final Set<String> CHAT_SETTINGS_KEYS = Collections.unmodifiableSet(
             new HashSet<String>(Arrays.asList("chatBackgroundColor",
                     "chatSelectedLineColor", "chatMentionLineColor",
-                    "chatSelectedMentionColor", "chatReplyHighlightColor")));
+                    "chatSelectedMentionColor", "chatReplyHighlightColor",
+                    "enableChatEmojis", "convertChatEmoticons",
+                    "chatProfanityFilter", "enableChatMessageGrouping",
+                    "enableChatBackgroundBlur", "enableChatPings",
+                    "chatPingSound", "chatFeedAlignment", "chatSpeakerSize",
+                    "chatFeedSpeakerSize", "chatFeedMessageSize",
+                    "chatQuoteSize", "chatFeedQuoteSize",
+                    "hideHudWhileChatting", "sendChatTypingStatus",
+                    "showChatTypingIndicators", "enableNpcChatStyling",
+                    "showChatSpeechBubbles")));
 
     private static File loadedClientFile;
     private static File loadedServerFile;
@@ -140,7 +150,6 @@ public final class LostTalesConfig {
     public static boolean linkShowQuestHud = false;
     public static double questHudOffsetX = 2.0D;
     public static double questHudOffsetY = 38.0D;
-    public static int questHudMaxObjectives = 3;
     public static int questHudMaxTrackedQuests = 4;
     public static int questHudObjectiveLineCount = 2;
     public static boolean showQuestHudNotifications = true;
@@ -148,8 +157,8 @@ public final class LostTalesConfig {
     /**
      * Whether a quest offered by somebody is talked about in the Lost
      * Tales conversation screen. Off, a Middle-earth quest is offered on
-     * LOTR's own screen and a Lost Tales quest starts the moment its
-     * giver is touched, as they did before there was a conversation.
+     * LOTR's own screen, and a Lost Tales quest giver's words go to the
+     * chat while their quest is taken or handed in on touch.
      */
     public static boolean enableQuestDialogue = true;
     /** The one slot every passing notice shares: quest banners, discoveries, area names. */
@@ -919,14 +928,6 @@ public final class LostTalesConfig {
                     questHudOffsetY, 0.0D, 100.0D,
                     "Vertical quest tracker position as a percentage of the scaled screen height."
             );
-            questHudMaxObjectives = config.getInt(
-                    "questHudMaxObjectives",
-                    CATEGORY_CLIENT,
-                    questHudMaxObjectives,
-                    1,
-                    6,
-                    "Maximum number of current-stage objectives shown per tracked quest on the quest HUD."
-            );
             questHudMaxTrackedQuests = config.getInt(
                     "questHudMaxTrackedQuests",
                     CATEGORY_CLIENT,
@@ -959,7 +960,7 @@ public final class LostTalesConfig {
                     "enableQuestDialogue",
                     CATEGORY_CLIENT,
                     enableQuestDialogue,
-                    "Talk to a quest giver in the Lost Tales conversation screen. Off, Middle-earth quests are offered on LOTR's own screen and Lost Tales quests start as soon as their giver is touched."
+                    "Talk to a quest giver in the Lost Tales conversation screen. Off, Middle-earth quests are offered on LOTR's own screen, and a Lost Tales quest giver's words go to the chat while their quest is taken or handed in on touch."
             );
             notificationHudOffsetX = getHudPercent(
                     config, "notificationHudOffsetX",
@@ -1049,7 +1050,7 @@ public final class LostTalesConfig {
                     "permissions",
                     CATEGORY_ROLES,
                     chatPermissions,
-                    "What a role may grant, in the server's own words, one per line as <id>=capability:<id>;capability:<id>;desc:<text>. capability may repeat and names something the code can do: chat.moderate (mute, unmute, remove any message), chat.console.read (the Server Console), chat.narrate (speak as the Narrator in the roleplaying channels), roles.manage (/losttales role), server.config (the server settings, which includes these roles and permissions), character.admin, quest.admin, party.admin, mapmarker.manage, waystone.manage, hud.admin. A permission naming no capability the code has is kept and allows nothing. A role's grant naming no permission here is read as the capability of that id, so grant:chat.moderate needs nothing defined."
+                    "What a role may grant, in the server's own words, one per line as <id>=capability:<id>;capability:<id>;desc:<text>. capability may repeat and names something the code can do: chat.moderate (mute, unmute, remove any message), chat.server_console.read (the Server Console), chat.narrate (speak as the Narrator in the roleplaying channels), roles.manage (/losttales role), server.config (the server settings, which includes these roles and permissions), character.admin, quest.admin, party.admin, mapmarker.manage, waystone.manage, hud.admin. A permission naming no capability the code has is kept and allows nothing. A role's grant naming no permission here is read as the capability of that id, so grant:chat.moderate needs nothing defined."
             );
             chatRoles = config.getStringList(
                     "definitions",
@@ -1067,19 +1068,19 @@ public final class LostTalesConfig {
                     "definitions",
                     CATEGORY_CHANNELS,
                     new String[0],
-                    "Channels this server has of its own, one per line as <id>=name:<shown name>;rule:<global|proximity|operators>;colour:<RRGGBB>;ooc:<true|false>;bridge:<true|false>. The id is permanent: packets, the layout file and the gates all name a channel by it. The routing rules a config cannot describe - a party, a faction, a whisper, a private console - are refused, and an entry naming a channel this build already has is refused rather than replacing it."
+                    "Channels this server has of its own, one per line as <id>=name:<shown name>;rule:<everyone|proximity|operators>;colour:<RRGGBB>;ooc:<true|false>;bridge:<true|false>. The id is the channel's code name: packets, the layout file, the gates, # links and Discord links all name a channel by it. The routing rules a config cannot describe - a party, a faction, a whisper, a private console - are refused, and so is an entry naming a channel this build already has or a faction's code name (gondor, high_elf)."
             );
             chatChannelRoles = config.getStringList(
                     "gates",
                     CATEGORY_CHANNELS,
-                    new String[] {ChatRoleConfig.DEFAULT_ADMIN_GATE},
+                    new String[] {ChatRoleConfig.DEFAULT_OPERATOR_GATE},
                     "The roles a channel asks for, one channel per line as <channel>=read:<role,role|any|none>;send:<role,role|any|none>. A side left out or set to any is open to everyone the channel already admits; none closes it; a side naming a role that does not exist is closed until the entry is fixed. A fresh file starts with the Operator channel asking for the operator role on both sides, and that line is put back whenever it is missing; to open the channel on purpose, keep the line and set its sides to any."
             );
             chatChannelIcons = config.getStringList(
                     "icons",
                     CATEGORY_CHANNELS,
                     new String[0],
-                    "The icon a channel wears before its name, on its tab and wherever the name stands alone, one channel per line as <channel id>=emoji:<name> or <channel id>=item:<item id>[@<damage>], for example admin=item:minecraft:iron_sword or trade=emoji:moneybag. Built-in channels and the ones defined above alike; a channel not named here keeps the emoji the mod gives it, and a client without the item shows that emoji too."
+                    "The icon a channel wears before its name, on its tab and wherever the name stands alone, one channel per line as <channel id>=emoji:<name> or <channel id>=item:<item id>[@<damage>], for example operator=item:minecraft:iron_sword or trade=emoji:moneybag. Built-in channels and the ones defined above alike; a channel not named here keeps the emoji the mod gives it, and a client without the item shows that emoji too."
             );
             installChatRoles();
             discordEnabled = config.getBoolean(
@@ -1106,7 +1107,7 @@ public final class LostTalesConfig {
                     CATEGORY_DISCORD,
                     "channelBindings",
                     new String[0],
-                    "Server only, secrets: the links between game channels and Discord channels. Make one with /losttales discord link <channel> in the game, which gives a code, and /link code:<code> in the Discord channel, where the bot makes the channel's webhook itself; take one away with /losttales discord unlink or /unlink. Each entry is <channel>=<direction>;channel=<Discord channel id>;webhook=<webhook address>: a game channel may be linked to several Discord channels, in any Discord server the bot is in, while a Discord channel holds one game channel only. The channel is a wire id (all, proximity, ooc, admin, or a server's own) or faction:<faction id> for one faction's chat (faction:lotr:gondor); the direction is DISABLED, GAME_TO_DISCORD, DISCORD_TO_GAME or BIDIRECTIONAL. Party, the consoles and whispers are private and refused. Kept off the Server Settings screen and /losttales config, since a webhook address lets whoever holds it post into its channel."
+                    "Server only, secrets: the links between game channels and Discord channels. Make one with /losttales discord link <channel> in the game, which gives a code, and /link code:<code> in the Discord channel, where the bot makes the channel's webhook itself; take one away with /losttales discord unlink or /unlink. Each entry is <channel>=<direction>;channel=<Discord channel id>;webhook=<webhook address>: a game channel may be linked to several Discord channels, in any Discord server the bot is in, while a Discord channel holds one game channel only. The channel is its code name: global, proximity, ooc, operator, a server's own, or a faction's code name for that faction's chat (gondor, high_elf); the direction is DISABLED, GAME_TO_DISCORD, DISCORD_TO_GAME or BIDIRECTIONAL. Party, the consoles and whispers are private and refused. Kept off the Server Settings screen and /losttales config, since a webhook address lets whoever holds it post into its channel."
             );
             discordChannelBindings = bindingsProperty.getStringList();
             discordAvatarUrlTemplate = config.getString(
@@ -1223,35 +1224,35 @@ public final class LostTalesConfig {
                     "chatBackgroundColor",
                     CATEGORY_CLIENT,
                     chatBackgroundColor,
-                    "Palette colour of the open chat's history panel and the rows framing it. Set from a chat window's own menu.",
+                    "Palette colour of the open chat's history panel and the rows framing it. Set in the chat's Chat Settings.",
                     LostTalesColors.paletteNames()
             ), DEFAULT_CHAT_BACKGROUND_COLOR);
             chatSelectedLineColor = paletteName(config.getString(
                     "chatSelectedLineColor",
                     CATEGORY_CLIENT,
                     chatSelectedLineColor,
-                    "Palette colour of the chat line under the pointer. Set from a chat window's own menu.",
+                    "Palette colour of the chat line under the pointer. Set in the chat's Chat Settings.",
                     LostTalesColors.paletteNames()
             ), DEFAULT_CHAT_SELECTED_LINE_COLOR);
             chatMentionLineColor = paletteName(config.getString(
                     "chatMentionLineColor",
                     CATEGORY_CLIENT,
                     chatMentionLineColor,
-                    "Palette colour of a chat line that @-mentions you. Set from a chat window's own menu.",
+                    "Palette colour of a chat line that @-mentions you. Set in the chat's Chat Settings.",
                     LostTalesColors.paletteNames()
             ), DEFAULT_CHAT_MENTION_LINE_COLOR);
             chatSelectedMentionColor = automaticOrPaletteName(config.getString(
                     "chatSelectedMentionColor",
                     CATEGORY_CLIENT,
                     chatSelectedMentionColor,
-                    "Palette colour of a chat line that @-mentions you while it is under the pointer. AUTO, the default, is the mention colour one shade lighter on its own ramp of the palette, or the selected-line colour where the mention colour is already its ramp's lightest. Set from a chat window's own menu.",
+                    "Palette colour of a chat line that @-mentions you while it is under the pointer. AUTO, the default, is the mention colour one shade lighter on its own ramp of the palette, or the selected-line colour where the mention colour is already its ramp's lightest. Set in the chat's Chat Settings.",
                     automaticOrPaletteNames()
             ));
             chatReplyHighlightColor = paletteName(config.getString(
                     "chatReplyHighlightColor",
                     CATEGORY_CLIENT,
                     chatReplyHighlightColor,
-                    "Palette colour a chat line is lit in when a reply's quote jumps to it. Set from a chat window's own menu.",
+                    "Palette colour a chat line is lit in when a reply's quote jumps to it. Set in the chat's Chat Settings.",
                     LostTalesColors.paletteNames()
             ), DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR);
             Property feedAlignmentProperty = config.get(
@@ -2068,6 +2069,20 @@ public final class LostTalesConfig {
         LostTalesConfigDefinitions.apply(shipped, config);
     }
 
+    /**
+     * A client option as the mod ships it, as the file writes it; null
+     * before the first load, or for an option the client category does
+     * not hold. What the chat's Restore Defaults puts back.
+     */
+    public static String shippedClientValue(String key) {
+        Configuration definitions = shipped;
+        if (definitions == null || !definitions.hasCategory(CATEGORY_CLIENT)) {
+            return null;
+        }
+        Property property = definitions.getCategory(CATEGORY_CLIENT).get(key);
+        return property == null ? null : property.getString();
+    }
+
     private static void writeCurrentValues(Configuration config) {
         if (config == null) {
             return;
@@ -2092,6 +2107,18 @@ public final class LostTalesConfig {
                 .set(chatProfanityWords);
         config.get(CATEGORY_CLIENT, "enableChatEmojis",
                 enableChatEmojis).set(enableChatEmojis);
+        config.get(CATEGORY_CLIENT, "convertChatEmoticons",
+                convertChatEmoticons).set(convertChatEmoticons);
+        config.get(CATEGORY_CLIENT, "enableChatMessageGrouping",
+                enableChatMessageGrouping).set(enableChatMessageGrouping);
+        config.get(CATEGORY_CLIENT, "enableChatBackgroundBlur",
+                enableChatBackgroundBlur).set(enableChatBackgroundBlur);
+        config.get(CATEGORY_CLIENT, "sendChatTypingStatus",
+                sendChatTypingStatus).set(sendChatTypingStatus);
+        config.get(CATEGORY_CLIENT, "showChatTypingIndicators",
+                showChatTypingIndicators).set(showChatTypingIndicators);
+        config.get(CATEGORY_CLIENT, "showChatSpeechBubbles",
+                showChatSpeechBubbles).set(showChatSpeechBubbles);
         config.get(CATEGORY_CLIENT, "enableNpcChatStyling",
                 enableNpcChatStyling).set(enableNpcChatStyling);
         config.get(CATEGORY_CLIENT, "enableChatPings",
@@ -2254,7 +2281,6 @@ public final class LostTalesConfig {
         config.get(CATEGORY_CLIENT, "linkShowQuestHud", linkShowQuestHud).set(linkShowQuestHud);
         config.get(CATEGORY_CLIENT, "questHudOffsetX", questHudOffsetX).set(questHudOffsetX);
         config.get(CATEGORY_CLIENT, "questHudOffsetY", questHudOffsetY).set(questHudOffsetY);
-        config.get(CATEGORY_CLIENT, "questHudMaxObjectives", questHudMaxObjectives).set(questHudMaxObjectives);
         config.get(CATEGORY_CLIENT, "questHudMaxTrackedQuests", questHudMaxTrackedQuests).set(questHudMaxTrackedQuests);
         config.get(CATEGORY_CLIENT, "questHudObjectiveLineCount", questHudObjectiveLineCount).set(questHudObjectiveLineCount);
         config.get(CATEGORY_CLIENT, "showQuestHudNotifications", showQuestHudNotifications).set(showQuestHudNotifications);

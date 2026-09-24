@@ -1,5 +1,6 @@
 package com.ninuna.losttales.quest;
 
+import com.ninuna.losttales.quest.progress.LostTalesQuestHistoryEntry;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -100,6 +101,19 @@ public final class LostTalesQuestDefinition {
         return this.restartable;
     }
 
+    /**
+     * Whether a player whose last run of this quest ended as
+     * {@code history} may take it now: never taken, yes; finished, only a
+     * repeatable quest; failed or abandoned, only a restartable one. The
+     * one rule the server starts by and a conversation offers by.
+     */
+    public boolean mayTakeAgain(LostTalesQuestHistoryEntry history) {
+        if (history == null) {
+            return true;
+        }
+        return history.isCompleted() ? this.repeatable : this.restartable;
+    }
+
     public String getStartMode() {
         return this.startMode;
     }
@@ -110,6 +124,15 @@ public final class LostTalesQuestDefinition {
 
     public boolean canStartFromInteraction() {
         return START_MODE_INTERACTION.equals(this.startMode) || START_MODE_ANY.equals(this.startMode);
+    }
+
+    /**
+     * Whether a party member may join this quest from a card shared in
+     * the chat. A locked quest starts only on its own server path, a
+     * missive board's for one, so its card is never joined.
+     */
+    public boolean canStartFromShare() {
+        return !START_MODE_LOCKED.equals(this.startMode);
     }
 
     public Map<String, String> getPrerequisites() {

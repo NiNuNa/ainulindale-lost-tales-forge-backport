@@ -22,7 +22,10 @@ import net.minecraft.entity.player.EntityPlayer;
 final class ChatShareSuggestionBox {
     static final int MAX_ROWS = 8;
     private static final int ROW_HEIGHT = 12;
-    private static final int PADDING = 2;
+    /** The rows stand two pixels inside the frame's ink, as a framed button's content does. */
+    private static final int PADDING = LostTalesChatVisualStyle.POPUP_INSET;
+    /** Between the glyph's slot and its name. */
+    private static final int ICON_GAP = 4;
     /**
      * How far above the input anchor ({@link ChatInputBar#inputAnchor})
      * the box ends: one pixel clear of the bar's top.
@@ -196,9 +199,9 @@ final class ChatShareSuggestionBox {
         for (int row = 0; row < this.matches.size(); row++) {
             ChatShareCandidates.Entry entry = this.matches.get(row);
             int rowTop = top + PADDING + row * ROW_HEIGHT;
-            drawIcon(minecraft, entry, inputX + 3, rowTop + 1);
+            drawIcon(minecraft, entry, inputX + PADDING, rowTop + 1);
             LostTalesChatVisualStyle.drawPlain(font, entry.label(),
-                    inputX + 3 + ICON_SLOT + 4, rowTop + 2,
+                    inputX + PADDING + ICON_SLOT + ICON_GAP, rowTop + 2,
                     row == this.selectedIndex ? 255 : 200);
         }
     }
@@ -232,7 +235,7 @@ final class ChatShareSuggestionBox {
             width = Math.max(width,
                     font.getStringWidth(this.matches.get(index).label()));
         }
-        return width + ICON_SLOT + 12;
+        return PADDING + ICON_SLOT + ICON_GAP + width + PADDING;
     }
 
     private int boxTop(int screenHeight) {

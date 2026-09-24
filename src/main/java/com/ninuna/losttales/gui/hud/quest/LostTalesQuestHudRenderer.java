@@ -32,6 +32,7 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.MathHelper;
 import net.minecraft.util.StatCollector;
 import org.lwjgl.opengl.GL11;
+import com.ninuna.losttales.quest.LostTalesQuestTimeText;
 /** Shared Lost Tales and LOTR quest tracker plus sync-derived notifications. */
 public final class LostTalesQuestHudRenderer {
     private static final int PANEL_WIDTH = 238;
@@ -228,7 +229,11 @@ public final class LostTalesQuestHudRenderer {
                 objectiveLines.set(0, objectiveLines.get(0) + " \u00b7 "
                         + StatCollector.translateToLocalFormatted(
                                 "gui.losttales.quest.deadline",
-                                formatRemainingTime(entry.getRemainingTicks())));
+                                entry.getRemainingTicks() > 0L
+                                        ? LostTalesQuestTimeText.shortForm(
+                                                entry.getRemainingTicks())
+                                        : StatCollector.translateToLocal(
+                                                "gui.losttales.quest.expired")));
             }
             entries.add(new TrackedQuestHudEntry(entry.getTitle(),
                     objectiveLines, current, Math.max(1, target), complete,
@@ -393,23 +398,6 @@ public final class LostTalesQuestHudRenderer {
             return null;
         }
         return new HudQuestTarget(x.doubleValue(), y.doubleValue(), z.doubleValue());
-    }
-
-    private static String formatRemainingTime(long ticks) {
-        if (ticks <= 0L) {
-            return "expired";
-        }
-        long days = ticks / 24000L;
-        long remainder = ticks % 24000L;
-        long hours = remainder / 1000L;
-        long minutes = (remainder % 1000L) * 60L / 1000L;
-        if (days > 0L) {
-            return days + "d " + hours + "h";
-        }
-        if (hours > 0L) {
-            return hours + "h " + minutes + "m";
-        }
-        return Math.max(1L, minutes) + "m";
     }
 
     private static boolean isGotoObjective(LostTalesQuestObjectiveDefinition objective) {

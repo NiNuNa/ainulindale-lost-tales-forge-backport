@@ -205,11 +205,11 @@ public final class LostTalesServerBroadcastHook {
                 return null;
             }
             ChatChannel shared = ChatSystemLineClassifier.classify(message);
-            if (shared == ChatChannel.ALL || shared == ChatChannel.OOC) {
+            if (shared == ChatChannel.GLOBAL || shared == ChatChannel.OOC) {
                 stampCopy(message, shared);
                 return message;
             }
-            if (shared != ChatChannel.CONSOLE) {
+            if (shared != ChatChannel.CLIENT_CONSOLE) {
                 return message;
             }
             String tabId = ChatCommandContexts.answerLine(account,
@@ -219,7 +219,7 @@ public final class LostTalesServerBroadcastHook {
             }
             ChatChannel channel = ChatTabIds.channelOf(tabId);
             if (channel == null) {
-                channel = ChatChannel.CONSOLE;
+                channel = ChatChannel.CLIENT_CONSOLE;
             }
             List<UUID> self = Collections.singletonList(account);
             List<ChatNamedPlayer> named = namedPlayers(message, channel);
@@ -250,7 +250,7 @@ public final class LostTalesServerBroadcastHook {
         }
         List<ChatNamedPlayer> named = namedPlayers(message, channel);
         long messageId = record(message, channel, "", recipients,
-                channel == ChatChannel.CONSOLE
+                channel == ChatChannel.CLIENT_CONSOLE
                         ? ChatHistory.Audience.accounts(recipients, false)
                         : ChatHistory.Audience.everyone(), named);
         if (messageId == ChatMessageIds.NONE) {
@@ -357,7 +357,7 @@ public final class LostTalesServerBroadcastHook {
                 channel, LostTalesChatMessagePacket.SERVER_SENDER_ID,
                 SERVER_NAME, SERVER_NAME, "",
                 LostTalesColors.rgb(LostTalesColors.HUD_LABEL),
-                ChatChannel.CONSOLE.getDisplayColor(), text,
+                ChatChannel.CLIENT_CONSOLE.getDisplayColor(), text,
                 System.currentTimeMillis(), "", null, "", "", 0, true,
                 messageId, ChatReplyReference.NONE, "")
                 .withServerBody(componentJson(message), named)

@@ -69,12 +69,12 @@ public final class ChatAuditLog {
         failedThisSession = false;
     }
 
-    public static void logMessage(long messageId, String channelId,
+    public static void logMessage(long messageId, String channel,
                                   UUID account, String accountName,
                                   UUID characterId, String identityName,
                                   String whisperTarget, String text) {
         append("message", messageId, account, accountName, characterId,
-                identityName, channelId, whisperTarget, text);
+                identityName, channel, whisperTarget, text);
     }
 
     /**
@@ -84,11 +84,11 @@ public final class ChatAuditLog {
      * origin, so a reader tells the two apart without knowing the id's
      * shape.
      */
-    public static void logDiscordMessage(long messageId, String channelId,
+    public static void logDiscordMessage(long messageId, String channel,
                                          UUID senderId, String displayName,
                                          String text) {
         append("discord_message", messageId, senderId, displayName, null,
-                "", channelId, "", text);
+                "", channel, "", text);
     }
 
     public static void logEdit(long messageId, UUID account,
@@ -118,7 +118,7 @@ public final class ChatAuditLog {
                                             UUID account, String accountName,
                                             UUID characterId,
                                             String identityName,
-                                            String channelId,
+                                            String channel,
                                             String whisperTarget,
                                             String text) {
         if (!LostTalesConfig.chatAuditLogEnabled || directory == null
@@ -129,7 +129,7 @@ public final class ChatAuditLog {
         try {
             Writer out = writerFor(now);
             out.write(buildLine(now, event, messageId, account, accountName,
-                    characterId, identityName, channelId, whisperTarget,
+                    characterId, identityName, channel, whisperTarget,
                     text));
             out.write('\n');
             out.flush();
@@ -145,7 +145,7 @@ public final class ChatAuditLog {
     static String buildLine(long atMillis, String event, long messageId,
                             UUID account, String accountName,
                             UUID characterId, String identityName,
-                            String channelId, String whisperTarget,
+                            String channel, String whisperTarget,
                             String text) {
         StringBuilder line = new StringBuilder(160);
         line.append("{\"at\":\"").append(utcTimestamp(atMillis));
@@ -161,8 +161,8 @@ public final class ChatAuditLog {
         if (identityName != null && identityName.length() > 0) {
             line.append("\",\"identity\":\"").append(jsonEscape(identityName));
         }
-        if (channelId != null && channelId.length() > 0) {
-            line.append("\",\"channel\":\"").append(jsonEscape(channelId));
+        if (channel != null && channel.length() > 0) {
+            line.append("\",\"channel\":\"").append(jsonEscape(channel));
         }
         if (whisperTarget != null && whisperTarget.length() > 0) {
             line.append("\",\"target\":\"").append(jsonEscape(whisperTarget));

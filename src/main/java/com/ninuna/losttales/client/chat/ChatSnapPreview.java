@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiRegionBlur;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
@@ -382,17 +383,17 @@ final class ChatSnapPreview {
             float holeTop = (float)hole.top;
             float holeRight = (float)hole.right();
             float holeBottom = (float)hole.bottom();
-            LostTalesChatOverlayRenderer.fillRect(left, cursor, right, holeTop,
+            LostTalesUiInk.fillRect(left, cursor, right, holeTop,
                     argb);
-            LostTalesChatOverlayRenderer.fillRect(left, holeTop, holeLeft,
+            LostTalesUiInk.fillRect(left, holeTop, holeLeft,
                     holeBottom, argb);
-            LostTalesChatOverlayRenderer.fillRect(holeRight, holeTop, right,
+            LostTalesUiInk.fillRect(holeRight, holeTop, right,
                     holeBottom, argb);
             LostTalesUiFramedButton.fillCorners(holeLeft, holeTop,
                     holeRight - holeLeft, holeBottom - holeTop, argb);
             cursor = holeBottom;
         }
-        LostTalesChatOverlayRenderer.fillRect(left, cursor, right, bottom,
+        LostTalesUiInk.fillRect(left, cursor, right, bottom,
                 argb);
     }
 
@@ -434,9 +435,9 @@ final class ChatSnapPreview {
         fillGlass(left, top, right, bottom, holes,
                 LostTalesChatVisualStyle.surfaceArgb(GLASS_SHARE
                         * surfaceShare));
-        LostTalesChatOverlayRenderer.drawFrameSurface(left, top, right,
+        LostTalesUiWindowFrame.drawSurface(left, top, right,
                 bottom, LostTalesChatVisualStyle.surfaceArgb(surfaceShare));
-        LostTalesChatOverlayRenderer.drawFrameEdges(left, top, right, bottom,
+        LostTalesUiWindowFrame.drawEdges(left, top, right, bottom,
                 Math.round(255.0F * Math.min(1.0F, opacity)));
     }
 }

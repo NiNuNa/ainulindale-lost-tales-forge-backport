@@ -407,7 +407,7 @@ public final class ChatChannelTabBarTest {
     private static ChatChannelTabBar.Tab tab(double fromLeft, double fromWidth,
                                             double toLeft, double toWidth) {
         ChatChannelTabBar.Tab tab = new ChatChannelTabBar.Tab(
-                ChatTab.of(com.ninuna.losttales.chat.ChatChannel.ALL), 0, null,
+                ChatTab.of(com.ninuna.losttales.chat.ChatChannel.GLOBAL), 0, null,
                 "Global", 30, 30, false, 0, (int)toWidth, -1, -1, -1, false);
         tab.standAt(fromLeft, fromWidth, 1.0D / 3.0D);
         tab.toLeft = toLeft;

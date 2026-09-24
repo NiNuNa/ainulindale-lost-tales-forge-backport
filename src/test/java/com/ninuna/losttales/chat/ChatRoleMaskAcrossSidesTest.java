@@ -29,7 +29,7 @@ public final class ChatRoleMaskAcrossSidesTest {
         int operator = ChatRoleFixtures.OPERATOR.bit();
         assertTrue(ChatAccountRole.isValidMask(operator));
         LostTalesChatMessagePacket kept = new LostTalesChatMessagePacket(
-                ChatChannel.ALL, UUID.randomUUID(), "Aldric", "alice", "", 0, 0,
+                ChatChannel.GLOBAL, UUID.randomUUID(), "Aldric", "alice", "", 0, 0,
                 "the gate holds", 1000000L, "", null, "", "", operator, false, 7L,
                 ChatReplyReference.NONE, "");
         // The client arrives and forgets what it was told.

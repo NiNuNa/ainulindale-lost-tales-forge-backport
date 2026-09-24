@@ -30,6 +30,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
+import com.ninuna.losttales.util.LostTalesServerPlayers;
 
 /** Builds and sends private, revisioned party snapshots to authorized clients. */
 public final class PartySyncManager {
@@ -270,7 +271,7 @@ public final class PartySyncManager {
             if (ownerId == null || ownerId.equals(excludedOwnerId)) {
                 continue;
             }
-            EntityPlayerMP player = findOnlinePlayer(ownerId);
+            EntityPlayerMP player = LostTalesServerPlayers.findOnline(ownerId);
             if (player != null) {
                 sendState(player, UNSOLICITED_REQUEST_ID);
             }
@@ -396,27 +397,6 @@ public final class PartySyncManager {
                     candidates.subList(0, PartyStateSnapshot.MAX_INVITE_TARGETS));
         }
         return new InviteTargetCollection(candidates, truncated);
-    }
-
-    private static EntityPlayerMP findOnlinePlayer(UUID ownerId) {
-        MinecraftServer server = MinecraftServer.getServer();
-        if (server == null || server.getConfigurationManager() == null
-                || ownerId == null) {
-            return null;
-        }
-        List<?> players = server.getConfigurationManager().playerEntityList;
-        if (players == null) {
-            return null;
-        }
-        for (Object value : players) {
-            if (value instanceof EntityPlayerMP) {
-                EntityPlayerMP player = (EntityPlayerMP) value;
-                if (ownerId.equals(player.getUniqueID())) {
-                    return player;
-                }
-            }
-        }
-        return null;
     }
 
     private static boolean isServerPlayer(EntityPlayerMP player) {

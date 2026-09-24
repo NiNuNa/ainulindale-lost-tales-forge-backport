@@ -31,9 +31,9 @@ public final class ChatChannelRegistryTest {
 
     @Test
     public void theBuiltInChannelsAreInForceBeforeAnythingIsRegistered() {
-        List<ChatChannel> built = Arrays.asList(ChatChannel.ALL,
+        List<ChatChannel> built = Arrays.asList(ChatChannel.GLOBAL,
                 ChatChannel.PROXIMITY, ChatChannel.PARTY, ChatChannel.FACTION,
-                ChatChannel.OOC, ChatChannel.ADMIN, ChatChannel.CONSOLE,
+                ChatChannel.OOC, ChatChannel.OPERATOR, ChatChannel.CLIENT_CONSOLE,
                 ChatChannel.SERVER_CONSOLE, ChatChannel.WHISPER);
         List<ChatChannel> inForce = Arrays.asList(ChatChannel.values());
 
@@ -60,7 +60,7 @@ public final class ChatChannelRegistryTest {
 
         assertEquals("it comes last", custom, order.get(order.size() - 1));
         assertEquals("the built-ins keep their own order",
-                ChatChannel.ALL, order.get(0));
+                ChatChannel.GLOBAL, order.get(0));
         assertFalse("whispers are still not a row of their own",
                 order.contains(ChatChannel.WHISPER));
     }
@@ -70,7 +70,7 @@ public final class ChatChannelRegistryTest {
     public void aRegisteredChannelCarriesTheFactsAChannelIsDecidedBy() {
         ChatChannel custom = register();
 
-        assertEquals(ChatRecipientRule.GLOBAL, custom.getRecipientRule());
+        assertEquals(ChatRecipientRule.EVERYONE, custom.getRecipientRule());
         assertEquals(ChatChannelAccess.NONE, custom.getAccess());
         assertEquals(ChatPresentationMode.OUT_OF_CHARACTER,
                 custom.getPresentation());
@@ -95,12 +95,12 @@ public final class ChatChannelRegistryTest {
         }
         try {
             ChatChannel.register(new ChatChannelDescriptor(
-                    ChatChannel.ALL.getId(), "Impostor",
+                    ChatChannel.GLOBAL.getId(), "Impostor",
                     ChatPresentationMode.OUT_OF_CHARACTER,
-                    ChatRecipientRule.GLOBAL, ChatChannelAccess.NONE, 0, false));
+                    ChatRecipientRule.EVERYONE, ChatChannelAccess.NONE, 0, false));
             fail("a built-in id was taken over");
         } catch (IllegalStateException expected) {
-            assertTrue(expected.getMessage().contains(ChatChannel.ALL.getId()));
+            assertTrue(expected.getMessage().contains(ChatChannel.GLOBAL.getId()));
         }
     }
 
@@ -119,7 +119,7 @@ public final class ChatChannelRegistryTest {
 
         assertEquals(builtIn, ChatChannel.values().length);
         assertSame("a built-in is the same channel it always was",
-                ChatChannel.ALL, ChatChannel.fromId("all"));
+                ChatChannel.GLOBAL, ChatChannel.fromId("global"));
         assertEquals("and the one the config named is gone",
                 null, ChatChannel.fromId(CUSTOM_ID));
 
@@ -139,7 +139,7 @@ public final class ChatChannelRegistryTest {
     private static ChatChannel register() {
         return ChatChannel.register(new ChatChannelDescriptor(
                 CUSTOM_ID, "Test", ChatPresentationMode.OUT_OF_CHARACTER,
-                ChatRecipientRule.GLOBAL, ChatChannelAccess.NONE,
+                ChatRecipientRule.EVERYONE, ChatChannelAccess.NONE,
                 LostTalesColors.rgb(LostTalesColors.HONEY), false));
     }
 }

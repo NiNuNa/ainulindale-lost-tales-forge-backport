@@ -14,6 +14,7 @@ import net.minecraft.client.resources.I18n;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumChatFormatting;
 import org.lwjgl.opengl.GL11;
+import com.ninuna.losttales.quest.LostTalesQuestTimeText;
 
 /**
  * Client-side reader for generated missive letters.
@@ -146,7 +147,7 @@ public class LostTalesMissiveLetterReaderGui extends GuiScreen {
             y = this.drawWrapped(I18n.format("gui.losttales.missive_letter.reward", reward), left, y, width, 0x2E5C20, 9);
         }
         if (this.missive.hasTimeLimit()) {
-            this.drawWrapped(I18n.format("gui.losttales.missive_letter.time_limit", LostTalesItemMissiveLetter.formatTicks(this.missive.getTimeLimitTicks())), left, y, width, 0x8A1C1C, 9);
+            this.drawWrapped(I18n.format("gui.losttales.missive_letter.time_limit", LostTalesQuestTimeText.shortForm(this.missive.getTimeLimitTicks())), left, y, width, 0x8A1C1C, 9);
         }
     }
 

@@ -1,6 +1,7 @@
 package com.ninuna.losttales.compat.discord;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatCodeNames;
 import com.ninuna.losttales.chat.ChatRecipientRule;
 
 import java.util.ArrayList;
@@ -22,14 +23,14 @@ import java.util.regex.Pattern;
  * game channel to one Discord channel:
  *
  * <pre>
- * all=GAME_TO_DISCORD;webhook=https://discord.com/api/webhooks/...
+ * global=GAME_TO_DISCORD;webhook=https://discord.com/api/webhooks/...
  * ooc=BIDIRECTIONAL;channel=123456789012345678;webhook=https://...
  * ooc=GAME_TO_DISCORD;webhook=https://discord.com/api/webhooks/...
- * faction:lotr:gondor=BIDIRECTIONAL;channel=...;webhook=...
+ * gondor=BIDIRECTIONAL;channel=...;webhook=...
  * </pre>
  *
- * The part before {@code =} names the channel by its wire id, the
- * Faction channel always with the faction after a colon; then the
+ * The part before {@code =} is the game channel's code name
+ * ({@link ChatCodeNames}), a faction's for that faction's chat; then the
  * direction, then {@code channel} (the Discord channel the bot reads)
  * and {@code webhook} (where the bridge posts) in any order. A game
  * channel may be bound as often as it has Discord channels to go to —
@@ -177,34 +178,17 @@ public final class DiscordChannelBindings {
         String target = text.substring(0, equals).trim().toLowerCase(Locale.ROOT);
         String[] parts = text.substring(equals + 1).split(
                 String.valueOf(ENTRY_SEPARATOR));
-        String channelId = target;
-        String scope = "";
-        int colon = target.indexOf(DiscordChannelBinding.SCOPE_SEPARATOR);
-        if (colon >= 0) {
-            channelId = target.substring(0, colon).trim();
-            scope = target.substring(colon + 1).trim();
-        }
-        ChatChannel channel = ChatChannel.fromId(channelId);
-        if (channel == null) {
-            warn(warnings, "Discord binding for unknown channel '" + channelId
+        ChatCodeNames.Named named = ChatCodeNames.parse(target);
+        if (named == null) {
+            warn(warnings, "Discord binding for unknown channel '" + target
                     + "'; ignored");
             return null;
         }
+        ChatChannel channel = named.channel;
+        String scope = named.scope;
         if (!channel.isBridgeable()) {
             warn(warnings, "Discord binding for the " + channel.getDisplayName()
                     + " channel refused: that channel is private and never leaves the game");
-            return null;
-        }
-        if (scope.length() > 0 && channel != ChatChannel.FACTION) {
-            warn(warnings, "Discord binding '" + target + "': only the faction channel"
-                    + " takes a scope; ignored");
-            return null;
-        }
-        if (scope.length() == 0 && channel == ChatChannel.FACTION) {
-            // Every faction's talk in one Discord channel would be several
-            // conversations in one place.
-            warn(warnings, "Discord binding for the faction channel names no"
-                    + " faction; name one as faction:<faction id>; ignored");
             return null;
         }
         DiscordBridgeDirection direction = DiscordBridgeDirection.parse(
@@ -319,9 +303,6 @@ public final class DiscordChannelBindings {
                 } else if (binding.getChannel().getRecipientRule()
                         == ChatRecipientRule.PROXIMITY) {
                     why = "is the proximity channel, which has no place on Discord to read from";
-                } else if (binding.getChannel() == ChatChannel.FACTION
-                        && binding.getFactionScope().length() == 0) {
-                    why = "is the faction channel without a faction; name one as faction:<id>";
                 }
                 if (why != null) {
                     warn(warnings, "Discord binding '" + id + "' " + why
@@ -413,13 +394,7 @@ public final class DiscordChannelBindings {
      * case-insensitively; for any other, the channel's own; else none.
      */
     public List<DiscordChannelBinding> forGame(ChatChannel channel, String factionId) {
-        if (channel == null) {
-            return Collections.emptyList();
-        }
-        String key = channel != ChatChannel.FACTION ? channel.getId()
-                : factionId == null || factionId.trim().length() == 0 ? null
-                : DiscordChannelBinding.keyOf(channel,
-                        factionId.trim().toLowerCase(Locale.ROOT));
+        String key = DiscordChannelBinding.keyOf(channel, factionId);
         List<DiscordChannelBinding> own = key == null ? null : this.byKey.get(key);
         return own == null ? Collections.<DiscordChannelBinding>emptyList() : own;
     }

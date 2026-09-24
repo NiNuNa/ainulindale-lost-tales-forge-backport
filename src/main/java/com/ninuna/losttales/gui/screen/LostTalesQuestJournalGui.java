@@ -46,7 +46,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import net.minecraft.client.gui.GuiScreen;
@@ -57,6 +56,8 @@ import net.minecraft.util.StatCollector;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
+import com.ninuna.losttales.quest.LostTalesQuestTimeText;
+import com.ninuna.losttales.quest.LostTalesQuestRewardText;
 /**
  * Skyrim-inspired quest journal layout for 1.7.10.
  *
@@ -84,7 +85,7 @@ public class LostTalesQuestJournalGui extends GuiScreen
     private static final QuestFilter[] FILTERS = QuestFilter.values();
 
     /** The actions a quest being read offers, in the order they stand. */
-    private enum QuestAction { TRACK, SHARE, ABANDON }
+    private enum QuestAction { TRACK, SHARE, ABANDON, CLEAR }
 
     private static final QuestAction[] ACTIONS = QuestAction.values();
 
@@ -696,16 +697,8 @@ public class LostTalesQuestJournalGui extends GuiScreen
         return selected ? LostTalesColors.TEXT_BRIGHT : LostTalesColors.TEXT;
     }
 
-    /** A category's name, translated where the code chose it. */
     private static String categoryName(String category) {
-        if (category == null || category.length() == 0) {
-            return translate("gui.losttales.quest.category.misc");
-        }
-        String key = "gui.losttales.quest.category."
-                + category.toLowerCase(Locale.ROOT).replace(' ', '_')
-                        .replace("-", "");
-        String translated = translate(key);
-        return key.equals(translated) ? category : translated;
+        return ClientQuestCatalog.categoryName(category);
     }
 
     /**
@@ -824,6 +817,7 @@ public class LostTalesQuestJournalGui extends GuiScreen
                     actionLabel(quest, ACTIONS[index]), false,
                     this.hovered == Hovered.ACTION && this.hoveredIndex == index,
                     LostTalesColors.rgb(ACTIONS[index] == QuestAction.ABANDON
+                            || ACTIONS[index] == QuestAction.CLEAR
                             ? LostTalesColors.RED
                             : LostTalesColors.TEXT_BRIGHT));
         }
@@ -848,14 +842,15 @@ public class LostTalesQuestJournalGui extends GuiScreen
         if (quest == null) {
             return false;
         }
-        if (action == QuestAction.ABANDON) {
-            return quest.isActive()
-                    && quest.getSource() == ClientQuestEntry.Source.LOST_TALES;
+        if (action == QuestAction.CLEAR) {
+            // Only a Middle-earth quest leaves History: a Lost Tales one
+            // decides whether the quest may be taken again.
+            return quest.getSource() == ClientQuestEntry.Source.LOTR
+                    && (quest.isCompleted() || quest.isFailed());
         }
-        if (action == QuestAction.TRACK) {
-            return quest.isActive();
-        }
-        return true;
+        // Tracking and sharing are for a quest still running: a finished
+        // one has nothing left to follow, and the server shares no other.
+        return quest.isActive();
     }
 
     private static String actionLabel(ClientQuestEntry quest,
@@ -867,6 +862,9 @@ public class LostTalesQuestJournalGui extends GuiScreen
         }
         if (action == QuestAction.SHARE) {
             return translate("gui.losttales.quest.action.share");
+        }
+        if (action == QuestAction.CLEAR) {
+            return translate("gui.losttales.quest.action.clear");
         }
         return translate("gui.losttales.quest.action.abandon");
     }
@@ -889,8 +887,9 @@ public class LostTalesQuestJournalGui extends GuiScreen
             return;
         }
         LostTalesNetworkHandler.CHANNEL.sendToServer(
-                new LostTalesQuestActionPacket(
-                        LostTalesQuestActionPacket.ACTION_ABANDON,
+                new LostTalesQuestActionPacket(action == QuestAction.CLEAR
+                        ? LostTalesQuestActionPacket.ACTION_CLEAR
+                        : LostTalesQuestActionPacket.ACTION_ABANDON,
                         quest.getReference()));
     }
 
@@ -1153,8 +1152,12 @@ public class LostTalesQuestJournalGui extends GuiScreen
         addWrappedLines(lines, status + " \u00b7 " + tracking + stageText,
                 color, 8, width - 16);
         if (progress != null && progress.hasTimeLimit() && this.mc != null && this.mc.theWorld != null) {
-            String remaining = formatRemainingTime(progress.getRemainingTicks(this.mc.theWorld.getTotalWorldTime()));
-            addWrappedLines(lines, translate("gui.losttales.quest.remaining", remaining), remaining.equals("expired") ? LostTalesSkyrimUiStyle.RED : LostTalesSkyrimUiStyle.GOLD, 8, width - 16);
+            long left = progress.getRemainingTicks(this.mc.theWorld.getTotalWorldTime());
+            addWrappedLines(lines, translate("gui.losttales.quest.remaining",
+                    left > 0L ? LostTalesQuestTimeText.shortForm(left)
+                            : translate("gui.losttales.quest.expired")),
+                    left > 0L ? LostTalesSkyrimUiStyle.GOLD : LostTalesSkyrimUiStyle.RED,
+                    8, width - 16);
         }
     }
 
@@ -1168,7 +1171,9 @@ public class LostTalesQuestJournalGui extends GuiScreen
                     translate(history.isCompleted()
                             ? "gui.losttales.quest.outcome"
                             : "gui.losttales.quest.reason",
-                            history.getDetail()),
+                            // A reason the game wrote is a lang key; one a
+                            // quest's file wrote reads as it was written.
+                            translate(history.getDetail())),
                     history.isFailed() ? LostTalesSkyrimUiStyle.RED
                             : history.isCompleted()
                             ? LostTalesSkyrimUiStyle.GREEN
@@ -1194,76 +1199,16 @@ public class LostTalesQuestJournalGui extends GuiScreen
     }
 
     private List<String> buildRewardLines(LostTalesQuestDefinition quest) {
-        List<String> result = new ArrayList<String>();
-        if (quest == null || quest.getRewards().isEmpty()) {
-            return result;
-        }
-        for (Map.Entry<String, String> entry : quest.getRewards().entrySet()) {
-            String key = entry.getKey() == null ? "" : entry.getKey();
-            String value = entry.getValue() == null ? "" : entry.getValue();
-            if ("experience".equalsIgnoreCase(key) || "xp".equalsIgnoreCase(key) || "experiencePoints".equalsIgnoreCase(key)) {
-                result.add(value + " experience");
-            } else if ("levels".equalsIgnoreCase(key) || "experienceLevels".equalsIgnoreCase(key) || "xpLevels".equalsIgnoreCase(key)) {
-                result.add(value + " experience level" + ("1".equals(value) ? "" : "s"));
-            } else if ("items".equalsIgnoreCase(key) || "stacks".equalsIgnoreCase(key) || "itemStacks".equalsIgnoreCase(key)) {
-                String[] parts = value.replace(';', ',').split(",");
-                for (String part : parts) {
-                    String reward = formatItemReward(part);
-                    if (reward.length() > 0) {
-                        result.add(reward);
-                    }
-                }
-            } else if ("item".equalsIgnoreCase(key) || "itemId".equalsIgnoreCase(key) || "stack".equalsIgnoreCase(key)) {
-                String reward = formatItemReward(value);
-                if (reward.length() > 0) {
-                    result.add(reward);
-                }
-            } else if (value.length() > 0) {
-                result.add(prettifyKey(key) + ": " + value);
-            }
-        }
+        List<String> result = quest == null ? new ArrayList<String>()
+                : LostTalesQuestRewardText.phrases(quest.getRewards());
         if (result.isEmpty()) {
             result.add(translate("gui.losttales.quest.reward.pending"));
         }
         return result;
     }
 
-    private String formatItemReward(String value) {
-        String spec = value == null ? "" : value.trim();
-        if (spec.length() == 0) {
-            return "";
-        }
-        int count = 1;
-        int meta = 0;
-        int star = spec.lastIndexOf('*');
-        if (star >= 0 && star + 1 < spec.length()) {
-            count = Math.max(1, parseStageNumber(spec.substring(star + 1), 1));
-            spec = spec.substring(0, star);
-        }
-        int at = spec.lastIndexOf('@');
-        if (at >= 0 && at + 1 < spec.length()) {
-            meta = Math.max(0, parseStageNumber(spec.substring(at + 1), 0));
-            spec = spec.substring(0, at);
-        }
-        if (spec.indexOf(':') < 0) {
-            spec = "minecraft:" + spec;
-        }
-        Object object = Item.itemRegistry.getObject(spec);
-        String name = spec;
-        if (object instanceof Item) {
-            try {
-                name = new ItemStack((Item)object, 1, meta).getDisplayName();
-            } catch (RuntimeException ignored) {
-                name = prettifyKey(spec.substring(spec.indexOf(':') + 1));
-            }
-        } else if (spec.indexOf(':') >= 0) {
-            name = prettifyKey(spec.substring(spec.indexOf(':') + 1));
-        }
-        return (count > 1 ? count + "x " : "") + name;
-    }
-
     private String buildObjectiveLine(LostTalesQuestProgress progress, LostTalesQuestObjectiveDefinition objective, boolean currentStage, boolean questCompleted) {
-        return LostTalesQuestObjectiveTextHelper.buildObjectiveLine(progress, objective, currentStage, questCompleted, false, false);
+        return LostTalesQuestObjectiveTextHelper.buildObjectiveLine(progress, objective, currentStage, questCompleted);
     }
 
     private boolean isObjectiveComplete(LostTalesQuestProgress progress, LostTalesQuestObjectiveDefinition objective, boolean currentStage, boolean stageComplete) {
@@ -1296,23 +1241,6 @@ public class LostTalesQuestJournalGui extends GuiScreen
             return fromId;
         }
         return progress.getStageIndex();
-    }
-
-    private String formatRemainingTime(long ticks) {
-        if (ticks <= 0L) {
-            return "expired";
-        }
-        long days = ticks / 24000L;
-        long remainder = ticks % 24000L;
-        long hours = remainder / 1000L;
-        long minutes = (remainder % 1000L) * 60L / 1000L;
-        if (days > 0L) {
-            return days + "d " + hours + "h";
-        }
-        if (hours > 0L) {
-            return hours + "h " + minutes + "m";
-        }
-        return Math.max(1L, minutes) + "m";
     }
 
     private int parseStageNumber(String text, int fallback) {
@@ -1531,27 +1459,6 @@ public class LostTalesQuestJournalGui extends GuiScreen
             y += row.height;
         }
         return 0;
-    }
-
-    private String prettifyKey(String key) {
-        if (key == null || key.length() == 0) {
-            return "";
-        }
-        String[] parts = key.replace('-', '_').split("_");
-        StringBuilder builder = new StringBuilder();
-        for (String part : parts) {
-            if (part.length() == 0) {
-                continue;
-            }
-            if (builder.length() > 0) {
-                builder.append(' ');
-            }
-            builder.append(Character.toUpperCase(part.charAt(0)));
-            if (part.length() > 1) {
-                builder.append(part.substring(1).toLowerCase(Locale.ENGLISH));
-            }
-        }
-        return builder.length() == 0 ? key : builder.toString();
     }
 
 

@@ -1,7 +1,5 @@
-package com.ninuna.losttales.client.chat;
+package com.ninuna.losttales.gui.style;
 
-import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
-import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import java.awt.image.BufferedImage;
 import java.io.InputStream;
 import javax.imageio.ImageIO;
@@ -16,7 +14,7 @@ import static org.junit.Assert.assertNotNull;
  * texel by texel on the frame's ramps, and every edge from the texel a
  * framed button stretches along that edge.
  */
-public final class ChatFrameCornersTest {
+public final class LostTalesUiWindowFrameTest {
 
     /**
      * The window frame's cells hold the lit framed button's ink exactly:
@@ -44,21 +42,21 @@ public final class ChatFrameCornersTest {
     @Test
     public void everyEdgeIsStretchedAsAFramedButtonsIs() throws Exception {
         assertEquals(LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT,
-                LostTalesChatOverlayRenderer.edgeCorner(false, false));
+                LostTalesUiWindowFrame.edgeCorner(false, false));
         assertEquals(LostTalesUiSheet.WINDOW_FRAME_BOTTOM_LEFT,
-                LostTalesChatOverlayRenderer.edgeCorner(false, true));
+                LostTalesUiWindowFrame.edgeCorner(false, true));
         assertEquals(LostTalesUiSheet.WINDOW_FRAME_TOP_LEFT,
-                LostTalesChatOverlayRenderer.edgeCorner(true, false));
+                LostTalesUiWindowFrame.edgeCorner(true, false));
         assertEquals(LostTalesUiSheet.WINDOW_FRAME_TOP_RIGHT,
-                LostTalesChatOverlayRenderer.edgeCorner(true, true));
+                LostTalesUiWindowFrame.edgeCorner(true, true));
         BufferedImage sheet = readSheet();
         int innermost = LostTalesUiFramedButton.CORNER - 1;
         for (int side = 0; side < 2; side++) {
             for (int far = 0; far < 2; far++) {
-                LostTalesUiSheet corner = LostTalesChatOverlayRenderer.edgeCorner(
+                LostTalesUiSheet corner = LostTalesUiWindowFrame.edgeCorner(
                         side == 1, far == 1);
-                int line = LostTalesChatOverlayRenderer.cornerTexel(far == 1,
-                        LostTalesChatOverlayRenderer.EDGE_LINE);
+                int line = LostTalesUiWindowFrame.cornerTexel(far == 1,
+                        LostTalesUiWindowFrame.EDGE_LINE);
                 for (int across = 0; across < LostTalesUiFramedButton.CORNER;
                         across++) {
                     int u = side == 1 ? across : innermost;
@@ -93,11 +91,11 @@ public final class ChatFrameCornersTest {
      */
     @Test
     public void anArmRunsFromTheBoxCornerToTheCellsInnerSide() {
-        assertEquals(4, LostTalesChatOverlayRenderer.CORNER_ARM);
-        assertEquals(1, LostTalesChatOverlayRenderer.EDGE_LINE);
-        assertEquals(2, LostTalesChatOverlayRenderer.cornerTexel(false, 2));
-        assertEquals(3, LostTalesChatOverlayRenderer.cornerTexel(true, 2));
-        assertEquals(4, LostTalesChatOverlayRenderer.cornerTexel(true, 1));
+        assertEquals(4, LostTalesUiWindowFrame.CORNER_ARM);
+        assertEquals(1, LostTalesUiWindowFrame.EDGE_LINE);
+        assertEquals(2, LostTalesUiWindowFrame.cornerTexel(false, 2));
+        assertEquals(3, LostTalesUiWindowFrame.cornerTexel(true, 2));
+        assertEquals(4, LostTalesUiWindowFrame.cornerTexel(true, 1));
     }
 
     /**
@@ -106,12 +104,12 @@ public final class ChatFrameCornersTest {
      */
     @Test
     public void theRoundingPixelTakesTheMeanOfTheArmsBesideIt() {
-        assertEquals(255, LostTalesChatOverlayRenderer.bendAlpha(255, 255,
+        assertEquals(255, LostTalesUiWindowFrame.bendAlpha(255, 255,
                 255, 255));
-        assertEquals(251, LostTalesChatOverlayRenderer.bendAlpha(250, 230,
+        assertEquals(251, LostTalesUiWindowFrame.bendAlpha(250, 230,
                 255, 251));
-        assertEquals(3, LostTalesChatOverlayRenderer.bendAlpha(0, 40, 0, 8));
-        assertEquals(0, LostTalesChatOverlayRenderer.bendAlpha(0, 0, 0, 0));
+        assertEquals(3, LostTalesUiWindowFrame.bendAlpha(0, 40, 0, 8));
+        assertEquals(0, LostTalesUiWindowFrame.bendAlpha(0, 0, 0, 0));
     }
 
     /**
@@ -120,32 +118,32 @@ public final class ChatFrameCornersTest {
      */
     @Test
     public void aHorizontalEdgeFadesFromItsFullEndToNothing() {
-        assertEquals(255, LostTalesChatOverlayRenderer.edgeAlphaAt(255,
+        assertEquals(255, LostTalesUiWindowFrame.edgeAlphaAt(255,
                 100.0F, 0.0F, 100.0F));
-        assertEquals(128, LostTalesChatOverlayRenderer.edgeAlphaAt(255,
+        assertEquals(128, LostTalesUiWindowFrame.edgeAlphaAt(255,
                 100.0F, 0.0F, 50.0F));
-        assertEquals(1, LostTalesChatOverlayRenderer.edgeAlphaAt(255,
+        assertEquals(1, LostTalesUiWindowFrame.edgeAlphaAt(255,
                 100.0F, 0.0F, 0.5F));
-        assertEquals(0, LostTalesChatOverlayRenderer.edgeAlphaAt(255,
+        assertEquals(0, LostTalesUiWindowFrame.edgeAlphaAt(255,
                 0.0F, 100.0F, 100.0F));
-        assertEquals(0, LostTalesChatOverlayRenderer.edgeAlphaAt(255,
+        assertEquals(0, LostTalesUiWindowFrame.edgeAlphaAt(255,
                 0.0F, 0.0F, 0.0F));
     }
 
     private static void assertInk(BufferedImage sheet, LostTalesUiSheet corner,
                                   boolean right, boolean bottom) {
         int cell = LostTalesUiFramedButton.CORNER;
-        int ring = ChatWindowPlacement.FRAME_WIDTH;
-        int line = LostTalesChatOverlayRenderer.EDGE_LINE;
+        int ring = LostTalesUiWindowFrame.WIDTH;
+        int line = LostTalesUiWindowFrame.EDGE_LINE;
         boolean[][] ink = new boolean[cell][cell];
         for (int depth = ring; depth < cell; depth++) {
-            ink[LostTalesChatOverlayRenderer.cornerTexel(bottom, depth)]
-                    [LostTalesChatOverlayRenderer.cornerTexel(right, line)] = true;
-            ink[LostTalesChatOverlayRenderer.cornerTexel(bottom, line)]
-                    [LostTalesChatOverlayRenderer.cornerTexel(right, depth)] = true;
+            ink[LostTalesUiWindowFrame.cornerTexel(bottom, depth)]
+                    [LostTalesUiWindowFrame.cornerTexel(right, line)] = true;
+            ink[LostTalesUiWindowFrame.cornerTexel(bottom, line)]
+                    [LostTalesUiWindowFrame.cornerTexel(right, depth)] = true;
         }
-        ink[LostTalesChatOverlayRenderer.cornerTexel(bottom, ring)]
-                [LostTalesChatOverlayRenderer.cornerTexel(right, ring)] = true;
+        ink[LostTalesUiWindowFrame.cornerTexel(bottom, ring)]
+                [LostTalesUiWindowFrame.cornerTexel(right, ring)] = true;
         for (int v = 0; v < cell; v++) {
             for (int u = 0; u < cell; u++) {
                 int alpha = sheet.getRGB(corner.getTextureU() + u,
@@ -175,7 +173,7 @@ public final class ChatFrameCornersTest {
     }
 
     private static BufferedImage readSheet() throws Exception {
-        InputStream stream = ChatFrameCornersTest.class.getResourceAsStream(
+        InputStream stream = LostTalesUiWindowFrameTest.class.getResourceAsStream(
                 "/assets/losttales/" + LostTalesUiSheet.TEXTURE_PATH);
         assertNotNull("The UI sheet is missing", stream);
         try {

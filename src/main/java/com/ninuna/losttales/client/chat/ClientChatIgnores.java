@@ -10,8 +10,10 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -194,6 +196,42 @@ public final class ClientChatIgnores {
     /** Every ignore kept, accounts and identities together. */
     public static synchronized int count() {
         return ignoredAccounts.size() + ignoredIdentities.size();
+    }
+
+    /** One ignore as a list shows it. */
+    public static final class Ignored {
+        public final UUID accountId;
+        /** The name it goes by: the account's, or the one identity's. */
+        public final String name;
+        /** Whether it is one identity of the account rather than all of it. */
+        public final boolean identity;
+
+        Ignored(UUID accountId, String name, boolean identity) {
+            this.accountId = accountId;
+            this.name = name;
+            this.identity = identity;
+        }
+    }
+
+    /** Every ignore, the accounts first, each in the order it was laid. */
+    public static synchronized List<Ignored> ignored() {
+        List<Ignored> all = new ArrayList<Ignored>(count());
+        for (Map.Entry<UUID, String> account : ignoredAccounts.entrySet()) {
+            all.add(new Ignored(account.getKey(), account.getValue(), false));
+        }
+        for (Map.Entry<String, String> identity
+                : ignoredIdentities.entrySet()) {
+            String key = identity.getKey();
+            int bar = key.indexOf('|');
+            try {
+                all.add(new Ignored(UUID.fromString(key.substring(0, bar)),
+                        identity.getValue(), true));
+            } catch (RuntimeException unreadable) {
+                // Every key is made by identityKey; one that is not names
+                // nobody, and the list leaves it out.
+            }
+        }
+        return all;
     }
 
     private static void rebuildKnownNames() {

@@ -3,6 +3,7 @@ package com.ninuna.losttales.chat.server;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
+import com.ninuna.losttales.chat.ChatReportReason;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.Arrays;
@@ -47,17 +48,44 @@ public final class ChatHistoryNbtCodecTest {
         ChatMessageIdAllocator.reset();
     }
 
+    /** A report entry keeps what was reported through the save. */
+    @Test
+    public void aReportEntryKeepsItsReport() {
+        long reported = ChatMessageIdAllocator.next();
+        long entry = ChatMessageIdAllocator.next();
+        ChatConsoleStream.record(new ChatConsoleEvent(entry, 7L,
+                ChatConsoleEvent.Kind.REPORT, ChatConsoleEvent.Severity.NOTICE,
+                "Steve", "reported a message", "", null,
+                new ChatConsoleEvent.Report(ChatReportReason.SPAM, "again",
+                        reported, "Aldric", 0x7A9E3F, "buy gold",
+                        "#global/" + reported)));
+        NBTTagCompound written = new NBTTagCompound();
+        ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
+                ChatConsoleStream.snapshot(),
+                ChatConsoleStream.reactionsSnapshot(), Collections.<NBTTagCompound>emptyList());
+        ChatHistoryNbtCodec.ReadResult result = ChatHistoryNbtCodec.read(written);
+        assertFalse(result.wasRepaired());
+        ChatConsoleEvent.Report read = result.getConsoleEvents().get(0).getReport();
+        assertEquals(ChatReportReason.SPAM, read.getReason());
+        assertEquals("again", read.getNote());
+        assertEquals(reported, read.getMessageId());
+        assertEquals("Aldric", read.getAuthor());
+        assertEquals(0x7A9E3F, read.getAuthorColor());
+        assertEquals("buy gold", read.getExcerpt());
+        assertEquals("#global/" + reported, read.getLink());
+    }
+
     /** The console's events are written beside the lines and come back whole. */
     @Test
     public void theConsolesEventsRoundTripBesideTheLines() {
         long line = ChatMessageIdAllocator.next();
         ChatHistory.record(line, ALICE, "Aldric", null,
-                line(line, ChatChannel.ALL, ALICE, "hail", ""),
+                line(line, ChatChannel.GLOBAL, ALICE, "hail", ""),
                 Arrays.asList(ALICE), ChatHistory.Audience.everyone());
         long command = ChatMessageIdAllocator.next();
         ChatConsoleStream.record(new ChatConsoleEvent(command, 5L,
                 ChatConsoleEvent.Kind.COMMAND, ChatConsoleEvent.Severity.INFO,
-                "Steve", "/tp Alex", "all",
+                "Steve", "/tp Alex", "global",
                 ChatNamedPlayer.account(BOB, "Steve")));
         long warning = ChatMessageIdAllocator.next();
         ChatConsoleStream.record(new ChatConsoleEvent(warning, 6L,
@@ -84,7 +112,7 @@ public final class ChatHistoryNbtCodecTest {
         assertEquals(ChatConsoleEvent.Severity.INFO, first.getSeverity());
         assertEquals("Steve", first.getActor());
         assertEquals("/tp Alex", first.getText());
-        assertEquals("all", first.getContext());
+        assertEquals("global", first.getContext());
         // The actor as the server knew them, so an old entry's mention
         // still opens their card.
         assertEquals(BOB, first.getActorIdentity().getPlayerId());
@@ -170,7 +198,7 @@ public final class ChatHistoryNbtCodecTest {
     public void everyKindOfLineRoundTripsWithItsAudience() {
         long global = ChatMessageIdAllocator.next();
         ChatHistory.record(global, ALICE, "Aldric", null,
-                line(global, ChatChannel.ALL, ALICE, "hail", ""),
+                line(global, ChatChannel.GLOBAL, ALICE, "hail", ""),
                 Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
         long whisper = ChatMessageIdAllocator.next();
         LostTalesChatMessagePacket own = line(whisper, ChatChannel.WHISPER, ALICE,
@@ -232,7 +260,7 @@ public final class ChatHistoryNbtCodecTest {
                 UUID.randomUUID(), "", 0L, null, EVERY_CHANNEL), 0L).size());
         // The whisper still quotes back into its own conversation only.
         assertTrue(ChatHistory.quoteFor(whisper, BOB, ChatChannel.WHISPER, "").exists());
-        assertFalse(ChatHistory.quoteFor(whisper, BOB, ChatChannel.ALL, "").exists());
+        assertFalse(ChatHistory.quoteFor(whisper, BOB, ChatChannel.GLOBAL, "").exists());
     }
 
     /**
@@ -244,7 +272,7 @@ public final class ChatHistoryNbtCodecTest {
     public void aKeptLineCutShortIsQuarantined() {
         long id = ChatMessageIdAllocator.next();
         ChatHistory.record(id, ALICE, "Aldric", null,
-                line(id, ChatChannel.ALL, ALICE, "hail", ""),
+                line(id, ChatChannel.GLOBAL, ALICE, "hail", ""),
                 Arrays.asList(ALICE), ChatHistory.Audience.everyone());
         NBTTagCompound written = new NBTTagCompound();
         ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
@@ -271,7 +299,7 @@ public final class ChatHistoryNbtCodecTest {
     public void aLineTheSaveCannotVouchForIsQuarantined() {
         long id = ChatMessageIdAllocator.next();
         ChatHistory.record(id, ALICE, "Aldric", null,
-                line(id, ChatChannel.ALL, ALICE, "hail", ""),
+                line(id, ChatChannel.GLOBAL, ALICE, "hail", ""),
                 Arrays.asList(ALICE), ChatHistory.Audience.everyone());
         NBTTagCompound written = new NBTTagCompound();
         ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
@@ -338,7 +366,7 @@ public final class ChatHistoryNbtCodecTest {
         // An entry from a newer build makes the whole store read-only too.
         long id = ChatMessageIdAllocator.next();
         ChatHistory.record(id, ALICE, "Aldric", null,
-                line(id, ChatChannel.ALL, ALICE, "hail", ""),
+                line(id, ChatChannel.GLOBAL, ALICE, "hail", ""),
                 Arrays.asList(ALICE), ChatHistory.Audience.everyone());
         NBTTagCompound current = new NBTTagCompound();
         ChatHistoryNbtCodec.write(current, ChatHistory.snapshot(),
@@ -363,11 +391,11 @@ public final class ChatHistoryNbtCodecTest {
     public void reactionsRoundTripAndOnlyAReactedLineWearsTheNewerLayout() {
         long plain = ChatMessageIdAllocator.next();
         ChatHistory.record(plain, ALICE, "Aldric", null,
-                line(plain, ChatChannel.ALL, ALICE, "hail", ""),
+                line(plain, ChatChannel.GLOBAL, ALICE, "hail", ""),
                 Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
         long reacted = ChatMessageIdAllocator.next();
         ChatHistory.record(reacted, ALICE, "Aldric", null,
-                line(reacted, ChatChannel.ALL, ALICE, "well met", ""),
+                line(reacted, ChatChannel.GLOBAL, ALICE, "well met", ""),
                 Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
         ChatHistory.Requester bob = new ChatHistory.Requester(BOB, "", 0L,
                 null, EVERY_CHANNEL);
@@ -402,7 +430,7 @@ public final class ChatHistoryNbtCodecTest {
     public void unreadableReactionsQuarantineTheLineWhole() {
         long reacted = ChatMessageIdAllocator.next();
         ChatHistory.record(reacted, ALICE, "Aldric", null,
-                line(reacted, ChatChannel.ALL, ALICE, "well met", ""),
+                line(reacted, ChatChannel.GLOBAL, ALICE, "well met", ""),
                 Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
         ChatHistory.react(reacted, new ChatHistory.Requester(BOB, "", 0L,
                 null, EVERY_CHANNEL), BOB, "Beren", "smile", true);
@@ -515,7 +543,7 @@ public final class ChatHistoryNbtCodecTest {
     public void aForeignEmojiInAnOlderLayoutIsQuarantined() {
         long reacted = ChatMessageIdAllocator.next();
         ChatHistory.record(reacted, ALICE, "Aldric", null,
-                line(reacted, ChatChannel.ALL, ALICE, "well met", ""),
+                line(reacted, ChatChannel.GLOBAL, ALICE, "well met", ""),
                 Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
         ChatHistory.react(reacted, new ChatHistory.Requester(BOB, "", 0L,
                 null, EVERY_CHANNEL), BOB, "Beren", "smile", true);

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
@@ -13,8 +14,8 @@ import net.minecraft.client.gui.FontRenderer;
 /**
  * The press-to-drag state machines of the chat screen: a tab carried
  * along its row, torn off into a window of its own and docked into
- * another; a window moved by its strip, its grip, its messages or its
- * tabs, snapped against a neighbour or into a part of the screen; a
+ * another; a window moved by its strip, its grip or its tabs, snapped
+ * against a neighbour or into a part of the screen; a
  * window resized by an edge or a corner; a member list resized by its
  * edge; a scrollbar's thumb carried. The screen arms them from its
  * presses, feeds them the pointer every frame and every mouse event,
@@ -133,7 +134,7 @@ final class ChatWindowGestures {
 
     boolean isDragging() {
         return (this.tabDrag != null && this.tabDrag.active)
-                || (this.windowDrag != null && this.windowDrag.active)
+                || this.windowDrag != null
                 || (this.windowResize != null && this.windowResize.active)
                 || this.fillResize != null
                 || this.membersResize != null;
@@ -144,9 +145,9 @@ final class ChatWindowGestures {
         return this.membersResize != null;
     }
 
-    /** Whether a live window drag is carrying this window. */
+    /** Whether a window drag is carrying this window. */
     boolean isMovingWindow(String windowId) {
-        return this.windowDrag != null && this.windowDrag.active
+        return this.windowDrag != null
                 && windowId.equals(this.windowDrag.windowId);
     }
 
@@ -193,7 +194,7 @@ final class ChatWindowGestures {
             updateFillResize();
         } else if (this.membersResize != null) {
             updateMembersResize();
-        } else if (this.windowDrag != null && this.windowDrag.active) {
+        } else if (this.windowDrag != null) {
             moveDraggedWindow(mouseX, mouseY);
         } else if (this.tabDrag != null && this.tabDrag.active) {
             dragTabs(this.tabDrag, mouseX, mouseY);
@@ -243,19 +244,19 @@ final class ChatWindowGestures {
                 LostTalesChatVisualStyle.LANDING_RGB, 0xFF);
         switch (landing.snapSide) {
             case ABOVE:
-                LostTalesChatOverlayRenderer.fillRect(left - ring, top - ring,
+                LostTalesUiInk.fillRect(left - ring, top - ring,
                         right + ring, top, colour);
                 return;
             case BELOW:
-                LostTalesChatOverlayRenderer.fillRect(left - ring, bottom,
+                LostTalesUiInk.fillRect(left - ring, bottom,
                         right + ring, bottom + ring, colour);
                 return;
             case LEFT:
-                LostTalesChatOverlayRenderer.fillRect(left - ring, top - ring,
+                LostTalesUiInk.fillRect(left - ring, top - ring,
                         left, bottom + ring, colour);
                 return;
             default:
-                LostTalesChatOverlayRenderer.fillRect(right, top - ring,
+                LostTalesUiInk.fillRect(right, top - ring,
                         right + ring, bottom + ring, colour);
         }
     }
@@ -273,7 +274,7 @@ final class ChatWindowGestures {
 
     /** Where the window being carried right now would land, or null while none is. */
     private Landing activeLanding() {
-        if (this.windowDrag != null && this.windowDrag.active) {
+        if (this.windowDrag != null) {
             return this.windowDrag.landing;
         }
         if (this.tabDrag != null && this.tabDrag.active
@@ -286,11 +287,11 @@ final class ChatWindowGestures {
     /* ---- Mouse events ---- */
 
     /**
-     * A press-and-move with the left button. A resize is live from its
-     * press; an armed window or tab drag becomes live once the pointer
-     * has travelled the threshold; a live one follows the pointer. True
-     * when a drag took the event, so the screen leaves vanilla's own
-     * handling alone.
+     * A press-and-move with the left button. A resize and a window drag
+     * are live from their press; an armed tab drag becomes live once the
+     * pointer has travelled the threshold; a live one follows the
+     * pointer. True when a drag took the event, so the screen leaves
+     * vanilla's own handling alone.
      */
     boolean onDragMove(int mouseX, int mouseY) {
         if (this.scrollbarDrag != null) {
@@ -313,15 +314,7 @@ final class ChatWindowGestures {
             return true;
         }
         if (this.windowDrag != null) {
-            if (!this.windowDrag.active
-                    && travelled(mouseX, mouseY, this.windowDrag.pressX,
-                            this.windowDrag.pressY)) {
-                this.windowDrag.active = true;
-                this.bar.closePickers();
-            }
-            if (this.windowDrag.active) {
-                moveDraggedWindow(mouseX, mouseY);
-            }
+            moveDraggedWindow(mouseX, mouseY);
             return true;
         }
         if (this.tabDrag != null) {
@@ -329,7 +322,6 @@ final class ChatWindowGestures {
                     && travelled(mouseX, mouseY, this.tabDrag.pressX,
                             this.tabDrag.pressY)) {
                 this.tabDrag.active = true;
-                this.bar.closePickers();
             }
             if (this.tabDrag.active) {
                 dragTabs(this.tabDrag, mouseX, mouseY);
@@ -346,13 +338,11 @@ final class ChatWindowGestures {
     }
 
     /**
-     * The left button coming up: a live resize commits, a live window
-     * drag and a live tab drag write the layout down, a tab press that
-     * never travelled collapses the group to the pressed tab. Answers a
-     * window press that never travelled — one that was a click on the
-     * lines after all — for the screen to act on, or null.
+     * The left button coming up: a live resize commits, a window drag and
+     * a live tab drag write the layout down, a tab press that never
+     * travelled collapses the group to the pressed tab.
      */
-    WindowDrag onRelease() {
+    void onRelease() {
         this.scrollbarDrag = null;
         if (this.windowResize != null) {
             WindowResize resize = this.windowResize;
@@ -376,18 +366,13 @@ final class ChatWindowGestures {
             this.membersResize = null;
             ChatWindowLayout.persist();
         }
-        WindowDrag click = null;
         if (this.windowDrag != null) {
             WindowDrag drag = this.windowDrag;
             this.windowDrag = null;
-            if (drag.active) {
-                // Touching another window only shows what it would stick
-                // to; locking it is what sticks it.
-                land(drag.windowId, drag.landing);
-                ChatWindowLayout.persist();
-            } else {
-                click = drag;
-            }
+            // Touching another window only shows what it would stick to;
+            // locking it is what sticks it.
+            land(drag.windowId, drag.landing);
+            ChatWindowLayout.persist();
         }
         if (this.tabDrag != null) {
             TabDrag drag = this.tabDrag;
@@ -400,10 +385,12 @@ final class ChatWindowGestures {
                 ChatTabSelection.selectOnly(drag.sourceWindowId, drag.tab);
             }
         }
-        return click;
     }
 
-    /** Ends every drag where it stands: Escape, or the screen closing. */
+    /**
+     * Escape, or the screen closing: a window or tab drag ends where it
+     * stands, a resize goes back as it was.
+     */
     void cancelDrags() {
         // Nothing carried lands anywhere: the preview goes back into its
         // window and the snap bar goes up.
@@ -413,8 +400,7 @@ final class ChatWindowGestures {
             // The tabs are already where the drag left them — in a row
             // they slid into, or in a window of their own — so ending
             // the carry writes that down rather than putting the row
-            // back together. Leaving it unwritten was the one way the
-            // layout on screen and the layout on disk could disagree.
+            // back together, and the layout on screen and on disk agree.
             ChatWindowLayout.persist();
         }
         this.tabDrag = null;
@@ -444,9 +430,7 @@ final class ChatWindowGestures {
             }
         }
         if (this.windowDrag != null) {
-            if (this.windowDrag.active) {
-                ChatWindowLayout.persist();
-            }
+            ChatWindowLayout.persist();
             this.windowDrag = null;
         }
     }
@@ -817,7 +801,6 @@ final class ChatWindowGestures {
         ChatWindowFrame frame = target.frame;
         ChatWindowLayout.raise(frame.windowId);
         this.tabActions.selectWindow(window);
-        this.bar.closePickers();
         if (outOfItsOwnBox(window)) {
             armFillResize(target.edge, window);
             return;
@@ -1190,7 +1173,6 @@ final class ChatWindowGestures {
         }
         ChatWindowLayout.raise(window.getId());
         this.tabActions.selectWindow(window);
-        this.bar.closePickers();
         this.membersResize = new MembersResize(window.getId(),
                 ChatWindowPlacement.preciseMouseX(this.mc, this.screenWidth)
                         - frame.members.screenLeft,
@@ -1246,12 +1228,9 @@ final class ChatWindowGestures {
     }
 
     /**
-     * A window being moved. From the grip the drag is live at once; from
-     * the messages it is armed by the press and becomes a drag only once
-     * the pointer travels, so a plain click on a line still acts on the
-     * line when the button comes up. Offsets are fractional: the drag
-     * follows the raw mouse so the window glides instead of stepping by
-     * whole GUI pixels.
+     * A window being moved by its strip, its grip or its tabs, live from
+     * the press. Offsets are fractional: the drag follows the raw mouse so
+     * the window glides instead of stepping by whole GUI pixels.
      */
     static final class WindowDrag {
         final String windowId;
@@ -1259,7 +1238,6 @@ final class ChatWindowGestures {
         final double grabOffsetY;
         final int pressX;
         final int pressY;
-        boolean active;
         final Landing landing = new Landing();
         /**
          * Whether the hold was taken afresh in the window's own box, as
@@ -1269,30 +1247,28 @@ final class ChatWindowGestures {
         boolean rebased;
 
         WindowDrag(String windowId, double grabOffsetX, double grabOffsetY,
-                   int pressX, int pressY, boolean active) {
+                   int pressX, int pressY) {
             this.windowId = windowId;
             this.grabOffsetX = grabOffsetX;
             this.grabOffsetY = grabOffsetY;
             this.pressX = pressX;
             this.pressY = pressY;
-            this.active = active;
         }
     }
 
     /**
-     * Arms a window drag from the pointer's current position; live at
-     * once from the strip or the grip, armed only from the messages.
-     * A window taken hold of comes to the front, dragged or not.
+     * Takes hold of a window by its strip or its grip from the pointer's
+     * current position, live at once. A window taken hold of comes to the
+     * front, dragged or not.
      */
-    void armWindowDrag(ChatWindowFrame frame, int mouseX, int mouseY,
-                       boolean active) {
+    void armWindowDrag(ChatWindowFrame frame, int mouseX, int mouseY) {
         ChatWindowLayout.raise(frame.windowId);
         this.windowDrag = new WindowDrag(frame.windowId,
                 ChatWindowPlacement.preciseMouseX(this.mc, this.screenWidth)
                         - frame.boxLeft,
                 ChatWindowPlacement.preciseMouseY(this.mc, this.screenHeight)
                         - frame.baseline,
-                mouseX, mouseY, active);
+                mouseX, mouseY);
     }
 
     /**
@@ -1550,7 +1526,7 @@ final class ChatWindowGestures {
         double depth = pointerY - frame.boxTop;
         WindowDrag held = new WindowDrag(window.getId(), across * width,
                 depth - (height - barHeight), this.windowDrag.pressX,
-                this.windowDrag.pressY, true);
+                this.windowDrag.pressY);
         held.rebased = true;
         this.windowDrag = held;
     }

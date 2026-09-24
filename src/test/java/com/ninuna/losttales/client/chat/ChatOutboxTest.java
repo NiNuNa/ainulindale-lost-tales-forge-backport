@@ -47,7 +47,7 @@ public final class ChatOutboxTest {
         // Nobody is on the other end of an NPC conversation.
         assertFalse(ChatOutbox.isTyping("hello", ChatTab.npc("Bilbo"), 0L));
         // A tab the player may not send into says nothing either.
-        assertFalse(ChatOutbox.isTyping("hello", ChatTab.of(ChatChannel.ADMIN),
+        assertFalse(ChatOutbox.isTyping("hello", ChatTab.of(ChatChannel.OPERATOR),
                 0L));
         LostTalesConfig.sendChatTypingStatus = false;
         assertFalse(ChatOutbox.isTyping("hello", ooc, 0L));

@@ -120,6 +120,19 @@ public final class Party {
         return characterId == null ? null : this.membersByCharacterId.get(characterId);
     }
 
+    /** Whether a character of that account is in the party. An account has one character in a party at most. */
+    public boolean hasMemberOwnedBy(UUID ownerId) {
+        if (ownerId == null) {
+            return false;
+        }
+        for (PartyMember member : this.membersByCharacterId.values()) {
+            if (ownerId.equals(member.getOwnerId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public List<PartyMember> getMembers() {
         ArrayList<PartyMember> members = new ArrayList<PartyMember>(this.membersByCharacterId.values());
         Collections.sort(members, MEMBER_ORDER);

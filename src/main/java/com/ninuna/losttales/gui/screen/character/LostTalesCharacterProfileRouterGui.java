@@ -11,11 +11,11 @@ import net.minecraft.client.resources.I18n;
 import org.lwjgl.input.Keyboard;
 
 /**
- * Client-only profile entry controller. It never treats a missing client cache
- * as an empty authoritative roster and routes only after a server snapshot:
- * a player with no characters yet lands on the roster, where the account is
- * the identity they are playing and a character can be made; everyone else
- * lands on the profile of whatever they are playing as.
+ * The way into the profile. It waits for the server's roster, never
+ * taking a missing client cache for an empty roster, then opens the
+ * profile of whoever the player is playing as: the default character
+ * too, so Edit Profile and the Party screen are always reachable. The
+ * roster is one button away on the profile.
  */
 public final class LostTalesCharacterProfileRouterGui extends GuiScreen {
 
@@ -67,14 +67,7 @@ public final class LostTalesCharacterProfileRouterGui extends GuiScreen {
             return;
         }
         this.routed = true;
-        // A player who has made nobody yet is shown the roster, where
-        // they can. The account's own identity is always on it and is not
-        // somebody they made, so it is not what decides this.
-        if (snapshot.getRoleplayCharacterCount() == 0) {
-            this.mc.displayGuiScreen(new LostTalesCharacterRosterGui(this.parent));
-        } else {
-            this.mc.displayGuiScreen(new LostTalesCharacterInfoGui(this.parent));
-        }
+        this.mc.displayGuiScreen(new LostTalesCharacterInfoGui(this.parent));
     }
 
     private void updateButtons() {

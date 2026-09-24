@@ -60,7 +60,7 @@ public final class DiscordBridgePolicyTest {
 
     @Test
     public void anOperatorChannelItsServerOpensIsCarried() {
-        ChatChannel admin = ChatChannel.ADMIN;
+        ChatChannel admin = ChatChannel.OPERATOR;
         assertTrue("this test needs a bridgeable operator channel",
                 admin.isBridgeable());
         assertFalse(DiscordBridgePolicy.acceptsInbound(admin));

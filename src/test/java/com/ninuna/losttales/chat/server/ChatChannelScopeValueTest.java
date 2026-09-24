@@ -35,11 +35,11 @@ public final class ChatChannelScopeValueTest {
         assertEquals(ChatChannelScope.FACTION, ChatChannel.FACTION.getScope());
         assertEquals(ChatChannelScope.PARTY, ChatChannel.PARTY.getScope());
 
-        assertFalse(ChatChannel.ALL.isScoped());
+        assertFalse(ChatChannel.GLOBAL.isScoped());
         assertFalse(ChatChannel.PROXIMITY.isScoped());
         assertFalse(ChatChannel.OOC.isScoped());
-        assertFalse(ChatChannel.ADMIN.isScoped());
-        assertFalse(ChatChannel.CONSOLE.isScoped());
+        assertFalse(ChatChannel.OPERATOR.isScoped());
+        assertFalse(ChatChannel.CLIENT_CONSOLE.isScoped());
         assertFalse(ChatChannel.WHISPER.isScoped());
     }
 
@@ -75,7 +75,7 @@ public final class ChatChannelScopeValueTest {
     @Test
     public void anUnscopedChannelNamesNoConversation() {
         assertEquals("", ChatChannelPolicy.scopeValueOf(
-                ChatChannel.ALL, party(), GONDOR));
+                ChatChannel.GLOBAL, party(), GONDOR));
         assertEquals("", ChatChannelPolicy.scopeValueOf(
                 ChatChannel.OOC, party(), GONDOR));
         assertEquals("", ChatChannelPolicy.scopeValueOf(null, party(), GONDOR));

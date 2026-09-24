@@ -37,7 +37,7 @@ public final class LostTalesChatServiceAudienceTest {
     private static final List<ChatChannel> EVERY_CHANNEL =
             Arrays.asList(ChatChannel.values());
     private static final List<ChatChannel> OPEN_CHANNELS = Arrays.asList(
-            ChatChannel.ALL, ChatChannel.PROXIMITY, ChatChannel.FACTION,
+            ChatChannel.GLOBAL, ChatChannel.PROXIMITY, ChatChannel.FACTION,
             ChatChannel.OOC, ChatChannel.PARTY, ChatChannel.WHISPER);
 
     @Before
@@ -58,14 +58,14 @@ public final class LostTalesChatServiceAudienceTest {
 
     @Test
     public void openWorldWideChannelsReachEveryoneLater() {
-        record(ChatChannel.ALL, null, "", Arrays.asList(ALICE, BOB));
+        record(ChatChannel.GLOBAL, null, "", Arrays.asList(ALICE, BOB));
         record(ChatChannel.OOC, null, "", Arrays.asList(ALICE, BOB));
         assertEquals(2, replay(CAROL, "", 0L, null, OPEN_CHANNELS).size());
     }
 
     @Test
     public void theStaffChannelReachesWhoeverMayReadItNow() {
-        record(ChatChannel.ADMIN, null, "", Arrays.asList(ALICE, BOB));
+        record(ChatChannel.OPERATOR, null, "", Arrays.asList(ALICE, BOB));
         assertEquals(1, replay(BOB, "", 0L, null, EVERY_CHANNEL).size());
         // Bob lost the operator role since.
         assertTrue(replay(BOB, "", 0L, null, OPEN_CHANNELS).isEmpty());
@@ -79,10 +79,10 @@ public final class LostTalesChatServiceAudienceTest {
     public void aConfiguredReadGateNarrowsAnOpenChannel() {
         Map<ChatChannel, ChatChannelGates.Gate> gates =
                 new HashMap<ChatChannel, ChatChannelGates.Gate>();
-        gates.put(ChatChannel.ALL, new ChatChannelGates.Gate(
+        gates.put(ChatChannel.GLOBAL, new ChatChannelGates.Gate(
                 Collections.singleton(ChatRoleFixtures.OPERATOR_ID), null));
         ChatChannelGates.install(ChatChannelGates.of(gates));
-        record(ChatChannel.ALL, null, "", Arrays.asList(ALICE, BOB));
+        record(ChatChannel.GLOBAL, null, "", Arrays.asList(ALICE, BOB));
         assertEquals(1, replay(BOB, "", 0L, null, EVERY_CHANNEL).size());
         // Carol was not sent it, but may read the channel now.
         assertEquals(1, replay(CAROL, "", 0L, null, EVERY_CHANNEL).size());
@@ -119,7 +119,7 @@ public final class LostTalesChatServiceAudienceTest {
     public void proximityWhispersAndConsoleNotesReachOnlyWhoWasSentThem() {
         record(ChatChannel.PROXIMITY, null, "", Arrays.asList(ALICE, BOB));
         record(ChatChannel.WHISPER, null, "", Arrays.asList(ALICE, BOB));
-        record(ChatChannel.CONSOLE, null, "", Arrays.asList(ALICE, BOB));
+        record(ChatChannel.CLIENT_CONSOLE, null, "", Arrays.asList(ALICE, BOB));
         assertEquals(3, replay(BOB, "", 0L, null, EVERY_CHANNEL).size());
         // Carol was near nobody, whispered with nobody and was sent no
         // note: an operator's role opens none of them.

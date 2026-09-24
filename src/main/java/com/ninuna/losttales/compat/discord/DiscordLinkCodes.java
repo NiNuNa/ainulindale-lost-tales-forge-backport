@@ -33,7 +33,7 @@ public final class DiscordLinkCodes {
 
     /** What a code will link, and who asked for it. */
     public static final class Pending {
-        /** The game channel's binding key: {@code ooc}, {@code faction:lotr:gondor}. */
+        /** The game channel's code name: {@code ooc}, {@code gondor}. */
         public final String gameKey;
         public final DiscordBridgeDirection direction;
         /** The account that asked; null for the server's own console. */

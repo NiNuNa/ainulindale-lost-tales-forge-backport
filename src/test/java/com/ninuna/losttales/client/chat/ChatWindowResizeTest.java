@@ -93,7 +93,7 @@ public final class ChatWindowResizeTest {
     public void unreadableHeightsFallBackToTheGameSetting() {
         ChatWindowLayoutStore.load(java.util.Arrays.asList(
                 "window w1 locked=false x=0.00 y=0.00 lines=zzz "
-                        + "active=all tabs=all",
+                        + "active=global tabs=global",
                 "window w2 locked=false x=0.00 y=50.00 lines=9999 "
                         + "active=ooc tabs=ooc",
                 "window w3 locked=false x=0.00 y=90.00 active=party "
@@ -153,7 +153,7 @@ public final class ChatWindowResizeTest {
     public void anUnreadableWidthFollowsTheGameSetting() {
         ChatWindowLayoutStore.load(java.util.Arrays.asList(
                 "window w1 locked=false x=0.00 y=0.00 width=zzz "
-                        + "active=all tabs=all",
+                        + "active=global tabs=global",
                 "window w2 locked=false x=0.00 y=50.00 width=3 "
                         + "active=ooc tabs=ooc"));
         assertEquals(0, ChatWindowLayout.window("w1").getWidth());
@@ -190,7 +190,7 @@ public final class ChatWindowResizeTest {
     @Test
     public void olderFilesKeepTheirTopAndBottomLinks() {
         ChatWindowLayoutStore.load(java.util.Arrays.asList(
-                "window w1 locked=false x=0.00 y=0.00 active=all tabs=all",
+                "window w1 locked=false x=0.00 y=0.00 active=global tabs=global",
                 "window w2 locked=false x=0.00 y=50.00 link=w1:above "
                         + "active=ooc tabs=ooc",
                 "window w3 locked=false x=0.00 y=90.00 link=w1:below "

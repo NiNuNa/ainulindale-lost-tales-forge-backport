@@ -17,7 +17,7 @@ import static org.junit.Assert.assertTrue;
  * the file it is written to reads back to the same marks.
  */
 public final class ClientChatReadMarksTest {
-    private static final ChatTab GLOBAL = ChatTab.of(ChatChannel.ALL);
+    private static final ChatTab GLOBAL = ChatTab.of(ChatChannel.GLOBAL);
     private static final ChatTab OOC = ChatTab.of(ChatChannel.OOC);
 
     @Before
@@ -66,7 +66,7 @@ public final class ClientChatReadMarksTest {
         // A line nobody can read is a mark nobody had.
         ClientChatReadMarks.clear();
         ClientChatReadMarks.load(Arrays.asList("garbage", "a\tb\tnot-a-number",
-                "server:x\tall\t-5", "server:x\tall\t12"));
+                "server:x\tglobal\t-5", "server:x\tglobal\t12"));
         assertEquals(12L, ClientChatReadMarks.lastRead("server:x", GLOBAL));
         assertEquals(1, ClientChatReadMarks.size());
     }

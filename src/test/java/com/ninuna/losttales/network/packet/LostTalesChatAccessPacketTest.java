@@ -54,7 +54,7 @@ public final class LostTalesChatAccessPacketTest {
         LostTalesChatAccessPacket decoded = roundTrip(
                 new LostTalesChatAccessPacket(true, roles));
         assertFalse(decoded.isMalformed());
-        assertTrue(decoded.hasAdminAccess());
+        assertTrue(decoded.hasOperatorAccess());
         assertEquals(roles, decoded.getRoleMask());
         assertEquals(2, decoded.getCatalog().size());
         assertEquals(LostTalesChatAccessPacket.allChannelIds(),
@@ -66,10 +66,10 @@ public final class LostTalesChatAccessPacketTest {
     @Test
     public void theDiscordStatusFlagRoundTrips() {
         LostTalesChatAccessPacket decoded = roundTrip(new LostTalesChatAccessPacket(false, 0)
-                .withDiscordLinks(Arrays.asList("ooc", "faction:lotr:gondor"))
+                .withDiscordLinks(Arrays.asList("ooc", "gondor"))
                 .withDiscordStatuses(true));
         assertFalse(decoded.isMalformed());
-        assertEquals(Arrays.asList("ooc", "faction:lotr:gondor"), decoded.getDiscordLinks());
+        assertEquals(Arrays.asList("ooc", "gondor"), decoded.getDiscordLinks());
         assertTrue(decoded.showsDiscordStatuses());
         assertFalse(roundTrip(new LostTalesChatAccessPacket(false, 0))
                 .showsDiscordStatuses());
@@ -84,7 +84,7 @@ public final class LostTalesChatAccessPacketTest {
         LostTalesChatAccessPacket decoded = new LostTalesChatAccessPacket();
         decoded.fromBytes(buffer);
         assertTrue(decoded.isMalformed());
-        assertFalse(decoded.hasAdminAccess());
+        assertFalse(decoded.hasOperatorAccess());
         assertEquals(0, decoded.getRoleMask());
         assertTrue(decoded.getCatalog().isEmpty());
         assertEquals(LostTalesChatAccessPacket.allChannelIds(),
@@ -109,7 +109,7 @@ public final class LostTalesChatAccessPacketTest {
         LostTalesChatAccessPacket decoded = new LostTalesChatAccessPacket();
         decoded.fromBytes(buffer);
         assertTrue(decoded.isMalformed());
-        assertFalse(decoded.hasAdminAccess());
+        assertFalse(decoded.hasOperatorAccess());
         assertEquals(0, decoded.getRoleMask());
     }
 
@@ -163,8 +163,8 @@ public final class LostTalesChatAccessPacketTest {
                 moderator), null, null);
         int held = catalog.byId("moderator").bit() | ChatRoleFixtures.OPERATOR.bit();
         List<String> readable = Arrays.asList(
-                ChatChannel.ALL.getId(), ChatChannel.ADMIN.getId());
-        List<String> sendable = Arrays.asList(ChatChannel.ALL.getId());
+                ChatChannel.GLOBAL.getId(), ChatChannel.OPERATOR.getId());
+        List<String> sendable = Arrays.asList(ChatChannel.GLOBAL.getId());
         LostTalesChatAccessPacket decoded = roundTrip(new LostTalesChatAccessPacket(false, held,
                 Collections.singletonList(new LostTalesChatAccessPacket.RoleHolder("Steve", held)),
                 Collections.<UUID>emptyList(), catalog.roles(), readable, sendable));
@@ -217,7 +217,7 @@ public final class LostTalesChatAccessPacketTest {
         java.util.Map<String, com.ninuna.losttales.chat.ChatChannelIconSpec> icons =
                 new java.util.LinkedHashMap<String,
                         com.ninuna.losttales.chat.ChatChannelIconSpec>();
-        icons.put(ChatChannel.ADMIN.getId(),
+        icons.put(ChatChannel.OPERATOR.getId(),
                 com.ninuna.losttales.chat.ChatChannelIconSpec.parse(
                         "item:minecraft:iron_sword"));
         icons.put(ChatChannel.PARTY.getId(),
@@ -250,7 +250,7 @@ public final class LostTalesChatAccessPacketTest {
         // The icon count and the word count are the last three bytes.
         broken.writerIndex(broken.writerIndex() - 3);
         broken.writeByte(1);
-        writeString(broken, ChatChannel.ADMIN.getId());
+        writeString(broken, ChatChannel.OPERATOR.getId());
         writeString(broken, "item:");
         broken.writeShort(0);
         LostTalesChatAccessPacket refused = new LostTalesChatAccessPacket();
@@ -312,7 +312,7 @@ public final class LostTalesChatAccessPacketTest {
     @Test
     public void theChannelAnswerTravelsAsIdsAndNotAsPositions() {
         List<String> readable = Arrays.asList(
-                ChatChannel.CONSOLE.getId(), ChatChannel.OOC.getId());
+                ChatChannel.CLIENT_CONSOLE.getId(), ChatChannel.OOC.getId());
         LostTalesChatAccessPacket packet = new LostTalesChatAccessPacket(false, 0,
                 Collections.<LostTalesChatAccessPacket.RoleHolder>emptyList(),
                 Collections.<UUID>emptyList(), ChatRoleCatalog.builtIn().roles(),
@@ -329,7 +329,7 @@ public final class LostTalesChatAccessPacketTest {
         assertFalse(decoded.isMalformed());
         assertEquals(readable, decoded.getReadableChannels());
         assertTrue(decoded.getSendableChannels().isEmpty());
-        assertTrue(written.contains(ChatChannel.CONSOLE.getId()));
+        assertTrue(written.contains(ChatChannel.CLIENT_CONSOLE.getId()));
         assertTrue(written.contains(ChatChannel.OOC.getId()));
     }
 
@@ -338,7 +338,7 @@ public final class LostTalesChatAccessPacketTest {
     public void aRepeatedOrEmptyChannelIdIsRefused() {
         LostTalesChatAccessPacket decoded = new LostTalesChatAccessPacket();
         decoded.fromBytes(channelPayload(
-                ChatChannel.ALL.getId(), ChatChannel.ALL.getId()));
+                ChatChannel.GLOBAL.getId(), ChatChannel.GLOBAL.getId()));
         assertTrue(decoded.isMalformed());
 
         LostTalesChatAccessPacket blank = new LostTalesChatAccessPacket();

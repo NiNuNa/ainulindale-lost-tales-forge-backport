@@ -21,7 +21,7 @@ public final class LostTalesServerConfigPacketsTest {
     private static ServerConfigEntry entry() {
         return new ServerConfigEntry("discord", "channelBindings",
                 ServerConfigEntry.Type.STRING, true,
-                Arrays.asList("ooc=BIDIRECTIONAL;channel=1;webhook=x", "all=DISABLED;webhook="),
+                Arrays.asList("ooc=BIDIRECTIONAL;channel=1;webhook=x", "global=DISABLED;webhook="),
                 Collections.singletonList("ooc=DISABLED;channel=;webhook="),
                 "", "", "One entry per bound game channel.", "channelBindings", false,
                 Collections.<String>emptyList());

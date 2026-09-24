@@ -38,12 +38,12 @@ public final class ClientChatChannelStateTest {
                 ChatChannel.PROXIMITY, ClientChatChannelState.getSelectedChannel());
         // Closing the window's last tab is the one case that leaves it.
         assertTrue(ClientChatChannelState.close(ChatTab.of(ChatChannel.PROXIMITY)));
-        assertEquals(ChatChannel.ALL, ClientChatChannelState.getSelectedChannel());
+        assertEquals(ChatChannel.GLOBAL, ClientChatChannelState.getSelectedChannel());
     }
 
     @Test
     public void sentHistoryIsKeptPerTabAndClearedWithTheState() {
-        ChatTab global = ChatTab.of(ChatChannel.ALL);
+        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
         ChatTab ooc = ChatTab.of(ChatChannel.OOC);
         ClientChatChannelState.recordSent(global, "Hi");
         assertEquals("Hi", ClientChatChannelState.recallSent(global, -1, ""));
@@ -57,8 +57,8 @@ public final class ClientChatChannelStateTest {
     public void closedChannelsAreNeverSelectedAndCycleFollowsTheLayout() {
         joinParty(acceptRoster("lotr:gondor"));
         ChatWindowLayout.detach(ChatChannel.PROXIMITY, 0.0D, 0.0D);
-        assertEquals(java.util.Arrays.asList(ChatChannel.CONSOLE,
-                ChatChannel.ALL, ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.PARTY,
+        assertEquals(java.util.Arrays.asList(ChatChannel.CLIENT_CONSOLE,
+                ChatChannel.GLOBAL, ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.PARTY,
                 ChatChannel.PROXIMITY),
                 ClientChatChannelState.getOpenChannels());
         // Cycling stays within the window: Proximity is alone in its.
@@ -66,20 +66,20 @@ public final class ClientChatChannelStateTest {
         assertEquals(ChatChannel.PROXIMITY, ClientChatChannelState.cycle().getChannel());
         ClientChatChannelState.select(ChatChannel.OOC);
         assertEquals(ChatChannel.PARTY, ClientChatChannelState.cycle().getChannel());
-        assertEquals(ChatChannel.ALL, ClientChatChannelState.cycle().getChannel());
+        assertEquals(ChatChannel.GLOBAL, ClientChatChannelState.cycle().getChannel());
         assertEquals(ChatChannel.FACTION, ClientChatChannelState.cycle().getChannel());
         // A closed channel stays available (readable) but not selectable.
         ClientChatChannelState.select(ChatChannel.OOC);
         ChatWindowLayout.close(ChatChannel.OOC);
         assertTrue(ClientChatChannelState.isAvailable(ChatChannel.OOC));
         assertFalse(ClientChatChannelState.isSelectable(ChatChannel.OOC));
-        assertEquals(ChatChannel.ALL, ClientChatChannelState.getSelectedChannel());
+        assertEquals(ChatChannel.GLOBAL, ClientChatChannelState.getSelectedChannel());
         ClientChatChannelState.select(ChatChannel.OOC);
-        assertEquals(ChatChannel.ALL, ClientChatChannelState.getSelectedChannel());
+        assertEquals(ChatChannel.GLOBAL, ClientChatChannelState.getSelectedChannel());
         // Without a character and with Global closed, the fallback is OOC
         // (account conversation) even though it now sits after Console.
         ChatWindowLayout.restore(ChatChannel.OOC);
-        ChatWindowLayout.close(ChatChannel.ALL);
+        ChatWindowLayout.close(ChatChannel.GLOBAL);
         acceptRoster("");
         ClientChatChannelState.ensureAvailable();
         assertEquals(ChatChannel.OOC, ClientChatChannelState.getSelectedChannel());
@@ -89,8 +89,8 @@ public final class ClientChatChannelStateTest {
     public void accountOnlyPlayersTalkAnywhereWithTheAccount() {
         // The Party tab is not there until the identity is in a party;
         // Faction is open to the account, which speaks in Unaligned.
-        assertTrue(ClientChatChannelState.isAvailable(ChatChannel.ALL));
-        assertTrue(ClientChatChannelState.canSend(ChatChannel.ALL));
+        assertTrue(ClientChatChannelState.isAvailable(ChatChannel.GLOBAL));
+        assertTrue(ClientChatChannelState.canSend(ChatChannel.GLOBAL));
         assertTrue(ClientChatChannelState.isAvailable(
                 ChatChannel.PROXIMITY));
         assertTrue(ClientChatChannelState.canSend(ChatChannel.PROXIMITY));
@@ -100,15 +100,15 @@ public final class ClientChatChannelStateTest {
         assertTrue(ClientChatChannelState.isAvailable(ChatChannel.OOC));
         assertTrue(ClientChatChannelState.canSend(ChatChannel.OOC));
         // The console is always there; Admin only once the server says so.
-        assertEquals(java.util.Arrays.asList(ChatChannel.ALL,
+        assertEquals(java.util.Arrays.asList(ChatChannel.GLOBAL,
                 ChatChannel.PROXIMITY, ChatChannel.FACTION, ChatChannel.OOC,
-                ChatChannel.CONSOLE),
+                ChatChannel.CLIENT_CONSOLE),
                 ClientChatChannelState.getAvailableChannels());
         // TAB cycles inside the selected channel's own window: Global,
         // OOC and Proximity share the conversation window, the console
         // lives elsewhere; the Party tab joins the round once joined.
         ClientChatChannelState.select(ChatChannel.OOC);
-        assertEquals(ChatChannel.ALL, ClientChatChannelState.cycle().getChannel());
+        assertEquals(ChatChannel.GLOBAL, ClientChatChannelState.cycle().getChannel());
         assertEquals(ChatChannel.PROXIMITY,
                 ClientChatChannelState.cycle().getChannel());
         assertEquals(ChatChannel.FACTION, ClientChatChannelState.cycle().getChannel());
@@ -117,26 +117,26 @@ public final class ClientChatChannelStateTest {
         assertTrue(ClientChatChannelState.isAvailable(ChatChannel.PARTY));
         assertTrue(ClientChatChannelState.canSend(ChatChannel.PARTY));
         assertEquals(ChatChannel.PARTY, ClientChatChannelState.cycle().getChannel());
-        ClientChatChannelState.select(ChatChannel.CONSOLE);
-        assertEquals(ChatChannel.CONSOLE, ClientChatChannelState.cycle().getChannel());
-        assertFalse(ClientChatChannelState.canSend(ChatChannel.ADMIN));
-        assertTrue(ClientChatChannelState.canSend(ChatChannel.CONSOLE));
+        ClientChatChannelState.select(ChatChannel.CLIENT_CONSOLE);
+        assertEquals(ChatChannel.CLIENT_CONSOLE, ClientChatChannelState.cycle().getChannel());
+        assertFalse(ClientChatChannelState.canSend(ChatChannel.OPERATOR));
+        assertTrue(ClientChatChannelState.canSend(ChatChannel.CLIENT_CONSOLE));
         // The server's word arrives as channel ids: every channel open here.
         ClientChatChannelState.setChannelGates(allChannelIds(), allChannelIds());
-        ClientChatChannelState.setAdminAccess(true);
-        assertEquals(java.util.Arrays.asList(ChatChannel.ALL,
+        ClientChatChannelState.setOperatorAccess(true);
+        assertEquals(java.util.Arrays.asList(ChatChannel.GLOBAL,
                 ChatChannel.PROXIMITY, ChatChannel.FACTION, ChatChannel.OOC,
-                ChatChannel.PARTY, ChatChannel.ADMIN,
-                ChatChannel.CONSOLE, ChatChannel.SERVER_CONSOLE),
+                ChatChannel.PARTY, ChatChannel.OPERATOR,
+                ChatChannel.CLIENT_CONSOLE, ChatChannel.SERVER_CONSOLE),
                 ClientChatChannelState.getAvailableChannels());
-        ClientChatChannelState.select(ChatChannel.ADMIN);
-        ClientChatChannelState.setAdminAccess(false);
+        ClientChatChannelState.select(ChatChannel.OPERATOR);
+        ClientChatChannelState.setOperatorAccess(false);
         ClientChatChannelState.setChannelGates(
-                everyChannelExcept(ChatChannel.ADMIN),
-                everyChannelExcept(ChatChannel.ADMIN));
+                everyChannelExcept(ChatChannel.OPERATOR),
+                everyChannelExcept(ChatChannel.OPERATOR));
         // Losing op status drops the selection back to a channel the
         // player can talk in: Global, sendable with the account now.
-        assertEquals(ChatChannel.ALL, ClientChatChannelState.getSelectedChannel());
+        assertEquals(ChatChannel.GLOBAL, ClientChatChannelState.getSelectedChannel());
         ClientChatChannelState.setDraft("unsent text");
         assertEquals("unsent text", ClientChatChannelState.getDraft());
         // Drafts belong to the tab they were typed in.
@@ -151,7 +151,7 @@ public final class ClientChatChannelStateTest {
         assertEquals("unsent text", ClientChatChannelState.getDraft());
         ClientChatChannelState.clear();
         assertEquals("", ClientChatChannelState.getDraft());
-        assertEquals(ChatChannel.ALL, ClientChatChannelState.getSelectedChannel());
+        assertEquals(ChatChannel.GLOBAL, ClientChatChannelState.getSelectedChannel());
         ClientChatChannelState.select(ChatChannel.OOC);
         assertEquals(ChatChannel.OOC, ClientChatChannelState.getSelectedChannel());
         // Proximity is selectable without a character now.
@@ -194,25 +194,25 @@ public final class ClientChatChannelStateTest {
     @Test
     public void everyVisibleTabClosesAndTheEmptyStateIsReported() {
         for (ChatChannel channel : ChatChannel.presentationOrder()) {
-            if (channel != ChatChannel.ALL && channel != ChatChannel.ADMIN) {
+            if (channel != ChatChannel.GLOBAL && channel != ChatChannel.OPERATOR) {
                 assertTrue(ClientChatChannelState.close(ChatTab.of(channel)));
             }
         }
         assertEquals(2, ChatWindowLayout.openTabCount());
-        assertEquals(Collections.singletonList(ChatChannel.ALL),
+        assertEquals(Collections.singletonList(ChatChannel.GLOBAL),
                 ClientChatChannelState.getOpenChannels());
-        assertTrue(ClientChatChannelState.isClosable(ChatTab.of(ChatChannel.ALL)));
-        assertTrue(ClientChatChannelState.close(ChatTab.of(ChatChannel.ALL)));
-        assertFalse(ChatWindowLayout.isOpen(ChatChannel.ALL));
+        assertTrue(ClientChatChannelState.isClosable(ChatTab.of(ChatChannel.GLOBAL)));
+        assertTrue(ClientChatChannelState.close(ChatTab.of(ChatChannel.GLOBAL)));
+        assertFalse(ChatWindowLayout.isOpen(ChatChannel.GLOBAL));
         assertFalse(ClientChatChannelState.hasVisibleWindow());
         // Reopening one makes the chat visible again, and closing the
         // selected tab moves the selection to what is left.
-        assertTrue(ChatWindowLayout.restore(ChatChannel.ALL));
+        assertTrue(ChatWindowLayout.restore(ChatChannel.GLOBAL));
         assertTrue(ChatWindowLayout.restore(ChatChannel.OOC));
         assertTrue(ClientChatChannelState.hasVisibleWindow());
         ClientChatChannelState.select(ChatChannel.OOC);
         assertTrue(ClientChatChannelState.close(ChatTab.of(ChatChannel.OOC)));
-        assertEquals(ChatChannel.ALL, ClientChatChannelState.getSelectedChannel());
+        assertEquals(ChatChannel.GLOBAL, ClientChatChannelState.getSelectedChannel());
     }
 
     /**
@@ -241,7 +241,7 @@ public final class ClientChatChannelStateTest {
         // Untracked lines ride with the console wherever, or whether, it
         // is placed.
         assertTrue(ChatLineFilter.of(ChatWindowFrame.feedTabs()).accepts(null));
-        assertTrue(ChatWindowLayout.close(ChatChannel.CONSOLE));
+        assertTrue(ChatWindowLayout.close(ChatChannel.CLIENT_CONSOLE));
         assertTrue(ChatLineFilter.of(ChatWindowFrame.feedTabs()).accepts(null));
         // Conversations are read from their open tabs only.
         ChatTab whisper = ChatWindowLayout.openWhisper("Bilbo", null);
@@ -262,27 +262,27 @@ public final class ClientChatChannelStateTest {
     public void aDigitPicksTheSelectedWindowsTabByPlace() {
         joinParty(null);
         ClientChatChannelState.select(ChatChannel.OOC);
-        assertEquals(ChatChannel.ALL,
+        assertEquals(ChatChannel.GLOBAL,
                 ClientChatChannelState.selectOrdinal(1).getChannel());
         assertEquals(ChatChannel.PROXIMITY,
                 ClientChatChannelState.selectOrdinal(2).getChannel());
         assertEquals(ChatChannel.FACTION,
                 ClientChatChannelState.selectOrdinal(3).getChannel());
-        assertEquals(ChatChannel.ALL,
+        assertEquals(ChatChannel.GLOBAL,
                 ClientChatChannelState.selectOrdinal(1).getChannel());
         // Past the row: nothing moves. Nine: the last, whatever the row holds.
-        assertEquals(ChatChannel.ALL,
+        assertEquals(ChatChannel.GLOBAL,
                 ClientChatChannelState.selectOrdinal(6).getChannel());
         assertEquals(ChatChannel.PARTY,
                 ClientChatChannelState.selectOrdinal(9).getChannel());
         assertEquals(ChatChannel.PARTY,
                 ClientChatChannelState.selectOrdinal(0).getChannel());
-        ClientChatChannelState.select(ChatChannel.CONSOLE);
-        assertEquals(ChatChannel.CONSOLE,
+        ClientChatChannelState.select(ChatChannel.CLIENT_CONSOLE);
+        assertEquals(ChatChannel.CLIENT_CONSOLE,
                 ClientChatChannelState.selectOrdinal(1).getChannel());
-        assertEquals(ChatChannel.CONSOLE,
+        assertEquals(ChatChannel.CLIENT_CONSOLE,
                 ClientChatChannelState.selectOrdinal(9).getChannel());
-        assertEquals(ChatChannel.CONSOLE,
+        assertEquals(ChatChannel.CLIENT_CONSOLE,
                 ClientChatChannelState.selectOrdinal(3).getChannel());
     }
 
@@ -293,10 +293,10 @@ public final class ClientChatChannelStateTest {
     @Test
     public void cyclingAcrossWindowsFollowsTheLayoutOrder() {
         joinParty(null);
-        ClientChatChannelState.select(ChatChannel.CONSOLE);
-        assertEquals(ChatChannel.CONSOLE,
+        ClientChatChannelState.select(ChatChannel.CLIENT_CONSOLE);
+        assertEquals(ChatChannel.CLIENT_CONSOLE,
                 ClientChatChannelState.cycle().getChannel());
-        assertEquals(ChatChannel.ALL,
+        assertEquals(ChatChannel.GLOBAL,
                 ClientChatChannelState.cycleAll(false).getChannel());
         assertEquals(ChatChannel.PROXIMITY,
                 ClientChatChannelState.cycleAll(false).getChannel());
@@ -306,7 +306,7 @@ public final class ClientChatChannelStateTest {
                 ClientChatChannelState.cycleAll(false).getChannel());
         assertEquals(ChatChannel.PARTY,
                 ClientChatChannelState.cycleAll(false).getChannel());
-        assertEquals(ChatChannel.CONSOLE,
+        assertEquals(ChatChannel.CLIENT_CONSOLE,
                 ClientChatChannelState.cycleAll(false).getChannel());
         assertEquals(ChatChannel.PARTY,
                 ClientChatChannelState.cycleAll(true).getChannel());
@@ -316,9 +316,9 @@ public final class ClientChatChannelStateTest {
                 ClientChatChannelState.cycleAll(true).getChannel());
         assertEquals(ChatChannel.PROXIMITY,
                 ClientChatChannelState.cycleAll(true).getChannel());
-        assertEquals(ChatChannel.ALL,
+        assertEquals(ChatChannel.GLOBAL,
                 ClientChatChannelState.cycleAll(true).getChannel());
-        assertEquals(ChatChannel.CONSOLE,
+        assertEquals(ChatChannel.CLIENT_CONSOLE,
                 ClientChatChannelState.cycleAll(true).getChannel());
     }
 
@@ -359,9 +359,9 @@ public final class ClientChatChannelStateTest {
         ClientChatChannelState.rememberPartnerCharacterId(asAccount, null);
         assertEquals(null, ClientChatChannelState.partnerCharacterIdOf(asAccount));
         ClientChatChannelState.rememberPartnerCharacterId(asAccount, aldric);
-        ClientChatChannelState.rememberPartnerCharacterId(ChatTab.of(ChatChannel.ALL), aldric);
+        ClientChatChannelState.rememberPartnerCharacterId(ChatTab.of(ChatChannel.GLOBAL), aldric);
         assertEquals(null, ClientChatChannelState.partnerCharacterIdOf(
-                ChatTab.of(ChatChannel.ALL)));
+                ChatTab.of(ChatChannel.GLOBAL)));
         ClientChatChannelState.clear();
         assertEquals(null, ClientChatChannelState.partnerCharacterIdOf(asAccount));
     }

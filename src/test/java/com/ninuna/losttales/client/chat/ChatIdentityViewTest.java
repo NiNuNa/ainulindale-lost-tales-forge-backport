@@ -200,8 +200,8 @@ public final class ChatIdentityViewTest {
         ChatSpeechBubbles.receive(packet);
         assertFalse(ChatSpeechBubbles.isEmpty());
         ChatSpeechBubbles.clear();
-        for (ChatChannel channel : new ChatChannel[] {ChatChannel.OOC, ChatChannel.ADMIN,
-                ChatChannel.CONSOLE}) {
+        for (ChatChannel channel : new ChatChannel[] {ChatChannel.OOC, ChatChannel.OPERATOR,
+                ChatChannel.CLIENT_CONSOLE}) {
             ChatSpeechBubbles.receive(new LostTalesChatMessagePacket(
                     channel, speaker, "Steve", "Steve", "", 0, 0, "Hello", 1L, ""));
         }
@@ -213,7 +213,7 @@ public final class ChatIdentityViewTest {
         roster();
         UUID party = new UUID(1L, 2L);
         ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(ALDRIC, party, 0, "Aldric", false));
-        for (ChatChannel channel : new ChatChannel[] {ChatChannel.ALL, ChatChannel.PROXIMITY,
+        for (ChatChannel channel : new ChatChannel[] {ChatChannel.GLOBAL, ChatChannel.PROXIMITY,
                 ChatChannel.FACTION, ChatChannel.PARTY, ChatChannel.WHISPER}) {
             ChatSpeechBubbles.clear();
             LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
@@ -340,7 +340,7 @@ public final class ChatIdentityViewTest {
 
         // A faction line arrives while another tab is in front.
         ClientChatChannelViews.record(41, gondor,
-                ChatTab.of(ChatChannel.ALL), false);
+                ChatTab.of(ChatChannel.GLOBAL), false);
 
         assertEquals(Integer.valueOf(41),
                 ClientChatChannelViews.unreadDividerLine(row));
@@ -381,7 +381,7 @@ public final class ChatIdentityViewTest {
         ChatTab row = ChatTab.of(ChatChannel.FACTION);
         ClientChatChannelViews.record(43,
                 ChatTab.of(ChatChannel.FACTION, GONDOR),
-                ChatTab.of(ChatChannel.ALL), false);
+                ChatTab.of(ChatChannel.GLOBAL), false);
         assertEquals(1, ClientChatChannelViews.unreadCount(row));
 
         ClientChatIdentities.select(identityOf(BEREN));
@@ -397,7 +397,7 @@ public final class ChatIdentityViewTest {
     @Test
     public void anUnscopedChannelIsOneConversationWhoeverReadsIt() {
         roster();
-        ChatTab global = ChatTab.of(ChatChannel.ALL);
+        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
         assertEquals(global, ChatTab.viewed(global));
         ClientChatIdentities.select(identityOf(BEREN));
         assertEquals("still the one tab, still its one conversation",
@@ -506,8 +506,8 @@ public final class ChatIdentityViewTest {
         ChatTab row = ChatTab.of(ChatChannel.FACTION);
         assertEquals(row, ChatTab.row(ChatTab.of(ChatChannel.FACTION, GONDOR)));
         assertEquals("an unscoped tab is its own row",
-                ChatTab.of(ChatChannel.ALL),
-                ChatTab.row(ChatTab.of(ChatChannel.ALL)));
+                ChatTab.of(ChatChannel.GLOBAL),
+                ChatTab.row(ChatTab.of(ChatChannel.GLOBAL)));
         ChatTab whisper = ChatTab.whisper("Steve", "Faramir", keyOf(ALDRIC));
         assertEquals("a whisper conversation belongs to the person's row entry",
                 ChatTab.whisper("Steve", "Faramir"), ChatTab.row(whisper));
@@ -526,8 +526,8 @@ public final class ChatIdentityViewTest {
         ChatTab rohan = ChatTab.of(ChatChannel.FACTION, ROHAN);
         assertEquals("faction|in:" + ROHAN, rohan.id());
         assertEquals(rohan, ChatTab.fromId(rohan.id()));
-        ChatTab plain = ChatTab.of(ChatChannel.ALL);
-        assertEquals("all", plain.id());
+        ChatTab plain = ChatTab.of(ChatChannel.GLOBAL);
+        assertEquals("global", plain.id());
         assertEquals(plain, ChatTab.fromId(plain.id()));
         assertNull("a conversation named by a character names none now",
                 ChatTab.fromId("faction|own:" + keyOf(BEREN)));

@@ -39,7 +39,7 @@ public final class ClientChatChannelViewsTest {
         ClientChatSession.resumeAt("server:play.example");
         ClientChatReadMarks.markArrival("server:play.example", 4000L);
         ChatTab party = ChatTab.of(ChatChannel.PARTY);
-        ChatTab global = ChatTab.of(ChatChannel.ALL);
+        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
         ClientChatChannelViews.noteOwnLine(party, -7, 4200L);
         ClientChatChannelViews.record(-8, party, global, false, 4200L, 1000L, true);
         assertFalse(ClientChatChannelViews.hasUnread(ChatChannel.PARTY));
@@ -58,8 +58,8 @@ public final class ClientChatChannelViewsTest {
         ClientChatSession.resumeAt("server:new.example");
         ClientChatChannelViews.noteArrival(700L);
         assertEquals(700L, ClientChatReadMarks.arrival("server:new.example"));
-        ChatTab global = ChatTab.of(ChatChannel.ALL);
-        ChatTab console = ChatTab.of(ChatChannel.CONSOLE);
+        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
+        ChatTab console = ChatTab.of(ChatChannel.CLIENT_CONSOLE);
         for (int index = 0; index < 200; index++) {
             ClientChatChannelViews.record(-100 - index, global, console,
                     index % 10 == 0, 500L + index, 1000L, true);
@@ -67,12 +67,12 @@ public final class ClientChatChannelViewsTest {
         // Their own join line.
         ClientChatChannelViews.record(-399, global, console, false, 700L,
                 1000L, true);
-        assertFalse(ClientChatChannelViews.hasUnread(ChatChannel.ALL));
-        assertEquals(0, ClientChatChannelViews.unreadCount(ChatChannel.ALL));
+        assertFalse(ClientChatChannelViews.hasUnread(ChatChannel.GLOBAL));
+        assertEquals(0, ClientChatChannelViews.unreadCount(ChatChannel.GLOBAL));
         // Said after they arrived, in a tab they are not looking at.
         ClientChatChannelViews.record(-400, global, console, false, 900L,
                 1000L, false);
-        assertEquals(1, ClientChatChannelViews.unreadCount(ChatChannel.ALL));
+        assertEquals(1, ClientChatChannelViews.unreadCount(ChatChannel.GLOBAL));
     }
 
     /**
@@ -84,8 +84,8 @@ public final class ClientChatChannelViewsTest {
     public void aReturnVisitStillCountsWhatWasSaidWhileAway() {
         ClientChatSession.resumeAt("server:known.example");
         ClientChatReadMarks.markArrival("server:known.example", 100L);
-        ChatTab global = ChatTab.of(ChatChannel.ALL);
-        ChatTab console = ChatTab.of(ChatChannel.CONSOLE);
+        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
+        ChatTab console = ChatTab.of(ChatChannel.CLIENT_CONSOLE);
         ClientChatReadMarks.markRead("server:known.example", global, 500L);
         ClientChatChannelViews.record(-1, global, console, false, 500L,
                 1000L, true);
@@ -93,7 +93,7 @@ public final class ClientChatChannelViewsTest {
                 1000L, true);
         ClientChatChannelViews.record(-3, global, console, false, 502L,
                 1000L, true);
-        assertEquals(2, ClientChatChannelViews.unreadCount(ChatChannel.ALL));
+        assertEquals(2, ClientChatChannelViews.unreadCount(ChatChannel.GLOBAL));
     }
 
     /**
@@ -111,7 +111,7 @@ public final class ClientChatChannelViewsTest {
         assertEquals(400L,
                 ClientChatReadMarks.arrival("server:return.example"));
         ChatTab proximity = ChatTab.of(ChatChannel.PROXIMITY);
-        ChatTab global = ChatTab.of(ChatChannel.ALL);
+        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
         ClientChatChannelViews.record(-1, proximity, global, false, 300L,
                 1000L, true);
         ClientChatChannelViews.record(-2, proximity, global, false, 500L,
@@ -134,7 +134,7 @@ public final class ClientChatChannelViewsTest {
         ClientChatSession.resumeAt("server:live.example");
         ClientChatChannelViews.noteArrival(100L);
         ChatTab proximity = ChatTab.of(ChatChannel.PROXIMITY);
-        ChatTab global = ChatTab.of(ChatChannel.ALL);
+        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
         ClientChatChannelViews.record(-1, proximity, global, false, 150L,
                 1000L, false);
         assertEquals(1,
@@ -142,7 +142,7 @@ public final class ClientChatChannelViewsTest {
         // In the tab in front, at the newest line, it is read as it comes.
         ClientChatChannelViews.record(-2, global, global, false, 151L,
                 1000L, false);
-        assertEquals(0, ClientChatChannelViews.unreadCount(ChatChannel.ALL));
+        assertEquals(0, ClientChatChannelViews.unreadCount(ChatChannel.GLOBAL));
     }
 
     private static ChatLine line(int chatLineId) {
@@ -152,9 +152,9 @@ public final class ClientChatChannelViewsTest {
     @Test
     public void viewsFilterByRecordedChannelAndKeepVanillaLines() {
         ClientChatChannelViews.record(-10, ChatChannel.PARTY,
-                ChatChannel.ALL, false);
-        ClientChatChannelViews.record(-11, ChatChannel.ALL,
-                ChatChannel.ALL, false);
+                ChatChannel.GLOBAL, false);
+        ClientChatChannelViews.record(-11, ChatChannel.GLOBAL,
+                ChatChannel.GLOBAL, false);
         List<ChatLine> drawn = new ArrayList<ChatLine>();
         drawn.add(line(-11));
         drawn.add(line(0));
@@ -167,16 +167,16 @@ public final class ClientChatChannelViewsTest {
         assertEquals(1, party.size());
         assertEquals(-10, party.get(0).getChatLineID());
         List<ChatLine> all = ClientChatChannelViews.visibleLines(
-                drawn, ChatChannel.ALL);
+                drawn, ChatChannel.GLOBAL);
         assertEquals(1, all.size());
         assertEquals(-11, all.get(0).getChatLineID());
         List<ChatLine> console = ClientChatChannelViews.visibleLines(
-                drawn, ChatChannel.CONSOLE);
+                drawn, ChatChannel.CLIENT_CONSOLE);
         assertEquals(1, console.size());
         assertEquals(0, console.get(0).getChatLineID());
         // Same list, same head, same view: the cached instance is reused.
         assertSame(console, ClientChatChannelViews.visibleLines(
-                drawn, ChatChannel.CONSOLE));
+                drawn, ChatChannel.CLIENT_CONSOLE));
         assertNull(ClientChatChannelViews.channelOf(0));
         assertEquals(ChatChannel.PARTY, ClientChatChannelViews.channelOf(-10));
     }
@@ -184,11 +184,11 @@ public final class ClientChatChannelViewsTest {
     @Test
     public void filtersCombineChannelsAndCarryUntrackedLinesWithTheConsole() {
         ClientChatChannelViews.record(-10, ChatChannel.PARTY,
-                ChatChannel.ALL, false);
-        ClientChatChannelViews.record(-11, ChatChannel.ALL,
-                ChatChannel.ALL, false);
+                ChatChannel.GLOBAL, false);
+        ClientChatChannelViews.record(-11, ChatChannel.GLOBAL,
+                ChatChannel.GLOBAL, false);
         ClientChatChannelViews.record(-12, ChatChannel.OOC,
-                ChatChannel.ALL, false);
+                ChatChannel.GLOBAL, false);
         List<ChatLine> drawn = new ArrayList<ChatLine>();
         drawn.add(line(-12));
         drawn.add(line(-11));
@@ -196,26 +196,26 @@ public final class ClientChatChannelViewsTest {
         drawn.add(line(-10));
 
         ChatLineFilter window = ChatLineFilter.of(java.util.Arrays.asList(
-                ChatTab.of(ChatChannel.ALL), ChatTab.of(ChatChannel.PARTY)));
+                ChatTab.of(ChatChannel.GLOBAL), ChatTab.of(ChatChannel.PARTY)));
         List<ChatLine> lines = ClientChatChannelViews.visibleLines(drawn, window);
         assertEquals(2, lines.size());
         assertEquals(-11, lines.get(0).getChatLineID());
         assertEquals(-10, lines.get(1).getChatLineID());
         assertSame(lines, ClientChatChannelViews.visibleLines(drawn,
                 ChatLineFilter.of(java.util.Arrays.asList(
-                        ChatTab.of(ChatChannel.PARTY), ChatTab.of(ChatChannel.ALL)))));
+                        ChatTab.of(ChatChannel.PARTY), ChatTab.of(ChatChannel.GLOBAL)))));
         // The console channel brings the untracked line with it.
         List<ChatLine> withConsole = ClientChatChannelViews.visibleLines(
                 drawn, ChatLineFilter.of(java.util.Arrays.asList(
-                        ChatTab.of(ChatChannel.OOC), ChatTab.of(ChatChannel.CONSOLE))));
+                        ChatTab.of(ChatChannel.OOC), ChatTab.of(ChatChannel.CLIENT_CONSOLE))));
         assertEquals(2, withConsole.size());
         assertEquals(-12, withConsole.get(0).getChatLineID());
         assertEquals(0, withConsole.get(1).getChatLineID());
         assertTrue(ClientChatChannelViews.visibleLines(drawn,
                 ChatLineFilter.of(java.util.Collections.<ChatTab>emptyList()))
                 .isEmpty());
-        assertTrue(ChatLineFilter.of(ChatTab.of(ChatChannel.CONSOLE)).accepts(null));
-        assertFalse(ChatLineFilter.of(ChatTab.of(ChatChannel.ALL)).accepts(null));
+        assertTrue(ChatLineFilter.of(ChatTab.of(ChatChannel.CLIENT_CONSOLE)).accepts(null));
+        assertFalse(ChatLineFilter.of(ChatTab.of(ChatChannel.GLOBAL)).accepts(null));
         // Separate filters keep separate cached results.
         assertEquals(1, ClientChatChannelViews.visibleLines(drawn,
                 ChatChannel.OOC).size());
@@ -244,11 +244,11 @@ public final class ClientChatChannelViewsTest {
     @Test
     public void unreadCountersFollowTheSelectedChannel() {
         ClientChatChannelViews.record(-1, ChatChannel.PARTY,
-                ChatChannel.ALL, true);
-        ClientChatChannelViews.record(-2, ChatChannel.ALL,
-                ChatChannel.ALL, true);
+                ChatChannel.GLOBAL, true);
+        ClientChatChannelViews.record(-2, ChatChannel.GLOBAL,
+                ChatChannel.GLOBAL, true);
         ClientChatChannelViews.record(-3, ChatChannel.PARTY,
-                ChatChannel.ALL, false);
+                ChatChannel.GLOBAL, false);
         assertTrue(ClientChatChannelViews.hasUnread(ChatChannel.PARTY));
         // A ping is counted once, as a ping, never also as "other".
         assertEquals(1, ClientChatChannelViews.unreadPingCount(
@@ -258,11 +258,11 @@ public final class ClientChatChannelViewsTest {
         assertEquals(2, ClientChatChannelViews.unreadCount(ChatChannel.PARTY));
         assertTrue(ClientChatChannelViews.hasUnreadMention(ChatChannel.PARTY));
         // Lines arriving in the selected channel are read on arrival.
-        assertFalse(ClientChatChannelViews.hasUnread(ChatChannel.ALL));
+        assertFalse(ClientChatChannelViews.hasUnread(ChatChannel.GLOBAL));
         assertEquals(0, ClientChatChannelViews.unreadPingCount(
-                ChatChannel.ALL));
+                ChatChannel.GLOBAL));
         assertEquals(0, ClientChatChannelViews.unreadOtherCount(
-                ChatChannel.ALL));
+                ChatChannel.GLOBAL));
         ClientChatChannelViews.markViewed(ChatChannel.PARTY);
         assertFalse(ClientChatChannelViews.hasUnread(ChatChannel.PARTY));
         assertEquals(0, ClientChatChannelViews.unreadPingCount(
@@ -273,7 +273,7 @@ public final class ClientChatChannelViewsTest {
                 ChatChannel.PARTY));
         for (int index = 0; index < 150; index++) {
             ClientChatChannelViews.record(-10 - index, ChatChannel.OOC,
-                    ChatChannel.ALL, index % 2 == 0);
+                    ChatChannel.GLOBAL, index % 2 == 0);
         }
         assertEquals(75, ClientChatChannelViews.unreadPingCount(
                 ChatChannel.OOC));
@@ -281,7 +281,7 @@ public final class ClientChatChannelViewsTest {
                 ChatChannel.OOC));
         for (int index = 0; index < 150; index++) {
             ClientChatChannelViews.record(-200 - index, ChatChannel.OOC,
-                    ChatChannel.ALL, false);
+                    ChatChannel.GLOBAL, false);
         }
         assertEquals(ClientChatChannelViews.MAX_UNREAD + 1,
                 ClientChatChannelViews.unreadOtherCount(ChatChannel.OOC));
@@ -301,11 +301,11 @@ public final class ClientChatChannelViewsTest {
         try {
             assertTrue(ChatWindowLayout.close(ChatChannel.PARTY));
             ClientChatChannelViews.record(-1, ChatChannel.PARTY,
-                    ChatChannel.ALL, false);
+                    ChatChannel.GLOBAL, false);
             ClientChatChannelViews.record(-2, ChatChannel.PARTY,
-                    ChatChannel.ALL, true);
+                    ChatChannel.GLOBAL, true);
             ClientChatChannelViews.record(-3, ChatChannel.PARTY,
-                    ChatChannel.ALL, false);
+                    ChatChannel.GLOBAL, false);
             assertEquals(3, ClientChatChannelViews.unreadCount(
                     ChatChannel.PARTY));
             // Closing and restoring touch no counter on their own.
@@ -329,7 +329,7 @@ public final class ClientChatChannelViewsTest {
      */
     @Test
     public void scrollToPlacesTheViewAtALineAndClamps() {
-        ChatTab tab = ChatTab.of(ChatChannel.ALL);
+        ChatTab tab = ChatTab.of(ChatChannel.GLOBAL);
         ClientChatChannelViews.scrollTo(tab, 12.0D, 30, 10.0D);
         assertEquals(12.0D, ClientChatChannelViews.getScroll(tab, 30, 10.0D),
                 0.0001D);
@@ -346,23 +346,23 @@ public final class ClientChatChannelViewsTest {
 
     @Test
     public void scrollIsPerChannelAndClamped() {
-        ClientChatChannelViews.scroll(ChatChannel.ALL, 7, 30, 10.0D);
+        ClientChatChannelViews.scroll(ChatChannel.GLOBAL, 7, 30, 10.0D);
         assertEquals(7.0D, ClientChatChannelViews.getScroll(
-                ChatChannel.ALL, 30, 10.0D), 0.0D);
+                ChatChannel.GLOBAL, 30, 10.0D), 0.0D);
         assertEquals(0.0D, ClientChatChannelViews.getScroll(
                 ChatChannel.OOC, 30, 10.0D), 0.0D);
-        ClientChatChannelViews.scroll(ChatChannel.ALL, 100, 30, 10.0D);
+        ClientChatChannelViews.scroll(ChatChannel.GLOBAL, 100, 30, 10.0D);
         assertEquals(20.0D, ClientChatChannelViews.getScroll(
-                ChatChannel.ALL, 30, 10.0D), 0.0D);
-        ClientChatChannelViews.scroll(ChatChannel.ALL, -100, 32, 10.0D);
+                ChatChannel.GLOBAL, 30, 10.0D), 0.0D);
+        ClientChatChannelViews.scroll(ChatChannel.GLOBAL, -100, 32, 10.0D);
         assertEquals(0.0D, ClientChatChannelViews.getScroll(
-                ChatChannel.ALL, 32, 10.0D), 0.0D);
+                ChatChannel.GLOBAL, 32, 10.0D), 0.0D);
         assertEquals(0.0D, ClientChatChannelViews.getScroll(
                 (ChatTab)null, 32, 10.0D), 0.0D);
-        ClientChatChannelViews.scroll(ChatChannel.ALL, 5, 32, 10.0D);
+        ClientChatChannelViews.scroll(ChatChannel.GLOBAL, 5, 32, 10.0D);
         ClientChatChannelViews.resetScroll();
         assertEquals(0.0D, ClientChatChannelViews.getScroll(
-                ChatChannel.ALL, 32, 10.0D), 0.0D);
+                ChatChannel.GLOBAL, 32, 10.0D), 0.0D);
     }
 
     /**
@@ -372,9 +372,9 @@ public final class ClientChatChannelViewsTest {
      */
     @Test
     public void theFarEndOfAScrollLeavesTheOldestLineWhole() {
-        ClientChatChannelViews.scroll(ChatChannel.ALL, 100, 30, 12.37D);
+        ClientChatChannelViews.scroll(ChatChannel.GLOBAL, 100, 30, 12.37D);
         assertEquals(30.0D - 12.37D, ClientChatChannelViews.getScroll(
-                ChatChannel.ALL, 30, 12.37D), 1.0E-9D);
+                ChatChannel.GLOBAL, 30, 12.37D), 1.0E-9D);
         ClientChatChannelViews.resetScroll();
     }
 
@@ -384,12 +384,12 @@ public final class ClientChatChannelViewsTest {
      */
     @Test
     public void aViewThatFitsItsWindowDoesNotScroll() {
-        ClientChatChannelViews.scroll(ChatChannel.ALL, 100, 10, 10.0D);
+        ClientChatChannelViews.scroll(ChatChannel.GLOBAL, 100, 10, 10.0D);
         assertEquals(0.0D, ClientChatChannelViews.getScroll(
-                ChatChannel.ALL, 10, 10.0D), 0.0D);
-        ClientChatChannelViews.scroll(ChatChannel.ALL, 100, 8, 12.5D);
+                ChatChannel.GLOBAL, 10, 10.0D), 0.0D);
+        ClientChatChannelViews.scroll(ChatChannel.GLOBAL, 100, 8, 12.5D);
         assertEquals(0.0D, ClientChatChannelViews.getScroll(
-                ChatChannel.ALL, 8, 12.5D), 0.0D);
+                ChatChannel.GLOBAL, 8, 12.5D), 0.0D);
         ClientChatChannelViews.resetScroll();
     }
 
@@ -400,12 +400,12 @@ public final class ClientChatChannelViewsTest {
         assertTrue(bound >= LostTalesChatHistoryHooks.capacity());
         int recorded = bound + 150;
         for (int index = 0; index < recorded; index++) {
-            ClientChatChannelViews.record(-index - 1, ChatChannel.ALL,
-                    ChatChannel.ALL, false);
+            ClientChatChannelViews.record(-index - 1, ChatChannel.GLOBAL,
+                    ChatChannel.GLOBAL, false);
         }
         assertEquals(bound, ClientChatChannelViews.trackedLineCount());
         assertNull(ClientChatChannelViews.channelOf(-1));
-        assertEquals(ChatChannel.ALL,
+        assertEquals(ChatChannel.GLOBAL,
                 ClientChatChannelViews.channelOf(-recorded));
     }
 }

@@ -10,15 +10,14 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Small stable channel catalogue shared by packet validation and client UI.
- * Each constant is one built-in {@link ChatChannelDescriptor}: the id, how
- * its lines present their sender, the routing rule, the access a player
- * needs, the colour, and whether the Discord bridge may carry it — the
- * Party channel, the console and whispers are private and never leave
- * the game. The string ids are the wire and storage surface —
- * packets and the layout file carry them, and client view state is keyed
- * by tab identity — so an id is permanent while declaration order carries
- * no meaning of its own; the order channels are presented in is
+ * The chat's channels, shared by packet validation and the client. Each
+ * constant is one built-in {@link ChatChannelDescriptor}: the id, how its
+ * lines present their sender, the routing rule, the access a player needs,
+ * the colour, and whether the Discord bridge may carry it (Party, the
+ * consoles and whispers are private and never leave the game). The id is
+ * the channel's code name ({@link ChatCodeNames}): packets, saves, the
+ * layout file, {@code #} links and Discord links all name it by that.
+ * Declaration order means nothing; the order channels are shown in is
  * {@link #presentationOrder()}.
  */
 public final class ChatChannel {
@@ -32,8 +31,8 @@ public final class ChatChannel {
     private static final Map<String, ChatChannel> BY_ID =
             new LinkedHashMap<String, ChatChannel>();
 
-    public static final ChatChannel ALL = register("all", "Global", ChatPresentationMode.IN_CHARACTER,
-            ChatRecipientRule.GLOBAL, ChatChannelAccess.NONE,
+    public static final ChatChannel GLOBAL = register("global", "Global", ChatPresentationMode.IN_CHARACTER,
+            ChatRecipientRule.EVERYONE, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.FERN_GREEN), true);
     // Orchid, the palette's pink, so the two open channels never share
     // a family: Global is green.
@@ -59,28 +58,26 @@ public final class ChatChannel {
      * Discord's.
      */
     public static final ChatChannel OOC = register("ooc", "Out of Character", ChatPresentationMode.OUT_OF_CHARACTER,
-            ChatRecipientRule.GLOBAL, ChatChannelAccess.NONE,
+            ChatRecipientRule.EVERYONE, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.STEEL_BLUE), true);
-    /** Staff channel: operators only, out of character; the wire id stays. */
-    public static final ChatChannel ADMIN = register("admin", "Operator", ChatPresentationMode.OUT_OF_CHARACTER,
+    /** Staff channel: operators only, out of character. */
+    public static final ChatChannel OPERATOR = register("operator", "Operator", ChatPresentationMode.OUT_OF_CHARACTER,
             ChatRecipientRule.OPERATORS, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.CRIMSON), true);
     /**
      * This player's own console: what only they see anyway — command
      * output, fast-travel countdowns, other mods' notices — plus anything
      * they type there, which is echoed back to them alone. Nobody else
-     * is ever shown a line of it. The wire id stays {@code console}: it
-     * is the console every player has had, and layouts and read marks
-     * name it by that.
+     * is ever shown a line of it.
      */
-    public static final ChatChannel CONSOLE = register("console", "Client Console", ChatPresentationMode.OUT_OF_CHARACTER,
+    public static final ChatChannel CLIENT_CONSOLE = register("client_console", "Client Console", ChatPresentationMode.OUT_OF_CHARACTER,
             ChatRecipientRule.SELF, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.ROSE_GRAY), false);
     /**
      * The server's own console, one stream every reader shares: what the
      * server did — started, stopped, a command run, a message taken
      * back, a setting changed, a warning it had to raise — and the talk
-     * its readers have over it. Held by the {@code chat.console.read}
+     * its readers have over it. Held by the {@code chat.server_console.read}
      * capability rather than by a channel gate, and never bridged.
      */
     // The two consoles wear one grey: they are one kind of place.
@@ -98,15 +95,15 @@ public final class ChatChannel {
             ChatRecipientRule.WHISPER, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.HUD_LABEL), false);
 
-    /** Tab, indicator, and cycle order for the built-in channels: the two
-     *  global ones bracket the scoped role-play ones, then Party, staff,
-     *  and the two consoles, this player's before the server's. Whispers
-     *  are not listed: their tabs exist per conversation. Anything
-     *  registered besides these follows them, in the order it was
-     *  registered. */
+    /** Tab, indicator, and cycle order for the built-in channels: Global
+     *  and Out of Character bracket the role-play ones, then Party,
+     *  Operator, and the two consoles, this player's before the server's.
+     *  Whispers are not listed: their tabs exist per conversation.
+     *  Anything registered besides these follows them, in the order it
+     *  was registered. */
     private static final List<ChatChannel> BUILT_IN_ORDER =
             Collections.unmodifiableList(Arrays.asList(
-                    ALL, PROXIMITY, FACTION, OOC, PARTY, ADMIN, CONSOLE,
+                    GLOBAL, PROXIMITY, FACTION, OOC, PARTY, OPERATOR, CLIENT_CONSOLE,
                     SERVER_CONSOLE));
 
     /** The ids that are the code's own and are never taken out of force. */
@@ -232,25 +229,6 @@ public final class ChatChannel {
     /** Every channel in force, in the order they were registered. */
     public static synchronized ChatChannel[] values() {
         return BY_ID.values().toArray(new ChatChannel[BY_ID.size()]);
-    }
-
-    /**
-     * The constant's own name, for a log line or a test that needs to say
-     * which channel it means. A channel a server defined has none of its
-     * own and answers with its id.
-     */
-    public String name() {
-        for (java.lang.reflect.Field field : ChatChannel.class.getFields()) {
-            try {
-                if (field.getType() == ChatChannel.class
-                        && field.get(null) == this) {
-                    return field.getName();
-                }
-            } catch (IllegalAccessException unreadable) {
-                break;
-            }
-        }
-        return getId();
     }
 
     public String getId() { return this.descriptor.getId(); }

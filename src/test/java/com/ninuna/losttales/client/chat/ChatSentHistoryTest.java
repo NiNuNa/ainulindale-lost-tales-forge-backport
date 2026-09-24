@@ -12,7 +12,7 @@ import static org.junit.Assert.assertTrue;
 
 public final class ChatSentHistoryTest {
 
-    private static final ChatTab GLOBAL = ChatTab.of(ChatChannel.ALL);
+    private static final ChatTab GLOBAL = ChatTab.of(ChatChannel.GLOBAL);
     private static final ChatTab OOC = ChatTab.of(ChatChannel.OOC);
 
     @Test

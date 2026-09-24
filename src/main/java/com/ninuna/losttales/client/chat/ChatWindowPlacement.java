@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import net.minecraft.util.MathHelper;
 import java.util.List;
@@ -48,18 +49,12 @@ public final class ChatWindowPlacement {
      *  asymmetry is a decision, not an oversight.</p> */
     public static final int INPUT_HEIGHT = ChatInputBar.HEIGHT;
     /**
-     * The edge of a window's frame, a lit framed button's: one pixel just
-     * outside its box.
+     * The window frame's whole width ({@link LostTalesUiWindowFrame}): its
+     * edge, and a pixel of the window's own surface under it, all of it
+     * over nothing of the window's own. Placement keeps that room for it,
+     * so every frame shows whole and none lies over another window.
      */
-    static final int FRAME_EDGE_WIDTH = 1;
-    /**
-     * The window frame's whole width: its edge, and a pixel of the
-     * window's own surface just outside that, lying under the edge as a
-     * framed button's surface lies under its frame — all of it over
-     * nothing of the window's own. Placement keeps that room for it, so
-     * every frame shows whole and none lies over another window.
-     */
-    static final int FRAME_WIDTH = FRAME_EDGE_WIDTH + 1;
+    static final int FRAME_WIDTH = LostTalesUiWindowFrame.WIDTH;
     /** How far a window's box stays inside the screen: the margin and its frame. */
     static final int EDGE_MARGIN = HudPlacementLayout.SCREEN_MARGIN
             + FRAME_WIDTH;

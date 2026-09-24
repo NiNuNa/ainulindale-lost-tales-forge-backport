@@ -50,7 +50,7 @@ public final class LostTalesChatTypingPacketTest {
         java.util.UUID character =
                 java.util.UUID.fromString("00000000-0000-0000-0000-0000000000c1");
         LostTalesChatTypingPacket original = new LostTalesChatTypingPacket(
-                ChatChannel.ALL, "", true,
+                ChatChannel.GLOBAL, "", true,
                 LostTalesChatSendPacket.IDENTITY_CHARACTER, character);
         ByteBuf buffer = Unpooled.buffer();
         try {
@@ -68,7 +68,7 @@ public final class LostTalesChatTypingPacketTest {
         // Every field is mandatory; no older wire layout is supported.
         ByteBuf older = Unpooled.buffer();
         try {
-            LostTalesPacketCodec.writeUtf8String(older, "all", 16);
+            LostTalesPacketCodec.writeUtf8String(older, "global", 16);
             LostTalesPacketCodec.writeUtf8String(older, "", 64);
             older.writeBoolean(true);
             LostTalesChatTypingPacket decoded = new LostTalesChatTypingPacket();
@@ -91,7 +91,7 @@ public final class LostTalesChatTypingPacketTest {
             // The packet is never built.
         }
         try {
-            new LostTalesChatTypingPacket(ChatChannel.ALL, "Bilbo", true);
+            new LostTalesChatTypingPacket(ChatChannel.GLOBAL, "Bilbo", true);
             fail("only a whisper names a partner");
         } catch (IllegalArgumentException expected) {
             // The packet is never built.
@@ -124,7 +124,7 @@ public final class LostTalesChatTypingPacketTest {
         assertTrue(decoded.isTyping());
 
         try {
-            new LostTalesChatTypingSyncPacket(ChatChannel.ALL, "", " ", true);
+            new LostTalesChatTypingSyncPacket(ChatChannel.GLOBAL, "", " ", true);
             fail("a typist has a name");
         } catch (IllegalArgumentException expected) {
             // The packet is never built.

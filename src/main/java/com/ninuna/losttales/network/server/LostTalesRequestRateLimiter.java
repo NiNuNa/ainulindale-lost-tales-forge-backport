@@ -47,6 +47,11 @@ public final class LostTalesRequestRateLimiter {
         // twenty in five seconds covers a burst of clicking through a
         // message's chips and back.
         CHAT_REACTION(20, 5000L),
+        // A report is chosen from a menu and a reason; three in five
+        // seconds is already more than a hand does. The five in ten
+        // minutes a player may file is the report rules' own
+        // (ChatReports).
+        CHAT_REPORT(3, 5000L),
         // One ask per conversation the first time it is read, and only
         // for a channel that has more than one; a handful covers a
         // player moving between their characters.

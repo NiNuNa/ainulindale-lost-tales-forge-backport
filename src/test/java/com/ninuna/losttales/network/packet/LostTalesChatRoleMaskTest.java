@@ -131,7 +131,7 @@ public final class LostTalesChatRoleMaskTest {
                 0xFFFFFF, 0xFFFFFF, "hello", 1L, "", null, "", "",
                 ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR)));
         lines.add(new LostTalesChatMessagePacket(
-                ChatChannel.ALL, UUID.randomUUID(), "Alex", "Alex", "",
+                ChatChannel.GLOBAL, UUID.randomUUID(), "Alex", "Alex", "",
                 0xFFFFFF, 0xFFFFFF, "hi", 2L, ""));
         ByteBuf buffer = Unpooled.buffer();
         new LostTalesChatHistorySyncPacket(lines, 3L).toBytes(buffer);

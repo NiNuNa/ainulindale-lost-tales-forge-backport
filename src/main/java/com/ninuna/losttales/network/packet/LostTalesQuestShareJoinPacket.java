@@ -9,7 +9,6 @@ import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
 import com.ninuna.losttales.network.server.LostTalesServerPacketDispatcher;
 import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
 import com.ninuna.losttales.party.model.Party;
-import com.ninuna.losttales.party.model.PartyMember;
 import com.ninuna.losttales.party.server.PartyService;
 import com.ninuna.losttales.quest.LostTalesQuestManager;
 import com.ninuna.losttales.quest.LostTalesQuestStartSource;
@@ -70,7 +69,7 @@ public final class LostTalesQuestShareJoinPacket implements IMessage {
         Party party = PartyService.getInstance()
                 .getPartyForActiveCharacter(player);
         if (claim == null || claim.authorId == null || party == null
-                || !containsOwner(party, claim.authorId)
+                || !party.hasMemberOwnedBy(claim.authorId)
                 || LotrQuestReference.isLotrQuest(
                         claim.showcase.getQuestReference())) {
             player.addChatMessage(new ChatComponentTranslation(
@@ -80,14 +79,6 @@ public final class LostTalesQuestShareJoinPacket implements IMessage {
         LostTalesQuestManager.startQuest(player,
                 claim.showcase.getQuestReference(),
                 LostTalesQuestStartSource.SHARED);
-    }
-
-    private static boolean containsOwner(Party party,
-                                         java.util.UUID ownerId) {
-        for (PartyMember member : party.getMembers()) {
-            if (ownerId.equals(member.getOwnerId())) return true;
-        }
-        return false;
     }
 
     public static final class Handler implements IMessageHandler<

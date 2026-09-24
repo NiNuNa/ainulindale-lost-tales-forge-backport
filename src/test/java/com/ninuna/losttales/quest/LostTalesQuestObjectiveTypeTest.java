@@ -3,6 +3,8 @@ package com.ninuna.losttales.quest;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import net.minecraft.util.StringTranslate;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -16,6 +18,13 @@ import static org.junit.Assert.assertTrue;
  * somebody — are answered here and nowhere else.
  */
 public final class LostTalesQuestObjectiveTypeTest {
+
+    /** The mod's own words, as a game loads them from its lang file. */
+    @BeforeClass
+    public static void loadTheModsWords() {
+        StringTranslate.inject(LostTalesQuestObjectiveTypeTest.class
+                .getResourceAsStream("/assets/losttales/lang/en_US.lang"));
+    }
 
     @Test
     public void everySpellingOfAKindNamesThatKind() {
@@ -84,17 +93,50 @@ public final class LostTalesQuestObjectiveTypeTest {
     public void theJournalDescribesATalkAndADeliveryWithoutAuthoredText() {
         assertEquals("Speak to Nia.", LostTalesQuestObjectiveTextHelper
                 .buildObjectiveLine(null, objective("talk",
-                        "entity", "Nia,losttalesnia"), false, false, false,
-                        false).replace(" (0/1)", ""));
-        assertEquals("Bring Nia 4 stick.", LostTalesQuestObjectiveTextHelper
+                        "entity", "Nia,losttalesnia"), false, false)
+                        .replace(" (0/1)", ""));
+        assertEquals("Bring Nia 4 Stick.", LostTalesQuestObjectiveTextHelper
                 .buildObjectiveLine(null, objective("deliver",
                         "entity", "Nia", "item", "minecraft:stick",
-                        "count", "4"), false, false, false, false)
+                        "count", "4"), false, false)
                         .replace(" (0/4)", ""));
         assertEquals("Deliver", LostTalesQuestObjectiveTextHelper
-                .getReadableObjectiveType("turn_in"));
+                .typeName("turn_in"));
         assertEquals("Speak", LostTalesQuestObjectiveTextHelper
-                .getReadableObjectiveType("visit"));
+                .typeName("visit"));
+        assertEquals("Dance", LostTalesQuestObjectiveTextHelper
+                .typeName("dance"));
+    }
+
+    @Test
+    public void anObjectiveWithoutWordsIsDescribedByItsKindAndTarget() {
+        assertEquals("Defeat 1 enemy.", LostTalesQuestObjectiveTextHelper
+                .describe(objective("kill")));
+        assertEquals("Defeat 3 enemies.", LostTalesQuestObjectiveTextHelper
+                .describe(objective("kill", "count", "3")));
+        assertEquals("Gather 2 items.", LostTalesQuestObjectiveTextHelper
+                .describe(objective("gather", "count", "2")));
+        assertEquals("Travel to the destination.",
+                LostTalesQuestObjectiveTextHelper.describe(objective("goto")));
+        assertEquals("Speak to the person named.",
+                LostTalesQuestObjectiveTextHelper.describe(objective("talk")));
+        assertEquals("Objective",
+                LostTalesQuestObjectiveTextHelper.describe(null));
+    }
+
+    @Test
+    public void anOptionalObjectiveSaysSo() {
+        Map<String, String> params = new LinkedHashMap<String, String>();
+        params.put("count", "2");
+        LostTalesQuestObjectiveDefinition optional =
+                new LostTalesQuestObjectiveDefinition("objective", "gather",
+                        "Pick the herbs.", true, params);
+        assertEquals("Pick the herbs. (0/2) optional",
+                LostTalesQuestObjectiveTextHelper.buildObjectiveLine(
+                        null, optional, false, false));
+        assertEquals("Pick the herbs. (2/2) optional",
+                LostTalesQuestObjectiveTextHelper.buildObjectiveLine(
+                        null, optional, false, true));
     }
 
     private static LostTalesQuestObjectiveDefinition objective(String type,

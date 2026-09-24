@@ -10,6 +10,7 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.client.motion.MotionIds;
 import net.minecraft.client.Minecraft;
@@ -61,13 +62,19 @@ final class LostTalesChatVisualStyle {
      */
     static final int LANDING_RGB = LostTalesColors.rgb(LostTalesColors.HONEY);
     /**
-     * The one opacity of everything that opens over the chat — the
-     * menus, the completion lists, the pickers and their tips, the
-     * cards, the pointer's tip, the bar's notice — and of the controls
-     * floating over the history: nearly opaque, so the lines under a
-     * popup never compete with its own words.
+     * The frame a popup wears inside its footprint: a chat window's, a
+     * pixel of surface with the ink inside it (Nils, 2026-09-24).
      */
-    static final int POPUP_ALPHA = 0xE0;
+    static final int POPUP_FRAME = LostTalesUiWindowFrame.WIDTH;
+    /**
+     * From a popup's edge to what it shows: the frame and two clear
+     * pixels, as round a framed button's content.
+     */
+    static final int POPUP_INSET = POPUP_FRAME + 2;
+    /** A one-line popup's height: the capitals and their shadow, the inset above and below. */
+    static final int POPUP_LINE_HEIGHT = POPUP_INSET * 2
+            + LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT
+            + LostTalesUiInk.SHADOW_OFFSET;
     /**
      * A margin, a well or a tab has a surface of its own, a step darker
      * than the half-opacity surface beside it: two thirds. The surface
@@ -97,7 +104,7 @@ final class LostTalesChatVisualStyle {
      * every one of them with it.
      */
     static int asideRgb() {
-        return ClientChatChannelState.displayColor(ChatChannel.CONSOLE);
+        return ClientChatChannelState.displayColor(ChatChannel.CLIENT_CONSOLE);
     }
 
     /**
@@ -233,45 +240,46 @@ final class LostTalesChatVisualStyle {
 
     /**
      * A popup's surface over {@code [left, right)} by {@code [top,
-     * bottom)} at {@link #POPUP_ALPHA} times {@code opacity}: a one-pixel
-     * frame in the highlight tone round the chat's surface. The lit row
-     * — {@code [rowLeft, rowRight)} by {@code [rowTop, rowBottom)}, what
-     * a press or Enter would take — wears the frame's tone in place of
-     * the surface, cut to the frame's inside. Frame, surface and row lie
-     * side by side, never one over another, so every pixel of a popup
-     * is a single layer; a row with no area lights nothing.
+     * bottom)}: what follows the pointer or the caret and never moves
+     * wears the small windows' surface — the chat's inset plum black at
+     * two thirds, thinned by the chat opacity and by {@code opacity} —
+     * and a chat window's frame inside its footprint, as the snap panels
+     * do (Nils, 2026-09-24). The lit row — {@code [rowLeft, rowRight)} by
+     * {@code [rowTop, rowBottom)}, what a press or Enter would take — is
+     * the surface in the highlight's tone, cut to the frame's inside;
+     * surface and row lie side by side, never one over another, and the
+     * frame's edges lie over its ring as on a window. A row with no area
+     * lights nothing.
      */
     static void drawPopup(float left, float top, float right, float bottom,
                           float opacity, float rowLeft, float rowTop,
                           float rowRight, float rowBottom) {
-        int alpha = Math.round(POPUP_ALPHA
-                * Math.max(0.0F, Math.min(1.0F, opacity)));
-        if (alpha < MIN_VISIBLE_ALPHA || right - left < 2.0F
-                || bottom - top < 2.0F) {
+        float share = Math.max(0.0F, Math.min(1.0F, opacity));
+        float boxLeft = left + POPUP_FRAME;
+        float boxTop = top + POPUP_FRAME;
+        float boxRight = right - POPUP_FRAME;
+        float boxBottom = bottom - POPUP_FRAME;
+        int surfaceAlpha = Math.round(INSET_ALPHA * share
+                * chatOpacity(Minecraft.getMinecraft()));
+        if (surfaceAlpha < MIN_VISIBLE_ALPHA || boxRight <= boxLeft
+                || boxBottom <= boxTop) {
             return;
         }
-        int edge = argb(SURFACE_HIGHLIGHT_RGB, alpha);
-        LostTalesChatOverlayRenderer.fillRect(left, top, right, top + 1.0F,
-                edge);
-        LostTalesChatOverlayRenderer.fillRect(left, bottom - 1.0F, right,
-                bottom, edge);
-        LostTalesChatOverlayRenderer.fillRect(left, top + 1.0F, left + 1.0F,
-                bottom - 1.0F, edge);
-        LostTalesChatOverlayRenderer.fillRect(right - 1.0F, top + 1.0F,
-                right, bottom - 1.0F, edge);
-        float insideLeft = left + 1.0F;
-        float insideTop = top + 1.0F;
-        float insideRight = right - 1.0F;
-        float insideBottom = bottom - 1.0F;
-        float litLeft = Math.max(insideLeft, rowLeft);
-        float litTop = Math.max(insideTop, rowTop);
-        float litRight = Math.min(insideRight, rowRight);
-        float litBottom = Math.min(insideBottom, rowBottom);
-        fillAround(insideLeft, insideTop, insideRight, insideBottom,
-                litLeft, litTop, litRight, litBottom,
-                argb(SURFACE_RGB, alpha));
-        LostTalesChatOverlayRenderer.fillRect(litLeft, litTop, litRight,
-                litBottom, edge);
+        int surface = argb(SURFACE_RGB, surfaceAlpha);
+        float litLeft = Math.max(boxLeft, rowLeft);
+        float litTop = Math.max(boxTop, rowTop);
+        float litRight = Math.min(boxRight, rowRight);
+        float litBottom = Math.min(boxBottom, rowBottom);
+        fillAround(boxLeft, boxTop, boxRight, boxBottom, litLeft, litTop,
+                litRight, litBottom, surface);
+        if (litRight > litLeft && litBottom > litTop) {
+            LostTalesUiInk.fillRect(litLeft, litTop, litRight, litBottom,
+                    argb(SURFACE_HIGHLIGHT_RGB, surfaceAlpha));
+        }
+        LostTalesUiWindowFrame.drawSurface(boxLeft, boxTop, boxRight,
+                boxBottom, surface);
+        LostTalesUiWindowFrame.drawEdges(boxLeft, boxTop, boxRight,
+                boxBottom, Math.round(255.0F * share));
     }
 
     /** A popup with no row lit. */
@@ -280,9 +288,30 @@ final class LostTalesChatVisualStyle {
         drawPopup(left, top, right, bottom, opacity, 0.0F, 0.0F, 0.0F, 0.0F);
     }
 
+    /** A one-line popup's width for {@code text}: the text, the inset either side. */
+    static int popupLineWidth(FontRenderer font, String text) {
+        return font.getStringWidth(text) + POPUP_INSET * 2;
+    }
+
+    /**
+     * A one-line popup with its top left at {@code x}, {@code y},
+     * {@link #popupLineWidth} wide and {@link #POPUP_LINE_HEIGHT} tall:
+     * the framed surface at {@code opacity}, and {@code text} two clear
+     * pixels inside the frame. The pointer's tip, a picker's tip and the
+     * bar's notice are each one.
+     */
+    static void drawPopupLine(FontRenderer font, String text, int x, int y,
+                              float opacity) {
+        drawPopup(x, y, x + popupLineWidth(font, text), y + POPUP_LINE_HEIGHT,
+                opacity);
+        drawPlain(font, text, x + POPUP_INSET, y + POPUP_INSET,
+                Math.round(255.0F * Math.max(0.0F, Math.min(1.0F, opacity))));
+    }
+
     /**
      * A list's popup: rows {@code rowHeight} apart from {@code rowsTop},
-     * row {@code litRow} lit across the frame's inside; none for -1.
+     * which stand {@link #POPUP_INSET} inside its edges, row
+     * {@code litRow} lit across the frame's inside; none for -1.
      */
     static void drawPopupList(int left, int top, int right, int bottom,
                               int rowsTop, int rowHeight, int litRow) {
@@ -305,17 +334,17 @@ final class LostTalesChatVisualStyle {
         float cutTop = Math.max(top, holeTop);
         float cutBottom = Math.min(bottom, holeBottom);
         if (cutRight <= cutLeft || cutBottom <= cutTop) {
-            LostTalesChatOverlayRenderer.fillRect(left, top, right, bottom,
+            LostTalesUiInk.fillRect(left, top, right, bottom,
                     argb);
             return;
         }
-        LostTalesChatOverlayRenderer.fillRect(left, top, cutLeft, bottom,
+        LostTalesUiInk.fillRect(left, top, cutLeft, bottom,
                 argb);
-        LostTalesChatOverlayRenderer.fillRect(cutRight, top, right, bottom,
+        LostTalesUiInk.fillRect(cutRight, top, right, bottom,
                 argb);
-        LostTalesChatOverlayRenderer.fillRect(cutLeft, top, cutRight, cutTop,
+        LostTalesUiInk.fillRect(cutLeft, top, cutRight, cutTop,
                 argb);
-        LostTalesChatOverlayRenderer.fillRect(cutLeft, cutBottom, cutRight,
+        LostTalesUiInk.fillRect(cutLeft, cutBottom, cutRight,
                 bottom, argb);
     }
 
@@ -1804,13 +1833,13 @@ final class LostTalesChatVisualStyle {
         }
         int shadow = shadowAlpha(alpha);
         if (shadow > 0) {
-            LostTalesChatOverlayRenderer.fillRect(start + SHADOW_OFFSET,
+            LostTalesUiInk.fillRect(start + SHADOW_OFFSET,
                     y + UNDERLINE_ROW + SHADOW_OFFSET,
                     end - 1 + SHADOW_OFFSET,
                     y + UNDERLINE_ROW + 1 + SHADOW_OFFSET,
                     argb(SHADOW, shadow));
         }
-        LostTalesChatOverlayRenderer.fillRect(start, y + UNDERLINE_ROW,
+        LostTalesUiInk.fillRect(start, y + UNDERLINE_ROW,
                 end - 1, y + UNDERLINE_ROW + 1, argb(color, alpha));
     }
 

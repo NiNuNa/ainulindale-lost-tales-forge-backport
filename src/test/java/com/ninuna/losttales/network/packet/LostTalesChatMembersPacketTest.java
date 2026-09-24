@@ -56,7 +56,7 @@ public final class LostTalesChatMembersPacketTest {
         UUID aldric = UUID.randomUUID();
         UUID steve = UUID.randomUUID();
         LostTalesChatMembersPacket sent = new LostTalesChatMembersPacket(
-                ChatChannel.ALL, "all", Arrays.asList(
+                ChatChannel.GLOBAL, "global", Arrays.asList(
                         new LostTalesChatMembersPacket.Member(steve, "Steve",
                                 aldric, "Aldric", 0x4A90D9, "human/male/2",
                                 "the Gondor Farmer", 0x4A90D9, "lotr:gondor",
@@ -70,8 +70,8 @@ public final class LostTalesChatMembersPacketTest {
         read.fromBytes(buffer);
         assertFalse(read.isMalformed());
         assertFalse(read.isUnchanged());
-        assertEquals(ChatChannel.ALL, read.getChannel());
-        assertEquals("all", read.getConversationKey());
+        assertEquals(ChatChannel.GLOBAL, read.getChannel());
+        assertEquals("global", read.getConversationKey());
         assertEquals(sent.getFingerprint(), read.getFingerprint());
         assertEquals(7, read.getUnlisted());
         assertEquals(2, read.getMembers().size());

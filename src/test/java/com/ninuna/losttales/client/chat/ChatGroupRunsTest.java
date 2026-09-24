@@ -61,9 +61,9 @@ public final class ChatGroupRunsTest {
      */
     @Test
     public void anotherChannelBreaksTheFeedsRunButNotTheChannelsOwn() {
-        remember(1, ChatChannel.ALL, ALICE, "Alice", START);
+        remember(1, ChatChannel.GLOBAL, ALICE, "Alice", START);
         remember(2, ChatChannel.OOC, BOB, "Bob", START + 1000L);
-        remember(3, ChatChannel.ALL, ALICE, "Alice", START + 2000L);
+        remember(3, ChatChannel.GLOBAL, ALICE, "Alice", START + 2000L);
 
         // The Global window shows only its own two messages.
         assertArrayEquals(new boolean[] { true, false },
@@ -80,10 +80,10 @@ public final class ChatGroupRunsTest {
      */
     @Test
     public void aDaysRuleOpensARunOfItsOwn() {
-        remember(1, ChatChannel.ALL, ALICE, "Alice", START);
-        remember(2, ChatChannel.ALL, ALICE, "Alice", START + 240000L);
-        remember(3, ChatChannel.ALL, ALICE, "Alice", START + 360000L);
-        remember(4, ChatChannel.ALL, ALICE, "Alice", START + 540000L);
+        remember(1, ChatChannel.GLOBAL, ALICE, "Alice", START);
+        remember(2, ChatChannel.GLOBAL, ALICE, "Alice", START + 240000L);
+        remember(3, ChatChannel.GLOBAL, ALICE, "Alice", START + 360000L);
+        remember(4, ChatChannel.GLOBAL, ALICE, "Alice", START + 540000L);
         int[] ids = newestFirst(1, 2, 3, 4);
         // Without a rule: one run from 1 for eight minutes, then 4 opens one.
         assertArrayEquals(new boolean[] { false, true, true, false },
@@ -103,9 +103,9 @@ public final class ChatGroupRunsTest {
      */
     @Test
     public void theUnreadDividerOpensARunWhileItStands() {
-        remember(1, ChatChannel.ALL, ALICE, "Alice", START);
-        remember(2, ChatChannel.ALL, ALICE, "Alice", START + 10000L);
-        remember(3, ChatChannel.ALL, ALICE, "Alice", START + 20000L);
+        remember(1, ChatChannel.GLOBAL, ALICE, "Alice", START);
+        remember(2, ChatChannel.GLOBAL, ALICE, "Alice", START + 10000L);
+        remember(3, ChatChannel.GLOBAL, ALICE, "Alice", START + 20000L);
         int[] ids = newestFirst(1, 2, 3);
         String[] noDays = new String[ids.length];
         assertArrayEquals(new boolean[] { true, false, false },
@@ -125,9 +125,9 @@ public final class ChatGroupRunsTest {
     /** Ordinary consecutive messages still group, in either view. */
     @Test
     public void consecutiveMessagesFromOneIdentityGroup() {
-        remember(1, ChatChannel.ALL, ALICE, "Alice", START);
-        remember(2, ChatChannel.ALL, ALICE, "Alice", START + 1000L);
-        remember(3, ChatChannel.ALL, ALICE, "Alice", START + 2000L);
+        remember(1, ChatChannel.GLOBAL, ALICE, "Alice", START);
+        remember(2, ChatChannel.GLOBAL, ALICE, "Alice", START + 1000L);
+        remember(3, ChatChannel.GLOBAL, ALICE, "Alice", START + 2000L);
         assertArrayEquals(new boolean[] { true, true, false },
                 ChatGroupRuns.continuationsOf(newestFirst(1, 2, 3)));
     }
@@ -139,13 +139,13 @@ public final class ChatGroupRunsTest {
      */
     @Test
     public void runsEndOnAnotherSenderIdentitySilenceOrUntrackedLine() {
-        remember(1, ChatChannel.ALL, ALICE, "Alice", START);
+        remember(1, ChatChannel.GLOBAL, ALICE, "Alice", START);
         // The same account speaking as a character: another identity.
-        remember(2, ChatChannel.ALL, ALICE, "Aldric", START + 1000L);
-        remember(3, ChatChannel.ALL, BOB, "Bob", START + 2000L);
-        remember(4, ChatChannel.ALL, BOB, "Bob",
+        remember(2, ChatChannel.GLOBAL, ALICE, "Aldric", START + 1000L);
+        remember(3, ChatChannel.GLOBAL, BOB, "Bob", START + 2000L);
+        remember(4, ChatChannel.GLOBAL, BOB, "Bob",
                 START + 2000L + 481L * 1000L);
-        remember(5, ChatChannel.ALL, BOB, "Bob",
+        remember(5, ChatChannel.GLOBAL, BOB, "Bob",
                 START + 2000L + 482L * 1000L);
         // Line 99 was never recorded: it is not groupable and ends the run.
         // Newest first, so only line 5 continues anything.
@@ -159,8 +159,8 @@ public final class ChatGroupRunsTest {
     /** With grouping switched off every message opens with its header. */
     @Test
     public void groupingOffLeavesEveryMessageWithItsHeader() {
-        remember(1, ChatChannel.ALL, ALICE, "Alice", START);
-        remember(2, ChatChannel.ALL, ALICE, "Alice", START + 1000L);
+        remember(1, ChatChannel.GLOBAL, ALICE, "Alice", START);
+        remember(2, ChatChannel.GLOBAL, ALICE, "Alice", START + 1000L);
         LostTalesConfig.enableChatMessageGrouping = false;
         assertArrayEquals(new boolean[] { false, false },
                 ChatGroupRuns.continuationsOf(newestFirst(1, 2)));
@@ -175,10 +175,10 @@ public final class ChatGroupRunsTest {
     @Test
     public void aFeedRunContinuesWhileItsGroupIsStillOnScreen() {
         long step = ChatGroupRuns.FEED_RUN_MILLIS * 3L / 4L;
-        remember(1, ChatChannel.ALL, ALICE, "Alice", START);
-        remember(2, ChatChannel.ALL, ALICE, "Alice", START + step);
-        remember(3, ChatChannel.ALL, ALICE, "Alice", START + 2L * step);
-        remember(4, ChatChannel.ALL, ALICE, "Alice", START + 3L * step);
+        remember(1, ChatChannel.GLOBAL, ALICE, "Alice", START);
+        remember(2, ChatChannel.GLOBAL, ALICE, "Alice", START + step);
+        remember(3, ChatChannel.GLOBAL, ALICE, "Alice", START + 2L * step);
+        remember(4, ChatChannel.GLOBAL, ALICE, "Alice", START + 3L * step);
         // The last is well past the fade from the first, but every gap
         // is inside it, so the group never went and never split.
         assertArrayEquals(new boolean[] { true, true, true, false },
@@ -198,7 +198,7 @@ public final class ChatGroupRunsTest {
         boolean[] expected = new boolean[lines];
         for (int index = 0; index < lines; index++) {
             oldestFirst[index] = index + 1;
-            remember(index + 1, ChatChannel.ALL, ALICE, "Alice",
+            remember(index + 1, ChatChannel.GLOBAL, ALICE, "Alice",
                     START + index * step);
             expected[index] = true;
         }
@@ -219,15 +219,15 @@ public final class ChatGroupRunsTest {
      */
     @Test
     public void aFeedRunEndsOnceItsGroupHasFaded() {
-        remember(1, ChatChannel.ALL, ALICE, "Alice", START);
-        remember(2, ChatChannel.ALL, ALICE, "Alice",
+        remember(1, ChatChannel.GLOBAL, ALICE, "Alice", START);
+        remember(2, ChatChannel.GLOBAL, ALICE, "Alice",
                 START + ChatGroupRuns.FEED_RUN_MILLIS);
         assertArrayEquals(new boolean[] { true, false },
                 ChatGroupRuns.continuationsInFeed(newestFirst(1, 2)));
 
         ChatGroupRuns.clear();
-        remember(1, ChatChannel.ALL, ALICE, "Alice", START);
-        remember(2, ChatChannel.ALL, ALICE, "Alice",
+        remember(1, ChatChannel.GLOBAL, ALICE, "Alice", START);
+        remember(2, ChatChannel.GLOBAL, ALICE, "Alice",
                 START + ChatGroupRuns.FEED_RUN_MILLIS + 1L);
         assertArrayEquals(new boolean[] { false, false },
                 ChatGroupRuns.continuationsInFeed(newestFirst(1, 2)));
@@ -241,9 +241,9 @@ public final class ChatGroupRunsTest {
      */
     @Test
     public void aWindowRunIsMeasuredFromItsHead() {
-        remember(1, ChatChannel.ALL, ALICE, "Alice", START);
-        remember(2, ChatChannel.ALL, ALICE, "Alice", START + 300000L);
-        remember(3, ChatChannel.ALL, ALICE, "Alice", START + 600000L);
+        remember(1, ChatChannel.GLOBAL, ALICE, "Alice", START);
+        remember(2, ChatChannel.GLOBAL, ALICE, "Alice", START + 300000L);
+        remember(3, ChatChannel.GLOBAL, ALICE, "Alice", START + 600000L);
         assertArrayEquals(new boolean[] { false, true, false },
                 ChatGroupRuns.continuationsOf(newestFirst(1, 2, 3)));
         // The feed would have kept none of that: every gap is past its
@@ -259,11 +259,11 @@ public final class ChatGroupRunsTest {
      */
     @Test
     public void aMessageThatCannotGroupStillOpensARun() {
-        remember(1, ChatChannel.ALL, ALICE, "Alice", START);
-        ChatGroupRuns.remember(2, ChatTab.of(ChatChannel.ALL), ALICE,
+        remember(1, ChatChannel.GLOBAL, ALICE, "Alice", START);
+        ChatGroupRuns.remember(2, ChatTab.of(ChatChannel.GLOBAL), ALICE,
                 "Alice", true, START + 1000L, false,
                 new ChatComponentText("grouped"));
-        remember(3, ChatChannel.ALL, ALICE, "Alice", START + 2000L);
+        remember(3, ChatChannel.GLOBAL, ALICE, "Alice", START + 2000L);
         // Newest first: 3 continues 2, but 2 never continues 1.
         assertArrayEquals(new boolean[] { true, false, false },
                 ChatGroupRuns.continuationsOf(newestFirst(1, 2, 3)));
@@ -272,7 +272,7 @@ public final class ChatGroupRunsTest {
     /** A message with no grouped form of its own is never grouped. */
     @Test
     public void aMessageWithoutAGroupedFormIsNotRecorded() {
-        ChatGroupRuns.remember(1, ChatTab.of(ChatChannel.ALL), ALICE,
+        ChatGroupRuns.remember(1, ChatTab.of(ChatChannel.GLOBAL), ALICE,
                 "Alice", true, START, true, null);
         assertNull(ChatGroupRuns.of(1));
         assertFalse(ChatGroupRuns.continuationsOf(new int[] { 1 })[0]);

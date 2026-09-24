@@ -32,7 +32,8 @@ import net.minecraft.client.gui.FontRenderer;
 final class ChatNameSuggestionBox {
     static final int MAX_ROWS = 8;
     private static final int ROW_HEIGHT = 11;
-    private static final int PADDING = 2;
+    /** The rows stand two pixels inside the frame's ink, as a framed button's content does. */
+    private static final int PADDING = LostTalesChatVisualStyle.POPUP_INSET;
     /** The face's box and the gap after it, shared by every row. */
     private static final int ICON_SIZE = 8;
     /**
@@ -169,10 +170,10 @@ final class ChatNameSuggestionBox {
         for (int row = 0; row < this.matches.size(); row++) {
             int rowTop = top + PADDING + row * ROW_HEIGHT;
             ChatMentionCandidate candidate = this.matches.get(row);
-            drawFace(minecraft, candidate, inputX + 4, rowTop + 1);
+            drawFace(minecraft, candidate, inputX + PADDING, rowTop + 1);
             LostTalesChatVisualStyle.drawColored(font,
                     "@" + candidate.getDisplayName(),
-                    inputX + 4 + ICON_WIDTH + ICON_GAP, rowTop + 2,
+                    inputX + PADDING + ICON_WIDTH + ICON_GAP, rowTop + 2,
                     rowColor(candidate), 255);
         }
     }
@@ -265,7 +266,7 @@ final class ChatNameSuggestionBox {
             width = Math.max(width, font.getStringWidth(
                     "@" + this.matches.get(index).getDisplayName()));
         }
-        return width + 8 + ICON_WIDTH + ICON_GAP;
+        return width + PADDING * 2 + ICON_WIDTH + ICON_GAP;
     }
 
     private int boxTop(int screenHeight) {

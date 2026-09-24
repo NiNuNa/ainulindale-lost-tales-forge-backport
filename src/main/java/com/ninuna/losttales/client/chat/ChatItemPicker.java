@@ -43,7 +43,7 @@ final class ChatItemPicker extends ChatPickerPanel {
     }
 
     @Override
-    int columns() {
+    int naturalColumns() {
         return COLUMNS;
     }
 
@@ -99,7 +99,7 @@ final class ChatItemPicker extends ChatPickerPanel {
 
     @Override
     void drawEntry(Minecraft minecraft, Entry entry, int x, int y,
-                   int alpha, boolean hovered) {
+                   int width, int alpha, boolean hovered) {
         ChatShareCandidates.ItemEntry item =
                 (ChatShareCandidates.ItemEntry)entry.value;
         ChatInlineIcons.drawItem(minecraft, item.stack,

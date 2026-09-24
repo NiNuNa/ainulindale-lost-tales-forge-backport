@@ -21,7 +21,7 @@ public final class DiscordBindingEntriesTest {
     private static final String[] ENTRIES = {
             "# a comment naming channel=5",
             "ooc=DISABLED;channel=;webhook=",
-            "all=GAME_TO_DISCORD;channel=7;webhook=" + HOOK_ALL,
+            "global=GAME_TO_DISCORD;channel=7;webhook=" + HOOK_ALL,
     };
 
     /**
@@ -39,11 +39,11 @@ public final class DiscordBindingEntriesTest {
     /** A game channel links to a second Discord channel beside its first. */
     @Test
     public void aGameChannelLinksToManyDiscordChannels() {
-        List<String> linked = DiscordBindingEntries.link(ENTRIES, "all",
+        List<String> linked = DiscordBindingEntries.link(ENTRIES, "global",
                 DiscordBridgeDirection.GAME_TO_DISCORD, "8", HOOK_OOC);
         assertEquals(4, linked.size());
         assertEquals(ENTRIES[2], linked.get(2));
-        assertEquals("all=GAME_TO_DISCORD;channel=8;webhook=" + HOOK_OOC, linked.get(3));
+        assertEquals("global=GAME_TO_DISCORD;channel=8;webhook=" + HOOK_OOC, linked.get(3));
     }
 
     @Test
@@ -63,7 +63,7 @@ public final class DiscordBindingEntriesTest {
 
     @Test
     public void keysAndOptionsAreReadOffAnEntry() {
-        assertEquals("all", DiscordBindingEntries.keyOf(ENTRIES[2]));
+        assertEquals("global", DiscordBindingEntries.keyOf(ENTRIES[2]));
         assertEquals("", DiscordBindingEntries.keyOf(ENTRIES[0]));
         assertEquals(HOOK_ALL, DiscordBindingEntries.optionOf(ENTRIES[2], "webhook"));
         assertEquals("7", DiscordBindingEntries.optionOf(ENTRIES[2], "channel"));

@@ -230,21 +230,21 @@ public final class ChatRoleConfigTest {
                 ChatRoleConfig.DEFAULT_OPERATOR_ENTRY, "moderator=name:Mod"}, null, collect);
         ChatRoleCatalog.installServer(catalog);
         ChatChannelGates gates = ChatRoleConfig.parseGates(new String[] {
-                "all=send:moderator,operator",
-                "admin=read:moderator,operator;send:operator",
+                "global=send:moderator,operator",
+                "operator=read:moderator,operator;send:operator",
                 "nowhere=read:operator",
                 "ooc=read:ghost",
                 "party=send:none",
         }, catalog, collect);
         int moderator = catalog.byId("moderator").bit();
         int operator = catalog.byId("operator").bit();
-        assertTrue(gates.canRead(0, ChatChannel.ALL));
-        assertFalse(gates.canSend(0, ChatChannel.ALL));
-        assertTrue(gates.canSend(moderator, ChatChannel.ALL));
-        assertTrue(gates.canRead(moderator, ChatChannel.ADMIN));
-        assertFalse(gates.canSend(moderator, ChatChannel.ADMIN));
-        assertTrue(gates.canSend(operator, ChatChannel.ADMIN));
-        assertTrue(gates.isGated(ChatChannel.ALL));
+        assertTrue(gates.canRead(0, ChatChannel.GLOBAL));
+        assertFalse(gates.canSend(0, ChatChannel.GLOBAL));
+        assertTrue(gates.canSend(moderator, ChatChannel.GLOBAL));
+        assertTrue(gates.canRead(moderator, ChatChannel.OPERATOR));
+        assertFalse(gates.canSend(moderator, ChatChannel.OPERATOR));
+        assertTrue(gates.canSend(operator, ChatChannel.OPERATOR));
+        assertTrue(gates.isGated(ChatChannel.GLOBAL));
         assertFalse(gates.isGated(ChatChannel.PROXIMITY));
         // A side naming a role nobody has is closed to everyone, an
         // operator included, until the entry is fixed; so is "none".
@@ -258,14 +258,14 @@ public final class ChatRoleConfigTest {
         // Nothing is gated before the file says so; the seeded entry is
         // what makes the Operator channel the operators' alone.
         ChatChannelGates defaults = ChatChannelGates.defaults();
-        assertTrue(defaults.canRead(moderator, ChatChannel.ADMIN));
+        assertTrue(defaults.canRead(moderator, ChatChannel.OPERATOR));
         ChatChannelGates seeded = ChatRoleConfig.parseGates(
-                new String[] {ChatRoleConfig.DEFAULT_ADMIN_GATE}, catalog, collect);
-        assertFalse(seeded.canRead(moderator, ChatChannel.ADMIN));
-        assertTrue(seeded.canRead(operator, ChatChannel.ADMIN));
-        assertFalse(seeded.canSend(0, ChatChannel.ADMIN));
-        assertEquals("admin=read:moderator,operator;send:operator",
-                ChatChannelGates.format(ChatChannel.ADMIN, gates.gateOf(ChatChannel.ADMIN)));
+                new String[] {ChatRoleConfig.DEFAULT_OPERATOR_GATE}, catalog, collect);
+        assertFalse(seeded.canRead(moderator, ChatChannel.OPERATOR));
+        assertTrue(seeded.canRead(operator, ChatChannel.OPERATOR));
+        assertFalse(seeded.canSend(0, ChatChannel.OPERATOR));
+        assertEquals("operator=read:moderator,operator;send:operator",
+                ChatChannelGates.format(ChatChannel.OPERATOR, gates.gateOf(ChatChannel.OPERATOR)));
         assertEquals("party=read:any;send:none",
                 ChatChannelGates.format(ChatChannel.PARTY, gates.gateOf(ChatChannel.PARTY)));
         assertNull(ChatChannelGates.format(ChatChannel.PROXIMITY,
@@ -279,17 +279,17 @@ public final class ChatRoleConfigTest {
     @Test
     public void theOperatorGateIsPutBackWhenItsLineIsMissing() {
         String[] reseeded = ChatRoleConfig.withRequiredGates(new String[] {
-                "# gates", "all=send:moderator"}, collect);
+                "# gates", "global=send:moderator"}, collect);
         assertEquals(3, reseeded.length);
-        assertEquals(ChatRoleConfig.DEFAULT_ADMIN_GATE, reseeded[2]);
+        assertEquals(ChatRoleConfig.DEFAULT_OPERATOR_GATE, reseeded[2]);
         assertEquals(1, warnings.size());
         assertTrue(warnings.get(0).contains("Operator channel"));
         assertEquals(1, ChatRoleConfig.withRequiredGates(null, collect).length);
         assertEquals(1, ChatRoleConfig.withRequiredGates(new String[0], collect).length);
         warnings.clear();
-        String[] opened = new String[] {"admin=read:any;send:any"};
+        String[] opened = new String[] {"operator=read:any;send:any"};
         assertSame(opened, ChatRoleConfig.withRequiredGates(opened, collect));
-        String[] spaced = new String[] {" Admin = read:operator;send:none "};
+        String[] spaced = new String[] {" Operator = read:operator;send:none "};
         assertSame(spaced, ChatRoleConfig.withRequiredGates(spaced, collect));
         assertTrue(warnings.isEmpty());
         // The put-back line is the seeded gate: the operators' alone.
@@ -298,9 +298,9 @@ public final class ChatRoleConfigTest {
         ChatRoleCatalog.installServer(catalog);
         ChatChannelGates gates = ChatRoleConfig.parseGates(
                 ChatRoleConfig.withRequiredGates(new String[0], collect), catalog, collect);
-        assertTrue(gates.hasEntry(ChatChannel.ADMIN));
-        assertFalse(gates.canRead(catalog.byId("moderator").bit(), ChatChannel.ADMIN));
-        assertTrue(gates.canSend(catalog.byId("operator").bit(), ChatChannel.ADMIN));
+        assertTrue(gates.hasEntry(ChatChannel.OPERATOR));
+        assertFalse(gates.canRead(catalog.byId("moderator").bit(), ChatChannel.OPERATOR));
+        assertTrue(gates.canSend(catalog.byId("operator").bit(), ChatChannel.OPERATOR));
     }
 
     @Test

@@ -33,8 +33,8 @@ import java.util.Set;
  * layout with no windows left at all is a valid state — the chat is
  * simply not shown, every channel keeps receiving, and the screen's
  * empty state offers them back. Nothing is ever kept open to stand in
- * for one. The default layout is a console window (Console,
- * Admin) in the top-left corner and a conversation window with every
+ * for one. The default layout is a console window (the two consoles
+ * and Operator) in the top-left corner and a conversation window with every
  * other channel in the bottom-left corner. A window dropped against
  * another's top or bottom edge <em>links</em> to it and from then on
  * keeps that gap as the other grows, shrinks or moves; a link is one
@@ -90,9 +90,9 @@ public final class ChatWindowLayout {
     private static final String ID_PREFIX = "w";
     private static final List<ChatTab> CONSOLE_WINDOW_TABS =
             Collections.unmodifiableList(Arrays.asList(
-                    ChatTab.of(ChatChannel.CONSOLE),
+                    ChatTab.of(ChatChannel.CLIENT_CONSOLE),
                     ChatTab.of(ChatChannel.SERVER_CONSOLE),
-                    ChatTab.of(ChatChannel.ADMIN)));
+                    ChatTab.of(ChatChannel.OPERATOR)));
 
     private static final List<ChatWindow> WINDOWS = new ArrayList<ChatWindow>();
     private static final List<ChatWindow> WINDOWS_VIEW =
@@ -174,7 +174,7 @@ public final class ChatWindowLayout {
         toolbarCollapsed = false;
         ChatWindow console = newWindow();
         console.tabs().addAll(CONSOLE_WINDOW_TABS);
-        console.setActiveTab(ChatTab.of(ChatChannel.CONSOLE));
+        console.setActiveTab(ChatTab.of(ChatChannel.CLIENT_CONSOLE));
         console.setOffsets(0.0D, 0.0D);
         WINDOWS.add(console);
         ChatWindow conversation = newWindow();
@@ -183,7 +183,7 @@ public final class ChatWindowLayout {
                 conversation.tabs().add(ChatTab.of(channel));
             }
         }
-        conversation.setActiveTab(ChatTab.of(ChatChannel.ALL));
+        conversation.setActiveTab(ChatTab.of(ChatChannel.GLOBAL));
         conversation.setOffsets(0.0D, 100.0D);
         WINDOWS.add(conversation);
     }
@@ -1481,7 +1481,7 @@ public final class ChatWindowLayout {
                 // Everything closed needs no window at all.
                 ChatWindow window = newWindow();
                 window.tabs().addAll(unplaced);
-                ChatTab global = ChatTab.of(ChatChannel.ALL);
+                ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
                 window.setActiveTab(unplaced.contains(global)
                         ? global : unplaced.get(0));
                 window.setOffsets(0.0D, 100.0D);

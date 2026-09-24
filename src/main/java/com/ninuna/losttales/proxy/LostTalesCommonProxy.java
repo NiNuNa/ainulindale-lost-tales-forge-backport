@@ -110,6 +110,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.World;
 import net.minecraftforge.common.MinecraftForge;
 import com.ninuna.losttales.chat.ChatChannelIconCatalog;
+import com.ninuna.losttales.chat.ChatCodeNames;
 import com.ninuna.losttales.chat.moderation.ChatAuditLog;
 import com.ninuna.losttales.chat.server.ChatMessageIdAllocator;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
@@ -257,6 +258,9 @@ public class LostTalesCommonProxy {
         // Run after Lost Tales has registered its additional LOTR factions so
         // the immutable character-creation catalogue includes them as well.
         LotrCharacterAdapter.getInstance().initialize();
+        // A faction's chat is named by the faction (#gondor), on both sides.
+        ChatCodeNames.installFactions(
+                LotrCharacterAdapter.getInstance().getFactionIds());
     }
 
     protected void registerTileEntities() {
@@ -399,6 +403,7 @@ public class LostTalesCommonProxy {
         ChatMessageIdAllocator.reset();
         ChatHistory.clear();
         ChatConsoleStream.clear();
+        com.ninuna.losttales.chat.server.ChatReports.clear();
         // After the channels and the config above, since every kept
         // line names its channel by id: the save's recent lines and the
         // console's kept events come back as the live stores, and the
@@ -525,6 +530,7 @@ public class LostTalesCommonProxy {
         ChatHistoryStorage.release();
         ChatHistory.clear();
         ChatConsoleStream.clear();
+        com.ninuna.losttales.chat.server.ChatReports.clear();
         ChatCommandContexts.clear();
         LostTalesChatService.clear();
         ChatIdentitySelection.clear();

@@ -29,17 +29,17 @@ public final class ChatMemberWatchesTest {
     }
 
     private static LostTalesChatMembersRequestPacket ask(String conversation) {
-        return new LostTalesChatMembersRequestPacket(ChatChannel.ALL,
+        return new LostTalesChatMembersRequestPacket(ChatChannel.GLOBAL,
                 conversation, "", "", null, null, 0L);
     }
 
     @Test
     public void anAskedListStaysWatchedWhileItsClientKeepsAsking() {
-        ChatMemberWatches.watch(PLAYER, ask("all"), 1L, 1000L);
+        ChatMemberWatches.watch(PLAYER, ask("global"), 1L, 1000L);
         assertEquals(1, ChatMemberWatches.watchedAt(PLAYER,
                 1000L + ChatMemberWatches.WATCH_MILLIS));
         // Asked again: one watch, from the newer ask.
-        ChatMemberWatches.watch(PLAYER, ask("all"), 2L, 9000L);
+        ChatMemberWatches.watch(PLAYER, ask("global"), 2L, 9000L);
         assertEquals(1, ChatMemberWatches.watchedAt(PLAYER,
                 9000L + ChatMemberWatches.WATCH_MILLIS));
         assertEquals(0, ChatMemberWatches.watchedAt(PLAYER,
@@ -58,7 +58,7 @@ public final class ChatMemberWatchesTest {
 
     @Test
     public void aPlayerWhoLeftWatchesNothing() {
-        ChatMemberWatches.watch(PLAYER, ask("all"), 0L, 1000L);
+        ChatMemberWatches.watch(PLAYER, ask("global"), 0L, 1000L);
         ChatMemberWatches.forget(PLAYER);
         assertEquals(0, ChatMemberWatches.watchedAt(PLAYER, 1000L));
     }

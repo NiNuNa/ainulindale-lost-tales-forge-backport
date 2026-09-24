@@ -44,6 +44,25 @@ public final class LoreCharacterRegistryTest {
         assertTrue(result.getDefinition().hasAppearance());
         assertEquals("lotr:human",
                 result.getDefinition().getAppearance().getModelId());
+        assertEquals("a file without an age is eighteen",
+                LoreCharacterDefinition.DEFAULT_AGE,
+                result.getDefinition().getAge());
+    }
+
+    @Test
+    public void anAgeIsReadWhenGivenAndHeldToACharactersBounds() {
+        LoreCharacterDefinitionJsonParser.ParseResult aged = parse(
+                "{\"dataVersion\":1,\"id\":\"losttales:aged\","
+                        + "\"name\":\"Aged\",\"description\":\"\","
+                        + "\"age\":2931,\"appearance\":null}");
+        LoreCharacterDefinitionJsonParser.ParseResult unborn = parse(
+                "{\"dataVersion\":1,\"id\":\"losttales:unborn\","
+                        + "\"name\":\"Unborn\",\"description\":\"\","
+                        + "\"age\":0,\"appearance\":null}");
+
+        assertTrue(aged.getErrors().toString(), aged.isValid());
+        assertEquals(2931, aged.getDefinition().getAge());
+        assertFalse(unborn.isValid());
     }
 
     @Test
@@ -63,7 +82,7 @@ public final class LoreCharacterRegistryTest {
         assertFalse(unknown.isValid());
         assertTrue(unknown.getErrors().get(0).contains("unknown field unsupported"));
         assertFalse(missing.isValid());
-        assertTrue(missing.getErrors().get(0).contains("exactly dataVersion, id, name, description, and appearance"));
+        assertTrue(missing.getErrors().get(0).contains("must contain dataVersion, id, name, description, and appearance"));
     }
 
     @Test

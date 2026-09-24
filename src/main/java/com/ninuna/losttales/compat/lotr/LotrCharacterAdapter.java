@@ -19,6 +19,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -46,7 +47,7 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
     private static final LotrCharacterAdapter INSTANCE = new LotrCharacterAdapter();
 
     private final Map<String, CharacterFactionDefinition> resolved =
-            new HashMap<String, CharacterFactionDefinition>();
+            new LinkedHashMap<String, CharacterFactionDefinition>();
     private final Map<String, LOTRFaction> factionsById =
             new HashMap<String, LOTRFaction>();
     private final Set<String> unresolved = new HashSet<String>();
@@ -175,6 +176,14 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
     public synchronized List<String> getPlayableFactionIds() {
         ensureInitialized();
         return this.available ? this.playableFactionIds : Collections.<String>emptyList();
+    }
+
+    /** Every faction LOTR has, playable or not, by id, in LOTR's order. */
+    public synchronized List<String> getFactionIds() {
+        ensureInitialized();
+        return this.available
+                ? Collections.unmodifiableList(new ArrayList<String>(this.resolved.keySet()))
+                : Collections.<String>emptyList();
     }
 
     @Override

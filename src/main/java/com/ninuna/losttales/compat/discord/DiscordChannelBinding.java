@@ -1,20 +1,19 @@
 package com.ninuna.losttales.compat.discord;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatCodeNames;
 
 /**
  * One game channel tied to one Discord channel: which channel, for the
  * Faction channel which faction, the Discord channel the bot reads, the
  * webhook the bridge posts through, and which way lines cross. The key
- * names the game channel — {@code all}, {@code ooc},
- * {@code faction:gondor} — and several bindings may share it, one per
- * Discord channel the game channel goes to; the id tells them apart,
- * the key for the first and {@code ooc#2} for the next, and is what the
- * log and the bridge's memory of which post went where carry.
+ * is the game channel's code name ({@link ChatCodeNames}): {@code global},
+ * {@code ooc}, or a faction's, {@code gondor}. Several bindings may share
+ * it, one per Discord channel the game channel goes to; the id tells them
+ * apart, the key for the first and {@code ooc#2} for the next, and is
+ * what the log and the bridge's memory of which post went where carry.
  */
 public final class DiscordChannelBinding {
-    /** Separates the channel id from a faction scope in a key. */
-    static final char SCOPE_SEPARATOR = ':';
     /** Separates the key from the ordinal in a binding's id. */
     static final char ORDINAL_SEPARATOR = '#';
 
@@ -102,10 +101,9 @@ public final class DiscordChannelBinding {
                 this.webhookUrl, this.direction, named);
     }
 
+    /** The game channel's code name; null for a faction nobody knows. */
     static String keyOf(ChatChannel channel, String factionScope) {
-        String scope = factionScope == null ? "" : factionScope.trim();
-        return scope.length() == 0 ? channel.getId()
-                : channel.getId() + SCOPE_SEPARATOR + scope;
+        return ChatCodeNames.of(channel, factionScope);
     }
 
     @Override

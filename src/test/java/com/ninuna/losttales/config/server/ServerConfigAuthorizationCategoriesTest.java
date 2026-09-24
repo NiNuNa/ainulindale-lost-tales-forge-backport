@@ -32,8 +32,8 @@ public final class ServerConfigAuthorizationCategoriesTest {
         config.get(LostTalesConfig.CATEGORY_ROLES, "permissions",
                 new String[0]).set(new String[0]);
         config.get(LostTalesConfig.CATEGORY_CHANNELS, "gates",
-                new String[] {"admin=read:operator;send:operator"}).set(
-                        new String[] {"admin=read:operator;send:operator"});
+                new String[] {"operator=read:operator;send:operator"}).set(
+                        new String[] {"operator=read:operator;send:operator"});
         config.get(LostTalesConfig.CATEGORY_CHAT, "proximityRadius", 64).set(64);
 
         List<ServerConfigEntry> entries = ServerConfigSnapshot.fromConfiguration(

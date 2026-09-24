@@ -82,16 +82,16 @@ public final class ChatSystemLineClassifier {
         }
         String key = translationKey(message);
         if (key == null) {
-            return ChatChannel.CONSOLE;
+            return ChatChannel.CLIENT_CONSOLE;
         }
         ChatChannel announced = channelOf(kindOfKey(key));
         if (announced != null) {
             return announced;
         }
         if (contains(OTHER_GLOBAL_KEYS, key)) {
-            return ChatChannel.ALL;
+            return ChatChannel.GLOBAL;
         }
-        return ChatChannel.CONSOLE;
+        return ChatChannel.CLIENT_CONSOLE;
     }
 
     /**
@@ -106,7 +106,7 @@ public final class ChatSystemLineClassifier {
         switch (kind) {
             case ACHIEVEMENT:
             case DEATH:
-                return ChatChannel.ALL;
+                return ChatChannel.GLOBAL;
             case JOIN:
             case LEAVE:
                 return ChatChannel.OOC;

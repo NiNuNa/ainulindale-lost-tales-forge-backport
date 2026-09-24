@@ -9,7 +9,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import static com.ninuna.losttales.chat.ChatChannel.CONSOLE;
+import static com.ninuna.losttales.chat.ChatChannel.CLIENT_CONSOLE;
 
 public final class ChatSystemLineClassifierTest {
 
@@ -19,17 +19,17 @@ public final class ChatSystemLineClassifierTest {
      */
     @Test
     public void achievementsAndDeathsGoToGlobal() {
-        assertEquals(ChatChannel.ALL, ChatSystemLineClassifier.classify(
+        assertEquals(ChatChannel.GLOBAL, ChatSystemLineClassifier.classify(
                 new ChatComponentTranslation("chat.type.achievement",
                         "Steve", new ChatComponentText("Taking Inventory"))));
-        assertEquals(ChatChannel.ALL, ChatSystemLineClassifier.classify(
+        assertEquals(ChatChannel.GLOBAL, ChatSystemLineClassifier.classify(
                 new ChatComponentTranslation("chat.type.achievement.taken",
                         "Steve", "x")));
-        assertEquals(ChatChannel.ALL, ChatSystemLineClassifier.classify(
+        assertEquals(ChatChannel.GLOBAL, ChatSystemLineClassifier.classify(
                 new ChatComponentTranslation("chat.lotr.achievement",
                         "Steve", "Middle-earth",
                         new ChatComponentText("[First Steps]"))));
-        assertEquals(ChatChannel.ALL, ChatSystemLineClassifier.classify(
+        assertEquals(ChatChannel.GLOBAL, ChatSystemLineClassifier.classify(
                 new ChatComponentTranslation("death.attack.mob", "Steve",
                         "Zombie")));
     }
@@ -53,9 +53,9 @@ public final class ChatSystemLineClassifierTest {
 
     @Test
     public void eachKindNamesItsChannel() {
-        assertEquals(ChatChannel.ALL, ChatSystemLineClassifier.channelOf(
+        assertEquals(ChatChannel.GLOBAL, ChatSystemLineClassifier.channelOf(
                 ChatSystemLineClassifier.Kind.ACHIEVEMENT));
-        assertEquals(ChatChannel.ALL, ChatSystemLineClassifier.channelOf(
+        assertEquals(ChatChannel.GLOBAL, ChatSystemLineClassifier.channelOf(
                 ChatSystemLineClassifier.Kind.DEATH));
         assertEquals(ChatChannel.OOC, ChatSystemLineClassifier.channelOf(
                 ChatSystemLineClassifier.Kind.JOIN));
@@ -68,13 +68,13 @@ public final class ChatSystemLineClassifierTest {
 
     @Test
     public void otherSharedLinesGoToGlobal() {
-        assertEquals(ChatChannel.ALL, ChatSystemLineClassifier.classify(
+        assertEquals(ChatChannel.GLOBAL, ChatSystemLineClassifier.classify(
                 new ChatComponentTranslation("chat.type.announcement",
                         "Server", "hello")));
-        assertEquals(ChatChannel.ALL, ChatSystemLineClassifier.classify(
+        assertEquals(ChatChannel.GLOBAL, ChatSystemLineClassifier.classify(
                 new ChatComponentTranslation("chat.type.emote",
                         "Steve", "waves")));
-        assertEquals(ChatChannel.ALL, ChatSystemLineClassifier.classify(
+        assertEquals(ChatChannel.GLOBAL, ChatSystemLineClassifier.classify(
                 new ChatComponentTranslation("chat.type.text",
                         "Steve", "vanilla chat")));
     }
@@ -82,23 +82,23 @@ public final class ChatSystemLineClassifierTest {
     @Test
     public void privateAndUnknownLinesGoToTheConsole() {
         // Command output, whispers, LOTR notices, other mods, plain text.
-        assertEquals(CONSOLE, ChatSystemLineClassifier.classify(
+        assertEquals(CLIENT_CONSOLE, ChatSystemLineClassifier.classify(
                 new ChatComponentTranslation("commands.gamemode.success.self",
                         "Creative")));
-        assertEquals(CONSOLE, ChatSystemLineClassifier.classify(
+        assertEquals(CLIENT_CONSOLE, ChatSystemLineClassifier.classify(
                 new ChatComponentTranslation(
                         "commands.message.display.incoming", "Steve", "psst")));
-        assertEquals(CONSOLE, ChatSystemLineClassifier.classify(
+        assertEquals(CLIENT_CONSOLE, ChatSystemLineClassifier.classify(
                 new ChatComponentTranslation("lotr.fastTravel.wait", "5")));
-        assertEquals(CONSOLE, ChatSystemLineClassifier.classify(
+        assertEquals(CLIENT_CONSOLE, ChatSystemLineClassifier.classify(
                 new ChatComponentTranslation("chat.losttales.waystone.saved")));
-        assertEquals(CONSOLE, ChatSystemLineClassifier.classify(
+        assertEquals(CLIENT_CONSOLE, ChatSystemLineClassifier.classify(
                 new ChatComponentText("Steve has made the achievement")));
-        assertEquals(CONSOLE, ChatSystemLineClassifier.classify(
+        assertEquals(CLIENT_CONSOLE, ChatSystemLineClassifier.classify(
                 new ChatComponentTranslation("")));
         assertNull(ChatSystemLineClassifier.classify(null));
         // The key decides, never the rendered text.
-        assertEquals(CONSOLE, ChatSystemLineClassifier.classify(
+        assertEquals(CLIENT_CONSOLE, ChatSystemLineClassifier.classify(
                 new ChatComponentText("death.attack.mob")));
     }
 
@@ -176,7 +176,7 @@ public final class ChatSystemLineClassifierTest {
         ChatComponentTranslation opped = new ChatComponentTranslation(
                 "chat.type.admin", "Nils",
                 new ChatComponentTranslation("commands.op.success", "Steve"));
-        assertEquals(CONSOLE, ChatSystemLineClassifier.classify(opped));
+        assertEquals(CLIENT_CONSOLE, ChatSystemLineClassifier.classify(opped));
         assertTrue(ChatSystemLineClassifier.isAdminNotice(opped));
         assertEquals("Nils", ChatSystemLineClassifier.adminNoticeActor(opped));
         assertEquals("Server", ChatSystemLineClassifier.adminNoticeActor(

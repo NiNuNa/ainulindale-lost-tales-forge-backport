@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
@@ -565,7 +566,7 @@ final class ChatSnapLayouts {
                         }
                     }
                 });
-        LostTalesChatOverlayRenderer.drawFrameEdges(left + FRAME, top + FRAME,
+        LostTalesUiWindowFrame.drawEdges(left + FRAME, top + FRAME,
                 right - FRAME, bottom - FRAME, Math.round(255.0F * share));
     }
 
@@ -601,15 +602,15 @@ final class ChatSnapLayouts {
         float right = (float)box.right();
         float bottom = (float)box.bottom();
         if (right - left < 3.0F || bottom - top < 3.0F) {
-            LostTalesChatOverlayRenderer.fillRect(left, top, right, bottom,
+            LostTalesUiInk.fillRect(left, top, right, bottom,
                     argb);
             return;
         }
-        LostTalesChatOverlayRenderer.fillRect(left + 1.0F, top, right - 1.0F,
+        LostTalesUiInk.fillRect(left + 1.0F, top, right - 1.0F,
                 top + 1.0F, argb);
-        LostTalesChatOverlayRenderer.fillRect(left, top + 1.0F, right,
+        LostTalesUiInk.fillRect(left, top + 1.0F, right,
                 bottom - 1.0F, argb);
-        LostTalesChatOverlayRenderer.fillRect(left + 1.0F, bottom - 1.0F,
+        LostTalesUiInk.fillRect(left + 1.0F, bottom - 1.0F,
                 right - 1.0F, bottom, argb);
     }
 
@@ -1097,13 +1098,13 @@ final class ChatSnapLayouts {
             int width = panelWidth(count, COLUMNS);
             int height = panelHeight(count, COLUMNS,
                     thumbHeight(screenWidth, screenHeight));
-            ChatPopupMenu.Anchor anchor = ChatPopupMenu.Anchor.inward(
+            ChatMenu.Anchor anchor = ChatMenu.Anchor.inward(
                     (int)Math.floor(control.left),
                     (int)Math.floor(control.top),
                     (int)Math.ceil(control.right()),
                     (int)Math.ceil(control.bottom()), frame, screenWidth,
                     screenHeight);
-            int gap = ChatPopupMenu.Anchor.GAP;
+            int gap = ChatMenu.Anchor.GAP;
             int roomBelow = screenHeight - (anchor.bottom + gap);
             int roomAbove = anchor.top - gap;
             boolean below = anchor.below;

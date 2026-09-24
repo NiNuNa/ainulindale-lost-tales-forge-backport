@@ -53,7 +53,7 @@ public final class ChatChannelSendRefusalTest {
     /** An open channel refuses nobody, whatever they are or are not in. */
     @Test
     public void anOpenChannelRefusesNobody() {
-        assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.ALL, null, ALDRIC, "", 0, false, false));
+        assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.GLOBAL, null, ALDRIC, "", 0, false, false));
         assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.PROXIMITY, null, ALDRIC, "", 0, false, false));
         assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.OOC, null, null, "", 0, false, false));
     }
@@ -103,12 +103,12 @@ public final class ChatChannelSendRefusalTest {
     /** The gate the config put on a channel refuses whoever does not hold its role. */
     @Test
     public void theGateRefusesWhoeverDoesNotHoldItsRole() {
-        installOperatorGateOn(ChatChannel.ADMIN);
+        installOperatorGateOn(ChatChannel.OPERATOR);
         assertEquals(GATE_REFUSAL,
-                ChatChannelPolicy.sendRefusal(ChatChannel.ADMIN, null, ALDRIC, "", 0, false, false));
+                ChatChannelPolicy.sendRefusal(ChatChannel.OPERATOR, null, ALDRIC, "", 0, false, false));
         int operator = ChatRoleCatalog.server().byId("operator").bit();
         assertNull(ChatChannelPolicy.sendRefusal(
-                ChatChannel.ADMIN, null, ALDRIC, "", operator, false, false));
+                ChatChannel.OPERATOR, null, ALDRIC, "", operator, false, false));
         assertTrue("the client is told to ask again for its tabs",
                 ChatChannelPolicy.isGateRefusal(GATE_REFUSAL));
         assertTrue(!ChatChannelPolicy.isGateRefusal(FACTION_REFUSAL));
@@ -129,16 +129,16 @@ public final class ChatChannelSendRefusalTest {
         ChatChannelGates.install(ChatChannelGates.defaults());
 
         assertTrue("the staff channel is restricted by its own rule",
-                ChatChannelPolicy.staffOnly(ChatChannel.ADMIN,
+                ChatChannelPolicy.staffOnly(ChatChannel.OPERATOR,
                         ChatChannelGates.current()));
         assertEquals("a player who is not an operator is refused",
                 GATE_REFUSAL, ChatChannelPolicy.sendRefusal(
-                        ChatChannel.ADMIN, null, ALDRIC, "", 0, false, false));
+                        ChatChannel.OPERATOR, null, ALDRIC, "", 0, false, false));
         assertNull("an operator still reaches it",
                 ChatChannelPolicy.sendRefusal(
-                        ChatChannel.ADMIN, null, ALDRIC, "", 0, true, false));
+                        ChatChannel.OPERATOR, null, ALDRIC, "", 0, true, false));
         assertTrue("no other channel is restricted by its rule",
-                !ChatChannelPolicy.staffOnly(ChatChannel.ALL,
+                !ChatChannelPolicy.staffOnly(ChatChannel.GLOBAL,
                         ChatChannelGates.current())
                         && !ChatChannelPolicy.staffOnly(ChatChannel.OOC,
                                 ChatChannelGates.current()));
@@ -156,27 +156,27 @@ public final class ChatChannelSendRefusalTest {
                 ChatRoleConfig.SILENT);
         ChatRoleCatalog.installServer(catalog);
         ChatChannelGates.install(ChatRoleConfig.parseGates(
-                new String[] {"admin=read:any;send:any"}, catalog,
+                new String[] {"operator=read:any;send:any"}, catalog,
                 ChatRoleConfig.SILENT));
 
         assertTrue("the file named it, so the floor stands down",
-                !ChatChannelPolicy.staffOnly(ChatChannel.ADMIN,
+                !ChatChannelPolicy.staffOnly(ChatChannel.OPERATOR,
                         ChatChannelGates.current()));
         assertNull("anyone may send into it",
                 ChatChannelPolicy.sendRefusal(
-                        ChatChannel.ADMIN, null, ALDRIC, "", 0, false, false));
+                        ChatChannel.OPERATOR, null, ALDRIC, "", 0, false, false));
     }
 
     /** With a gate in place the config decides again, operator or not. */
     @Test
     public void aGatedStaffChannelFollowsTheConfigNotTheOperatorFloor() {
-        installOperatorGateOn(ChatChannel.ADMIN);
+        installOperatorGateOn(ChatChannel.OPERATOR);
         assertTrue("a gate is what the config put there",
-                !ChatChannelPolicy.staffOnly(ChatChannel.ADMIN,
+                !ChatChannelPolicy.staffOnly(ChatChannel.OPERATOR,
                         ChatChannelGates.current()));
         assertEquals("the gate refuses whoever does not hold its role",
                 GATE_REFUSAL, ChatChannelPolicy.sendRefusal(
-                        ChatChannel.ADMIN, null, ALDRIC, "", 0, true, false));
+                        ChatChannel.OPERATOR, null, ALDRIC, "", 0, true, false));
     }
 
     /** Installs the seeded operator role and puts its gate on one channel. */
@@ -193,7 +193,7 @@ public final class ChatChannelSendRefusalTest {
     }
 
     /**
-     * The Server Console is opened by the {@code chat.console.read}
+     * The Server Console is opened by the {@code chat.server_console.read}
      * capability and by nothing else: no role, no gate and no operator
      * level reaches it on their own, and holding the capability reaches
      * it whatever the config says.
@@ -203,8 +203,8 @@ public final class ChatChannelSendRefusalTest {
         assertTrue("the rule is what marks the channel",
                 ChatChannelPolicy.isServerConsole(ChatChannel.SERVER_CONSOLE));
         assertTrue("no other channel takes it",
-                !ChatChannelPolicy.isServerConsole(ChatChannel.CONSOLE)
-                        && !ChatChannelPolicy.isServerConsole(ChatChannel.ADMIN));
+                !ChatChannelPolicy.isServerConsole(ChatChannel.CLIENT_CONSOLE)
+                        && !ChatChannelPolicy.isServerConsole(ChatChannel.OPERATOR));
         assertEquals("a player without the capability is refused",
                 GATE_REFUSAL, ChatChannelPolicy.sendRefusal(
                         ChatChannel.SERVER_CONSOLE, null, ALDRIC, "", 0,
@@ -224,7 +224,7 @@ public final class ChatChannelSendRefusalTest {
      */
     @Test
     public void theClientConsoleIsEveryPlayersOwn() {
-        assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.CONSOLE, null,
+        assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.CLIENT_CONSOLE, null,
                 ALDRIC, "", 0, false, false));
     }
 
@@ -236,10 +236,10 @@ public final class ChatChannelSendRefusalTest {
                 ChatRoleConfig.SILENT);
         ChatRoleCatalog.installServer(catalog);
         ChatChannelGates.install(ChatRoleConfig.parseGates(
-                new String[] {"admin=read:opreator;send:opreator"}, catalog,
+                new String[] {"operator=read:opreator;send:opreator"}, catalog,
                 ChatRoleConfig.SILENT));
         assertEquals(GATE_REFUSAL, ChatChannelPolicy.sendRefusal(
-                ChatChannel.ADMIN, null, ALDRIC,  "",
+                ChatChannel.OPERATOR, null, ALDRIC,  "",
                 catalog.byId("operator").bit(), false, false));
     }
 

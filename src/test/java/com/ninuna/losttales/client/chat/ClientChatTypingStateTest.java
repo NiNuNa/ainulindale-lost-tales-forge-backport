@@ -81,7 +81,7 @@ public final class ClientChatTypingStateTest {
 
     @Test
     public void aTabKeepsABoundedNumberOfTypists() {
-        ChatTab global = ChatTab.of(ChatChannel.ALL);
+        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
         for (int index = 0; index < ClientChatTypingState.MAX_NAMES_PER_TAB + 5;
              index++) {
             ClientChatTypingState.apply(global, "Player" + index, true,

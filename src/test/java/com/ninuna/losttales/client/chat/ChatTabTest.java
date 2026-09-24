@@ -66,7 +66,7 @@ public final class ChatTabTest {
     private static com.ninuna.losttales.chat.ChatChannelDescriptor tradeDescriptor() {
         return new com.ninuna.losttales.chat.ChatChannelDescriptor("trade",
                 "Trade", com.ninuna.losttales.chat.ChatPresentationMode.IN_CHARACTER,
-                com.ninuna.losttales.chat.ChatRecipientRule.GLOBAL,
+                com.ninuna.losttales.chat.ChatRecipientRule.EVERYONE,
                 com.ninuna.losttales.chat.ChatChannelAccess.NONE,
                 0xC9A227, false);
     }
@@ -118,7 +118,7 @@ public final class ChatTabTest {
         assertEquals(steve, again);
         assertEquals("Steve", again.getPartner());
         assertFalse(ChatWindowLayout.window("w1").contains(steve));
-        assertEquals(ChatTab.of(ChatChannel.ALL),
+        assertEquals(ChatTab.of(ChatChannel.GLOBAL),
                 ChatWindowLayout.window("w2").getActiveTab());
         assertEquals(1, countWhispers());
         // A locked preferred window is passed over for an unlocked one.
@@ -147,7 +147,7 @@ public final class ChatTabTest {
         ChatWindowLayoutStore.load(lines);
         assertFalse(ChatWindowLayout.isOpen(alex));
         assertFalse(ChatWindowLayout.isMuted(alex));
-        assertEquals(Arrays.asList(ChatChannel.ALL, ChatChannel.PROXIMITY,
+        assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.PROXIMITY,
                 ChatChannel.FACTION, ChatChannel.OOC,
                 ChatChannel.PARTY), ChatWindowLayout.window("w2").getChannels());
         // They also end with the session: closed along with the history.
@@ -158,7 +158,7 @@ public final class ChatTabTest {
         ChatWindowLayout.closeConversations();
         assertEquals(2, ChatWindowLayout.windows().size());
         assertFalse(ChatWindowLayout.isOpen(wanderer));
-        assertEquals(Arrays.asList(ChatChannel.ALL, ChatChannel.PROXIMITY,
+        assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.PROXIMITY,
                 ChatChannel.FACTION, ChatChannel.OOC,
                 ChatChannel.PARTY), ChatWindowLayout.window("w2").getChannels());
     }

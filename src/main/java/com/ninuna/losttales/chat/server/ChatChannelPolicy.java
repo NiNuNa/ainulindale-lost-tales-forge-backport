@@ -68,7 +68,7 @@ public final class ChatChannelPolicy {
         /** Whether the reader holds the server's operator level. */
         boolean isOperator();
 
-        /** Whether the reader holds {@code chat.console.read}. */
+        /** Whether the reader holds {@code chat.server_console.read}. */
         boolean readsConsole();
 
         /** The account's own roles: what an out-of-character gate is passed with. */
@@ -88,7 +88,7 @@ public final class ChatChannelPolicy {
      *                 which is what reaches a staff channel the config
      *                 names no gate for; see {@link #staffOnly}
      * @param consoleReader whether the sender holds
-     *                 {@code chat.console.read}, which is what reaches
+     *                 {@code chat.server_console.read}, which is what reaches
      *                 the server's console; see {@link #readsConsole}
      */
     public static String sendRefusal(ChatChannel channel, Party party, UUID gameplayId,
@@ -233,7 +233,7 @@ public final class ChatChannelPolicy {
             }
             boolean reached;
             switch (rule) {
-                case GLOBAL:
+                case EVERYONE:
                 case OPERATORS:
                     reached = true;
                     break;
@@ -287,7 +287,7 @@ public final class ChatChannelPolicy {
         ChatChannelGates.Gate gate = ChatChannelGates.current().gateOf(channel);
         boolean readGated = gate.isReadClosed() || !gate.getReadRoles().isEmpty();
         switch (channel.getRecipientRule()) {
-            case GLOBAL:
+            case EVERYONE:
                 return readGated
                         ? ChatHistory.Audience.readers()
                         : ChatHistory.Audience.everyone();
@@ -332,7 +332,7 @@ public final class ChatChannelPolicy {
 
     /** Whether the player may read the Server Console. */
     public static boolean readsConsole(EntityPlayerMP player) {
-        return LostTalesPermissions.has(player, LostTalesCapability.CHAT_CONSOLE_READ);
+        return LostTalesPermissions.has(player, LostTalesCapability.CHAT_SERVER_CONSOLE_READ);
     }
 
     /**

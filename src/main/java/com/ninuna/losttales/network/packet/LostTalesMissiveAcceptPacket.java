@@ -17,8 +17,7 @@ import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
-import net.minecraft.util.ChatComponentText;
-import net.minecraft.util.EnumChatFormatting;
+import net.minecraft.util.ChatComponentTranslation;
 
 /**
  * Client-to-server request to accept a missive.
@@ -111,17 +110,17 @@ public class LostTalesMissiveAcceptPacket implements IMessage {
             EntityPlayerMP player, int x, int y, int z, int slot, String expectedQuestId) {
         TileEntity tileEntity = player.worldObj.getTileEntity(x, y, z);
         if (!(tileEntity instanceof LostTalesTileEntityMissiveBoard)) {
-            send(player, EnumChatFormatting.RED + "That missive board is no longer available.");
+            send(player, "chat.losttales.missive.board_gone");
             return;
         }
 
         LostTalesTileEntityMissiveBoard board = (LostTalesTileEntityMissiveBoard) tileEntity;
         if (!board.isUseableByPlayer(player)) {
-            send(player, EnumChatFormatting.RED + "You are too far away from the missive board.");
+            send(player, "chat.losttales.missive.too_far");
             return;
         }
         if (slot < 0 || slot >= board.getSizeInventory()) {
-            send(player, EnumChatFormatting.RED + "That missive is no longer available.");
+            send(player, "chat.losttales.missive.gone");
             return;
         }
 
@@ -152,7 +151,7 @@ public class LostTalesMissiveAcceptPacket implements IMessage {
     private static void handlePlayerInventoryAcceptance(
             EntityPlayerMP player, int slot, String expectedQuestId) {
         if (slot < 0 || slot >= player.inventory.getSizeInventory()) {
-            send(player, EnumChatFormatting.RED + "That missive letter is no longer in your inventory.");
+            send(player, "chat.losttales.missive.letter_gone");
             return;
         }
 
@@ -176,19 +175,19 @@ public class LostTalesMissiveAcceptPacket implements IMessage {
             EntityPlayerMP player, ItemStack stack, String expectedQuestId) {
         if (stack == null || stack.stackSize <= 0
                 || stack.getItem() != ELostTalesItem.MISSIVE_LETTER.getItem()) {
-            send(player, EnumChatFormatting.RED + "That missive is no longer available.");
+            send(player, "chat.losttales.missive.gone");
             return null;
         }
 
         LostTalesMissiveData missive = LostTalesMissiveNbt.readFromItemStack(stack);
         if (missive == null || !missive.isValid()) {
-            send(player, EnumChatFormatting.RED + "That missive is damaged or incomplete.");
+            send(player, "chat.losttales.missive.damaged");
             return null;
         }
 
         String expected = expectedQuestId == null ? "" : expectedQuestId.trim();
         if (expected.length() == 0 || !expected.equals(missive.getQuestId())) {
-            send(player, EnumChatFormatting.RED + "That missive changed before you could accept it.");
+            send(player, "chat.losttales.missive.changed");
             return null;
         }
         return missive;
@@ -198,7 +197,7 @@ public class LostTalesMissiveAcceptPacket implements IMessage {
             EntityPlayerMP player, LostTalesMissiveData missive) {
         LostTalesQuestDefinition quest = LostTalesMissiveQuestFactory.createQuestDefinition(missive);
         if (quest == null) {
-            send(player, EnumChatFormatting.RED + "That missive cannot be accepted.");
+            send(player, "chat.losttales.missive.refused");
             return LostTalesQuestManager.StartResult.UNKNOWN_QUEST;
         }
         return LostTalesQuestManager.startGeneratedQuest(
@@ -208,19 +207,20 @@ public class LostTalesMissiveAcceptPacket implements IMessage {
     private static void sendStartFailure(
             EntityPlayerMP player, LostTalesQuestManager.StartResult result) {
         if (result == LostTalesQuestManager.StartResult.ALREADY_ACTIVE) {
-            send(player, EnumChatFormatting.YELLOW + "You already have this missive active.");
+            send(player, "chat.losttales.missive.already_active");
         } else if (result == LostTalesQuestManager.StartResult.ALREADY_COMPLETED) {
-            send(player, EnumChatFormatting.YELLOW + "You have already completed this missive.");
+            send(player, "chat.losttales.missive.already_completed");
         } else if (result == LostTalesQuestManager.StartResult.REQUIREMENTS_NOT_MET) {
             // startGeneratedQuest already sends the specific prerequisite failure.
         } else {
-            send(player, EnumChatFormatting.RED + "This missive cannot be accepted right now.");
+            send(player, "chat.losttales.missive.not_now");
         }
     }
 
-    private static void send(EntityPlayerMP player, String message) {
-        if (player != null && message != null && message.length() > 0) {
-            player.addChatMessage(new ChatComponentText(message));
+    /** A missive board's word to the player, said by the Server. */
+    private static void send(EntityPlayerMP player, String key) {
+        if (player != null) {
+            player.addChatMessage(new ChatComponentTranslation(key));
         }
     }
 

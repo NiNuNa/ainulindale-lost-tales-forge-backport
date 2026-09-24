@@ -13,12 +13,12 @@ import com.ninuna.losttales.party.storage.PartyInvitationWorldData;
 import com.ninuna.losttales.party.storage.PartyWorldData;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.World;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import com.ninuna.losttales.util.LostTalesServerPlayers;
 
 /**
  * Invitation-specific operations kept separate from the core party lifecycle.
@@ -77,7 +77,7 @@ final class PartyInvitationCoordinator {
                 characterData,
                 System.currentTimeMillis());
 
-        EntityPlayerMP targetPlayer = findOnlinePlayer(targetOwnerId);
+        EntityPlayerMP targetPlayer = LostTalesServerPlayers.findOnline(targetOwnerId);
         if (targetPlayer == null) {
             return PartyInvitationOperationResult.failure(
                     PartyErrorId.TARGET_OFFLINE, party, null);
@@ -97,6 +97,10 @@ final class PartyInvitationCoordinator {
         if (targetParty != null) {
             return PartyInvitationOperationResult.failure(
                     PartyErrorId.TARGET_ALREADY_IN_PARTY, party, null);
+        }
+        if (party.hasMemberOwnedBy(target.ownerId())) {
+            return PartyInvitationOperationResult.failure(
+                    PartyErrorId.ACCOUNT_ALREADY_IN_PARTY, party, null);
         }
         if (invitationData.hasInvitationForPartyAndTarget(
                 party.getPartyId(), targetCharacterId)) {
@@ -392,6 +396,11 @@ final class PartyInvitationCoordinator {
                 invitation.getTargetCharacterId()) != null) {
             return PartyErrorId.TARGET_ALREADY_IN_PARTY;
         }
+        // Another character of the account may have joined while this
+        // invitation waited.
+        if (party.hasMemberOwnedBy(invitation.getTargetOwnerId())) {
+            return PartyErrorId.ACCOUNT_ALREADY_IN_PARTY;
+        }
         CharacterIndex index =
                 characterData.characterIndex();
         if (getInvitationCorruptionReason(invitation, index) != null) {
@@ -475,26 +484,4 @@ final class PartyInvitationCoordinator {
                 : now + PartyService.INVITATION_LIFETIME_MILLIS;
     }
 
-    private EntityPlayerMP findOnlinePlayer(UUID ownerId) {
-        if (ownerId == null) {
-            return null;
-        }
-        MinecraftServer server = MinecraftServer.getServer();
-        if (server == null || server.getConfigurationManager() == null) {
-            return null;
-        }
-        List<?> players = server.getConfigurationManager().playerEntityList;
-        if (players == null) {
-            return null;
-        }
-        for (Object value : players) {
-            if (value instanceof EntityPlayerMP) {
-                EntityPlayerMP candidate = (EntityPlayerMP) value;
-                if (ownerId.equals(candidate.getUniqueID())) {
-                    return candidate;
-                }
-            }
-        }
-        return null;
-    }
 }

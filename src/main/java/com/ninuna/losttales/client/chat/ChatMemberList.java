@@ -249,7 +249,7 @@ final class ChatMemberList {
      */
     static List<LostTalesChatMembersPacket.Member> membersOf(ChatTab tab,
             List<LostTalesChatMembersPacket.Member> answered) {
-        boolean console = tab != null && tab.getChannel() == ChatChannel.CONSOLE;
+        boolean console = tab != null && tab.getChannel() == ChatChannel.CLIENT_CONSOLE;
         if (tab == null || !(tab.isNpc() || console)) {
             return answered;
         }
@@ -262,7 +262,7 @@ final class ChatMemberList {
 
     /** The Client as the Client Console's list shows it: here, in the consoles' colour, with no status. */
     static LostTalesChatMembersPacket.Member clientMember() {
-        int color = ChatChannel.CONSOLE.getDisplayColor();
+        int color = ChatChannel.CLIENT_CONSOLE.getDisplayColor();
         return new LostTalesChatMembersPacket.Member(
                 LostTalesChatMessagePacket.CLIENT_SENDER_ID, "", null,
                 StatCollector.translateToLocal("chat.losttales.client.name"),
@@ -551,7 +551,7 @@ final class ChatMemberList {
         // The list's own surface: the chat's inset one, as the timestamp
         // area wears on the other side, standing beside the history's
         // panel rather than over it.
-        LostTalesChatOverlayRenderer.fillRect(left, top, windowRight, bottom,
+        LostTalesUiInk.fillRect(left, top, windowRight, bottom,
                 LostTalesChatVisualStyle.argb(LostTalesChatVisualStyle.SURFACE_RGB,
                         surfaceAlpha));
         // The rows' own space starts past the separator, on the display's

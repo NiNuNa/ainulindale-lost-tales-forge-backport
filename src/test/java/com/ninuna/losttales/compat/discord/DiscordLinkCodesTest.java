@@ -43,7 +43,7 @@ public final class DiscordLinkCodesTest {
 
     @Test
     public void aCodeRunsOut() {
-        String code = DiscordLinkCodes.issue("all", DiscordBridgeDirection.GAME_TO_DISCORD,
+        String code = DiscordLinkCodes.issue("global", DiscordBridgeDirection.GAME_TO_DISCORD,
                 null, "Server", NOW);
         assertNull(DiscordLinkCodes.take(code, NOW + DiscordLinkCodes.LIFETIME_MILLIS));
     }
@@ -64,7 +64,7 @@ public final class DiscordLinkCodesTest {
         String first = DiscordLinkCodes.issue("ooc", DiscordBridgeDirection.BIDIRECTIONAL,
                 null, "", NOW);
         for (int index = 0; index < DiscordLinkCodes.MAX_PENDING; index++) {
-            DiscordLinkCodes.issue("all", DiscordBridgeDirection.BIDIRECTIONAL, null, "", NOW);
+            DiscordLinkCodes.issue("global", DiscordBridgeDirection.BIDIRECTIONAL, null, "", NOW);
         }
         assertNull(DiscordLinkCodes.peek(first, NOW));
     }

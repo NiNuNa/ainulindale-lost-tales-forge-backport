@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import com.ninuna.losttales.gui.style.LostTalesUiCaret;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
@@ -187,6 +188,11 @@ final class ChatInputBar {
     /** The pickers the chevron folds away; the emoji picker stands apart. */
     private final ChatPickerPanel[] insertPickers = new ChatPickerPanel[] {
             this.itemPicker, this.markerPicker, this.questPicker};
+    /**
+     * The Reactions window's emoji picker, aimed at a message: it has no
+     * button of its own, a message's React opens it.
+     */
+    private final ChatEmojiPicker reactionPicker = new ChatEmojiPicker();
     /** Bar slot of the fold chevron, between the emoji and the inserts. */
     private int toolbarToggleIndex;
     private final ChatIconFlipbook toolbarToggle =
@@ -347,7 +353,7 @@ final class ChatInputBar {
         return wellTopFor(barTop) + LostTalesChatOverlayRenderer.ROW_TEXT_TOP;
     }
 
-    /** The anchor the pickers hang their buttons and panels from. */
+    /** The anchor the pickers hang their buttons from, and first open their windows by. */
     int pickerAnchor() {
         return barControlTop() + ChatPickerPanel.BUTTON_ANCHOR_OFFSET;
     }
@@ -440,12 +446,8 @@ final class ChatInputBar {
 
     /* ---- The pickers ---- */
 
-    ChatPickerPanel[] pickers() {
-        return this.pickers;
-    }
-
-    ChatEmojiPicker emojiPicker() {
-        return this.emojiPicker;
+    ChatEmojiPicker reactionPicker() {
+        return this.reactionPicker;
     }
 
     ChatMapMarkerPicker markerPicker() {
@@ -459,30 +461,50 @@ final class ChatInputBar {
         this.questPicker.refresh();
     }
 
-    /** The picker whose panel is open, or null. */
-    ChatPickerPanel openPicker() {
-        for (ChatPickerPanel picker : this.pickers) {
-            if (picker.isOpen()) {
-                return picker;
-            }
+    /** The kind of window a picker opens in. */
+    ChatSmallWindowKind kindOf(ChatPickerPanel picker) {
+        if (picker == this.reactionPicker) {
+            return ChatSmallWindowKind.REACTIONS;
         }
-        return null;
+        if (picker == this.itemPicker) {
+            return ChatSmallWindowKind.ITEMS;
+        }
+        if (picker == this.markerPicker) {
+            return ChatSmallWindowKind.MARKERS;
+        }
+        if (picker == this.questPicker) {
+            return ChatSmallWindowKind.QUESTS;
+        }
+        return ChatSmallWindowKind.EMOJI;
     }
 
-    void closePickers() {
-        for (ChatPickerPanel picker : this.pickers) {
-            picker.setOpen(false);
+    /** The picker a kind of window holds; null for a kind no picker opens in. */
+    ChatPickerPanel pickerOf(ChatSmallWindowKind kind) {
+        switch (kind) {
+            case EMOJI:
+                return this.emojiPicker;
+            case REACTIONS:
+                return this.reactionPicker;
+            case ITEMS:
+                return this.itemPicker;
+            case MARKERS:
+                return this.markerPicker;
+            case QUESTS:
+                return this.questPicker;
+            default:
+                return null;
         }
     }
 
-    /** Folds the insert pickers' panels with their buttons. */
-    void closeInsertPickers() {
-        for (ChatPickerPanel picker : this.insertPickers) {
-            picker.setOpen(false);
-        }
+    /**
+     * Where a picker's window opens before the player has placed it: on
+     * the bar being typed in, at its right edge, as the panel always did.
+     */
+    LostTalesUiHitBox firstPickerBox(ChatPickerPanel picker) {
+        return picker.firstContentBox(inputBarRight(), pickerAnchor());
     }
 
-    /** Whether the picker's button (and panel) is on the bar right now. */
+    /** Whether the picker's button is on the bar right now. */
     boolean isPickerShown(ChatPickerPanel picker) {
         if (picker == this.emojiPicker) {
             return LostTalesConfig.enableChatEmojis;
@@ -521,16 +543,15 @@ final class ChatInputBar {
             return;
         }
         float opacity = Motions.enabled() ? noticeOpacity(ageMillis) : 1.0F;
-        int alpha = Math.max(LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA,
-                Math.min(255, Math.round(255.0F * opacity)));
-        int popupWidth = this.font.getStringWidth(this.noticeText) + 10;
-        // Centred over the input bar, which is as wide as the history.
+        int popupWidth = LostTalesChatVisualStyle.popupLineWidth(this.font,
+                this.noticeText);
+        // Centred over the input bar, which is as wide as the history,
+        // four pixels clear of it, settling the last three as it comes.
         int x = Math.max(2, (this.left + inputBarRight() - popupWidth) / 2);
-        int y = this.top - 17 + Math.round((1.0F - opacity) * 3.0F);
-        LostTalesChatVisualStyle.drawPopup(x, y, x + popupWidth, y + 13,
-                opacity);
-        LostTalesChatVisualStyle.drawPlain(this.font, this.noticeText, x + 5,
-                y + 2, alpha);
+        int y = this.top - 4 - LostTalesChatVisualStyle.POPUP_LINE_HEIGHT
+                + Math.round((1.0F - opacity) * 3.0F);
+        LostTalesChatVisualStyle.drawPopupLine(this.font, this.noticeText, x,
+                y, opacity);
     }
 
     /** A quick fade in and a slower fade out over the notice's life. */
@@ -581,7 +602,7 @@ final class ChatInputBar {
         // the tab has one — each frame's corner pixels are the bar's,
         // outside the frame's rounding; from the divider on, around the
         // typing well.
-        LostTalesChatOverlayRenderer.fillRect(this.left, this.top + 1,
+        LostTalesUiInk.fillRect(this.left, this.top + 1,
                 fit.frameLeft, barBottom, surface);
         LostTalesChatVisualStyle.fillAround(fit.frameLeft, this.top + 1,
                 fit.frameRight, barBottom, fit.frameLeft, frameTop,
@@ -599,7 +620,7 @@ final class ChatInputBar {
             LostTalesUiFramedButton.fillCorners(characterLeft, characterTop,
                     CHARACTER_BUTTON_SIZE, CHARACTER_BUTTON_SIZE, surface);
         } else {
-            LostTalesChatOverlayRenderer.fillRect(fit.frameRight, this.top + 1,
+            LostTalesUiInk.fillRect(fit.frameRight, this.top + 1,
                     line.leftDividerX, barBottom, surface);
         }
         LostTalesChatVisualStyle.fillAround(line.leftDividerX, this.top + 1,
@@ -612,22 +633,22 @@ final class ChatInputBar {
         // row the window's bottom rule stands on included; the frame's
         // edges lie over it.
         int ring = ChatWindowPlacement.FRAME_WIDTH;
-        LostTalesChatOverlayRenderer.fillRect(this.left - ring, this.top,
+        LostTalesUiInk.fillRect(this.left - ring, this.top,
                 this.left, barBottom, surface);
-        LostTalesChatOverlayRenderer.fillRect(barRight, this.top,
+        LostTalesUiInk.fillRect(barRight, this.top,
                 barRight + ring, barBottom, surface);
-        LostTalesChatOverlayRenderer.fillRect(this.left - ring, barBottom,
+        LostTalesUiInk.fillRect(this.left - ring, barBottom,
                 barRight + ring, barBottom + ring - 1, surface);
         // The ring's outermost corner pixels lie outside the frame's
         // rounding, as a framed button's footprint corners do.
-        LostTalesChatOverlayRenderer.fillRect(this.left - ring + 1,
+        LostTalesUiInk.fillRect(this.left - ring + 1,
                 barBottom + ring - 1, barRight + ring - 1, barBottom + ring,
                 surface);
         // The frame's edges beside and under the bar and its two bottom
         // corners, on the whole window's ramps: the window's box reaches
         // as far above the bar's foot here as it does on screen.
         if (frame != null) {
-            LostTalesChatOverlayRenderer.drawFrameEdgesBelow(this.left,
+            LostTalesUiWindowFrame.drawEdgesBelow(this.left,
                     barBottom - (float)(frame.boxBottom - frame.boxTop),
                     barRight, barBottom, this.top, faded(255));
         }
@@ -804,13 +825,12 @@ final class ChatInputBar {
                 barControlTop() + ChatPickerPanel.BUTTON_SIZE);
     }
 
-    /** Every picker's button and open panel, in bar space. */
-    void drawPickers(int barRight, double mouseX, double mouseY, int tipX,
-                     int tipY) {
+    /** Every picker's button, in bar space; their windows are the screen's. */
+    void drawPickerButtons(int barRight, double mouseX, double mouseY) {
         for (ChatPickerPanel picker : this.pickers) {
             if (isPickerShown(picker)) {
-                picker.draw(this.mc, this.regions, barRight, pickerAnchor(),
-                        mouseX, mouseY, tipX, tipY);
+                picker.drawButton(this.regions, barRight, pickerAnchor(),
+                        mouseX, mouseY);
             }
         }
     }

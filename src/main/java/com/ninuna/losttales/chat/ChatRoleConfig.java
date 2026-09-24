@@ -43,7 +43,7 @@ import java.util.regex.Pattern;
  * assignment is worn by that character alone and grants nothing.</p>
  *
  * <p>{@code channels.gates} in {@code server/channels.cfg}, one channel
- * per entry: {@code admin=read:operator,moderator;send:operator}; a
+ * per entry: {@code operator=read:operator,moderator;send:operator}; a
  * side left out or set to {@code any} is open, and a side naming a role
  * that does not exist is closed to everyone, with a warning.</p>
  *
@@ -80,7 +80,7 @@ public final class ChatRoleConfig {
             "operator=name:Operator;color:A94B54;mention:true;rank:10;op:2"
             + ";icon:emoji:expressionless;desc:Runs the server day to day.";
     /** The gate a fresh file starts with: the Operator channel for the operator role. */
-    public static final String DEFAULT_ADMIN_GATE = ChatChannel.ADMIN.getId()
+    public static final String DEFAULT_OPERATOR_GATE = ChatChannel.OPERATOR.getId()
             + "=read:operator;send:operator";
 
     private ChatRoleConfig() {}
@@ -289,7 +289,7 @@ public final class ChatRoleConfig {
     /**
      * The permissions the entries describe:
      * <pre>
-     * keeper=capability:chat.moderate;capability:chat.console.read;desc:Keeps the peace.
+     * keeper=capability:chat.moderate;capability:chat.server_console.read;desc:Keeps the peace.
      * </pre>
      * {@code capability:} may repeat and names a capability the code
      * registers; one naming none is skipped with a warning and the rest
@@ -369,11 +369,12 @@ public final class ChatRoleConfig {
      * The channels the entries define, registered beside the built-in
      * ones:
      * <pre>
-     * trade=name:Trade;rule:global;colour:C9A227;bridge:true
+     * trade=name:Trade;rule:everyone;colour:C9A227;bridge:true
      * </pre>
-     * The key is the channel's id and is permanent: packets, the layout
-     * file and the gates all name a channel by it. {@code rule} is how
-     * the server routes it — {@code global}, {@code proximity} or
+     * The key is the channel's id, its code name: packets, the layout
+     * file, the gates, {@code #} links and Discord links all name a
+     * channel by it. {@code rule} is how the server routes it —
+     * {@code everyone}, {@code proximity} or
      * {@code operators}; the rules that need something the config cannot
      * describe (a party, a faction, a whisper, a private console) are
      * refused. {@code ooc} makes it an out-of-character channel: its
@@ -382,7 +383,9 @@ public final class ChatRoleConfig {
      *
      * <p>An entry naming a built-in channel's id is refused rather than
      * replacing it: the code's own channels are not a config's to
-     * redefine. Every problem is reported and that entry alone skipped.</p>
+     * redefine. So is one taking a faction's code name, which already
+     * names that faction's chat. Every problem is reported and that
+     * entry alone skipped.</p>
      */
     public static List<ChatChannelDescriptor> parseChannelDefinitions(
             String[] entries, Warnings out) {
@@ -405,6 +408,11 @@ public final class ChatRoleConfig {
                         + "already has and is not a config's to define; skipped");
                 continue;
             }
+            if (ChatCodeNames.isFaction(id)) {
+                warnings.warn("Channel '" + id + "' is a faction's name, "
+                        + "which names that faction's chat; skipped");
+                continue;
+            }
             if (!seen.add(id)) {
                 warnings.warn("Channel '" + id + "' is defined twice; the "
                         + "second was skipped");
@@ -414,7 +422,7 @@ public final class ChatRoleConfig {
             ChatRecipientRule rule = definedRule(first(options, "rule"));
             if (rule == null) {
                 warnings.warn("Channel '" + id + "' names no routing a config "
-                        + "can describe (global, proximity or operators); skipped");
+                        + "can describe (everyone, proximity or operators); skipped");
                 continue;
             }
             if (defined.size() >= ChatChannel.MAX_DEFINED_CHANNELS) {
@@ -454,8 +462,8 @@ public final class ChatRoleConfig {
      */
     private static ChatRecipientRule definedRule(String rule) {
         String named = rule == null ? "" : rule.trim().toLowerCase(Locale.ROOT);
-        if ("global".equals(named) || named.length() == 0) {
-            return ChatRecipientRule.GLOBAL;
+        if ("everyone".equals(named) || named.length() == 0) {
+            return ChatRecipientRule.EVERYONE;
         }
         if ("proximity".equals(named)) {
             return ChatRecipientRule.PROXIMITY;
@@ -560,13 +568,13 @@ public final class ChatRoleConfig {
      * editor as easily as on purpose, so a missing line is treated as a
      * slip: the seeded gate returns and the file is told so. An entry
      * that names the channel is a decision and stands as written —
-     * {@code admin=read:any;send:any} opens the channel on purpose.
+     * {@code operator=read:any;send:any} opens the channel on purpose.
      */
     public static String[] withRequiredGates(String[] entries, Warnings warnings) {
         String[] kept = entries == null ? new String[0] : entries;
         for (String entry : kept) {
             if (!isBlankOrComment(entry)
-                    && ChatChannel.fromId(keyOf(entry)) == ChatChannel.ADMIN) {
+                    && ChatChannel.fromId(keyOf(entry)) == ChatChannel.OPERATOR) {
                 return kept;
             }
         }
@@ -576,7 +584,7 @@ public final class ChatRoleConfig {
                 + "keep the line and set its sides to any.");
         String[] reseeded = new String[kept.length + 1];
         System.arraycopy(kept, 0, reseeded, 0, kept.length);
-        reseeded[kept.length] = DEFAULT_ADMIN_GATE;
+        reseeded[kept.length] = DEFAULT_OPERATOR_GATE;
         return reseeded;
     }
 

@@ -54,8 +54,8 @@
     "curve": "ease_in_out",
     "params": { "distance": 13, "swing": 1.25, "swings": 2.5 }
   },
-  "chat.picker.open": {
-    "about": "A picker panel opening from its button and closing back into it.",
+  "chat.small_window.open": {
+    "about": "A small window opening where it stands, rising its last pixels into place, and fading out there as it closes.",
     "duration": 140,
     "curve": "settle"
   },

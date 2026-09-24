@@ -52,7 +52,7 @@ public final class ChatScrollHoldTest {
 
     @Test
     public void arrivingMessagesDoNotMoveThePageBeingRead() {
-        ChatTab tab = ChatTab.of(ChatChannel.ALL);
+        ChatTab tab = ChatTab.of(ChatChannel.GLOBAL);
         List<ChatLine> lines = history(10, 9, 8, 7, 6, 5, 4, 3, 2, 1);
         ClientChatChannelViews.scroll(tab, 4, lines.size(), 3.0D);
         // The hold is taken on the line at the view's edge: row 4, which
@@ -139,7 +139,7 @@ public final class ChatScrollHoldTest {
 
     @Test
     public void reWrappingTheHistoryDoesNotMoveThePage() {
-        ChatTab tab = ChatTab.of(ChatChannel.ALL);
+        ChatTab tab = ChatTab.of(ChatChannel.GLOBAL);
         List<ChatLine> lines = history(10, 9, 8, 7, 6, 5, 4, 3, 2, 1);
         ClientChatChannelViews.scroll(tab, 4, lines.size(), 3.0D);
         ClientChatChannelViews.holdPosition(tab, frameOver(lines, -1));
@@ -161,7 +161,7 @@ public final class ChatScrollHoldTest {
      */
     @Test
     public void aTallerWindowLowersTheCeilingWithoutAJitter() {
-        ChatTab tab = ChatTab.of(ChatChannel.ALL);
+        ChatTab tab = ChatTab.of(ChatChannel.GLOBAL);
         List<ChatLine> lines = history(10, 9, 8, 7, 6, 5, 4, 3, 2, 1);
         ChatWindowFrame frame = frameOver(lines, -1);
         // Three lines of room: the ceiling is seven rows up.
@@ -191,7 +191,7 @@ public final class ChatScrollHoldTest {
 
     @Test
     public void scrollingAgainTakesAFreshHold() {
-        ChatTab tab = ChatTab.of(ChatChannel.ALL);
+        ChatTab tab = ChatTab.of(ChatChannel.GLOBAL);
         List<ChatLine> lines = history(10, 9, 8, 7, 6, 5, 4, 3, 2, 1);
         ClientChatChannelViews.scroll(tab, 4, lines.size(), 3.0D);
         ClientChatChannelViews.holdPosition(tab, frameOver(lines, -1));
@@ -206,7 +206,7 @@ public final class ChatScrollHoldTest {
 
     @Test
     public void messagesArrivingWhileScrolledBackAreCounted() {
-        ChatTab tab = ChatTab.of(ChatChannel.ALL);
+        ChatTab tab = ChatTab.of(ChatChannel.GLOBAL);
         List<ChatLine> lines = history(10, 9, 8, 7, 6, 5, 4, 3, 2, 1);
         assertEquals(0, ClientChatChannelViews.waitingBelow(tab));
 
@@ -232,7 +232,7 @@ public final class ChatScrollHoldTest {
 
     @Test
     public void scrollingBackDownClearsWhatWasWaiting() {
-        ChatTab tab = ChatTab.of(ChatChannel.ALL);
+        ChatTab tab = ChatTab.of(ChatChannel.GLOBAL);
         List<ChatLine> lines = history(10, 9, 8, 7, 6, 5, 4, 3, 2, 1);
         ClientChatChannelViews.scroll(tab, 4, lines.size(), 3.0D);
         ClientChatChannelViews.record(11, tab, tab, false);
@@ -245,7 +245,7 @@ public final class ChatScrollHoldTest {
 
     @Test
     public void aHeldMessageTrimmedAwayLeavesTheViewWhereItIs() {
-        ChatTab tab = ChatTab.of(ChatChannel.ALL);
+        ChatTab tab = ChatTab.of(ChatChannel.GLOBAL);
         List<ChatLine> lines = history(10, 9, 8, 7, 6, 5, 4, 3, 2, 1);
         ClientChatChannelViews.scroll(tab, 8, lines.size(), 3.0D);
         ClientChatChannelViews.holdPosition(tab, frameOver(lines, -1));

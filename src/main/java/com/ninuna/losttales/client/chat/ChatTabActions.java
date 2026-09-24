@@ -142,7 +142,6 @@ final class ChatTabActions {
         this.composer.onTabSelected(tab);
         ClientChatChannelState.select(tab);
         syncSelection();
-        this.bar.closePickers();
         this.field.setFocused(true);
         this.completion.invalidateMentionCandidates();
     }

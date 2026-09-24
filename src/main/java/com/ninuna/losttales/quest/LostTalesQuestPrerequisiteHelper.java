@@ -3,17 +3,23 @@ package com.ninuna.losttales.quest;
 import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import java.util.Map;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.util.ChatComponentTranslation;
+import net.minecraft.util.IChatComponent;
 /** Small server-side evaluator for optional quest JSON prerequisites. */
 public final class LostTalesQuestPrerequisiteHelper {
 
     private LostTalesQuestPrerequisiteHelper() {}
 
-    public static String getFailureReason(LostTalesQuestDefinition quest, EntityPlayer player, LostTalesQuestPlayerData data) {
+    /**
+     * Why the player may not start {@code quest} yet, as the Server says
+     * it, or null when every prerequisite holds.
+     */
+    public static IChatComponent refusalOf(LostTalesQuestDefinition quest, EntityPlayer player, LostTalesQuestPlayerData data) {
         if (quest == null) {
-            return "Unknown quest.";
+            return new ChatComponentTranslation("chat.losttales.quest.no_such");
         }
         if (data == null) {
-            return "Quest data is not available.";
+            return new ChatComponentTranslation("chat.losttales.quest.no_data");
         }
 
         Map<String, String> prerequisites = quest.getPrerequisites();
@@ -23,28 +29,29 @@ public final class LostTalesQuestPrerequisiteHelper {
 
         String completed = firstNonEmpty(prerequisites.get("completed"), prerequisites.get("completedQuests"), prerequisites.get("requiresCompleted"));
         if (!hasAllCompleted(data, completed)) {
-            return "You have not completed the required quest yet.";
+            return new ChatComponentTranslation("chat.losttales.quest.requires.completed");
         }
 
         String active = firstNonEmpty(prerequisites.get("active"), prerequisites.get("activeQuests"), prerequisites.get("requiresActive"));
         if (!hasAllActive(data, active)) {
-            return "A required quest is not active.";
+            return new ChatComponentTranslation("chat.losttales.quest.requires.active");
         }
 
         String notCompleted = firstNonEmpty(prerequisites.get("notCompleted"), prerequisites.get("not_completed"), prerequisites.get("forbidCompleted"));
         if (hasAnyCompleted(data, notCompleted)) {
-            return "This quest is no longer available.";
+            return new ChatComponentTranslation("chat.losttales.quest.requires.not_completed");
         }
 
         String notActive = firstNonEmpty(prerequisites.get("notActive"), prerequisites.get("not_active"), prerequisites.get("forbidActive"));
         if (hasAnyActive(data, notActive)) {
-            return "Another conflicting quest is already active.";
+            return new ChatComponentTranslation("chat.losttales.quest.requires.not_active");
         }
 
         String levelValue = firstNonEmpty(prerequisites.get("minLevel"), prerequisites.get("minExperienceLevel"), prerequisites.get("level"));
         int requiredLevel = parseInt(levelValue, -1);
         if (requiredLevel >= 0 && player != null && player.experienceLevel < requiredLevel) {
-            return "You need level " + requiredLevel + " to start this quest.";
+            return new ChatComponentTranslation("chat.losttales.quest.requires.level",
+                    Integer.valueOf(requiredLevel));
         }
 
         return null;

@@ -1,6 +1,7 @@
 package com.ninuna.losttales.command;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatCodeNames;
 import com.ninuna.losttales.chat.ChatRecipientRule;
 import com.ninuna.losttales.compat.discord.DiscordBindingEntries;
 import com.ninuna.losttales.compat.discord.DiscordBridgeDirection;
@@ -112,15 +113,16 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
     private void link(ICommandSender sender, String[] args) {
         if (args.length < 2) {
             LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY
-                    + "/losttales discord link <channel|faction:<id>> "
+                    + "/losttales discord link <channel> "
                     + "[BIDIRECTIONAL|GAME_TO_DISCORD|DISCORD_TO_GAME]");
             return;
         }
         String key = args[1].toLowerCase(Locale.ROOT);
-        if (!isGameChannelKey(key)) {
+        ChatCodeNames.Named named = ChatCodeNames.parse(key);
+        if (named == null || !named.channel.isBridgeable()) {
             LostTalesCommandConfig.send(sender, EnumChatFormatting.RED
-                    + "Cannot link " + args[1] + ": name a channel that may reach Discord,"
-                    + " or a faction as faction:<id>.");
+                    + "Cannot link " + args[1] + ": name a channel that may reach"
+                    + " Discord, or a faction such as gondor.");
             return;
         }
         DiscordBridgeDirection direction = args.length > 2
@@ -130,8 +132,7 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
                     + "Unknown direction " + args[2] + ".");
             return;
         }
-        ChatChannel channel = ChatChannel.fromId(key);
-        if (channel != null && channel.getRecipientRule() == ChatRecipientRule.PROXIMITY
+        if (named.channel.getRecipientRule() == ChatRecipientRule.PROXIMITY
                 && direction.readsFromDiscord()) {
             // Nobody on Discord stands near anyone.
             direction = DiscordBridgeDirection.GAME_TO_DISCORD;
@@ -162,7 +163,7 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
     private void unlink(ICommandSender sender, String[] args) {
         if (args.length < 2) {
             LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY
-                    + "/losttales discord unlink <channel|faction:<id>> [<Discord channel id>]");
+                    + "/losttales discord unlink <channel> [<Discord channel id>]");
             return;
         }
         String key = args[1].toLowerCase(Locale.ROOT);
@@ -194,16 +195,6 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
         LostTalesDiscordBridge.getInstance().retireWebhooks(webhooks);
     }
 
-    /** A bridgeable channel's id, or {@code faction:<id>} for one faction's chat. */
-    static boolean isGameChannelKey(String key) {
-        if (key.startsWith("faction:")) {
-            return key.length() > "faction:".length();
-        }
-        ChatChannel channel = ChatChannel.fromId(key);
-        return channel != null && channel.isBridgeable()
-                && channel != ChatChannel.FACTION;
-    }
-
     private static String describe(DiscordBridgeDirection direction) {
         if (direction == null || direction == DiscordBridgeDirection.DISABLED) {
             return "switched off";
@@ -217,9 +208,9 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
         LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY + getCommandUsage(sender));
         LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY + "/losttales discord list");
         LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY
-                + "/losttales discord link <channel|faction:<id>> [direction]");
+                + "/losttales discord link <channel> [direction]");
         LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY
-                + "/losttales discord unlink <channel|faction:<id>> [<Discord channel id>]");
+                + "/losttales discord unlink <channel> [<Discord channel id>]");
         LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY + "/losttales discord reload");
     }
 
@@ -239,7 +230,7 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
                     keys.add(channel.getId());
                 }
             }
-            keys.add("faction:");
+            keys.addAll(ChatCodeNames.factionCodes());
             return getListOfStringsMatchingLastWord(args, keys.toArray(new String[keys.size()]));
         }
         if (args.length == 3 && "link".equalsIgnoreCase(args[0])) {

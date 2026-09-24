@@ -404,10 +404,10 @@ public class LostTalesCharacterInfoGui extends GuiScreen
             int target = LostTalesQuestObjectiveTextHelper.getObjectiveTargetCount(objective);
             int current = progress == null ? 0 : progress.getObjectiveProgress(objective.getId());
             if (current < target) {
-                return LostTalesQuestObjectiveTextHelper.buildObjectiveLine(progress, objective, true, false, false, false);
+                return LostTalesQuestObjectiveTextHelper.buildObjectiveLine(progress, objective, true, false);
             }
         }
-        return LostTalesQuestObjectiveTextHelper.buildObjectiveLine(progress, stage.getObjectives().get(0), true, false, false, false);
+        return LostTalesQuestObjectiveTextHelper.buildObjectiveLine(progress, stage.getObjectives().get(0), true, false);
     }
 
     private void drawEntityModel(int x, int y, int scale, float yaw, float pitch, EntityLivingBase entity) {

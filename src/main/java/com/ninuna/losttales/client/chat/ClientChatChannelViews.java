@@ -50,7 +50,7 @@ public final class ClientChatChannelViews {
      * are what only this player sees anyway, so they live in the console
      * tab and keep the conversation tabs clean.
      */
-    public static final ChatChannel SYSTEM_LINE_VIEW = ChatChannel.CONSOLE;
+    public static final ChatChannel SYSTEM_LINE_VIEW = ChatChannel.CLIENT_CONSOLE;
     private static final LinkedHashMap<Integer, ChatTab> TAB_BY_LINE_ID =
             new LinkedHashMap<Integer, ChatTab>();
     /**

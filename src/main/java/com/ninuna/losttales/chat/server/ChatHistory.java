@@ -266,6 +266,47 @@ public final class ChatHistory {
         return null;
     }
 
+    /**
+     * The message a player may report, as the server holds it, or null:
+     * one they were shown, or one said for everyone, spoken by another
+     * player or a Discord member — never by the Server, the Client or
+     * themselves.
+     */
+    public static synchronized Reportable reportable(long messageId,
+                                                     UUID reporter) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        if (entry == null || reporter == null
+                || !(entry.seenBy.contains(reporter) || entry.audience.isOpen())
+                || reporter.equals(entry.authorId)
+                || LostTalesChatMessagePacket.isSystemSender(
+                        entry.forOthers.getSenderId())) {
+            return null;
+        }
+        ChatChannel channel = ChatChannel.fromId(entry.channelId);
+        return channel == null ? null : new Reportable(channel,
+                entry.forOthers.getScopeValue(), entry.author,
+                entry.forOthers.getNameColor(), entry.excerpt);
+    }
+
+    /** A message as a report names it: where it was said, by whom, and how it began. */
+    public static final class Reportable {
+        public final ChatChannel channel;
+        /** The faction or party it was said in; empty for a channel of one conversation. */
+        public final String scope;
+        public final String author;
+        public final int authorColor;
+        public final String excerpt;
+
+        Reportable(ChatChannel channel, String scope, String author,
+                   int authorColor, String excerpt) {
+            this.channel = channel;
+            this.scope = scope == null ? "" : scope;
+            this.author = author;
+            this.authorColor = authorColor;
+            this.excerpt = excerpt;
+        }
+    }
+
     public static final class QuestShareClaim {
         public final UUID authorId;
         public final ChatShowcase showcase;

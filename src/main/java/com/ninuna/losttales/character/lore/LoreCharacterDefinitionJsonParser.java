@@ -22,6 +22,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import com.ninuna.losttales.character.validation.CharacterValidator;
 
 /** Strict parser for the intentionally small lore-character JSON format. */
 public final class LoreCharacterDefinitionJsonParser {
@@ -31,6 +32,9 @@ public final class LoreCharacterDefinitionJsonParser {
     private static final Pattern IDENTIFIER = Pattern.compile(
             "[a-z0-9_.-]+:[a-z0-9_./-]+");
     private static final Set<String> DEFINITION_KEYS = set(
+            "dataVersion", "id", "name", "description", "age", "appearance");
+    /** Every key but {@code age}, which a file may leave out. */
+    private static final Set<String> REQUIRED_DEFINITION_KEYS = set(
             "dataVersion", "id", "name", "description", "appearance");
     private static final Set<String> APPEARANCE_KEYS = set(
             "raceId", "genderId", "modelId", "skinId");
@@ -52,8 +56,10 @@ public final class LoreCharacterDefinitionJsonParser {
             }
             JsonObject object = root.getAsJsonObject();
             validateAllowedKeys(object, DEFINITION_KEYS, "root");
-            if (object.entrySet().size() != DEFINITION_KEYS.size()) {
-                throw invalid("root must contain exactly dataVersion, id, name, description, and appearance");
+            for (String key : REQUIRED_DEFINITION_KEYS) {
+                if (!object.has(key)) {
+                    throw invalid("root must contain dataVersion, id, name, description, and appearance");
+                }
             }
 
             int dataVersion = requiredInteger(
@@ -65,11 +71,18 @@ public final class LoreCharacterDefinitionJsonParser {
             String name = requiredString(object.get("name"), "name", 64);
             String description = string(
                     object.get("description"), "description", 512, true);
+            int age = object.has("age")
+                    ? requiredInteger(object.get("age"), "age")
+                    : LoreCharacterDefinition.DEFAULT_AGE;
+            if (age < CharacterValidator.MIN_AGE || age > CharacterValidator.MAX_AGE) {
+                throw invalid("age must be between " + CharacterValidator.MIN_AGE
+                        + " and " + CharacterValidator.MAX_AGE);
+            }
             LoreCharacterDefinition.Appearance appearance = parseAppearance(
                     object.get("appearance"), "appearance");
             return new ParseResult(
-                    new LoreCharacterDefinition(
-                            dataVersion, id, name, description, appearance), errors);
+                    new LoreCharacterDefinition(dataVersion, id, name,
+                            description, age, appearance), errors);
         } catch (RuntimeException e) {
             errors.add(source + ": " + safeMessage(e));
         } catch (IOException e) {

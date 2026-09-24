@@ -4,12 +4,11 @@ import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesFastTravelArrivalPacket;
 import com.ninuna.losttales.world.map.waypoint.LostTalesWaypointFastTravelPolicy;
 import cpw.mods.fml.common.FMLLog;
-import java.util.List;
 import java.util.UUID;
 import lotr.common.LOTRPlayerData;
 import lotr.common.world.map.LOTRAbstractWaypoint;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.server.MinecraftServer;
+import com.ninuna.losttales.util.LostTalesServerPlayers;
 
 /**
  * Called by the coremod right after {@code LOTRPlayerData.fastTravelTo}
@@ -35,7 +34,7 @@ public final class LostTalesLotrFastTravelArrivalHook {
             if (data == null || waypoint == null) {
                 return;
             }
-            EntityPlayerMP player = findPlayer(data.getPlayerUUID());
+            EntityPlayerMP player = LostTalesServerPlayers.findOnline(data.getPlayerUUID());
             if (player == null || player.worldObj == null
                     || player.worldObj.isRemote) {
                 return;
@@ -57,22 +56,4 @@ public final class LostTalesLotrFastTravelArrivalHook {
         }
     }
 
-    private static EntityPlayerMP findPlayer(UUID playerId) {
-        MinecraftServer server = MinecraftServer.getServer();
-        if (playerId == null || server == null
-                || server.getConfigurationManager() == null
-                || server.getConfigurationManager().playerEntityList == null) {
-            return null;
-        }
-        @SuppressWarnings("unchecked")
-        List<EntityPlayerMP> online =
-                server.getConfigurationManager().playerEntityList;
-        for (EntityPlayerMP candidate : online) {
-            if (candidate != null
-                    && playerId.equals(candidate.getUniqueID())) {
-                return candidate;
-            }
-        }
-        return null;
-    }
 }

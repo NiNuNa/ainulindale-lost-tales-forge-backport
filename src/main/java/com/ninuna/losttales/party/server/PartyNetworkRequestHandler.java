@@ -9,6 +9,9 @@ import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
 
 import java.util.UUID;
+import com.ninuna.losttales.party.model.PartyInvitation;
+import com.ninuna.losttales.party.sync.PartyInvitationNotice;
+import com.ninuna.losttales.util.LostTalesServerPlayers;
 
 /** Executes queued party requests on the logical server thread. */
 public final class PartyNetworkRequestHandler {
@@ -104,11 +107,14 @@ public final class PartyNetworkRequestHandler {
                             PartyServerActionService.removeGoHereMarker(
                                     player, expectedPartyRevision));
                     return;
-                case INVITE_PLAYER:
-                    finish(player, requestId, operationType, before,
+                case INVITE_PLAYER: {
+                    PartyInvitationOperationResult invited =
                             PartyServerActionService.invitePlayer(
-                                    player, expectedPartyRevision, targetId));
+                                    player, expectedPartyRevision, targetId);
+                    finish(player, requestId, operationType, before, invited);
+                    tellInvited(invited);
                     return;
+                }
                 case ACCEPT_INVITATION:
                     finish(player, requestId, operationType, before,
                             PartyServerActionService.acceptInvitation(
@@ -146,6 +152,22 @@ public final class PartyNetworkRequestHandler {
                     PartyErrorId.INTERNAL_ERROR,
                     -1L,
                     true);
+        }
+    }
+
+    /**
+     * Tells the invited player in a Server line, with Accept and Decline
+     * to click, after their party state has shown the invitation.
+     */
+    private static void tellInvited(PartyInvitationOperationResult result) {
+        PartyInvitation invitation = result.isSuccessful()
+                ? result.getInvitation() : null;
+        EntityPlayerMP invited = invitation == null ? null
+                : LostTalesServerPlayers.findOnline(invitation.getTargetOwnerId());
+        if (invited != null) {
+            invited.addChatMessage(PartyInvitationNotice.line(
+                    invitation.getInvitingCharacterName(),
+                    invitation.getInvitationId()));
         }
     }
 

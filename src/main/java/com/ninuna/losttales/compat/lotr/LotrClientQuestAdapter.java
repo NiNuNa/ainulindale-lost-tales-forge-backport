@@ -16,6 +16,7 @@ import lotr.common.quest.LOTRMiniQuestWelcome;
 import net.minecraft.client.Minecraft;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ChunkCoordinates;
+import net.minecraft.util.StatCollector;
 
 /** Converts LOTR miniquests into the shared Lost Tales presentation. */
 @SideOnly(Side.CLIENT)
@@ -62,15 +63,17 @@ public final class LotrClientQuestAdapter {
         boolean tracked = LostTalesClientQuestProgressStore
                 .isQuestReferencePinned(reference) || nativeTracked;
 
-        String objective = safe(quest.getQuestObjective(), "LOTR quest");
-        String giver = safe(quest.entityNameFull,
-                safe(quest.entityName, "Unknown quest giver"));
+        String objective = safe(quest.getQuestObjective(),
+                StatCollector.translateToLocal("gui.losttales.quest.lotr.untitled"));
+        String giver = safe(quest.entityNameFull, safe(quest.entityName,
+                StatCollector.translateToLocal("gui.losttales.quest.lotr.unknown_giver")));
         String faction = safe(quest.getFactionSubtitle(), "");
-        String subtitle = faction.length() == 0
-                ? "Offered by " + giver
-                : "Offered by " + giver + " | " + faction;
-        String journal = failed
-                ? safe(quest.getQuestFailure(), "This quest has failed.")
+        String offered = StatCollector.translateToLocalFormatted(
+                "gui.losttales.quest.lotr.offered_by", giver);
+        String subtitle = faction.length() == 0 ? offered
+                : offered + " | " + faction;
+        String journal = failed ? safe(quest.getQuestFailure(),
+                StatCollector.translateToLocal("gui.losttales.quest.lotr.failed"))
                 : objective;
 
         int[] progress = progress(quest, completedList);
@@ -89,7 +92,8 @@ public final class LotrClientQuestAdapter {
                 ? Math.max(1, ((LOTRMiniQuestWelcome)quest).stage) : 1;
         int stageCount = quest instanceof LOTRMiniQuestWelcome ? 15 : 1;
         String title = quest instanceof LOTRMiniQuestWelcome
-                ? "The Grey Wanderer" : objective;
+                ? StatCollector.translateToLocal("gui.losttales.quest.lotr.grey_wanderer")
+                : objective;
 
         return new ClientQuestEntry(ClientQuestEntry.Source.LOTR,
                 reference, title, subtitle, category(quest), journal, status,
@@ -123,19 +127,25 @@ public final class LotrClientQuestAdapter {
         ArrayList<String> rewards = new ArrayList<String>();
         if (!completed) {
             if (!(quest instanceof LOTRMiniQuestWelcome)) {
-                String faction = safe(quest.getFactionSubtitle(), "the giver's faction");
-                rewards.add("Alignment and payment from " + faction);
+                String faction = safe(quest.getFactionSubtitle(),
+                        StatCollector.translateToLocal("gui.losttales.quest.reward.faction"));
+                rewards.add(StatCollector.translateToLocalFormatted(
+                        "gui.losttales.quest.reward.payment", faction));
                 if (quest.willHire) {
-                    rewards.add("The quest giver may become available for hire");
+                    rewards.add(StatCollector.translateToLocal(
+                            "gui.losttales.quest.reward.hire"));
                 }
             }
             return rewards;
         }
         if (quest.alignmentRewarded > 0.0F) {
-            rewards.add(formatNumber(quest.alignmentRewarded) + " alignment");
+            rewards.add(StatCollector.translateToLocalFormatted(
+                    "gui.losttales.quest.reward.alignment",
+                    formatNumber(quest.alignmentRewarded)));
         }
         if (quest.coinsRewarded > 0) {
-            rewards.add(quest.coinsRewarded + " silver coins");
+            rewards.add(StatCollector.translateToLocalFormatted(
+                    "gui.losttales.quest.reward.coins", quest.coinsRewarded));
         }
         for (ItemStack stack : quest.itemsRewarded) {
             if (stack != null) {
@@ -144,7 +154,8 @@ public final class LotrClientQuestAdapter {
             }
         }
         if (quest.wasHired) {
-            rewards.add("The quest giver joined you");
+            rewards.add(StatCollector.translateToLocal(
+                    "gui.losttales.quest.reward.hired"));
         }
         return rewards;
     }

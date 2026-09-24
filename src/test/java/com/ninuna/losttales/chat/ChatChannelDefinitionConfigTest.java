@@ -36,13 +36,13 @@ public final class ChatChannelDefinitionConfigTest {
     @Test
     public void anEntryDescribesAChannel() {
         List<ChatChannelDescriptor> defined = parse(
-                "trade=name:Trade;rule:global;colour:C9A227;ooc:true;bridge:true");
+                "trade=name:Trade;rule:everyone;colour:C9A227;ooc:true;bridge:true");
 
         assertEquals(1, defined.size());
         ChatChannelDescriptor channel = defined.get(0);
         assertEquals("trade", channel.getId());
         assertEquals("Trade", channel.getDisplayName());
-        assertEquals(ChatRecipientRule.GLOBAL, channel.getRecipientRule());
+        assertEquals(ChatRecipientRule.EVERYONE, channel.getRecipientRule());
         assertEquals(ChatPresentationMode.OUT_OF_CHARACTER,
                 channel.getPresentation());
         assertEquals(0xC9A227, channel.getDisplayColor());
@@ -60,7 +60,7 @@ public final class ChatChannelDefinitionConfigTest {
         assertEquals("tavern", channel.getId());
         assertEquals("named by its id when it names nothing else",
                 "tavern", channel.getDisplayName());
-        assertEquals(ChatRecipientRule.GLOBAL, channel.getRecipientRule());
+        assertEquals(ChatRecipientRule.EVERYONE, channel.getRecipientRule());
         assertEquals(ChatPresentationMode.IN_CHARACTER, channel.getPresentation());
         assertFalse("nothing is bridged unless the file says so",
                 channel.isBridgeable());
@@ -94,8 +94,8 @@ public final class ChatChannelDefinitionConfigTest {
     /** The code's own channels are not a config's to take over. */
     @Test
     public void aBuiltInChannelIsNeverRedefined() {
-        assertTrue(parse("all=name:Mine;rule:global").isEmpty());
-        assertTrue(parse("admin=name:Mine;rule:global").isEmpty());
+        assertTrue(parse("global=name:Mine;rule:everyone").isEmpty());
+        assertTrue(parse("operator=name:Mine;rule:everyone").isEmpty());
         assertEquals(2, this.warnings.size());
         assertTrue(this.warnings.get(0).contains("already has"));
     }
@@ -104,9 +104,9 @@ public final class ChatChannelDefinitionConfigTest {
     @Test
     public void anIdThatNothingCouldCarryIsRefused() {
         assertTrue(parse("=name:Nameless").isEmpty());
-        assertTrue(parse("Has Spaces=rule:global").isEmpty());
-        assertTrue(parse("way_too_long_a_channel_id=rule:global").isEmpty());
-        assertTrue(parse("bad-punctuation=rule:global").isEmpty());
+        assertTrue(parse("Has Spaces=rule:everyone").isEmpty());
+        assertTrue(parse("way_too_long_a_channel_id=rule:everyone").isEmpty());
+        assertTrue(parse("bad-punctuation=rule:everyone").isEmpty());
         assertEquals(4, this.warnings.size());
     }
 
@@ -114,7 +114,7 @@ public final class ChatChannelDefinitionConfigTest {
     @Test
     public void anIdDefinedTwiceIsTakenOnce() {
         List<ChatChannelDescriptor> defined = parse(
-                "trade=name:First;rule:global", "trade=name:Second;rule:global");
+                "trade=name:First;rule:everyone", "trade=name:Second;rule:everyone");
 
         assertEquals(1, defined.size());
         assertEquals("First", defined.get(0).getDisplayName());
@@ -144,12 +144,12 @@ public final class ChatChannelDefinitionConfigTest {
     @Test
     public void aDefinedChannelBecomesAChannel() {
         ChatChannel trade = ChatChannel.register(
-                parse("trade=name:Trade;rule:global").get(0));
+                parse("trade=name:Trade;rule:everyone").get(0));
 
         assertEquals(trade, ChatChannel.fromId("trade"));
         assertFalse("and is known not to be the code's own",
                 ChatChannel.isBuiltIn(trade));
-        assertTrue(ChatChannel.isBuiltIn(ChatChannel.ALL));
+        assertTrue(ChatChannel.isBuiltIn(ChatChannel.GLOBAL));
     }
 
     private List<ChatChannelDescriptor> parse(String... entries) {

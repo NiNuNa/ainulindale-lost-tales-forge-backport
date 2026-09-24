@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.StatCollector;
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 
 /**
  * Map-marker browser on the shared picker frame: a search field and every
@@ -28,6 +29,7 @@ import net.minecraft.util.StatCollector;
  * re-checks the marker and the sender's right to see it on send.
  */
 final class ChatMapMarkerPicker extends ChatPickerPanel {
+    /** A row's width where the window first opens; it stretches with the window. */
     private static final int ROW_WIDTH = 116;
     private static final int ROW_HEIGHT = 12;
     /** Marker lists are refreshed at most this often while open. */
@@ -53,8 +55,13 @@ final class ChatMapMarkerPicker extends ChatPickerPanel {
     }
 
     @Override
-    int columns() {
+    int naturalColumns() {
         return 1;
+    }
+
+    @Override
+    boolean stretchesCells() {
+        return true;
     }
 
     @Override
@@ -172,7 +179,7 @@ final class ChatMapMarkerPicker extends ChatPickerPanel {
 
     @Override
     void drawEntry(Minecraft minecraft, Entry entry, int x, int y,
-                   int alpha, boolean hovered) {
+                   int width, int alpha, boolean hovered) {
         ChatShareCandidates.MarkerEntry marker =
                 (ChatShareCandidates.MarkerEntry)entry.value;
         LostTalesMapMarkerData data = marker.marker;
@@ -181,7 +188,7 @@ final class ChatMapMarkerPicker extends ChatPickerPanel {
                 ChatInlineIcons.boxLeft(x + 1, ChatInlineIcons.SLOT_WIDTH),
                 ChatInlineIcons.boxTop(y + 2, ChatInlineIcons.SLOT_WIDTH),
                 ChatInlineIcons.CONTENT_SIZE, alpha);
-        int labelWidth = ROW_WIDTH - ChatInlineIcons.SLOT_WIDTH - 10;
+        int labelWidth = width - ChatInlineIcons.SLOT_WIDTH - 10;
         String label = LostTalesSkyrimUiStyle.trimToWidth(
                 minecraft.fontRenderer, marker.label(), labelWidth);
         LostTalesChatVisualStyle.drawPlain(minecraft.fontRenderer, label,
@@ -191,11 +198,11 @@ final class ChatMapMarkerPicker extends ChatPickerPanel {
         // picker marks its cells: filled while the marker is one, plain
         // under the pointer as the control a right-click toggles.
         if (LostTalesClientMapMarkerUsageStore.isFavorite(data.getId())) {
-            LostTalesUiSheet.HEART_FAVORITE.drawWithShadow(x + ROW_WIDTH
+            LostTalesUiSheet.HEART_FAVORITE.drawWithShadow(x + width
                     - LostTalesUiSheet.HEART_FAVORITE.getWidth() - 2, y + 3,
                     alpha);
         } else if (hovered) {
-            LostTalesUiSheet.HEART.drawWithShadow(x + ROW_WIDTH
+            LostTalesUiSheet.HEART.drawWithShadow(x + width
                     - LostTalesUiSheet.HEART.getWidth() - 2, y + 3, alpha);
         }
     }
@@ -213,10 +220,9 @@ final class ChatMapMarkerPicker extends ChatPickerPanel {
         return ((ChatShareCandidates.MarkerEntry)entry.value).token() + " ";
     }
 
-    /** Right-click favouriting; true when a row was toggled. */
-    boolean toggleFavoriteAt(double mouseX, double mouseY,
-                             int screenWidth, int screenHeight) {
-        Entry entry = entryAt(mouseX, mouseY, screenWidth, screenHeight);
+    /** Right-click favouriting of the row under the point; true when one was toggled. */
+    boolean toggleFavoriteAt(LostTalesUiHitBox box, double x, double y) {
+        Entry entry = entryAt(box, x, y);
         if (entry == null) {
             return false;
         }

@@ -6,6 +6,7 @@ import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelAccess;
 import com.ninuna.losttales.chat.ChatChannelIconCatalog;
 import com.ninuna.losttales.chat.ChatChannelScope;
+import com.ninuna.losttales.chat.ChatCodeNames;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatEpithet;
 import com.ninuna.losttales.chat.ChatFormattingCodes;
@@ -334,7 +335,7 @@ public final class LostTalesChatService {
                         whisperTarget, message));
 
         FMLLog.info("[losttales/chat/%s] <%s (%s)> %s%s%s",
-                channel.getId(), identityName, accountName, message,
+                logName(channel, replyScope), identityName, accountName, message,
                 whisperTarget == null ? ""
                         : " -> " + whisperTarget.getCommandSenderName(),
                 showcases.isEmpty() ? ""
@@ -343,8 +344,8 @@ public final class LostTalesChatService {
         // Every accepted line is recorded before it goes anywhere, a
         // whisper included: the audit exists for what the live window
         // cannot reach back to, and a private line is exactly that.
-        ChatAuditLog.logMessage(packet.getMessageId(), channel.getId(),
-                sender.getUniqueID(), accountName,
+        ChatAuditLog.logMessage(packet.getMessageId(),
+                logName(channel, replyScope), sender.getUniqueID(), accountName,
                 worn == null ? null : worn.getCharacterId(),
                 identityName,
                 whisperTarget == null ? ""
@@ -468,16 +469,26 @@ public final class LostTalesChatService {
                 .withScope(factionScope == null ? "" : factionScope)
                 .withNamedPlayers(ChatMentionTargets.ofDiscordLine(channel,
                         factionScope, routing.recipients, message));
-        FMLLog.info("[losttales/chat/%s] <%s (discord)> %s", channel.getId(),
-                displayName, message);
+        FMLLog.info("[losttales/chat/%s] <%s (discord)> %s",
+                logName(channel, factionScope), displayName, message);
         deliver(packet, null, routing,
                 LostTalesChatMessagePacket.DISCORD_SENDER_ID, displayName);
         // Recorded under the member's own sender id, the same id a mute
         // names them by, so the audit and the moderation tools agree on
         // who a Discord line is from.
-        ChatAuditLog.logDiscordMessage(messageId, channel.getId(), senderId,
-                displayName, message);
+        ChatAuditLog.logDiscordMessage(messageId, logName(channel, factionScope),
+                senderId, displayName, message);
         return messageId;
+    }
+
+    /**
+     * What the logs call a line's conversation: its code name, so a
+     * faction's line is logged under the faction ({@code gondor}).
+     */
+    private static String logName(ChatChannel channel, String scope) {
+        String name = ChatCodeNames.of(channel,
+                channel == ChatChannel.FACTION ? scope : "");
+        return name == null ? channel.getId() : name;
     }
 
     /**
@@ -526,7 +537,7 @@ public final class LostTalesChatService {
     /**
      * Records one administrative event and shows it at once to every
      * online player who may read the console
-     * ({@link LostTalesCapability#CHAT_CONSOLE_READ}). The capability is
+     * ({@link LostTalesCapability#CHAT_SERVER_CONSOLE_READ}). The capability is
      * asked of each recipient here, and asked again of a joining player
      * before the kept entries are replayed to them; the client is never
      * the one deciding.
@@ -545,6 +556,17 @@ public final class LostTalesChatService {
     public static void console(ChatConsoleEvent.Kind kind,
                                ChatConsoleEvent.Severity severity, String actor,
                                String text, String context) {
+        console(kind, severity, actor, text, context, null);
+    }
+
+    /**
+     * As above for a report ({@link ChatConsoleEvent.Kind#REPORT}), with
+     * what was reported.
+     */
+    public static void console(ChatConsoleEvent.Kind kind,
+                               ChatConsoleEvent.Severity severity, String actor,
+                               String text, String context,
+                               ChatConsoleEvent.Report report) {
         if (kind == null || severity == null || text == null
                 || text.trim().length() == 0) {
             return;
@@ -554,7 +576,7 @@ public final class LostTalesChatService {
         try {
             event = new ChatConsoleEvent(ChatMessageIdAllocator.next(),
                     System.currentTimeMillis(), kind, severity, actor, text,
-                    context, actorIdentity(server, actor));
+                    context, actorIdentity(server, actor), report);
         } catch (IllegalArgumentException refused) {
             return;
         }
@@ -1246,7 +1268,7 @@ public final class LostTalesChatService {
     /**
      * Tells one client which channels it may use, which roles it holds,
      * and whether it may moderate the chat. Sent on login and whenever a
-     * staff-channel message is refused, so the Admin tab follows the
+     * staff-channel message is refused, so the Operator tab follows the
      * server's view without the client ever deciding it; the roles travel
      * with it so the client can notice a mention addressed to one of
      * them. The roster of every online role holder rides along, which
@@ -1277,7 +1299,7 @@ public final class LostTalesChatService {
         // follows its own. The server decides again on every request.
         LostTalesNetworkHandler.CHANNEL.sendTo(
                 new LostTalesChatAccessPacket(
-                        ChatChannelPolicy.canSend(player, ChatChannel.ADMIN, roles),
+                        ChatChannelPolicy.canSend(player, ChatChannel.OPERATOR, roles),
                         roles,
                         roleHolders,
                         moderator ? mutedSenders(player)

@@ -455,7 +455,7 @@ public final class ChatMemberDirectory {
             }
         }
         ChatChannelGates gates = ChatChannelGates.current();
-        Set<UUID> operatorVoices = ChatHistory.authorsIn(ChatChannel.ADMIN);
+        Set<UUID> operatorVoices = ChatHistory.authorsIn(ChatChannel.OPERATOR);
         List<Absentee> absent = new ArrayList<Absentee>();
         for (Map.Entry<UUID, CharacterRoster> entry : known.entrySet()) {
             UUID owner = entry.getKey();

@@ -16,7 +16,10 @@ import net.minecraft.client.gui.FontRenderer;
 final class ChatEmojiSuggestionBox {
     static final int MAX_ROWS = 8;
     private static final int ROW_HEIGHT = 12;
-    private static final int PADDING = 2;
+    /** The rows stand two pixels inside the frame's ink, as a framed button's content does. */
+    private static final int PADDING = LostTalesChatVisualStyle.POPUP_INSET;
+    /** Between the emoji's slot and its shortcode. */
+    private static final int ICON_GAP = 4;
     /**
      * How far above the input anchor ({@link ChatInputBar#inputAnchor})
      * the box ends: one pixel clear of the bar's top.
@@ -136,13 +139,14 @@ final class ChatEmojiSuggestionBox {
             ChatEmoji emoji = this.matches.get(row);
             int rowTop = top + PADDING + row * ROW_HEIGHT;
             ChatInlineIcons.drawEmoji(minecraft, emoji,
-                    ChatInlineIcons.boxLeft(inputX + 3,
+                    ChatInlineIcons.boxLeft(inputX + PADDING,
                             ChatInlineIcons.SLOT_WIDTH),
                     ChatInlineIcons.boxTop(rowTop + 2,
                             ChatInlineIcons.SLOT_WIDTH),
                     ChatInlineIcons.CONTENT_SIZE, 255);
             LostTalesChatVisualStyle.drawPlain(font, emoji.getShortcode(),
-                    inputX + 3 + ChatInlineIcons.SLOT_WIDTH + 4, rowTop + 2,
+                    inputX + PADDING + ChatInlineIcons.SLOT_WIDTH + ICON_GAP,
+                    rowTop + 2,
                     row == this.selectedIndex ? 255 : 200);
         }
     }
@@ -153,7 +157,8 @@ final class ChatEmojiSuggestionBox {
             width = Math.max(width,
                     font.getStringWidth(emoji.getShortcode()));
         }
-        return width + ChatInlineIcons.SLOT_WIDTH + 12;
+        return PADDING + ChatInlineIcons.SLOT_WIDTH + ICON_GAP + width
+                + PADDING;
     }
 
     private int boxTop(int screenHeight) {

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.gui.screen;
 
+import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.gui.LostTalesGuiPointerTargets;
 import com.ninuna.losttales.client.gui.LostTalesPointerInteractable;
 import com.ninuna.losttales.client.gui.animation.LostTalesControlBarAnimation;
@@ -14,6 +15,7 @@ import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import cpw.mods.fml.common.FMLLog;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
@@ -302,8 +304,10 @@ public class LostTalesCharacterMenuGui extends GuiScreen
             case OPTION_MAP:
                 try {
                     LostTalesLotrMapGui.open();
-                } catch (Throwable ignored) {
-                    this.mc.displayGuiScreen(new LostTalesCharacterProfileRouterGui(this));
+                } catch (RuntimeException failed) {
+                    // The menu stays open; a map that cannot open is logged.
+                    FMLLog.warning("[%s] The map could not be opened: %s",
+                            LostTalesMetaData.MOD_ID, failed.toString());
                 }
                 break;
             default:

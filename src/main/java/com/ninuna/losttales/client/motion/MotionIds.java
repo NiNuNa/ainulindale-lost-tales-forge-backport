@@ -26,8 +26,8 @@ public final class MotionIds {
     public static final String CHAT_LINE_APPEAR = "chat.line.appear";
     /** The input bars coming up from below as the chat opens. */
     public static final String CHAT_BAR_APPEAR = "chat.bar.appear";
-    /** A picker panel opening from its button. */
-    public static final String CHAT_PICKER_OPEN = "chat.picker.open";
+    /** A small window opening where it stands, and fading out there as it closes. */
+    public static final String CHAT_SMALL_WINDOW_OPEN = "chat.small_window.open";
     /** A tab gliding to its place and width in the row. */
     public static final String CHAT_TAB_MOVE = "chat.tab.move";
     /** A tab's own controls going and coming as the row narrows. */

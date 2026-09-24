@@ -4,6 +4,8 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
+import com.ninuna.losttales.chat.ChatReplyReference;
+import com.ninuna.losttales.chat.ChatReportReason;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
@@ -17,7 +19,7 @@ import java.util.UUID;
 /**
  * Server-to-client: entries of the Server Console, oldest
  * first — one as it happens, a batch when a staff member joins. Sent
- * only to players the server has found to hold {@code chat.console.read}
+ * only to players the server has found to hold {@code chat.server_console.read}
  * at that moment; the client is told nothing it may not read and
  * decides nothing about who may. At most {@link #MAX_EVENTS} per packet.
  */
@@ -28,9 +30,19 @@ public final class LostTalesChatConsoleSyncPacket implements IMessage {
     private static final int MAX_CONTEXT_BYTES = ChatConsoleEvent.MAX_CONTEXT_LENGTH * 4;
     /** The actor's account as the server knew it: a flag, its id and its colour. */
     private static final int ACTOR_IDENTITY_BYTES = 1 + 16;
+    private static final int MAX_NOTE_BYTES = ChatConsoleEvent.Report.MAX_NOTE_LENGTH * 4;
+    private static final int MAX_AUTHOR_BYTES = ChatConsoleEvent.Report.MAX_AUTHOR_LENGTH * 4;
+    private static final int MAX_LINK_BYTES = ChatConsoleEvent.Report.MAX_LINK_LENGTH * 4;
+    /**
+     * A report: a flag, the reason, the note, the message's id, its
+     * author and their colour, its words' start and its link.
+     */
+    private static final int REPORT_BYTES = 1 + 1 + 4 + MAX_NOTE_BYTES + 8
+            + 4 + MAX_AUTHOR_BYTES + 4 + 4 + ChatReplyReference.MAX_EXCERPT_BYTES
+            + 4 + MAX_LINK_BYTES;
     private static final int MAX_PACKET_BYTES = 4
             + MAX_EVENTS * (8 + 8 + 1 + 1 + 4 + MAX_ACTOR_BYTES + 4 + MAX_TEXT_BYTES
-                    + 4 + MAX_CONTEXT_BYTES + ACTOR_IDENTITY_BYTES)
+                    + 4 + MAX_CONTEXT_BYTES + ACTOR_IDENTITY_BYTES + REPORT_BYTES)
             + 8;
 
     private List<ChatConsoleEvent> events = Collections.emptyList();
@@ -91,6 +103,8 @@ public final class LostTalesChatConsoleSyncPacket implements IMessage {
                     UUID actorId = new UUID(buffer.readLong(), buffer.readLong());
                     actorIdentity = ChatNamedPlayer.account(actorId, actor);
                 }
+                ChatConsoleEvent.Report report = buffer.readBoolean()
+                        ? readReport(buffer) : null;
                 if (id <= 0L || kind == null || severity == null
                         || actor.length() > ChatConsoleEvent.MAX_ACTOR_LENGTH
                         || text.trim().length() == 0
@@ -100,7 +114,7 @@ public final class LostTalesChatConsoleSyncPacket implements IMessage {
                     throw new LostTalesPacketCodec.DecodeException("invalid console event");
                 }
                 decoded.add(new ChatConsoleEvent(id, timestamp, kind, severity, actor, text,
-                        context, actorIdentity));
+                        context, actorIdentity, report));
             }
             // After the entries: where the reader arrived.
             this.arrivalId = buffer.readLong();
@@ -131,8 +145,40 @@ public final class LostTalesChatConsoleSyncPacket implements IMessage {
                 buffer.writeLong(actorIdentity.getPlayerId().getMostSignificantBits());
                 buffer.writeLong(actorIdentity.getPlayerId().getLeastSignificantBits());
             }
+            ChatConsoleEvent.Report report = event.getReport();
+            buffer.writeBoolean(report != null);
+            if (report != null) {
+                buffer.writeByte(report.getReason().ordinal());
+                LostTalesPacketCodec.writeUtf8String(buffer, report.getNote(), MAX_NOTE_BYTES);
+                buffer.writeLong(report.getMessageId());
+                LostTalesPacketCodec.writeUtf8String(buffer, report.getAuthor(), MAX_AUTHOR_BYTES);
+                buffer.writeInt(report.getAuthorColor());
+                LostTalesPacketCodec.writeUtf8String(buffer, report.getExcerpt(),
+                        ChatReplyReference.MAX_EXCERPT_BYTES);
+                LostTalesPacketCodec.writeUtf8String(buffer, report.getLink(), MAX_LINK_BYTES);
+            }
         }
         buffer.writeLong(this.arrivalId);
+    }
+
+    /** A report as {@link #toBytes} writes it; a malformed one throws. */
+    private static ChatConsoleEvent.Report readReport(ByteBuf buffer) {
+        ChatReportReason reason = ChatReportReason.fromOrdinal(buffer.readUnsignedByte());
+        String note = LostTalesPacketCodec.readUtf8String(buffer, MAX_NOTE_BYTES);
+        long messageId = buffer.readLong();
+        String author = LostTalesPacketCodec.readUtf8String(buffer, MAX_AUTHOR_BYTES);
+        int authorColor = buffer.readInt();
+        String excerpt = LostTalesPacketCodec.readUtf8String(buffer,
+                ChatReplyReference.MAX_EXCERPT_BYTES);
+        String link = LostTalesPacketCodec.readUtf8String(buffer, MAX_LINK_BYTES);
+        if (note.length() > ChatConsoleEvent.Report.MAX_NOTE_LENGTH
+                || author.length() > ChatConsoleEvent.Report.MAX_AUTHOR_LENGTH
+                || excerpt.length() > ChatReplyReference.MAX_EXCERPT_CHARACTERS
+                || link.length() > ChatConsoleEvent.Report.MAX_LINK_LENGTH) {
+            throw new LostTalesPacketCodec.DecodeException("invalid report");
+        }
+        return new ChatConsoleEvent.Report(reason, note, messageId, author,
+                authorColor, excerpt, link);
     }
 
     /** The entries, oldest first; empty for a malformed payload. */

@@ -8,11 +8,12 @@ import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.IChatComponent;
 
 /**
- * A channel named in a line as a link: {@code #Global} in the channel's
- * colour, and on a click the tab it names comes forward. It may also
- * name one line of that tab, which the click then lands on: by this
+ * A channel named in a line as a link: {@code #global} as typed, drawn
+ * {@code #Global} in the channel's colour, and on a click the tab it
+ * names comes forward. It may also name one line of that tab, which
+ * the click then lands on: by this
  * client's own line id for the command a console entry is about, or by
- * the server's message id for a link to a message — {@code #Global/1234}
+ * the server's message id for a link to a message — {@code #global/1234}
  * as typed, drawn as {@code #Global >} and a speech bubble, the way a
  * messenger draws a link to a message. Same carrier as every other
  * marker: a click event that survives vanilla's wrapped-chat component

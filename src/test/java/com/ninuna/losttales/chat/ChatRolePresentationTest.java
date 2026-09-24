@@ -41,7 +41,7 @@ public final class ChatRolePresentationTest {
         int held = ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR);
         assertEquals(held, ChatRolePresentation.rolesShown(ChatChannel.OOC, held));
         assertEquals(0, ChatRolePresentation.rolesShown(ChatChannel.WHISPER, held));
-        assertEquals(0, ChatRolePresentation.rolesShown(ChatChannel.ALL, held));
+        assertEquals(0, ChatRolePresentation.rolesShown(ChatChannel.GLOBAL, held));
         assertEquals(0, ChatRolePresentation.rolesShown(ChatChannel.FACTION, held));
     }
 
@@ -52,7 +52,7 @@ public final class ChatRolePresentationTest {
         assertEquals(ChatAccountRole.TEAM.bit(),
                 ChatRolePresentation.rolesShown(ChatChannel.OOC, both));
         assertEquals(ChatAccountRole.TEAM.bit(),
-                ChatRolePresentation.rolesShown(ChatChannel.ADMIN, both));
+                ChatRolePresentation.rolesShown(ChatChannel.OPERATOR, both));
         assertEquals(0, ChatRolePresentation.rolesShown(ChatChannel.OOC, 0));
     }
 
@@ -65,9 +65,9 @@ public final class ChatRolePresentationTest {
         assertEquals(ChatRoleFixtures.OPERATOR.getColor(),
                 ChatRolePresentation.nameColor(ChatChannel.OOC, held, false, GONDOR));
         assertEquals(ChatRolePresentation.unassignedColor(),
-                ChatRolePresentation.nameColor(ChatChannel.ADMIN, 0, true, GONDOR));
+                ChatRolePresentation.nameColor(ChatChannel.OPERATOR, 0, true, GONDOR));
         assertEquals(ChatRolePresentation.unassignedColor(),
-                ChatRolePresentation.nameColor(ChatChannel.ADMIN, 0, false, GONDOR));
+                ChatRolePresentation.nameColor(ChatChannel.OPERATOR, 0, false, GONDOR));
     }
 
     /** In character the faction colours the name; the account is unassigned. */
@@ -75,11 +75,11 @@ public final class ChatRolePresentationTest {
     public void inCharacterTheFactionColoursTheNameAndRolesAreNotWorn() {
         int held = ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR, ChatAccountRole.TEAM);
         assertEquals(GONDOR,
-                ChatRolePresentation.nameColor(ChatChannel.ALL, held, false, GONDOR));
+                ChatRolePresentation.nameColor(ChatChannel.GLOBAL, held, false, GONDOR));
         assertEquals(GONDOR,
                 ChatRolePresentation.nameColor(ChatChannel.PARTY, 0, false, GONDOR));
         assertEquals(ChatRolePresentation.unassignedColor(),
-                ChatRolePresentation.nameColor(ChatChannel.ALL, held, true, GONDOR));
+                ChatRolePresentation.nameColor(ChatChannel.GLOBAL, held, true, GONDOR));
         assertEquals(ChatRolePresentation.unassignedColor(),
                 ChatRolePresentation.nameColor(ChatChannel.PROXIMITY, 0, true, GONDOR));
         assertTrue(ChatRolePresentation.unassignedColor() != GONDOR);

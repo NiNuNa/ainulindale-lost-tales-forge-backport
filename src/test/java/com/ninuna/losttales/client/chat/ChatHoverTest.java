@@ -26,7 +26,8 @@ public final class ChatHoverTest {
                 ChatHover.Kind.SEND_BUTTON, ChatHover.Kind.TOOLBAR_TOGGLE,
                 ChatHover.Kind.PICKER_BUTTON, ChatHover.Kind.JUMP_PILL,
                 ChatHover.Kind.REPLY_CHIP, ChatHover.Kind.MESSAGE_TOOLBAR,
-                ChatHover.Kind.SCROLLBAR}) {
+                ChatHover.Kind.SCROLLBAR, ChatHover.Kind.SMALL_WINDOW_CLOSE,
+                ChatHover.Kind.SMALL_WINDOW_STRIP}) {
             assertEquals(kind.name(), LostTalesMapCursor.Pose.HAND,
                     new ChatHover(kind).pose());
         }
@@ -35,9 +36,9 @@ public final class ChatHoverTest {
     @Test
     public void theArrowIsWhereAPressOnlyLands() {
         for (ChatHover.Kind kind : new ChatHover.Kind[] {
-                ChatHover.Kind.NONE, ChatHover.Kind.CARD, ChatHover.Kind.MENU,
+                ChatHover.Kind.NONE, ChatHover.Kind.MENU,
                 ChatHover.Kind.SUGGESTIONS, ChatHover.Kind.PICKER,
-                ChatHover.Kind.OVERLAY}) {
+                ChatHover.Kind.SMALL_WINDOW, ChatHover.Kind.OVERLAY}) {
             assertEquals(kind.name(), LostTalesMapCursor.Pose.ARROW,
                     new ChatHover(kind).pose());
         }
@@ -57,6 +58,15 @@ public final class ChatHoverTest {
         assertEquals("a strip of no window moves nothing",
                 LostTalesMapCursor.Pose.ARROW,
                 new ChatHover(ChatHover.Kind.STRIP).pose());
+    }
+
+    @Test
+    public void aSmallWindowsEdgeResizesAsAChatWindowsDoes() {
+        ChatHover edge = new ChatHover(ChatHover.Kind.SMALL_WINDOW_RESIZE);
+        edge.smallEdge = ChatWindowGestures.ResizeEdge.LEFT;
+        assertEquals(LostTalesMapCursor.Pose.RESIZE_HORIZONTAL, edge.pose());
+        edge.smallEdge = ChatWindowGestures.ResizeEdge.BOTTOM;
+        assertEquals(LostTalesMapCursor.Pose.RESIZE_VERTICAL, edge.pose());
     }
 
     @Test

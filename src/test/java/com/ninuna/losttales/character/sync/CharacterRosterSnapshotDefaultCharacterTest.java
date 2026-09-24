@@ -34,31 +34,15 @@ public final class CharacterRosterSnapshotDefaultCharacterTest {
     }
 
     @Test
-    public void theDefaultCharacterIsFoundAndNotCountedAsOneTheyMade() {
+    public void theDefaultCharacterIsFound() {
         CharacterRosterSnapshot snapshot = snapshot(Arrays.asList(
                 summary(OWNER, CharacterRoster.DEFAULT_SLOT_INDEX, "Steve"),
                 summary(MADE, 0, "Aldric")));
 
         assertEquals(2, snapshot.getCharacterCount());
-        assertEquals("only the one they made counts",
-                1, snapshot.getRoleplayCharacterCount());
         CharacterSummary account = snapshot.getDefaultCharacter();
         assertNotNull(account);
         assertEquals("Steve", account.getName());
-    }
-
-    /**
-     * A player who has made nobody is the case the character screen routes
-     * on, and the account's own identity must not look like somebody they
-     * made or they would never be shown the roster.
-     */
-    @Test
-    public void anAccountWithOnlyItsOwnIdentityHasMadeNobody() {
-        CharacterRosterSnapshot snapshot = snapshot(Collections.singletonList(
-                summary(OWNER, CharacterRoster.DEFAULT_SLOT_INDEX, "Steve")));
-
-        assertEquals(1, snapshot.getCharacterCount());
-        assertEquals(0, snapshot.getRoleplayCharacterCount());
     }
 
     /** A roster from a world that has not made it yet answers with none. */
@@ -68,7 +52,6 @@ public final class CharacterRosterSnapshotDefaultCharacterTest {
                 Collections.singletonList(summary(MADE, 0, "Aldric")));
 
         assertNull(snapshot.getDefaultCharacter());
-        assertEquals(1, snapshot.getRoleplayCharacterCount());
     }
 
     private static CharacterRosterSnapshot snapshot(

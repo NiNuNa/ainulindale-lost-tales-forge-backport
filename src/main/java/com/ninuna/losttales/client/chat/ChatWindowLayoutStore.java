@@ -20,6 +20,7 @@ import java.util.Set;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.EnumMap;
 
 /**
  * File-backed persistence for {@link ChatWindowLayout}: a presentation
@@ -28,20 +29,22 @@ import java.util.UUID;
  * between worlds. Two people sharing a machine keep their own windows,
  * and one person with two accounts keeps an arrangement for each. The
  * file is a few plain lines
- * — one per window, one per closed channel, one per preference (muted,
- * mentions muted, hidden) — so a hand edit or a stale entry cannot
- * corrupt anything: whatever does not parse is
- * skipped and the layout repairs itself on load.
+ * — one per window, one per small window the player has placed, one per
+ * closed channel, one per preference (muted, mentions muted, hidden) —
+ * so a hand edit or a stale entry cannot corrupt anything: whatever does
+ * not parse is skipped and the layout repairs itself on load.
  *
  * <pre>
- * window w1 locked=false x=0.00 y=0.00 active=console tabs=console,admin
- * window w2 locked=true x=62.50 y=100.00 lines=12.40 width=320 fill=full area=hidden members=hidden members_width=90.00 active=all tabs=all,ooc,party link=w1:above
+ * window w1 locked=false x=0.00 y=0.00 active=client_console tabs=client_console,operator
+ * window w2 locked=true x=62.50 y=100.00 lines=12.40 width=320 fill=full area=hidden members=hidden members_width=90.00 active=global tabs=global,ooc,party link=w1:above
+ * small emoji x=100.00 y=62.50 w=120 h=160
+ * small tab x=12.00 y=40.00
  * feed x=0.00 y=100.00
  * toolbar collapsed=false
  * closed faction
  * muted ooc
  * noping party
- * hidden admin
+ * hidden operator
  * </pre>
  *
  * <p>A whisper tab is remembered per place on a line of its own, its
@@ -94,6 +97,7 @@ public final class ChatWindowLayoutStore {
             loadedLines = null;
             layoutTouched = false;
             ChatWindowLayout.reset();
+            ChatSmallWindowPlacements.load(null);
         }
         ChatWindowLayout.setChangeListener(new Runnable() {
             @Override
@@ -152,6 +156,10 @@ public final class ChatWindowLayoutStore {
                 new LinkedHashMap<String, List<String[]>>();
         Map<String, Set<String>> closedConversations =
                 new LinkedHashMap<String, Set<String>>();
+        Map<ChatSmallWindowKind, ChatSmallWindowPlacements.Placement> placed =
+                new EnumMap<ChatSmallWindowKind,
+                        ChatSmallWindowPlacements.Placement>(
+                        ChatSmallWindowKind.class);
         for (String raw : lines) {
             String line = raw == null ? "" : raw.trim();
             if (line.length() == 0 || line.startsWith("#")) {
@@ -195,6 +203,13 @@ public final class ChatWindowLayoutStore {
                 if (spec != null) {
                     specs.add(spec);
                 }
+            } else if (parts.length >= 2 && "small".equals(parts[0])) {
+                ChatSmallWindowKind kind = ChatSmallWindowKind.fromId(parts[1]);
+                ChatSmallWindowPlacements.Placement placement =
+                        parseSmallWindow(parts);
+                if (kind != null && placement != null) {
+                    placed.put(kind, placement);
+                }
             } else if ("feed".equals(parts[0])) {
                 for (int index = 1; index < parts.length; index++) {
                     if (parts[index].startsWith("x=")) {
@@ -215,6 +230,42 @@ public final class ChatWindowLayoutStore {
         ChatWindowLayout.load(specs, closed, muted, pingsMuted, hidden,
                 feedX, feedY, collapsed);
         ChatWindowLayout.loadConversations(conversations, closedConversations);
+        ChatSmallWindowPlacements.load(placed);
+    }
+
+    /**
+     * A small window's remembered place: both shares, and both sizes for
+     * a kind the player resized or neither for one they only moved; null
+     * where a share is missing, a size stands alone or anything is
+     * unreadable, which leaves the kind to open where its popup did.
+     */
+    private static ChatSmallWindowPlacements.Placement parseSmallWindow(
+            String[] parts) {
+        double x = Double.NaN;
+        double y = Double.NaN;
+        int width = 0;
+        int height = 0;
+        for (int index = 2; index < parts.length; index++) {
+            String part = parts[index];
+            try {
+                if (part.startsWith("x=")) {
+                    x = Double.parseDouble(part.substring(2));
+                } else if (part.startsWith("y=")) {
+                    y = Double.parseDouble(part.substring(2));
+                } else if (part.startsWith("w=")) {
+                    width = Integer.parseInt(part.substring(2));
+                } else if (part.startsWith("h=")) {
+                    height = Integer.parseInt(part.substring(2));
+                }
+            } catch (NumberFormatException unreadable) {
+                return null;
+            }
+        }
+        if (Double.isNaN(x) || Double.isNaN(y) || width < 0 || height < 0
+                || (width > 0) != (height > 0)) {
+            return null;
+        }
+        return new ChatSmallWindowPlacements.Placement(x, y, width, height);
     }
 
     /** What the file says of a window's area or member list put away. */
@@ -385,6 +436,15 @@ public final class ChatWindowLayoutStore {
                 line.append(spec.tabs.get(index).id());
             }
             lines.add(line.toString());
+        }
+        for (Map.Entry<ChatSmallWindowKind, ChatSmallWindowPlacements.Placement>
+                small : ChatSmallWindowPlacements.all().entrySet()) {
+            ChatSmallWindowPlacements.Placement placement = small.getValue();
+            lines.add("small " + small.getKey().id
+                    + " x=" + formatPercent(placement.xPercent)
+                    + " y=" + formatPercent(placement.yPercent)
+                    + (placement.isSized() ? " w=" + placement.width
+                            + " h=" + placement.height : ""));
         }
         lines.add("feed x=" + formatPercent(ChatWindowLayout.feedOffsetX())
                 + " y=" + formatPercent(ChatWindowLayout.feedOffsetY()));

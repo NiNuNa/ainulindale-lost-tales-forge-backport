@@ -44,14 +44,14 @@ public final class ChatPermissionConfigTest {
     @Test
     public void aPermissionNamesTheCapabilitiesItReaches() {
         LostTalesPermissionCatalog catalog = ChatRoleConfig.parsePermissions(new String[] {
-                "keeper=capability:chat.moderate;capability:chat.console.read;"
+                "keeper=capability:chat.moderate;capability:chat.server_console.read;"
                         + "desc:Keeps the peace.",
                 "builder=capability:waystone.manage",
         }, collect);
         assertTrue(warnings.toString(), warnings.isEmpty());
         assertEquals(Arrays.asList("keeper", "builder"), catalog.ids());
         assertEquals(new LinkedHashSet<String>(Arrays.asList("chat.moderate",
-                        "chat.console.read")),
+                        "chat.server_console.read")),
                 catalog.capabilityIdsOf("keeper"));
         assertEquals("Keeps the peace.", catalog.descriptionOf("keeper"));
         assertEquals("", catalog.descriptionOf("builder"));
@@ -161,15 +161,15 @@ public final class ChatPermissionConfigTest {
     public void aPermissionRoundTripsThroughItsEntry() {
         String entry = ChatRoleConfig.formatPermission("keeper",
                 new LinkedHashSet<String>(Arrays.asList("chat.moderate",
-                        "chat.console.read")),
+                        "chat.server_console.read")),
                 "Keeps the peace.");
-        assertEquals("keeper=capability:chat.moderate;capability:chat.console.read;"
+        assertEquals("keeper=capability:chat.moderate;capability:chat.server_console.read;"
                 + "desc:Keeps the peace.", entry);
         LostTalesPermissionCatalog catalog = ChatRoleConfig.parsePermissions(
                 new String[] {entry}, collect);
         assertTrue(warnings.toString(), warnings.isEmpty());
         assertEquals(new LinkedHashSet<String>(Arrays.asList("chat.moderate",
-                        "chat.console.read")),
+                        "chat.server_console.read")),
                 catalog.capabilityIdsOf("keeper"));
         assertEquals("Keeps the peace.", catalog.descriptionOf("keeper"));
     }

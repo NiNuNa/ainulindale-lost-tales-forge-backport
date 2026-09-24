@@ -2,10 +2,10 @@ package com.ninuna.losttales.client.chat;
 
 /**
  * What one turn of the mouse wheel moves in the chat. A turn is
- * vanilla's step of {@link #LINES} whole lines, one with Shift, counted
- * in the unit of whatever it scrolls: message lines for a window's
- * history, rows for a popup menu, and list lines of a menu row's height
- * for a picker. Menus and pickers keep their own pace whatever height a
+ * {@link #LINES} whole lines, one with Shift, counted in the unit of
+ * whatever it scrolls: message lines for a window's
+ * history, rows for a menu, and list lines of a menu row's height for a
+ * picker. Menus and pickers keep their own pace whatever height a
  * message row has.
  */
 final class ChatWheelStep {
@@ -16,7 +16,7 @@ final class ChatWheelStep {
      */
     static final int LINES = 2;
     /** Pixels one line moves a picker's list: a menu row's height. */
-    static final int PICKER_LINE_PIXELS = ChatPopupMenu.ROW_HEIGHT;
+    static final int PICKER_LINE_PIXELS = ChatMenu.ROW_HEIGHT;
 
     private ChatWheelStep() {}
 
@@ -36,7 +36,7 @@ final class ChatWheelStep {
         return lines * LostTalesChatOverlayRenderer.LINE_HEIGHT;
     }
 
-    /** Rows a popup menu moves: always whole rows. */
+    /** Rows a menu moves: always whole rows. */
     static int menuRows(int lines) {
         return lines;
     }

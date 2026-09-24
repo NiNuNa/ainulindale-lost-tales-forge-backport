@@ -24,6 +24,7 @@ public enum PartyErrorId {
     TARGET_OFFLINE("target_offline"),
     TARGET_NO_ACTIVE_CHARACTER("target_no_active_character"),
     TARGET_ALREADY_IN_PARTY("target_already_in_party"),
+    ACCOUNT_ALREADY_IN_PARTY("account_already_in_party"),
     CANNOT_INVITE_SELF("cannot_invite_self"),
     INVITATION_NOT_FOUND("invitation_not_found"),
     INVITATION_EXPIRED("invitation_expired"),

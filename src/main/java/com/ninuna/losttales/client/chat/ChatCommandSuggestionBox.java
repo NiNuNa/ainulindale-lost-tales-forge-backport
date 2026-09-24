@@ -20,7 +20,8 @@ final class ChatCommandSuggestionBox {
     /** Rows shown; more candidates fold into a trailing count. */
     static final int MAX_ROWS = 8;
     private static final int ROW_HEIGHT = 11;
-    private static final int PADDING = 2;
+    /** The rows stand two pixels inside the frame's ink, as a framed button's content does. */
+    private static final int PADDING = LostTalesChatVisualStyle.POPUP_INSET;
     /**
      * How far above the input anchor ({@link ChatInputBar#inputAnchor})
      * the box ends: one pixel clear of the bar's top.
@@ -98,13 +99,13 @@ final class ChatCommandSuggestionBox {
         for (int row = 0; row < shown; row++) {
             int rowTop = top + PADDING + row * ROW_HEIGHT;
             LostTalesChatVisualStyle.drawColored(font,
-                    this.candidates.get(row), inputX + 4, rowTop + 2,
+                    this.candidates.get(row), inputX + PADDING, rowTop + 2,
                     LostTalesChatVisualStyle.IVORY, 255);
         }
         if (this.candidates.size() > MAX_ROWS) {
             LostTalesChatVisualStyle.drawColored(font,
                     "+" + (this.candidates.size() - MAX_ROWS),
-                    inputX + 4, top + PADDING + shown * ROW_HEIGHT + 2,
+                    inputX + PADDING, top + PADDING + shown * ROW_HEIGHT + 2,
                     LostTalesChatVisualStyle.IVORY, 160);
         }
     }
@@ -133,7 +134,7 @@ final class ChatCommandSuggestionBox {
             width = Math.max(width, font.getStringWidth(
                     "+" + (this.candidates.size() - MAX_ROWS)));
         }
-        return width + 8;
+        return width + PADDING * 2;
     }
 
     private int boxTop(int screenHeight) {

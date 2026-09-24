@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiCaret;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
@@ -265,7 +266,7 @@ final class ChatToolStrip {
                 * alphaScale * LostTalesChatVisualStyle.chatOpacity(minecraft));
         // The well, in the hole the strip left for it: one surface, a
         // step darker than the strip, as the input bar's typing well is.
-        LostTalesChatOverlayRenderer.fillRect(laid.wellLeft, laid.wellTop,
+        LostTalesUiInk.fillRect(laid.wellLeft, laid.wellTop,
                 laid.wellRight, laid.wellBottom,
                 LostTalesChatVisualStyle.argb(LostTalesChatVisualStyle.SURFACE_RGB,
                         surfaceAlpha));

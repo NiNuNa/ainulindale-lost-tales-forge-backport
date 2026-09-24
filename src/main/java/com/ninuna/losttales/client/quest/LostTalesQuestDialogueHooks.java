@@ -27,6 +27,7 @@ import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.util.StatCollector;
+import com.ninuna.losttales.quest.LostTalesQuestRewardText;
 
 /**
  * Where a quest conversation is opened from.
@@ -161,14 +162,49 @@ public final class LostTalesQuestDialogueHooks {
 
     /**
      * The conversation touching {@code target} opens, or null where
-     * there is none: a quest that is offered by this person and can be
-     * taken, or one already under way whose hand-in they are waiting
-     * for. Only a quest that wrote dialogue is talked about.
+     * there is none, or while the conversation screen is switched off.
      */
     public static GuiScreen forEntity(Entity target) {
         if (target == null || !LostTalesQuestDialogueGui.isEnabled()) {
             return null;
         }
+        Exchange exchange = exchangeWith(target);
+        return exchange == null ? null : conversation(exchange);
+    }
+
+    /**
+     * Touching a person with the conversation screen switched off: their
+     * words go to the chat, and an offer is taken or a ready hand-in
+     * given over at once, as the screen's first answer would. A progress
+     * line is only said. Answers whether the person had anything to say.
+     */
+    public static boolean answerWithoutScreen(Entity target) {
+        if (target == null || LostTalesQuestDialogueGui.isEnabled()) {
+            return false;
+        }
+        Exchange exchange = exchangeWith(target);
+        if (exchange == null) {
+            return false;
+        }
+        LostTalesNpcChatHook.sayToPlayer(exchange.speaker, exchange.said,
+                LostTalesColors.rgb(LostTalesColors.HONEY), "");
+        LostTalesQuestDialogueGui.Action requests =
+                LostTalesQuestDialogueGui.questAction(exchange.quest.getId());
+        if (exchange.mood == QuestDialogueModel.Mood.OFFER) {
+            requests.accept();
+        } else if (exchange.mood == QuestDialogueModel.Mood.HAND_IN) {
+            requests.handOver();
+        }
+        return true;
+    }
+
+    /**
+     * What touching {@code target} comes to, or null where it comes to
+     * nothing: a quest this person offers and the player may take, or one
+     * under way whose hand-in they are waiting for. Only a quest that wrote
+     * dialogue is talked about.
+     */
+    private static Exchange exchangeWith(Entity target) {
         for (LostTalesQuestDefinition quest
                 : LostTalesClientQuestDefinitionStore.getQuests()) {
             LostTalesQuestDialogue dialogue = LostTalesQuestDialogue.of(quest);
@@ -177,31 +213,30 @@ public final class LostTalesQuestDialogueHooks {
             }
             LostTalesQuestProgress progress =
                     LostTalesClientQuestProgressStore.getActiveQuest(quest.getId());
-            if (progress == null) {
-                GuiScreen offered = offer(quest, dialogue, target);
-                if (offered != null) {
-                    return offered;
-                }
-                continue;
-            }
-            GuiScreen handIn = handIn(quest, dialogue, progress, target);
-            if (handIn != null) {
-                return handIn;
+            Exchange exchange = progress == null
+                    ? offer(quest, dialogue, target)
+                    : handIn(quest, dialogue, progress, target);
+            if (exchange != null) {
+                return exchange;
             }
         }
         return null;
     }
 
-    /** The offer, when this person gives the quest and it is not taken. */
-    private static GuiScreen offer(LostTalesQuestDefinition quest,
-                                   LostTalesQuestDialogue dialogue,
-                                   Entity target) {
+    /**
+     * The offer, when this person gives the quest and the player may take
+     * it: never taken, or taken again as the quest allows.
+     */
+    private static Exchange offer(LostTalesQuestDefinition quest,
+                                  LostTalesQuestDialogue dialogue,
+                                  Entity target) {
         if (!dialogue.isOffered()
-                || LostTalesClientQuestProgressStore.isQuestCompleted(quest.getId())
+                || !quest.mayTakeAgain(LostTalesClientQuestProgressStore
+                        .getQuestHistoryEntry(quest.getId()))
                 || !matches(quest.getInteraction(), target)) {
             return null;
         }
-        return conversation(quest, dialogue, target,
+        return exchange(quest, dialogue, target,
                 QuestDialogueModel.Mood.OFFER, dialogue.line(
                         LostTalesQuestDialogue.OFFER), firstObjective(quest));
     }
@@ -211,10 +246,10 @@ public final class LostTalesQuestDialogueHooks {
      * for. A quest part way through says its progress line instead, so
      * coming back early is answered rather than ignored.
      */
-    private static GuiScreen handIn(LostTalesQuestDefinition quest,
-                                    LostTalesQuestDialogue dialogue,
-                                    LostTalesQuestProgress progress,
-                                    Entity target) {
+    private static Exchange handIn(LostTalesQuestDefinition quest,
+                                   LostTalesQuestDialogue dialogue,
+                                   LostTalesQuestProgress progress,
+                                   Entity target) {
         LostTalesQuestObjectiveDefinition waiting = null;
         for (LostTalesQuestObjectiveDefinition objective
                 : LostTalesQuestObjectiveSelection.getProgressibleObjectives(
@@ -236,11 +271,11 @@ public final class LostTalesQuestDialogueHooks {
                 ? dialogue.line(LostTalesQuestDialogue.HAND_IN)
                 : dialogue.lineOr(LostTalesQuestDialogue.PROGRESS,
                         dialogue.line(LostTalesQuestDialogue.HAND_IN));
-        return conversation(quest, dialogue, target,
+        return exchange(quest, dialogue, target,
                 ready ? QuestDialogueModel.Mood.HAND_IN
                         : QuestDialogueModel.Mood.PROGRESS,
                 said, LostTalesQuestObjectiveTextHelper.buildObjectiveLine(
-                        progress, waiting, true, false, false, false));
+                        progress, waiting, true, false));
     }
 
     /**
@@ -268,17 +303,47 @@ public final class LostTalesQuestDialogueHooks {
         return held >= wanted;
     }
 
-    private static GuiScreen conversation(LostTalesQuestDefinition quest,
-                                          LostTalesQuestDialogue dialogue,
-                                          Entity target,
-                                          QuestDialogueModel.Mood mood,
-                                          String said, String objective) {
+    /** What a person says to the player, and to what end; null when they would say nothing. */
+    private static Exchange exchange(LostTalesQuestDefinition quest,
+                                     LostTalesQuestDialogue dialogue,
+                                     Entity target,
+                                     QuestDialogueModel.Mood mood,
+                                     String said, String objective) {
         if (said.length() == 0 || !(target instanceof EntityLivingBase)) {
             return null;
         }
+        return new Exchange(quest, dialogue, (EntityLivingBase)target, mood,
+                said, objective);
+    }
+
+    /** One turn of a quest conversation: who speaks, what they say, and what it leads to. */
+    private static final class Exchange {
+        final LostTalesQuestDefinition quest;
+        final LostTalesQuestDialogue dialogue;
+        final EntityLivingBase speaker;
+        final QuestDialogueModel.Mood mood;
+        final String said;
+        final String objective;
+
+        Exchange(LostTalesQuestDefinition quest, LostTalesQuestDialogue dialogue,
+                 EntityLivingBase speaker, QuestDialogueModel.Mood mood,
+                 String said, String objective) {
+            this.quest = quest;
+            this.dialogue = dialogue;
+            this.speaker = speaker;
+            this.mood = mood;
+            this.said = said;
+            this.objective = objective;
+        }
+    }
+
+    /** The conversation screen for one exchange. */
+    private static GuiScreen conversation(Exchange exchange) {
+        LostTalesQuestDefinition quest = exchange.quest;
+        LostTalesQuestDialogue dialogue = exchange.dialogue;
         QuestDialogueModel model = QuestDialogueModel.of(
-                speakerName(target), "", quest.getTitle(), objective,
-                mood, said,
+                speakerName(exchange.speaker), "", quest.getTitle(),
+                exchange.objective, exchange.mood, exchange.said,
                 // Nothing written to say further leaves what the quest
                 // pays as the answer, which is what a player asks for.
                 dialogue.lineOr(LostTalesQuestDialogue.MORE,
@@ -293,7 +358,7 @@ public final class LostTalesQuestDialogueHooks {
                                 translate("gui.losttales.quest.dialogue.decline")),
                         dialogue.lineOr(LostTalesQuestDialogue.LEAVE,
                                 translate("gui.losttales.quest.dialogue.leave"))});
-        final EntityLivingBase speaker = (EntityLivingBase)target;
+        final EntityLivingBase speaker = exchange.speaker;
         final LostTalesQuestDialogueGui.Action requests =
                 LostTalesQuestDialogueGui.questAction(quest.getId());
         return new LostTalesQuestDialogueGui(null, model,
@@ -323,19 +388,9 @@ public final class LostTalesQuestDialogueHooks {
 
     /** What a quest gives, in a line; empty where it gives nothing. */
     private static String rewardLine(LostTalesQuestDefinition quest) {
-        StringBuilder line = new StringBuilder();
-        for (Map.Entry<String, String> reward : quest.getRewards().entrySet()) {
-            if (reward.getValue() == null || reward.getValue().length() == 0) {
-                continue;
-            }
-            if (line.length() > 0) {
-                line.append(", ");
-            }
-            line.append(reward.getValue());
-        }
-        return line.length() == 0 ? ""
-                : translate("gui.losttales.quest.dialogue.reward",
-                        line.toString());
+        String rewards = LostTalesQuestRewardText.summary(quest.getRewards());
+        return rewards.length() == 0 ? ""
+                : translate("gui.losttales.quest.dialogue.reward", rewards);
     }
 
     /** The first thing a quest asks for, for the card. */
@@ -344,7 +399,7 @@ public final class LostTalesQuestDialogueHooks {
             for (LostTalesQuestObjectiveDefinition objective
                     : stage.getObjectives()) {
                 return LostTalesQuestObjectiveTextHelper.buildObjectiveLine(
-                        null, objective, false, false, false, false);
+                        null, objective, false, false);
             }
         }
         return "";

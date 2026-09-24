@@ -195,6 +195,8 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
     private int dragWindowY;
 
     private int pendingRequestId;
+    /** The choices of the creation waiting on the server, kept as the template once it is made. */
+    private CharacterTemplate pendingTemplate;
 
     /** The look the player's body was last given as a preview; unset when none is worn. */
 
@@ -509,7 +511,9 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         CharacterOperationFeedback feedback =
                 ClientCharacterRosterCache.getOperation(this.pendingRequestId);
         int completedRequest = this.pendingRequestId;
+        CharacterTemplate template = this.pendingTemplate;
         this.pendingRequestId = 0;
+        this.pendingTemplate = null;
         if (feedback == null) {
             return;
         }
@@ -517,6 +521,12 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         if (!feedback.isSuccessful()) {
             setStatus(ClientCharacterDisplayNames.error(feedback.getErrorId()), true);
             return;
+        }
+        // What this account starts as on the next world it joins: the
+        // choices of a character the server made, never of one it refused.
+        if (template != null) {
+            CharacterTemplateStore.save(LostTalesClientAccount.templateId(),
+                    template);
         }
         setStatus(ClientCharacterDisplayNames.operationSuccess("create"), false);
         // The new character is on the roster; the player is still whoever
@@ -1741,11 +1751,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
                 this.showMinecraftCape, selectedCapeId());
         setStatus(I18n.format("gui.losttales.character.creating"), false);
         this.pendingRequestId = ClientCharacterNetwork.createCharacter(request);
-        // What this account starts as on the next world it joins. The
-        // creation itself is the server's answer; this only remembers the
-        // choices that led to it.
-        CharacterTemplateStore.save(LostTalesClientAccount.templateId(),
-                CharacterTemplate.of(request));
+        this.pendingTemplate = CharacterTemplate.of(request);
     }
 
     /**
