@@ -180,7 +180,7 @@ public final class LostTalesChatAccessPacketTest {
         assertEquals("Moderator", read.byId("moderator").getDisplayName());
         assertEquals("Keeps the peace.", read.byId("moderator").getDisplayDescription());
         assertEquals("emoji:bee", read.byId("moderator").getIcon().toText());
-        assertEquals("emoji:expressionless",
+        assertEquals("channel:operator",
                 read.byId("operator").getIcon().toText());
         assertEquals("emoji:purple_heart", read.byId("team").getIcon().toText());
         assertEquals(4, read.byId("moderator").bit());

@@ -133,6 +133,9 @@ final class ChatOutbox {
      */
     private void sendToTab(ChatTab tab, String outgoing,
                            ChatReplyReference reply) {
+        if (tab == null || tab.isPage()) {
+            return;
+        }
         ClientChatIdentitySelection.update();
         long echoNonce = LostTalesChatPresentation.echoPending(tab, outgoing,
                 resolveLocalShowcases(outgoing), reply);
@@ -379,6 +382,9 @@ final class ChatOutbox {
     }
 
     private static void sendTyping(ChatTab tab, boolean typing) {
+        if (tab == null || tab.isPage()) {
+            return;
+        }
         // The identity the message will be sent as, stated the same way
         // the send states it, so presence goes where the message will.
         LostTalesNetworkHandler.CHANNEL.sendToServer(

@@ -9,7 +9,8 @@ import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.client.party.ClientPartyTrackingCache;
 import com.ninuna.losttales.client.party.PartyClientRequestManager;
 import com.ninuna.losttales.gui.screen.LostTalesCharacterMenuGui;
-import com.ninuna.losttales.gui.screen.LostTalesQuestJournalGui;
+import com.ninuna.losttales.client.chat.LostTalesChatGui;
+import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.party.model.PartyPersonalMarkerOwner;
 import com.ninuna.losttales.party.sync.PartyStateSnapshot;
 import com.ninuna.losttales.world.map.waypoint.LostTalesMapCoordinateHelper;
@@ -2416,7 +2417,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             return;
         }
         if (LostTalesKeyBindings.isQuestJournalKey(keyCode)) {
-            this.mc.displayGuiScreen(new LostTalesQuestJournalGui(this));
+            LostTalesChatGui.openPage(QuestJournalPage.PAGE_ID);
             return;
         }
         if (keyCode == CREATE_WAYPOINT_KEY) {

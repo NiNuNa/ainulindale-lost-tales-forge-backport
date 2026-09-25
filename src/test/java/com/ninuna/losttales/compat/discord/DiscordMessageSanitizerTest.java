@@ -75,20 +75,29 @@ public final class DiscordMessageSanitizerTest {
     }
 
     @Test
-    public void aliasesResolveAndUnknownEmojiAreDropped() {
+    public void aliasesResolveAndUnknownEmojiKeepTheirNames() {
         // A literal alias shortcode, and a custom emoji named by one.
         assertEquals("well :flushed: then",
                 DiscordMessageSanitizer.inbound(
                         "well :flushed_face: then", null));
         assertEquals(":laughing:", DiscordMessageSanitizer.inbound(
                 "<:Satisfied:12345>", null));
-        // An emoji the registry does not carry is dropped, not shown as
-        // broken glyphs — a ZWJ sequence whole, even where its base is
-        // known, so it never becomes the wrong emoji.
-        assertEquals("look here", DiscordMessageSanitizer.inbound(
+        // An emoji the registry does not carry reads as its Discord name,
+        // never as broken glyphs: a ZWJ sequence whole, even where its
+        // base is known, so it never becomes the wrong emoji, and a flag
+        // as one name.
+        assertEquals("look :robot: here", DiscordMessageSanitizer.inbound(
                 "look 🤖 here", null));
-        assertEquals("so dizzy", DiscordMessageSanitizer.inbound(
-                "so 😵‍💫 dizzy", null));
+        assertEquals("so :face_with_spiral_eyes: dizzy",
+                DiscordMessageSanitizer.inbound("so 😵‍💫 dizzy", null));
+        assertEquals("from :flag_de:", DiscordMessageSanitizer.inbound(
+                "from 🇩🇪", null));
+        // A skin tone goes with the emoji the registry has.
+        assertEquals(":index_pointing_at_the_viewer:",
+                DiscordMessageSanitizer.inbound("🫵🏽", null));
+        // Signs the chat's font draws stay as they are.
+        assertEquals("© 2026", DiscordMessageSanitizer.inbound("© 2026", null));
+        assertEquals(":pepe:", DiscordMessageSanitizer.inbound("<:pepe:12345>", null));
     }
 
     @Test

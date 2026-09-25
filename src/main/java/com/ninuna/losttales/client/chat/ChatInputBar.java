@@ -8,7 +8,6 @@ import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
-import com.ninuna.losttales.chat.ChatMarkdown;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
@@ -125,6 +124,8 @@ final class ChatInputBar {
     private FontRenderer font;
     private ChatPointerRegions regions;
     private ChatInputField field;
+    /** Draws a resting bar's draft as the live field would show it. */
+    private ChatInputField restingField;
     private int screenHeight;
 
     /** When the bars' entrance began: the screen opening. */
@@ -210,6 +211,12 @@ final class ChatInputBar {
         this.regions = regions;
         this.field = field;
         this.screenHeight = screenHeight;
+        this.restingField = new ChatInputField(font, 0, 0, MIN_FIELD_WIDTH,
+                FIELD_HEIGHT);
+        this.restingField.setEnableBackgroundDrawing(false);
+        this.restingField.setMaxStringLength(
+                ChatMessageValidator.MAX_RAW_CHARACTERS);
+        this.restingField.mentionsFrom(field.mentionSource());
     }
 
     /**
@@ -235,13 +242,21 @@ final class ChatInputBar {
     ChatWindowFrame activeFrame() {
         ChatWindow window = ChatWindowLayout.windowOf(
                 ClientChatChannelState.getSelected());
+        if (ChatWindowLayout.showsPage(window)) {
+            // The input waits behind a page: there is no live bar.
+            return null;
+        }
         ChatWindowFrame frame = window == null ? null
                 : ChatWindowFrame.find(window.getId());
         if (frame != null && frame.drawn) {
             return frame;
         }
-        List<ChatWindowFrame> drawn = ChatWindowFrame.drawnFrames();
-        return drawn.isEmpty() ? null : drawn.get(0);
+        for (ChatWindowFrame drawn : ChatWindowFrame.drawnFrames()) {
+            if (drawn.page == null) {
+                return drawn;
+            }
+        }
+        return null;
     }
 
     /** Places the bar on the active window's bar strip, as just drawn. */
@@ -726,33 +741,24 @@ final class ChatInputBar {
     }
 
     /**
-     * A resting bar's unsent draft, cut to the field, where the live
-     * field would show it being typed: plain in the field's own ivory,
-     * save a command, which is the chat's inline code here as it is in
-     * the field, up to the words a whisper verb sends.
+     * A resting bar's unsent draft, where the live field would show it
+     * being typed, and drawn by a field of its own that never holds the
+     * keys, so its emoji, shares, pings, links, markup and a command read
+     * exactly as they do in the live field. It shows from its start.
      */
     private void drawDraft(ChatInputLine line, String draft) {
-        if (draft.length() == 0) {
+        if (draft.length() == 0 || this.restingField == null) {
             return;
         }
-        int x = line.fieldLeft + LostTalesUiCaret.WIDTH + 1;
-        String shown = this.font.trimStringToWidth(draft, line.fieldRight - x);
-        int code = Math.min(ChatInputStyles.commandCodeLength(draft),
-                shown.length());
-        if (code > 0) {
-            String command = shown.substring(0, code);
-            LostTalesChatVisualStyle.drawColored(this.font,
-                    ChatInputStyles.prefixOf(ChatMarkdown.Span.CODE) + command,
-                    x, barTextTop(), ChatInputStyles.colorOf(
-                            ChatMarkdown.Span.CODE,
-                            LostTalesChatVisualStyle.IVORY), faded(255));
-            x += this.font.getStringWidth(command);
+        this.restingField.xPosition = line.fieldLeft;
+        this.restingField.yPosition = barTextTop();
+        this.restingField.width = Math.max(MIN_FIELD_WIDTH,
+                line.fieldRight - line.fieldLeft);
+        if (!draft.equals(this.restingField.getText())) {
+            this.restingField.setText(draft);
         }
-        if (code < shown.length()) {
-            LostTalesChatVisualStyle.drawColored(this.font,
-                    shown.substring(code), x, barTextTop(),
-                    LostTalesChatVisualStyle.IVORY, faded(255));
-        }
+        this.restingField.setCursorPosition(0);
+        this.restingField.drawTextBox();
     }
 
     /**

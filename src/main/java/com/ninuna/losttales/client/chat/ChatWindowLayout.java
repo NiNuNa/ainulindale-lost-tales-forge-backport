@@ -135,6 +135,9 @@ public final class ChatWindowLayout {
      * never stored; windows not listed sit at the back in layout order.
      */
     private static final List<String> STACK = new ArrayList<String>();
+    /** By page id, where each page's window last stood. */
+    private static final Map<String, PagePlace> PAGE_PLACES =
+            new LinkedHashMap<String, PagePlace>();
     private static int nextWindowNumber = 1;
     private static Runnable changeListener;
     /** Closed-chat feed position, percent of its travel; vanilla's spot. */
@@ -160,6 +163,7 @@ public final class ChatWindowLayout {
      * everyone and shown to whoever the server lets read them.
      */
     public static synchronized void reset() {
+        PAGE_PLACES.clear();
         WINDOWS.clear();
         MUTED.clear();
         PINGS_MUTED.clear();
@@ -186,6 +190,100 @@ public final class ChatWindowLayout {
         conversation.setActiveTab(ChatTab.of(ChatChannel.GLOBAL));
         conversation.setOffsets(0.0D, 100.0D);
         WINDOWS.add(conversation);
+    }
+
+    /* ---- Pages ---- */
+
+    /** The message lines a page's window first opens with: a page wants more room than a conversation. */
+    static final double PAGE_LINES = 18.0D;
+    /** The width, in the chat's pixels, a page's window first opens with. */
+    static final int PAGE_WIDTH = 360;
+
+    /** Where a page's window stood as its tab last left it. */
+    static final class PagePlace {
+        final double x;
+        final double y;
+        final double lines;
+        final int width;
+
+        PagePlace(double x, double y, double lines, int width) {
+            this.x = x;
+            this.y = y;
+            this.lines = lines;
+            this.width = width;
+        }
+    }
+
+
+    /**
+     * Brings a page forward: in the window holding its tab, the tab put in
+     * front there and the window raised; else in a window of its own,
+     * where the page's window last stood, or cascaded from the front
+     * window at a page's size. Null when no window can open for it: every
+     * window the chat may have is out.
+     */
+    public static synchronized ChatWindow showPage(ChatTab page) {
+        if (page == null || !page.isPage()) {
+            return null;
+        }
+        ChatWindow holding = windowOf(page);
+        if (holding != null) {
+            holding.setActiveTab(page);
+            raise(holding.getId());
+            changed();
+            return holding;
+        }
+        if (WINDOWS.size() >= MAX_WINDOWS) {
+            return null;
+        }
+        ChatWindow created = newWindow();
+        PagePlace place = PAGE_PLACES.get(page.getPageId());
+        if (place != null) {
+            created.setOffsets(place.x, place.y);
+            created.setMaxLines(place.lines);
+            created.setWidth(clampChatWidth(place.width));
+        } else {
+            cascadeFrom(created, frontWindow());
+            created.setMaxLines(PAGE_LINES);
+            created.setWidth(PAGE_WIDTH);
+        }
+        created.tabs().add(page);
+        created.setActiveTab(page);
+        WINDOWS.add(created);
+        raise(created.getId());
+        changed();
+        return created;
+    }
+
+    /** Whether the window has a page in front of its conversations. */
+    public static synchronized boolean showsPage(ChatWindow window) {
+        ChatTab front = window == null ? null : window.getActiveTab();
+        return front != null && front.isPage();
+    }
+
+    /** Notes where the window stands for every page tab in {@code tabs} that is leaving it. */
+    private static void rememberPagePlaces(ChatWindow window,
+                                           List<ChatTab> tabs) {
+        for (ChatTab tab : tabs) {
+            if (tab != null && tab.isPage()) {
+                PAGE_PLACES.put(tab.getPageId(), new PagePlace(
+                        window.getOffsetX(), window.getOffsetY(),
+                        window.getMaxLines(), window.getWidth()));
+            }
+        }
+    }
+
+    /** Where each page's window last stood, for the layout file. */
+    static synchronized Map<String, PagePlace> pagePlaces() {
+        return new LinkedHashMap<String, PagePlace>(PAGE_PLACES);
+    }
+
+    /** What the layout file said of the pages' places. */
+    static synchronized void loadPagePlaces(Map<String, PagePlace> places) {
+        PAGE_PLACES.clear();
+        if (places != null) {
+            PAGE_PLACES.putAll(places);
+        }
     }
 
     /** Whether the picker strip above the input bar is folded away. */
@@ -474,7 +572,7 @@ public final class ChatWindowLayout {
 
     private static void setPreference(Set<ChatTab> set, ChatTab tab,
                                       boolean on) {
-        if (tab == null) {
+        if (tab == null || tab.isPage()) {
             return;
         }
         boolean changed = on ? set.add(tab) : set.remove(tab);
@@ -559,6 +657,7 @@ public final class ChatWindowLayout {
         if (window == null || window.isLocked()) {
             return false;
         }
+        rememberPagePlaces(window, window.tabs());
         window.tabs().clear();
         window.setActiveTab(null);
         dropWindow(window);
@@ -588,7 +687,8 @@ public final class ChatWindowLayout {
      * conversations reopen with their next line — and not open already.
      */
     private static boolean isRestorable(ChatTab tab) {
-        return tab != null && !tab.isWhisper() && !isOpen(tab);
+        return tab != null && !tab.isWhisper() && !tab.isPage()
+                && !isOpen(tab);
     }
 
     /**
@@ -1618,6 +1718,7 @@ public final class ChatWindowLayout {
     }
 
     private static void removeTab(ChatWindow window, ChatTab tab) {
+        rememberPagePlaces(window, Collections.singletonList(tab));
         window.tabs().remove(tab);
         if (window.tabs().isEmpty()) {
             dropWindow(window);

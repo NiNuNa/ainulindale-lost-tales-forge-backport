@@ -4,16 +4,19 @@ import java.util.Locale;
 
 /**
  * What a channel wears before its name when a server chooses it, and a
- * role over its members: one of the chat's own emoji, or an item's icon.
- * Written in the channels and roles files as {@code emoji:<name>} — or
- * the bare name — or {@code item:<id>}, with {@code @<damage>} after an
- * item that needs one, and carried to clients as that same text. Each side parses the text for itself, and text that
- * names nothing is refused rather than guessed at; whether the emoji or
- * the item exists is the drawing side's question, since a client may
- * lack the mod an item comes from.
+ * role over its members: one of the chat's own emoji, an item's icon, or
+ * for a role whatever a channel wears. Written in the channels and roles
+ * files as {@code emoji:<name>} — or the bare name — {@code item:<id>},
+ * with {@code @<damage>} after an item that needs one, or
+ * {@code channel:<code name>}, and carried to clients as that same text.
+ * Each side parses the text for itself, and text that names nothing is
+ * refused rather than guessed at; whether the emoji, the item or the
+ * channel exists is the drawing side's question, since a client may lack
+ * the mod an item comes from. A channel's own icon never names a channel,
+ * so no icon points round in a circle.
  */
 public final class ChatChannelIconSpec {
-    public enum Kind { EMOJI, ITEM }
+    public enum Kind { EMOJI, ITEM, CHANNEL }
 
     /** The longest text an entry may be, and the wire's bound on it. */
     public static final int MAX_TEXT_LENGTH = 96;
@@ -22,6 +25,9 @@ public final class ChatChannelIconSpec {
 
     private static final String ITEM_PREFIX = "item:";
     private static final String EMOJI_PREFIX = "emoji:";
+    private static final String CHANNEL_PREFIX = "channel:";
+    /** The longest code name a channel icon may name. */
+    private static final int MAX_CODE_NAME_LENGTH = 24;
 
     private final Kind kind;
     /** The emoji's canonical name, or the item's registry id. */
@@ -63,6 +69,11 @@ public final class ChatChannelIconSpec {
             return isItemId(id) ? new ChatChannelIconSpec(Kind.ITEM, id, meta)
                     : null;
         }
+        if (lower.startsWith(CHANNEL_PREFIX)) {
+            String codeName = lower.substring(CHANNEL_PREFIX.length()).trim();
+            return isCodeName(codeName)
+                    ? new ChatChannelIconSpec(Kind.CHANNEL, codeName, 0) : null;
+        }
         String name = lower.startsWith(EMOJI_PREFIX)
                 ? lower.substring(EMOJI_PREFIX.length()).trim() : lower;
         return isEmojiName(name) ? new ChatChannelIconSpec(Kind.EMOJI, name, 0)
@@ -75,11 +86,12 @@ public final class ChatChannelIconSpec {
             return ITEM_PREFIX + this.name
                     + (this.meta == 0 ? "" : "@" + this.meta);
         }
-        return EMOJI_PREFIX + this.name;
+        return (this.kind == Kind.CHANNEL ? CHANNEL_PREFIX : EMOJI_PREFIX)
+                + this.name;
     }
 
     public Kind getKind() { return this.kind; }
-    /** The emoji's canonical name, or the item's registry id. */
+    /** The emoji's canonical name, the item's registry id, or the channel's code name. */
     public String getName() { return this.name; }
     /** The item's damage value; zero for an emoji. */
     public int getMeta() { return this.meta; }
@@ -96,6 +108,22 @@ public final class ChatChannelIconSpec {
                     && (character < '0' || character > '9')
                     && character != '_' && character != '.'
                     && character != '-' && character != ':') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** A channel's code name: lower-case letters, digits and underscores. */
+    private static boolean isCodeName(String name) {
+        if (name.length() == 0 || name.length() > MAX_CODE_NAME_LENGTH) {
+            return false;
+        }
+        for (int index = 0; index < name.length(); index++) {
+            char character = name.charAt(index);
+            if ((character < 'a' || character > 'z')
+                    && (character < '0' || character > '9')
+                    && character != '_') {
                 return false;
             }
         }

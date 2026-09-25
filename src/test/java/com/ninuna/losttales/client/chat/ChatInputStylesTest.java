@@ -30,21 +30,17 @@ public final class ChatInputStylesTest {
     }
 
     @Test
-    public void subduedColoursNeverHideAMentionOutsideCode() {
-        int honey = 0xF7CF91;
+    public void eachStyleWearsItsOwnColour() {
         int ivory = LostTalesChatVisualStyle.IVORY;
-        assertEquals(ivory, ChatInputStyles.colorOf(ChatMarkdown.Span.BOLD, ivory));
-        assertEquals(honey, ChatInputStyles.colorOf(ChatMarkdown.Span.BOLD, honey));
-        assertEquals(honey, ChatInputStyles.colorOf(ChatMarkdown.Span.SPOILER, honey));
-        assertFalse(ivory == ChatInputStyles.colorOf(ChatMarkdown.Span.SPOILER, ivory));
-        assertFalse(honey == ChatInputStyles.colorOf(ChatMarkdown.Span.CODE, honey));
+        assertEquals(ivory, ChatInputStyles.colorOf(ChatMarkdown.Span.PLAIN));
+        assertEquals(ivory, ChatInputStyles.colorOf(ChatMarkdown.Span.BOLD));
+        assertFalse(ivory == ChatInputStyles.colorOf(ChatMarkdown.Span.SPOILER));
         // Code wears the chat's aside tone, the Console's colour.
         assertEquals(LostTalesChatVisualStyle.asideRgb(),
-                ChatInputStyles.colorOf(ChatMarkdown.Span.CODE, honey));
-        assertFalse(honey == ChatInputStyles.colorOf(ChatMarkdown.Span.MARK, honey));
-        assertEquals(ChatInputStyles.colorOf(ChatMarkdown.Span.MARK, honey),
-                ChatInputStyles.colorOf(ChatMarkdown.Span.BOLD | ChatMarkdown.Span.MARK,
-                        ivory));
+                ChatInputStyles.colorOf(ChatMarkdown.Span.CODE));
+        assertFalse(ivory == ChatInputStyles.colorOf(ChatMarkdown.Span.MARK));
+        assertEquals(ChatInputStyles.colorOf(ChatMarkdown.Span.MARK),
+                ChatInputStyles.colorOf(ChatMarkdown.Span.BOLD | ChatMarkdown.Span.MARK));
     }
 
     @Test

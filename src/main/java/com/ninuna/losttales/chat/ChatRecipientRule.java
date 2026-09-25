@@ -2,7 +2,7 @@ package com.ninuna.losttales.chat;
 
 /** How the server decides who hears a channel's lines. */
 public enum ChatRecipientRule {
-    /** Everyone online: Global and Out of Character. */
+    /** Everyone online: Global and OOC. */
     EVERYONE,
     PROXIMITY,
     PARTY,

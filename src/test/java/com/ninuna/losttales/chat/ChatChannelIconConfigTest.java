@@ -82,7 +82,9 @@ public final class ChatChannelIconConfigTest {
         assertTrue(parse("operator=item:").isEmpty());
         assertTrue(parse("operator=").isEmpty());
         assertTrue(parse("operator").isEmpty());
-        assertEquals(3, this.warnings.size());
+        // A channel wears an icon of its own, never another channel's.
+        assertTrue(parse("operator=channel:ooc").isEmpty());
+        assertEquals(4, this.warnings.size());
         for (String warning : this.warnings) {
             assertTrue(warning, warning.contains("no icon"));
         }

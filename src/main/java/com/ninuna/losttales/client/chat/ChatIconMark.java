@@ -48,7 +48,7 @@ final class ChatIconMark {
      * anything is unread.
      */
     static ChatIconMark of(ChatTab tab) {
-        if (tab == null) {
+        if (tab == null || tab.isPage()) {
             return NONE;
         }
         if (tab.isWhisper()) {

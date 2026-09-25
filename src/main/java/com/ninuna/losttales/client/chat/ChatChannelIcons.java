@@ -235,6 +235,14 @@ final class ChatChannelIcons {
         if (minecraft == null || tab == null) {
             return;
         }
+        if (tab.isPage()) {
+            // A page wears the item its system gave it.
+            ChatPages.Page page = tab.page();
+            if (page != null) {
+                drawItemIcon(minecraft, page.icon(), x, y, alpha, false, mark);
+            }
+            return;
+        }
         if (!tab.isNpc() && !tab.isWhisper()) {
             boolean linked = ClientChatChannelState.isLinkedToDiscord(tab);
             // The server's own choice of item stands before everything
@@ -600,9 +608,17 @@ final class ChatChannelIcons {
         return null;
     }
 
+    /**
+     * The emoji a tab wears, which also says whether it has an icon's slot
+     * at all; a page's item stands in that slot, so it answers the plain
+     * face, which is never drawn for it.
+     */
     static ChatEmoji iconOf(ChatTab tab) {
         if (tab == null) {
             return null;
+        }
+        if (tab.isPage()) {
+            return PLAIN_FACE;
         }
         if (tab.isNpc()) {
             return ChatEmoji.GRINNING;

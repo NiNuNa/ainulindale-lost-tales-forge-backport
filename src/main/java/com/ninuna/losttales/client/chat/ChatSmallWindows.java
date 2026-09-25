@@ -12,15 +12,20 @@ import org.lwjgl.opengl.GL11;
 
 /**
  * The chat screen's small windows: the pickers, the cards and the menus —
- * whatever opens on a click and stays until it is put away. They float
- * above every chat window, stacked among themselves, the one last pressed
- * in front; they are moved by their title strip and resized by their
- * edges, and stick to the screen's margins and to other windows as they
- * go. A window closes by its cross, by Escape while it is the one in
- * front, or by the control that opened it; one of each kind is open at
- * most, but a card for each person, and none counts toward the chat's
- * eight windows. With no chat window open the pickers wait, undrawn, for
- * a bar to write into; everything else stands as it was.
+ * whatever opens on a click and stays until it is put away. Each belongs to
+ * the chat window whose control opened it and lives inside it, as a window
+ * lives on a screen: it is drawn with that window, so a window lying over
+ * it covers it too, rides along as that window moves, and is moved by its
+ * title strip and resized by its edges anywhere inside it, never past its
+ * edges and never sticking to anything. The small windows of the window
+ * being typed in are drawn over every window, as its input bar is; one
+ * opened with no chat window open stands on the bare screen.
+ *
+ * <p>A window closes by its cross, by Escape while it is the one in front,
+ * or by the control that opened it; it closes with its chat window, too.
+ * One of each kind is open at most, but a card for each person: pressed
+ * for in another chat window, a kind's window moves there. None counts
+ * toward the chat's eight windows.</p>
  *
  * <p>"In front" is the window the player last pressed or opened; a press
  * anywhere else in the chat leaves no small window in front, and Escape
@@ -30,6 +35,14 @@ import org.lwjgl.opengl.GL11;
 final class ChatSmallWindows {
     /** The tab's accent and name, which no channel colours here. */
     static final int ACCENT_RGB = LostTalesChatVisualStyle.IVORY;
+    /**
+     * How far in from its chat window's edges a small window's room lies:
+     * its own frame and two clear pixels, so a window pushed against the
+     * edge keeps a framed button's clearance from its chat window's frame.
+     */
+    static final int ROOM_INSET = LostTalesUiWindowFrame.WIDTH + 2;
+    /** Offset a window of a kind already standing at that place opens at: a chat window's cascade. */
+    private static final int CASCADE_STEP = 24;
 
     /** Back to front. */
     private final List<ChatSmallWindow> stack = new ArrayList<ChatSmallWindow>();
@@ -37,18 +50,39 @@ final class ChatSmallWindows {
     private Gesture gesture;
     private int screenWidth;
     private int screenHeight;
+    /** The chat window whose small windows are drawn over every window this frame. */
+    private String topParentId;
 
     /** Takes the screen's size; called on every layout, which also runs on a resize. */
     void bind(int screenWidth, int screenHeight) {
         this.screenWidth = screenWidth;
         this.screenHeight = screenHeight;
-        for (ChatSmallWindow window : this.stack) {
-            fit(window);
-        }
     }
 
-    /** Offset a window of a kind already standing at that place opens at: a chat window's cascade. */
-    private static final int CASCADE_STEP = 24;
+    /**
+     * The room the small windows of chat window {@code parentId} have: that
+     * window's box as drawn, {@link #ROOM_INSET} in from its edges; for
+     * none, the screen inside its margins. Null while the chat window is
+     * not drawn.
+     */
+    LostTalesUiHitBox roomOf(String parentId) {
+        if (parentId == null) {
+            double margin = ChatWindowPlacement.EDGE_MARGIN;
+            return new LostTalesUiHitBox(margin, margin,
+                    Math.max(0.0D, this.screenWidth - 2.0D * margin),
+                    Math.max(0.0D, this.screenHeight - 2.0D * margin));
+        }
+        ChatWindowFrame frame = ChatWindowFrame.find(parentId);
+        if (frame == null || !frame.drawn
+                || ChatWindowLayout.window(parentId) == null) {
+            return null;
+        }
+        LostTalesUiHitBox box = frame.drawnBox();
+        return new LostTalesUiHitBox(box.left + ROOM_INSET,
+                box.top + ROOM_INSET,
+                Math.max(0.0D, box.width - 2.0D * ROOM_INSET),
+                Math.max(0.0D, box.height - 2.0D * ROOM_INSET));
+    }
 
     /** The window of that kind and key, open or still fading out; null for none. */
     ChatSmallWindow find(ChatSmallWindowKind kind, String key) {
@@ -62,54 +96,74 @@ final class ChatSmallWindows {
     }
 
     /**
-     * Opens a window of {@code kind} holding {@code content}, in front:
-     * where the player left one of its kind last — at the size they gave
-     * it, or else its content's own — and otherwise round
-     * {@code firstContentBox}, where the popup it replaces always opened;
-     * a step down and along from another of its kind standing there
-     * already. The window of that kind and key already out, or still
-     * fading, comes forward instead.
+     * Opens a window of {@code kind} holding {@code content} in chat window
+     * {@code parentId}, in front: where the player left one of its kind
+     * last — at the size they gave it, or else its content's own — and
+     * otherwise round {@code firstContentBox}, a screen box, where the
+     * popup it replaces always opened; a step down and along from another
+     * of its kind standing there already. The window of that kind and key
+     * already out, or still fading, comes forward instead, moved into
+     * {@code parentId} when it stood in another. A chat window that is not
+     * drawn leaves the window to the bare screen.
      */
     ChatSmallWindow open(ChatSmallWindowKind kind, String key,
-                         ChatSmallWindowContent content,
+                         ChatSmallWindowContent content, String parentId,
                          LostTalesUiHitBox firstContentBox) {
+        String parent = roomOf(parentId) == null ? null : parentId;
+        LostTalesUiHitBox room = roomOf(parent);
         ChatSmallWindow window = find(kind, key);
         if (window != null) {
             if (!window.isOpen()) {
                 window.setOpen(true);
                 window.content.opened();
             }
+            if (!window.belongsTo(parent)) {
+                window.parentId = parent;
+                place(window, room, firstContentBox);
+            }
             focus(window);
             return window;
         }
-        ChatSmallWindowPlacements.Placement placed =
-                ChatSmallWindowPlacements.of(kind);
-        if (placed != null) {
-            window = new ChatSmallWindow(kind, key, content, 0.0D, 0.0D,
-                    placed.width, placed.height);
-            window.sized = placed.isSized();
-            if (!window.sized) {
-                takeContentSize(window);
-            }
-            fitSize(window);
-            window.left = placed.left(this.screenWidth, window.width);
-            window.top = placed.top(this.screenHeight, window.height);
-        } else {
-            window = new ChatSmallWindow(kind, key, content,
-                    firstContentBox.left,
-                    firstContentBox.top - ChatSmallWindow.STRIP_HEIGHT,
-                    (int)Math.round(firstContentBox.width),
-                    (int)Math.round(firstContentBox.height)
-                            + ChatSmallWindow.STRIP_HEIGHT);
-        }
-        fit(window);
-        cascade(window);
+        window = new ChatSmallWindow(kind, key, content, parent);
+        place(window, room, firstContentBox);
+        cascade(window, room);
         return add(window);
     }
 
     /**
-     * Opens a window exactly where it stood as the chat closed, held on
-     * the screen: what comes back with the chat.
+     * Puts a window in its room where the player left its kind, or round
+     * {@code firstContentBox} while they have not.
+     */
+    private static void place(ChatSmallWindow window, LostTalesUiHitBox room,
+                              LostTalesUiHitBox firstContentBox) {
+        ChatSmallWindowPlacements.Placement placed =
+                ChatSmallWindowPlacements.of(window.kind);
+        if (placed != null) {
+            window.sized = placed.isSized();
+            if (window.sized) {
+                window.wantedWidth = placed.width;
+                window.wantedHeight = placed.height;
+            } else {
+                takeContentSize(window);
+            }
+            window.layOut(room);
+            window.x = placed.x(room.width, window.width);
+            window.y = placed.y(room.height, window.height);
+        } else {
+            window.wantedWidth = (int)Math.round(firstContentBox.width);
+            window.wantedHeight = (int)Math.round(firstContentBox.height)
+                    + ChatSmallWindow.STRIP_HEIGHT;
+            window.x = firstContentBox.left - room.left;
+            window.y = firstContentBox.top - ChatSmallWindow.STRIP_HEIGHT
+                    - room.top;
+        }
+        window.layOut(room);
+    }
+
+    /**
+     * Opens a window exactly where it stood as the chat closed, in the
+     * chat window it stood in: what comes back with the chat. One whose
+     * chat window has closed since stays closed.
      */
     ChatSmallWindow reopen(ChatSmallWindowPlacements.Reopening where,
                            ChatSmallWindowContent content) {
@@ -117,31 +171,41 @@ final class ChatSmallWindows {
         if (window != null) {
             return window;
         }
+        LostTalesUiHitBox room = roomOf(where.parentId);
+        if (room == null) {
+            return null;
+        }
         window = new ChatSmallWindow(where.kind, where.key, content,
-                where.left, where.top, where.width, where.height);
+                where.parentId);
+        window.x = where.x;
+        window.y = where.y;
+        window.wantedWidth = where.width;
+        window.wantedHeight = where.height;
         window.sized = where.sized;
-        fit(window);
+        window.layOut(room);
         return add(window);
     }
 
     /**
-     * Gives a window its content's own size again, its top left kept
-     * where the screen allows: a menu turned to something else. A window
-     * the player has sized keeps its size.
+     * Gives a window its content's own size again, its top left kept:
+     * a menu turned to something else. A window the player has sized
+     * keeps its size.
      */
     void refit(ChatSmallWindow window) {
         if (window == null || window.sized) {
             return;
         }
         takeContentSize(window);
-        fit(window);
+        if (window.room != null) {
+            window.layOut(window.room);
+        }
     }
 
     /** The content's own size, and the strip over it. */
     private static void takeContentSize(ChatSmallWindow window) {
-        window.width = window.content.naturalWidth();
-        window.height = ChatSmallWindow.STRIP_HEIGHT
-                + window.content.naturalHeight(window.width);
+        window.wantedWidth = window.content.naturalWidth();
+        window.wantedHeight = ChatSmallWindow.STRIP_HEIGHT
+                + window.content.naturalHeight(window.wantedWidth);
     }
 
     private ChatSmallWindow add(ChatSmallWindow window) {
@@ -151,14 +215,15 @@ final class ChatSmallWindows {
         return window;
     }
 
-    /** Steps the window down and along past any open window of its kind at its place. */
-    private void cascade(ChatSmallWindow window) {
+    /** Steps the window down and along past any open window of its kind at its place in the same room. */
+    private void cascade(ChatSmallWindow window, LostTalesUiHitBox room) {
         for (int step = 0; step < this.stack.size(); step++) {
             boolean taken = false;
             for (ChatSmallWindow other : this.stack) {
                 if (other.kind == window.kind && other.isOpen()
-                        && Math.abs(other.left - window.left) < 1.0D
-                        && Math.abs(other.top - window.top) < 1.0D) {
+                        && other.belongsTo(window.parentId)
+                        && Math.abs(other.x - window.x) < 1.0D
+                        && Math.abs(other.y - window.y) < 1.0D) {
                     taken = true;
                     break;
                 }
@@ -166,9 +231,11 @@ final class ChatSmallWindows {
             if (!taken) {
                 return;
             }
-            window.left += CASCADE_STEP;
-            window.top += CASCADE_STEP;
-            holdOnScreen(window);
+            window.x += CASCADE_STEP;
+            window.y += CASCADE_STEP;
+            window.layOut(room);
+            window.x = window.left - room.left;
+            window.y = window.top - room.top;
         }
     }
 
@@ -187,15 +254,20 @@ final class ChatSmallWindows {
         }
     }
 
-    /** Opens the window of that kind and key, or closes it: what its control does. */
+    /**
+     * What a window's control does: opens the window of that kind and key
+     * in chat window {@code parentId}, or closes it where it is already out
+     * there; out in another chat window, it moves over.
+     */
     void toggle(ChatSmallWindowKind kind, String key,
-                ChatSmallWindowContent content,
+                ChatSmallWindowContent content, String parentId,
                 LostTalesUiHitBox firstContentBox) {
+        String parent = roomOf(parentId) == null ? null : parentId;
         ChatSmallWindow window = find(kind, key);
-        if (window != null && window.isOpen()) {
+        if (window != null && window.isOpen() && window.belongsTo(parent)) {
             close(window);
         } else {
-            open(kind, key, content, firstContentBox);
+            open(kind, key, content, parent, firstContentBox);
         }
     }
 
@@ -249,8 +321,9 @@ final class ChatSmallWindows {
             if (window.isOpen()) {
                 open.add(new ChatSmallWindowPlacements.Reopening(window.kind,
                         window.key, window.content.sessionState(),
-                        window.left, window.top, window.width,
-                        window.height, window.sized));
+                        window.parentId, window.x, window.y,
+                        window.wantedWidth, window.wantedHeight,
+                        window.sized));
             }
         }
         return open;
@@ -259,14 +332,28 @@ final class ChatSmallWindows {
     /* ---- The pointer ---- */
 
     /**
-     * What a point is on among the small windows, front to back: an edge,
-     * a strip's cross, a strip, or the content, which answers for itself;
+     * What a point is on among the small windows, front to back: a list a
+     * window's field opens, over everything; then an edge, a strip's
+     * cross, a strip, or the content, which answers for itself. A window
+     * a chat window in front of its own covers at the point is not there;
      * null where no small window is.
      */
     ChatHover hoverAt(double x, double y) {
         for (int index = this.stack.size() - 1; index >= 0; index--) {
             ChatSmallWindow window = this.stack.get(index);
             if (!window.isOpen() || window.hidden) {
+                continue;
+            }
+            ChatHover popup = window.content.popupHoverAt(
+                    x - window.fractionX, y - window.fractionY);
+            if (popup != null) {
+                popup.smallWindow = window;
+                return popup;
+            }
+        }
+        for (int index = this.stack.size() - 1; index >= 0; index--) {
+            ChatSmallWindow window = this.stack.get(index);
+            if (!window.isOpen() || window.hidden || covered(window, x, y)) {
                 continue;
             }
             ChatWindowGestures.ResizeEdge edge = window.edgeAt(x, y);
@@ -298,32 +385,88 @@ final class ChatSmallWindows {
         return null;
     }
 
+    /**
+     * Whether a chat window lying over the window's own covers the point:
+     * the small windows of the window being typed in, and those on the bare
+     * screen, are drawn over every window and never are.
+     */
+    private boolean covered(ChatSmallWindow window, double x, double y) {
+        if (window.parentId == null
+                || window.parentId.equals(this.topParentId)) {
+            return false;
+        }
+        ChatWindowFrame front = ChatWindowFrame.drawnAt(x, y);
+        return front != null && !front.windowId.equals(window.parentId);
+    }
+
     /* ---- Drawing ---- */
 
     /**
-     * Draws every small window, back to front, each registering the box
-     * it covers and its resize band as above the chat windows; a window
-     * faded out altogether goes. {@code hover} says what the pointer is
-     * on, at {@code pointerX}/{@code pointerY}. With {@code barless} no
-     * chat window is open, and a window that works on the input bar
-     * waits undrawn.
+     * Readies the windows for a frame whose small windows of chat window
+     * {@code topParentId} are drawn over every window: a window faded out
+     * altogether goes, one whose chat window has closed closes with it, and
+     * every window waits undrawn until its chat window draws it.
+     */
+    void beginFrame(String topParentId) {
+        this.topParentId = topParentId;
+        for (int index = this.stack.size() - 1; index >= 0; index--) {
+            ChatSmallWindow window = this.stack.get(index);
+            if (window.parentId != null
+                    && ChatWindowLayout.window(window.parentId) == null) {
+                close(window);
+                this.stack.remove(index);
+                continue;
+            }
+            if (window.isGone()) {
+                this.stack.remove(index);
+                continue;
+            }
+            window.hidden = true;
+        }
+    }
+
+    /**
+     * Draws the small windows of chat window {@code parentId} — null for
+     * the bare screen — back to front, laid out in its room as it was just
+     * drawn, each registering the box it covers and its resize band; then
+     * what their fields open, over them. {@code hover} says what the
+     * pointer is on, at {@code pointerX}/{@code pointerY}. With
+     * {@code barless} no chat window is open, and a window that works on
+     * the input bar waits undrawn.
      */
     void draw(Minecraft minecraft, FontRenderer font,
               ChatPointerRegions regions, ChatHover hover, double pointerX,
-              double pointerY, boolean barless) {
-        long now = System.nanoTime();
-        List<ChatSmallWindow> windows =
-                new ArrayList<ChatSmallWindow>(this.stack);
-        for (ChatSmallWindow window : windows) {
-            window.hidden = barless && window.content.needsInputBar();
-            if (!window.hidden) {
-                drawWindow(minecraft, font, regions, window, hover, pointerX,
-                        pointerY, now);
-            }
+              double pointerY, boolean barless, String parentId) {
+        LostTalesUiHitBox room = roomOf(parentId);
+        if (room == null) {
+            return;
         }
-        for (int index = this.stack.size() - 1; index >= 0; index--) {
-            if (this.stack.get(index).isGone()) {
-                this.stack.remove(index);
+        long now = System.nanoTime();
+        List<ChatSmallWindow> drawn = new ArrayList<ChatSmallWindow>();
+        for (ChatSmallWindow window
+                : new ArrayList<ChatSmallWindow>(this.stack)) {
+            if (!window.belongsTo(parentId)
+                    || (barless && window.content.needsInputBar())) {
+                continue;
+            }
+            window.hidden = false;
+            window.layOut(room);
+            drawWindow(minecraft, font, regions, window, hover, pointerX,
+                    pointerY, now);
+            drawn.add(window);
+        }
+        for (ChatSmallWindow window : drawn) {
+            if (!window.isOpen()) {
+                continue;
+            }
+            GL11.glPushMatrix();
+            try {
+                GL11.glTranslatef(window.fractionX, window.fractionY, 0.0F);
+                window.content.drawPopups(minecraft, regions,
+                        pointerX - window.fractionX,
+                        pointerY - window.fractionY);
+            } finally {
+                GL11.glPopMatrix();
             }
         }
     }
@@ -364,6 +507,16 @@ final class ChatSmallWindows {
         float right = left + window.width;
         float bottom = top + window.height;
         int rowBottom = wholeTop + ChatSmallWindow.STRIP_HEIGHT;
+        // A window its room cannot hold is cut by the room's edge, and so
+        // is whatever its content cuts for itself.
+        boolean cut = window.overflowsRoom();
+        boolean clipped = false;
+        if (cut) {
+            ChatSmallWindowContent.setOuterClip(window.room);
+            clipped = ChatSmallWindowContent.beginClip(minecraft,
+                    window.room.left, window.room.top, window.room.width,
+                    window.room.height);
+        }
         GL11.glPushMatrix();
         GL11.glTranslatef(window.fractionX, window.fractionY, 0.0F);
         try {
@@ -388,6 +541,10 @@ final class ChatSmallWindows {
             LostTalesUiWindowFrame.drawEdges(left, top, right, bottom, alpha);
         } finally {
             GL11.glPopMatrix();
+            if (cut) {
+                ChatSmallWindowContent.endClip(clipped);
+                ChatSmallWindowContent.setOuterClip(null);
+            }
         }
         if (window.isOpen()) {
             int border = ChatWindowGestures.RESIZE_BORDER;
@@ -460,10 +617,14 @@ final class ChatSmallWindows {
         return this.gesture == null ? null : this.gesture.edge;
     }
 
-    /** Follows the pointer with the window held. */
+    /**
+     * Follows the pointer with the window held, inside its room: asked on
+     * every frame as well as on every move of the pointer, so the window
+     * glides with it as a chat window does.
+     */
     void drag(double x, double y) {
         Gesture held = this.gesture;
-        if (held == null) {
+        if (held == null || held.window.room == null) {
             return;
         }
         if (!held.active) {
@@ -475,76 +636,78 @@ final class ChatSmallWindows {
             held.active = true;
         }
         ChatSmallWindow window = held.window;
+        LostTalesUiHitBox room = window.room;
         double dx = x - held.pressX;
         double dy = y - held.pressY;
-        List<LostTalesUiHitBox> others = othersThan(window);
         if (held.edge == null) {
-            LostTalesUiHitBox moved = ChatSmallWindowSnap.moved(
-                    new LostTalesUiHitBox(held.startLeft + dx,
-                            held.startTop + dy, window.width, window.height),
-                    others, this.screenWidth, this.screenHeight);
-            window.left = moved.left;
-            window.top = moved.top;
-            holdOnScreen(window);
+            window.x = ChatSmallWindow.held(held.startX + dx,
+                    room.width - window.width);
+            window.y = ChatSmallWindow.held(held.startY + dy,
+                    room.height - window.height);
+            window.layOut(room);
             return;
         }
-        resize(window, held, dx, dy, others);
+        resize(window, held, dx, dy, room);
     }
 
-    /** Resizes the window by the pointer's travel, its far sides where they were. */
-    private void resize(ChatSmallWindow window, Gesture held, double dx,
-                        double dy, List<LostTalesUiHitBox> others) {
+    /**
+     * Resizes the window by the pointer's travel, its far sides where they
+     * were, its moving sides held inside the room.
+     */
+    private static void resize(ChatSmallWindow window, Gesture held,
+                               double dx, double dy, LostTalesUiHitBox room) {
         ChatWindowGestures.ResizeEdge edge = held.edge;
-        double left = held.startLeft;
-        double top = held.startTop;
-        double right = held.startLeft + held.startWidth;
-        double bottom = held.startTop + held.startHeight;
+        double left = held.startX;
+        double top = held.startY;
+        double right = held.startX + held.startWidth;
+        double bottom = held.startY + held.startHeight;
         if (edge.horizontal) {
             if (edge.fromLeft) {
-                left += dx;
+                left = Math.max(0.0D, left + dx);
             } else {
-                right += dx;
+                right = Math.min(room.width, right + dx);
             }
         }
         if (edge.vertical) {
             if (edge.fromTop) {
-                top += dy;
+                top = Math.max(0.0D, top + dy);
             } else {
-                bottom += dy;
+                bottom = Math.min(room.height, bottom + dy);
             }
         }
-        LostTalesUiHitBox stuck = ChatSmallWindowSnap.resized(
-                new LostTalesUiHitBox(left, top, right - left, bottom - top),
-                edge, others, this.screenWidth, this.screenHeight);
-        int width = clampSize((int)Math.round(stuck.width), window.minWidth(),
-                this.screenWidth);
-        int height = clampSize((int)Math.round(stuck.height),
-                window.minHeight(), this.screenHeight);
-        window.width = width;
-        window.height = height;
-        window.left = edge.horizontal && edge.fromLeft ? right - width
-                : held.startLeft;
-        window.top = edge.vertical && edge.fromTop ? bottom - height
-                : held.startTop;
-        holdOnScreen(window);
+        int width = ChatSmallWindow.fitted((int)Math.round(right - left),
+                window.minWidth(), (int)Math.floor(room.width));
+        int height = ChatSmallWindow.fitted((int)Math.round(bottom - top),
+                window.minHeight(), (int)Math.floor(room.height));
+        window.wantedWidth = width;
+        window.wantedHeight = height;
+        window.x = edge.horizontal && edge.fromLeft ? right - width
+                : held.startX;
+        window.y = edge.vertical && edge.fromTop ? bottom - height
+                : held.startY;
+        window.layOut(room);
     }
 
     /**
      * Lets go of the window held; a move is remembered as where the
-     * player left the kind, and a resize as the size they gave it too.
+     * player left the kind in its room, and a resize as the size they
+     * gave it too.
      */
     void release() {
         Gesture held = this.gesture;
         this.gesture = null;
-        if (held != null && held.active) {
-            ChatSmallWindow window = held.window;
-            if (held.edge != null) {
-                window.sized = true;
-            }
-            ChatSmallWindowPlacements.remember(window.kind, window.left,
-                    window.top, window.width, window.height, window.sized,
-                    this.screenWidth, this.screenHeight);
+        if (held == null || !held.active || held.window.room == null) {
+            return;
         }
+        ChatSmallWindow window = held.window;
+        if (held.edge != null) {
+            window.sized = true;
+        }
+        window.x = window.left - window.room.left;
+        window.y = window.top - window.room.top;
+        ChatSmallWindowPlacements.remember(window.kind, window.x, window.y,
+                window.width, window.height, window.sized,
+                window.room.width, window.room.height);
     }
 
     /** Puts the window held back where it was taken from. */
@@ -552,66 +715,26 @@ final class ChatSmallWindows {
         Gesture held = this.gesture;
         this.gesture = null;
         if (held != null) {
-            held.window.left = held.startLeft;
-            held.window.top = held.startTop;
-            held.window.width = held.startWidth;
-            held.window.height = held.startHeight;
+            held.window.x = held.startX;
+            held.window.y = held.startY;
+            held.window.wantedWidth = held.startWantedWidth;
+            held.window.wantedHeight = held.startWantedHeight;
         }
     }
 
-    /** The boxes a window may stick to: every chat window's and every other small window's. */
-    private List<LostTalesUiHitBox> othersThan(ChatSmallWindow window) {
-        List<LostTalesUiHitBox> others = new ArrayList<LostTalesUiHitBox>();
-        for (ChatWindowFrame frame : ChatWindowFrame.drawnFrames()) {
-            others.add(frame.drawnBox());
-        }
-        for (ChatSmallWindow other : this.stack) {
-            if (other != window && other.isOpen()) {
-                others.add(other.box());
-            }
-        }
-        return others;
-    }
-
-    /** Keeps the window's size within the screen and its place on it. */
-    private void fit(ChatSmallWindow window) {
-        fitSize(window);
-        holdOnScreen(window);
-    }
-
-    private void fitSize(ChatSmallWindow window) {
-        window.width = clampSize(window.width, window.minWidth(),
-                this.screenWidth);
-        window.height = clampSize(window.height, window.minHeight(),
-                this.screenHeight);
-    }
-
-    /** A size no smaller than {@code min} and no larger than the screen leaves. */
-    private static int clampSize(int size, int min, int screen) {
-        int max = Math.max(min, screen - 2 * ChatWindowPlacement.EDGE_MARGIN);
-        return Math.max(min, Math.min(max, size));
-    }
-
-    /** The whole window on the screen, inside its margins, strip first where it cannot be. */
-    private void holdOnScreen(ChatSmallWindow window) {
-        double margin = ChatWindowPlacement.EDGE_MARGIN;
-        window.left = Math.max(margin, Math.min(this.screenWidth - margin
-                - window.width, window.left));
-        window.top = Math.max(margin, Math.min(this.screenHeight - margin
-                - window.height, window.top));
-    }
-
-    /** A window held by its strip or an edge. */
+    /** A window held by its strip or an edge, from where it stood in its room. */
     private static final class Gesture {
         final ChatSmallWindow window;
         /** The edge held; null while the window is moved by its strip. */
         final ChatWindowGestures.ResizeEdge edge;
         final double pressX;
         final double pressY;
-        final double startLeft;
-        final double startTop;
+        final double startX;
+        final double startY;
         final int startWidth;
         final int startHeight;
+        final int startWantedWidth;
+        final int startWantedHeight;
         boolean active;
 
         Gesture(ChatSmallWindow window, ChatWindowGestures.ResizeEdge edge,
@@ -620,10 +743,13 @@ final class ChatSmallWindows {
             this.edge = edge;
             this.pressX = pressX;
             this.pressY = pressY;
-            this.startLeft = window.left;
-            this.startTop = window.top;
+            LostTalesUiHitBox room = window.room;
+            this.startX = room == null ? window.x : window.left - room.left;
+            this.startY = room == null ? window.y : window.top - room.top;
             this.startWidth = window.width;
             this.startHeight = window.height;
+            this.startWantedWidth = window.wantedWidth;
+            this.startWantedHeight = window.wantedHeight;
         }
     }
 }

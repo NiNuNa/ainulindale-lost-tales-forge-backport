@@ -4,6 +4,7 @@ import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatStatusLine;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
+import com.ninuna.losttales.chat.emoji.ChatEmojiShortcodes;
 import java.nio.charset.Charset;
 import java.util.Locale;
 import java.util.Map;
@@ -17,11 +18,11 @@ import java.util.regex.Pattern;
  * becomes {@code @name} from the message's own mention list, {@code <#id>}
  * a {@code #channel}, a custom {@code <:name:id>} its {@code :name:} —
  * registered Unicode emoji and alias shortcodes become their canonical
- * {@code :name:}, Discord's block markup is folded into the inline
- * marks the chat reads ({@link #normalizeMarkdown}), line breaks
- * collapse to spaces, control characters, section signs and whatever
- * emoji the registry does not carry go, and the result is cut to the
- * chat's own length. Outbound, a canonical
+ * {@code :name:}, any other Unicode emoji its Discord name between colons,
+ * Discord's block markup is folded into the inline marks the chat reads
+ * ({@link #normalizeMarkdown}), line breaks collapse to spaces, control
+ * characters, section signs and whatever no font can draw go, and the
+ * result is cut to the chat's own length. Outbound, a canonical
  * shortcode becomes the Unicode emoji Discord renders — the mod's own
  * sprites stay literal text — and nothing else is rewritten: the webhook
  * is told to ping nobody instead.
@@ -32,6 +33,9 @@ public final class DiscordMessageSanitizer {
     private static final Pattern CHANNEL_MENTION = Pattern.compile("<#(\\d+)>");
     private static final Pattern CUSTOM_EMOJI =
             Pattern.compile("<a?:([A-Za-z0-9_]+):\\d+>");
+    /** A custom emoji's name as Discord allows it. */
+    private static final Pattern CUSTOM_EMOJI_NAME =
+            Pattern.compile("[A-Za-z0-9_]{1,32}");
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
     /** A fenced block, with or without a language tag on its first line. */
     private static final Pattern CODE_FENCE =
@@ -92,10 +96,10 @@ public final class DiscordMessageSanitizer {
 
     /**
      * A Discord member's custom status as the chat's status line: its
-     * emoji first where the chat has that emoji, a Unicode emoji the chat
-     * has as its shortcode, anything no font can draw left out, and the
-     * whole cleaned and cut as a player's line is
-     * ({@link ChatStatusLine#clean}); empty for nothing left.
+     * emoji first, as its shortcode where the chat has it and else as its
+     * Discord name between colons, as a message's emoji are; anything no
+     * font can draw left out, and the whole cleaned and cut as a player's
+     * line is ({@link ChatStatusLine#clean}); empty for nothing left.
      * {@code emojiName} is the status emoji's name, the character itself
      * for a Unicode one; {@code custom} says it is a server's own emoji.
      */
@@ -106,7 +110,9 @@ public final class DiscordMessageSanitizer {
             if (custom) {
                 ChatEmoji known = ChatEmoji.fromInputName(
                         emojiName.toLowerCase(Locale.ROOT));
-                emoji = known == null ? "" : known.getShortcode();
+                emoji = known != null ? known.getShortcode()
+                        : CUSTOM_EMOJI_NAME.matcher(emojiName).matches()
+                                ? ":" + emojiName + ":" : "";
             } else {
                 emoji = stripUnsendable(unicodeToShortcodes(emojiName)).trim();
             }
@@ -177,31 +183,47 @@ public final class DiscordMessageSanitizer {
 
     /**
      * Registered Unicode emoji become canonical shortcodes. A form the
-     * registry does not carry — a ZWJ sequence continuing past a match
-     * included — is left for {@link #stripUnsendable} to drop, so a
-     * half-known sequence never turns into the wrong emoji.
+     * registry does not carry becomes its Discord name between colons,
+     * the longest listed sequence first, so a family or a flag is one
+     * name; one the list lacks is left for {@link #stripUnsendable} to
+     * drop. A registry emoji a joiner continues is never taken alone, so
+     * a half-known sequence never turns into the wrong emoji, and the skin
+     * tone after one goes with it.
      */
     private static String unicodeToShortcodes(String text) {
-        StringBuilder result = null;
+        StringBuilder result = new StringBuilder(text.length());
         int index = 0;
         while (index < text.length()) {
             ChatEmoji.UnicodeMatch match = ChatEmoji.matchUnicode(text, index);
             if (match != null && (index + match.length >= text.length()
                     || text.charAt(index + match.length) != '\u200D')) {
-                if (result == null) {
-                    result = new StringBuilder(text.length());
-                    result.append(text, 0, index);
-                }
                 result.append(match.emoji.getShortcode());
-                index += match.length;
+                index = pastSkinTones(text, index + match.length);
                 continue;
             }
-            if (result != null) {
-                result.append(text.charAt(index));
+            ChatEmojiShortcodes.Named named =
+                    ChatEmojiShortcodes.namedAt(text, index);
+            if (named != null) {
+                result.append(':').append(named.name).append(':');
+                index += named.length;
+                continue;
             }
+            result.append(text.charAt(index));
             index++;
         }
-        return result == null ? text : result.toString();
+        return result.toString();
+    }
+
+    /** The index past any skin tone modifiers starting at {@code index}. */
+    private static int pastSkinTones(String text, int index) {
+        while (index < text.length()) {
+            int codePoint = text.codePointAt(index);
+            if (codePoint < 0x1F3FB || codePoint > 0x1F3FF) {
+                return index;
+            }
+            index += Character.charCount(codePoint);
+        }
+        return index;
     }
 
     /**

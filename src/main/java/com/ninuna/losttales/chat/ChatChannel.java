@@ -57,7 +57,7 @@ public final class ChatChannel {
      * to Discord channels, and its icon is then half its own and half
      * Discord's.
      */
-    public static final ChatChannel OOC = register("ooc", "Out of Character", ChatPresentationMode.OUT_OF_CHARACTER,
+    public static final ChatChannel OOC = register("ooc", "OOC", ChatPresentationMode.OUT_OF_CHARACTER,
             ChatRecipientRule.EVERYONE, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.STEEL_BLUE), true);
     /** Staff channel: operators only, out of character. */
@@ -96,7 +96,7 @@ public final class ChatChannel {
             LostTalesColors.rgb(LostTalesColors.HUD_LABEL), false);
 
     /** Tab, indicator, and cycle order for the built-in channels: Global
-     *  and Out of Character bracket the role-play ones, then Party,
+     *  and OOC bracket the role-play ones, then Party,
      *  Operator, and the two consoles, this player's before the server's.
      *  Whispers are not listed: their tabs exist per conversation.
      *  Anything registered besides these follows them, in the order it

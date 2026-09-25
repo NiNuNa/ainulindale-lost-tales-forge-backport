@@ -42,6 +42,7 @@ public final class ChatEmojiShortcodes {
     static final int MAX_NAME_LENGTH = 64;
 
     private static final int VARIATION_SELECTOR = 0xFE0F;
+    private static final char KEYCAP = '\u20E3';
     private static final int MIN_HEX_DIGITS = 4;
     private static final int MAX_HEX_DIGITS = 6;
 
@@ -78,6 +79,51 @@ public final class ChatEmojiShortcodes {
             hexcode.append(hex);
         }
         return hexcode.toString();
+    }
+
+    /**
+     * The longest listed emoji starting at {@code index} of {@code text},
+     * or null where none does. Only a pictograph past the basic plane, or
+     * a character a variation selector or keycap mark turns into an emoji,
+     * starts one, so letters and signs such as the copyright sign stay
+     * text.
+     */
+    public static Named namedAt(String text, int index) {
+        if (text == null || index < 0 || index >= text.length()
+                || !startsEmoji(text, index)) {
+            return null;
+        }
+        Named longest = null;
+        int end = index;
+        for (int points = 0; points < ChatForeignEmoji.MAX_UNICODE_CODE_POINTS
+                && end < text.length(); points++) {
+            end += Character.charCount(text.codePointAt(end));
+            String name = nameOf(hexcode(text.substring(index, end)));
+            if (name != null) {
+                longest = new Named(name, end - index);
+            }
+        }
+        return longest;
+    }
+
+    private static boolean startsEmoji(String text, int index) {
+        if (Character.isSupplementaryCodePoint(text.codePointAt(index))) {
+            return true;
+        }
+        int next = index + 1;
+        return next < text.length() && (text.charAt(next) == VARIATION_SELECTOR
+                || text.charAt(next) == KEYCAP);
+    }
+
+    /** A listed emoji found in a text: its name, and how many chars it took. */
+    public static final class Named {
+        public final String name;
+        public final int length;
+
+        Named(String name, int length) {
+            this.name = name;
+            this.length = length;
+        }
     }
 
     /** Every entry of the bundled list, hexcode to name. */

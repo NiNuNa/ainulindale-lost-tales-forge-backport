@@ -10,7 +10,9 @@ import java.util.UUID;
  * What a tab stands for: a channel, and for a whisper the <em>identity</em>
  * the conversation is with, the identity of this player's own it is held
  * as — or the NPC, since LOTR speech is addressed to one player and reads
- * as a whisper from the NPC.
+ * as a whisper from the NPC — or a page, which is no conversation at all:
+ * the quest journal, the party ({@link ChatPages}). A page tab has no
+ * channel; it is never the tab typed into and never holds a line.
  *
  * <p>A conversation is between two people as they present themselves,
  * not between the accounts behind them: whispering someone speaking as
@@ -32,6 +34,8 @@ import java.util.UUID;
 public final class ChatTab {
     private static final String WHISPER_ID_PREFIX = ChatTabIds.WHISPER_PREFIX;
     private static final String NPC_ID_PREFIX = ChatTabIds.NPC_PREFIX;
+    /** What a page tab's id opens with, before the page's code name. */
+    private static final String PAGE_ID_PREFIX = "page:";
     /**
      * Between the account and the identity in a tab's id. A Minecraft
      * account name cannot hold one, so the account is always the part
@@ -56,7 +60,11 @@ public final class ChatTab {
      */
     private static final java.util.Map<String, ChatTab> PLAIN =
             new java.util.concurrent.ConcurrentHashMap<String, ChatTab>();
+    /** One interned tab per page, by the page's code name. */
+    private static final java.util.Map<String, ChatTab> PAGES =
+            new java.util.concurrent.ConcurrentHashMap<String, ChatTab>();
 
+    /** The channel; null for a page. */
     private final ChatChannel channel;
     private final String partner;
     private final String partnerKey;
@@ -65,9 +73,17 @@ public final class ChatTab {
     /** This player's identity the conversation is held as; empty for the account. */
     private final String ownerKey;
     private final boolean npc;
+    /** The page's code name; empty for a conversation. */
+    private final String pageId;
 
     private ChatTab(ChatChannel channel, String partner, String identity,
                     String ownerKey, boolean npc) {
+        this(channel, partner, identity, ownerKey, npc, "");
+    }
+
+    private ChatTab(ChatChannel channel, String partner, String identity,
+                    String ownerKey, boolean npc, String pageId) {
+        this.pageId = pageId;
         this.channel = channel;
         this.partner = partner == null ? "" : partner.trim();
         this.partnerKey = this.partner.toLowerCase(Locale.ROOT);
@@ -106,6 +122,19 @@ public final class ChatTab {
         return cached;
     }
 
+    /** The tab of a registered page; null for a code name no page is registered under. */
+    public static ChatTab page(String pageId) {
+        if (ChatPages.byId(pageId) == null) {
+            return null;
+        }
+        ChatTab cached = PAGES.get(pageId);
+        if (cached == null) {
+            cached = new ChatTab(null, "", "", "", false, pageId);
+            PAGES.put(pageId, cached);
+        }
+        return cached;
+    }
+
     /**
      * The tab whose lines are shown while this one is on screen. A
      * channel that is one conversation is its own; a scoped channel's
@@ -117,7 +146,8 @@ public final class ChatTab {
      * the identity, and nothing else in the layout has to know.
      */
     public static ChatTab viewed(ChatTab tab) {
-        if (tab == null || tab.npc || tab.ownerKey.length() > 0) {
+        if (tab == null || tab.isPage() || tab.npc
+                || tab.ownerKey.length() > 0) {
             return tab;
         }
         if (tab.isWhisper()) {
@@ -207,7 +237,14 @@ public final class ChatTab {
                 : new ChatTab(ChatChannel.WHISPER, trimmed, trimmed, "", true);
     }
 
+    /** The channel; null for a page. */
     public ChatChannel getChannel() { return this.channel; }
+    /** Whether the tab is a page rather than a conversation. */
+    public boolean isPage() { return this.pageId.length() > 0; }
+    /** The page the tab shows; null for a conversation. */
+    public ChatPages.Page page() { return ChatPages.byId(this.pageId); }
+    /** The page's code name; empty for a conversation. */
+    public String getPageId() { return this.pageId; }
     /** The account a whisper is routed to; empty otherwise. */
     public String getPartner() { return this.partner; }
     /**
@@ -225,7 +262,7 @@ public final class ChatTab {
     public String getOwnerKey() { return this.ownerKey; }
     /** Whether the conversation is with the account rather than a character. */
     public boolean isAccountConversation() {
-        return this.identityKey.equals(this.partnerKey);
+        return !isPage() && this.identityKey.equals(this.partnerKey);
     }
     public boolean isWhisper() { return this.channel == ChatChannel.WHISPER; }
     /** Whether the partner is an NPC rather than a player. */
@@ -249,6 +286,9 @@ public final class ChatTab {
      * {@code whisper:Name|Identity|own:<character id>} or {@code npc:Name}.
      */
     public String id() {
+        if (isPage()) {
+            return PAGE_ID_PREFIX + this.pageId;
+        }
         if (this.npc) {
             return NPC_ID_PREFIX + this.partner;
         }
@@ -284,6 +324,9 @@ public final class ChatTab {
         if (trimmed.toLowerCase(Locale.ROOT).startsWith(NPC_ID_PREFIX)) {
             return npc(trimmed.substring(NPC_ID_PREFIX.length()));
         }
+        if (trimmed.startsWith(PAGE_ID_PREFIX)) {
+            return page(trimmed.substring(PAGE_ID_PREFIX.length()));
+        }
         String scope = "";
         String channelPart = trimmed;
         int separator = trimmed.indexOf(IDENTITY_SEPARATOR);
@@ -311,6 +354,9 @@ public final class ChatTab {
             return false;
         }
         ChatTab tab = (ChatTab)other;
+        if (isPage() || tab.isPage()) {
+            return this.pageId.equals(tab.pageId);
+        }
         // By the channel's id, never the object: a channel a server
         // defines is registered again with every access broadcast, and
         // two tabs naming the same channel must stay the same tab across
@@ -324,6 +370,9 @@ public final class ChatTab {
 
     @Override
     public int hashCode() {
+        if (isPage()) {
+            return this.pageId.hashCode() * 31 + 7;
+        }
         return (((this.channel.getId().hashCode() * 31 + this.partnerKey.hashCode())
                 * 31 + this.identityKey.hashCode()) * 31 + this.ownerKey.hashCode()) * 2
                 + (this.npc ? 1 : 0);

@@ -2,9 +2,10 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.LostTalesMetaData;
-import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelSuggester;
 import com.ninuna.losttales.chat.ChatMarkdown;
+import com.ninuna.losttales.chat.ChatMentionCandidate;
+import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
@@ -28,8 +29,8 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumChatFormatting;
 
 /**
- * The chat's text fields — the input, and the pickers' search — drawn
- * the way the rest of the chat is drawn.
+ * The chat's one text field — the input bar, and every field of a small
+ * window — drawn the way the rest of the chat is drawn.
  *
  * <p>Vanilla's {@code GuiTextField} draws its text with
  * {@code drawStringWithShadow}, whose shadow is a quarter of the text's
@@ -39,11 +40,7 @@ import net.minecraft.util.EnumChatFormatting;
  * shared {@link LostTalesChatVisualStyle} treatment for the text, the
  * caret and the selection.</p>
  *
- * <p>A mention being typed is drawn in the colour it will have once it
- * is sent — a role's own, a player's role, or the shared mention honey —
- * so the bar reads as the line it is about to become. The rest of the
- * text stays ivory.</p>
- *
+
  * <p>The chat's markup is previewed as it is typed: the text between a
  * pair of marks wears the marks' style — bold, italic, underlined,
  * struck — code is the chat's inline code, spoiler text a subdued
@@ -59,13 +56,16 @@ import net.minecraft.util.EnumChatFormatting;
  * keeps the caret, the selection and the scroll on the glyphs actually
  * drawn.</p>
  *
- * <p>A share token whose item or marker the client can already resolve
- * — {@code [i:Stone Sword]}, {@code [m:Northgate]} — is shown as the
- * preview it will be in chat: the bracket, the icon, the real name, in
- * the rarity's or marker's colour. A complete emoji shortcode —
- * {@code :smile:} — is shown the same way, as the sprite it will be.
- * The raw text is untouched — it is what goes on the wire — but while
- * it is edited a resolved token behaves as one character: the caret can
+ * <p>Everything that can be inserted is shown as the sent line will
+ * show it: a complete emoji shortcode ({@code :smile:}) as its sprite; a
+ * share whose item, marker or quest the client can resolve
+ * ({@code [i:Stone Sword]}) as its icon and real name on its backdrop; a
+ * mention of a name the {@code @} list offers as the ping it will be,
+ * seafoam on slate for a person and a role in its own colour; and a
+ * channel link ({@code #global}, {@code #ooc/1234}) by the channel's
+ * shown name in its colour, with the speech bubble of a link to one
+ * message. The raw text is untouched — it is what goes on the wire — but
+ * while it is edited each of them behaves as one character: the caret can
  * stand on either side of it and never inside, Left and Right step
  * across it whole, Backspace behind it and Delete before it remove all
  * of it, a click lands on its nearer edge, and a selection takes it
@@ -76,7 +76,8 @@ import net.minecraft.util.EnumChatFormatting;
  * incomplete or unresolvable token is plain text and edits as such.</p>
  *
  * <p>A search field shows what is typed as it is ({@link #plainText}):
- * no mention colours, no previews and no markup.</p>
+ * no previews and no markup. A status line shows its emoji and nothing
+ * else ({@link #emojiOnly}), as a status line is drawn once set.</p>
  *
  * <p>The caret is the mod's one caret ({@link LostTalesUiCaret}), lit
  * from the last key or caret move, and only while the field holds the
@@ -96,16 +97,19 @@ final class ChatInputField extends GuiTextField {
     private final int fieldHeight;
     /** The raw text the previews below were resolved for. */
     private String previewedText;
+    /** The names the previews' mentions were found among. */
+    private List<ChatMentionCandidate> previewedNames;
     private List<TokenPreview> previews = Collections.emptyList();
     /** The raw text the styles below were laid out for. */
     private String styledText;
-    /** The text {@link #links} was found in. */
-    private String linkedText;
-    private Links links = Links.NONE;
     /** Every character's style, or null for text with nothing to style. */
     private int[] styles;
     /** Whether what is typed is shown as it is, as a search field's is. */
     private boolean plainText;
+    /** Whether only emoji are shown as they will be, as a status line's are. */
+    private boolean emojiOnly;
+    /** Where the names a mention may name come from; null for none. */
+    private MentionSource mentions;
     /** When the field last took a key or moved its caret: the caret's blink starts there. */
     private long caretNanos = System.nanoTime();
 
@@ -123,6 +127,31 @@ final class ChatInputField extends GuiTextField {
     ChatInputField plainText() {
         this.plainText = true;
         return this;
+    }
+
+    /**
+     * Shows a complete emoji shortcode as its sprite and nothing else as
+     * anything but itself, as a status line is drawn once it is set.
+     */
+    ChatInputField emojiOnly() {
+        this.emojiOnly = true;
+        return this;
+    }
+
+    /** Where the names the {@code @} list offers come from. */
+    interface MentionSource {
+        /** The names now: the same list, unchanged, until they change. */
+        List<ChatMentionCandidate> candidates();
+    }
+
+    /** Lets mentions of the names {@code source} offers show as pings. */
+    void mentionsFrom(MentionSource source) {
+        this.mentions = source;
+    }
+
+    /** Where the field's pings find their names; null for none. */
+    MentionSource mentionSource() {
+        return this.mentions;
     }
 
     /** Whether the field can be drawn in the chat's own style. */
@@ -162,8 +191,7 @@ final class ChatInputField extends GuiTextField {
             return;
         }
         List<TokenPreview> resolved = previewsFor(text);
-        if (!resolved.isEmpty() || stylesFor(text) != null
-                || linksFor(text).backdrops) {
+        if (!resolved.isEmpty() || stylesFor(text) != null) {
             // Vanilla scrolls by raw character widths, but a token is
             // drawn as one narrow element — ":creeper:" measures nine
             // characters and draws ten pixels — and a bold glyph a pixel
@@ -194,10 +222,6 @@ final class ChatInputField extends GuiTextField {
         boolean caretVisible = caretLit() && caretInside;
         int left = this.xPosition;
         int top = this.yPosition;
-        // The whole visible run is coloured at once, so a mention split
-        // by the caret keeps one colour across the break.
-        int[] colors = colorsOf(text, scrollOffset,
-                scrollOffset + visible.length());
         int headEnd = caretInside ? caret : visible.length();
         int cursorX = left + this.font.getStringWidth(
                 visible.substring(0, headEnd));
@@ -211,11 +235,11 @@ final class ChatInputField extends GuiTextField {
         if (caretVisible) {
             drawCaretShadow(caretX, top);
         }
-        if (visible.length() > 0) {
-            drawRuns(visible, colors, 0, headEnd, left, top);
+        if (headEnd > 0) {
+            drawRun(visible.substring(0, headEnd), left, top);
         }
-        if (visible.length() > 0 && caretInside && caret < visible.length()) {
-            drawRuns(visible, colors, caret, visible.length(), cursorX, top);
+        if (caretInside && caret < visible.length()) {
+            drawRun(visible.substring(caret), cursorX, top);
         }
         if (caretVisible) {
             drawCaretBar(caretX, top);
@@ -292,152 +316,6 @@ final class ChatInputField extends GuiTextField {
     }
 
     /**
-     * The colour of every character of {@code [from, to)} of the text:
-     * ivory, except where an {@code @name} reaches somebody, which wears
-     * that somebody's colour, and where a {@code #channel} names a
-     * channel, which wears the channel's.
-     */
-    private int[] colorsOf(String text, int from, int to) {
-        Links found = linksFor(text);
-        int[] colors = new int[Math.max(0, to - from)];
-        for (int index = 0; index < colors.length; index++) {
-            int color = found.colorAt(from + index);
-            colors[index] = color >= 0 ? color : LostTalesChatVisualStyle.IVORY;
-        }
-        return colors;
-    }
-
-    /**
-     * The links of the text as the sent line will show them: every
-     * {@code @name} that reaches somebody, and every {@code #channel} or
-     * {@code #channel/id} that names a channel — each character's colour,
-     * and the padding of the backdrop each wears ({@link ChatRunBackdrops})
-     * at either end of it. Nothing inside code is a link, a command's
-     * words are its arguments rather than a line, and a link a spoiler
-     * hides wears no backdrop. Found again only when the text changes.
-     */
-    private static final class Links {
-        static final Links NONE = new Links(new int[0], new int[0],
-                new int[0], new boolean[0], false);
-
-        /** Each character's colour; -1 outside a link. */
-        final int[] colors;
-        /** The padding before each character: a backdrop's, where one opens. */
-        final int[] before;
-        /** The padding after each character: a backdrop's, where one closes. */
-        final int[] after;
-        /** Whether a character is of a player's mention, whose backdrop is the ping's own. */
-        final boolean[] players;
-        /** Whether any link wears a backdrop. */
-        final boolean backdrops;
-
-        Links(int[] colors, int[] before, int[] after, boolean[] players,
-              boolean backdrops) {
-            this.colors = colors;
-            this.before = before;
-            this.after = after;
-            this.players = players;
-            this.backdrops = backdrops;
-        }
-
-        int colorAt(int index) {
-            return index >= 0 && index < this.colors.length ? this.colors[index] : -1;
-        }
-
-        int beforeAt(int index) {
-            return index >= 0 && index < this.before.length ? this.before[index] : 0;
-        }
-
-        int afterAt(int index) {
-            return index >= 0 && index < this.after.length ? this.after[index] : 0;
-        }
-    }
-
-    private Links linksFor(String text) {
-        if (this.plainText || text.length() == 0) {
-            return Links.NONE;
-        }
-        if (text.equals(this.linkedText)) {
-            return this.links;
-        }
-        this.linkedText = text;
-        this.links = findLinks(text, stylesFor(text));
-        return this.links;
-    }
-
-    private static Links findLinks(String text, int[] styles) {
-        int[] colors = new int[text.length()];
-        java.util.Arrays.fill(colors, -1);
-        int[] before = new int[text.length()];
-        int[] after = new int[text.length()];
-        boolean[] players = new boolean[text.length()];
-        boolean backdrops = false;
-        int cursor = 0;
-        while (cursor < text.length()) {
-            int at = text.indexOf('@', cursor);
-            if (at < 0) {
-                break;
-            }
-            int end = at + 1;
-            while (end < text.length() && ChatMentionColors
-                    .isMentionCharacter(text.charAt(end))) {
-                end++;
-            }
-            boolean opensWord = at == 0 || !ChatMentionColors
-                    .isMentionCharacter(text.charAt(at - 1));
-            String name = text.substring(at + 1, end);
-            int color = opensWord && end > at + 1
-                    ? ChatMentionColors.colorOf(name) : -1;
-            int style = ChatInputStyles.styleAt(styles, at);
-            if (color >= 0 && (style & ChatMarkdown.Span.CODE) == 0) {
-                boolean player = ChatMentionColors.roleFor(name) == null;
-                for (int index = at; index < end; index++) {
-                    colors[index] = color;
-                    players[index] = player;
-                }
-                if ((style & ChatMarkdown.Span.SPOILER) == 0) {
-                    before[at] = ChatRunBackdrops.PAD;
-                    after[end - 1] = ChatRunBackdrops.PAD;
-                    backdrops = true;
-                }
-            }
-            cursor = Math.max(end, at + 1);
-        }
-        // A channel's name after a # opening a word, and a message's id
-        // after it, read exactly as the sent line reads them.
-        cursor = ChatInputRules.isCommand(text) ? text.length() : 0;
-        while (cursor < text.length()) {
-            int hash = text.indexOf('#', cursor);
-            if (hash < 0) {
-                break;
-            }
-            boolean opensWord = hash == 0 || Character.isWhitespace(text.charAt(hash - 1));
-            ChatChannelSuggester.Link link = opensWord
-                    ? ChatChannelSuggester.linkAt(text, hash) : null;
-            if (link == null) {
-                cursor = hash + 1;
-                continue;
-            }
-            int linkEnd = link.end;
-            int style = ChatInputStyles.styleAt(styles, hash);
-            if ((style & ChatMarkdown.Span.CODE) == 0) {
-                int color = ClientChatChannelState.displayColor(link.channel,
-                        link.scope);
-                for (int index = hash; index < linkEnd; index++) {
-                    colors[index] = color;
-                }
-                if ((style & ChatMarkdown.Span.SPOILER) == 0) {
-                    before[hash] = ChatRunBackdrops.PAD;
-                    after[linkEnd - 1] = ChatRunBackdrops.PAD;
-                    backdrops = true;
-                }
-            }
-            cursor = linkEnd;
-        }
-        return new Links(colors, before, after, players, backdrops);
-    }
-
-    /**
      * A backdrop from {@code left} to {@code right} over the well, the
      * field's text top at {@code top}, fading with the field's words.
      */
@@ -446,26 +324,10 @@ final class ChatInputField extends GuiTextField {
                 top + ChatRunBackdrops.BOTTOM, rgb, ChatInputBar.faded(255));
     }
 
-    /**
-     * Draws {@code [from, to)} of the visible text as runs of one
-     * colour, and answers where the text ends.
-     */
-    private int drawRuns(String visible, int[] colors, int from, int to,
-                         int x, int y) {
-        int cursor = x;
-        int start = from;
-        while (start < to) {
-            int end = start + 1;
-            while (end < to && colors[end] == colors[start]) {
-                end++;
-            }
-            String run = visible.substring(start, end);
-            LostTalesChatVisualStyle.drawColored(this.font, run, cursor, y,
-                    colors[start], ChatInputBar.faded(255));
-            cursor += this.font.getStringWidth(run);
-            start = end;
-        }
-        return cursor;
+    /** A run of the field's text as it is typed, in ivory. */
+    private void drawRun(String run, int x, int y) {
+        LostTalesChatVisualStyle.drawColored(this.font, run, x, y,
+                LostTalesChatVisualStyle.IVORY, ChatInputBar.faded(255));
     }
 
     /** The selection band's wash: the palette's steel blue, translucent. */
@@ -487,81 +349,118 @@ final class ChatInputField extends GuiTextField {
         Gui.drawRect(fromX, fromY, toX, toY, SELECTION_ARGB);
     }
 
+    /** What a resolved token is; each is drawn as its sent line draws it. */
+    private enum TokenKind { EMOJI, SHARE, MENTION, CHANNEL }
+
     /**
-     * One resolved token: its raw span and its chat preview — a share
-     * token's bracketed icon and name, or an emoji shortcode's sprite.
+     * One resolved token: its raw span and how it is shown — an emoji's
+     * sprite; a share's icon and name; a mention's or a channel link's
+     * words, and a message link's bubble after them — each but an emoji
+     * on its backdrop.
      */
     private static final class TokenPreview {
         final int start;
         final int end;
-        final ChatShareKind kind;
+        final TokenKind kind;
+        /** What a share shares; null for any other token. */
+        final ChatShareKind shareKind;
         final ItemStack stack;
         final String markerIcon;
-        final String name;
-        /** The emoji this span previews as; null for a share token. */
+        /** The emoji an emoji's span shows; null for any other token. */
         final ChatEmoji emoji;
-        /** The brackets' and name's colour (white reads as ivory). */
+        /** A share's name after its icon, or a mention or link as shown. */
+        final String label;
+        /** The words' colour (white reads as ivory). */
         final int rgb;
         /** The marker artwork's exact colour; white stays untinted. */
         final int iconRgb;
-        /** Display width: the icon slot and the name, with the backdrop's padding. */
+        /** The backdrop's colour. */
+        final int backdropRgb;
+        /** Whether a link to one message shows its bubble after the words. */
+        final boolean bubble;
+        /** Display width, the backdrop's padding included. */
         final int width;
 
-        TokenPreview(int start, int end, ChatShareKind kind,
-                     ItemStack stack, String markerIcon, String name,
-                     int rgb, int iconRgb, int width) {
+        TokenPreview(int start, int end, TokenKind kind,
+                     ChatShareKind shareKind, ItemStack stack,
+                     String markerIcon, ChatEmoji emoji, String label,
+                     int rgb, int iconRgb, int backdropRgb, boolean bubble,
+                     int width) {
             this.start = start;
             this.end = end;
             this.kind = kind;
+            this.shareKind = shareKind;
             this.stack = stack;
             this.markerIcon = markerIcon;
-            this.name = name;
-            this.emoji = null;
+            this.emoji = emoji;
+            this.label = label;
             this.rgb = rgb;
             this.iconRgb = iconRgb;
+            this.backdropRgb = backdropRgb;
+            this.bubble = bubble;
             this.width = width;
         }
 
-        TokenPreview(int start, int end, ChatEmoji emoji) {
-            this.start = start;
-            this.end = end;
-            this.kind = null;
-            this.stack = null;
-            this.markerIcon = "";
-            this.name = "";
-            this.emoji = emoji;
-            this.rgb = 0;
-            this.iconRgb = 0;
-            this.width = ChatInlineIcons.SLOT_WIDTH;
+        static TokenPreview emoji(int start, int end, ChatEmoji emoji) {
+            return new TokenPreview(start, end, TokenKind.EMOJI, null, null,
+                    "", emoji, "", 0, 0, 0, false, ChatInlineIcons.SLOT_WIDTH);
         }
     }
 
+    private static final Comparator<TokenPreview> BY_START =
+            new Comparator<TokenPreview>() {
+                @Override
+                public int compare(TokenPreview left, TokenPreview right) {
+                    return left.start - right.start;
+                }
+            };
+
     /**
-     * The previews for the given raw text, rebuilt only when it changes.
-     * Only tokens the client can resolve right now — the same match the
-     * send will make — become previews; the rest stay literal text.
+     * The previews for the given raw text, rebuilt only when it changes
+     * or the names a mention may name do. Only tokens the client can
+     * resolve right now — the same match the send will make — become
+     * previews; the rest stay literal text.
      */
     private List<TokenPreview> previewsFor(String text) {
         if (this.plainText) {
             return Collections.emptyList();
         }
-        if (text.equals(this.previewedText)) {
+        List<ChatMentionCandidate> names = this.mentions == null
+                || this.emojiOnly ? Collections.<ChatMentionCandidate>emptyList()
+                : this.mentions.candidates();
+        if (text.equals(this.previewedText) && names == this.previewedNames) {
             return this.previews;
         }
         this.previewedText = text;
-        this.previews = buildPreviews(text);
+        this.previewedNames = names;
+        this.previews = buildPreviews(text, names);
         return this.previews;
     }
 
-    private List<TokenPreview> buildPreviews(String text) {
-        List<TokenPreview> result = buildSharePreviews(text);
-        // A command never previews: what is typed is what runs, and a
-        // completed shortcode in one is an argument, not an emoji.
-        if (LostTalesConfig.enableChatEmojis && !text.startsWith("/")
-                && text.indexOf(':') >= 0) {
-            result = mergeEmojiPreviews(text, result);
+    /**
+     * Every token of the text the send will turn into something, in span
+     * order, none overlapping another: shares first, whose brackets may
+     * hold any name, then emoji, channel links and mentions. Nothing
+     * inside code is a token, and a command is code but for the words a
+     * whisper sends.
+     */
+    private List<TokenPreview> buildPreviews(String text,
+                                             List<ChatMentionCandidate> names) {
+        List<TokenPreview> found = new ArrayList<TokenPreview>();
+        if (!this.emojiOnly) {
+            found.addAll(buildSharePreviews(text));
         }
-        return outsideCode(result, stylesFor(text));
+        if (LostTalesConfig.enableChatEmojis && text.indexOf(':') >= 0) {
+            addEmojiPreviews(text, found);
+        }
+        if (!this.emojiOnly) {
+            addChannelPreviews(text, found);
+            if (LostTalesConfig.enableChatPings && text.indexOf('@') >= 0) {
+                addMentionPreviews(text, names, found);
+            }
+        }
+        Collections.sort(found, BY_START);
+        return outsideCode(found, stylesFor(text));
     }
 
     /**
@@ -617,7 +516,7 @@ final class ChatInputField extends GuiTextField {
             } else if (token.kind == ChatShareKind.QUEST) {
                 for (ChatShareCandidates.QuestEntry entry : quests) {
                     if (entry.matchesToken(token)) {
-                        result.add(preview(token, null, "", entry.name,
+                        result.add(sharePreview(token, null, "", entry.name,
                                 LostTalesChatPresentation.QUEST_RGB,
                                 LostTalesChatPresentation.QUEST_RGB));
                         break;
@@ -626,7 +525,7 @@ final class ChatInputField extends GuiTextField {
             } else {
                 for (ChatShareCandidates.MarkerEntry entry : markers) {
                     if (entry.matchesToken(token)) {
-                        result.add(preview(token, null,
+                        result.add(sharePreview(token, null,
                                 entry.marker.getIconName(),
                                 ChatShareTokenParser.plainName(
                                         entry.marker.getName()),
@@ -644,15 +543,11 @@ final class ChatInputField extends GuiTextField {
 
     /**
      * Adds a preview for every complete {@code :name:} of a registered
-     * emoji, exactly the spans the sent message will draw as sprites —
-     * an alias or an unfinished name stays the literal text it is —
-     * merged in span order with the share previews, whose tokens a
-     * shortcode can never overlap ({@code :} is not a share-name
-     * character, so a share token's span never parses as an emoji).
+     * emoji, exactly the spans the sent message will draw as sprites: an
+     * alias or an unfinished name stays the literal text it is.
      */
-    private static List<TokenPreview> mergeEmojiPreviews(
-            String text, List<TokenPreview> shares) {
-        List<TokenPreview> merged = new ArrayList<TokenPreview>(shares);
+    private static void addEmojiPreviews(String text,
+                                         List<TokenPreview> found) {
         int index = 0;
         int length = text.length();
         while (index < length) {
@@ -665,23 +560,81 @@ final class ChatInputField extends GuiTextField {
                     && text.charAt(nameEnd) == ':'
                     ? ChatEmoji.fromName(text.substring(index + 1, nameEnd))
                     : null;
-            if (emoji == null || overlapsAny(shares, index, nameEnd + 1)) {
+            if (emoji == null || overlapsAny(found, index, nameEnd + 1)) {
                 index++;
                 continue;
             }
-            merged.add(new TokenPreview(index, nameEnd + 1, emoji));
+            found.add(TokenPreview.emoji(index, nameEnd + 1, emoji));
             index = nameEnd + 1;
         }
-        if (merged.size() == shares.size()) {
-            return shares;
-        }
-        Collections.sort(merged, new Comparator<TokenPreview>() {
-            @Override
-            public int compare(TokenPreview left, TokenPreview right) {
-                return left.start - right.start;
+    }
+
+    /**
+     * Adds a preview for every channel link after a {@code #} opening a
+     * word, read as the sent line reads it: the channel's shown name in
+     * its colour on the darkest shade of it, and for a link to one of its
+     * messages the arrow and the bubble after the name.
+     */
+    private void addChannelPreviews(String text, List<TokenPreview> found) {
+        int cursor = 0;
+        while (cursor < text.length()) {
+            int hash = text.indexOf('#', cursor);
+            if (hash < 0) {
+                return;
             }
-        });
-        return merged;
+            boolean opensWord = hash == 0
+                    || Character.isWhitespace(text.charAt(hash - 1));
+            ChatChannelSuggester.Link link = opensWord
+                    ? ChatChannelSuggester.linkAt(text, hash) : null;
+            if (link == null || overlapsAny(found, hash, link.end)) {
+                cursor = hash + 1;
+                continue;
+            }
+            boolean toMessage = ChatMessageIds.isServerId(link.messageId);
+            String label = "#" + ClientChatChannelState.displayName(
+                    link.channel, link.scope)
+                    + (toMessage ? ChatChannelLinkMarker.MESSAGE_SEPARATOR : "");
+            int rgb = ClientChatChannelState.displayColor(link.channel,
+                    link.scope);
+            found.add(new TokenPreview(hash, link.end, TokenKind.CHANNEL,
+                    null, null, "", null, label, rgb, rgb,
+                    LostTalesColors.darkestShade(rgb,
+                            LostTalesChatVisualStyle.SURFACE_RGB),
+                    toMessage, ChatRunBackdrops.PAD
+                            + this.font.getStringWidth(label)
+                            + (toMessage ? ChatInlineIcons.SLOT_WIDTH : 0)
+                            + ChatRunBackdrops.PAD));
+            cursor = link.end;
+        }
+    }
+
+    /**
+     * Adds a preview for every mention of a name the {@code @} list
+     * offers ({@link ChatInputMentions}), as typed: a person's in seafoam
+     * on the ping's slate blue, a role's in its own colour on the darkest
+     * shade of it.
+     */
+    private void addMentionPreviews(String text,
+                                    List<ChatMentionCandidate> names,
+                                    List<TokenPreview> found) {
+        for (ChatInputMentions.Found mention
+                : ChatInputMentions.find(text, names)) {
+            if (overlapsAny(found, mention.start, mention.end)) {
+                continue;
+            }
+            String label = text.substring(mention.start, mention.end);
+            boolean role = mention.candidate.isRole();
+            int rgb = role ? mention.candidate.getRoleColor()
+                    : ChatMentionColors.PLAYER_RGB;
+            found.add(new TokenPreview(mention.start, mention.end,
+                    TokenKind.MENTION, null, null, "", null, label, rgb, rgb,
+                    role ? LostTalesColors.darkestShade(rgb,
+                            LostTalesChatVisualStyle.SURFACE_RGB)
+                            : ChatRunBackdrops.PLAYER_RGB,
+                    false, ChatRunBackdrops.PAD
+                            + this.font.getStringWidth(label)
+                            + ChatRunBackdrops.PAD));
+        }
     }
 
     /** The parser's name scan: lowercase, digits, underscores, bounded. */
@@ -719,20 +672,22 @@ final class ChatInputField extends GuiTextField {
                 || rarity.rarityColor == null
                 ? EnumChatFormatting.WHITE : rarity.rarityColor;
         int rgb = LostTalesChatPresentation.rarityRgb(formatting);
-        return preview(token, stack, "",
+        return sharePreview(token, stack, "",
                 ChatShareTokenParser.plainName(stack.getDisplayName()),
                 rgb, rgb);
     }
 
-    private TokenPreview preview(ChatShareTokenParser.Token token,
-                                 ItemStack stack, String markerIcon,
-                                 String name, int rgb, int iconRgb) {
+    private TokenPreview sharePreview(ChatShareTokenParser.Token token,
+                                      ItemStack stack, String markerIcon,
+                                      String name, int rgb, int iconRgb) {
         // Icon and name on the backdrop that frames them, its padding
         // either side, as the sent line has it.
         int width = ChatRunBackdrops.PAD + slotWidth(token.kind)
                 + this.font.getStringWidth(" " + name) + ChatRunBackdrops.PAD;
-        return new TokenPreview(token.start, token.end, token.kind, stack,
-                markerIcon, name, rgb, iconRgb, width);
+        return new TokenPreview(token.start, token.end, TokenKind.SHARE,
+                token.kind, stack, markerIcon, null, name, rgb, iconRgb,
+                LostTalesColors.darkestShade(rgb,
+                        LostTalesChatVisualStyle.SURFACE_RGB), false, width);
     }
 
     /** The slot a shared thing's icon takes, as the message lines give it. */
@@ -745,7 +700,9 @@ final class ChatInputField extends GuiTextField {
      * The field with previews in it. Same structure as the plain path:
      * the visible span is cut to the box, drawn, and the caret and
      * selection are placed on it — every position through the one
-     * display model, so nothing drawn and nothing hit can disagree.
+     * display model, so nothing drawn and nothing hit can disagree. The
+     * tokens' backdrops go down first, then the caret's shadow, then the
+     * words and icons over both.
      */
     private void drawWithPreviews(String text, List<TokenPreview> resolved,
                                   int scrollOffset) {
@@ -758,11 +715,18 @@ final class ChatInputField extends GuiTextField {
         boolean caretVisible = caretLit() && caretInside;
         int caretX = left + displayedX(text, resolved, scrollOffset,
                 Math.max(scrollOffset, Math.min(caret, visibleEnd)));
-        drawLinkBackdrops(text, resolved, scrollOffset, visibleEnd, left, top);
+        for (TokenPreview preview : resolved) {
+            if (preview.start >= scrollOffset && preview.end <= visibleEnd
+                    && preview.kind != TokenKind.EMOJI) {
+                int x = left + displayedX(text, resolved, scrollOffset,
+                        preview.start);
+                drawBackdrop(x, x + preview.width - 1, top,
+                        preview.backdropRgb);
+            }
+        }
         if (caretVisible) {
             drawCaretShadow(caretX, top);
         }
-        int[] colors = colorsOf(text, scrollOffset, visibleEnd);
         int x = left;
         int cursor = scrollOffset;
         for (TokenPreview preview : resolved) {
@@ -772,13 +736,11 @@ final class ChatInputField extends GuiTextField {
             if (preview.end > visibleEnd) {
                 break;
             }
-            x = drawPlainRuns(text, colors, scrollOffset, cursor,
-                    preview.start, x, top);
+            x = drawPlainRuns(text, cursor, preview.start, x, top);
             x = drawPreview(preview, x, top);
             cursor = preview.end;
         }
-        drawPlainRuns(text, colors, scrollOffset, cursor, visibleEnd,
-                x, top);
+        drawPlainRuns(text, cursor, visibleEnd, x, top);
 
         if (caretVisible) {
             drawCaretBar(caretX, top);
@@ -795,81 +757,25 @@ final class ChatInputField extends GuiTextField {
     }
 
     /**
-     * The backdrop of every link of {@code [from, to)} that wears one, on
-     * the well, where the display model has it: from the padding before
-     * its {@code @} or {@code #} to a clear pixel short of the one after
-     * it. A player's mention stands on the ping's slate blue, anything
-     * else on the darkest shade of its own colour.
+     * Runs of one markup style over the raw range, like the plain path's:
+     * the style's decoration codes ahead of each run, and marks, code and
+     * spoiler text in their subdued colours.
      */
-    private void drawLinkBackdrops(String text, List<TokenPreview> resolved,
-                                   int from, int to, int left, int top) {
-        Links found = linksFor(text);
-        if (!found.backdrops) {
-            return;
-        }
-        for (int start = from; start < to; start++) {
-            // A link begins here, or began before the field scrolled
-            // past its start and still wears its backdrop from the edge.
-            boolean opens = found.beforeAt(start) > 0;
-            if (!opens && (start > from || !wearsBackdrop(found, start))) {
-                continue;
-            }
-            int end = start;
-            while (end < text.length() && found.afterAt(end) == 0) {
-                end++;
-            }
-            end = end + 1;
-            // One the field's end cuts runs on to that end.
-            int right = end <= to ? displayedX(text, resolved, from, end) - 1
-                    : displayedX(text, resolved, from, to);
-            int rgb = found.players[start] ? ChatRunBackdrops.PLAYER_RGB
-                    : LostTalesColors.darkestShade(found.colors[start],
-                            LostTalesChatVisualStyle.SURFACE_RGB);
-            drawBackdrop(left + displayedX(text, resolved, from, start),
-                    left + right, top, rgb);
-            start = end - 1;
-        }
-    }
-
-    /** Whether the character is of a link that wears a backdrop, wherever in it. */
-    private static boolean wearsBackdrop(Links found, int index) {
-        if (found.colorAt(index) < 0) {
-            return false;
-        }
-        int start = index;
-        while (start > 0 && found.colorAt(start - 1) >= 0) {
-            start--;
-        }
-        return found.beforeAt(start) > 0;
-    }
-
-    /**
-     * Runs of one colour and one markup style over the raw range, like
-     * the plain path's: the style's decoration codes ahead of each run,
-     * marks and code and spoiler text in their subdued colours over
-     * whatever the link pass chose, and a link inside its backdrop's
-     * padding.
-     */
-    private int drawPlainRuns(String text, int[] colors, int colorsBase,
-                              int from, int to, int x, int y) {
+    private int drawPlainRuns(String text, int from, int to, int x, int y) {
         int[] styles = stylesFor(text);
         int cursor = x;
         int start = from;
         while (start < to) {
             int end = start + 1;
-            while (end < to && colors[end - colorsBase]
-                    == colors[start - colorsBase]
-                    && ChatInputStyles.styleAt(styles, end)
-                            == ChatInputStyles.styleAt(styles, start)) {
+            while (end < to && ChatInputStyles.styleAt(styles, end)
+                    == ChatInputStyles.styleAt(styles, start)) {
                 end++;
             }
             int style = ChatInputStyles.styleAt(styles, start);
             String run = ChatInputStyles.prefixOf(style)
                     + text.substring(start, end);
-            LostTalesChatVisualStyle.drawColored(this.font, run,
-                    cursor + linksFor(text).beforeAt(start), y,
-                    ChatInputStyles.colorOf(style, colors[start - colorsBase]),
-                    ChatInputBar.faded(255));
+            LostTalesChatVisualStyle.drawColored(this.font, run, cursor, y,
+                    ChatInputStyles.colorOf(style), ChatInputBar.faded(255));
             cursor += rawWidth(text, start, end);
             start = end;
         }
@@ -879,10 +785,11 @@ final class ChatInputField extends GuiTextField {
     /**
      * The styles of the raw text as the field shows them
      * ({@link ChatInputStyles#layout}), laid out only when it changes;
-     * null for text with nothing to style, the common case.
+     * null for text with nothing to style, the common case, and for a
+     * field that shows no markup.
      */
     private int[] stylesFor(String text) {
-        if (this.plainText) {
+        if (this.plainText || this.emojiOnly) {
             return null;
         }
         if (text.equals(this.styledText)) {
@@ -893,15 +800,11 @@ final class ChatInputField extends GuiTextField {
         return this.styles;
     }
 
-    /**
-     * The drawn width of one raw character: its glyph, a pixel more in
-     * bold, and a link backdrop's padding where one opens or closes.
-     */
+    /** The drawn width of one raw character: its glyph, a pixel more in bold. */
     private int charWidth(String text, int index) {
         int width = this.font.getCharWidth(text.charAt(index));
-        Links found = linksFor(text);
-        return (width > 0 && ChatInputStyles.isBold(stylesFor(text), index)
-                ? width + 1 : width) + found.beforeAt(index) + found.afterAt(index);
+        return width > 0 && ChatInputStyles.isBold(stylesFor(text), index)
+                ? width + 1 : width;
     }
 
     /** The drawn width of the raw range {@code [from, to)}. */
@@ -913,43 +816,53 @@ final class ChatInputField extends GuiTextField {
         return width;
     }
 
-    /** The token as chat will show it: icon and name on their backdrop. */
+    /**
+     * The token as chat will show it, over the backdrop already laid for
+     * it; answers where it ends.
+     */
     private int drawPreview(TokenPreview preview, int x, int y) {
         Minecraft minecraft = Minecraft.getMinecraft();
-        if (preview.emoji != null) {
+        int alpha = ChatInputBar.faded(255);
+        if (preview.kind == TokenKind.EMOJI) {
             // The shortcode as the sprite it will be in chat, in the
             // same slot and box the message lines give it.
             ChatInlineIcons.drawEmoji(minecraft, preview.emoji,
                     ChatInlineIcons.boxLeft(x, ChatInlineIcons.SLOT_WIDTH),
                     ChatInlineIcons.boxTop(y, ChatInlineIcons.SLOT_WIDTH),
                     ChatInlineIcons.contentSize(ChatInlineIcons.SLOT_WIDTH),
-                    ChatInputBar.faded(255));
+                    alpha);
             return x + preview.width;
         }
-        int start = x;
-        drawBackdrop(start, start + preview.width - 1, y,
-                LostTalesColors.darkestShade(preview.rgb,
-                        LostTalesChatVisualStyle.SURFACE_RGB));
-        x += ChatRunBackdrops.PAD;
-        int slot = slotWidth(preview.kind);
-        float boxX = ChatInlineIcons.boxLeft(x, slot);
-        float boxY = ChatInlineIcons.boxTop(y, slot);
-        float size = ChatInlineIcons.contentSize(slot);
-        if (preview.kind == ChatShareKind.ITEM) {
-            ChatInlineIcons.drawItem(minecraft, preview.stack, boxX, boxY,
-                    size, ChatInputBar.faded(255));
-        } else if (preview.kind == ChatShareKind.QUEST) {
-            LostTalesUiSheet.QUEST.drawWithShadow(boxX, boxY, ChatInputBar.faded(255));
-        } else {
-            ChatInlineIcons.drawMarker(minecraft, preview.markerIcon,
-                    preview.iconRgb, boxX, boxY, size,
-                    ChatInputBar.faded(255));
+        int cursor = x + ChatRunBackdrops.PAD;
+        if (preview.kind == TokenKind.SHARE) {
+            int slot = slotWidth(preview.shareKind);
+            float boxX = ChatInlineIcons.boxLeft(cursor, slot);
+            float boxY = ChatInlineIcons.boxTop(y, slot);
+            float size = ChatInlineIcons.contentSize(slot);
+            if (preview.shareKind == ChatShareKind.ITEM) {
+                ChatInlineIcons.drawItem(minecraft, preview.stack, boxX, boxY,
+                        size, alpha);
+            } else if (preview.shareKind == ChatShareKind.QUEST) {
+                LostTalesUiSheet.QUEST.drawWithShadow(boxX, boxY, alpha);
+            } else {
+                ChatInlineIcons.drawMarker(minecraft, preview.markerIcon,
+                        preview.iconRgb, boxX, boxY, size, alpha);
+            }
+            LostTalesChatVisualStyle.drawColored(this.font,
+                    " " + preview.label, cursor + slot, y, preview.rgb, alpha);
+            return x + preview.width;
         }
-        x += slot;
-        String tail = " " + preview.name;
-        LostTalesChatVisualStyle.drawColored(this.font, tail, x, y,
-                preview.rgb, ChatInputBar.faded(255));
-        return start + preview.width;
+        LostTalesChatVisualStyle.drawColored(this.font, preview.label, cursor,
+                y, preview.rgb, alpha);
+        if (preview.bubble) {
+            int slotX = cursor + this.font.getStringWidth(preview.label);
+            int slot = ChatInlineIcons.SLOT_WIDTH;
+            ChatInlineIcons.drawSheetSprite(LostTalesUiSheet.SPEECH_BUBBLE,
+                    ChatInlineIcons.boxLeft(slotX, slot),
+                    ChatInlineIcons.boxTop(y, slot),
+                    ChatInlineIcons.contentSize(slot), preview.rgb, alpha);
+        }
+        return x + preview.width;
     }
 
     /**
@@ -1206,8 +1119,8 @@ final class ChatInputField extends GuiTextField {
         List<TokenPreview> resolved = previewsFor(text);
         boolean inside = LostTalesUiHitBox.contains(mouseX, mouseY, this.xPosition,
                 this.yPosition, getWidth(), this.fieldHeight);
-        if ((resolved.isEmpty() && !linksFor(text).backdrops)
-                || !isStyled() || !inside || button != 0 || !isFocused()) {
+        if (resolved.isEmpty() || !isStyled() || !inside || button != 0
+                || !isFocused()) {
             super.mouseClicked(mouseX, mouseY, button);
             return;
         }

@@ -19,7 +19,9 @@ import com.ninuna.losttales.gui.screen.character.LostTalesCharacterCapeGui;
 import com.ninuna.losttales.gui.screen.character.LostTalesCharacterProfileEditGui;
 import com.ninuna.losttales.gui.screen.character.LostTalesCharacterProfileRouterGui;
 import com.ninuna.losttales.gui.screen.character.LostTalesCharacterRosterGui;
-import com.ninuna.losttales.gui.screen.party.LostTalesPartyManagementGui;
+import com.ninuna.losttales.client.chat.LostTalesChatGui;
+import com.ninuna.losttales.gui.screen.party.PartyPage;
+import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
@@ -529,7 +531,7 @@ public class LostTalesCharacterInfoGui extends GuiScreen
     @Override
     protected void actionPerformed(GuiButton button) {
         if (button.id == BUTTON_PARTY) {
-            this.mc.displayGuiScreen(new LostTalesPartyManagementGui(this));
+            LostTalesChatGui.openPage(PartyPage.PAGE_ID);
             return;
         }
         if (button.id == BUTTON_CAPE) {
@@ -636,7 +638,7 @@ public class LostTalesCharacterInfoGui extends GuiScreen
             return;
         }
         if (LostTalesKeyBindings.isQuestJournalKey(keyCode)) {
-            this.mc.displayGuiScreen(new LostTalesQuestJournalGui(this.parent));
+            LostTalesChatGui.openPage(QuestJournalPage.PAGE_ID);
             return;
         }
         super.keyTyped(typedChar, keyCode);

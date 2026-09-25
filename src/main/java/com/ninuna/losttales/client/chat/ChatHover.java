@@ -41,6 +41,10 @@ final class ChatHover {
         SUGGESTION,
         /** An open completion list's own padding. */
         SUGGESTIONS,
+        /** A row of the list a small window's field opens. */
+        FIELD_SUGGESTION,
+        /** A page in a window: the journal, the party. */
+        PAGE,
         /** The band just outside a small window, which resizes it. */
         SMALL_WINDOW_RESIZE,
         /** The cross on a small window's strip. */
@@ -115,6 +119,8 @@ final class ChatHover {
     ChatPickerPanel picker;
     ChatPickerPanel.Entry pickerEntry;
     ChatInputCompletion.Slot suggestion;
+    /** The row of a field's list the pointer is on; -1 between rows. */
+    int fieldSuggestion = -1;
     int toolbarKind = -1;
     /** On the snap layouts, which zone of the panel; -1 on the panel round them. */
     int snapZone = -1;
@@ -158,6 +164,7 @@ final class ChatHover {
             case MENU_ENTRY:
             case EMPTY_PLUS:
             case SUGGESTION:
+            case FIELD_SUGGESTION:
             case PICKER_CELL:
             case PICKER_LABEL:
             case SMALL_WINDOW_CLOSE:
@@ -193,6 +200,7 @@ final class ChatHover {
             case LINE:
             case MEMBER_LIST:
             case WINDOW:
+            case PAGE:
                 return this.acts;
             default:
                 return false;

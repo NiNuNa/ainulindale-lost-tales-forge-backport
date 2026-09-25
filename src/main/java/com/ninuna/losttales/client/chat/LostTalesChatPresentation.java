@@ -1084,8 +1084,11 @@ public final class LostTalesChatPresentation {
         }
         // What the view's read mark moves to once the line is seen.
         long serverId = ClientChatMessageIds.messageIdOf(chatLineId);
+        // The tab typed in is in front only while no page stands before it.
+        ChatTab typedIn = ClientChatChannelState.getSelected();
         ClientChatChannelViews.record(chatLineId, tab,
-                ClientChatChannelState.getSelected(), mentioned,
+                ChatWindowLayout.showsPage(ChatWindowLayout.windowOf(typedIn))
+                        ? null : typedIn, mentioned,
                 serverId, timestampMillis, receivingReplayed);
         ClientChatChannelViews.recordTime(chatLineId, timestampMillis);
     }

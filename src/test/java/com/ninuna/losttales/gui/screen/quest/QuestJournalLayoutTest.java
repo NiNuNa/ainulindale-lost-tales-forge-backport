@@ -9,7 +9,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Where the journal's parts stand. The screen draws from these boxes and
+ * Where the journal's parts stand. The page draws from these boxes and
  * asks the pointer with the same ones, so anything asserted here is what
  * a press actually lands on.
  */
@@ -20,16 +20,10 @@ public final class QuestJournalLayoutTest {
 
     @Test
     public void thePartsStackWithoutOverlappingOrLeavingAGap() {
-        QuestJournalLayout layout = new QuestJournalLayout(WIDE, TALL);
+        QuestJournalLayout layout = new QuestJournalLayout(WIDE, TALL, true);
 
-        assertEquals(0.0D, layout.header().top, 0.0D);
-        assertEquals(QuestJournalLayout.HEADER_HEIGHT, layout.header().bottom(),
-                0.0D);
-        assertEquals("the rule sits directly under the header",
-                layout.header().bottom(), layout.headerRule().top, 0.0D);
-        assertEquals("the body starts under the rule and its margin",
-                layout.headerRule().bottom() + QuestJournalLayout.MARGIN,
-                layout.bodyTop(), 0.0D);
+        assertEquals("the body starts a margin under the window's strip",
+                QuestJournalLayout.MARGIN, layout.bodyTop());
         assertEquals("the action strip ends at the bottom", TALL,
                 (int)layout.actions().bottom());
         assertEquals("its rule sits directly over it",
@@ -40,7 +34,7 @@ public final class QuestJournalLayoutTest {
 
     @Test
     public void theTwoHalvesAreDividedByOneRuleWithAGutterEitherSide() {
-        QuestJournalLayout layout = new QuestJournalLayout(WIDE, TALL);
+        QuestJournalLayout layout = new QuestJournalLayout(WIDE, TALL, true);
         LostTalesUiHitBox list = layout.list();
         LostTalesUiHitBox divider = layout.divider();
         LostTalesUiHitBox detail = layout.detail();
@@ -63,25 +57,50 @@ public final class QuestJournalLayoutTest {
     }
 
     @Test
-    public void aNarrowScreenKeepsOnlyTheDetail() {
-        QuestJournalLayout layout = new QuestJournalLayout(
-                QuestJournalLayout.MIN_SPLIT_WIDTH - 1, TALL);
+    public void aFoldedListLeavesTheDetailsTheWholeBody() {
+        QuestJournalLayout folded = new QuestJournalLayout(WIDE, TALL, false);
 
-        assertFalse(layout.isSplit());
-        assertEquals(0.0D, layout.list().width, 0.0D);
-        assertEquals(0.0D, layout.divider().width, 0.0D);
-        assertEquals("the detail takes the whole width",
-                QuestJournalLayout.MARGIN, (int)layout.detail().left);
-        assertTrue(layout.detail().width > 0.0D);
+        assertTrue(folded.isWide());
+        assertFalse(folded.isSplit());
+        assertEquals("folded, the list is gone", 0.0D, folded.list().width,
+                0.0D);
+        assertEquals("and so is the rule", 0.0D, folded.divider().width,
+                0.0D);
+        assertEquals(QuestJournalLayout.MARGIN, (int)folded.detail().left);
+        assertEquals(WIDE - QuestJournalLayout.MARGIN,
+                (int)folded.detail().right());
     }
 
     @Test
-    public void theListNeverGrowsPastItsBoundsHoweverWideTheScreen() {
+    public void aNarrowPageShowsTheListOrTheDetailOverTheWholeBody() {
+        int narrow = QuestJournalLayout.MIN_SPLIT_WIDTH - 1;
+        QuestJournalLayout folded = new QuestJournalLayout(narrow, TALL, false);
+        QuestJournalLayout out = new QuestJournalLayout(narrow, TALL, true);
+
+        assertFalse(out.isWide());
+        assertFalse("too narrow to stand side by side", out.isSplit());
+        assertEquals(0.0D, out.divider().width, 0.0D);
+        assertEquals("folded, the detail takes the whole body",
+                QuestJournalLayout.MARGIN, (int)folded.detail().left);
+        assertEquals(narrow - QuestJournalLayout.MARGIN,
+                (int)folded.detail().right());
+
+        assertEquals("out, the detail is gone", 0.0D, out.detail().width,
+                0.0D);
+        assertEquals("and the list takes the very same box",
+                folded.detail().left, out.list().left, 0.0D);
+        assertEquals(folded.detail().width, out.list().width, 0.0D);
+        assertEquals(folded.detail().top, out.list().top, 0.0D);
+        assertEquals(folded.detail().height, out.list().height, 0.0D);
+    }
+
+    @Test
+    public void theListNeverGrowsPastItsBoundsHoweverWideThePage() {
         assertEquals(QuestJournalLayout.LIST_MAX_WIDTH,
-                (int)new QuestJournalLayout(1920, TALL).list().width);
+                (int)new QuestJournalLayout(1920, TALL, true).list().width);
         assertEquals(QuestJournalLayout.LIST_MIN_WIDTH,
-                (int)new QuestJournalLayout(
-                        QuestJournalLayout.MIN_SPLIT_WIDTH, TALL).list().width);
+                (int)new QuestJournalLayout(QuestJournalLayout.MIN_SPLIT_WIDTH,
+                        TALL, true).list().width);
     }
 
     @Test
@@ -126,8 +145,6 @@ public final class QuestJournalLayoutTest {
                 Math.floor(strip.top
                         + (strip.height - LostTalesUiFramedButton.HEIGHT) / 2.0D),
                 first.top, 0.0D);
-        assertEquals(8 + QuestJournalLayout.buttonsWidth(widths) - 8,
-                (int)(third.right() - first.left));
     }
 
     @Test
@@ -137,8 +154,9 @@ public final class QuestJournalLayoutTest {
         assertEquals(30 + 2 * LostTalesUiFramedButton.WIDE_INSET,
                 QuestJournalLayout.buttonWidthFor(30));
         // A width under the frame's minimum is grown, not drawn clipped.
-        int[] widths = {1};
+        LostTalesUiHitBox strip = new LostTalesUiHitBox(0, 0, 100, 26);
         assertEquals(LostTalesUiFramedButton.MIN_SIZE,
-                QuestJournalLayout.buttonsWidth(widths));
+                (int)QuestJournalLayout.buttonAt(strip, 0, new int[] {1}, 0)
+                        .width);
     }
 }

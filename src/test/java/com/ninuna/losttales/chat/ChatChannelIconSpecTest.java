@@ -46,9 +46,21 @@ public final class ChatChannelIconSpecTest {
     }
 
     @Test
+    public void aChannelIsNamedByItsCodeName() {
+        ChatChannelIconSpec operator = ChatChannelIconSpec.parse(" Channel:Operator ");
+        assertNotNull(operator);
+        assertEquals(ChatChannelIconSpec.Kind.CHANNEL, operator.getKind());
+        assertEquals("operator", operator.getName());
+        assertEquals("channel:operator", operator.toText());
+        assertEquals(null, ChatChannelIconSpec.parse("channel:"));
+        assertEquals(null, ChatChannelIconSpec.parse("channel:out of character"));
+    }
+
+    @Test
     public void theTextParsesBackToItself() {
         for (String text : new String[] {"emoji:slight_smile",
-                "item:minecraft:diamond", "item:minecraft:wool@7"}) {
+                "item:minecraft:diamond", "item:minecraft:wool@7",
+                "channel:client_console"}) {
             ChatChannelIconSpec icon = ChatChannelIconSpec.parse(text);
             assertNotNull(text, icon);
             assertEquals(text, icon.toText());

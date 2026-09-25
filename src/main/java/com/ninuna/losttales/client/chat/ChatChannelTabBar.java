@@ -49,16 +49,18 @@ import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
  * where its room ends — resting the pointer on such a tab slides the
  * name along to show the rest — and its buttons go at fixed shares of
  * the full width, every tab's at once since every tab is one width: the
- * draft mark under two thirds, the cog under a half, the cross under a
- * third. A button fades as it goes while the name glides into its room,
+ * draft mark under two thirds, the cross under a third. A tab's settings
+ * are the cog in the tool strip under the row. A button fades as it goes
+ * while the name glides into its room,
  * so nothing jumps. The tab in front keeps its cross throughout; its
  * icon and name are cut short before it like any name, so the cross
  * ends where the icon stood. The row's other controls stand at its two ends:
  * the restore {@code +} follows the last tab, since what it opens joins
  * that row, and the window's own controls are gathered against the
  * right edge beside the grip that moves it, in the order a title bar
- * reads them — the lock, a hairline, the settings cog, the fullscreen
- * control and the close cross, another hairline, then the grip. All of
+ * reads them — the lock, a hairline, the window's menu (three dots), the
+ * fullscreen control and the close cross, another hairline, then the
+ * grip. All of
  * them keep their room however many tabs there are, all of them are
  * centred on the same row
  * of the strip, and the bare stretch left between the two ends drags
@@ -163,11 +165,10 @@ final class ChatChannelTabBar {
     static final int DEFAULT_TAB_WIDTH = 128;
     /**
      * The shares of {@link #DEFAULT_TAB_WIDTH} under which every tab
-     * gives a button up: the draft mark first, then the cog, then the
-     * cross — the tab in front keeping its cross whatever its width.
+     * gives a button up: the draft mark first, then the cross — the tab
+     * in front keeping its cross whatever its width.
      */
     static final double DRAFT_SHARE = 2.0D / 3.0D;
-    static final double COG_SHARE = 1.0D / 2.0D;
     static final double CLOSE_SHARE = 1.0D / 3.0D;
     /** How far a carried tab rises off the row, and how long it takes to. */
     private static final float LIFT_PIXELS = 1.0F;
@@ -283,7 +284,7 @@ final class ChatChannelTabBar {
      */
     private static final int LOCK_WIDTH = ChatLockAnimation.WIDTH;
     private static final int PLUS_WIDTH = LostTalesUiSheet.PLUS.getWidth();
-    private static final int COG_WIDTH = LostTalesUiSheet.COG.getWidth();
+    private static final int MORE_WIDTH = LostTalesUiSheet.MORE.getWidth();
     private static final int CLOSE_WIDTH = LostTalesUiSheet.CLOSE.getWidth();
     private static final int FULLSCREEN_WIDTH =
             LostTalesUiSheet.FULLSCREEN.getWidth();
@@ -436,16 +437,10 @@ final class ChatChannelTabBar {
             new LostTalesUiButtonMotion(
                     LostTalesUiButtonMotion.Character.LIFT);
     /**
-     * The cog only rises. Its artwork is unchanged by a quarter turn and
-     * has no whole-pixel form at any smaller angle, so a turn shows
-     * either nothing or a mess (see the gui-rendering skill).
+     * The three dots only rise: a turn would lay them across the row.
+     * The {@code +} only rises too, being unchanged by a quarter turn.
      */
-    /**
-     * The cog only rises. Its artwork is unchanged by a quarter turn and
-     * has no whole-pixel form at any smaller angle, so a turn shows
-     * either nothing at all or a mess; the same goes for the {@code +}.
-     */
-    private final LostTalesUiButtonMotion windowSettingsMotion =
+    private final LostTalesUiButtonMotion windowMenuMotion =
             new LostTalesUiButtonMotion(
                     LostTalesUiButtonMotion.Character.LIFT);
     private final LostTalesUiButtonMotion windowFullscreenMotion =
@@ -499,8 +494,6 @@ final class ChatChannelTabBar {
      */
     private final MotionTransition draftShown =
             new MotionTransition(MotionIds.CHAT_TAB_CONTROLS);
-    private final MotionTransition cogShown =
-            new MotionTransition(MotionIds.CHAT_TAB_CONTROLS);
     private final MotionTransition closeShown =
             new MotionTransition(MotionIds.CHAT_TAB_CONTROLS);
     /**
@@ -517,10 +510,10 @@ final class ChatChannelTabBar {
     private int lockX = -1;
     private int restoreX = -1;
     /**
-     * Left edge of the window's own cog, fullscreen control and cross;
-     * -1 when absent.
+     * Left edge of the window's own menu dots, fullscreen control and
+     * cross; -1 when absent.
      */
-    private int windowSettingsX = -1;
+    private int windowMenuX = -1;
     private int windowFullscreenX = -1;
     private int windowCloseX = -1;
     /** Left edge of the hairline between the last tab and the +. */
@@ -535,13 +528,13 @@ final class ChatChannelTabBar {
     private float alphaScale = 1.0F;
 
     /**
-     * What a point in the row resolves to. {@code SETTINGS},
-     * {@code CLOSE} and {@code DRAFT} carry a tab and act on it;
-     * {@code WINDOW_SETTINGS}, {@code WINDOW_FULLSCREEN} and
-     * {@code WINDOW_CLOSE} carry none and act on the window.
+     * What a point in the row resolves to. {@code CLOSE} and
+     * {@code DRAFT} carry a tab and act on it; {@code WINDOW_MENU},
+     * {@code WINDOW_FULLSCREEN} and {@code WINDOW_CLOSE} carry none and
+     * act on the window.
      */
     enum HitKind {
-        TAB, CLOSE, SETTINGS, DRAFT, SEARCH, LOCK, RESTORE, WINDOW_SETTINGS,
+        TAB, CLOSE, DRAFT, SEARCH, LOCK, RESTORE, WINDOW_MENU,
         WINDOW_FULLSCREEN, WINDOW_CLOSE, GRIP
     }
 
@@ -607,8 +600,8 @@ final class ChatChannelTabBar {
         /** Whether a close cross is offered on the selected tab. */
         boolean closable;
         /**
-         * Whether the window's own cog, fullscreen control and cross are
-         * offered. A locked window keeps the tabs and the size it has, so
+         * Whether the window's own three dots, fullscreen control and
+         * cross are offered. A locked window keeps the tabs and the size it has, so
          * it offers none of them; its padlock is what unlocks it again.
          */
         boolean windowControls;
@@ -746,8 +739,8 @@ final class ChatChannelTabBar {
      * What lies under a GUI-space point: a tab, one of the selected tab's
      * controls, an end control, the grip, or nothing. Every control
      * answers on its own box and nowhere else — the search button on its
-     * frame, an end control on its square, a tab's cog and cross on
-     * their squares — and each box is read from the same numbers the
+     * frame, an end control on its square, a tab's cross and draft mark
+     * on their squares — and each box is read from the same numbers the
      * control is drawn with, so where a control lights and where it
      * answers cannot differ.
      */
@@ -772,10 +765,6 @@ final class ChatChannelTabBar {
                     .contains(localX, localY)) {
                 return new Hit(HitKind.CLOSE, tab.tab);
             }
-            if (tab.settingsX >= 0 && tabControlBox(tab.settingsX, tabTop)
-                    .contains(localX, localY)) {
-                return new Hit(HitKind.SETTINGS, tab.tab);
-            }
             if (tab.draftX >= 0 && draftBox(tab.draftX, tabTop)
                     .contains(localX, localY)) {
                 return new Hit(HitKind.DRAFT, tab.tab);
@@ -795,10 +784,10 @@ final class ChatChannelTabBar {
                 .contains(localX, localY)) {
             return new Hit(HitKind.RESTORE, null);
         }
-        if (this.windowSettingsX >= 0 && endControlBox(this.windowSettingsX,
-                COG_WIDTH, LostTalesUiSheet.COG.getHeight(), bottom)
+        if (this.windowMenuX >= 0 && endControlBox(this.windowMenuX,
+                MORE_WIDTH, LostTalesUiSheet.MORE.getHeight(), bottom)
                 .contains(localX, localY)) {
-            return new Hit(HitKind.WINDOW_SETTINGS, null);
+            return new Hit(HitKind.WINDOW_MENU, null);
         }
         if (this.windowFullscreenX >= 0 && endControlBox(
                 this.windowFullscreenX, FULLSCREEN_WIDTH,
@@ -915,7 +904,7 @@ final class ChatChannelTabBar {
         // Hit testing answers for the places the tabs will settle in,
         // not the places they are drawn while one of them is under the
         // hand. Asking it during a drag lights whichever tab's resting
-        // slot the pointer happens to be crossing — a cog or a cross on
+        // slot the pointer happens to be crossing — a cross or a draft on
         // a tab the hand is only passing over — so the row simply
         // answers nothing until the tab is put down. Nor while the
         // window's edge is under the hand: the row's band and the top
@@ -1055,7 +1044,7 @@ final class ChatChannelTabBar {
             drawSearch(searchLeft, searchTop, row.searchOpen,
                     hovered != null && hovered.kind == HitKind.SEARCH);
             // The window's own controls, in the order a title bar
-            // reads: the lock (drawn above), a hairline, its settings,
+            // reads: the lock (drawn above), a hairline, its menu,
             // fullscreen and close, another hairline, then the grip —
             // all hanging from the edge as it really stands, like the
             // grip.
@@ -1065,11 +1054,12 @@ final class ChatChannelTabBar {
                 if (this.firstDividerX >= 0) {
                     drawDivider(row.offsetX + this.firstDividerX, bottom);
                 }
-                if (this.windowSettingsX >= 0) {
-                    drawEndControl(LostTalesUiSheet.COG, LostTalesUiSheet.COG_HOVER,
-                            step(this.windowSettingsMotion, hovered,
-                                    HitKind.WINDOW_SETTINGS),
-                            row.offsetX + this.windowSettingsX, bottom);
+                if (this.windowMenuX >= 0) {
+                    drawEndControl(LostTalesUiSheet.MORE,
+                            LostTalesUiSheet.MORE_HOVER,
+                            step(this.windowMenuMotion, hovered,
+                                    HitKind.WINDOW_MENU),
+                            row.offsetX + this.windowMenuX, bottom);
                 }
                 if (this.windowFullscreenX >= 0) {
                     drawFullscreenControl(row.fullscreenShare,
@@ -1412,11 +1402,10 @@ final class ChatChannelTabBar {
             // coming takes its room first and shows after, so the name
             // never runs under a button.
             float closeFade = closeShare(row, selected);
-            float cogFade = this.cogShown.clamped();
             float draftFade = tab.draft ? this.draftShown.clamped() : 0.0F;
             TabRoom room = roomFor(laidWidth, iconWidth(tab.tab),
                     tab.labelWidth, drawnDraftWidth(tab, roomPhase(draftFade)),
-                    roomPhase(closeFade), roomPhase(cogFade));
+                    roomPhase(closeFade));
             // A name the row has cut short is read whole by resting the
             // pointer on it: the marquee runs on the clock while the tab
             // is hovered and glides home once it is not, so a pointer
@@ -1447,9 +1436,8 @@ final class ChatChannelTabBar {
                 drawTabContents(font, tab, hovered, left, right,
                         top + INTERIOR_TOP, room, inkPhase(draftFade),
                         labelRgb, textAlpha);
-                drawTabControls(tab, hovered, room, inkPhase(closeFade),
-                        inkPhase(cogFade), left, top + INTERIOR_TOP,
-                        textAlpha);
+                drawTabClose(tab, hovered, room, inkPhase(closeFade), left,
+                        top + INTERIOR_TOP, textAlpha);
             } finally {
                 LostTalesChatOverlayRenderer.endVerticalClip(clipped);
             }
@@ -1725,34 +1713,24 @@ final class ChatChannelTabBar {
     }
 
     /**
-     * The tab's own cog and cross, as far as the row shows them: each
-     * fades where it stands as the row's width crosses its share. Their
-     * hit squares are centred in the interior like the caps, and each
-     * sprite is centred in its square in turn. They hang from the tab's
-     * drawn right end, laid on display pixels, so a tab still gliding to
-     * another width carries them with its edge by exactly the fraction
-     * it moves.
+     * The tab's own cross, as far as the row shows it: it fades where it
+     * stands as the row's width crosses its share. Its hit square is
+     * centred in the interior like the caps, and the sprite is centred in
+     * its square in turn. It hangs from the tab's drawn right end, laid on
+     * display pixels, so a tab still gliding to another width carries it
+     * with its edge by exactly the fraction it moves.
      */
-    private void drawTabControls(Tab tab, Hit hovered, TabRoom room,
-                                 float closeShare, float cogShare, float left,
-                                 int interiorTop, int controlAlpha) {
-        int controlTop = centredInInterior(interiorTop, CONTROL_SIZE);
-        double step = displayStep();
+    private void drawTabClose(Tab tab, Hit hovered, TabRoom room,
+                              float closeShare, float left, int interiorTop,
+                              int controlAlpha) {
         int closeAlpha = Math.round(controlAlpha * closeShare);
-        if (closeAlpha >= LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
-            drawTabControl(LostTalesUiSheet.CLOSE,
-                    LostTalesUiSheet.CLOSE_HOVER,
-                    step(tab.closeMotion, hovered, tab, HitKind.CLOSE),
-                    (float)snappedLeft(left + room.closeLeft, step),
-                    controlTop, closeAlpha);
+        if (closeAlpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+            return;
         }
-        int cogAlpha = Math.round(controlAlpha * cogShare);
-        if (cogAlpha >= LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
-            drawTabControl(LostTalesUiSheet.COG, LostTalesUiSheet.COG_HOVER,
-                    step(tab.cogMotion, hovered, tab, HitKind.SETTINGS),
-                    (float)snappedLeft(left + room.cogLeft, step),
-                    controlTop, cogAlpha);
-        }
+        drawTabControl(LostTalesUiSheet.CLOSE, LostTalesUiSheet.CLOSE_HOVER,
+                step(tab.closeMotion, hovered, tab, HitKind.CLOSE),
+                (float)snappedLeft(left + room.closeLeft, displayStep()),
+                centredInInterior(interiorTop, CONTROL_SIZE), closeAlpha);
     }
 
     /** How tall a tab's border pieces stand: the selected pair reaches the rule. */
@@ -2355,7 +2333,6 @@ final class ChatChannelTabBar {
      */
     private void advanceButtons(long now) {
         this.draftShown.advance(now, draftStands(this.sharedDrawn));
-        this.cogShown.advance(now, cogStands(this.sharedDrawn));
         this.closeShown.advance(now, closeStands(this.sharedDrawn));
     }
 
@@ -2376,11 +2353,6 @@ final class ChatChannelTabBar {
     /** Whether every tab of a row this wide shows its draft mark. */
     static boolean draftStands(double width) {
         return width >= DEFAULT_TAB_WIDTH * DRAFT_SHARE - 1.0E-6D;
-    }
-
-    /** Whether every tab of a row this wide shows its cog. */
-    static boolean cogStands(double width) {
-        return width >= DEFAULT_TAB_WIDTH * COG_SHARE - 1.0E-6D;
     }
 
     /**
@@ -2937,7 +2909,7 @@ final class ChatChannelTabBar {
     }
 
     /**
-     * A tab's cog or cross: its {@link #CONTROL_SIZE} square, centred in
+     * A tab's cross: its {@link #CONTROL_SIZE} square, centred in
      * the interior of a tab whose rows start at {@code tabTop}, as it is
      * drawn.
      */
@@ -2982,7 +2954,7 @@ final class ChatChannelTabBar {
 
     /**
      * One of the row's end controls — the restore {@code +}, the
-     * window's cog, the window's cross — drawn where it was laid out
+     * window's three dots, the window's cross — drawn where it was laid out
      * and centred in the strip, the way the lock beside them is.
      */
     private void drawEndControl(LostTalesUiSheet resting, LostTalesUiSheet hovered,
@@ -2995,8 +2967,8 @@ final class ChatChannelTabBar {
     }
 
     /**
-     * The window's fullscreen control, centred in the strip like the cog
-     * and the cross beside it: four corners pointing out while the
+     * The window's fullscreen control, centred in the strip like the
+     * three dots and the cross beside it: four corners pointing out while the
      * window keeps its own size, pointing in while it fills the screen.
      * The two glyphs cross over exactly as far as the window has
      * travelled between its two boxes, so the control turns with the
@@ -3116,7 +3088,7 @@ final class ChatChannelTabBar {
             this.cachedTabs = Collections.emptyList();
             this.lockX = -1;
             this.restoreX = -1;
-            this.windowSettingsX = -1;
+            this.windowMenuX = -1;
             this.windowFullscreenX = -1;
             this.windowCloseX = -1;
             this.tabDividerX = -1;
@@ -3222,20 +3194,16 @@ final class ChatChannelTabBar {
             // cross always.
             float closeShare = !showClose ? 0.0F
                     : selected || closeStands(width) ? 1.0F : 0.0F;
-            float cogShare = cogStands(width) ? 1.0F : 0.0F;
             boolean draftShown = draft && draftStands(width);
             TabRoom settled = roomFor(tabWidth, iconWidth(channel), labelWidth,
-                    draftShown ? COUNTER_GAP + DRAFT_WIDTH : 0, closeShare,
-                    cogShare);
+                    draftShown ? COUNTER_GAP + DRAFT_WIDTH : 0, closeShare);
             int closeX = closeShare > 0.0F
                     ? x + (int)Math.floor(settled.closeLeft) : -1;
-            int settingsX = cogShare > 0.0F
-                    ? x + (int)Math.floor(settled.cogLeft) : -1;
             int draftX = draftShown ? draftLeft(x, icon != null,
                     (int)Math.floor(settled.labelRoom)) : -1;
             Tab built = new Tab(channel, index, icon, label, labelWidth,
                     (int)Math.floor(settled.labelRoom), draft, x, tabWidth,
-                    settingsX, closeX, draftX,
+                    closeX, draftX,
                     isTrue(this.cachedMuted.get(channel)));
             built.toLeft = cursor - row.left;
             built.exactWidth = width;
@@ -3333,8 +3301,8 @@ final class ChatChannelTabBar {
         this.firstDividerX = controlX;
         controlX += DIVIDER_WIDTH + END_CONTROL_GAP;
         if (row.windowControls) {
-            this.windowSettingsX = controlX;
-            controlX += COG_WIDTH + END_CONTROL_GAP;
+            this.windowMenuX = controlX;
+            controlX += MORE_WIDTH + END_CONTROL_GAP;
             this.windowFullscreenX = controlX;
             controlX += FULLSCREEN_WIDTH + END_CONTROL_GAP;
             this.windowCloseX = controlX;
@@ -3345,7 +3313,7 @@ final class ChatChannelTabBar {
             // A locked window keeps its tabs, its size and its place, so
             // it offers none of its controls; its lock alone divides off
             // the grip.
-            this.windowSettingsX = -1;
+            this.windowMenuX = -1;
             this.windowFullscreenX = -1;
             this.windowCloseX = -1;
             this.secondDividerX = -1;
@@ -3391,50 +3359,42 @@ final class ChatChannelTabBar {
 
     /**
      * Where the parts of a tab stand as it is drawn, measured from its
-     * left edge: its cross against the right padding, its cog before the
-     * cross, the edge everything before the buttons is cut at, and how
-     * much of the name shows.
+     * left edge: its cross against the right padding, the edge everything
+     * before the cross is cut at, and how much of the name shows.
      */
     static final class TabRoom {
         /** The cross's left edge, whether or not the cross stands. */
         final double closeLeft;
-        /** The cog's left edge: before the cross as far as the cross stands. */
-        final double cogLeft;
-        /** Where the icon, the name and the counters are cut. */
+        /** Where the icon, the name and the draft mark are cut. */
         final double contentRight;
         /** The name's room, never past the name itself. */
         final double labelRoom;
 
-        TabRoom(double closeLeft, double cogLeft, double contentRight,
-                double labelRoom) {
+        TabRoom(double closeLeft, double contentRight, double labelRoom) {
             this.closeLeft = closeLeft;
-            this.cogLeft = cogLeft;
             this.contentRight = contentRight;
             this.labelRoom = labelRoom;
         }
     }
 
     /**
-     * What a tab {@code width} wide holds: its buttons, shown as far as
-     * {@code closeShare} and {@code cogShare} say — each a share from
-     * nothing to whole as it fades — and before them, cut where they
-     * begin, its padding, its icon ({@code iconWidth} with its gap, 0 for
-     * none), its name and its draft mark ({@code draftWidth} as shown).
-     * A button fading hands its room to the name as it goes, so the name
-     * glides into it. Fractions are kept: the name's cut and everything
-     * after it move with the tab's edge by the fraction the edge moves.
+     * What a tab {@code width} wide holds: its cross, shown as far as
+     * {@code closeShare} says — a share from nothing to whole as it
+     * fades — and before it, cut where it begins, its padding, its icon
+     * ({@code iconWidth} with its gap, 0 for none), its name and its
+     * draft mark ({@code draftWidth} as shown). A cross fading hands its
+     * room to the name as it goes, so the name glides into it. Fractions
+     * are kept: the name's cut and everything after it move with the
+     * tab's edge by the fraction the edge moves.
      */
     static TabRoom roomFor(double width, int iconWidth, int labelWidth,
-                           double draftWidth, float closeShare,
-                           float cogShare) {
-        double control = CONTROL_GAP + CONTROL_SIZE;
+                           double draftWidth, float closeShare) {
         double closeLeft = width - PADDING_X - CONTROL_SIZE;
-        double cogLeft = closeLeft - control * closeShare;
         double contentRight = width - PADDING_X
-                - control * (closeShare + cogShare);
+                - (CONTROL_GAP + CONTROL_SIZE) * closeShare;
         double labelRoom = Math.max(0.0D, Math.min(labelWidth,
                 contentRight - PADDING_X - iconWidth - draftWidth));
-        return new TabRoom(closeLeft, cogLeft, contentRight, labelRoom);
+        return new TabRoom(closeLeft, contentRight, labelRoom);
     }
 
     /**
@@ -3451,7 +3411,7 @@ final class ChatChannelTabBar {
 
     /**
      * What the draft mark answers on: a {@link #CONTROL_SIZE} square
-     * centred in the interior like the cog and the cross, round the
+     * centred in the interior like the cross, round the
      * mark's own four columns — a small glyph is a small thing to hit.
      */
     static LostTalesUiHitBox draftBox(int draftX, int tabTop) {
@@ -3502,20 +3462,19 @@ final class ChatChannelTabBar {
     }
 
     private static int controlsWidth(boolean showClose) {
-        return CONTROL_GAP + CONTROL_SIZE
-                + (showClose ? CONTROL_GAP + CONTROL_SIZE : 0);
+        return showClose ? CONTROL_GAP + CONTROL_SIZE : 0;
     }
 
     /**
      * Room the window's own controls take at the row's right end: its
      * lock and the hairline after it always, and on an unlocked window
-     * its settings cog, its close cross and a second hairline before
-     * the grip. Each is followed by its own gap.
+     * its menu dots, its fullscreen control, its close cross and a second
+     * hairline before the grip. Each is followed by its own gap.
      */
     private static int windowControlsWidth(boolean unlocked) {
         return LOCK_WIDTH + END_CONTROL_GAP
                 + DIVIDER_WIDTH + END_CONTROL_GAP
-                + (unlocked ? COG_WIDTH + END_CONTROL_GAP
+                + (unlocked ? MORE_WIDTH + END_CONTROL_GAP
                         + FULLSCREEN_WIDTH + END_CONTROL_GAP + CLOSE_WIDTH
                         + END_CONTROL_GAP + DIVIDER_WIDTH + END_CONTROL_GAP
                         : 0);
@@ -3578,7 +3537,7 @@ final class ChatChannelTabBar {
 
     /**
      * A tab's width with nothing given up: its padding, icon, whole
-     * name, draft mark and both controls. What every tab shows while the
+     * name, draft mark and cross. What every tab shows while the
      * row has room, up to the default width.
      */
     private static int naturalWidth(FontRenderer font, ChatTab tab) {
@@ -3670,7 +3629,8 @@ final class ChatChannelTabBar {
      * is not the tab being typed in, whose draft is in the field.
      */
     private static boolean hasDraft(ChatTab tab) {
-        return !tab.equals(ClientChatChannelState.getSelected())
+        return !tab.isPage()
+                && !tab.equals(ClientChatChannelState.getSelected())
                 && ClientChatChannelState.getDraft(tab).length() > 0;
     }
 
@@ -3791,14 +3751,7 @@ final class ChatChannelTabBar {
         /** How far the tab and its controls have crossed to their lit
          *  artwork; carried on when the row is laid out again. */
         float hoverFade;
-        /**
-         * The tab's own two buttons, each keeping its own beat: the cog
-         * rises, the cross answers like a switch, exactly as their
-         * larger counterparts on the strip do.
-         */
-        LostTalesUiButtonMotion cogMotion =
-                new LostTalesUiButtonMotion(
-                        LostTalesUiButtonMotion.Character.LIFT);
+        /** The tab's cross answers like a switch, as the window's does. */
         LostTalesUiButtonMotion closeMotion =
                 new LostTalesUiButtonMotion(
                         LostTalesUiButtonMotion.Character.SNAP);
@@ -3807,8 +3760,6 @@ final class ChatChannelTabBar {
                 new LostTalesUiButtonMotion(
                         LostTalesUiButtonMotion.Character.LIFT);
         final int width;
-        /** Resting left edge of the cog once settled, or -1 when the tab shows none. */
-        final int settingsX;
         /** Resting left edge of the close cross once settled, or -1. */
         final int closeX;
         /** Resting left edge of the draft mark once settled, or -1. */
@@ -3818,7 +3769,7 @@ final class ChatChannelTabBar {
 
         Tab(ChatTab tab, int rowIndex, ChatEmoji icon, String label,
             int labelWidth, int labelRoom, boolean draft, int x, int width,
-            int settingsX, int closeX, int draftX, boolean muted) {
+            int closeX, int draftX, boolean muted) {
             this.tab = tab;
             this.rowIndex = rowIndex;
             this.icon = icon;
@@ -3829,7 +3780,6 @@ final class ChatChannelTabBar {
             this.x = x;
             this.width = width;
             this.exactWidth = width;
-            this.settingsX = settingsX;
             this.closeX = closeX;
             this.draftX = draftX;
             this.muted = muted;
@@ -3852,7 +3802,6 @@ final class ChatChannelTabBar {
             this.lift = was.lift;
             this.glow = was.glow;
             this.hoverFade = was.hoverFade;
-            this.cogMotion = was.cogMotion;
             this.closeMotion = was.closeMotion;
             this.draftMotion = was.draftMotion;
             this.hoverSeconds = was.hoverSeconds;

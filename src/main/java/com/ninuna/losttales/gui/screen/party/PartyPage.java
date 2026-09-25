@@ -1,12 +1,14 @@
 package com.ninuna.losttales.gui.screen.party;
 
-import com.ninuna.losttales.client.gui.LostTalesGuiPointerTargets;
-import com.ninuna.losttales.client.gui.LostTalesPointerInteractable;
+import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.client.chat.ChatPageContent;
+import com.ninuna.losttales.client.chat.ChatPageSearch;
 import com.ninuna.losttales.client.party.ClientPartyDisplayNames;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.client.party.ClientPartyTrackingCache;
 import com.ninuna.losttales.client.party.PartyClientRequestManager;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.party.model.PartyColor;
 import com.ninuna.losttales.party.server.PartyErrorId;
 import com.ninuna.losttales.party.sync.PartyInvitationSnapshot;
@@ -19,23 +21,31 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiButton;
-import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.resources.I18n;
 import org.lwjgl.input.Keyboard;
-import org.lwjgl.input.Mouse;
+import org.lwjgl.opengl.GL11;
 
 /**
- * Client-only profile-integrated party management screen.
- *
- * The screen renders only synchronized snapshots and never mutates local party
- * state optimistically. Every action is revalidated by the server.
+ * The party, a page a chat window holds: its members, the invitations and
+ * the players who can be invited, each a list with what can be done about
+ * the one chosen. The window's search narrows every list to the names
+ * that hold its words. It draws only synchronized snapshots and never
+ * changes the party on its own; every action is checked again by the
+ * server. An action that cannot be undone asks first, inside the page.
  */
-public final class LostTalesPartyManagementGui extends GuiScreen
-        implements LostTalesPointerInteractable {
+public final class PartyPage extends ChatPageContent {
+    /** The code name the page is registered and remembered under. */
+    public static final String PAGE_ID = "party";
 
-    private static final int BUTTON_BACK = 1;
     private static final int BUTTON_REFRESH = 2;
+    private static final int BUTTON_CONFIRM = 40;
+    private static final int BUTTON_CANCEL = 41;
+    /** Where the tab buttons stand below the page's top. */
+    private static final int TABS_TOP = 4;
     private static final int BUTTON_TAB_MEMBERS = 10;
     private static final int BUTTON_TAB_INVITATIONS = 11;
     private static final int BUTTON_TAB_INVITE = 12;
@@ -54,7 +64,19 @@ public final class LostTalesPartyManagementGui extends GuiScreen
         INVITE
     }
 
-    private final GuiScreen parent;
+    private final Minecraft mc = Minecraft.getMinecraft();
+    private final Gui gui = new Gui();
+    private final List<GuiButton> buttonList = new ArrayList<GuiButton>();
+    private FontRenderer fontRendererObj;
+    /** The page's size as it was last laid out; -1 before the first. */
+    private int width = -1;
+    private int height = -1;
+    /** An action waiting on the player's answer; null while none asks. */
+    private Runnable confirming;
+    private String confirmTitle = "";
+    private String confirmDetail = "";
+    private GuiButton confirmButton;
+    private GuiButton cancelButton;
 
     private Tab tab = Tab.MEMBERS;
     private int pendingRequestId;
@@ -71,6 +93,8 @@ public final class LostTalesPartyManagementGui extends GuiScreen
     private int membersScroll;
     private int invitationsScroll;
     private int inviteTargetsScroll;
+    /** The words in the window's well; empty while its search is closed. */
+    private String query = "";
 
     private int panelX;
     private int panelY;
@@ -95,12 +119,15 @@ public final class LostTalesPartyManagementGui extends GuiScreen
     private GuiButton actionFourButton;
     private final GuiButton[] colorButtons = new GuiButton[PartyColor.values().length];
 
-    public LostTalesPartyManagementGui(GuiScreen parent) {
-        this.parent = parent;
-    }
-
-    @Override
-    public void initGui() {
+    /**
+     * Lays the page out for a box {@code width} by {@code height}: the tab
+     * buttons along its top, the list and what is chosen in it in one
+     * panel, the actions along its foot. Laid out again whenever the box
+     * changes size.
+     */
+    private void layOutPage(int width, int height) {
+        this.width = width;
+        this.height = height;
         this.buttonList.clear();
         calculateLayout();
 
@@ -108,30 +135,28 @@ public final class LostTalesPartyManagementGui extends GuiScreen
         int tabsTotal = tabWidth * 3;
         int tabsX = this.width / 2 - tabsTotal / 2;
         this.membersTabButton = new GuiButton(BUTTON_TAB_MEMBERS,
-                tabsX, 34, tabWidth, 20,
+                tabsX, TABS_TOP, tabWidth, 20,
                 I18n.format("gui.losttales.party.tab.members"));
         this.invitationsTabButton = new GuiButton(BUTTON_TAB_INVITATIONS,
-                tabsX + tabWidth, 34, tabWidth, 20,
+                tabsX + tabWidth, TABS_TOP, tabWidth, 20,
                 I18n.format("gui.losttales.party.tab.invitations"));
         this.inviteTabButton = new GuiButton(BUTTON_TAB_INVITE,
-                tabsX + tabWidth * 2, 34, tabWidth, 20,
+                tabsX + tabWidth * 2, TABS_TOP, tabWidth, 20,
                 I18n.format("gui.losttales.party.tab.invite"));
         this.buttonList.add(this.membersTabButton);
         this.buttonList.add(this.invitationsTabButton);
         this.buttonList.add(this.inviteTabButton);
 
         int gap = 6;
-        int footerWidth = Math.max(52, (this.width - 16 - gap * 3) / 4);
+        int footerWidth = Math.max(52, (this.width - 16 - gap * 2) / 3);
         int footerY = this.height - 28;
-        this.buttonList.add(new GuiButton(BUTTON_BACK, 8, footerY,
-                footerWidth, 20, I18n.format("gui.back")));
         this.refreshButton = new GuiButton(BUTTON_REFRESH,
-                8 + footerWidth + gap, footerY, footerWidth, 20,
+                8, footerY, footerWidth, 20,
                 I18n.format("gui.losttales.party.refresh"));
         this.buttonList.add(this.refreshButton);
 
-        int actionThreeX = 8 + (footerWidth + gap) * 2;
-        int actionFourX = 8 + (footerWidth + gap) * 3;
+        int actionThreeX = 8 + footerWidth + gap;
+        int actionFourX = 8 + (footerWidth + gap) * 2;
         this.actionThreeButton = new GuiButton(BUTTON_ACTION_THREE,
                 actionThreeX, footerY, footerWidth, 20, "");
         this.actionFourButton = new GuiButton(BUTTON_ACTION_FOUR,
@@ -161,6 +186,14 @@ public final class LostTalesPartyManagementGui extends GuiScreen
             this.buttonList.add(button);
         }
 
+        int confirmY = this.panelY + this.panelHeight / 2 + 12;
+        this.confirmButton = new GuiButton(BUTTON_CONFIRM,
+                this.width / 2 - 102, confirmY, 100, 20,
+                I18n.format("gui.losttales.party.confirm"));
+        this.cancelButton = new GuiButton(BUTTON_CANCEL,
+                this.width / 2 + 2, confirmY, 100, 20,
+                I18n.format("gui.cancel"));
+
         if (!this.initialRequestSent && this.pendingRequestId == 0) {
             this.initialRequestSent = true;
             beginRequest(PartyClientRequestManager.requestState(), false);
@@ -172,7 +205,7 @@ public final class LostTalesPartyManagementGui extends GuiScreen
     private void calculateLayout() {
         this.panelWidth = Math.min(680, Math.max(280, this.width - 20));
         this.panelX = (this.width - this.panelWidth) / 2;
-        this.panelY = 58;
+        this.panelY = TABS_TOP + 24;
         int panelBottom = Math.max(this.panelY + 90, this.height - 72);
         this.panelHeight = panelBottom - this.panelY;
 
@@ -193,7 +226,10 @@ public final class LostTalesPartyManagementGui extends GuiScreen
     }
 
     @Override
-    public void updateScreen() {
+    public void tick() {
+        if (this.width < 0) {
+            return;
+        }
         handlePendingOperation();
         synchronizeSelection();
         updateButtons();
@@ -399,10 +435,13 @@ public final class LostTalesPartyManagementGui extends GuiScreen
         button.displayString = label == null ? "" : label;
     }
 
-    @Override
-    protected void actionPerformed(GuiButton button) {
-        if (button.id == BUTTON_BACK) {
-            this.mc.displayGuiScreen(this.parent);
+    private void actionPerformed(GuiButton button) {
+        if (button.id == BUTTON_CONFIRM || button.id == BUTTON_CANCEL) {
+            Runnable action = this.confirming;
+            this.confirming = null;
+            if (button.id == BUTTON_CONFIRM && action != null) {
+                action.run();
+            }
             return;
         }
         if (button.id == BUTTON_REFRESH) {
@@ -578,9 +617,11 @@ public final class LostTalesPartyManagementGui extends GuiScreen
         }
     }
 
+    /** Asks before {@code action}, inside the page: nothing else answers until the player does. */
     private void confirm(String title, String detail, Runnable action) {
-        this.mc.displayGuiScreen(new LostTalesPartyConfirmationGui(
-                this, title, detail, action));
+        this.confirmTitle = title == null ? "" : title;
+        this.confirmDetail = detail == null ? "" : detail;
+        this.confirming = action;
     }
 
     private void leaveParty(UUID expectedActiveCharacterId,
@@ -649,12 +690,61 @@ public final class LostTalesPartyManagementGui extends GuiScreen
     }
 
     @Override
-    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
-        LostTalesSkyrimUiStyle.drawScreenShade(this.width, this.height);
-        LostTalesSkyrimUiStyle.drawCenteredHeader(this.fontRendererObj,
-                I18n.format("gui.losttales.party.title"),
-                I18n.format("gui.losttales.party.server_authoritative"),
-                this.width, 10);
+    public void draw(Minecraft minecraft, LostTalesUiHitBox box, double clipX,
+                     double clipY, double pointerX, double pointerY,
+                     float partialTicks, int alpha) {
+        this.fontRendererObj = minecraft.fontRenderer;
+        int boxWidth = (int)Math.floor(box.width);
+        int boxHeight = (int)Math.floor(box.height);
+        if (boxWidth != this.width || boxHeight != this.height) {
+            layOutPage(boxWidth, boxHeight);
+        }
+        int mouseX = pageX(box, pointerX);
+        int mouseY = pageY(box, pointerY);
+        GL11.glPushMatrix();
+        try {
+            GL11.glTranslatef((float)box.left, (float)box.top, 0.0F);
+            drawPage(this.confirming == null ? mouseX : Integer.MIN_VALUE / 2,
+                    this.confirming == null ? mouseY : Integer.MIN_VALUE / 2);
+            if (this.confirming != null) {
+                drawConfirmation(mouseX, mouseY);
+            }
+        } finally {
+            GL11.glPopMatrix();
+        }
+    }
+
+    /** A screen x in the page's own space; far off for a pointer away. */
+    private static int pageX(LostTalesUiHitBox box, double x) {
+        return Double.isNaN(x) ? Integer.MIN_VALUE / 2
+                : (int)Math.floor(x - box.left);
+    }
+
+    private static int pageY(LostTalesUiHitBox box, double y) {
+        return Double.isNaN(y) ? Integer.MIN_VALUE / 2
+                : (int)Math.floor(y - box.top);
+    }
+
+    /** The question an action waits on, over the panel, with its two answers. */
+    private void drawConfirmation(int mouseX, int mouseY) {
+        int panelWidth = Math.min(420, this.panelWidth - 20);
+        int panelHeight = 84;
+        int x = (this.width - panelWidth) / 2;
+        int y = this.panelY + this.panelHeight / 2 - 44;
+        LostTalesSkyrimUiStyle.drawPanel(x, y, panelWidth, panelHeight);
+        this.gui.drawCenteredString(this.fontRendererObj,
+                LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj,
+                        this.confirmTitle, panelWidth - 24),
+                this.width / 2, y + 12, LostTalesSkyrimUiStyle.TEXT_BRIGHT);
+        this.gui.drawCenteredString(this.fontRendererObj,
+                LostTalesSkyrimUiStyle.trimToWidth(this.fontRendererObj,
+                        this.confirmDetail, panelWidth - 24),
+                this.width / 2, y + 30, LostTalesSkyrimUiStyle.TEXT_MUTED);
+        this.confirmButton.drawButton(this.mc, mouseX, mouseY);
+        this.cancelButton.drawButton(this.mc, mouseX, mouseY);
+    }
+
+    private void drawPage(int mouseX, int mouseY) {
         LostTalesSkyrimUiStyle.drawPanel(
                 this.panelX, this.panelY, this.panelWidth, this.panelHeight);
 
@@ -678,7 +768,7 @@ public final class LostTalesPartyManagementGui extends GuiScreen
         }
 
         if (this.statusMessage.length() > 0) {
-            drawCenteredString(this.fontRendererObj,
+            this.gui.drawCenteredString(this.fontRendererObj,
                     LostTalesSkyrimUiStyle.trimToWidth(
                             this.fontRendererObj, this.statusMessage,
                             this.width - 24),
@@ -688,7 +778,9 @@ public final class LostTalesPartyManagementGui extends GuiScreen
                             ? LostTalesSkyrimUiStyle.RED
                             : LostTalesSkyrimUiStyle.GREEN);
         }
-        super.drawScreen(mouseX, mouseY, partialTicks);
+        for (GuiButton button : this.buttonList) {
+            button.drawButton(this.mc, mouseX, mouseY);
+        }
     }
 
     private void drawUnavailable(String message) {
@@ -723,7 +815,10 @@ public final class LostTalesPartyManagementGui extends GuiScreen
             return;
         }
 
-        List<PartyMemberSnapshot> members = party.getMembers();
+        List<PartyMemberSnapshot> members = shownMembers(party);
+        if (members.isEmpty()) {
+            drawNoneFound();
+        }
         int visibleRows = getVisibleRowCount();
         int hoveredIndex = rowAt(snapshot, mouseX, mouseY);
         for (int visible = 0; visible < visibleRows; visible++) {
@@ -802,15 +897,19 @@ public final class LostTalesPartyManagementGui extends GuiScreen
                     LostTalesSkyrimUiStyle.TEXT_MUTED, 5);
             return;
         }
+        List<InvitationEntry> shown = shownInvitations(snapshot);
+        if (shown.isEmpty()) {
+            drawNoneFound();
+        }
         int visibleRows = getVisibleRowCount();
         int hoveredIndex = rowAt(snapshot, mouseX, mouseY);
         long now = System.currentTimeMillis();
         for (int visible = 0; visible < visibleRows; visible++) {
             int index = this.invitationsScroll + visible;
-            if (index >= entries.size()) {
+            if (index >= shown.size()) {
                 break;
             }
-            InvitationEntry entry = entries.get(index);
+            InvitationEntry entry = shown.get(index);
             PartyInvitationSnapshot invitation = entry.invitation;
             int rowY = this.listY + visible * ROW_HEIGHT;
             boolean selected = invitation.getInvitationId().equals(
@@ -906,14 +1005,18 @@ public final class LostTalesPartyManagementGui extends GuiScreen
                     LostTalesSkyrimUiStyle.TEXT_MUTED, 5);
             return;
         }
+        List<PartyInviteTargetSnapshot> shown = shownInviteTargets(snapshot);
+        if (shown.isEmpty()) {
+            drawNoneFound();
+        }
         int visibleRows = getVisibleRowCount();
         int hoveredIndex = rowAt(snapshot, mouseX, mouseY);
         for (int visible = 0; visible < visibleRows; visible++) {
             int index = this.inviteTargetsScroll + visible;
-            if (index >= targets.size()) {
+            if (index >= shown.size()) {
                 break;
             }
-            PartyInviteTargetSnapshot target = targets.get(index);
+            PartyInviteTargetSnapshot target = shown.get(index);
             int rowY = this.listY + visible * ROW_HEIGHT;
             boolean selected = target.getOwnerId().equals(
                     this.selectedInviteOwnerId);
@@ -955,6 +1058,13 @@ public final class LostTalesPartyManagementGui extends GuiScreen
         }
     }
 
+    /** Said in a list the search has left empty. */
+    private void drawNoneFound() {
+        drawWrapped(I18n.format("gui.losttales.party.search.none"),
+                this.listX, this.listY + 8, this.listWidth,
+                LostTalesSkyrimUiStyle.TEXT_MUTED, 5);
+    }
+
     private int drawDetailLine(String label, String value, int y) {
         String safeLabel = label == null ? "" : label;
         String safeValue = value == null ? "" : value;
@@ -986,7 +1096,20 @@ public final class LostTalesPartyManagementGui extends GuiScreen
     }
 
     @Override
-    protected void mouseClicked(int mouseX, int mouseY, int button) {
+    public boolean mousePressed(Minecraft minecraft, LostTalesUiHitBox box,
+                                double x, double y, int button) {
+        if (this.width < 0) {
+            return false;
+        }
+        int mouseX = pageX(box, x);
+        int mouseY = pageY(box, y);
+        if (this.confirming != null) {
+            if (button == 0) {
+                pressButton(this.confirmButton, mouseX, mouseY);
+                pressButton(this.cancelButton, mouseX, mouseY);
+            }
+            return true;
+        }
         if (button == 0 && isInside(mouseX, mouseY,
                 this.listX, this.listY, this.listWidth, this.listHeight)) {
             PartyStateSnapshot snapshot = getSnapshot();
@@ -997,9 +1120,26 @@ public final class LostTalesPartyManagementGui extends GuiScreen
                 }
                 updateButtons();
             }
-            return;
+            return true;
         }
-        super.mouseClicked(mouseX, mouseY, button);
+        if (button == 0) {
+            for (GuiButton candidate : new ArrayList<GuiButton>(this.buttonList)) {
+                if (pressButton(candidate, mouseX, mouseY)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** A button pressed where it stands: it clicks and acts; answers whether it did. */
+    private boolean pressButton(GuiButton button, int mouseX, int mouseY) {
+        if (button == null || !button.mousePressed(this.mc, mouseX, mouseY)) {
+            return false;
+        }
+        button.func_146113_a(this.mc.getSoundHandler());
+        actionPerformed(button);
+        return true;
     }
 
     /**
@@ -1010,12 +1150,33 @@ public final class LostTalesPartyManagementGui extends GuiScreen
      * pointer but take no click, so they keep the arrow.
      */
     @Override
-    public boolean isPointerOverInteractable(int x, int y) {
+    public boolean acts(LostTalesUiHitBox box, double pointerX,
+                        double pointerY) {
+        if (this.width < 0) {
+            return false;
+        }
+        int x = pageX(box, pointerX);
+        int y = pageY(box, pointerY);
+        if (this.confirming != null) {
+            return overEnabled(this.confirmButton, x, y)
+                    || overEnabled(this.cancelButton, x, y);
+        }
         if (isInside(x, y, this.listX, this.listY,
                 this.listWidth, this.listHeight)) {
             return rowAt(getSnapshot(), x, y) >= 0;
         }
-        return LostTalesGuiPointerTargets.isOverEnabledButton(this, x, y);
+        for (GuiButton button : this.buttonList) {
+            if (overEnabled(button, x, y)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean overEnabled(GuiButton button, int x, int y) {
+        return button != null && button.visible && button.enabled
+                && isInside(x, y, button.xPosition, button.yPosition,
+                        button.width, button.height);
     }
 
     /**
@@ -1049,9 +1210,9 @@ public final class LostTalesPartyManagementGui extends GuiScreen
     }
 
     /**
-     * How many entries the open tab lists. None when it shows a message in
-     * their place; the conditions are the early returns of drawMembers,
-     * drawInvitations and drawInviteTargets.
+     * How many entries the open tab lists, the search's words held. None
+     * when it shows a message in their place; the conditions are the
+     * early returns of drawMembers, drawInvitations and drawInviteTargets.
      */
     private int getShownRowCount(PartyStateSnapshot snapshot) {
         if (snapshot == null || !snapshot.isAvailable()) {
@@ -1059,38 +1220,216 @@ public final class LostTalesPartyManagementGui extends GuiScreen
         }
         PartySnapshot party = snapshot.getParty();
         if (this.tab == Tab.MEMBERS) {
-            return party == null ? 0 : party.getMembers().size();
+            return party == null ? 0 : shownMembers(party).size();
         }
         if (this.tab == Tab.INVITATIONS) {
-            return getInvitationEntries(snapshot).size();
+            return shownInvitations(snapshot).size();
         }
         if (party == null || !party.isLeader(snapshot.getActiveCharacterId())
                 || party.isFull()) {
             return 0;
         }
-        return snapshot.getInviteTargets().size();
+        return shownInviteTargets(snapshot).size();
     }
 
     /** Selects the open tab's entry at an index {@link #rowAt} returned. */
     private void selectRow(PartyStateSnapshot snapshot, int index) {
         if (this.tab == Tab.MEMBERS) {
-            this.selectedMemberCharacterId = snapshot.getParty()
-                    .getMembers().get(index).getCharacterId();
+            this.selectedMemberCharacterId = shownMembers(snapshot.getParty())
+                    .get(index).getCharacterId();
         } else if (this.tab == Tab.INVITATIONS) {
-            InvitationEntry entry = getInvitationEntries(snapshot).get(index);
+            InvitationEntry entry = shownInvitations(snapshot).get(index);
             this.selectedInvitationId = entry.invitation.getInvitationId();
             this.selectedInvitationIncoming = entry.incoming;
         } else {
-            this.selectedInviteOwnerId = snapshot.getInviteTargets()
+            this.selectedInviteOwnerId = shownInviteTargets(snapshot)
                     .get(index).getOwnerId();
         }
     }
 
+    /** Where the open tab's chosen entry stands among those shown; -1 for none. */
+    private int selectedShownIndex(PartyStateSnapshot snapshot) {
+        if (this.tab == Tab.MEMBERS) {
+            List<PartyMemberSnapshot> members = shownMembers(snapshot.getParty());
+            for (int index = 0; index < members.size(); index++) {
+                if (members.get(index).getCharacterId().equals(
+                        this.selectedMemberCharacterId)) {
+                    return index;
+                }
+            }
+        } else if (this.tab == Tab.INVITATIONS) {
+            List<InvitationEntry> entries = shownInvitations(snapshot);
+            for (int index = 0; index < entries.size(); index++) {
+                InvitationEntry entry = entries.get(index);
+                if (entry.incoming == this.selectedInvitationIncoming
+                        && entry.invitation.getInvitationId().equals(
+                                this.selectedInvitationId)) {
+                    return index;
+                }
+            }
+        } else {
+            List<PartyInviteTargetSnapshot> targets =
+                    shownInviteTargets(snapshot);
+            for (int index = 0; index < targets.size(); index++) {
+                if (targets.get(index).getOwnerId().equals(
+                        this.selectedInviteOwnerId)) {
+                    return index;
+                }
+            }
+        }
+        return -1;
+    }
+
+    /* ---- The window's search ---- */
+
+    /** The members whose names hold the search's words, in the party's order. */
+    private List<PartyMemberSnapshot> shownMembers(PartySnapshot party) {
+        if (party == null) {
+            return Collections.emptyList();
+        }
+        ChatPageSearch search = ChatPageSearch.of(this.query);
+        List<PartyMemberSnapshot> shown = new ArrayList<PartyMemberSnapshot>();
+        for (PartyMemberSnapshot member : party.getMembers()) {
+            if (search.matches(member.getCharacterName())) {
+                shown.add(member);
+            }
+        }
+        return shown;
+    }
+
+    /** The invitations whose either name holds the search's words. */
+    private List<InvitationEntry> shownInvitations(
+            PartyStateSnapshot snapshot) {
+        ChatPageSearch search = ChatPageSearch.of(this.query);
+        List<InvitationEntry> shown = new ArrayList<InvitationEntry>();
+        for (InvitationEntry entry : getInvitationEntries(snapshot)) {
+            if (search.matches(entry.invitation.getInvitingCharacterName(),
+                    entry.invitation.getTargetCharacterName())) {
+                shown.add(entry);
+            }
+        }
+        return shown;
+    }
+
+    /** The players to invite whose character or account name holds the search's words. */
+    private List<PartyInviteTargetSnapshot> shownInviteTargets(
+            PartyStateSnapshot snapshot) {
+        ChatPageSearch search = ChatPageSearch.of(this.query);
+        List<PartyInviteTargetSnapshot> shown =
+                new ArrayList<PartyInviteTargetSnapshot>();
+        for (PartyInviteTargetSnapshot target : snapshot.getInviteTargets()) {
+            if (search.matches(target.getCharacterName(),
+                    target.getPlayerName())) {
+                shown.add(target);
+            }
+        }
+        return shown;
+    }
+
+    /**
+     * The party's tab wears the colour the player wears in the party, the
+     * one they chose here; the Party channel's while they are in none.
+     */
     @Override
-    public void handleMouseInput() {
-        int wheel = Mouse.getEventDWheel();
-        if (wheel != 0) {
-            int amount = wheel > 0 ? -1 : 1;
+    public int tone() {
+        PartyStateSnapshot snapshot = getSnapshot();
+        PartySnapshot party = snapshot == null ? null : snapshot.getParty();
+        PartyMemberSnapshot member = party == null ? null
+                : party.getMember(snapshot.getActiveCharacterId());
+        return member == null || member.getColor() == null
+                ? ChatChannel.PARTY.getDisplayColor()
+                : member.getColor().getRgb();
+    }
+
+    @Override
+    public String searchPrompt() {
+        return I18n.format("gui.losttales.party.search");
+    }
+
+    /**
+     * New words read every list from its top, the first name each list
+     * keeps chosen, so what is chosen is always one of the names shown.
+     */
+    @Override
+    public void search(String words) {
+        String typed = words == null ? "" : words.trim();
+        if (typed.equals(this.query)) {
+            return;
+        }
+        this.query = typed;
+        this.membersScroll = 0;
+        this.invitationsScroll = 0;
+        this.inviteTargetsScroll = 0;
+        PartyStateSnapshot snapshot = getSnapshot();
+        if (snapshot == null || !snapshot.isAvailable()
+                || typed.length() == 0) {
+            return;
+        }
+        List<PartyMemberSnapshot> members = shownMembers(snapshot.getParty());
+        if (!members.isEmpty()) {
+            this.selectedMemberCharacterId = members.get(0).getCharacterId();
+        }
+        List<InvitationEntry> invitations = shownInvitations(snapshot);
+        if (!invitations.isEmpty()) {
+            this.selectedInvitationId =
+                    invitations.get(0).invitation.getInvitationId();
+            this.selectedInvitationIncoming = invitations.get(0).incoming;
+        }
+        List<PartyInviteTargetSnapshot> targets = shownInviteTargets(snapshot);
+        if (!targets.isEmpty()) {
+            this.selectedInviteOwnerId = targets.get(0).getOwnerId();
+        }
+        if (this.width >= 0) {
+            updateButtons();
+        }
+    }
+
+    @Override
+    public int found() {
+        return this.query.length() == 0 ? -1
+                : getShownRowCount(getSnapshot());
+    }
+
+    /** The arrows walk the open list's names found; Return reads the one chosen. */
+    @Override
+    public boolean searchKey(int keyCode) {
+        if (keyCode == Keyboard.KEY_RETURN
+                || keyCode == Keyboard.KEY_NUMPADENTER) {
+            return true;
+        }
+        if (keyCode != Keyboard.KEY_UP && keyCode != Keyboard.KEY_DOWN) {
+            return false;
+        }
+        PartyStateSnapshot snapshot = getSnapshot();
+        int count = getShownRowCount(snapshot);
+        if (count == 0 || this.width < 0) {
+            return true;
+        }
+        int step = keyCode == Keyboard.KEY_UP ? -1 : 1;
+        int index = Math.max(0, Math.min(count - 1,
+                selectedShownIndex(snapshot) + step));
+        selectRow(snapshot, index);
+        // The chosen row stays in view.
+        int rows = getVisibleRowCount();
+        int scroll = getTabScroll();
+        int kept = Math.max(index - rows + 1, Math.min(scroll, index));
+        if (this.tab == Tab.MEMBERS) {
+            this.membersScroll = kept;
+        } else if (this.tab == Tab.INVITATIONS) {
+            this.invitationsScroll = kept;
+        } else {
+            this.inviteTargetsScroll = kept;
+        }
+        updateButtons();
+        return true;
+    }
+
+    /** The wheel moves the open list a row a turn, whichever way it turns. */
+    @Override
+    public boolean scroll(LostTalesUiHitBox box, double x, double y,
+                          int lines) {
+        if (lines != 0 && this.width >= 0 && this.confirming == null) {
+            int amount = lines > 0 ? 1 : -1;
             if (this.tab == Tab.MEMBERS) {
                 this.membersScroll += amount;
             } else if (this.tab == Tab.INVITATIONS) {
@@ -1102,50 +1441,57 @@ public final class LostTalesPartyManagementGui extends GuiScreen
             if (snapshot != null) {
                 clampScrollOffsets(snapshot);
             }
+            return true;
         }
-        super.handleMouseInput();
+        return false;
     }
 
+    /**
+     * The page's keys while it is the page in front: R refreshes, 1 to 3
+     * choose a list. Escape takes back a question waiting on an answer,
+     * and otherwise passes to the chat.
+     */
     @Override
-    protected void keyTyped(char typedChar, int keyCode) {
-        if (keyCode == Keyboard.KEY_ESCAPE) {
-            this.mc.displayGuiScreen(this.parent);
-            return;
+    public boolean keyTyped(char typedChar, int keyCode) {
+        if (this.width < 0) {
+            return false;
+        }
+        if (this.confirming != null) {
+            if (keyCode == Keyboard.KEY_ESCAPE) {
+                this.confirming = null;
+            }
+            return true;
         }
         if (keyCode == Keyboard.KEY_R && this.pendingRequestId == 0) {
             beginRequest(PartyClientRequestManager.requestState(), false);
-            return;
+            return true;
         }
         if (keyCode == Keyboard.KEY_1) {
             this.tab = Tab.MEMBERS;
             updateButtons();
-            return;
+            return true;
         }
         if (keyCode == Keyboard.KEY_2) {
             this.tab = Tab.INVITATIONS;
             updateButtons();
-            return;
+            return true;
         }
         if (keyCode == Keyboard.KEY_3) {
             this.tab = Tab.INVITE;
             updateButtons();
-            return;
+            return true;
         }
-        super.keyTyped(typedChar, keyCode);
+        return false;
     }
 
     private void clampScrollOffsets(PartyStateSnapshot snapshot) {
         int visibleRows = getVisibleRowCount();
-        int memberCount = snapshot.getParty() == null
-                ? 0 : snapshot.getParty().getMemberCount();
-        this.membersScroll = clampScroll(
-                this.membersScroll, memberCount, visibleRows);
-        this.invitationsScroll = clampScroll(
-                this.invitationsScroll,
-                getInvitationEntries(snapshot).size(), visibleRows);
-        this.inviteTargetsScroll = clampScroll(
-                this.inviteTargetsScroll,
-                snapshot.getInviteTargets().size(), visibleRows);
+        this.membersScroll = clampScroll(this.membersScroll,
+                shownMembers(snapshot.getParty()).size(), visibleRows);
+        this.invitationsScroll = clampScroll(this.invitationsScroll,
+                shownInvitations(snapshot).size(), visibleRows);
+        this.inviteTargetsScroll = clampScroll(this.inviteTargetsScroll,
+                shownInviteTargets(snapshot).size(), visibleRows);
     }
 
     private int getVisibleRowCount() {
@@ -1260,11 +1606,6 @@ public final class LostTalesPartyManagementGui extends GuiScreen
                                     int x, int y, int width, int height) {
         return mouseX >= x && mouseX < x + width
                 && mouseY >= y && mouseY < y + height;
-    }
-
-    @Override
-    public boolean doesGuiPauseGame() {
-        return false;
     }
 
     private static final class InvitationEntry {

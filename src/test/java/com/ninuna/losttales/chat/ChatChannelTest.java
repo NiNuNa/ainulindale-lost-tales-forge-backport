@@ -27,9 +27,13 @@ public final class ChatChannelTest {
         assertEquals("whisper", ChatChannel.WHISPER.getId());
     }
 
-    /** Each id is the channel's name in lower case, and Out of Character's is ooc. */
+    /** Each id is the channel's name in lower case, its spaces underscores. */
     @Test
     public void idsAreTheChannelsNames() {
+        for (ChatChannel channel : ChatChannel.values()) {
+            assertEquals(channel.getDisplayName().toLowerCase(java.util.Locale.ROOT)
+                    .replace(' ', '_'), channel.getId());
+        }
         assertEquals("global", ChatChannel.GLOBAL.getId());
         assertEquals("proximity", ChatChannel.PROXIMITY.getId());
         assertEquals("party", ChatChannel.PARTY.getId());
@@ -50,13 +54,13 @@ public final class ChatChannelTest {
         assertEquals(null, ChatChannel.fromId(null));
     }
 
-    /** Out of Character is one channel under the id {@code ooc}; the bare word Discord names nothing. */
+    /** OOC is one channel under the id {@code ooc}; the bare word Discord names nothing. */
     @Test
     public void outOfCharacterIsOneChannel() {
         assertEquals(null, ChatChannel.fromId("discord"));
         assertEquals(ChatChannel.OOC, ChatChannel.fromId(" OOC "));
         assertEquals("ooc", ChatChannel.OOC.getId());
-        assertEquals("Out of Character", ChatChannel.OOC.getDisplayName());
+        assertEquals("OOC", ChatChannel.OOC.getDisplayName());
         assertEquals(ChatRecipientRule.SELF,
                 ChatChannel.CLIENT_CONSOLE.getRecipientRule());
         assertEquals(ChatRecipientRule.CONSOLE_READERS,

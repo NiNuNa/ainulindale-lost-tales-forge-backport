@@ -30,6 +30,7 @@ import com.ninuna.losttales.client.character.ClientCharacterCreationCatalogCache
 import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
+import com.ninuna.losttales.client.chat.ChatPages;
 import com.ninuna.losttales.client.chat.ChatSpeechBubbles;
 import com.ninuna.losttales.client.chat.ChatWindowLayout;
 import com.ninuna.losttales.client.chat.LostTalesSpeechBubbleRenderer;
@@ -82,7 +83,8 @@ import com.ninuna.losttales.gui.hud.mapmarker.LostTalesMapMarkerHudRenderer;
 import com.ninuna.losttales.gui.hud.party.LostTalesPartyHudRenderer;
 import com.ninuna.losttales.gui.hud.quest.LostTalesQuestHudRenderer;
 import com.ninuna.losttales.gui.hud.quest.LostTalesWorldQuestMarkerRenderer;
-import com.ninuna.losttales.gui.screen.LostTalesQuestJournalGui;
+import com.ninuna.losttales.client.chat.LostTalesChatGui;
+import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.item.weapon.LostTalesItemBattleaxe;
 import com.ninuna.losttales.item.weapon.LostTalesItemDagger;
@@ -162,6 +164,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     }
 
     private static void clearSessionState() {
+        ChatPages.forgetContents();
         LostTalesClientQuestProgressStore.clear();
         LostTalesClientQuestNotificationStore.clear();
         LostTalesClientQuestDefinitionStore.clearDynamicQuestDefinitions();
@@ -533,7 +536,12 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
             }
         } else if (event.gui != null
                 && event.gui.getClass() == LOTRGuiRedBook.class) {
-            event.gui = new LostTalesQuestJournalGui(null);
+            // LOTR's quest book is the journal, a page of the chat.
+            GuiScreen journal = LostTalesChatGui.screenForPage(
+                    QuestJournalPage.PAGE_ID);
+            if (journal != null) {
+                event.gui = journal;
+            }
         } else if (event.gui != null
                 && event.gui.getClass() == LOTRGuiMap.class) {
             event.gui = LostTalesLotrMapGui.replace(

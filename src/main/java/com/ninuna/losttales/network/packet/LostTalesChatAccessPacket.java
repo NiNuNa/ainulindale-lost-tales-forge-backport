@@ -506,6 +506,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
                         LostTalesPacketCodec.readUtf8String(
                                 buffer, MAX_CHANNEL_ICON_BYTES));
                 if (id.length() == 0 || icon == null
+                        || icon.getKind() == ChatChannelIconSpec.Kind.CHANNEL
                         || icons.containsKey(id)) {
                     throw new LostTalesPacketCodec.DecodeException(
                             "invalid channel icon");

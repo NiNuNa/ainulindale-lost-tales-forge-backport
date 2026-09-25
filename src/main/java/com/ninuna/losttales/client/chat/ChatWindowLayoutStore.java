@@ -37,8 +37,9 @@ import java.util.EnumMap;
  * <pre>
  * window w1 locked=false x=0.00 y=0.00 active=client_console tabs=client_console,operator
  * window w2 locked=true x=62.50 y=100.00 lines=12.40 width=320 fill=full area=hidden members=hidden members_width=90.00 active=global tabs=global,ooc,party link=w1:above
- * small emoji x=100.00 y=62.50 w=120 h=160
- * small tab x=12.00 y=40.00
+ * small emoji from=br dx=0.00 dy=0.00 w=120 h=160
+ * small tab from=tl dx=12.00 dy=40.00
+ * page journal x=40.00 y=60.00 lines=18.00 width=360
  * feed x=0.00 y=100.00
  * toolbar collapsed=false
  * closed faction
@@ -160,6 +161,8 @@ public final class ChatWindowLayoutStore {
                 new EnumMap<ChatSmallWindowKind,
                         ChatSmallWindowPlacements.Placement>(
                         ChatSmallWindowKind.class);
+        Map<String, ChatWindowLayout.PagePlace> pagePlaces =
+                new LinkedHashMap<String, ChatWindowLayout.PagePlace>();
         for (String raw : lines) {
             String line = raw == null ? "" : raw.trim();
             if (line.length() == 0 || line.startsWith("#")) {
@@ -203,6 +206,11 @@ public final class ChatWindowLayoutStore {
                 if (spec != null) {
                     specs.add(spec);
                 }
+            } else if (parts.length >= 2 && "page".equals(parts[0])) {
+                ChatWindowLayout.PagePlace place = parsePagePlace(parts);
+                if (place != null) {
+                    pagePlaces.put(parts[1], place);
+                }
             } else if (parts.length >= 2 && "small".equals(parts[0])) {
                 ChatSmallWindowKind kind = ChatSmallWindowKind.fromId(parts[1]);
                 ChatSmallWindowPlacements.Placement placement =
@@ -231,16 +239,51 @@ public final class ChatWindowLayoutStore {
                 feedX, feedY, collapsed);
         ChatWindowLayout.loadConversations(conversations, closedConversations);
         ChatSmallWindowPlacements.load(placed);
+        ChatWindowLayout.loadPagePlaces(pagePlaces);
     }
 
     /**
-     * A small window's remembered place: both shares, and both sizes for
-     * a kind the player resized or neither for one they only moved; null
-     * where a share is missing, a size stands alone or anything is
+     * Where a page's window last stood: its place and its size, all four
+     * or null, which leaves the page to open cascaded at a page's size.
+     */
+    private static ChatWindowLayout.PagePlace parsePagePlace(String[] parts) {
+        double x = Double.NaN;
+        double y = Double.NaN;
+        double lines = Double.NaN;
+        int width = -1;
+        for (int index = 2; index < parts.length; index++) {
+            String part = parts[index];
+            try {
+                if (part.startsWith("x=")) {
+                    x = parsePercent(part.substring(2));
+                } else if (part.startsWith("y=")) {
+                    y = parsePercent(part.substring(2));
+                } else if (part.startsWith("lines=")) {
+                    lines = Double.parseDouble(part.substring(6));
+                } else if (part.startsWith("width=")) {
+                    width = Integer.parseInt(part.substring(6));
+                }
+            } catch (NumberFormatException unreadable) {
+                return null;
+            }
+        }
+        if (Double.isNaN(x) || Double.isNaN(y) || Double.isNaN(lines)
+                || lines < 0.0D || width < 0) {
+            return null;
+        }
+        return new ChatWindowLayout.PagePlace(x, y, lines, width);
+    }
+
+    /**
+     * A small window's remembered place: the corner of its chat window it
+     * is measured from, how far in from it, and both sizes for a kind the
+     * player resized or neither for one they only moved; null where the
+     * corner or a distance is missing, a size stands alone or anything is
      * unreadable, which leaves the kind to open where its popup did.
      */
     private static ChatSmallWindowPlacements.Placement parseSmallWindow(
             String[] parts) {
+        String corner = null;
         double x = Double.NaN;
         double y = Double.NaN;
         int width = 0;
@@ -248,10 +291,12 @@ public final class ChatWindowLayoutStore {
         for (int index = 2; index < parts.length; index++) {
             String part = parts[index];
             try {
-                if (part.startsWith("x=")) {
-                    x = Double.parseDouble(part.substring(2));
-                } else if (part.startsWith("y=")) {
-                    y = Double.parseDouble(part.substring(2));
+                if (part.startsWith("from=")) {
+                    corner = part.substring(5);
+                } else if (part.startsWith("dx=")) {
+                    x = Double.parseDouble(part.substring(3));
+                } else if (part.startsWith("dy=")) {
+                    y = Double.parseDouble(part.substring(3));
                 } else if (part.startsWith("w=")) {
                     width = Integer.parseInt(part.substring(2));
                 } else if (part.startsWith("h=")) {
@@ -261,11 +306,15 @@ public final class ChatWindowLayoutStore {
                 return null;
             }
         }
-        if (Double.isNaN(x) || Double.isNaN(y) || width < 0 || height < 0
-                || (width > 0) != (height > 0)) {
+        if (corner == null || corner.length() != 2
+                || "tb".indexOf(corner.charAt(0)) < 0
+                || "lr".indexOf(corner.charAt(1)) < 0
+                || Double.isNaN(x) || Double.isNaN(y) || width < 0
+                || height < 0 || (width > 0) != (height > 0)) {
             return null;
         }
-        return new ChatSmallWindowPlacements.Placement(x, y, width, height);
+        return new ChatSmallWindowPlacements.Placement(corner.charAt(1) == 'r',
+                corner.charAt(0) == 'b', x, y, width, height);
     }
 
     /** What the file says of a window's area or member list put away. */
@@ -400,8 +449,8 @@ public final class ChatWindowLayoutStore {
         for (ChatWindowLayout.WindowSpec spec : ChatWindowLayout.describe()) {
             StringBuilder line = new StringBuilder("window ").append(spec.id);
             line.append(" locked=").append(spec.locked);
-            line.append(" x=").append(formatPercent(spec.offsetX));
-            line.append(" y=").append(formatPercent(spec.offsetY));
+            line.append(" x=").append(formatDecimals(spec.offsetX));
+            line.append(" y=").append(formatDecimals(spec.offsetY));
             if (spec.maxLines > 0.0D) {
                 line.append(" lines=").append(formatLines(spec.maxLines));
             }
@@ -441,13 +490,23 @@ public final class ChatWindowLayoutStore {
                 small : ChatSmallWindowPlacements.all().entrySet()) {
             ChatSmallWindowPlacements.Placement placement = small.getValue();
             lines.add("small " + small.getKey().id
-                    + " x=" + formatPercent(placement.xPercent)
-                    + " y=" + formatPercent(placement.yPercent)
+                    + " from=" + placement.corner()
+                    + " dx=" + formatDecimals(placement.dx)
+                    + " dy=" + formatDecimals(placement.dy)
                     + (placement.isSized() ? " w=" + placement.width
                             + " h=" + placement.height : ""));
         }
-        lines.add("feed x=" + formatPercent(ChatWindowLayout.feedOffsetX())
-                + " y=" + formatPercent(ChatWindowLayout.feedOffsetY()));
+        for (Map.Entry<String, ChatWindowLayout.PagePlace> page
+                : ChatWindowLayout.pagePlaces().entrySet()) {
+            ChatWindowLayout.PagePlace place = page.getValue();
+            lines.add("page " + page.getKey()
+                    + " x=" + formatDecimals(place.x)
+                    + " y=" + formatDecimals(place.y)
+                    + " lines=" + formatDecimals(place.lines)
+                    + " width=" + place.width);
+        }
+        lines.add("feed x=" + formatDecimals(ChatWindowLayout.feedOffsetX())
+                + " y=" + formatDecimals(ChatWindowLayout.feedOffsetY()));
         lines.add("toolbar collapsed="
                 + ChatWindowLayout.isToolbarCollapsed());
         for (ChatChannel channel : ChatWindowLayout.closedChannels()) {
@@ -483,8 +542,8 @@ public final class ChatWindowLayoutStore {
         return String.format(Locale.ROOT, "%.2f", lines);
     }
 
-    private static String formatPercent(double value) {
-        // Locale-independent, two decimals: plenty for a screen percent.
+    /** Locale-independent, two decimals: plenty for a percent or a place in pixels. */
+    private static String formatDecimals(double value) {
         return String.format(Locale.ROOT, "%.2f", value);
     }
 
@@ -513,8 +572,8 @@ public final class ChatWindowLayoutStore {
                 lines.add(raw);
             }
         }
-        lines.add("feed x=" + formatPercent(ChatWindowLayout.feedOffsetX())
-                + " y=" + formatPercent(ChatWindowLayout.feedOffsetY()));
+        lines.add("feed x=" + formatDecimals(ChatWindowLayout.feedOffsetX())
+                + " y=" + formatDecimals(ChatWindowLayout.feedOffsetY()));
         loadedLines = lines;
         write(storeFile, lines);
     }

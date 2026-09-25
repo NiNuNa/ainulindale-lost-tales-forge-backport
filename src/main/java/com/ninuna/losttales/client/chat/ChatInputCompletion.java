@@ -50,7 +50,7 @@ import org.lwjgl.input.Keyboard;
  * the keys, the clicks and the frame; it hands the screen back whether
  * it took them.
  */
-final class ChatInputCompletion {
+final class ChatInputCompletion implements ChatInputField.MentionSource {
     /** What a suggestion list's keys ask for. */
     private static final int KEY_NONE = 0;
     private static final int KEY_UP = 1;
@@ -699,6 +699,12 @@ final class ChatInputCompletion {
     }
 
     /* ---- Mention candidates ---- */
+
+    /** The names the {@code @} list offers now, which the field's pings show. */
+    @Override
+    public List<ChatMentionCandidate> candidates() {
+        return mentionCandidates();
+    }
 
     /**
      * One candidate per person the conversation in front has, as its

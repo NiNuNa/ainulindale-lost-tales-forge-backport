@@ -85,7 +85,22 @@ final class ChatTabActions {
         // the selection just changed or the layout came back from its
         // file with another tab in front; setting what is already set
         // changes nothing.
-        ChatWindowLayout.setActiveTab(selected);
+        // A page brought in front of the tab typed in sends the input to
+        // the conversation in front of the window last brought forward,
+        // which stays where it stands; with none, the input waits behind
+        // the page with no bar.
+        boolean moved = false;
+        if (ChatWindowLayout.showsPage(ChatWindowLayout.windowOf(selected))) {
+            ChatTab elsewhere = frontConversationElsewhere();
+            if (elsewhere != null) {
+                ClientChatChannelState.select(elsewhere);
+                selected = ClientChatChannelState.getSelected();
+                moved = true;
+            }
+        }
+        if (!ChatWindowLayout.showsPage(ChatWindowLayout.windowOf(selected))) {
+            ChatWindowLayout.setActiveTab(selected);
+        }
         if (!selected.equals(this.lastSelected)) {
             ChatTab previous = this.lastSelected;
             this.lastSelected = selected;
@@ -95,7 +110,7 @@ final class ChatTabActions {
             this.completion.dismissCompletion();
             ClientChatChannelViews.dismissSeenDivider(previous);
             ChatWindow selectedWindow = ChatWindowLayout.windowOf(selected);
-            if (selectedWindow != null) {
+            if (selectedWindow != null && !moved) {
                 ChatWindowLayout.raise(selectedWindow.getId());
             }
             this.bar.updateInputBounds();
@@ -105,9 +120,29 @@ final class ChatTabActions {
         List<ChatWindow> windows = ChatWindowLayout.windows();
         for (int index = 0; index < windows.size(); index++) {
             ChatWindow window = windows.get(index);
-            ClientChatChannelViews.markViewed(ChatWindowFrame.activeTab(
-                    window, ChatWindowFrame.visibleTabs(window)));
+            ChatTab front = ChatWindowFrame.activeTab(window,
+                    ChatWindowFrame.visibleTabs(window));
+            if (front != null && !front.isPage()) {
+                ClientChatChannelViews.markViewed(front);
+            }
         }
+    }
+
+    /**
+     * The conversation in front of the window last brought forward among
+     * those that show one; null while every window shows a page.
+     */
+    private static ChatTab frontConversationElsewhere() {
+        List<ChatWindow> stacked = ChatWindowLayout.stacked();
+        for (int index = stacked.size() - 1; index >= 0; index--) {
+            ChatWindow window = stacked.get(index);
+            ChatTab front = ChatWindowFrame.activeTab(window,
+                    ChatWindowFrame.visibleTabs(window));
+            if (front != null && ClientChatChannelState.isSelectable(front)) {
+                return front;
+            }
+        }
+        return null;
     }
 
     /**
@@ -121,6 +156,11 @@ final class ChatTabActions {
         }
         ChatTab front = ChatWindowFrame.activeTab(window,
                 ChatWindowFrame.visibleTabs(window));
+        if (front != null && front.isPage()) {
+            // A page takes no input: its window only comes forward.
+            ChatWindowLayout.raise(window.getId());
+            return;
+        }
         if (front != null && !front.equals(
                 ClientChatChannelState.getSelected())) {
             selectChannel(front);
@@ -139,8 +179,21 @@ final class ChatTabActions {
      * channel identity — are rebuilt.
      */
     void selectChannel(ChatTab tab) {
+        if (tab != null && tab.isPage()) {
+            // A page is never typed into: it comes in front of its
+            // window, and the input moves off it.
+            ChatWindowLayout.showPage(tab);
+            syncSelection();
+            return;
+        }
         this.composer.onTabSelected(tab);
         ClientChatChannelState.select(tab);
+        if (tab != null && tab.equals(ClientChatChannelState.getSelected())) {
+            // The conversation picked comes in front of its window, over a
+            // page there too; a page only moves the input when it is the
+            // one brought forward.
+            ChatWindowLayout.setActiveTab(tab);
+        }
         syncSelection();
         this.field.setFocused(true);
         this.completion.invalidateMentionCandidates();
@@ -340,7 +393,7 @@ final class ChatTabActions {
     }
 
     /**
-     * The cog menu's way of giving a channel a window of its own: the
+     * The tab menu's way of giving a channel a window of its own: the
      * new window lands a little below its old row, kept on screen, and
      * the channel stays selected there.
      */

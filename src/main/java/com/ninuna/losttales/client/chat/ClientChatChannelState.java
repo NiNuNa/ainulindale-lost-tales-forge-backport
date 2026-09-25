@@ -194,13 +194,29 @@ public final class ClientChatChannelState {
         if (ordinal < 1) {
             return current;
         }
-        List<ChatTab> order = selectedWindowOrder(current);
+        // Counted along the row as it is drawn, pages and all; a page
+        // chosen this way is shown, never typed into.
+        ChatWindow window = ChatWindowLayout.windowOf(current);
+        List<ChatTab> order = new ArrayList<ChatTab>();
+        if (window != null) {
+            for (ChatTab tab : window.getTabs()) {
+                if (isAvailable(tab)) {
+                    order.add(tab);
+                }
+            }
+        }
+        if (order.isEmpty()) {
+            order = selectedWindowOrder(current);
+        }
         int index = ordinal >= 9 ? order.size() - 1 : ordinal - 1;
         if (index >= order.size()) {
             return current;
         }
-        selected = order.get(index);
-        return selected;
+        ChatTab chosen = order.get(index);
+        if (!chosen.isPage()) {
+            selected = chosen;
+        }
+        return chosen;
     }
 
     /**
@@ -213,7 +229,7 @@ public final class ClientChatChannelState {
         List<ChatTab> order = new ArrayList<ChatTab>();
         if (window != null) {
             for (ChatTab tab : window.getTabs()) {
-                if (isAvailable(tab)) {
+                if (!tab.isPage() && isAvailable(tab)) {
                     order.add(tab);
                 }
             }
@@ -257,13 +273,13 @@ public final class ClientChatChannelState {
     }
 
     /**
-     * Available tabs that are open in some window, in window and tab
-     * order.
+     * Available conversations open in some window, pages left out, in
+     * window and tab order.
      */
     public static synchronized List<ChatTab> getOpenTabs() {
         ArrayList<ChatTab> result = new ArrayList<ChatTab>();
         for (ChatTab tab : ChatWindowLayout.order()) {
-            if (isAvailable(tab)) {
+            if (!tab.isPage() && isAvailable(tab)) {
                 result.add(tab);
             }
         }
@@ -285,9 +301,13 @@ public final class ClientChatChannelState {
         }
     }
 
-    /** Available to this player and open in a window. */
+    /**
+     * Available to this player and open in a window, and a conversation:
+     * a page is never the tab typed into.
+     */
     public static synchronized boolean isSelectable(ChatTab tab) {
-        return isAvailable(tab) && ChatWindowLayout.isOpen(tab);
+        return tab != null && !tab.isPage() && isAvailable(tab)
+                && ChatWindowLayout.isOpen(tab);
     }
 
     public static synchronized boolean isSelectable(ChatChannel channel) {
@@ -362,6 +382,10 @@ public final class ClientChatChannelState {
      * included — one row entry, showing the conversation being read.
      */
     public static synchronized boolean isAvailable(ChatTab tab) {
+        if (tab != null && tab.isPage()) {
+            // A page shows while a system has it registered.
+            return tab.page() != null;
+        }
         if (tab == null || !isAvailable(tab.getChannel())) {
             return false;
         }
@@ -512,6 +536,11 @@ public final class ClientChatChannelState {
     public static synchronized int displayColor(ChatTab tab) {
         if (tab == null) {
             return LostTalesChatVisualStyle.IVORY;
+        }
+        if (tab.isPage()) {
+            // A page wears the tone it gives itself.
+            ChatPageContent page = ChatPages.contentOf(tab);
+            return page == null ? LostTalesChatVisualStyle.IVORY : page.tone();
         }
         Integer partner = PARTNER_COLORS.get(ChatTab.row(tab));
         if (partner != null) {
@@ -664,6 +693,10 @@ public final class ClientChatChannelState {
     public static synchronized String displayName(ChatTab tab) {
         if (tab == null) {
             return "";
+        }
+        if (tab.isPage()) {
+            ChatPages.Page page = tab.page();
+            return page == null ? "" : page.title();
         }
         if (tab.isWhisper()) {
             String remembered = PARTNER_NAMES.get(ChatTab.row(tab));

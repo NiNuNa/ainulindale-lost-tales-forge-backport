@@ -6,7 +6,7 @@ public final class CharacterMenuSectorResolver {
     public static final int NONE = -1;
     public static final int PROFILE = 0;
     public static final int QUESTS = 1;
-    public static final int ITEMS = 2;
+    public static final int CHAT = 2;
     public static final int MAP = 3;
 
     private CharacterMenuSectorResolver() {}
@@ -35,7 +35,7 @@ public final class CharacterMenuSectorResolver {
         long verticalWeight = Math.abs((long) dy)
                 * horizontalExtent;
         if (horizontalWeight > verticalWeight) {
-            return dx < 0 ? QUESTS : ITEMS;
+            return dx < 0 ? QUESTS : CHAT;
         }
         return dy < 0 ? PROFILE : MAP;
     }

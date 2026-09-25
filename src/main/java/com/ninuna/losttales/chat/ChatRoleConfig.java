@@ -73,12 +73,14 @@ public final class ChatRoleConfig {
     public static final String CHARACTER_MEMBER_PREFIX = "character:";
     /**
      * The operator role a fresh file starts with: held by op level 2,
-     * crimson, mentionable, rank 10, no grants. Text only — the code
-     * knows no operator role — and the file's to change once written.
+     * crimson, mentionable, rank 10, no grants, wearing whatever the
+     * Operator channel wears. Text only — the code knows no operator role
+     * — and the file's to change once written.
      */
     public static final String DEFAULT_OPERATOR_ENTRY =
             "operator=name:Operator;color:A94B54;mention:true;rank:10;op:2"
-            + ";icon:emoji:expressionless;desc:Runs the server day to day.";
+            + ";icon:channel:" + ChatChannel.OPERATOR.getId()
+            + ";desc:Runs the server day to day.";
     /** The gate a fresh file starts with: the Operator channel for the operator role. */
     public static final String DEFAULT_OPERATOR_GATE = ChatChannel.OPERATOR.getId()
             + "=read:operator;send:operator";
@@ -208,8 +210,8 @@ public final class ChatRoleConfig {
             icon = ChatChannelIconSpec.parse(iconOption);
             if (icon == null) {
                 out.warn("Chat role '" + id + "' has icon '" + iconOption
-                        + "', which is neither emoji:<name> nor item:<id>; it wears "
-                        + "the plain face");
+                        + "', which is none of emoji:<name>, item:<id> or "
+                        + "channel:<id>; it wears the plain face");
             }
         }
         return ChatAccountRole.custom(id, name.length() == 0 ? id : name, description,
@@ -543,9 +545,10 @@ public final class ChatRoleConfig {
             }
             String text = valueOf(entry).trim();
             ChatChannelIconSpec icon = ChatChannelIconSpec.parse(text);
-            if (icon == null) {
+            if (icon == null
+                    || icon.getKind() == ChatChannelIconSpec.Kind.CHANNEL) {
                 warnings.warn("Channel '" + channel.getId() + "' names '" + text
-                        + "', which is no icon: emoji:<name> or "
+                        + "', which is no icon for a channel: emoji:<name> or "
                         + "item:<id>[@<damage>]; skipped");
                 continue;
             }

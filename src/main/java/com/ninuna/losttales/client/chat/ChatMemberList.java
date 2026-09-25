@@ -724,13 +724,29 @@ final class ChatMemberList {
     }
 
     /**
-     * A role's icon: its emoji, or its item drawn as an item in a line
-     * is, and the face a channel given no icon wears for a role given
-     * none or one this client cannot draw.
+     * A role's icon: its emoji, its item drawn as an item in a line is, or
+     * what the channel it names wears, the server's choice included; the
+     * face a channel given no icon wears for a role given none or one this
+     * client cannot draw.
      */
     private static void drawRoleIcon(Minecraft minecraft, ChatAccountRole role,
                                      int x, int boxTop, int alpha) {
         ChatChannelIconSpec icon = role.getIcon();
+        ChatChannel worn = icon != null
+                && icon.getKind() == ChatChannelIconSpec.Kind.CHANNEL
+                ? ChatChannel.fromId(icon.getName()) : null;
+        if (worn != null) {
+            ItemStack item = ChatChannelIcons.itemIconOf(worn);
+            if (item != null) {
+                ChatInlineIcons.drawItem(minecraft, item, x, boxTop,
+                        HEADING_ICON_SIZE, alpha);
+            } else {
+                ChatInlineIcons.drawEmoji(minecraft,
+                        ChatChannelIcons.iconOf(worn), x, boxTop,
+                        HEADING_ICON_SIZE, alpha);
+            }
+            return;
+        }
         if (icon != null && icon.getKind() == ChatChannelIconSpec.Kind.ITEM) {
             Object item = Item.itemRegistry.getObject(icon.getName());
             if (item instanceof Item) {

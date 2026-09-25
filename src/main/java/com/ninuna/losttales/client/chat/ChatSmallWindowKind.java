@@ -19,9 +19,9 @@ enum ChatSmallWindowKind {
     MESSAGE("message"),
     /** A person's: message them, ignore them. */
     PERSON("person"),
-    /** A tab's settings, behind its cog. */
+    /** A tab's settings, behind the channel's cog on the tool strip. */
     TAB("tab"),
-    /** A chat window's own menu, behind the cog at the end of its row. */
+    /** A chat window's own menu, behind the three dots at the end of its row. */
     WINDOW("window"),
     /** The palette a colour row of the window menu opens. */
     PALETTE("palette"),

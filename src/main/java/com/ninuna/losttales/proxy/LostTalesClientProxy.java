@@ -23,7 +23,12 @@ import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
 import com.ninuna.losttales.client.chat.ChatEmojiUsageStore;
 import com.ninuna.losttales.client.chat.ChatSpeechBubbles;
+import com.ninuna.losttales.client.chat.ChatPageContent;
+import com.ninuna.losttales.client.chat.ChatPages;
 import com.ninuna.losttales.client.chat.ChatWindowLayoutStore;
+import com.ninuna.losttales.gui.screen.party.PartyPage;
+import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
+import net.minecraft.init.Items;
 import com.ninuna.losttales.client.chat.LostTalesChatClientHandler;
 import com.ninuna.losttales.client.chat.ClientChatChannelViews;
 import com.ninuna.losttales.client.chat.LostTalesChatPresentation;
@@ -150,6 +155,9 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         ChatEmojiUsageStore.initialize(clientFolder);
         ClientChatIgnores.initialize(clientFolder);
         ClientChatProfanity.initialize(clientFolder);
+        // The pages a chat window holds beside its conversations, known
+        // before the layout that may name them is read.
+        registerChatPages();
         ChatWindowLayoutStore.initialize(clientFolder);
         ClientChatReadMarks.initialize(clientFolder);
         ClientChatPresenceChoices.initialize(clientFolder);
@@ -182,6 +190,24 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         GeoArmorRenderer.registerArmorRenderer(LostTalesItemArmor3D.class, new LostTalesItemRendererArmor3D());
 
         super.preInit(event);
+    }
+
+    /** The quest journal and the party, each a page a chat window can hold. */
+    private static void registerChatPages() {
+        ChatPages.register(QuestJournalPage.PAGE_ID, "gui.losttales.page.journal",
+                new ItemStack(Items.writable_book), new ChatPages.Factory() {
+                    @Override
+                    public ChatPageContent create() {
+                        return new QuestJournalPage();
+                    }
+                });
+        ChatPages.register(PartyPage.PAGE_ID, "gui.losttales.page.party",
+                new ItemStack(Items.iron_helmet), new ChatPages.Factory() {
+                    @Override
+                    public ChatPageContent create() {
+                        return new PartyPage();
+                    }
+                });
     }
 
     @Override

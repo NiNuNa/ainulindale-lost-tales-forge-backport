@@ -99,23 +99,21 @@ final class ChatInputStyles {
     }
 
     /**
-     * The colour a run of the style is drawn in, given the colour the
-     * mention pass chose for it: a mark is always dimmed, code always in
-     * the chat's aside tone, as the sent line's inline code is — nothing
-     * inside it is a mention — and a spoiler subdued unless it holds a
-     * mention, which keeps its colour as it does in the sent line.
+     * The colour a run of the style is drawn in: a mark is always dimmed,
+     * code always in the chat's aside tone, as the sent line's inline
+     * code is, a spoiler subdued, and anything else ivory. Mentions and
+     * links are tokens of their own, drawn in their own colours.
      */
-    static int colorOf(int style, int mentionColor) {
+    static int colorOf(int style) {
         if ((style & ChatMarkdown.Span.MARK) != 0) {
             return MARK_RGB;
         }
         if ((style & ChatMarkdown.Span.CODE) != 0) {
             return LostTalesChatVisualStyle.asideRgb();
         }
-        if ((style & ChatMarkdown.Span.SPOILER) != 0
-                && mentionColor == LostTalesChatVisualStyle.IVORY) {
+        if ((style & ChatMarkdown.Span.SPOILER) != 0) {
             return SPOILER_RGB;
         }
-        return mentionColor;
+        return LostTalesChatVisualStyle.IVORY;
     }
 }

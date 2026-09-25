@@ -11,28 +11,37 @@ import java.util.Map;
  * account in the layout file, and which windows were open when the chat
  * last closed. A window opens where its popup always opened until the
  * player moves or resizes it; from then on it opens where they left it.
- * A place is kept as shares of the room the screen leaves the window, so
- * it lands in the same part of any screen. A kind the player has only
- * moved keeps its content's own size, which changes with what it holds;
- * one they have resized keeps the size they gave it.
+ * A place is kept from the corner of the room it was left nearest to, so
+ * a picker left in a window's bottom right corner opens in the bottom
+ * right corner of whichever window it opens in, however large. A kind the
+ * player has only moved keeps its content's own size, which changes with
+ * what it holds; one they have resized keeps the size they gave it.
  */
 public final class ChatSmallWindowPlacements {
     /** The widest and tallest a remembered size is read as. */
     static final int MAX_SIZE = 4096;
+    /** The farthest from its corner a remembered place is read as. */
+    static final double MAX_DISTANCE = 4096.0D;
 
     /** A kind's remembered place, and the size the player gave it if they did. */
     static final class Placement {
-        /** Share of the room left and right of the window, 0-100. */
-        final double xPercent;
-        /** Share of the room above and below the window, 0-100. */
-        final double yPercent;
+        /** Whether it is measured from the room's right edge, else from its left. */
+        final boolean fromRight;
+        /** Whether it is measured from the room's bottom edge, else from its top. */
+        final boolean fromBottom;
+        /** How far in from those two edges it stands. */
+        final double dx;
+        final double dy;
         /** The size the player gave the kind; 0 for a kind only moved, which its content sizes. */
         final int width;
         final int height;
 
-        Placement(double xPercent, double yPercent, int width, int height) {
-            this.xPercent = clampPercent(xPercent);
-            this.yPercent = clampPercent(yPercent);
+        Placement(boolean fromRight, boolean fromBottom, double dx, double dy,
+                  int width, int height) {
+            this.fromRight = fromRight;
+            this.fromBottom = fromBottom;
+            this.dx = clampDistance(dx);
+            this.dy = clampDistance(dy);
             boolean sized = width > 0 && height > 0;
             this.width = sized ? Math.min(MAX_SIZE, width) : 0;
             this.height = sized ? Math.min(MAX_SIZE, height) : 0;
@@ -43,40 +52,46 @@ public final class ChatSmallWindowPlacements {
             return this.width > 0;
         }
 
-        /** The left edge of a window {@code width} wide on a screen {@code screenWidth} wide. */
-        double left(int screenWidth, int width) {
-            return ChatWindowPlacement.EDGE_MARGIN + this.xPercent / 100.0D
-                    * room(screenWidth, width);
+        /** Where a window {@code width} wide stands across a room {@code roomWidth} wide. */
+        double x(double roomWidth, int width) {
+            return this.fromRight ? roomWidth - width - this.dx : this.dx;
         }
 
-        /** The top edge of a window {@code height} tall on a screen {@code screenHeight} tall. */
-        double top(int screenHeight, int height) {
-            return ChatWindowPlacement.EDGE_MARGIN + this.yPercent / 100.0D
-                    * room(screenHeight, height);
+        /** Where a window {@code height} tall stands down a room {@code roomHeight} tall. */
+        double y(double roomHeight, int height) {
+            return this.fromBottom ? roomHeight - height - this.dy : this.dy;
+        }
+
+        /** The corner it is measured from as the layout file writes it. */
+        String corner() {
+            return (this.fromBottom ? "b" : "t") + (this.fromRight ? "r" : "l");
         }
     }
 
-    /** A window open as the chat closed: what it was, what it held, and where it stood. */
+    /** A window open as the chat closed: what it was, what it held, and where it stood in which window. */
     static final class Reopening {
         final ChatSmallWindowKind kind;
         final String key;
         /** What its content needs to come back as it was; null for nothing. */
         final Object state;
-        final double left;
-        final double top;
+        /** The chat window it stood in; null for the bare screen. */
+        final String parentId;
+        final double x;
+        final double y;
         final int width;
         final int height;
         /** Whether the player had given it its size. */
         final boolean sized;
 
         Reopening(ChatSmallWindowKind kind, String key, Object state,
-                  double left, double top, int width, int height,
+                  String parentId, double x, double y, int width, int height,
                   boolean sized) {
             this.kind = kind;
             this.key = key;
             this.state = state;
-            this.left = left;
-            this.top = top;
+            this.parentId = parentId;
+            this.x = x;
+            this.y = y;
             this.width = width;
             this.height = height;
             this.sized = sized;
@@ -98,28 +113,32 @@ public final class ChatSmallWindowPlacements {
     }
 
     /**
-     * Remembers where the player left a window, with its size when
-     * {@code sized}, and writes the layout file.
+     * Remembers where the player left a window in its room, with its size
+     * when {@code sized}, and writes the layout file.
      */
-    static void remember(ChatSmallWindowKind kind, double left, double top,
+    static void remember(ChatSmallWindowKind kind, double x, double y,
                          int width, int height, boolean sized,
-                         int screenWidth, int screenHeight) {
+                         double roomWidth, double roomHeight) {
         synchronized (ChatSmallWindowPlacements.class) {
-            PLACED.put(kind, placementOf(left, top, width, height, sized,
-                    screenWidth, screenHeight));
+            PLACED.put(kind, placementOf(x, y, width, height, sized,
+                    roomWidth, roomHeight));
         }
         ChatWindowLayout.persist();
     }
 
     /**
-     * The place of a window's box as shares of the room the screen leaves
-     * it, and its size when the player gave it one.
+     * The place of a window standing at {@code x}, {@code y} in a room,
+     * measured from the corner its middle is nearest to, and its size when
+     * the player gave it one.
      */
-    static Placement placementOf(double left, double top, int width,
-                                 int height, boolean sized, int screenWidth,
-                                 int screenHeight) {
-        return new Placement(percentOf(left, room(screenWidth, width)),
-                percentOf(top, room(screenHeight, height)),
+    static Placement placementOf(double x, double y, int width, int height,
+                                 boolean sized, double roomWidth,
+                                 double roomHeight) {
+        boolean fromRight = x + width / 2.0D > roomWidth / 2.0D;
+        boolean fromBottom = y + height / 2.0D > roomHeight / 2.0D;
+        return new Placement(fromRight, fromBottom,
+                fromRight ? roomWidth - width - x : x,
+                fromBottom ? roomHeight - height - y : y,
                 sized ? width : 0, sized ? height : 0);
     }
 
@@ -152,19 +171,8 @@ public final class ChatSmallWindowPlacements {
         OPEN_AT_CLOSE.clear();
     }
 
-    /** The room a screen {@code screen} long leaves a window {@code size} long. */
-    private static double room(int screen, int size) {
-        return Math.max(0.0D, screen - 2.0D * ChatWindowPlacement.EDGE_MARGIN
-                - size);
-    }
-
-    private static double percentOf(double edge, double room) {
-        return room <= 0.0D ? 0.0D : clampPercent(
-                (edge - ChatWindowPlacement.EDGE_MARGIN) / room * 100.0D);
-    }
-
-    private static double clampPercent(double value) {
-        return Double.isNaN(value) ? 0.0D : Math.max(0.0D, Math.min(100.0D,
-                value));
+    private static double clampDistance(double value) {
+        return Double.isNaN(value) ? 0.0D
+                : Math.max(0.0D, Math.min(MAX_DISTANCE, value));
     }
 }

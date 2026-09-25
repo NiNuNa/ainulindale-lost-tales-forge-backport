@@ -161,6 +161,11 @@ final class ChatEmojiSuggestionBox {
                 + PADDING;
     }
 
+    /** The anchor at which the box ends at {@code bottom}: for a list over a field that is not the bar. */
+    static int anchorEndingAt(int bottom) {
+        return bottom + BOTTOM_MARGIN;
+    }
+
     private int boxTop(int screenHeight) {
         return screenHeight - BOTTOM_MARGIN
                 - this.matches.size() * ROW_HEIGHT - PADDING * 2;

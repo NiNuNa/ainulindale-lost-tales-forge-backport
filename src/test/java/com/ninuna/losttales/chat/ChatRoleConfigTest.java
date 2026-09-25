@@ -70,10 +70,12 @@ public final class ChatRoleConfigTest {
                 .contains(";icon:item:minecraft:iron_sword@3"));
         assertFalse(ChatRoleConfig.formatRole(catalog.byId("reeve"))
                 .contains("icon:"));
-        // The seeded operator wears the Operator channel's face.
+        // The seeded operator wears whatever the Operator channel wears.
         ChatRoleCatalog seeded = ChatRoleConfig.parse(new String[] {
                 ChatRoleConfig.DEFAULT_OPERATOR_ENTRY}, null, collect);
-        assertEquals("expressionless",
+        assertEquals(ChatChannelIconSpec.Kind.CHANNEL,
+                seeded.byId("operator").getIcon().getKind());
+        assertEquals(ChatChannel.OPERATOR.getId(),
                 seeded.byId("operator").getIcon().getName());
         // The team mark wears its own, in the code.
         assertEquals("purple_heart", ChatAccountRole.TEAM.getIcon().getName());

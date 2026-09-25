@@ -85,8 +85,10 @@ final class ChatWindowFrame {
     private List<ChatLine> dividerSource;
     private int dividerSourceSize;
     private int dividerSourceLineId;
-    /** The tab shown while open, null for the closed-chat feed. */
+    /** The conversation shown while open; null for the closed-chat feed and for a page. */
     ChatTab view;
+    /** The page shown while open instead of a conversation; null for none. */
+    ChatTab page;
     boolean drawn;
     double boxLeft;
     double boxTop;

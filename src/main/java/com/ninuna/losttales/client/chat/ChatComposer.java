@@ -7,6 +7,7 @@ import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.util.StatCollector;
+import org.lwjgl.opengl.GL11;
 
 /**
  * What the bar is composing besides a fresh message: the message being
@@ -39,10 +40,10 @@ final class ChatComposer {
     private long editingMessageId = ChatMessageIds.NONE;
     private ChatTab editingTab;
     /** The chip drawn this frame, for the click that dismisses it. */
-    private int chipLeft;
-    private int chipTop;
-    private int chipRight;
-    private int chipBottom;
+    private double chipLeft;
+    private double chipTop;
+    private double chipRight;
+    private double chipBottom;
 
     /**
      * Starts answering a message in its tab, the line's {@code head} as
@@ -201,16 +202,12 @@ final class ChatComposer {
             return false;
         }
         // The line begins where the messages above it do: past the
-        // timestamp column, not across it.
-        ChatTimestampColumn columns = ChatTimestampColumn.of(frame, font);
-        int inset = Math.round(columns.messageX() * frame.scale);
-        int x = (int)Math.floor(frame.drawnLeft()) + inset;
-        int room = (int)Math.round(frame.boxRight - frame.boxLeft
-                - ChatMemberList.drawnWidth(frame) * frame.scale)
-                - inset - 6;
-        int y = (int)Math.floor(frame.drawnBaseline())
-                + LostTalesChatOverlayRenderer.LINE_HEIGHT
-                - LostTalesChatOverlayRenderer.TEXT_OFFSET;
+        // timestamp column, not across it, riding their origin's exact
+        // place as the area slides.
+        ChatTrailingStrip strip = ChatTrailingStrip.of(frame, font);
+        int x = strip.x;
+        int y = strip.y;
+        int room = strip.room;
         String label = font.trimStringToWidth(
                 isEditing()
                         ? StatCollector.translateToLocal(
@@ -225,15 +222,21 @@ final class ChatComposer {
         // glyph is not a five-pixel target.
         int crossX = x + width + 3;
         int crossY = y + 1;
-        this.chipLeft = crossX - 2;
-        this.chipTop = crossY - 2;
-        this.chipRight = crossX + LostTalesUiSheet.CLOSE.getWidth() + 2;
-        this.chipBottom = crossY + LostTalesUiSheet.CLOSE.getHeight() + 2;
-        LostTalesChatVisualStyle.drawColored(font, label, x, y,
-                LostTalesChatVisualStyle.asideRgb(), alpha);
+        this.chipLeft = crossX - 2 + strip.fractionX;
+        this.chipTop = crossY - 2 + strip.fractionY;
+        this.chipRight = this.chipLeft + LostTalesUiSheet.CLOSE.getWidth() + 4;
+        this.chipBottom = this.chipTop + LostTalesUiSheet.CLOSE.getHeight() + 4;
         LostTalesUiSheet cross = chipContains(mouseX, mouseY)
                 ? LostTalesUiSheet.CLOSE_HOVER : LostTalesUiSheet.CLOSE;
-        cross.drawWithShadow(crossX, crossY, alpha);
+        GL11.glPushMatrix();
+        try {
+            GL11.glTranslatef(strip.fractionX, strip.fractionY, 0.0F);
+            LostTalesChatVisualStyle.drawColored(font, label, x, y,
+                    LostTalesChatVisualStyle.asideRgb(), alpha);
+            cross.drawWithShadow(crossX, crossY, alpha);
+        } finally {
+            GL11.glPopMatrix();
+        }
         return true;
     }
 

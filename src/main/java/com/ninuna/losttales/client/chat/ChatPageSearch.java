@@ -1,4 +1,4 @@
-package com.ninuna.losttales.gui.screen.quest;
+package com.ninuna.losttales.client.chat;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -6,26 +6,26 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * What the journal's search is looking for, and whether a quest answers
- * it.
+ * What a page's search is looking for — the words typed in the well of
+ * a page window's tool strip — and whether an entry answers it: a quest
+ * in the journal, a member or an invitation in the party.
  *
- * <p>Every word typed has to appear somewhere in what a quest says — its
- * title, its category, its giver, what it asks — so a half-remembered
- * objective finds its quest and the order the words are typed in does
- * not matter. Case is ignored. This is the chat's search rule, asked of
- * a quest instead of a line.</p>
+ * <p>Every word typed has to appear somewhere in what the entry says,
+ * so a half-remembered objective finds its quest and the order the words
+ * are typed in does not matter. Case is ignored. This is the chat's
+ * search rule, asked of an entry instead of a line.</p>
  *
- * <p>Free of Minecraft: the screen hands it words, and a test can ask it
- * the same questions the screen does.</p>
+ * <p>Free of Minecraft: the page hands it words, and a test can ask it
+ * the same questions the page does.</p>
  */
-public final class QuestSearchQuery {
+public final class ChatPageSearch {
 
-    /** A search for nothing, which every quest answers. */
-    public static final QuestSearchQuery NONE = new QuestSearchQuery("");
+    /** A search for nothing, which every entry answers. */
+    public static final ChatPageSearch NONE = new ChatPageSearch("");
 
     private final List<String> words;
 
-    private QuestSearchQuery(String raw) {
+    private ChatPageSearch(String raw) {
         List<String> found = new ArrayList<String>();
         String text = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
         if (text.length() > 0) {
@@ -39,8 +39,8 @@ public final class QuestSearchQuery {
     }
 
     /** The search a typed line stands for. */
-    public static QuestSearchQuery of(String raw) {
-        QuestSearchQuery query = new QuestSearchQuery(raw);
+    public static ChatPageSearch of(String raw) {
+        ChatPageSearch query = new ChatPageSearch(raw);
         return query.isEmpty() ? NONE : query;
     }
 
@@ -55,7 +55,7 @@ public final class QuestSearchQuery {
     }
 
     /**
-     * Whether everything a quest says answers the search. The parts are
+     * Whether everything an entry says answers the search. The parts are
      * joined with a space between them, so a word never matches across
      * the join.
      */

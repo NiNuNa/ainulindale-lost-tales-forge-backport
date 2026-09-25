@@ -69,6 +69,11 @@ final class ChatSearch {
         return query;
     }
 
+    /** The window the search is open over; null while it is closed. */
+    static synchronized String windowId() {
+        return windowId;
+    }
+
     /** Opens the search over a window; the one already open there is kept. */
     static synchronized void open(String id) {
         if (id == null || id.equals(windowId)) {

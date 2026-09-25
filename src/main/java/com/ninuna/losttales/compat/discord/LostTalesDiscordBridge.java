@@ -1491,7 +1491,7 @@ public final class LostTalesDiscordBridge {
 
     /**
      * The name a link's game channel reads by: the channel's own
-     * ({@code Out of Character}, {@code Global}), or a faction's for a
+     * ({@code OOC}, {@code Global}), or a faction's for a
      * faction's chat ({@code Gondor}).
      */
     public static String gameChannelName(String key) {

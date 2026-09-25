@@ -7,7 +7,9 @@ import com.ninuna.losttales.client.gui.animation.LostTalesControlBarAnimation;
 import com.ninuna.losttales.client.gui.controlbar.LostTalesControlBar;
 import com.ninuna.losttales.client.gui.controlbar.LostTalesControlBar.Hint;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
+import com.ninuna.losttales.client.chat.LostTalesChatGui;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
+import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.config.client.LostTalesSettingsHubGui;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.screen.character.LostTalesCharacterProfileRouterGui;
@@ -19,7 +21,6 @@ import cpw.mods.fml.common.FMLLog;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
-import net.minecraft.client.gui.inventory.GuiInventory;
 import net.minecraft.client.resources.I18n;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
@@ -31,7 +32,7 @@ public class LostTalesCharacterMenuGui extends GuiScreen
     private static final int NONE = CharacterMenuSectorResolver.NONE;
     private static final int OPTION_PROFILE = CharacterMenuSectorResolver.PROFILE;
     private static final int OPTION_QUESTS = CharacterMenuSectorResolver.QUESTS;
-    private static final int OPTION_ITEMS = CharacterMenuSectorResolver.ITEMS;
+    private static final int OPTION_CHAT = CharacterMenuSectorResolver.CHAT;
     private static final int OPTION_MAP = CharacterMenuSectorResolver.MAP;
 
     private final GuiScreen parent;
@@ -68,7 +69,7 @@ public class LostTalesCharacterMenuGui extends GuiScreen
         drawRadialFrame(centerX, centerY, radius);
         drawRadialOption("PROFILE", OPTION_PROFILE, centerX, centerY - radius, centerX, centerY - 18);
         drawRadialOption("QUESTS", OPTION_QUESTS, centerX - radius, centerY, centerX - 22, centerY);
-        drawRadialOption("ITEMS", OPTION_ITEMS, centerX + radius, centerY, centerX + 22, centerY);
+        drawRadialOption("CHAT", OPTION_CHAT, centerX + radius, centerY, centerX + 22, centerY);
         drawRadialOption("MAP", OPTION_MAP, centerX, centerY + radius, centerX, centerY + 22);
         drawCenterOrnament(centerX, centerY);
         drawControlBar();
@@ -95,7 +96,7 @@ public class LostTalesCharacterMenuGui extends GuiScreen
             case OPTION_QUESTS:
                 drawTriangle(centerX, centerY, 0, this.height, 0, 0, color);
                 break;
-            case OPTION_ITEMS:
+            case OPTION_CHAT:
                 drawTriangle(centerX, centerY, this.width, 0,
                         this.width, this.height, color);
                 break;
@@ -192,8 +193,8 @@ public class LostTalesCharacterMenuGui extends GuiScreen
                 return "Character Info";
             case OPTION_QUESTS:
                 return "Quest Journal";
-            case OPTION_ITEMS:
-                return "Inventory";
+            case OPTION_CHAT:
+                return "Chat";
             case OPTION_MAP:
                 return "Middle-earth Map";
             default:
@@ -294,12 +295,10 @@ public class LostTalesCharacterMenuGui extends GuiScreen
                 this.mc.displayGuiScreen(new LostTalesCharacterProfileRouterGui(this));
                 break;
             case OPTION_QUESTS:
-                this.mc.displayGuiScreen(new LostTalesQuestJournalGui(this.parent));
+                LostTalesChatGui.openPage(QuestJournalPage.PAGE_ID);
                 break;
-            case OPTION_ITEMS:
-                if (this.mc.thePlayer != null) {
-                    this.mc.displayGuiScreen(new GuiInventory(this.mc.thePlayer));
-                }
+            case OPTION_CHAT:
+                this.mc.displayGuiScreen(new LostTalesChatGui(""));
                 break;
             case OPTION_MAP:
                 try {
@@ -322,7 +321,7 @@ public class LostTalesCharacterMenuGui extends GuiScreen
             return;
         }
         if (LostTalesKeyBindings.isQuestJournalKey(keyCode)) {
-            this.mc.displayGuiScreen(new LostTalesQuestJournalGui(this.parent));
+            LostTalesChatGui.openPage(QuestJournalPage.PAGE_ID);
             return;
         }
         if (keyCode == Keyboard.KEY_UP || keyCode == Keyboard.KEY_W) {
@@ -334,7 +333,7 @@ public class LostTalesCharacterMenuGui extends GuiScreen
             return;
         }
         if (keyCode == Keyboard.KEY_RIGHT || keyCode == Keyboard.KEY_D) {
-            openOption(OPTION_ITEMS);
+            openOption(OPTION_CHAT);
             return;
         }
         if (keyCode == Keyboard.KEY_DOWN || keyCode == Keyboard.KEY_S) {

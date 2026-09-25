@@ -6,6 +6,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiCornerCut;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
@@ -23,6 +24,7 @@ import java.lang.reflect.Field;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ChatLine;
@@ -347,6 +349,18 @@ final class LostTalesChatOverlayRenderer {
         frame.clearAvatars();
         List<ChatTab> tabs = ChatWindowFrame.visibleTabs(window);
         ChatTab view = ChatWindowFrame.activeTab(window, tabs);
+        if (view != null && view.isPage()) {
+            // A page is no conversation: its window holds no lines, no
+            // member list and no search, and the screen draws the page.
+            frame.page = view;
+            frame.view = null;
+            frame.lines = Collections.<ChatLine>emptyList();
+            frame.advanceFill(window.getFill());
+            layOutPageWindow(minecraft, chat, frame, window, screenWidth,
+                    screenHeight, opening);
+            return;
+        }
+        frame.page = null;
         ChatLineFilter filter = ChatLineFilter.of(view);
         // An open window lays its own lines out: at its own width when
         // it has one, with the grouping its own tab's sequence gives,
@@ -474,6 +488,98 @@ final class LostTalesChatOverlayRenderer {
         float originY = (float)frame.drawnBaseline();
         drawWindow(minecraft, chat, frame, filter, lines, scroll, room,
                 originX, originY, true, opening, chatWidth, columns);
+    }
+
+    /**
+     * A window with a page in front holds no history: it is laid out as any
+     * window is, on its own rectangle of the blurred frame, with no tool
+     * strip, and the page takes everything under its tab row. The screen
+     * draws the page itself ({@link #drawPageSurface}).
+     */
+    private static void layOutPageWindow(Minecraft minecraft,
+                                         GuiNewChat chat,
+                                         ChatWindowFrame frame,
+                                         ChatWindow window, int screenWidth,
+                                         int screenHeight,
+                                         LostTalesGuiAnimationSample opening) {
+        ChatWindowPlacement.Box box = ChatWindowPlacement.windowBounds(
+                window, minecraft, screenWidth, screenHeight);
+        frame.begin(box, chat.func_146244_h(), opening.getTranslationX(),
+                opening.getTranslationY());
+        frame.renderedScrollLines = 0.0D;
+        frame.historyMoving = false;
+        frame.members.clearDrawn();
+        // The row hangs from the window's top and the tool strip from the
+        // row; the stack's top stands where a conversation's would, so
+        // everything measured from it finds the row and the strip where
+        // they are.
+        frame.setStackTop(frame.boxTop + frame.motionY
+                + ChatChannelTabBar.ROW_HEIGHT
+                + ChatWindowPlacement.TOOL_STRIP_HEIGHT
+                + ChatWindowPlacement.HISTORY_TOP_MARGIN);
+        frame.drawn = true;
+        int ring = ChatWindowPlacement.FRAME_WIDTH;
+        LostTalesGuiRegionBlur.getInstance().drawRegion(
+                frame.drawnLeft() - ring, frame.boxTop + frame.motionY - ring,
+                frame.drawnLeft() + (frame.boxRight - frame.boxLeft) + ring,
+                frame.boxBottom + frame.motionY + ring, opening.getOpacity());
+    }
+
+    /**
+     * The page's box in a page window as drawn this frame: the window's
+     * width under its tool strip, down to its foot, laid on the display's
+     * grid.
+     */
+    static LostTalesUiHitBox pageBox(ChatWindowFrame frame) {
+        double left = frame.drawnLeft();
+        double top = ChatWindowFrame.snapToDisplayPixels(frame.historyTop());
+        double bottom = ChatWindowFrame.snapToDisplayPixels(
+                frame.boxBottom + frame.motionY);
+        return new LostTalesUiHitBox(left, top, frame.boxRight - frame.boxLeft,
+                Math.max(0.0D, bottom - top));
+    }
+
+    /**
+     * A page window's surface under its tool strip, in one layer with the
+     * frame's ring beside and under it: the small windows' surface, the
+     * inset plum black thinned by the chat's opacity. Then the frame's
+     * edges all round, since the window has no bar to draw the lower ones.
+     */
+    static void drawPageSurface(Minecraft minecraft, ChatWindowFrame frame,
+                                LostTalesGuiAnimationSample opening) {
+        if (minecraft == null || frame == null || !frame.drawn
+                || opening == null) {
+            return;
+        }
+        LostTalesUiHitBox page = pageBox(frame);
+        int ring = ChatWindowPlacement.FRAME_WIDTH;
+        float left = (float)page.left;
+        float right = (float)(page.left + page.width);
+        float top = (float)page.top;
+        float bottom = (float)(page.top + page.height);
+        int surface = LostTalesChatVisualStyle.insetArgb(opening.getOpacity()
+                * LostTalesChatVisualStyle.chatOpacity(minecraft));
+        LostTalesUiInk.fillRect(left, top, right, bottom, surface);
+        fillFrameSides(left, right, top, bottom, surface, surface);
+        LostTalesUiInk.fillRect(left - ring, bottom, right + ring,
+                bottom + ring - 1, surface);
+        LostTalesUiInk.fillRect(left - ring + 1, bottom + ring - 1,
+                right + ring - 1, bottom + ring, surface);
+    }
+
+    /** A page window's frame edges all round: it has no bar to carry the lower ones. */
+    static void drawPageFrameEdges(Minecraft minecraft, ChatWindowFrame frame,
+                                   LostTalesGuiAnimationSample opening) {
+        if (minecraft == null || frame == null || !frame.drawn
+                || opening == null) {
+            return;
+        }
+        float left = (float)frame.drawnLeft();
+        LostTalesUiWindowFrame.drawEdges(left,
+                (float)(frame.boxTop + frame.motionY),
+                left + (float)(frame.boxRight - frame.boxLeft),
+                (float)(frame.boxBottom + frame.motionY),
+                Math.round(255.0F * opening.getOpacity()));
     }
 
     /**
@@ -1232,16 +1338,33 @@ final class LostTalesChatOverlayRenderer {
         float topEdge = -roomUnscaled
                 - ChatWindowPlacement.HISTORY_TOP_MARGIN / scale;
         float bottomEdge = LINE_HEIGHT;
+        // The timestamp area's left edge: the text origin this method
+        // draws from lies messageX inside it. The avatars, the times and
+        // the separator ride it, so they slide with the words as the
+        // area goes.
+        float areaLeft = -columns.messageX();
         // The panel reaches from the window's left edge — past the
-        // timestamp column when there is one — to its right; the text
-        // origin this method draws from lies messageX inside it.
-        float panelLeft = -columns.messageX();
-        // The window's right edge, and the member list standing in from
-        // it as far as it has come out; the history's panel ends where
-        // the list begins, as it begins where the timestamp area ends.
-        float windowRight = panelLeft + unscaledWidth + 6.0F;
-        float panelRight = windowRight
-                - (open ? ChatMemberList.drawnWidth(frame) : 0.0F);
+        // timestamp column when there is one — to its right; the member
+        // list stands in from the window's right edge as far as it has
+        // come out, and the panel ends where it begins. An open window's
+        // edges are laid on the display's grid on the screen, where the
+        // window stands, and only then brought into the history's units:
+        // the text origin slides with the area and is laid on the grid
+        // afresh every frame, and edges measured from it would pick up
+        // its rounding and shake while the area moves.
+        float panelLeft = areaLeft;
+        float windowRight = areaLeft + unscaledWidth + 6.0F;
+        float panelRight = windowRight;
+        if (open) {
+            double screenLeft = frame.drawnLeft();
+            double screenRight = ChatWindowFrame.snapToDisplayPixels(
+                    screenLeft + (unscaledWidth + 6.0F) * scale);
+            panelLeft = (float)((screenLeft - originX) / scale);
+            windowRight = (float)((screenRight - originX) / scale);
+            panelRight = (float)((ChatWindowFrame.snapToDisplayPixels(
+                    screenRight - ChatMemberList.drawnWidth(frame) * scale)
+                    - originX) / scale);
+        }
         // The message area: from the timestamp column's separator, when
         // there is one, to the panel's right. The panel's backdrop and
         // every line's tint and shade stand in it and nowhere left of
@@ -1249,11 +1372,17 @@ final class LostTalesChatOverlayRenderer {
         // backgrounds are ever laid over each other. While the area is
         // driven out, what is left of it narrows toward the window's
         // edge.
-        float messageLeft = panelLeft + (columns.shows()
-                ? Math.max(0.0F, columns.separatorX()) : 0.0F);
+        float messageLeft = columns.shows()
+                ? Math.max(panelLeft, areaLeft + columns.separatorX())
+                : panelLeft;
+        // Where the words' own stretch begins: past the separator.
+        float wordsLeft = columns.shows()
+                ? messageLeft + ChatTimestampColumn.SEPARATOR_WIDTH
+                : panelLeft;
         // Where the area's contents are cut: the window's own left edge,
         // past which they slide as the area is driven out.
-        double areaClipLeft = originX + panelLeft * scale;
+        double areaClipLeft = open ? frame.drawnLeft()
+                : originX + panelLeft * scale;
         // The panel's opacity, shared by every stretch of it a line
         // recolours, so the stretch and the panel beside it are one.
         int panelAlpha = backdropAlpha(opacity, opening) / 2;
@@ -1396,11 +1525,7 @@ final class LostTalesChatOverlayRenderer {
                         + (totalLineCount <= 0 ? LINE_HEIGHT : 0.0F);
                 if (totalHeight < roomUnscaled - 0.01F) {
                     LostTalesUiSheet.EMPTY_HATCH.drawTiledFadingFromMiddle(
-                            columns.shows()
-                                    ? messageLeft + ChatTimestampColumn
-                                            .SEPARATOR_WIDTH
-                                    : panelLeft,
-                            topEdge, panelRight,
+                            wordsLeft, topEdge, panelRight,
                             hatchBottom(offset, hatchedHeight),
                             Math.round(EMPTY_HATCH_ALPHA * opacity
                                     * opening.getOpacity()));
@@ -1531,7 +1656,7 @@ final class LostTalesChatOverlayRenderer {
                         // with the divider's words — and the date comes
                         // back once the divider goes.
                         boolean unreadHere = lineIndex == dividerDateIndex;
-                        drawDividerRow(font, columns, panelLeft, panelRight,
+                        drawDividerRow(font, wordsLeft, panelRight,
                                 y - rowHeight,
                                 unreadHere ? dividerLabel : dayLabel,
                                 unreadHere ? UNREAD_DIVIDER_RGB
@@ -1718,7 +1843,7 @@ final class LostTalesChatOverlayRenderer {
                         // line is.
                         int dividerBottom = -(rows.dividerLineBottom()
                                 - Math.round(stackBase));
-                        drawDividerRow(font, columns, panelLeft,
+                        drawDividerRow(font, wordsLeft,
                                 panelRight, dividerBottom - LINE_HEIGHT,
                                 dividerLabel, UNREAD_DIVIDER_RGB, alpha);
                     }
@@ -1744,7 +1869,7 @@ final class LostTalesChatOverlayRenderer {
                                     areaClipLeft, Double.NaN, clipTop,
                                     clipBottom, true);
                             try {
-                                drawColumnTime(font, columns, panelLeft,
+                                drawColumnTime(font, columns, areaLeft,
                                         ChatTimestampFormatter.formatDrawnTime(
                                                 said.longValue()),
                                         stampTextTop(y, rowHeight,
@@ -1861,7 +1986,7 @@ final class LostTalesChatOverlayRenderer {
                     try {
                         drawAvatars(minecraft, frame, lines, firstLine,
                                 lastRow, dividerIndex, rows, glide, stackBase,
-                                opacity, opening, columns, panelLeft,
+                                opacity, opening, columns, areaLeft,
                                 originX, originY + stackOffset, scale,
                                 clipTop, clipBottom, areaClipLeft);
                     } finally {
@@ -1909,8 +2034,8 @@ final class LostTalesChatOverlayRenderer {
                     // shades below, with the rest of the history: the
                     // rules are what the window ends on, and everything
                     // the history draws goes behind them.
-                    drawVerticalRule(panelLeft + columns.separatorX(),
-                            panelLeft + columns.separatorX()
+                    drawVerticalRule(areaLeft + columns.separatorX(),
+                            areaLeft + columns.separatorX()
                                     + ChatTimestampColumn.SEPARATOR_WIDTH,
                             topEdge, bottomEdge,
                             Math.round(255.0F * opening.getOpacity()));
@@ -2487,20 +2612,16 @@ final class LostTalesChatOverlayRenderer {
      * a small one — so the rule is as fine as the date's strokes. The
      * unread divider draws it in crimson, a day's first message in the
      * timestamps' colour. {@code top} is the row's top edge in the
-     * caller's stack space.
+     * caller's stack space; {@code wordsLeft} is where the words'
+     * stretch begins, past the timestamp column.
      */
-    private static void drawDividerRow(FontRenderer font,
-                                       ChatTimestampColumn columns,
-                                       float panelLeft, float panelRight,
-                                       float top, String label, int rgb,
-                                       int alpha) {
+    private static void drawDividerRow(FontRenderer font, float wordsLeft,
+                                       float panelRight, float top,
+                                       String label, int rgb, int alpha) {
         if (alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
             return;
         }
-        float left = panelLeft + 3.0F + (columns.shows()
-                ? Math.max(0.0F, columns.separatorX())
-                        + ChatTimestampColumn.SEPARATOR_WIDTH
-                : 0.0F);
+        float left = wordsLeft + 3.0F;
         float right = panelRight - 3.0F;
         if (right <= left) {
             return;
@@ -3921,7 +4042,7 @@ final class LostTalesChatOverlayRenderer {
      */
     private static void drawColumnTime(FontRenderer font,
                                        ChatTimestampColumn columns,
-                                       float panelLeft, String time,
+                                       float areaLeft, String time,
                                        float textTop, int alpha) {
         if (font == null
                 || alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
@@ -3938,8 +4059,8 @@ final class LostTalesChatOverlayRenderer {
         float ink = (font.getStringWidth(rendered) - 1) * small;
         GL11.glPushMatrix();
         try {
-            GL11.glTranslatef(panelLeft
-                    + floorToStackPixel(columns.timeX(ink)), textTop, 0.0F);
+            GL11.glTranslatef(floorToStackPixel(areaLeft
+                    + columns.timeX(ink)), textTop, 0.0F);
             GL11.glScalef(small, small, 1.0F);
             LostTalesChatVisualStyle.drawColored(font, rendered, 0, 0,
                     colours ? LostTalesChatVisualStyle.asideRgb()

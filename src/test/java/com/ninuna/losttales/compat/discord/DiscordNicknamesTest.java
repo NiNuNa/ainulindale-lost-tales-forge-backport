@@ -83,10 +83,14 @@ public final class DiscordNicknamesTest {
                 DiscordMessageSanitizer.inboundStatusLine("  Out on the\nhills ",
                         "🧀", false));
         assertEquals(":bee: busy", DiscordMessageSanitizer.inboundStatusLine("busy", "Bee", true));
-        // A server's own emoji the chat lacks, and an emoji no font draws, are left out.
-        assertEquals("busy", DiscordMessageSanitizer.inboundStatusLine("busy", "pepe", true));
-        assertEquals("busy", DiscordMessageSanitizer.inboundStatusLine("busy",
+        // An emoji the chat lacks keeps its name, a server's own and a Unicode one alike.
+        assertEquals(":pepe: busy", DiscordMessageSanitizer.inboundStatusLine("busy", "pepe", true));
+        assertEquals(":melting_face: busy", DiscordMessageSanitizer.inboundStatusLine("busy",
                 "🫠", false));
+        assertEquals(":unicorn: off to :unicorn: land",
+                DiscordMessageSanitizer.inboundStatusLine("off to 🦄 land", "🦄", false));
+        // A name Discord would never send is left out.
+        assertEquals("busy", DiscordMessageSanitizer.inboundStatusLine("busy", "a b", true));
         assertEquals("", DiscordMessageSanitizer.inboundStatusLine(null, null, false));
         StringBuilder long_ = new StringBuilder();
         for (int index = 0; index < 60; index++) {

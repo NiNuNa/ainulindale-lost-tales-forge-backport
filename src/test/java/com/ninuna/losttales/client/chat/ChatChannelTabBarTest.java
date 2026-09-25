@@ -30,7 +30,7 @@ public final class ChatChannelTabBarTest {
     /**
      * Every control of the strip answers on the box it is drawn in and
      * nowhere else: the search button on its frame, an end control on
-     * the nine-pixel square round its glyph, a tab's cog or cross on its
+     * the nine-pixel square round its glyph, a tab's cross on its
      * square in the tab. The rows of the band above and below a box
      * answer nothing.
      */
@@ -189,55 +189,51 @@ public final class ChatChannelTabBarTest {
     /**
      * Every tab gives its buttons up at fixed shares of the full width,
      * all tabs at once since they share one width: the draft mark under
-     * two thirds, the cog under a half, the cross under a third.
+     * two thirds, the cross under a third.
      */
     @Test
     public void buttonsGoAtFixedSharesOfTheFullWidth() {
         double full = ChatChannelTabBar.DEFAULT_TAB_WIDTH;
         assertTrue(ChatChannelTabBar.draftStands(full * 2.0D / 3.0D));
         assertFalse(ChatChannelTabBar.draftStands(full * 2.0D / 3.0D - 0.01D));
-        assertTrue(ChatChannelTabBar.cogStands(full / 2.0D));
-        assertFalse(ChatChannelTabBar.cogStands(full / 2.0D - 0.01D));
         assertTrue(ChatChannelTabBar.closeStands(full / 3.0D));
         assertFalse(ChatChannelTabBar.closeStands(full / 3.0D - 0.01D));
-        // In that order, so a narrowing row never shows a cog without
-        // a cross beside it.
-        assertTrue(ChatChannelTabBar.DRAFT_SHARE > ChatChannelTabBar.COG_SHARE);
-        assertTrue(ChatChannelTabBar.COG_SHARE > ChatChannelTabBar.CLOSE_SHARE);
+        // In that order, so a narrowing row never shows a draft mark
+        // without a cross after it.
+        assertTrue(ChatChannelTabBar.DRAFT_SHARE > ChatChannelTabBar.CLOSE_SHARE);
     }
 
     /**
-     * A button fading out hands its room to the name as it goes: the
+     * A cross fading out hands its room to the name as it goes: the
      * name's room grows smoothly with the fade, never in a step, and is
      * never more than the name is wide.
      */
     @Test
     public void aFadingButtonHandsItsRoomToTheName() {
         int icon = 13;
-        int name = 80;
-        ChatChannelTabBar.TabRoom both = ChatChannelTabBar.roomFor(100.0D,
-                icon, name, 0.0D, 1.0F, 1.0F);
+        int name = 90;
+        ChatChannelTabBar.TabRoom shown = ChatChannelTabBar.roomFor(100.0D,
+                icon, name, 0.0D, 1.0F);
         assertEquals(100 - ChatChannelTabBar.PADDING_X
-                - ChatChannelTabBar.CONTROL_SIZE, both.closeLeft, EPSILON);
-        assertEquals(both.closeLeft - CONTROL, both.cogLeft, EPSILON);
-        assertEquals(100 - ChatChannelTabBar.PADDING_X - 2 * CONTROL,
-                both.contentRight, EPSILON);
-        assertEquals(both.contentRight - ChatChannelTabBar.PADDING_X - icon,
-                both.labelRoom, EPSILON);
-        double previous = both.labelRoom;
-        for (float cog = 0.9F; cog >= 0.0F; cog -= 0.1F) {
+                - ChatChannelTabBar.CONTROL_SIZE, shown.closeLeft, EPSILON);
+        assertEquals(100 - ChatChannelTabBar.PADDING_X - CONTROL,
+                shown.contentRight, EPSILON);
+        assertEquals(shown.contentRight - ChatChannelTabBar.PADDING_X - icon,
+                shown.labelRoom, EPSILON);
+        double previous = shown.labelRoom;
+        for (float close = 0.9F; close >= 0.0F; close -= 0.1F) {
             ChatChannelTabBar.TabRoom fading = ChatChannelTabBar.roomFor(
-                    100.0D, icon, name, 0.0D, 1.0F, cog);
+                    100.0D, icon, name, 0.0D, close);
             assertTrue(fading.labelRoom > previous);
             assertTrue(fading.labelRoom - previous <= CONTROL * 0.1D + EPSILON);
             previous = fading.labelRoom;
         }
         // A short name never takes more than it is wide.
         assertEquals(12.0D, ChatChannelTabBar.roomFor(100.0D, icon, 12, 0.0D,
-                0.0F, 0.0F).labelRoom, EPSILON);
-        // Counters stand between the name and the buttons.
-        assertEquals(both.labelRoom - 20.0D, ChatChannelTabBar.roomFor(100.0D,
-                icon, name, 20.0D, 1.0F, 1.0F).labelRoom, EPSILON);
+                0.0F).labelRoom, EPSILON);
+        // The draft mark stands between the name and the cross.
+        assertEquals(shown.labelRoom - 20.0D, ChatChannelTabBar.roomFor(100.0D,
+                icon, name, 20.0D, 1.0F).labelRoom, EPSILON);
     }
 
     /**
@@ -249,16 +245,12 @@ public final class ChatChannelTabBarTest {
     public void theTabInFrontCutsItsIconBeforeItsCross() {
         int width = ChatChannelTabBar.PADDING_X * 2 + 10;
         ChatChannelTabBar.TabRoom narrow = ChatChannelTabBar.roomFor(width,
-                13, 40, 0.0D, 1.0F, 0.0F);
+                13, 40, 0.0D, 1.0F);
         assertEquals(width - ChatChannelTabBar.PADDING_X
                 - ChatChannelTabBar.CONTROL_SIZE, narrow.closeLeft, EPSILON);
         assertEquals(narrow.closeLeft - ChatChannelTabBar.CONTROL_GAP,
                 narrow.contentRight, EPSILON);
         assertEquals(0.0D, narrow.labelRoom, EPSILON);
-        // Without a cross the cog stands at the right padding instead.
-        ChatChannelTabBar.TabRoom cogOnly = ChatChannelTabBar.roomFor(100.0D,
-                0, 30, 0.0D, 0.0F, 1.0F);
-        assertEquals(cogOnly.closeLeft, cogOnly.cogLeft, EPSILON);
     }
 
     /**
@@ -296,7 +288,7 @@ public final class ChatChannelTabBarTest {
     }
 
     /**
-     * A tab's buttons ride its right edge exactly at every GUI scale. At
+     * A tab's cross rides its right edge exactly at every GUI scale. At
      * scale three a third of a GUI pixel has no exact float, and a cross
      * laid on the display pixel at or before its place dropped a pixel
      * against the tab's edge on some frames and not others; every place
@@ -314,15 +306,11 @@ public final class ChatChannelTabBarTest {
                 float left = 212 + tab.drawnLeftOffset;
                 float width = tab.drawnWidthSnapped;
                 ChatChannelTabBar.TabRoom room = ChatChannelTabBar.roomFor(
-                        width, 13, 40, 0.0D, 1.0F, 1.0F);
+                        width, 13, 40, 0.0D, 1.0F);
                 double edge = left + width;
                 assertEquals(edge - ChatChannelTabBar.PADDING_X
                         - ChatChannelTabBar.CONTROL_SIZE,
                         ChatChannelTabBar.snappedLeft(left + room.closeLeft,
-                                step), 1.0E-4D);
-                assertEquals(edge - ChatChannelTabBar.PADDING_X
-                        - ChatChannelTabBar.CONTROL_SIZE - CONTROL,
-                        ChatChannelTabBar.snappedLeft(left + room.cogLeft,
                                 step), 1.0E-4D);
             }
         }
@@ -408,7 +396,7 @@ public final class ChatChannelTabBarTest {
                                             double toLeft, double toWidth) {
         ChatChannelTabBar.Tab tab = new ChatChannelTabBar.Tab(
                 ChatTab.of(com.ninuna.losttales.chat.ChatChannel.GLOBAL), 0, null,
-                "Global", 30, 30, false, 0, (int)toWidth, -1, -1, -1, false);
+                "Global", 30, 30, false, 0, (int)toWidth, -1, -1, false);
         tab.standAt(fromLeft, fromWidth, 1.0D / 3.0D);
         tab.toLeft = toLeft;
         tab.exactWidth = toWidth;

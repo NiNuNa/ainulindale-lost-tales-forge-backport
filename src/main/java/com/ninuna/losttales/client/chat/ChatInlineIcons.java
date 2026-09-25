@@ -368,6 +368,18 @@ final class ChatInlineIcons {
 
     /* Two-pass conveniences for callers that draw one glyph at a time. */
 
+    static void drawSheetSprite(LostTalesUiSheet sprite, float boxX,
+                                float boxY, float size, int rgb, int alpha) {
+        int shadow = LostTalesChatVisualStyle.shadowAlpha(alpha);
+        if (shadow > 0) {
+            drawSheetSprite(sprite,
+                    boxX + LostTalesChatVisualStyle.SHADOW_OFFSET,
+                    boxY + LostTalesChatVisualStyle.SHADOW_OFFSET, size, rgb,
+                    shadow, true);
+        }
+        drawSheetSprite(sprite, boxX, boxY, size, rgb, alpha, false);
+    }
+
     static void drawEmoji(Minecraft minecraft, ChatEmoji emoji,
                           float boxX, float boxY, float size, int alpha) {
         int shadow = LostTalesChatVisualStyle.shadowAlpha(alpha);
