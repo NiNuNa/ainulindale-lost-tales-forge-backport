@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarkerIcon;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
@@ -64,7 +65,7 @@ final class ChatMapMarkerRenderer {
                                 float boxX, float boxY, float box, float scale,
                                 int rgb, int alpha) {
         if (minecraft == null || icon == null || scale <= 0.0F
-                || alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+                || alpha < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
             return;
         }
         float width = artWidth(icon) * scale;

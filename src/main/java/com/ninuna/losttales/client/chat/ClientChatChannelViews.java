@@ -2,10 +2,10 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMessageIds;
-import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
-import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationState;
 import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.client.motion.MotionIds;
+import com.ninuna.losttales.client.window.TabSelection;
+import com.ninuna.losttales.client.window.WindowOpening;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -118,10 +118,6 @@ public final class ClientChatChannelViews {
      * them; {@link ChatMessageIds#NONE} until the replay says.
      */
     private static long sessionArrival = ChatMessageIds.NONE;
-
-    private static long openedNanos;
-    private static final LostTalesGuiAnimationState OPEN_STATE =
-            new LostTalesGuiAnimationState();
 
     /** Filters whose visible subset is kept; one per window is plenty. */
     private static final int MAX_CACHED_FILTERS = 8;
@@ -334,7 +330,7 @@ public final class ClientChatChannelViews {
      * it, which is what jumping to the present goes back to.</p>
      */
     static synchronized void holdPosition(ChatTab tab,
-                                          ChatWindowFrame frame) {
+                                          ChatFrame frame) {
         ChatTab view = key(tab);
         if (view == null || frame == null) {
             return;
@@ -907,25 +903,6 @@ public final class ClientChatChannelViews {
         }
     }
 
-    /** Starts the history's entrance when the chat screen opens. */
-    public static synchronized void noteOpened() {
-        openedNanos = System.nanoTime();
-        OPEN_STATE.restart();
-    }
-
-    /**
-     * The opening motion for the history and the tabs: every other Lost
-     * Tales screen's ({@link MotionIds#SCREEN_OPEN}), so the chat arrives
-     * like the rest of the interface. Only the input bars keep their own
-     * entrance.
-     */
-    public static synchronized LostTalesGuiAnimationSample openSample() {
-        if (!Motions.enabled() || openedNanos <= 0L) {
-            return LostTalesGuiAnimationSample.SETTLED;
-        }
-        return OPEN_STATE.sample(System.nanoTime());
-    }
-
     public static synchronized void clear() {
         ClientChatContextHistory.clear();
         ClientChatOlderHistory.clear();
@@ -941,7 +918,7 @@ public final class ClientChatChannelViews {
         UNREAD_DIVIDERS.clear();
         NEWEST_MESSAGE_BY_VIEW.clear();
         sessionArrival = ChatMessageIds.NONE;
-        openedNanos = 0L;
+        WindowOpening.clear();
         invalidateCache();
         ChatGroupRuns.clear();
         ClientChatMessageIds.clear();
@@ -950,15 +927,15 @@ public final class ClientChatChannelViews {
         ClientChatPendingEchoes.clear();
         LostTalesChatPresentation.forgetServerClock();
         ChatWindowLines.clear();
-        ChatWindowFrame.clear();
+        ChatFrame.clear();
         ClientChatAccountRoles.clear();
         ClientChatIdentities.clear();
         ClientChatIdentitySelection.clear();
         ClientChatConsoleEvents.clear();
-        ChatTabSelection.clear();
+        TabSelection.clear();
         // The history is gone with the world, and so are its conversations
         // and what was said in them.
-        ChatWindowLayout.closeConversations();
+        ChatLayout.closeConversations();
         ClientChatChannelState.forgetConversationHistory();
         ChatChannelIcons.forgetPortraits();
         ChatChannelIcons.forgetChannelIcons();
@@ -997,9 +974,9 @@ public final class ClientChatChannelViews {
         ClientChatPendingEchoes.clear();
         LostTalesChatPresentation.forgetServerClock();
         ChatWindowLines.clear();
-        ChatWindowFrame.clear();
+        ChatFrame.clear();
         ClientChatConsoleEvents.clear();
-        ChatTabSelection.clear();
+        TabSelection.clear();
     }
 
     /** Line ids remembered: the history's capacity and a margin. */

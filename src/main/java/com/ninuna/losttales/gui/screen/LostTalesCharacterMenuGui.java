@@ -7,8 +7,8 @@ import com.ninuna.losttales.client.gui.animation.LostTalesControlBarAnimation;
 import com.ninuna.losttales.client.gui.controlbar.LostTalesControlBar;
 import com.ninuna.losttales.client.gui.controlbar.LostTalesControlBar.Hint;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
-import com.ninuna.losttales.client.chat.LostTalesChatGui;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
+import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.config.client.LostTalesSettingsHubGui;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
@@ -295,10 +295,10 @@ public class LostTalesCharacterMenuGui extends GuiScreen
                 this.mc.displayGuiScreen(new LostTalesCharacterProfileRouterGui(this));
                 break;
             case OPTION_QUESTS:
-                LostTalesChatGui.openPage(QuestJournalPage.PAGE_ID);
+                WindowScreen.openPage(QuestJournalPage.PAGE_ID);
                 break;
             case OPTION_CHAT:
-                this.mc.displayGuiScreen(new LostTalesChatGui(""));
+                this.mc.displayGuiScreen(new WindowScreen(""));
                 break;
             case OPTION_MAP:
                 try {
@@ -321,7 +321,7 @@ public class LostTalesCharacterMenuGui extends GuiScreen
             return;
         }
         if (LostTalesKeyBindings.isQuestJournalKey(keyCode)) {
-            LostTalesChatGui.openPage(QuestJournalPage.PAGE_ID);
+            WindowScreen.openPage(QuestJournalPage.PAGE_ID);
             return;
         }
         if (keyCode == Keyboard.KEY_UP || keyCode == Keyboard.KEY_W) {

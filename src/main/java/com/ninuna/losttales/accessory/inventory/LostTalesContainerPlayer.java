@@ -1,6 +1,5 @@
 package com.ninuna.losttales.accessory.inventory;
 
-import com.ninuna.losttales.accessory.player.AccessoryInventory;
 import com.ninuna.losttales.accessory.player.AccessoryPlayerData;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.InventoryPlayer;

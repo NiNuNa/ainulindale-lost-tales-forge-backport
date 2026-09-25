@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.TabRow;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import org.junit.Test;
 
@@ -23,21 +24,21 @@ public final class ChatTabArtworkTest {
         // The selected pieces are their feet wider than the resting
         // ones: the feet reach past the tab on the rule's row.
         assertEquals(LostTalesUiSheet.TAB_LEFT.getWidth()
-                        + ChatChannelTabBar.SELECTED_FOOT,
+                        + TabRow.SELECTED_FOOT,
                 LostTalesUiSheet.TAB_SELECTED_LEFT.getWidth());
-        assertEquals(1, ChatChannelTabBar.SELECTED_FOOT);
+        assertEquals(1, TabRow.SELECTED_FOOT);
         // The selected pieces are one row taller: the row they stand on
         // the rule with. Every tab stands at one top, so there is no
         // lift; a sheet with taller selected pieces would lift the tab.
-        assertEquals(ChatChannelTabBar.LIFT + 1,
+        assertEquals(TabRow.LIFT + 1,
                 LostTalesUiSheet.TAB_SELECTED_LEFT.getHeight()
                         - LostTalesUiSheet.TAB_LEFT.getHeight());
-        assertEquals(0, ChatChannelTabBar.LIFT);
+        assertEquals(0, TabRow.LIFT);
         // A tab draws its pieces whole and stands on the window's top
         // rule, so the row is one row taller than the artwork; a
         // re-export at another height moves the row with it.
         assertEquals("A tab is its pieces whole, plus the rule they stand on",
-                ChatChannelTabBar.HEIGHT,
+                TabRow.HEIGHT,
                 LostTalesUiSheet.TAB_LEFT.getHeight() + 1);
     }
 

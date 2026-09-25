@@ -11,6 +11,7 @@ import java.util.UUID;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.ChatComponentTranslation;
+import net.minecraft.util.EnumChatFormatting;
 
 /**
  * Notices role changes the server never sees as an event. Operator status
@@ -131,9 +132,12 @@ public final class LostTalesChatRoleRosterWatcher {
                 continue;
             }
             if (operator != OPERATORS.contains(id)) {
-                player.addChatMessage(new ChatComponentTranslation(operator
-                        ? "chat.losttales.operator.granted"
-                        : "chat.losttales.operator.revoked"));
+                // The Server's own word, in the yellow of a join or a leave.
+                ChatComponentTranslation note = new ChatComponentTranslation(
+                        operator ? "chat.losttales.operator.granted"
+                                : "chat.losttales.operator.revoked");
+                note.getChatStyle().setColor(EnumChatFormatting.YELLOW);
+                player.addChatMessage(note);
             }
             if (reads && !CONSOLE_READERS.contains(id)) {
                 LostTalesChatService.sendConsoleHistory(player);

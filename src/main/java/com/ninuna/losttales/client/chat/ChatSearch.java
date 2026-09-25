@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.WindowSearch;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -11,9 +12,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ChatLine;
 
 /**
- * One search at a time, over the window being typed in: the query, the
- * messages of the front tab that answer it — lit in place — and the one
- * the view stands on. The lines are the view's own, scanned each frame
+ * What the windows' one search ({@link WindowSearch}) finds in a
+ * conversation: the messages of the front tab that answer it — lit in
+ * place — and the one the view stands on. The lines are the view's own, scanned each frame
  * they are drawn, so an edit, a removal or an older page arriving is
  * searched the moment it shows. Walking past the oldest match asks the
  * server for the page before the view's oldest line, the way scrolling
@@ -21,7 +22,7 @@ import net.minecraft.client.gui.ChatLine;
  * kept history is exhausted. Closed with the screen, and whenever the
  * input moves to another window.
  */
-final class ChatSearch {
+public final class ChatSearch {
     /** How brightly a match is lit; the match the view stands on is lit whole. */
     static final float MATCH_SHARE = 0.4F;
     /** How long to wait for a page before giving the paging up. */
@@ -42,8 +43,9 @@ final class ChatSearch {
         }
     }
 
-    private static String windowId;
-    private static String query = "";
+    /** The search and the words the matches below were found for. */
+    private static int seenGeneration = -1;
+    private static String seenQuery = "";
     private static ChatSearchQuery parsed = ChatSearchQuery.EMPTY;
     /** The matches as chat line ids, newest first, as the view lists them. */
     private static List<Integer> matches = Collections.emptyList();
@@ -57,65 +59,36 @@ final class ChatSearch {
 
     private ChatSearch() {}
 
-    static synchronized boolean isOpen() {
-        return windowId != null;
-    }
-
-    static synchronized boolean isOpenOn(String id) {
-        return windowId != null && windowId.equals(id);
-    }
-
-    static synchronized String query() {
-        return query;
-    }
-
-    /** The window the search is open over; null while it is closed. */
-    static synchronized String windowId() {
-        return windowId;
-    }
-
-    /** Opens the search over a window; the one already open there is kept. */
-    static synchronized void open(String id) {
-        if (id == null || id.equals(windowId)) {
-            return;
+    /**
+     * Catches up with the windows' search: a search closed, or opened over
+     * another window, forgets everything found, and new words forget the
+     * place and are read again.
+     */
+    private static void sync() {
+        int generation = WindowSearch.generation();
+        if (generation != seenGeneration) {
+            seenGeneration = generation;
+            seenQuery = "";
+            parsed = ChatSearchQuery.EMPTY;
+            matches = Collections.emptyList();
+            MATCH_SET.clear();
+            current = -1;
+            TEXTS.clear();
+            pagingOlder = false;
         }
-        close();
-        windowId = id;
-    }
-
-    static synchronized void close() {
-        windowId = null;
-        query = "";
-        parsed = ChatSearchQuery.EMPTY;
-        matches = Collections.emptyList();
-        MATCH_SET.clear();
-        current = -1;
-        TEXTS.clear();
-        pagingOlder = false;
-    }
-
-    /** Closes the search unless it is over the window being typed in. */
-    static synchronized void closeUnless(String activeWindowId) {
-        if (windowId != null && !windowId.equals(activeWindowId)) {
-            close();
+        String query = WindowSearch.query();
+        if (!query.equals(seenQuery)) {
+            seenQuery = query;
+            parsed = ChatSearchQuery.parse(query);
+            current = -1;
+            pagingOlder = false;
         }
-    }
-
-    /** The query as typed; a change forgets the place and rescans. */
-    static synchronized void setQuery(String text) {
-        String typed = text == null ? "" : text;
-        if (typed.equals(query)) {
-            return;
-        }
-        query = typed;
-        parsed = ChatSearchQuery.parse(typed);
-        current = -1;
-        pagingOlder = false;
     }
 
     /** How lit a line is by the search: whole for the match stood on, a share for any other. */
     static synchronized float litShare(int chatLineId) {
-        if (windowId == null || MATCH_SET.isEmpty()) {
+        sync();
+        if (!WindowSearch.isOpen() || MATCH_SET.isEmpty()) {
             return 0.0F;
         }
         Integer id = Integer.valueOf(chatLineId);
@@ -125,12 +98,14 @@ final class ChatSearch {
         return MATCH_SET.contains(id) ? MATCH_SHARE : 0.0F;
     }
 
-    static synchronized int matchCount() {
+    public static synchronized int matchCount() {
+        sync();
         return matches.size();
     }
 
     /** The place of the match stood on, one-based; zero while on none. */
-    static synchronized int position() {
+    public static synchronized int position() {
+        sync();
         return current < 0 ? 0 : current + 1;
     }
 
@@ -140,8 +115,9 @@ final class ChatSearch {
      * when the query changed or a page brought an older one that was
      * waited for; zero to stay. Called every frame the window is drawn.
      */
-    static synchronized int scan(Minecraft minecraft, ChatWindowFrame frame) {
-        if (windowId == null || frame == null || !windowId.equals(frame.windowId)) {
+    static synchronized int scan(Minecraft minecraft, ChatFrame frame) {
+        sync();
+        if (frame == null || !WindowSearch.isOpenOn(frame.windowId)) {
             return 0;
         }
         List<ChatLine> lines = frame.lines;
@@ -199,8 +175,9 @@ final class ChatSearch {
      * server's kept history, and the landing follows when it comes.
      */
     static synchronized int walk(boolean forward, Minecraft minecraft,
-                                 ChatWindowFrame frame) {
-        if (windowId == null || frame == null || !windowId.equals(frame.windowId)) {
+                                 ChatFrame frame) {
+        sync();
+        if (frame == null || !WindowSearch.isOpenOn(frame.windowId)) {
             return 0;
         }
         if (forward) {
@@ -223,7 +200,7 @@ final class ChatSearch {
     }
 
     /** Asks for the page before the view's oldest line, once per oldest line. */
-    private static void askOlder(Minecraft minecraft, ChatWindowFrame frame) {
+    private static void askOlder(Minecraft minecraft, ChatFrame frame) {
         if (parsed.isEmpty() || frame.view == null
                 || ClientChatOlderHistory.isExhausted(frame.view)) {
             pagingOlder = false;
@@ -240,7 +217,7 @@ final class ChatSearch {
     }
 
     /** While a page is waited for: a page that came without a match asks for the next. */
-    private static void keepPaging(Minecraft minecraft, ChatWindowFrame frame) {
+    private static void keepPaging(Minecraft minecraft, ChatFrame frame) {
         long now = System.nanoTime();
         if (frame.view == null || ClientChatOlderHistory.isExhausted(frame.view)
                 || now - pagingSince > PAGE_WAIT_NANOS) {

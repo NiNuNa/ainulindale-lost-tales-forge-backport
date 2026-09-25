@@ -4,6 +4,8 @@ import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.gui.style.LostTalesUiCornerCut;
+import com.ninuna.losttales.gui.style.LostTalesUiCornerMark;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.UUID;
@@ -39,35 +41,14 @@ import net.minecraft.util.StatCollector;
  * characters spoke.</p>
  */
 public final class ChatPresenceMark {
-    /** A mark's size on screen: the sheet's own, one texel to one pixel. */
-    public static final int SIZE = 5;
-    /** How far the mark's left edge stands short of the head's right edge. */
-    public static final int INSET_X = 3;
-    /** How far its top edge stands short of the head's bottom edge: one more. */
-    public static final int INSET_Y = INSET_X + 1;
-    /**
-     * How far the mark stands past the head's own edges. A head that
-     * wears one is laid out as this much wider and taller: the head and
-     * its mark are one icon, so a name beside it keeps its clear space
-     * from the mark rather than from the face.
-     */
-    public static final int OVERHANG_X = SIZE - INSET_X;
-    public static final int OVERHANG_Y = SIZE - INSET_Y;
-    /**
-     * The outline every mark shares, and the ivory sphere with them, row
-     * by row from its top: the column each row's ink starts at. Round:
-     * its top and bottom rows are a pixel in from its sides
-     * ({@code ChatPresenceMarkTest} reads the sheet to hold it).
-     */
-    static final int[] SPHERE_INK_LEFT = {1, 0, 0, 0, 1};
 
     private ChatPresenceMark() {}
 
     /** The cut a head drawn at {@code headX}, {@code headY}, {@code headSize} square gives its mark. */
     public static LostTalesUiCornerCut cutFor(float headX, float headY,
                                               float headSize) {
-        return LostTalesUiCornerCut.around(headX + headSize - INSET_X,
-                headY + headSize - INSET_Y, SPHERE_INK_LEFT);
+        return LostTalesUiCornerCut.around(headX + headSize - LostTalesUiCornerMark.INSET_X,
+                headY + headSize - LostTalesUiCornerMark.INSET_Y, LostTalesUiCornerMark.SPHERE_INK_LEFT);
     }
 
     /**
@@ -90,8 +71,8 @@ public final class ChatPresenceMark {
      */
     public static void beginShadowCut(float headX, float headY,
                                       float headSize) {
-        beginHeadCut(headX + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                headY + LostTalesChatVisualStyle.SHADOW_OFFSET, headSize);
+        beginHeadCut(headX + LostTalesUiInk.SHADOW_OFFSET,
+                headY + LostTalesUiInk.SHADOW_OFFSET, headSize);
     }
 
     /** Ends the cut, whether the head drew or not. */
@@ -108,8 +89,8 @@ public final class ChatPresenceMark {
         if (alpha <= 0) {
             return;
         }
-        markOf(presence).drawWithShadow(headX + headSize - INSET_X,
-                headY + headSize - INSET_Y, alpha);
+        markOf(presence).drawWithShadow(headX + headSize - LostTalesUiCornerMark.INSET_X,
+                headY + headSize - LostTalesUiCornerMark.INSET_Y, alpha);
     }
 
     /**

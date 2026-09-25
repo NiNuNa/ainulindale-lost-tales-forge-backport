@@ -934,6 +934,30 @@ public final class LostTalesClassTransformerTest {
                 "drawMapCompass"));
     }
 
+    /**
+     * The map in a window is cut to its box by LOTR's own scissor, moved
+     * there, and hears LOTR's news for the open map through the window
+     * screen. Without either the map keeps a screen of its own.
+     */
+    @Test
+    public void theMapInAWindowFollowsItsBoxAndHearsItsNews()
+            throws Exception {
+        ClassNode map = transform("lotr.client.gui.LOTRGuiMap");
+        assertTrue(containsStaticHook(map, "setupMapClipping",
+                LOTR_MAP_LAYOUT_HOOK_OWNER, "lotrScissor"));
+        assertTrue(Boolean.getBoolean(LostTalesClassTransformer
+                .LOTR_MAP_WINDOW_CLIP_ACTIVE_PROPERTY));
+        ClassNode proxy = transform("lotr.client.LOTRClientProxy");
+        assertTrue(containsStaticHook(proxy, "setMapIsOp",
+                "com/ninuna/losttales/client/mapmarker/LostTalesMapPage",
+                "screenOf"));
+        assertTrue(containsStaticHook(proxy, "setMapCWPProtectionMessage",
+                "com/ninuna/losttales/client/mapmarker/LostTalesMapPage",
+                "screenOf"));
+        assertTrue(Boolean.getBoolean(LostTalesClassTransformer
+                .LOTR_MAP_WINDOW_NEWS_ACTIVE_PROPERTY));
+    }
+
     @Test
     public void clippedLotrMapPreviewsUseOceanPadding() throws Exception {
         ClassNode transformed = transform("lotr.client.gui.LOTRGuiMap");

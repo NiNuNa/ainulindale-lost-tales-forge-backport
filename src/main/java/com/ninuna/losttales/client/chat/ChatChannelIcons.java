@@ -7,6 +7,12 @@ import com.ninuna.losttales.chat.ChatChannelIconSpec;
 import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
+import com.ninuna.losttales.client.window.TabIcons;
+import com.ninuna.losttales.client.window.TabMark;
+import com.ninuna.losttales.gui.style.LostTalesUiClip;
+import com.ninuna.losttales.gui.style.LostTalesUiCornerMark;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.gui.style.LostTalesUiItemIcon;
 import cpw.mods.fml.common.FMLLog;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
@@ -47,19 +53,9 @@ import net.minecraft.item.ItemStack;
  * what waits unread ({@link ChatIconMark}), cut into the icon as a
  * head's status sphere is cut into the head.</p>
  */
-final class ChatChannelIcons {
-    /** Icons are drawn at the sheet's own sprite size, never scaled. */
-    static final int SIZE = ChatEmoji.SPRITE_SIZE;
-    /**
-     * The room an icon that may wear a mark takes across: the icon and
-     * the two pixels its mark stands past it, kept whether a mark shows
-     * or not, so a name never moves as one comes and goes.
-     */
-    static final int SLOT = SIZE + ChatPresenceMark.OVERHANG_X;
-    /** Gap between the icon and the text. */
-    static final int GAP = 3;
+public final class ChatChannelIcons {
     /** Where a linked channel's icon is cut in two, across its box. */
-    private static final float HALF = SIZE / 2.0F;
+    private static final float HALF = TabIcons.SIZE / 2.0F;
     /** The face a channel given no icon of its own wears, and a role too. */
     static final ChatEmoji PLAIN_FACE = ChatEmoji.SLIGHT_SMILE;
     /** A head is drawn as it is in the lines, centred in the icon's box. */
@@ -224,23 +220,15 @@ final class ChatChannelIcons {
      * head for a whisper with a player the client can place, the tab's
      * emoji otherwise, and no mark in its corner.
      */
-    static void draw(Minecraft minecraft, ChatTab tab, float x, float y,
+    public static void draw(Minecraft minecraft, ChatTab tab, float x, float y,
                      int alpha) {
-        draw(minecraft, tab, x, y, alpha, ChatIconMark.NONE);
+        draw(minecraft, tab, x, y, alpha, TabMark.NONE);
     }
 
     /** As above, the icon wearing {@code mark} in its corner. */
-    static void draw(final Minecraft minecraft, ChatTab tab, float x, float y,
-                     final int alpha, final ChatIconMark mark) {
+    public static void draw(final Minecraft minecraft, ChatTab tab, float x, float y,
+                     final int alpha, final TabMark mark) {
         if (minecraft == null || tab == null) {
-            return;
-        }
-        if (tab.isPage()) {
-            // A page wears the item its system gave it.
-            ChatPages.Page page = tab.page();
-            if (page != null) {
-                drawItemIcon(minecraft, page.icon(), x, y, alpha, false, mark);
-            }
             return;
         }
         if (!tab.isNpc() && !tab.isWhisper()) {
@@ -257,19 +245,19 @@ final class ChatChannelIcons {
                 drawItemIcon(minecraft, item, x, y, alpha, linked, mark);
                 return;
             }
-            drawEmojiIcon(minecraft, iconOf(tab), x, y, SIZE, alpha, linked,
+            drawEmojiIcon(minecraft, iconOf(tab), x, y, TabIcons.SIZE, alpha, linked,
                     mark);
             return;
         }
-        final float inset = (SIZE - HEAD_SIZE) / 2.0F;
+        final float inset = (TabIcons.SIZE - HEAD_SIZE) / 2.0F;
         if (tab.isNpc()) {
             final String portrait = npcPortrait(tab);
             if (portrait != null) {
                 final float headX = x + inset;
                 final float headY = y + inset;
                 // A head fading with its window is one picture.
-                LostTalesUiFlatLayers.draw(alpha, x, y, x + SLOT + 1,
-                        y + SIZE + ChatPresenceMark.OVERHANG_Y + 1,
+                LostTalesUiFlatLayers.draw(alpha, x, y, x + TabIcons.SLOT + 1,
+                        y + TabIcons.SIZE + LostTalesUiCornerMark.OVERHANG_Y + 1,
                         new LostTalesUiFlatLayers.Layers() {
                             @Override
                             public void draw() {
@@ -285,10 +273,10 @@ final class ChatChannelIcons {
                 // The head and its sphere are one icon, so the icon that
                 // is centred in the slot is the pair, not the face: the
                 // face sits left of centre and the sphere fills the rest.
-                final float headX = x + (SIZE - HEAD_SIZE
-                        - ChatPresenceMark.OVERHANG_X) / 2.0F;
-                final float headY = y + (float)Math.floor((SIZE - HEAD_SIZE
-                        - ChatPresenceMark.OVERHANG_Y) / 2.0F);
+                final float headX = x + (TabIcons.SIZE - HEAD_SIZE
+                        - LostTalesUiCornerMark.OVERHANG_X) / 2.0F;
+                final float headY = y + (float)Math.floor((TabIcons.SIZE - HEAD_SIZE
+                        - LostTalesUiCornerMark.OVERHANG_Y) / 2.0F);
                 // A conversation's tab wears the other player's head, so
                 // it wears the status of the identity the conversation is
                 // with, in the corner the head gives up for it — until
@@ -296,8 +284,8 @@ final class ChatChannelIcons {
                 final ChatPresence presence = ClientChatPresence.presenceOf(
                         partner, ChatPresenceIdentity.character(
                                 ClientChatChannelState.partnerCharacterIdOf(tab)));
-                LostTalesUiFlatLayers.draw(alpha, x, y, x + SLOT + 1,
-                        y + SIZE + ChatPresenceMark.OVERHANG_Y + 1,
+                LostTalesUiFlatLayers.draw(alpha, x, y, x + TabIcons.SLOT + 1,
+                        y + TabIcons.SIZE + LostTalesUiCornerMark.OVERHANG_Y + 1,
                         new LostTalesUiFlatLayers.Layers() {
                             @Override
                             public void draw() {
@@ -308,7 +296,7 @@ final class ChatChannelIcons {
                 return;
             }
         }
-        drawEmojiIcon(minecraft, iconOf(tab), x, y, SIZE, alpha, false, mark);
+        drawEmojiIcon(minecraft, iconOf(tab), x, y, TabIcons.SIZE, alpha, false, mark);
     }
 
     /**
@@ -320,7 +308,7 @@ final class ChatChannelIcons {
                                  float x, float y, float size, int alpha) {
         drawEmojiIcon(minecraft, iconOf(channel), x, y, size, alpha,
                 ClientChatChannelState.isLinkedToDiscord(ChatTab.of(channel)),
-                ChatIconMark.NONE);
+                TabMark.NONE);
     }
 
     /**
@@ -333,7 +321,7 @@ final class ChatChannelIcons {
                                       final ChatEmoji emoji, final float x,
                                       final float y, final float size,
                                       final int alpha, final boolean linked,
-                                      final ChatIconMark mark) {
+                                      final TabMark mark) {
         if (emoji == null) {
             return;
         }
@@ -355,8 +343,8 @@ final class ChatChannelIcons {
             return;
         }
         LostTalesUiFlatLayers.draw(alpha, x, y,
-                x + size + ChatPresenceMark.OVERHANG_X + 1,
-                y + size + ChatPresenceMark.OVERHANG_Y + 1, layers);
+                x + size + LostTalesUiCornerMark.OVERHANG_X + 1,
+                y + size + LostTalesUiCornerMark.OVERHANG_Y + 1, layers);
     }
 
     /**
@@ -369,8 +357,8 @@ final class ChatChannelIcons {
     static void drawEmojiLayers(Minecraft minecraft, ChatEmoji emoji, float x,
                                 float y, float size, int alpha,
                                 boolean linked, LostTalesUiCornerCut cut) {
-        int shadow = LostTalesChatVisualStyle.shadowAlpha(alpha);
-        float offset = LostTalesChatVisualStyle.SHADOW_OFFSET;
+        int shadow = LostTalesUiInk.shadowAlpha(alpha);
+        float offset = LostTalesUiInk.SHADOW_OFFSET;
         if (shadow > 0) {
             drawEmojiPieces(minecraft, emoji, x + offset, y + offset, size,
                     shadow, true, linked, cut.moved(offset, offset));
@@ -388,7 +376,7 @@ final class ChatChannelIcons {
                                         final boolean silhouette,
                                         final boolean linked,
                                         LostTalesUiCornerCut cut) {
-        final float half = HALF * size / SIZE;
+        final float half = HALF * size / TabIcons.SIZE;
         forEachBand(cut, x, y, size, new Band() {
             @Override
             public void draw(float top, float bottom, float right) {
@@ -414,20 +402,20 @@ final class ChatChannelIcons {
                                      final ItemStack item, final float x,
                                      final float y, final int alpha,
                                      final boolean linked,
-                                     final ChatIconMark mark) {
-        final LostTalesUiCornerCut cut = mark.cut(x, y, SIZE);
+                                     final TabMark mark) {
+        final LostTalesUiCornerCut cut = mark.cut(x, y, TabIcons.SIZE);
         if (!linked && cut.isNone()) {
-            ChatInlineIcons.drawItem(minecraft, item, x, y, SIZE, alpha);
+            LostTalesUiItemIcon.drawFitted(minecraft, item, x, y, TabIcons.SIZE, alpha);
             return;
         }
-        int shadow = LostTalesChatVisualStyle.shadowAlpha(alpha);
-        float offset = LostTalesChatVisualStyle.SHADOW_OFFSET;
+        int shadow = LostTalesUiInk.shadowAlpha(alpha);
+        float offset = LostTalesUiInk.SHADOW_OFFSET;
         if (shadow > 0) {
             drawItemPieces(minecraft, item, x + offset, y + offset, shadow,
                     true, linked, cut.moved(offset, offset));
         }
         drawItemPieces(minecraft, item, x, y, alpha, false, linked, cut);
-        mark.draw(x, y, SIZE, alpha);
+        mark.draw(x, y, TabIcons.SIZE, alpha);
     }
 
     private static void drawItemPieces(final Minecraft minecraft,
@@ -436,31 +424,31 @@ final class ChatChannelIcons {
                                        final boolean silhouette,
                                        final boolean linked,
                                        LostTalesUiCornerCut cut) {
-        forEachBand(cut, x, y, SIZE, new Band() {
+        forEachBand(cut, x, y, TabIcons.SIZE, new Band() {
             @Override
             public void draw(float top, float bottom, float right) {
                 // An item reaches a little past its box, so a piece is
                 // clipped only where it is cut: at a band's rows inside
                 // the box, at the cut, and at the middle beside Discord's
                 // half. The box's own outer edges stay open.
-                float clipTop = top <= 0.0F ? -SIZE : top;
-                float clipBottom = bottom >= SIZE ? 2 * SIZE : bottom;
+                float clipTop = top <= 0.0F ? -TabIcons.SIZE : top;
+                float clipBottom = bottom >= TabIcons.SIZE ? 2 * TabIcons.SIZE : bottom;
                 float clipRight = linked ? Math.min(HALF, right)
-                        : right >= SIZE ? 2 * SIZE : right;
-                boolean clipped = LostTalesChatOverlayRenderer.beginLocalClip(
-                        minecraft, x - SIZE, y + clipTop, x + clipRight,
+                        : right >= TabIcons.SIZE ? 2 * TabIcons.SIZE : right;
+                boolean clipped = LostTalesUiClip.beginLocal(
+                        minecraft, x - TabIcons.SIZE, y + clipTop, x + clipRight,
                         y + clipBottom);
                 if (clipped) {
                     try {
-                        ChatInlineIcons.drawItem(minecraft, item, x, y, SIZE,
+                        LostTalesUiItemIcon.drawFitted(minecraft, item, x, y, TabIcons.SIZE,
                                 alpha, silhouette);
                     } finally {
-                        LostTalesChatOverlayRenderer.endVerticalClip(true);
+                        LostTalesUiClip.end(true);
                     }
                 }
                 if (linked) {
                     ChatEmojiRenderer.drawRegion(minecraft, ChatEmoji.DISCORD,
-                            x, y, SIZE, alpha, silhouette, HALF, top, right,
+                            x, y, TabIcons.SIZE, alpha, silhouette, HALF, top, right,
                             bottom);
                 }
             }
@@ -505,15 +493,15 @@ final class ChatChannelIcons {
      */
     private static void drawNpcIcon(Minecraft minecraft, String portrait,
                                     float headX, float headY, int alpha,
-                                    ChatIconMark mark) {
+                                    TabMark mark) {
         LostTalesUiCornerCut cut = mark.cut(headX, headY, HEAD_SIZE);
-        int shadow = LostTalesChatVisualStyle.shadowAlpha(alpha);
-        float offset = LostTalesChatVisualStyle.SHADOW_OFFSET;
+        int shadow = LostTalesUiInk.shadowAlpha(alpha);
+        float offset = LostTalesUiInk.SHADOW_OFFSET;
         if (shadow > 0) {
             LostTalesCharacterHeadIconRenderer.beginCorner(
                     cut.moved(offset, offset));
             LostTalesSilhouetteRenderState.begin(
-                    LostTalesChatVisualStyle.SHADOW);
+                    LostTalesUiInk.SHADOW);
             try {
                 LostTalesCharacterHeadIconRenderer.drawTintedNpcHeadBase(
                         minecraft, portrait, headX + offset, headY + offset,
@@ -543,17 +531,17 @@ final class ChatChannelIcons {
     private static void drawPartnerIcon(Minecraft minecraft, UUID partner,
                                         ChatPresence presence, float headX,
                                         float headY, int alpha,
-                                        ChatIconMark mark) {
+                                        TabMark mark) {
         LostTalesUiCornerCut cut = mark.isNone()
                 ? ChatPresenceMark.cutFor(headX, headY, HEAD_SIZE)
                 : mark.cut(headX, headY, HEAD_SIZE);
-        int shadow = LostTalesChatVisualStyle.shadowAlpha(alpha);
-        float offset = LostTalesChatVisualStyle.SHADOW_OFFSET;
+        int shadow = LostTalesUiInk.shadowAlpha(alpha);
+        float offset = LostTalesUiInk.SHADOW_OFFSET;
         if (shadow > 0) {
             LostTalesCharacterHeadIconRenderer.beginCorner(
                     cut.moved(offset, offset));
             LostTalesSilhouetteRenderState.begin(
-                    LostTalesChatVisualStyle.SHADOW);
+                    LostTalesUiInk.SHADOW);
             try {
                 LostTalesCharacterHeadIconRenderer.drawTintedAccountHeadBase(
                         minecraft, partner, headX + offset, headY + offset,
@@ -610,15 +598,11 @@ final class ChatChannelIcons {
 
     /**
      * The emoji a tab wears, which also says whether it has an icon's slot
-     * at all; a page's item stands in that slot, so it answers the plain
-     * face, which is never drawn for it.
+     * at all.
      */
-    static ChatEmoji iconOf(ChatTab tab) {
+    public static ChatEmoji iconOf(ChatTab tab) {
         if (tab == null) {
             return null;
-        }
-        if (tab.isPage()) {
-            return PLAIN_FACE;
         }
         if (tab.isNpc()) {
             return ChatEmoji.GRINNING;
@@ -634,7 +618,7 @@ final class ChatChannelIcons {
      * emoji this build has, the code's own otherwise — which is also
      * what stands in for a chosen item this client cannot draw.
      */
-    static ChatEmoji iconOf(ChatChannel channel) {
+    public static ChatEmoji iconOf(ChatChannel channel) {
         if (channel == null) {
             return null;
         }

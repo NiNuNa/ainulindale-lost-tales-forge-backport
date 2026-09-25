@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -16,7 +17,7 @@ public final class ChatTimestampColumnTest {
 
     /** {@code 12:59 PM}: 41 pixels of ink, leaning a pixel either way and shadowed. */
     private static final int WIDEST = 41 + 2 * ChatTimestampColumn.ITALIC_LEAN
-            + LostTalesChatVisualStyle.SHADOW_OFFSET;
+            + LostTalesUiInk.SHADOW_OFFSET;
 
     @Test
     public void theAvatarStandsSevenPixelsFromEitherSide() {

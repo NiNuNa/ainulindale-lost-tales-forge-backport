@@ -1,5 +1,8 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.PointerRegions;
+import com.ninuna.losttales.client.window.WindowStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiCornerMark;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.chat.ChatMentionCandidate;
 import com.ninuna.losttales.chat.ChatNameSuggester;
@@ -7,6 +10,7 @@ import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.Collections;
 import java.util.List;
@@ -33,7 +37,7 @@ final class ChatNameSuggestionBox {
     static final int MAX_ROWS = 8;
     private static final int ROW_HEIGHT = 11;
     /** The rows stand two pixels inside the frame's ink, as a framed button's content does. */
-    private static final int PADDING = LostTalesChatVisualStyle.POPUP_INSET;
+    private static final int PADDING = WindowStyle.POPUP_INSET;
     /** The face's box and the gap after it, shared by every row. */
     private static final int ICON_SIZE = 8;
     /**
@@ -41,7 +45,7 @@ final class ChatNameSuggestionBox {
      * stands past it, which is one icon.
      */
     private static final int ICON_WIDTH =
-            ICON_SIZE + ChatPresenceMark.OVERHANG_X;
+            ICON_SIZE + LostTalesUiCornerMark.OVERHANG_X;
     private static final int ICON_GAP = 3;
     /**
      * How far above the input anchor ({@link ChatInputBar#inputAnchor})
@@ -150,7 +154,7 @@ final class ChatNameSuggestionBox {
     }
 
     void draw(Minecraft minecraft, FontRenderer font,
-              ChatPointerRegions regions, int screenHeight, int inputX,
+              PointerRegions regions, int screenHeight, int inputX,
               double mouseX, double mouseY) {
         if (!isActive()) {
             return;
@@ -163,7 +167,7 @@ final class ChatNameSuggestionBox {
             this.selectedIndex = hoveredRow;
         }
         regions.add(inputX, top, inputX + width, bottom);
-        LostTalesChatVisualStyle.drawPopupList(inputX, top, inputX + width,
+        WindowStyle.drawPopupList(inputX, top, inputX + width,
                 bottom, top + PADDING, ROW_HEIGHT,
                 this.selectedIndex < this.matches.size()
                         ? this.selectedIndex : -1);
@@ -171,7 +175,7 @@ final class ChatNameSuggestionBox {
             int rowTop = top + PADDING + row * ROW_HEIGHT;
             ChatMentionCandidate candidate = this.matches.get(row);
             drawFace(minecraft, candidate, inputX + PADDING, rowTop + 1);
-            LostTalesChatVisualStyle.drawColored(font,
+            LostTalesUiInk.drawText(font,
                     "@" + candidate.getDisplayName(),
                     inputX + PADDING + ICON_WIDTH + ICON_GAP, rowTop + 2,
                     rowColor(candidate), 255);
@@ -206,16 +210,16 @@ final class ChatNameSuggestionBox {
                     x - inset, y - inset, ChatEmoji.SPRITE_SIZE, 255);
             return;
         }
-        int shadow = LostTalesChatVisualStyle.shadowAlpha(255);
+        int shadow = LostTalesUiInk.shadowAlpha(255);
         if (shadow > 0) {
             ChatPresenceMark.beginShadowCut(x, y, ICON_SIZE);
             LostTalesSilhouetteRenderState.begin(
-                    LostTalesChatVisualStyle.SHADOW);
+                    LostTalesUiInk.SHADOW);
             try {
                 LostTalesCharacterHeadIconRenderer.drawTintedAccountHeadBase(
                         minecraft, account,
-                        x + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                        y + LostTalesChatVisualStyle.SHADOW_OFFSET,
+                        x + LostTalesUiInk.SHADOW_OFFSET,
+                        y + LostTalesUiInk.SHADOW_OFFSET,
                         ICON_SIZE, 1.0F, 1.0F, 1.0F, shadow / 255.0F);
             } finally {
                 LostTalesSilhouetteRenderState.end();

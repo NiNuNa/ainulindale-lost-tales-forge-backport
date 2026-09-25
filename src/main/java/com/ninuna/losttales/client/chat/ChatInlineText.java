@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
@@ -74,7 +75,7 @@ final class ChatInlineText {
     static void draw(Minecraft minecraft, FontRenderer font, String text,
                      String style, int x, int y, int rgb, int alpha) {
         if (font == null || text == null
-                || alpha < LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+                || alpha < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
             return;
         }
         List<ChatEmojiParser.Segment> segments = ChatEmojiParser.split(text);
@@ -90,7 +91,7 @@ final class ChatInlineText {
                 continue;
             }
             String piece = style + segment.getText();
-            LostTalesChatVisualStyle.drawColored(font, piece, cursor, y, rgb,
+            LostTalesUiInk.drawText(font, piece, cursor, y, rgb,
                     alpha);
             cursor += font.getStringWidth(piece);
         }

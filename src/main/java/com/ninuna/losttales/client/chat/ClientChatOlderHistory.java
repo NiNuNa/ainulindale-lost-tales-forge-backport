@@ -49,7 +49,7 @@ final class ClientChatOlderHistory {
     static synchronized boolean requestIfAtTop(Minecraft minecraft, ChatTab view,
                                                List<ChatLine> lines, boolean atTop) {
         if (!atTop || minecraft == null || minecraft.ingameGUI == null
-                || view == null || view.isNpc() || view.isPage() || lines == null
+                || view == null || view.isNpc() || lines == null
                 || lines.isEmpty()) {
             return false;
         }

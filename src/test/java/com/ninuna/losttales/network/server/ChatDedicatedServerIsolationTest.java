@@ -23,7 +23,6 @@ import com.ninuna.losttales.network.packet.LostTalesChatHistorySyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
 import com.ninuna.losttales.network.packet.character.CharacterAppearanceSyncPacket;
-import java.io.IOException;
 import org.junit.Test;
 
 /** Common chat routing and packet classes must remain loadable without client code. */

@@ -4,8 +4,6 @@ import com.ninuna.losttales.client.gui.animation.LostTalesControlBarAnimation;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import lotr.client.LOTRTextures;
-import lotr.client.gui.LOTRGuiMap;
-import net.minecraft.client.Minecraft;
 import org.lwjgl.opengl.GL11;
 
 /**
@@ -97,14 +95,10 @@ public final class LostTalesLotrMapCompass {
                 + LostTalesLotrMapLegend.getAnimatedReservedHeight(gui);
     }
 
+    /** The map being drawn, on its own screen or in a window, while it has the full-screen layout. */
     private static LostTalesLotrMapGui currentMapGui() {
-        Minecraft minecraft = Minecraft.getMinecraft();
-        Object screen = minecraft == null ? null : minecraft.currentScreen;
-        if (!(screen instanceof LostTalesLotrMapGui)) {
-            return null;
-        }
-        LOTRGuiMap gui = (LOTRGuiMap)screen;
-        return LostTalesLotrMapLayout.isFullscreenLayoutActive(gui)
-                ? (LostTalesLotrMapGui)gui : null;
+        LostTalesLotrMapGui gui = LostTalesLotrMapGui.drawing();
+        return gui != null && LostTalesLotrMapLayout.isFullscreenLayoutActive(gui)
+                ? gui : null;
     }
 }

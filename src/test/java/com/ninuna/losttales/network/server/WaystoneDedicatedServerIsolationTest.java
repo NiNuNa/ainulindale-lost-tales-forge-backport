@@ -12,8 +12,6 @@ import com.ninuna.losttales.network.packet.LostTalesWaystoneStatePacket;
 import com.ninuna.losttales.network.packet.LostTalesWaystoneTravelRequestPacket;
 import com.ninuna.losttales.world.waystone.LostTalesGlowstoneHouseWaystonePlacer;
 import com.ninuna.losttales.world.waystone.LostTalesWaystoneGenerationHandler;
-import cpw.mods.fml.common.IWorldGenerator;
-import java.io.IOException;
 import org.junit.Test;
 
 public final class WaystoneDedicatedServerIsolationTest {

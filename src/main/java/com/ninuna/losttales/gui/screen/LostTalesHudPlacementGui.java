@@ -1,8 +1,10 @@
 package com.ninuna.losttales.gui.screen;
 
-import com.ninuna.losttales.client.chat.ChatWindowLayout;
-import com.ninuna.losttales.client.chat.ChatWindowLayoutStore;
-import com.ninuna.losttales.client.chat.ChatWindowPlacement;
+import com.ninuna.losttales.client.chat.ChatFeedPlacement;
+import com.ninuna.losttales.client.chat.ChatLayout;
+import com.ninuna.losttales.client.window.WindowLayout;
+import com.ninuna.losttales.client.window.WindowLayoutStore;
+import com.ninuna.losttales.client.window.WindowPlacement;
 import com.ninuna.losttales.client.gui.LostTalesGuiPointerTargets;
 import com.ninuna.losttales.client.gui.LostTalesPointerInteractable;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
@@ -23,7 +25,7 @@ import org.lwjgl.input.Keyboard;
  * Direct-manipulation editor for every movable Lost Tales HUD panel. The
  * fixed panels read and write their percent offsets in the config. The
  * feed the closed chat shows is an element too: it reads and writes the
- * feed position in {@link ChatWindowLayout}, the one the closed chat
+ * feed position in {@link WindowLayout}, the one the closed chat
  * draws it at, and drags in fractional pixels. Chat windows are part of
  * the chat screen, not the HUD, so they are not here; they are moved and
  * resized in the chat screen itself.
@@ -103,10 +105,10 @@ public class LostTalesHudPlacementGui extends GuiScreen
             this.snappedToCenterY = false;
             if (clicked != null) {
                 if (clicked.precise()) {
-                    ChatWindowPlacement.Box box = clicked.preciseBounds(this);
-                    this.dragOffsetX = ChatWindowPlacement.preciseMouseX(
+                    WindowPlacement.Box box = clicked.preciseBounds(this);
+                    this.dragOffsetX = WindowPlacement.preciseMouseX(
                             this.mc, this.width) - box.x;
-                    this.dragOffsetY = ChatWindowPlacement.preciseMouseY(
+                    this.dragOffsetY = WindowPlacement.preciseMouseY(
                             this.mc, this.height) - box.y;
                 } else {
                     HudPlacementLayout.Bounds bounds = getBounds(clicked);
@@ -162,12 +164,12 @@ public class LostTalesHudPlacementGui extends GuiScreen
 
     /** The feed follows the raw mouse in fractional pixels. */
     private void dragPrecise() {
-        ChatWindowPlacement.Box box = this.selected.preciseBounds(this);
+        WindowPlacement.Box box = this.selected.preciseBounds(this);
         HudPlacementLayout.PreciseDragResult position =
                 HudPlacementLayout.constrainDrag(
-                        ChatWindowPlacement.preciseMouseX(this.mc, this.width)
+                        WindowPlacement.preciseMouseX(this.mc, this.width)
                                 - this.dragOffsetX,
-                        ChatWindowPlacement.preciseMouseY(this.mc, this.height)
+                        WindowPlacement.preciseMouseY(this.mc, this.height)
                                 - this.dragOffsetY,
                         box.width, (int)Math.round(box.height),
                         this.width, this.height,
@@ -341,7 +343,7 @@ public class LostTalesHudPlacementGui extends GuiScreen
 
     private void nudgeSelected(int dx, int dy) {
         if (this.selected.precise()) {
-            ChatWindowPlacement.Box box = this.selected.preciseBounds(this);
+            WindowPlacement.Box box = this.selected.preciseBounds(this);
             HudPlacementLayout.PreciseDragResult position =
                     HudPlacementLayout.constrainDrag(
                             box.x + dx, box.y + dy, box.width,
@@ -374,7 +376,7 @@ public class LostTalesHudPlacementGui extends GuiScreen
 
     private HudPlacementLayout.Bounds getBounds(Placeable element) {
         if (element.precise()) {
-            ChatWindowPlacement.Box box = element.preciseBounds(this);
+            WindowPlacement.Box box = element.preciseBounds(this);
             return HudPlacementLayout.bounds((int)Math.floor(box.x),
                     (int)Math.floor(box.y), box.width,
                     (int)Math.round(box.height));
@@ -429,7 +431,7 @@ public class LostTalesHudPlacementGui extends GuiScreen
         void persist();
         /** Whether the element positions itself in fractional pixels. */
         boolean precise();
-        ChatWindowPlacement.Box preciseBounds(LostTalesHudPlacementGui gui);
+        WindowPlacement.Box preciseBounds(LostTalesHudPlacementGui gui);
         /** Live fractional move of the top-left corner. */
         void moveTo(double x, double y, LostTalesHudPlacementGui gui);
     }
@@ -461,12 +463,12 @@ public class LostTalesHudPlacementGui extends GuiScreen
 
         @Override
         public double offsetX() {
-            return ChatWindowLayout.feedOffsetX();
+            return ChatLayout.feedOffsetX();
         }
 
         @Override
         public double offsetY() {
-            return ChatWindowLayout.feedOffsetY();
+            return ChatLayout.feedOffsetY();
         }
 
         @Override
@@ -491,11 +493,11 @@ public class LostTalesHudPlacementGui extends GuiScreen
 
         @Override
         public void apply(double offsetX, double offsetY) {
-            double previousX = ChatWindowLayout.feedOffsetX();
-            double previousY = ChatWindowLayout.feedOffsetY();
-            ChatWindowLayout.setFeedPosition(offsetX, offsetY, false);
-            if (ChatWindowLayout.feedOffsetX() != previousX
-                    || ChatWindowLayout.feedOffsetY() != previousY) {
+            double previousX = ChatLayout.feedOffsetX();
+            double previousY = ChatLayout.feedOffsetY();
+            ChatLayout.setFeedPosition(offsetX, offsetY, false);
+            if (ChatLayout.feedOffsetX() != previousX
+                    || ChatLayout.feedOffsetY() != previousY) {
                 this.unsaved = true;
             }
         }
@@ -508,7 +510,7 @@ public class LostTalesHudPlacementGui extends GuiScreen
             this.unsaved = false;
             // apply() has already moved the feed; the store writes it
             // without dropping windows it could not place yet.
-            ChatWindowLayoutStore.saveFeedPosition();
+            ChatLayout.saveFeedPosition();
         }
 
         @Override
@@ -517,17 +519,17 @@ public class LostTalesHudPlacementGui extends GuiScreen
         }
 
         @Override
-        public ChatWindowPlacement.Box preciseBounds(
+        public WindowPlacement.Box preciseBounds(
                 LostTalesHudPlacementGui gui) {
-            return ChatWindowPlacement.feedBounds(gui.mc, gui.width,
+            return ChatFeedPlacement.bounds(gui.mc, gui.width,
                     gui.height);
         }
 
         @Override
         public void moveTo(double x, double y, LostTalesHudPlacementGui gui) {
-            ChatWindowPlacement.Box box = preciseBounds(gui);
-            apply(ChatWindowPlacement.feedPercentX(x, gui.mc, gui.width),
-                    ChatWindowPlacement.feedPercentY(y + box.height, gui.mc,
+            WindowPlacement.Box box = preciseBounds(gui);
+            apply(ChatFeedPlacement.percentX(x, gui.mc, gui.width),
+                    ChatFeedPlacement.percentY(y + box.height, gui.mc,
                             gui.height));
         }
     }
@@ -673,7 +675,7 @@ public class LostTalesHudPlacementGui extends GuiScreen
         }
 
         @Override
-        public ChatWindowPlacement.Box preciseBounds(
+        public WindowPlacement.Box preciseBounds(
                 LostTalesHudPlacementGui gui) {
             return null;
         }

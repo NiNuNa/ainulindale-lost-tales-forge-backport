@@ -1,8 +1,8 @@
 package com.ninuna.losttales.gui.screen.party;
 
 import com.ninuna.losttales.chat.ChatChannel;
-import com.ninuna.losttales.client.chat.ChatPageContent;
-import com.ninuna.losttales.client.chat.ChatPageSearch;
+import com.ninuna.losttales.client.window.PageContent;
+import com.ninuna.losttales.client.window.PageSearch;
 import com.ninuna.losttales.client.party.ClientPartyDisplayNames;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.client.party.ClientPartyTrackingCache;
@@ -37,7 +37,7 @@ import org.lwjgl.opengl.GL11;
  * changes the party on its own; every action is checked again by the
  * server. An action that cannot be undone asks first, inside the page.
  */
-public final class PartyPage extends ChatPageContent {
+public final class PartyPage extends PageContent {
     /** The code name the page is registered and remembered under. */
     public static final String PAGE_ID = "party";
 
@@ -1287,7 +1287,7 @@ public final class PartyPage extends ChatPageContent {
         if (party == null) {
             return Collections.emptyList();
         }
-        ChatPageSearch search = ChatPageSearch.of(this.query);
+        PageSearch search = PageSearch.of(this.query);
         List<PartyMemberSnapshot> shown = new ArrayList<PartyMemberSnapshot>();
         for (PartyMemberSnapshot member : party.getMembers()) {
             if (search.matches(member.getCharacterName())) {
@@ -1300,7 +1300,7 @@ public final class PartyPage extends ChatPageContent {
     /** The invitations whose either name holds the search's words. */
     private List<InvitationEntry> shownInvitations(
             PartyStateSnapshot snapshot) {
-        ChatPageSearch search = ChatPageSearch.of(this.query);
+        PageSearch search = PageSearch.of(this.query);
         List<InvitationEntry> shown = new ArrayList<InvitationEntry>();
         for (InvitationEntry entry : getInvitationEntries(snapshot)) {
             if (search.matches(entry.invitation.getInvitingCharacterName(),
@@ -1314,7 +1314,7 @@ public final class PartyPage extends ChatPageContent {
     /** The players to invite whose character or account name holds the search's words. */
     private List<PartyInviteTargetSnapshot> shownInviteTargets(
             PartyStateSnapshot snapshot) {
-        ChatPageSearch search = ChatPageSearch.of(this.query);
+        PageSearch search = PageSearch.of(this.query);
         List<PartyInviteTargetSnapshot> shown =
                 new ArrayList<PartyInviteTargetSnapshot>();
         for (PartyInviteTargetSnapshot target : snapshot.getInviteTargets()) {
@@ -1444,6 +1444,12 @@ public final class PartyPage extends ChatPageContent {
             return true;
         }
         return false;
+    }
+
+    /** A question waiting on its answer keeps every key. */
+    @Override
+    public boolean holdsKeys() {
+        return this.confirming != null;
     }
 
     /**

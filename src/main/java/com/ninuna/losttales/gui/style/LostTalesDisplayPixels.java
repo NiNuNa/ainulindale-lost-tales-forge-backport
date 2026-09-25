@@ -131,4 +131,20 @@ public final class LostTalesDisplayPixels {
         return (float)((Math.floor(display + 0.5D) + TIE_BREAK - display)
                 / (scale * factor));
     }
+
+    /** A GUI-space position rounded to the nearest whole display pixel. */
+    public static double snap(double position) {
+        int factor = scaleFactor();
+        return factor <= 1 ? Math.round(position)
+                : Math.round(position * factor) / (double)factor;
+    }
+
+    /**
+     * A GUI-space position laid on the whole display pixel at or left of
+     * it, above it for a y: where something centred between two display
+     * pixels stands by the one centring rule.
+     */
+    public static double floor(double position) {
+        return floor(position, Math.max(1, scaleFactor()));
+    }
 }

@@ -39,14 +39,14 @@ final class ChatEmojiPicker extends ChatPickerPanel {
     }
 
     @Override
-    void closed() {
+    public void closed() {
         super.closed();
         this.reactionTarget = ChatMessageIds.NONE;
     }
 
     /** The Reactions window comes back with the chat aimed where it was. */
     @Override
-    Object sessionState() {
+    public Object sessionState() {
         long target = reactionTarget();
         return target == ChatMessageIds.NONE ? null : Long.valueOf(target);
     }

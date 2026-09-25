@@ -1,6 +1,5 @@
 package com.ninuna.losttales.chat.server;
 
-import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatRoleFixtures;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelGates;

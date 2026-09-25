@@ -1,5 +1,9 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.Window;
+import com.ninuna.losttales.client.window.WindowLayout;
+import com.ninuna.losttales.client.window.WindowTab;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import java.util.HashMap;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
@@ -189,32 +193,32 @@ public final class ClientChatChannelState {
      * is always the last tab, whatever the row holds. A number past the
      * row leaves the selection where it is.
      */
-    public static synchronized ChatTab selectOrdinal(int ordinal) {
+    public static synchronized WindowTab selectOrdinal(int ordinal) {
         ChatTab current = getSelected();
         if (ordinal < 1) {
             return current;
         }
         // Counted along the row as it is drawn, pages and all; a page
         // chosen this way is shown, never typed into.
-        ChatWindow window = ChatWindowLayout.windowOf(current);
-        List<ChatTab> order = new ArrayList<ChatTab>();
+        Window window = WindowLayout.windowOf(current);
+        List<WindowTab> order = new ArrayList<WindowTab>();
         if (window != null) {
-            for (ChatTab tab : window.getTabs()) {
-                if (isAvailable(tab)) {
+            for (WindowTab tab : window.getTabs()) {
+                if (tab.isAvailable()) {
                     order.add(tab);
                 }
             }
         }
         if (order.isEmpty()) {
-            order = selectedWindowOrder(current);
+            order.addAll(selectedWindowOrder(current));
         }
         int index = ordinal >= 9 ? order.size() - 1 : ordinal - 1;
         if (index >= order.size()) {
             return current;
         }
-        ChatTab chosen = order.get(index);
-        if (!chosen.isPage()) {
-            selected = chosen;
+        WindowTab chosen = order.get(index);
+        if (chosen instanceof ChatTab) {
+            selected = (ChatTab)chosen;
         }
         return chosen;
     }
@@ -225,11 +229,12 @@ public final class ClientChatChannelState {
      * and Global when nothing is open at all. Never empty.
      */
     private static List<ChatTab> selectedWindowOrder(ChatTab current) {
-        ChatWindow window = ChatWindowLayout.windowOf(current);
+        Window window = WindowLayout.windowOf(current);
         List<ChatTab> order = new ArrayList<ChatTab>();
         if (window != null) {
-            for (ChatTab tab : window.getTabs()) {
-                if (!tab.isPage() && isAvailable(tab)) {
+            for (WindowTab each : window.getTabs()) {
+                ChatTab tab = ChatTab.from(each);
+                if (tab != null && isAvailable(tab)) {
                     order.add(tab);
                 }
             }
@@ -278,8 +283,9 @@ public final class ClientChatChannelState {
      */
     public static synchronized List<ChatTab> getOpenTabs() {
         ArrayList<ChatTab> result = new ArrayList<ChatTab>();
-        for (ChatTab tab : ChatWindowLayout.order()) {
-            if (!tab.isPage() && isAvailable(tab)) {
+        for (WindowTab each : WindowLayout.order()) {
+            ChatTab tab = ChatTab.from(each);
+            if (tab != null && isAvailable(tab)) {
                 result.add(tab);
             }
         }
@@ -306,8 +312,7 @@ public final class ClientChatChannelState {
      * a page is never the tab typed into.
      */
     public static synchronized boolean isSelectable(ChatTab tab) {
-        return tab != null && !tab.isPage() && isAvailable(tab)
-                && ChatWindowLayout.isOpen(tab);
+        return tab != null && isAvailable(tab) && ChatLayout.isOpen(tab);
     }
 
     public static synchronized boolean isSelectable(ChatChannel channel) {
@@ -320,7 +325,7 @@ public final class ClientChatChannelState {
      * closes like any other, and the screen shows its empty state.
      */
     public static synchronized boolean isClosable(ChatTab tab) {
-        return ChatWindowLayout.isClosable(tab);
+        return WindowLayout.isClosable(tab);
     }
 
     /**
@@ -332,10 +337,10 @@ public final class ClientChatChannelState {
      * keeps receiving and keeps its own mute setting.
      */
     public static synchronized boolean close(ChatTab tab) {
-        ChatWindow window = ChatWindowLayout.windowOf(tab);
+        Window window = WindowLayout.windowOf(tab);
         int index = window == null ? -1 : window.getTabs().indexOf(tab);
         boolean wasSelected = tab != null && tab.equals(selected);
-        if (!isClosable(tab) || !ChatWindowLayout.close(tab)) {
+        if (!isClosable(tab) || !ChatLayout.close(tab)) {
             return false;
         }
         if (wasSelected) {
@@ -351,19 +356,20 @@ public final class ClientChatChannelState {
      * standing where it stood, else the last, else any selectable one;
      * null when the window is gone or holds nothing selectable.
      */
-    private static ChatTab neighbourIn(ChatWindow window, int index) {
+    private static ChatTab neighbourIn(Window window, int index) {
         if (window == null || index < 0) {
             return null;
         }
-        List<ChatTab> tabs = window.getTabs();
+        List<WindowTab> tabs = window.getTabs();
         if (tabs.isEmpty()) {
             return null;
         }
-        ChatTab nearest = tabs.get(Math.min(index, tabs.size() - 1));
+        ChatTab nearest = ChatTab.from(tabs.get(Math.min(index, tabs.size() - 1)));
         if (isSelectable(nearest)) {
             return nearest;
         }
-        for (ChatTab candidate : tabs) {
+        for (WindowTab each : tabs) {
+            ChatTab candidate = ChatTab.from(each);
             if (isSelectable(candidate)) {
                 return candidate;
             }
@@ -382,10 +388,6 @@ public final class ClientChatChannelState {
      * included — one row entry, showing the conversation being read.
      */
     public static synchronized boolean isAvailable(ChatTab tab) {
-        if (tab != null && tab.isPage()) {
-            // A page shows while a system has it registered.
-            return tab.page() != null;
-        }
         if (tab == null || !isAvailable(tab.getChannel())) {
             return false;
         }
@@ -408,7 +410,7 @@ public final class ClientChatChannelState {
      * without it shows its empty state. Channels exist either way.
      */
     public static synchronized boolean hasVisibleWindow() {
-        List<ChatWindow> windows = ChatWindowLayout.windows();
+        List<Window> windows = WindowLayout.windows();
         for (int index = 0; index < windows.size(); index++) {
             if (isVisible(windows.get(index))) {
                 return true;
@@ -422,13 +424,12 @@ public final class ClientChatChannelState {
      * that has not is not drawn and is in nothing's way until one of its
      * channels becomes available.
      */
-    public static synchronized boolean isVisible(ChatWindow window) {
+    public static synchronized boolean isVisible(Window window) {
         if (window == null) {
             return false;
         }
-        List<ChatTab> tabs = window.getTabs();
-        for (int index = 0; index < tabs.size(); index++) {
-            if (isAvailable(tabs.get(index))) {
+        for (WindowTab tab : window.getTabs()) {
+            if (tab.isAvailable()) {
                 return true;
             }
         }
@@ -535,12 +536,7 @@ public final class ClientChatChannelState {
      */
     public static synchronized int displayColor(ChatTab tab) {
         if (tab == null) {
-            return LostTalesChatVisualStyle.IVORY;
-        }
-        if (tab.isPage()) {
-            // A page wears the tone it gives itself.
-            ChatPageContent page = ChatPages.contentOf(tab);
-            return page == null ? LostTalesChatVisualStyle.IVORY : page.tone();
+            return LostTalesUiInk.IVORY;
         }
         Integer partner = PARTNER_COLORS.get(ChatTab.row(tab));
         if (partner != null) {
@@ -669,7 +665,7 @@ public final class ClientChatChannelState {
 
     public static synchronized int displayColor(ChatChannel channel) {
         if (channel == null) {
-            return LostTalesChatVisualStyle.IVORY;
+            return LostTalesUiInk.IVORY;
         }
         if (channel == ChatChannel.FACTION) {
             String factionId = wornFactionId(channel);
@@ -693,10 +689,6 @@ public final class ClientChatChannelState {
     public static synchronized String displayName(ChatTab tab) {
         if (tab == null) {
             return "";
-        }
-        if (tab.isPage()) {
-            ChatPages.Page page = tab.page();
-            return page == null ? "" : page.title();
         }
         if (tab.isWhisper()) {
             String remembered = PARTNER_NAMES.get(ChatTab.row(tab));

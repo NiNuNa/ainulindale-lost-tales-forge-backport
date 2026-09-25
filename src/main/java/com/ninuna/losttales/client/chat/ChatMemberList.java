@@ -7,9 +7,16 @@ import com.ninuna.losttales.chat.ChatEpithet;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
+import com.ninuna.losttales.client.window.TabRow;
+import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.compat.lotr.LotrFactionBannerResolver;
+import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
+import com.ninuna.losttales.gui.style.LostTalesUiClip;
+import com.ninuna.losttales.gui.style.LostTalesUiFading;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.gui.style.LostTalesUiItemIcon;
+import com.ninuna.losttales.gui.style.LostTalesUiRules;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
@@ -71,7 +78,7 @@ import org.lwjgl.opengl.GL11;
  * so the words keep {@link #MIN_MESSAGE_WIDTH} beside it, down to the
  * heads alone; the list never leaves by itself.</p>
  */
-final class ChatMemberList {
+public final class ChatMemberList {
     /** The list's own width in the chat's pixels, its separator included. */
     static final int DEFAULT_WIDTH = 100;
     /** The most of its window's width a list may take. */
@@ -145,15 +152,15 @@ final class ChatMemberList {
     }
 
     /** One window's list: its width, where it is scrolled to, and what the pointer is on. */
-    static final class State {
+    public static final class State {
         /**
          * How wide the list stands in its window this frame, in the
          * chat's pixels, and how wide it may be dragged: what the window
          * asked for, bounded by its heads and a third of the window.
          */
         float width = DEFAULT_WIDTH;
-        float minWidth;
-        float maxWidth = DEFAULT_WIDTH;
+        public float minWidth;
+        public float maxWidth = DEFAULT_WIDTH;
         /** Whether the rows have room for any of a name this frame. */
         boolean namesShown = true;
         /** How long the pointer has rested on {@link #hovered}, for its name's slide. */
@@ -179,9 +186,9 @@ final class ChatMemberList {
         /** The last member lit, kept while its light fades. */
         LostTalesChatMembersPacket.Member lit;
         /** Where the list stood on screen last frame, and each member's box there. */
-        float screenLeft;
+        public float screenLeft;
         float screenTop;
-        float screenRight;
+        public float screenRight;
         float screenBottom;
         final List<float[]> memberBoxes = new ArrayList<float[]>();
         final List<LostTalesChatMembersPacket.Member> boxMembers =
@@ -199,7 +206,7 @@ final class ChatMemberList {
     private ChatMemberList() {}
 
     /** How much of the list stands in the window, in the chat's pixels. */
-    static float drawnWidth(ChatWindowFrame frame) {
+    static float drawnWidth(ChatFrame frame) {
         return frame == null ? 0.0F
                 : frame.members.width * frame.membersShare();
     }
@@ -207,23 +214,22 @@ final class ChatMemberList {
     /**
      * Lays the list's width out for a window {@code windowWidth} of the
      * chat's pixels wide whose words start {@code messageX} in: the width
-     * the player dragged it to, or its own, never past a third of the
-     * window nor past what leaves the words {@link #MIN_MESSAGE_WIDTH},
-     * and never narrower than its heads.
+     * the player dragged it to ({@code chosen}; 0 for none), or its own,
+     * never past a third of the window nor past what leaves the words
+     * {@link #MIN_MESSAGE_WIDTH}, and never narrower than its heads.
      */
-    static void measure(State state, ChatWindow window, float windowWidth,
+    static void measure(State state, double chosen, float windowWidth,
                         float messageX) {
         state.minWidth = minWidth();
         state.maxWidth = Math.max(state.minWidth, Math.min(
                 windowWidth * MAX_SHARE,
                 windowWidth - messageX - MIN_MESSAGE_WIDTH));
-        double chosen = window == null ? 0.0D : window.getMembersWidth();
         state.width = clampWidth(chosen > 0.0D ? (float)chosen
                 : DEFAULT_WIDTH, state.minWidth, state.maxWidth);
     }
 
     /** A width between the list's least and most. */
-    static float clampWidth(float width, float least, float most) {
+    public static float clampWidth(float width, float least, float most) {
         return Math.max(least, Math.min(most, width));
     }
 
@@ -500,7 +506,7 @@ final class ChatMemberList {
      * space onto the screen, where the rows are recorded for the pointer.
      */
     static void draw(Minecraft minecraft, FontRenderer font,
-                     ChatWindowFrame frame, float left, float top,
+                     ChatFrame frame, float left, float top,
                      float bottom, float windowRight, float clipTop,
                      float clipBottom, float originX, float originY,
                      float scale, int surfaceAlpha, int alpha) {
@@ -546,13 +552,13 @@ final class ChatMemberList {
         } else {
             state.hoverSeconds = 0.0D;
         }
-        state.hoverFade = LostTalesChatVisualStyle.hoverFade(state.hoverFade,
+        state.hoverFade = WindowStyle.hoverFade(state.hoverFade,
                 state.hovered != null, elapsed);
         // The list's own surface: the chat's inset one, as the timestamp
         // area wears on the other side, standing beside the history's
         // panel rather than over it.
         LostTalesUiInk.fillRect(left, top, windowRight, bottom,
-                LostTalesChatVisualStyle.argb(LostTalesChatVisualStyle.SURFACE_RGB,
+                LostTalesUiInk.argb(LostTalesUiInk.SURFACE_RGB,
                         surfaceAlpha));
         // The rows' own space starts past the separator, on the display's
         // grid, so its whole units land on whole display pixels while the
@@ -562,7 +568,7 @@ final class ChatMemberList {
         float roomRight = (left + state.width - rowsLeft) / unit - RIGHT_GAP;
         state.namesShown = roomRight > INSET + ChatAvatar.ICON_WIDTH + NAME_GAP;
         float rowsOriginX = originX + rowsLeft * scale;
-        boolean clipped = LostTalesChatOverlayRenderer.beginClip(minecraft,
+        boolean clipped = LostTalesUiClip.begin(minecraft,
                 state.screenLeft, state.screenRight, clipTop, clipBottom,
                 true);
         try {
@@ -586,9 +592,9 @@ final class ChatMemberList {
                 if (lit > 0.0F) {
                     LostTalesChatOverlayRenderer.recolourSurface(rowsLeft,
                             rowTop, windowRight, rowBottom, surfaceAlpha,
-                            LostTalesChatVisualStyle.SURFACE_RGB,
-                            LostTalesChatVisualStyle.blend(
-                                    LostTalesChatVisualStyle.SURFACE_RGB,
+                            LostTalesUiInk.SURFACE_RGB,
+                            LostTalesUiInk.blend(
+                                    LostTalesUiInk.SURFACE_RGB,
                                     LostTalesChatVisualStyle.selectedLineRgb(),
                                     lit));
                 }
@@ -604,9 +610,9 @@ final class ChatMemberList {
                 }
             }
         } finally {
-            LostTalesChatOverlayRenderer.endVerticalClip(clipped);
+            LostTalesUiClip.end(clipped);
         }
-        LostTalesChatOverlayRenderer.drawVerticalRule(left, left
+        LostTalesUiRules.drawVerticalRule(left, left
                         + ChatTimestampColumn.SEPARATOR_WIDTH, top, bottom,
                 alpha);
     }
@@ -625,7 +631,7 @@ final class ChatMemberList {
                                     float clipTop, float clipBottom,
                                     int alpha) {
         int textTop = LostTalesUiInk.centredStart(HEADER_HEIGHT,
-                LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT);
+                LostTalesUiInk.CAP_HEIGHT);
         int textLeft = INSET;
         GL11.glPushMatrix();
         try {
@@ -679,7 +685,7 @@ final class ChatMemberList {
     private static void drawHeadingIcon(Minecraft minecraft, ChatTab tab,
                                         LostTalesChatMembersPacket.Member first,
                                         int x, int textTop, int alpha) {
-        int boxTop = textTop - LostTalesChatOverlayRenderer.ROW_TEXT_TOP;
+        int boxTop = textTop - WindowStyle.ROW_TEXT_TOP;
         String group = first.getGroupKey();
         ChatChannel channel = tab == null ? null : tab.getChannel();
         switch (headingIconOf(group, channel != null
@@ -699,7 +705,7 @@ final class ChatMemberList {
             case FACTION:
                 ItemStack banner = LotrFactionBannerResolver.bannerFor(group);
                 if (banner != null) {
-                    ChatInlineIcons.drawItem(minecraft, banner, x, boxTop,
+                    LostTalesUiItemIcon.drawFitted(minecraft, banner, x, boxTop,
                             HEADING_ICON_SIZE, alpha);
                 } else {
                     ChatInlineIcons.drawEmoji(minecraft,
@@ -719,7 +725,7 @@ final class ChatMemberList {
         mark.drawWithShadow(x + LostTalesUiInk.centredStart(HEADING_ICON_SIZE,
                         mark.getWidth()),
                 textTop + LostTalesUiInk.centredStart(
-                        LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT,
+                        LostTalesUiInk.CAP_HEIGHT,
                         mark.getHeight()), alpha);
     }
 
@@ -738,7 +744,7 @@ final class ChatMemberList {
         if (worn != null) {
             ItemStack item = ChatChannelIcons.itemIconOf(worn);
             if (item != null) {
-                ChatInlineIcons.drawItem(minecraft, item, x, boxTop,
+                LostTalesUiItemIcon.drawFitted(minecraft, item, x, boxTop,
                         HEADING_ICON_SIZE, alpha);
             } else {
                 ChatInlineIcons.drawEmoji(minecraft,
@@ -750,7 +756,7 @@ final class ChatMemberList {
         if (icon != null && icon.getKind() == ChatChannelIconSpec.Kind.ITEM) {
             Object item = Item.itemRegistry.getObject(icon.getName());
             if (item instanceof Item) {
-                ChatInlineIcons.drawItem(minecraft,
+                LostTalesUiItemIcon.drawFitted(minecraft,
                         new ItemStack((Item)item, 1, icon.getMeta()), x, boxTop,
                         HEADING_ICON_SIZE, alpha);
                 return;
@@ -783,7 +789,7 @@ final class ChatMemberList {
                                    final float rowsOriginX, float scale,
                                    final float clipTop, final float clipBottom,
                                    final int alpha, double elapsed) {
-        final int capitals = LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT;
+        final int capitals = LostTalesUiInk.CAP_HEIGHT;
         final List<Part> nameLine = new ArrayList<Part>(2);
         nameLine.add(new Part(nameOf(member), "", member.getNameColor()));
         if (member.getTitle().length() > 0) {
@@ -810,7 +816,7 @@ final class ChatMemberList {
         // The display pixels one of the list's units takes, which a mark
         // standing for a head is fitted to as an avatar's is.
         final float pixelsPerUnit = unitScale
-                * ChatWindowFrame.displayScaleFactor();
+                * LostTalesDisplayPixels.scaleFactor();
         // A line cut short slides along while the pointer rests on its
         // row, as a cut tab name does, and glides home after; one row at
         // a time, the one last lit, and every other stays home.
@@ -868,18 +874,18 @@ final class ChatMemberList {
         float current = name ? state.nameSlide : state.titleSlide;
         float next;
         if (rested && overflow > 0 && room > 0.0F && Motions.enabled()) {
-            next = (float)ChatChannelTabBar.marqueeOffset(state.hoverSeconds,
+            next = (float)TabRow.marqueeOffset(state.hoverSeconds,
                     overflow);
         } else {
-            next = ChatChannelTabBar.eased(current, 0.0F, elapsed);
+            next = TabRow.eased(current, 0.0F, elapsed);
         }
         if (name) {
             state.nameSlide = next;
         } else {
             state.titleSlide = next;
         }
-        double step = ChatChannelTabBar.displayStep() / unitScale;
-        return (float)ChatChannelTabBar.snapped(next, step);
+        double step = TabRow.displayStep() / unitScale;
+        return (float)TabRow.snapped(next, step);
     }
 
     /**
@@ -933,18 +939,18 @@ final class ChatMemberList {
             drawParts(minecraft, font, parts, x, y, alpha);
             return;
         }
-        float depth = LostTalesChatOverlayRenderer.sideFadeDepth(room * scale);
-        LostTalesChatOverlayRenderer.drawFading(minecraft, originX + x * scale,
+        float depth = LostTalesUiFading.sideFadeDepth(room * scale);
+        LostTalesUiFading.drawFading(minecraft, originX + x * scale,
                 originX + right * scale, clipTop, clipBottom, depth,
-                LostTalesChatOverlayRenderer.sideFadeStrength(slide * scale,
+                LostTalesUiFading.sideFadeStrength(slide * scale,
                         depth),
-                LostTalesChatOverlayRenderer.sideFadeStrength(
+                LostTalesUiFading.sideFadeStrength(
                         (width - slide - room) * scale, depth),
-                new LostTalesChatOverlayRenderer.FadingPainter() {
+                new LostTalesUiFading.FadingPainter() {
                     @Override
                     public void paint(float share) {
                         int sliceAlpha = Math.round(alpha * share);
-                        if (sliceAlpha < LostTalesChatVisualStyle
+                        if (sliceAlpha < LostTalesUiInk
                                 .MIN_VISIBLE_ALPHA) {
                             return;
                         }
@@ -981,16 +987,16 @@ final class ChatMemberList {
             return;
         }
         if (width <= room) {
-            LostTalesChatVisualStyle.drawColored(font, text, x, y, rgb, alpha);
+            LostTalesUiInk.drawText(font, text, x, y, rgb, alpha);
             return;
         }
-        float depth = LostTalesChatOverlayRenderer.sideFadeDepth(room * scale);
-        LostTalesChatOverlayRenderer.drawFadingText(minecraft, font, text, x,
+        float depth = LostTalesUiFading.sideFadeDepth(room * scale);
+        LostTalesUiFading.drawFadingText(minecraft, font, text, x,
                 -slide, y, rgb, alpha, originX + x * scale,
                 originX + right * scale, clipTop, clipBottom, depth,
-                LostTalesChatOverlayRenderer.sideFadeStrength(slide * scale,
+                LostTalesUiFading.sideFadeStrength(slide * scale,
                         depth),
-                LostTalesChatOverlayRenderer.sideFadeStrength(
+                LostTalesUiFading.sideFadeStrength(
                         (width - slide - room) * scale, depth));
     }
 }

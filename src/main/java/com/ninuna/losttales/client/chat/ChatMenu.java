@@ -8,6 +8,18 @@ import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.emoji.ChatEmojiSuggester;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
+import com.ninuna.losttales.client.window.PointerRegions;
+import com.ninuna.losttales.client.window.SubWindow;
+import com.ninuna.losttales.client.window.SubWindowAnchor;
+import com.ninuna.losttales.client.window.SubWindowContent;
+import com.ninuna.losttales.client.window.SubWindowKind;
+import com.ninuna.losttales.client.window.TabIcons;
+import com.ninuna.losttales.client.window.TabMark;
+import com.ninuna.losttales.client.window.TabRow;
+import com.ninuna.losttales.client.window.WheelStep;
+import com.ninuna.losttales.client.window.WindowPlacement;
+import com.ninuna.losttales.client.window.WindowStyle;
+import com.ninuna.losttales.client.window.WindowTab;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
@@ -16,7 +28,6 @@ import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
-import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -30,7 +41,7 @@ import net.minecraft.util.StatCollector;
 import org.lwjgl.input.Keyboard;
 
 /**
- * A menu in a small window of its own: the rows a control or the pointer
+ * A menu in a sub-window of its own: the rows a control or the pointer
  * opens — a tab's settings behind the tool strip's cog, the closed
  * channels and conversations behind the {@code +}, a message's or a
  * person's actions.
@@ -49,8 +60,8 @@ import org.lwjgl.input.Keyboard;
  * text and draws the field; which rows a filter leaves is the screen's
  * menus' business.</p>
  */
-final class ChatMenu extends ChatSmallWindowContent {
-    static final int ROW_HEIGHT = 11;
+public final class ChatMenu extends SubWindowContent {
+    public static final int ROW_HEIGHT = 11;
     private static final int PADDING_X = 6;
     private static final int PADDING_Y = 3;
     private static final int MIN_WIDTH = 56;
@@ -99,7 +110,7 @@ final class ChatMenu extends ChatSmallWindowContent {
          */
         boolean chip;
         /** The tab whose icon stands before the name, or null for none. */
-        final ChatTab icon;
+        final WindowTab icon;
         /** Player whose head stands before the name, or null for none. */
         ChatHeadOwner head;
         /** A sheet sprite before the name, or null. */
@@ -191,12 +202,12 @@ final class ChatMenu extends ChatSmallWindowContent {
             return this;
         }
 
-        Entry(String id, String label, boolean dim, int color, ChatTab icon) {
+        Entry(String id, String label, boolean dim, int color, WindowTab icon) {
             this(id, label, false, false, dim, color, icon);
         }
 
         private Entry(String id, String label, boolean header,
-                      boolean passive, boolean dim, int color, ChatTab icon) {
+                      boolean passive, boolean dim, int color, WindowTab icon) {
             this.id = id;
             this.label = label == null ? "" : label;
             this.header = header;
@@ -217,7 +228,7 @@ final class ChatMenu extends ChatSmallWindowContent {
         }
 
         /** A group's name in {@code rgb}, a channel's {@code icon} before it or none. */
-        static Entry group(String label, ChatTab icon, int rgb) {
+        static Entry group(String label, WindowTab icon, int rgb) {
             Entry entry = new Entry("", label, false, true, false, -1, icon);
             entry.group = true;
             entry.labelColor = rgb;
@@ -250,79 +261,6 @@ final class ChatMenu extends ChatSmallWindowContent {
         boolean isTakeable() {
             return !this.header && !this.passive
                     && this.unavailable.length() == 0;
-        }
-    }
-
-    /**
-     * Where a window opens from a control or the pointer: the box it
-     * hangs from — a control's footprint, or the pointer's point — and
-     * which way it grows from it. It opens toward the middle of the
-     * window the control belongs to: below a control in the window's
-     * upper half, above one in its lower half, lining up with the box's
-     * left edge in the window's left half and its right edge in the right
-     * half. Only when that side of the screen has less room than the
-     * other does it turn round.
-     */
-    static final class Anchor {
-        /** Clear space between a window's frame and the box it hangs from. */
-        static final int GAP = 2;
-        /** From the box it hangs from to the window's own box, its frame between them. */
-        static final int REACH = GAP + LostTalesUiWindowFrame.WIDTH;
-        final int left;
-        final int top;
-        final int right;
-        final int bottom;
-        /** Whether it opens below the box rather than above it. */
-        final boolean below;
-        /** Whether its right edge lines up with the box's, growing leftward. */
-        final boolean fromRight;
-        /** The chat window the box belongs to, whose room the menu opens in; null for the bare screen. */
-        final String windowId;
-
-        Anchor(int left, int top, int right, int bottom, boolean below,
-               boolean fromRight, String windowId) {
-            this.left = left;
-            this.top = top;
-            this.right = Math.max(left, right);
-            this.bottom = Math.max(top, bottom);
-            this.below = below;
-            this.fromRight = fromRight;
-            this.windowId = windowId;
-        }
-
-        /**
-         * Opening from a box toward the middle of the space spanning
-         * {@code spaceLeft}..{@code spaceRight} and
-         * {@code spaceTop}..{@code spaceBottom}, in chat window
-         * {@code windowId}.
-         */
-        static Anchor inward(int left, int top, int right, int bottom,
-                             double spaceLeft, double spaceTop,
-                             double spaceRight, double spaceBottom,
-                             String windowId) {
-            double middleX = (spaceLeft + spaceRight) / 2.0D;
-            double middleY = (spaceTop + spaceBottom) / 2.0D;
-            return new Anchor(left, top, right, bottom,
-                    (top + bottom) / 2.0D < middleY,
-                    (left + right) / 2.0D > middleX, windowId);
-        }
-
-        /**
-         * Opening from a box toward the middle of a chat window, in that
-         * window; with none drawn, toward the middle of the bare screen.
-         */
-        static Anchor inward(int left, int top, int right, int bottom,
-                             ChatWindowFrame frame, int screenWidth,
-                             int screenHeight) {
-            if (frame == null || !frame.drawn) {
-                return inward(left, top, right, bottom, 0.0D, 0.0D,
-                        screenWidth, screenHeight, null);
-            }
-            double windowLeft = frame.drawnLeft();
-            return inward(left, top, right, bottom, windowLeft,
-                    frame.boxTop + frame.motionY,
-                    windowLeft + (frame.boxRight - frame.boxLeft),
-                    frame.boxBottom + frame.motionY, frame.windowId);
         }
     }
 
@@ -364,7 +302,7 @@ final class ChatMenu extends ChatSmallWindowContent {
         }
     }
 
-    final ChatSmallWindowKind kind;
+    final SubWindowKind kind;
     /**
      * What the menu is about, {@link ChatScreenMenus}' own: the message,
      * the person, the tab or the window it was opened for; null for a
@@ -420,7 +358,7 @@ final class ChatMenu extends ChatSmallWindowContent {
     private final Map<String, Float> labelFades = new HashMap<String, Float>();
     private long spriteNanos;
 
-    ChatMenu(ChatSmallWindowKind kind) {
+    ChatMenu(SubWindowKind kind) {
         this.kind = kind;
     }
 
@@ -462,7 +400,7 @@ final class ChatMenu extends ChatSmallWindowContent {
         // the padding.
         this.swatchWidth = chips ? CHIP_WIDTH : SWATCH_WIDTH;
         this.labelX = PADDING_X + (swatches ? this.swatchWidth + SWATCH_GAP : 0)
-                + (icons ? ChatChannelIcons.SLOT + ChatChannelIcons.GAP : 0);
+                + (icons ? TabIcons.SLOT + TabIcons.GAP : 0);
     }
 
     /** The rows, top first. */
@@ -608,7 +546,7 @@ final class ChatMenu extends ChatSmallWindowContent {
     }
 
     @Override
-    boolean dismissPopup() {
+    public boolean dismissPopup() {
         refreshEmojiList();
         if (!this.emojiList.isActive()) {
             return false;
@@ -619,7 +557,7 @@ final class ChatMenu extends ChatSmallWindowContent {
 
     /** The emoji list, over everything, a clear pixel above the field's row. */
     @Override
-    void drawPopups(Minecraft minecraft, ChatPointerRegions regions,
+    public void drawPopups(Minecraft minecraft, PointerRegions regions,
                     double pointerX, double pointerY) {
         refreshEmojiList();
         if (this.emojiList.isActive()) {
@@ -629,7 +567,7 @@ final class ChatMenu extends ChatSmallWindowContent {
     }
 
     @Override
-    ChatHover popupHoverAt(double x, double y) {
+    public ChatHover popupHoverAt(double x, double y) {
         FontRenderer font = Minecraft.getMinecraft().fontRenderer;
         if (!this.emojiList.isActive() || !this.emojiList.contains(font, x, y,
                 listAnchor(), this.fieldRowLeft)) {
@@ -660,29 +598,16 @@ final class ChatMenu extends ChatSmallWindowContent {
         return true;
     }
 
-    /**
-     * The Ctrl presses a field keeps from the screen behind it, so none
-     * of them edits the chat bar: Backspace and Delete, and the
-     * clipboard's and selection's letters. Ctrl+Shift+A is the chat's own
-     * and passes.
-     */
-    static boolean isFieldCommand(LostTalesKeyPress press) {
-        return press.is(Keyboard.KEY_BACK) || press.is(Keyboard.KEY_DELETE)
-                || press.is(Keyboard.KEY_C) || press.is(Keyboard.KEY_V)
-                || press.is(Keyboard.KEY_X)
-                || press.is(Keyboard.KEY_A) && !press.shift;
-    }
-
     /* ---- The window ---- */
 
     /** The name the menu was given, else its kind's. */
     @Override
-    String stripTitle() {
+    public String stripTitle() {
         return this.title.length() == 0 ? null : this.title;
     }
 
     @Override
-    LostTalesUiSheet stripIcon() {
+    public LostTalesUiSheet stripIcon() {
         return this.icon;
     }
 
@@ -692,7 +617,7 @@ final class ChatMenu extends ChatSmallWindowContent {
      * strip's name.
      */
     @Override
-    int naturalWidth() {
+    public int naturalWidth() {
         Minecraft minecraft = Minecraft.getMinecraft();
         FontRenderer font = minecraft.fontRenderer;
         int widest = MIN_WIDTH;
@@ -708,7 +633,7 @@ final class ChatMenu extends ChatSmallWindowContent {
                     + SWATCH_GAP + hintWidth(minecraft) + PADDING_X);
         }
         String name = stripTitle();
-        return Math.max(widest, ChatChannelTabBar.loneTabWidth(font,
+        return Math.max(widest, TabRow.loneTabWidth(font,
                 name != null ? name : this.kind.title(), this.icon != null));
     }
 
@@ -721,7 +646,7 @@ final class ChatMenu extends ChatSmallWindowContent {
         }
         if (entry.group) {
             return PADDING_X + (entry.icon != null
-                    ? ChatChannelIcons.SLOT + ChatChannelIcons.GAP : 0)
+                    ? TabIcons.SLOT + TabIcons.GAP : 0)
                     + label + PADDING_X;
         }
         int value = valueWidth(minecraft, font, entry);
@@ -731,19 +656,19 @@ final class ChatMenu extends ChatSmallWindowContent {
 
     /** Every row up to {@link #MAX_VISIBLE_ROWS}, the field above them. */
     @Override
-    int naturalHeight(int width) {
+    public int naturalHeight(int width) {
         return PADDING_Y * 2 + fieldHeight() + this.rowHeight * Math.max(1,
                 Math.min(this.entries.size(), MAX_VISIBLE_ROWS));
     }
 
     @Override
-    int minWidth() {
+    public int minWidth() {
         return MIN_WIDTH;
     }
 
     /** One row under the field. */
     @Override
-    int minHeight() {
+    public int minHeight() {
         return PADDING_Y * 2 + fieldHeight() + this.rowHeight;
     }
 
@@ -754,24 +679,24 @@ final class ChatMenu extends ChatSmallWindowContent {
      * side holds up to {@link #MAX_VISIBLE_ROWS}, and on the other side
      * only where that holds more of them.
      */
-    LostTalesUiHitBox firstContentBox(Anchor anchor, LostTalesUiHitBox room) {
+    LostTalesUiHitBox firstContentBox(SubWindowAnchor anchor, LostTalesUiHitBox room) {
         return firstContentBox(anchor, naturalWidth(), room);
     }
 
     /** As above for a window {@code width} wide. */
-    LostTalesUiHitBox firstContentBox(Anchor anchor, int width,
+    LostTalesUiHitBox firstContentBox(SubWindowAnchor anchor, int width,
                                       LostTalesUiHitBox room) {
         int roomLeft = (int)Math.ceil(room.left);
         int roomTop = (int)Math.ceil(room.top);
         int roomRight = (int)Math.floor(room.left + room.width);
         int roomBottom = (int)Math.floor(room.top + room.height);
-        int frame = ChatSmallWindow.STRIP_HEIGHT + PADDING_Y * 2
+        int frame = SubWindow.STRIP_HEIGHT + PADDING_Y * 2
                 + fieldHeight();
         int wanted = Math.max(1, Math.min(this.entries.size(),
                 MAX_VISIBLE_ROWS));
-        int roomBelow = rowsIn(roomBottom - anchor.bottom - Anchor.REACH
+        int roomBelow = rowsIn(roomBottom - anchor.bottom - SubWindowAnchor.REACH
                 - frame);
-        int roomAbove = rowsIn(anchor.top - Anchor.REACH - roomTop - frame);
+        int roomAbove = rowsIn(anchor.top - SubWindowAnchor.REACH - roomTop - frame);
         boolean below = anchor.below
                 ? roomBelow >= wanted || roomBelow >= roomAbove
                 : !(roomAbove >= wanted || roomAbove >= roomBelow);
@@ -781,16 +706,16 @@ final class ChatMenu extends ChatSmallWindowContent {
         int left = Math.max(roomLeft, Math.min(roomRight - width,
                 anchor.fromRight ? anchor.right - width : anchor.left));
         int top = Math.max(roomTop, Math.min(roomBottom - height,
-                below ? anchor.bottom + Anchor.REACH
-                        : anchor.top - Anchor.REACH - height));
+                below ? anchor.bottom + SubWindowAnchor.REACH
+                        : anchor.top - SubWindowAnchor.REACH - height));
         return new LostTalesUiHitBox(left,
-                top + ChatSmallWindow.STRIP_HEIGHT, width,
-                height - ChatSmallWindow.STRIP_HEIGHT);
+                top + SubWindow.STRIP_HEIGHT, width,
+                height - SubWindow.STRIP_HEIGHT);
     }
 
     /**
      * The content box the menu's window first opens round in
-     * {@code room} beside {@code sibling}, the small window whose row
+     * {@code room} beside {@code sibling}, the sub-window whose row
      * opened it: to its right with the gap windows keep, or to its left
      * where the right has no room, its top on the other's, as many rows
      * as the room below holds up to {@link #MAX_VISIBLE_ROWS}.
@@ -800,8 +725,8 @@ final class ChatMenu extends ChatSmallWindowContent {
         int width = naturalWidth();
         double roomRight = room.left + room.width;
         double roomBottom = room.top + room.height;
-        int gap = ChatWindowPlacement.WINDOW_GAP;
-        int frame = ChatSmallWindow.STRIP_HEIGHT + PADDING_Y * 2
+        int gap = WindowPlacement.WINDOW_GAP;
+        int frame = SubWindow.STRIP_HEIGHT + PADDING_Y * 2
                 + fieldHeight();
         double right = sibling.left + sibling.width + gap;
         double left = right + width <= roomRight ? right
@@ -815,8 +740,8 @@ final class ChatMenu extends ChatSmallWindowContent {
         int height = frame + rows * this.rowHeight;
         top = Math.max(room.top, Math.min(roomBottom - height, top));
         return new LostTalesUiHitBox(left,
-                top + ChatSmallWindow.STRIP_HEIGHT, width,
-                height - ChatSmallWindow.STRIP_HEIGHT);
+                top + SubWindow.STRIP_HEIGHT, width,
+                height - SubWindow.STRIP_HEIGHT);
     }
 
     /**
@@ -827,7 +752,7 @@ final class ChatMenu extends ChatSmallWindowContent {
      */
     LostTalesUiHitBox firstContentBoxCentred(LostTalesUiHitBox room) {
         int width = naturalWidth();
-        int frame = ChatSmallWindow.STRIP_HEIGHT + PADDING_Y * 2
+        int frame = SubWindow.STRIP_HEIGHT + PADDING_Y * 2
                 + fieldHeight();
         int wanted = Math.max(1, Math.min(this.entries.size(),
                 MAX_VISIBLE_ROWS));
@@ -839,8 +764,8 @@ final class ChatMenu extends ChatSmallWindowContent {
         double top = room.top + Math.max(0, LostTalesUiInk.centredStart(
                 (int)Math.floor(room.height), height));
         return new LostTalesUiHitBox(left,
-                top + ChatSmallWindow.STRIP_HEIGHT, width,
-                height - ChatSmallWindow.STRIP_HEIGHT);
+                top + SubWindow.STRIP_HEIGHT, width,
+                height - SubWindow.STRIP_HEIGHT);
     }
 
     /** Whole rows in {@code pixels}. */
@@ -861,11 +786,11 @@ final class ChatMenu extends ChatSmallWindowContent {
 
     /** The field's icon and the gap after it. */
     private int fieldIconRun() {
-        return this.fieldIcon.getWidth() + ChatChannelIcons.GAP;
+        return this.fieldIcon.getWidth() + TabIcons.GAP;
     }
 
     @Override
-    ChatHover hoverAt(LostTalesUiHitBox box, double x, double y) {
+    public ChatHover hoverAt(LostTalesUiHitBox box, double x, double y) {
         Layout at = layOut(box);
         clampScroll(at);
         int index = rowIndexAt(at, x, y);
@@ -883,38 +808,38 @@ final class ChatMenu extends ChatSmallWindowContent {
      * put. The drawn rows glide after the target.
      */
     @Override
-    void scrollBy(int lines) {
-        this.scrollRows += ChatWheelStep.menuRows(lines);
+    public void scrollBy(int lines) {
+        this.scrollRows += WheelStep.menuRows(lines);
     }
 
     @Override
-    boolean holdsKeys() {
+    public boolean holdsKeys() {
         return this.field != null && this.field.isFocused();
     }
 
     /** The field takes the keys as its window comes in front, the caret lit at once. */
     @Override
-    void takeKeys() {
+    public void takeKeys() {
         if (this.field != null) {
             this.field.setFocused(true);
         }
     }
 
     @Override
-    void releaseKeys() {
+    public void releaseKeys() {
         if (this.field != null) {
             this.field.setFocused(false);
         }
     }
 
     @Override
-    void closed() {
+    public void closed() {
         releaseKeys();
     }
 
     /** The menu itself comes back with the chat: what it is about, its field and its place in the list. */
     @Override
-    Object sessionState() {
+    public Object sessionState() {
         return this;
     }
 
@@ -925,7 +850,7 @@ final class ChatMenu extends ChatSmallWindowContent {
      * surface, clipped to the band they glide in.
      */
     @Override
-    void draw(Minecraft minecraft, LostTalesUiHitBox box, double clipX,
+    public void draw(Minecraft minecraft, LostTalesUiHitBox box, double clipX,
               double clipY, double pointerX, double pointerY, int alpha,
               int surfaceAlpha) {
         FontRenderer font = minecraft.fontRenderer;
@@ -953,8 +878,8 @@ final class ChatMenu extends ChatSmallWindowContent {
             LostTalesChatOverlayRenderer.recolourSurface(at.left,
                     Math.max(at.rowsTop, litTop), at.left + at.width,
                     Math.min(at.rowsBottom, litTop + this.rowHeight),
-                    surfaceAlpha, LostTalesChatVisualStyle.SURFACE_RGB,
-                    LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB);
+                    surfaceAlpha, LostTalesUiInk.SURFACE_RGB,
+                    LostTalesUiInk.SURFACE_HIGHLIGHT_RGB);
         }
         drawField(minecraft, font, at, alpha);
         int last = Math.min(this.entries.size(),
@@ -973,7 +898,7 @@ final class ChatMenu extends ChatSmallWindowContent {
             endClip(clipped);
         }
         // A hairline on an edge the list continues past.
-        int more = LostTalesChatVisualStyle.argb(MORE_RGB, alpha);
+        int more = LostTalesUiInk.argb(MORE_RGB, alpha);
         if (this.scrollRows > 0.0D) {
             Gui.drawRect(at.left + 1, at.top + 1, at.left + at.width - 1,
                     at.top + 2, more);
@@ -995,18 +920,18 @@ final class ChatMenu extends ChatSmallWindowContent {
                          Entry entry, int rowY, boolean hovered,
                          double elapsed, int alpha) {
         int labelTop = rowY + LostTalesUiInk.centredStart(this.rowHeight,
-                LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT);
+                LostTalesUiInk.CAP_HEIGHT);
         if (entry.header) {
             // The section's name over a hairline, in the sand the
             // timestamps wear, so it reads as a label, not a row.
-            LostTalesChatVisualStyle.drawColored(font, trimmed(font,
+            LostTalesUiInk.drawText(font, trimmed(font,
                             entry.label, at.width - PADDING_X * 2),
                     at.left + PADDING_X, rowY + this.rowHeight - 10,
                     LostTalesColors.rgb(LostTalesColors.SAND), alpha);
             Gui.drawRect(at.left + PADDING_X, rowY + this.rowHeight - 1,
                     at.left + at.width - PADDING_X, rowY + this.rowHeight,
-                    LostTalesChatVisualStyle.argb(
-                            LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB,
+                    LostTalesUiInk.argb(
+                            LostTalesUiInk.SURFACE_HIGHLIGHT_RGB,
                             Math.round(HEADER_RULE_ALPHA * alpha / 255.0F)));
             return;
         }
@@ -1022,16 +947,16 @@ final class ChatMenu extends ChatSmallWindowContent {
                     at.left + PADDING_X
                             + (entry.chip ? this.swatchWidth : SWATCH_WIDTH),
                     rowY + this.rowHeight - 1,
-                    LostTalesChatVisualStyle.argb(entry.color, alpha));
+                    LostTalesUiInk.argb(entry.color, alpha));
         }
         drawRowIcon(minecraft, at, entry, labelTop, hovered, elapsed, alpha);
         int labelRgb = entry.unavailable.length() > 0
                 ? LostTalesChatVisualStyle.asideRgb()
                 : entry.labelColor >= 0 ? entry.labelColor
-                : LostTalesChatVisualStyle.IVORY;
+                : LostTalesUiInk.IVORY;
         if (entry.icon != null) {
-            labelRgb = LostTalesChatVisualStyle.blend(labelRgb,
-                    ClientChatChannelState.displayColor(entry.icon),
+            labelRgb = LostTalesUiInk.blend(labelRgb,
+                    entry.icon.tone(),
                     labelFade(entry, hovered, elapsed));
         }
         int labelLeft = at.left + this.labelX;
@@ -1050,7 +975,7 @@ final class ChatMenu extends ChatSmallWindowContent {
                     alpha);
         } else {
             String label = trimmed(font, entry.label, right - labelLeft);
-            LostTalesChatVisualStyle.drawColored(font,
+            LostTalesUiInk.drawText(font,
                     entry.dim ? "§o" + label : label, labelLeft, labelTop,
                     labelRgb, alpha);
         }
@@ -1064,12 +989,12 @@ final class ChatMenu extends ChatSmallWindowContent {
                            Entry entry, int labelTop, int alpha) {
         int x = at.left + PADDING_X;
         if (entry.icon != null) {
-            ChatChannelIcons.draw(minecraft, entry.icon, x,
+            entry.icon.drawIcon(minecraft, x,
                     labelTop + ChatInlineIcons.CONTENT_TOP_OFFSET, alpha,
-                    ChatIconMark.of(entry.icon));
-            x += ChatChannelIcons.SLOT + ChatChannelIcons.GAP;
+                    TabMark.of(entry.icon));
+            x += TabIcons.SLOT + TabIcons.GAP;
         }
-        LostTalesChatVisualStyle.drawColored(font, trimmed(font, entry.label,
+        LostTalesUiInk.drawText(font, trimmed(font, entry.label,
                         at.left + at.width - PADDING_X - x), x, labelTop,
                 entry.labelColor >= 0 ? entry.labelColor
                         : LostTalesColors.rgb(LostTalesColors.SAND), alpha);
@@ -1106,12 +1031,12 @@ final class ChatMenu extends ChatSmallWindowContent {
         int aside = LostTalesChatVisualStyle.asideRgb();
         if (entry.valueChip >= 0) {
             Gui.drawRect(x, labelTop, x + CHIP_WIDTH,
-                    labelTop + LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT,
-                    LostTalesChatVisualStyle.argb(entry.valueChip, alpha));
+                    labelTop + LostTalesUiInk.CAP_HEIGHT,
+                    LostTalesUiInk.argb(entry.valueChip, alpha));
             x += CHIP_WIDTH + (entry.value.length() > 0 ? SWATCH_GAP : 0);
         }
         if (entry.value.length() > 0) {
-            LostTalesChatVisualStyle.drawColored(font, entry.value, x,
+            LostTalesUiInk.drawText(font, entry.value, x,
                     labelTop, aside, alpha);
             x += font.getStringWidth(entry.value);
         }
@@ -1119,7 +1044,7 @@ final class ChatMenu extends ChatSmallWindowContent {
                 LostTalesInputIconRenderer.BASE_ICON_HEIGHT);
         for (Object part : entry.keys) {
             if (part instanceof Integer) {
-                LostTalesChatVisualStyle.beginContent();
+                LostTalesUiInk.beginContent();
                 x += LostTalesInputIconRenderer.drawInput(minecraft,
                         LostTalesInputBinding.Type.KEYBOARD,
                         ((Integer)part).intValue(), x, keyY, 1.0F,
@@ -1127,7 +1052,7 @@ final class ChatMenu extends ChatSmallWindowContent {
             } else {
                 String word = String.valueOf(part);
                 x += KEY_GAP;
-                LostTalesChatVisualStyle.drawColored(font, word, x, labelTop,
+                LostTalesUiInk.drawText(font, word, x, labelTop,
                         aside, alpha);
                 x += font.getStringWidth(word) + KEY_GAP;
             }
@@ -1143,12 +1068,12 @@ final class ChatMenu extends ChatSmallWindowContent {
     private void drawRowIcon(Minecraft minecraft, Layout at, Entry entry,
                              int labelTop, boolean hovered, double elapsed,
                              int alpha) {
-        int iconX = at.left + this.labelX - ChatChannelIcons.SLOT
-                - ChatChannelIcons.GAP;
+        int iconX = at.left + this.labelX - TabIcons.SLOT
+                - TabIcons.GAP;
         if (entry.icon != null) {
-            ChatChannelIcons.draw(minecraft, entry.icon, iconX,
+            entry.icon.drawIcon(minecraft, iconX,
                     labelTop + ChatInlineIcons.CONTENT_TOP_OFFSET, alpha,
-                    ChatIconMark.of(entry.icon));
+                    TabMark.of(entry.icon));
         } else if (entry.head != null) {
             // A head drawn as the tabs draw theirs: eight pixels, centred
             // across the icon's box, fading as one picture.
@@ -1180,11 +1105,11 @@ final class ChatMenu extends ChatSmallWindowContent {
             // Centred in the icon column and on the label's capitals, the
             // odd pixel left and up.
             int spriteX = iconX + LostTalesUiInk.centredStart(
-                    ChatChannelIcons.SIZE, entry.sprite.getWidth());
+                    TabIcons.SIZE, entry.sprite.getWidth());
             int spriteY = labelTop + Math.floorDiv(
-                    LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT
+                    LostTalesUiInk.CAP_HEIGHT
                             - entry.sprite.getHeight(), 2);
-            LostTalesChatVisualStyle.beginContent();
+            LostTalesUiInk.beginContent();
             if (entry.litSprite == null) {
                 entry.sprite.drawWithShadow(spriteX, spriteY, alpha);
             } else {
@@ -1214,12 +1139,12 @@ final class ChatMenu extends ChatSmallWindowContent {
         this.fieldRowLeft = at.left + PADDING_X;
         this.fieldRowTop = top;
         int textY = top + LostTalesUiInk.centredStart(height - 1,
-                LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT);
+                LostTalesUiInk.CAP_HEIGHT);
         // The icon stands on the capitals of what is typed beside it, as
         // every icon in a chat row does.
-        LostTalesChatVisualStyle.beginContent();
+        LostTalesUiInk.beginContent();
         this.fieldIcon.drawWithShadow(at.left + PADDING_X,
-                textY + LostTalesChatOverlayRenderer.centredBoxTop(
+                textY + WindowStyle.centredBoxTop(
                         this.fieldIcon.getHeight()), alpha);
         int textX = at.left + PADDING_X + fieldIconRun();
         boolean empty = this.field.getText().length() == 0;
@@ -1231,7 +1156,7 @@ final class ChatMenu extends ChatSmallWindowContent {
             // A pixel clear of the caret waiting at the field's start.
             String prompt = trimmed(font, this.filterPrompt, right - promptX
                     - (hinted ? hintWidth + SWATCH_GAP : 0));
-            LostTalesChatVisualStyle.drawColored(font, "§o" + prompt,
+            LostTalesUiInk.drawText(font, "§o" + prompt,
                     promptX, textY, LostTalesChatVisualStyle.asideRgb(),
                     alpha);
         }
@@ -1250,8 +1175,8 @@ final class ChatMenu extends ChatSmallWindowContent {
             ChatInputBar.endFade();
         }
         Gui.drawRect(at.left + PADDING_X, top + height - 1, right,
-                top + height, LostTalesChatVisualStyle.argb(
-                        LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB,
+                top + height, LostTalesUiInk.argb(
+                        LostTalesUiInk.SURFACE_HIGHLIGHT_RGB,
                         Math.min(alpha, 0xA0)));
     }
 
@@ -1267,16 +1192,16 @@ final class ChatMenu extends ChatSmallWindowContent {
         String joiner = keyJoiner();
         int joinerY = keyY + LostTalesUiInk.centredStart(
                 LostTalesInputIconRenderer.BASE_ICON_HEIGHT,
-                LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT);
+                LostTalesUiInk.CAP_HEIGHT);
         int quiet = LostTalesColors.rgb(LostTalesColors.SAND);
-        LostTalesChatVisualStyle.beginContent();
+        LostTalesUiInk.beginContent();
         for (int index = 0; index < this.filterHint.length; index++) {
             if (index > 0) {
                 keyX += KEY_GAP;
-                LostTalesChatVisualStyle.drawColored(font, joiner, keyX,
+                LostTalesUiInk.drawText(font, joiner, keyX,
                         joinerY, quiet, alpha);
                 keyX += font.getStringWidth(joiner) + KEY_GAP;
-                LostTalesChatVisualStyle.beginContent();
+                LostTalesUiInk.beginContent();
             }
             keyX += LostTalesInputIconRenderer.drawInput(minecraft,
                     LostTalesInputBinding.Type.KEYBOARD,
@@ -1401,7 +1326,7 @@ final class ChatMenu extends ChatSmallWindowContent {
                                   boolean lit, double elapsed) {
         Float kept = fades.get(entry.id);
         float fade = kept == null ? (lit ? 1.0F : 0.0F)
-                : LostTalesChatVisualStyle.hoverFade(kept.floatValue(), lit,
+                : WindowStyle.hoverFade(kept.floatValue(), lit,
                         elapsed);
         fades.put(entry.id, Float.valueOf(fade));
         return fade;

@@ -1,6 +1,8 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
+import com.ninuna.losttales.gui.style.LostTalesUiCornerMark;
+import com.ninuna.losttales.gui.style.LostTalesUiItemIcon;
 import net.minecraft.util.IChatComponent;
 
 /**
@@ -30,7 +32,7 @@ final class ChatAvatar {
     /** The face's eight texels, each two pixels square. */
     static final int SIZE = 2 * LostTalesChatOverlayRenderer.HEAD_SIZE;
     /** The avatar as one icon: the face and the sphere standing past its right edge. */
-    static final int ICON_WIDTH = SIZE + ChatPresenceMark.OVERHANG_X;
+    static final int ICON_WIDTH = SIZE + LostTalesUiCornerMark.OVERHANG_X;
     /** How far past the avatar's square a mark standing for a head may reach, each side. */
     static final int MARK_OVERFLOW = 1;
 
@@ -59,7 +61,7 @@ final class ChatAvatar {
     static float markSize(float displayPixelsPerPixel) {
         float perPixel = Math.max(0.001F, displayPixelsPerPixel);
         int texels = ChatEmoji.SPRITE_SIZE;
-        int ratio = ChatInlineIcons.wholePixelsPerTexel(SIZE * perPixel,
+        int ratio = LostTalesUiItemIcon.wholePixelsPerTexel(SIZE * perPixel,
                 (SIZE + 2 * MARK_OVERFLOW) * perPixel, texels);
         return Math.max(1, ratio) * texels / perPixel;
     }

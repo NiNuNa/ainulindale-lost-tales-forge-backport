@@ -297,9 +297,9 @@ public final class ClientChatChannelViewsTest {
      */
     @Test
     public void closedChannelsAccumulateUnreadUntilRestoredAndViewed() {
-        ChatWindowLayout.reset();
+        ChatLayout.reset();
         try {
-            assertTrue(ChatWindowLayout.close(ChatChannel.PARTY));
+            assertTrue(ChatLayout.close(ChatChannel.PARTY));
             ClientChatChannelViews.record(-1, ChatChannel.PARTY,
                     ChatChannel.GLOBAL, false);
             ClientChatChannelViews.record(-2, ChatChannel.PARTY,
@@ -309,17 +309,17 @@ public final class ClientChatChannelViewsTest {
             assertEquals(3, ClientChatChannelViews.unreadCount(
                     ChatChannel.PARTY));
             // Closing and restoring touch no counter on their own.
-            assertTrue(ChatWindowLayout.restore(ChatChannel.PARTY));
+            assertTrue(ChatLayout.restore(ChatChannel.PARTY));
             assertEquals(3, ClientChatChannelViews.unreadCount(
                     ChatChannel.PARTY));
-            assertTrue(ChatWindowLayout.close(ChatChannel.PARTY));
+            assertTrue(ChatLayout.close(ChatChannel.PARTY));
             assertEquals(3, ClientChatChannelViews.unreadCount(
                     ChatChannel.PARTY));
             ClientChatChannelViews.markViewed(ChatChannel.PARTY);
             assertEquals(0, ClientChatChannelViews.unreadCount(
                     ChatChannel.PARTY));
         } finally {
-            ChatWindowLayout.reset();
+            ChatLayout.reset();
         }
     }
 

@@ -4,7 +4,6 @@ import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesFastTravelArrivalPacket;
 import com.ninuna.losttales.world.map.waypoint.LostTalesWaypointFastTravelPolicy;
 import cpw.mods.fml.common.FMLLog;
-import java.util.UUID;
 import lotr.common.LOTRPlayerData;
 import lotr.common.world.map.LOTRAbstractWaypoint;
 import net.minecraft.entity.player.EntityPlayerMP;

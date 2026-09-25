@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
+import com.ninuna.losttales.client.window.WindowPlacement;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ChatLine;
@@ -57,10 +58,10 @@ final class LostTalesChatClipboard {
             // the message by, so what is copied is the message lit.
             GuiScreen screen = minecraft.currentScreen;
             float pointerX = screen == null ? mouseX + 0.5F
-                    : (float)ChatWindowPlacement.preciseMouseX(minecraft,
+                    : (float)WindowPlacement.preciseMouseX(minecraft,
                             screen.width);
             float pointerY = screen == null ? mouseY + 0.5F
-                    : (float)ChatWindowPlacement.preciseMouseY(minecraft,
+                    : (float)WindowPlacement.preciseMouseY(minecraft,
                             screen.height);
             LostTalesChatOverlayRenderer.Band band =
                     LostTalesChatOverlayRenderer.bandAt(

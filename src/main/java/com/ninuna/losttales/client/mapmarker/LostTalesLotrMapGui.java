@@ -8,8 +8,8 @@ import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimations;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.client.party.ClientPartyTrackingCache;
 import com.ninuna.losttales.client.party.PartyClientRequestManager;
+import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.gui.screen.LostTalesCharacterMenuGui;
-import com.ninuna.losttales.client.chat.LostTalesChatGui;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.party.model.PartyPersonalMarkerOwner;
 import com.ninuna.losttales.party.sync.PartyStateSnapshot;
@@ -42,16 +42,20 @@ import lotr.common.fac.LOTRFaction;
 import lotr.common.world.map.LOTRAbstractWaypoint;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
+import net.minecraft.client.gui.GuiScreen;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
 
 /**
- * LOTR map screen wrapper used only to intercept the waypoint rendering pass.
+ * LOTR's map with everything Lost Tales adds to it: its own icons,
+ * undiscovered hover and selection — so private names, lore and fast
+ * travel never reach LOTR's own path — the smooth zoom, the turn and lean,
+ * the control strip, the legend and the prompts.
  *
- * <p>The base map handles movement and discovered LOTR waypoints. This wrapper
- * owns Lost Tales icons plus undiscovered hover/selection so private names,
- * lore, and fast-travel actions never reach the native GUI path.</p>
+ * <p>The ordinary map stands in a window ({@link LostTalesMapPage}), drawn
+ * in its box as if the box were the screen; LOTR's special maps, the
+ * conquest grid and the control zones, keep a screen of their own.</p>
  */
 public class LostTalesLotrMapGui extends LOTRGuiMap
         implements LostTalesPointerInteractable {
@@ -144,7 +148,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
     private LostTalesMapSearchPrompt searchPrompt;
     /** Search result brackets that survive the popup until the next input. */
     private boolean searchSelectionFrameActive;
-    /** A focus parked by {@link #openFocusedOn} for the next fresh screen. */
+    /** A focus parked by {@link #openFocusedOn} for the map's next frame. */
     private static boolean pendingFocus;
     private static String pendingFocusMarkerId = "";
     private static double pendingFocusX;
@@ -208,6 +212,10 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
     private boolean panningMap;
     private int panLastX;
     private int panLastY;
+    /** The page the map stands on in a window; null on a screen of its own. */
+    private LostTalesMapPage page;
+    /** The map being drawn this moment, which LOTR's hooks ask about; null between frames. */
+    private static LostTalesLotrMapGui drawing;
 
     /**
      * Creates the marker-aware map without discarding a mode configured by
@@ -215,9 +223,18 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
      * conquest grid. If the expected v36.15 fields are unavailable, retain
      * LOTR's original screen so base-mod behavior is not silently disabled.
      */
-    public static LOTRGuiMap replace(LOTRGuiMap original) {
+    public static GuiScreen replace(LOTRGuiMap original) {
         if (original == null) {
             return null;
+        }
+        // The ordinary map opens in its window, filling the screen the
+        // first time and where it was left after that (M1 a).
+        if (isOrdinary(original) && LostTalesMapPage.standsInWindow()) {
+            GuiScreen window = WindowScreen.screenForPage(
+                    LostTalesMapPage.PAGE_ID);
+            if (window != null) {
+                return window;
+            }
         }
         LostTalesLotrMapGui replacement = new LostTalesLotrMapGui();
         return copyInitialMode(original, replacement)
@@ -227,21 +244,68 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
     /**
      * Opens every ordinary map through LOTR's native screen and the one
      * GuiOpenEvent replacement seam. This keeps keybind, menu, and in-world
-     * entry paths from initializing subtly different map instances.
+     * entry paths from initializing subtly different map instances. On the
+     * window screen the map's window only comes forward.
      */
     public static void open() {
         Minecraft minecraft = Minecraft.getMinecraft();
-        if (minecraft != null) {
-            minecraft.displayGuiScreen(new LOTRGuiMap());
+        if (minecraft == null) {
+            return;
+        }
+        if (minecraft.currentScreen instanceof WindowScreen
+                && LostTalesMapPage.standsInWindow()) {
+            WindowScreen.openPage(LostTalesMapPage.PAGE_ID);
+            return;
+        }
+        minecraft.displayGuiScreen(new LOTRGuiMap());
+    }
+
+    /** Whether a prompt with a field is open, the waypoint's or Find Location's: it takes every key. */
+    boolean hasFieldPrompt() {
+        return this.waypointPrompt != null || this.searchPrompt != null;
+    }
+
+    /** Stands the map on a page in a window: the window screen draws it and hands it the pointer and the keys. */
+    void embedIn(LostTalesMapPage owner) {
+        this.page = owner;
+    }
+
+    /** The map being drawn now, on its own screen or in a window; null between frames. */
+    static LostTalesLotrMapGui drawing() {
+        return drawing;
+    }
+
+    /** Closes the map: its window when it stands in one, else its screen. */
+    private void closeMap() {
+        if (this.page != null) {
+            this.page.close();
+        } else {
+            this.mc.displayGuiScreen(null);
+        }
+    }
+
+    /** Whether a map LOTR opened is the ordinary one: no conquest grid, no control zones. */
+    private static boolean isOrdinary(LOTRGuiMap original) {
+        if (!ensureInitialModeReflection()) {
+            return false;
+        }
+        try {
+            return controlZoneFactionField.get(original) == null
+                    && !conquestGridField.getBoolean(original);
+        } catch (IllegalAccessException exception) {
+            markInitialModeReflectionFailed(exception);
+            return false;
         }
     }
 
     /**
      * Opens the map and flies the camera to a world position — a location
-     * shared in chat, for instance. The request is parked until the fresh
-     * screen has restored its remembered view, so the focus starts from
-     * where the player last left the map rather than from LOTR's default
-     * framing. A known marker id also gets the selection frame.
+     * shared in chat, for instance. The request is parked until the map's
+     * next frame, after a new map has restored its remembered view, so the
+     * focus starts from where the player last left the map rather than
+     * from LOTR's default framing; a map already open in its window flies
+     * from where it stands. A known marker id also gets the selection
+     * frame.
      */
     public static void openFocusedOn(String markerId, int dimensionId,
                                      double worldX, double worldZ) {
@@ -253,7 +317,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         open();
     }
 
-    /** Runs the parked focus once, on the first frame of a fresh screen. */
+    /** Runs the parked focus once, on the map's next frame. */
     private void consumePendingFocus() {
         if (!pendingFocus) {
             return;
@@ -353,8 +417,11 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
     @Override
     public void initGui() {
         // Taken here rather than on the first frame, so a resize that runs
-        // initGui again finds it already held and does nothing.
-        LostTalesMapCursor.acquire();
+        // initGui again finds it already held and does nothing. In a window
+        // the window screen holds the pointer.
+        if (this.page == null) {
+            LostTalesMapCursor.acquire();
+        }
         boolean preserveSmoothZoom = this.smoothZoomInitialized;
         LostTalesLotrMapLayout.prepareBeforeInit(this);
         super.initGui();
@@ -486,7 +553,10 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
     public void updateScreen() {
         float[] camera = new float[
                 LostTalesMapCameraFocus.CAMERA_STATE_SIZE];
-        boolean frozen = isModalOpen()
+        // In a window the map answers WASD and the arrows only while it
+        // holds the keys: typing in a chat bar never moves it (M3 a).
+        boolean keysElsewhere = this.page != null && !this.page.hasKeys();
+        boolean frozen = (isModalOpen() || keysElsewhere)
                 && LostTalesMapCameraFocus.captureCamera(this, camera);
         try {
             super.updateScreen();
@@ -494,6 +564,11 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             if (frozen) {
                 // LOTR's keyboard movement runs inside its own tick, so the
                 // only way to hold the map is to put back what it moved.
+                if (keysElsewhere) {
+                    // Nor does a movement carry on once the keys are gone.
+                    camera[4] = 0.0F;
+                    camera[5] = 0.0F;
+                }
                 LostTalesMapCameraFocus.restoreCamera(this, camera);
             }
         }
@@ -630,12 +705,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
     public void handleMouseInput() {
         int wheel = Mouse.getEventDWheel();
         if (isModalOpen() && wheel != 0) {
-            if (this.waypointPrompt != null) {
-                this.waypointPrompt.mouseWheel(wheel);
-            }
-            if (this.searchPrompt != null) {
-                this.searchPrompt.mouseWheel(wheel);
-            }
+            wheelIntoPrompts(wheel);
             return;
         }
         if (wheel != 0) {
@@ -677,6 +747,43 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         adjustSmoothZoom(Math.signum((float)wheel)
                 * SMOOTH_ZOOM_WHEEL_INCREMENT * wheelSteps,
                 System.nanoTime());
+    }
+
+    /**
+     * A turn of the wheel over the map in a window, at a point of the map's
+     * own box: what the wheel does on the map's own screen, but for LOTR's
+     * whole-step zoom, which only a screen of its own reaches.
+     * {@code wheel} is the game's own measure, 120 a notch.
+     */
+    boolean wheelAt(int mouseX, int mouseY, int wheel) {
+        if (wheel == 0) {
+            return false;
+        }
+        if (isModalOpen()) {
+            wheelIntoPrompts(wheel);
+            return true;
+        }
+        clearSearchSelectionFrame();
+        if (LostTalesLotrMapLegend.handleMouseWheel(
+                this, mouseX, mouseY, wheel)) {
+            return true;
+        }
+        if (!shouldHandleSmoothZoomWheel(wheel)) {
+            return false;
+        }
+        adjustSmoothZoom(Math.signum((float)wheel)
+                * SMOOTH_ZOOM_WHEEL_INCREMENT, System.nanoTime());
+        return true;
+    }
+
+    /** The wheel over an open prompt scrolls its list. */
+    private void wheelIntoPrompts(int wheel) {
+        if (this.waypointPrompt != null) {
+            this.waypointPrompt.mouseWheel(wheel);
+        }
+        if (this.searchPrompt != null) {
+            this.searchPrompt.mouseWheel(wheel);
+        }
     }
 
     private boolean shouldHandleSmoothZoomWheel(int wheel) {
@@ -1109,6 +1216,16 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
 
     @Override
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+        LostTalesLotrMapGui previous = drawing;
+        drawing = this;
+        try {
+            drawMap(mouseX, mouseY, partialTicks);
+        } finally {
+            drawing = previous;
+        }
+    }
+
+    private void drawMap(int mouseX, int mouseY, float partialTicks) {
         this.cursorPosition.beginFrame(this, mouseX, mouseY);
         LostTalesLotrMapLayout.prepareForDraw(this);
         this.roadsRenderedBelowClouds = false;
@@ -1193,10 +1310,13 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         }
         // Last of everything: the pointer is over the map, the popups and the
         // strip alike, and it is drawn at the very coordinate every hit test
-        // above was resolved against.
-        LostTalesMapCursor.render(this.mc, fixedMouseX, fixedMouseY,
-                LostTalesGuiPointerTargets.isOverInteractable(
-                        this, mouseX, mouseY));
+        // above was resolved against. In a window the window screen draws
+        // it, over everything the screen has.
+        if (this.page == null) {
+            LostTalesMapCursor.render(this.mc, fixedMouseX, fixedMouseY,
+                    LostTalesGuiPointerTargets.isOverInteractable(
+                            this, mouseX, mouseY));
+        }
     }
 
     /**
@@ -1544,7 +1664,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int button) {
         if (LostTalesKeyBindings.isMapMouseButton(button)) {
-            this.mc.displayGuiScreen(null);
+            closeMap();
             return;
         }
         int fixedMouseX = LostTalesGuiAnimations.forwardMouseX(
@@ -2397,8 +2517,10 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             handleSearchSelection();
             return;
         }
+        // In a window the screen answers M and J before the map does:
+        // they are the pages' keys (N1 a).
         if (LostTalesKeyBindings.isMapKey(keyCode)) {
-            this.mc.displayGuiScreen(null);
+            closeMap();
             return;
         }
         if (this.fastTravelPrompt != null) {
@@ -2413,11 +2535,14 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         }
         clearSearchSelectionFrame();
         if (LostTalesKeyBindings.isCharacterMenuKey(keyCode)) {
-            this.mc.displayGuiScreen(new LostTalesCharacterMenuGui(this));
+            // The menu goes back to the screen it opened over: the window
+            // screen, for the map in a window.
+            this.mc.displayGuiScreen(new LostTalesCharacterMenuGui(
+                    this.page != null ? this.mc.currentScreen : this));
             return;
         }
         if (LostTalesKeyBindings.isQuestJournalKey(keyCode)) {
-            LostTalesChatGui.openPage(QuestJournalPage.PAGE_ID);
+            WindowScreen.openPage(QuestJournalPage.PAGE_ID);
             return;
         }
         if (keyCode == CREATE_WAYPOINT_KEY) {
@@ -2503,7 +2628,9 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         // Before anything below is cleared: what is cleared here is this
         // screen's state, and the view has to outlive it.
         rememberView();
-        LostTalesMapCursor.release();
+        if (this.page == null) {
+            LostTalesMapCursor.release();
+        }
         clearFastTravelPrompt();
         clearWaypointPrompt();
         clearMoveMarkerPrompt();

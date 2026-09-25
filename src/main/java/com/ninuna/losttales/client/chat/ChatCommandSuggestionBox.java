@@ -1,6 +1,9 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.PointerRegions;
+import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -21,7 +24,7 @@ final class ChatCommandSuggestionBox {
     static final int MAX_ROWS = 8;
     private static final int ROW_HEIGHT = 11;
     /** The rows stand two pixels inside the frame's ink, as a framed button's content does. */
-    private static final int PADDING = LostTalesChatVisualStyle.POPUP_INSET;
+    private static final int PADDING = WindowStyle.POPUP_INSET;
     /**
      * How far above the input anchor ({@link ChatInputBar#inputAnchor})
      * the box ends: one pixel clear of the bar's top.
@@ -82,7 +85,7 @@ final class ChatCommandSuggestionBox {
                 ? row : -1;
     }
 
-    void draw(FontRenderer font, ChatPointerRegions regions,
+    void draw(FontRenderer font, PointerRegions regions,
               int screenHeight, int inputX, double mouseX, double mouseY) {
         if (!isActive()) {
             return;
@@ -94,19 +97,19 @@ final class ChatCommandSuggestionBox {
                 inputX);
         regions.add(inputX, top, inputX + width, bottom);
         int shown = Math.min(this.candidates.size(), MAX_ROWS);
-        LostTalesChatVisualStyle.drawPopupList(inputX, top, inputX + width,
+        WindowStyle.drawPopupList(inputX, top, inputX + width,
                 bottom, top + PADDING, ROW_HEIGHT, litRow(hoveredRow, shown));
         for (int row = 0; row < shown; row++) {
             int rowTop = top + PADDING + row * ROW_HEIGHT;
-            LostTalesChatVisualStyle.drawColored(font,
+            LostTalesUiInk.drawText(font,
                     this.candidates.get(row), inputX + PADDING, rowTop + 2,
-                    LostTalesChatVisualStyle.IVORY, 255);
+                    LostTalesUiInk.IVORY, 255);
         }
         if (this.candidates.size() > MAX_ROWS) {
-            LostTalesChatVisualStyle.drawColored(font,
+            LostTalesUiInk.drawText(font,
                     "+" + (this.candidates.size() - MAX_ROWS),
                     inputX + PADDING, top + PADDING + shown * ROW_HEIGHT + 2,
-                    LostTalesChatVisualStyle.IVORY, 160);
+                    LostTalesUiInk.IVORY, 160);
         }
     }
 

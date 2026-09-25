@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.chat.ChatNarrator;
 import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.gui.style.LostTalesUiCornerCut;
+import com.ninuna.losttales.gui.style.LostTalesUiCornerMark;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.awt.image.BufferedImage;
@@ -33,17 +34,17 @@ public final class ChatPresenceMarkTest {
 
     @Test
     public void theMarkStandsPastTheHeadsRightEdgeAndItsBottom() {
-        assertEquals(5, ChatPresenceMark.SIZE);
-        assertEquals(3, ChatPresenceMark.INSET_X);
+        assertEquals(5, LostTalesUiCornerMark.SIZE);
+        assertEquals(3, LostTalesUiCornerMark.INSET_X);
         // A pixel higher than it is far in: the mark is not on the
         // corner's diagonal.
-        assertEquals(4, ChatPresenceMark.INSET_Y);
-        int left = HEAD - ChatPresenceMark.INSET_X;
-        int top = HEAD - ChatPresenceMark.INSET_Y;
-        assertEquals(HEAD + 2, left + ChatPresenceMark.SIZE);
-        assertEquals(HEAD + 1, top + ChatPresenceMark.SIZE);
-        assertEquals(2, ChatPresenceMark.OVERHANG_X);
-        assertEquals(1, ChatPresenceMark.OVERHANG_Y);
+        assertEquals(4, LostTalesUiCornerMark.INSET_Y);
+        int left = HEAD - LostTalesUiCornerMark.INSET_X;
+        int top = HEAD - LostTalesUiCornerMark.INSET_Y;
+        assertEquals(HEAD + 2, left + LostTalesUiCornerMark.SIZE);
+        assertEquals(HEAD + 1, top + LostTalesUiCornerMark.SIZE);
+        assertEquals(2, LostTalesUiCornerMark.OVERHANG_X);
+        assertEquals(1, LostTalesUiCornerMark.OVERHANG_Y);
     }
 
     /**
@@ -56,8 +57,8 @@ public final class ChatPresenceMarkTest {
     @Test
     public void theCutIsTheMarksShapeGrownByAPixel() throws Exception {
         BufferedImage sheet = readSheet();
-        int markX = HEAD - ChatPresenceMark.INSET_X;
-        int markY = HEAD - ChatPresenceMark.INSET_Y;
+        int markX = HEAD - LostTalesUiCornerMark.INSET_X;
+        int markY = HEAD - LostTalesUiCornerMark.INSET_Y;
         LostTalesUiCornerCut cut = ChatPresenceMark.cutFor(0.0F, 0.0F, HEAD);
         LostTalesUiSheet[] marks = {
                 LostTalesUiSheet.PRESENCE_ONLINE,
@@ -67,9 +68,9 @@ public final class ChatPresenceMarkTest {
                 LostTalesUiSheet.PRESENCE_SELECTED,
         };
         for (LostTalesUiSheet mark : marks) {
-            for (int row = 0; row < ChatPresenceMark.SIZE; row++) {
+            for (int row = 0; row < LostTalesUiCornerMark.SIZE; row++) {
                 assertEquals(mark + " row " + row,
-                        ChatPresenceMark.SPHERE_INK_LEFT[row],
+                        LostTalesUiCornerMark.SPHERE_INK_LEFT[row],
                         firstInk(sheet, mark, row));
             }
             for (int y = 0; y < HEAD; y++) {
@@ -83,8 +84,8 @@ public final class ChatPresenceMarkTest {
                             int sx = x + dx - markX;
                             int sy = y + dy - markY;
                             nearInk = sx >= 0 && sy >= 0
-                                    && sx < ChatPresenceMark.SIZE
-                                    && sy < ChatPresenceMark.SIZE
+                                    && sx < LostTalesUiCornerMark.SIZE
+                                    && sy < LostTalesUiCornerMark.SIZE
                                     && inked(sheet, mark, sx, sy);
                         }
                     }
@@ -133,7 +134,7 @@ public final class ChatPresenceMarkTest {
     @Test
     public void theIconIsTheHeadAndTheMarkTogether() {
         assertEquals(ChatInlineIcons.HEAD_SLOT_WIDTH
-                        + ChatPresenceMark.OVERHANG_X,
+                        + LostTalesUiCornerMark.OVERHANG_X,
                 ChatInlineIcons.PRESENCE_HEAD_SLOT_WIDTH);
         assertTrue(ChatInlineIcons.PRESENCE_HEAD_SLOT_WIDTH
                 > ChatInlineIcons.HEAD_SLOT_WIDTH);
@@ -260,9 +261,9 @@ public final class ChatPresenceMarkTest {
                 LostTalesUiSheet.PRESENCE_SELECTED,
         };
         for (LostTalesUiSheet mark : marks) {
-            assertEquals(mark.name(), ChatPresenceMark.SIZE,
+            assertEquals(mark.name(), LostTalesUiCornerMark.SIZE,
                     mark.getWidth());
-            assertEquals(mark.name(), ChatPresenceMark.SIZE,
+            assertEquals(mark.name(), LostTalesUiCornerMark.SIZE,
                     mark.getHeight());
         }
     }
@@ -283,8 +284,8 @@ public final class ChatPresenceMarkTest {
         java.util.Set<String> hollows = new java.util.HashSet<String>();
         for (LostTalesUiSheet mark : shaped) {
             StringBuilder hollow = new StringBuilder();
-            for (int y = 0; y < ChatPresenceMark.SIZE; y++) {
-                for (int x = 0; x < ChatPresenceMark.SIZE; x++) {
+            for (int y = 0; y < LostTalesUiCornerMark.SIZE; y++) {
+                for (int x = 0; x < LostTalesUiCornerMark.SIZE; x++) {
                     boolean solid = opaque(sheet, LostTalesUiSheet.PRESENCE_ONLINE,
                             x, y);
                     hollow.append(solid && !opaque(sheet, mark, x, y) ? '#' : '.');

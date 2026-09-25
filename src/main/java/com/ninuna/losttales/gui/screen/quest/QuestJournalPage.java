@@ -5,9 +5,10 @@ import com.ninuna.losttales.client.quest.ClientQuestEntry;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
-import com.ninuna.losttales.client.chat.ChatPageContent;
-import com.ninuna.losttales.client.chat.ChatPageSearch;
-import com.ninuna.losttales.client.chat.LostTalesChatGui;
+import com.ninuna.losttales.client.window.PageContent;
+import com.ninuna.losttales.client.window.PageSearch;
+import com.ninuna.losttales.client.window.ToolStrip;
+import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
@@ -52,7 +53,7 @@ import com.ninuna.losttales.quest.LostTalesQuestRewardText;
  * assembled from Lost Tales and LOTR's synchronized quest state, and
  * draws itself in the box its window gives it.
  */
-public final class QuestJournalPage extends ChatPageContent {
+public final class QuestJournalPage extends PageContent {
     /** The code name the page is registered and remembered under. */
     public static final String PAGE_ID = "journal";
 
@@ -69,7 +70,7 @@ public final class QuestJournalPage extends ChatPageContent {
      * The quest list's button at the strip's left end: the input bar's
      * quest mark, lit and resting alike until its lit cell is drawn.
      */
-    private static final Panel LIST_PANEL = new Panel(LostTalesUiSheet.QUEST,
+    private static final ToolStrip.Panel LIST_PANEL = new ToolStrip.Panel(LostTalesUiSheet.QUEST,
             LostTalesUiSheet.QUEST, "gui.losttales.quest.list.show",
             "gui.losttales.quest.list.hide");
 
@@ -307,7 +308,7 @@ public final class QuestJournalPage extends ChatPageContent {
     }
 
     @Override
-    public Panel panel() {
+    public ToolStrip.Panel panel() {
         return LIST_PANEL;
     }
 
@@ -862,8 +863,8 @@ public final class QuestJournalPage extends ChatPageContent {
         if (action == QuestAction.SHARE) {
             // The quest's own token goes into the field being typed in,
             // so the share is written the way a player writes one.
-            if (this.mc.currentScreen instanceof LostTalesChatGui) {
-                ((LostTalesChatGui)this.mc.currentScreen).insertIntoInput(
+            if (this.mc.currentScreen instanceof WindowScreen) {
+                ((WindowScreen)this.mc.currentScreen).insertIntoInput(
                         ChatShareTokenParser.buildToken(ChatShareKind.QUEST,
                                 quest.getTitle(), 1));
             }
@@ -1315,7 +1316,7 @@ public final class QuestJournalPage extends ChatPageContent {
 
     private List<ClientQuestEntry> buildVisibleQuests(String rawQuery) {
         List<ClientQuestEntry> visible = new ArrayList<ClientQuestEntry>();
-        ChatPageSearch query = ChatPageSearch.of(rawQuery);
+        PageSearch query = PageSearch.of(rawQuery);
         for (ClientQuestEntry quest : ClientQuestCatalog.getEntries(this.mc)) {
             if (!query.isEmpty() && !matchesSearch(quest, query)) {
                 continue;
@@ -1337,7 +1338,7 @@ public final class QuestJournalPage extends ChatPageContent {
 
     /** Everything a quest says, put to the search. */
     private static boolean matchesSearch(ClientQuestEntry quest,
-                                         ChatPageSearch query) {
+                                         PageSearch query) {
         List<String> parts = new ArrayList<String>();
         parts.add(quest.getTitle());
         parts.add(quest.getCategory());

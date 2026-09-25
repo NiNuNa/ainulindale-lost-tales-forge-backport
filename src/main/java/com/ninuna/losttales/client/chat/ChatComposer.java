@@ -1,5 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.Window;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
@@ -187,14 +189,14 @@ final class ChatComposer {
      * talking. Returns whether it drew, so the typing line knows to
      * stand down.
      */
-    boolean drawChip(FontRenderer font, ChatWindow window,
-                     ChatWindowFrame frame, LostTalesGuiAnimationSample opening,
+    boolean drawChip(FontRenderer font, Window window,
+                     ChatFrame frame, LostTalesGuiAnimationSample opening,
                      int mouseX, int mouseY) {
         this.chipRight = 0;
         ChatTab composing = composingTab();
         if (composing == null || !composing.equals(
-                ChatWindowFrame.activeTab(window,
-                        ChatWindowFrame.visibleTabs(window)))) {
+                ChatFrame.activeTab(window,
+                        ChatFrame.visibleTabs(window)))) {
             return false;
         }
         int alpha = Math.round(255.0F * opening.getOpacity());
@@ -231,7 +233,7 @@ final class ChatComposer {
         GL11.glPushMatrix();
         try {
             GL11.glTranslatef(strip.fractionX, strip.fractionY, 0.0F);
-            LostTalesChatVisualStyle.drawColored(font, label, x, y,
+            LostTalesUiInk.drawText(font, label, x, y,
                     LostTalesChatVisualStyle.asideRgb(), alpha);
             cross.drawWithShadow(crossX, crossY, alpha);
         } finally {

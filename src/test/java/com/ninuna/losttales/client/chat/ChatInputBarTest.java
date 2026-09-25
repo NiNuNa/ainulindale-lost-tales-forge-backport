@@ -1,7 +1,11 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.TabIcons;
+import com.ninuna.losttales.client.window.WindowPlacement;
+import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import org.junit.After;
 import org.junit.Test;
 
@@ -79,7 +83,7 @@ public final class ChatInputBarTest {
     @Test
     public void theFramedButtonsShareOneHeight() {
         assertEquals(18, LostTalesUiFramedButton.HEIGHT);
-        assertEquals(ChatChannelIcons.SIZE + 2 * LostTalesUiFramedButton.INSET,
+        assertEquals(TabIcons.SIZE + 2 * LostTalesUiFramedButton.INSET,
                 LostTalesUiFramedButton.HEIGHT);
         assertEquals(LostTalesChatOverlayRenderer.CONTENT_BOX_HEIGHT
                 + 2 * LostTalesUiFramedButton.INSET, LostTalesUiFramedButton.HEIGHT);
@@ -107,7 +111,7 @@ public final class ChatInputBarTest {
     public void theBarKeepsTwoRowsAboveAndBelowAndTwoPixelsBetweenItsFramedButtons() {
         assertEquals(2, ChatInputBar.CLEARANCE);
         assertEquals(1 + 2 + LostTalesUiFramedButton.HEIGHT + 2,
-                ChatInputBar.HEIGHT);
+                WindowPlacement.BAR_STRIP_HEIGHT);
         assertEquals(3, ChatInputBar.BAR_GAP);
         assertEquals(2, ChatInputBar.BUTTON_GAP);
     }
@@ -132,10 +136,9 @@ public final class ChatInputBarTest {
         // The framed buttons stand the clearance below the rule and as far
         // above the bar's bottom, the window's frame running just below it.
         assertEquals(1 + ChatInputBar.CLEARANCE, contentTop - barTop);
-        assertEquals(ChatInputBar.CLEARANCE, barTop + ChatInputBar.HEIGHT
+        assertEquals(ChatInputBar.CLEARANCE, barTop + WindowPlacement.BAR_STRIP_HEIGHT
                 - (contentTop + ChatInputBar.CONTENT_HEIGHT));
         assertEquals(LostTalesUiFramedButton.HEIGHT, ChatInputBar.CONTENT_HEIGHT);
-        assertEquals(ChatInputBar.HEIGHT, ChatWindowPlacement.INPUT_HEIGHT);
         // The well is one message row, as every chat input box is, centred
         // on the framed buttons: three rows clear above it and below it.
         assertEquals(LostTalesChatOverlayRenderer.LINE_HEIGHT,
@@ -145,7 +148,7 @@ public final class ChatInputBarTest {
         // Its text stands where a message row puts it: the caret a row
         // inside the message row.
         int rowTop = wellTop;
-        assertEquals(LostTalesChatOverlayRenderer.ROW_TEXT_TOP,
+        assertEquals(WindowStyle.ROW_TEXT_TOP,
                 textTop - rowTop);
         assertEquals(1, caretTop - rowTop);
         assertEquals(1, rowTop + LostTalesChatOverlayRenderer.LINE_HEIGHT
@@ -153,8 +156,8 @@ public final class ChatInputBarTest {
         // The caret's shadow fills the clear row under the caret, and
         // stays inside the message row.
         assertEquals(rowTop + LostTalesChatOverlayRenderer.LINE_HEIGHT,
-                caretBottom + LostTalesChatVisualStyle.SHADOW_OFFSET);
-        assertEquals(textTop + LostTalesChatOverlayRenderer.centredBoxTop(
+                caretBottom + LostTalesUiInk.SHADOW_OFFSET);
+        assertEquals(textTop + WindowStyle.centredBoxTop(
                         (int)ChatInlineIcons.CONTENT_SIZE),
                 ChatInlineIcons.boxTop(textTop, ChatInlineIcons.SLOT_WIDTH),
                 0.0F);
@@ -196,7 +199,7 @@ public final class ChatInputBarTest {
      */
     @Test
     public void theIndicatorGivesItsNameUpForTheField() {
-        int whole = ChatChannelIcons.GAP + 40;
+        int whole = TabIcons.GAP + 40;
         int comfortable = ChatInputBar.COMFORTABLE_FIELD_WIDTH;
         assertEquals(whole, ChatInputBar.indicatorShown(whole, comfortable));
         assertEquals(whole,

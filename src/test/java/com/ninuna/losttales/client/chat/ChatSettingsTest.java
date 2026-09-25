@@ -19,7 +19,7 @@ public final class ChatSettingsTest {
     @After
     public void cleanUp() {
         ClientChatChannelState.clear();
-        ChatWindowLayout.reset();
+        ChatLayout.reset();
     }
 
     /**

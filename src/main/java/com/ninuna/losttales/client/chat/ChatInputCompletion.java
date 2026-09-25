@@ -15,6 +15,7 @@ import com.ninuna.losttales.chat.share.ChatShareSuggester;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
+import com.ninuna.losttales.client.window.PointerRegions;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
@@ -64,7 +65,7 @@ final class ChatInputCompletion implements ChatInputField.MentionSource {
     private final ChatNoticeSink notices;
     private Minecraft mc;
     private FontRenderer font;
-    private ChatPointerRegions regions;
+    private PointerRegions regions;
     private ChatInputField field;
 
     private final ChatEmojiSuggestionBox emojiSuggestions =
@@ -107,7 +108,7 @@ final class ChatInputCompletion implements ChatInputField.MentionSource {
      * which also runs on every resize, when vanilla has replaced the
      * field. The lists and the walk keep their state across it.
      */
-    void bind(Minecraft mc, FontRenderer font, ChatPointerRegions regions,
+    void bind(Minecraft mc, FontRenderer font, PointerRegions regions,
               ChatInputField field) {
         this.mc = mc;
         this.font = font;

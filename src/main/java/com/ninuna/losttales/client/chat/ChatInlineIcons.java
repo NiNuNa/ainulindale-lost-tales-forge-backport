@@ -1,14 +1,14 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
+import com.ninuna.losttales.gui.style.LostTalesUiCornerMark;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.gui.style.LostTalesUiItemIcon;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.item.ItemStack;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.BufferUtils;
-import java.nio.FloatBuffer;
 
 /**
  * The one set of rules every inline chat glyph — emoji, item icon, map
@@ -36,9 +36,9 @@ import java.nio.FloatBuffer;
  * scaled onto the box, the marker artwork fitted uniformly — so the
  * emoji, item, marker and quest buttons read at one size on one baseline
  * and nothing is stretched.</li>
- * <li>Shadows are flat {@link LostTalesChatVisualStyle#SHADOW}
- * silhouettes offset by {@link LostTalesChatVisualStyle#SHADOW_OFFSET}
- * at {@link LostTalesChatVisualStyle#SHADOW_OPACITY}, exactly like the
+ * <li>Shadows are flat {@link LostTalesUiInk#SHADOW}
+ * silhouettes offset by {@link LostTalesUiInk#SHADOW_OFFSET}
+ * at {@link LostTalesUiInk#SHADOW_OPACITY}, exactly like the
  * text's. Markers keep the colour they have on the map, except that the
  * map's plain white becomes the chat's ivory so a white marker and the
  * text around it share one white.</li>
@@ -75,7 +75,7 @@ final class ChatInlineIcons {
      * what follows keeps its clear space from the sphere.
      */
     static final int PRESENCE_HEAD_SLOT_WIDTH =
-            HEAD_SLOT_WIDTH + ChatPresenceMark.OVERHANG_X;
+            HEAD_SLOT_WIDTH + LostTalesUiCornerMark.OVERHANG_X;
     /** Where the face starts inside that slot. */
     static final float HEAD_SLOT_INSET = 1.0F;
     /** The clear space a name keeps from what is written either side. */
@@ -89,14 +89,6 @@ final class ChatInlineIcons {
      * ten-row box ({@link LostTalesChatOverlayRenderer#centredBoxTop}).
      */
     static final int CONTENT_TOP_OFFSET = -2;
-    /** An item icon's sixteen texels; vanilla's item icon size. */
-    static final int ICON_TEXELS = 16;
-    /**
-     * How far past its box an item icon may reach on each side, in GUI
-     * pixels, to keep every texel whole: the clear rows a message row
-     * keeps around the content box and a tab keeps around its icon.
-     */
-    static final int ITEM_OVERFLOW = 1;
     private ChatInlineIcons() {}
 
     /**
@@ -129,7 +121,7 @@ final class ChatInlineIcons {
             int slot = head.mark() != null ? MARK_HEAD_SLOT_WIDTH
                     : HEAD_SLOT_WIDTH;
             return ChatPresenceMark.wears(head)
-                    ? slot + ChatPresenceMark.OVERHANG_X : slot;
+                    ? slot + LostTalesUiCornerMark.OVERHANG_X : slot;
         }
         if (ChatReplyMarker.isIconSlot(part)) {
             return ChatReplyMarker.ICON_SLOT_WIDTH;
@@ -154,47 +146,24 @@ final class ChatInlineIcons {
     }
 
     /**
-     * The whole display pixels per texel an icon of {@code texels} is
-     * drawn at in a box {@code box} display pixels wide: the count whose
-     * icon is nearest the box in size, a tie going to the smaller, unless
-     * that icon would reach past {@code room}, in which case the largest
-     * that fits the box; zero when not even one pixel per texel fits the
-     * room. Sixteen texels in a ten-pixel box: half size at GUI scale 2,
-     * one and a third at 3, eight tenths at 4, close to one at 5.
-     */
-    static int wholePixelsPerTexel(double box, double room, int texels) {
-        if (texels <= 0 || box <= 0.0D) {
-            return 0;
-        }
-        int lower = (int)Math.floor(box / texels + 1.0E-6D);
-        int upper = lower + 1;
-        int nearest = upper * texels - box < box - lower * texels
-                ? upper : lower;
-        if (nearest * texels > room + 1.0E-6D) {
-            nearest = lower;
-        }
-        return Math.max(0, nearest);
-    }
-
-    /**
      * The slot an inline item icon reserves: the emoji's, widened to the
      * whole GUI pixels the icon's nearest crisp size needs wherever that
      * reaches past the box — eleven at GUI scales 3 and 6 — so what
      * follows starts clear of it.
      */
     static int itemSlotWidth() {
-        return itemSlotWidth(ChatWindowFrame.displayScaleFactor());
+        return itemSlotWidth(LostTalesDisplayPixels.scaleFactor());
     }
 
     static int itemSlotWidth(int displayScaleFactor) {
         int factor = Math.max(1, displayScaleFactor);
-        int ratio = wholePixelsPerTexel(CONTENT_SIZE * factor,
-                (CONTENT_SIZE + 2 * ITEM_OVERFLOW) * factor, ICON_TEXELS);
+        int ratio = LostTalesUiItemIcon.wholePixelsPerTexel(CONTENT_SIZE * factor,
+                (CONTENT_SIZE + 2 * LostTalesUiItemIcon.ITEM_OVERFLOW) * factor, LostTalesUiItemIcon.ICON_TEXELS);
         if (ratio <= 0) {
             return SLOT_WIDTH;
         }
         return Math.max(SLOT_WIDTH, (int)Math.ceil(
-                ratio * ICON_TEXELS / (double)factor - 1.0E-6D));
+                ratio * LostTalesUiItemIcon.ICON_TEXELS / (double)factor - 1.0E-6D));
     }
 
     /** Content edge for a slot; a degraded slot narrower than ten shrinks it. */
@@ -239,7 +208,7 @@ final class ChatInlineIcons {
      */
     static int markerTextRgb(String colorName) {
         int rgb = markerRgb(colorName);
-        return rgb == 0xFFFFFF ? LostTalesChatVisualStyle.IVORY : rgb;
+        return rgb == 0xFFFFFF ? LostTalesUiInk.IVORY : rgb;
     }
 
     static void drawEmoji(Minecraft minecraft, ChatEmoji emoji,
@@ -247,65 +216,9 @@ final class ChatInlineIcons {
                           boolean silhouette) {
         if (silhouette) {
             ChatEmojiRenderer.drawShadow(minecraft, emoji, boxX, boxY, size,
-                    LostTalesChatVisualStyle.SHADOW, alpha);
+                    LostTalesUiInk.SHADOW, alpha);
         } else {
             ChatEmojiRenderer.draw(minecraft, emoji, boxX, boxY, size, alpha);
-        }
-    }
-
-    /**
-     * An item's icon in its box, crisp and never cut: drawn at the whole
-     * display pixels per texel nearest the box's size, a tie going to the
-     * smaller, from an origin on the display grid, so its pixel art keeps
-     * every texel whole the way the emoji do rather than being squeezed
-     * into the box. The nearest size may reach {@link #ITEM_OVERFLOW}
-     * past the box on each side, into the clear rows around it; one that
-     * would reach further gives way to the largest that fits the box.
-     * Only where not even one pixel per texel fits the room — GUI scale
-     * 1, sixteen texels in a ten-pixel box — is the icon squeezed to the
-     * box as it always was, uneven pixels and all, rather than cut. The
-     * faction banner and a channel's chosen item are drawn the same way.
-     */
-    static void drawItem(Minecraft minecraft, ItemStack stack,
-                         float boxX, float boxY, float size, int alpha,
-                         boolean silhouette) {
-        if (minecraft == null || stack == null || size <= 0.0F) {
-            return;
-        }
-        // The matrix the caller draws in only scales and translates:
-        // the chat scale over the lines, a fraction of a pixel under the
-        // strips and the bar. Its scale and offset give the box's place
-        // on the screen, and with the GUI scale, how many display pixels
-        // one of the caller's units is.
-        FloatBuffer matrix = BufferUtils.createFloatBuffer(16);
-        GL11.glGetFloat(GL11.GL_MODELVIEW_MATRIX, matrix);
-        float scaleX = matrix.get(0);
-        float scaleY = matrix.get(5);
-        float shiftX = matrix.get(12);
-        float shiftY = matrix.get(13);
-        if (scaleX <= 0.0F || scaleY <= 0.0F) {
-            return;
-        }
-        int factor = ChatWindowFrame.displayScaleFactor();
-        double unit = factor * scaleX;
-        int ratio = wholePixelsPerTexel(size * unit,
-                (size + 2 * ITEM_OVERFLOW) * unit, ICON_TEXELS);
-        // Not one whole pixel per texel fits the room: squeezed to the
-        // box, as the box is all the room there is.
-        float drawn = ratio <= 0 ? size : (float)(ratio * ICON_TEXELS / unit);
-        // Centred in the box, on the display grid, the odd display pixel
-        // up and left.
-        double originX = ChatWindowFrame.floorToDisplayPixels(
-                scaleX * boxX + shiftX + (size - drawn) / 2.0D * scaleX);
-        double originY = ChatWindowFrame.floorToDisplayPixels(
-                scaleY * boxY + shiftY + (size - drawn) / 2.0D * scaleY);
-        float x = (float)((originX - shiftX) / scaleX);
-        float y = (float)((originY - shiftY) / scaleY);
-        if (silhouette) {
-            ChatItemRenderer.drawShadow(minecraft, stack, x, y, drawn,
-                    LostTalesChatVisualStyle.SHADOW, alpha);
-        } else {
-            ChatItemRenderer.draw(minecraft, stack, x, y, drawn, alpha);
         }
     }
 
@@ -316,7 +229,7 @@ final class ChatInlineIcons {
                            boolean silhouette) {
         if (silhouette) {
             ChatMapMarkerRenderer.drawShadow(minecraft, iconName, boxX, boxY,
-                    size, LostTalesChatVisualStyle.SHADOW, alpha);
+                    size, LostTalesUiInk.SHADOW, alpha);
         } else {
             ChatMapMarkerRenderer.draw(minecraft, iconName, boxX, boxY, size,
                     rgb, alpha);
@@ -363,18 +276,18 @@ final class ChatInlineIcons {
         float x = spriteStart(boxX, size, sprite.getWidth());
         float y = spriteTop(boxY, size, sprite.getHeight());
         sprite.drawSilhouette(silhouette
-                ? LostTalesChatVisualStyle.SHADOW : rgb, x, y, alpha);
+                ? LostTalesUiInk.SHADOW : rgb, x, y, alpha);
     }
 
     /* Two-pass conveniences for callers that draw one glyph at a time. */
 
     static void drawSheetSprite(LostTalesUiSheet sprite, float boxX,
                                 float boxY, float size, int rgb, int alpha) {
-        int shadow = LostTalesChatVisualStyle.shadowAlpha(alpha);
+        int shadow = LostTalesUiInk.shadowAlpha(alpha);
         if (shadow > 0) {
             drawSheetSprite(sprite,
-                    boxX + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                    boxY + LostTalesChatVisualStyle.SHADOW_OFFSET, size, rgb,
+                    boxX + LostTalesUiInk.SHADOW_OFFSET,
+                    boxY + LostTalesUiInk.SHADOW_OFFSET, size, rgb,
                     shadow, true);
         }
         drawSheetSprite(sprite, boxX, boxY, size, rgb, alpha, false);
@@ -382,33 +295,22 @@ final class ChatInlineIcons {
 
     static void drawEmoji(Minecraft minecraft, ChatEmoji emoji,
                           float boxX, float boxY, float size, int alpha) {
-        int shadow = LostTalesChatVisualStyle.shadowAlpha(alpha);
+        int shadow = LostTalesUiInk.shadowAlpha(alpha);
         if (shadow > 0) {
-            drawEmoji(minecraft, emoji, boxX + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                    boxY + LostTalesChatVisualStyle.SHADOW_OFFSET, size, shadow,
+            drawEmoji(minecraft, emoji, boxX + LostTalesUiInk.SHADOW_OFFSET,
+                    boxY + LostTalesUiInk.SHADOW_OFFSET, size, shadow,
                     true);
         }
         drawEmoji(minecraft, emoji, boxX, boxY, size, alpha, false);
     }
 
-    static void drawItem(Minecraft minecraft, ItemStack stack,
-                         float boxX, float boxY, float size, int alpha) {
-        int shadow = LostTalesChatVisualStyle.shadowAlpha(alpha);
-        if (shadow > 0) {
-            drawItem(minecraft, stack, boxX + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                    boxY + LostTalesChatVisualStyle.SHADOW_OFFSET, size, shadow,
-                    true);
-        }
-        drawItem(minecraft, stack, boxX, boxY, size, alpha, false);
-    }
-
     static void drawMarker(Minecraft minecraft, String iconName, int rgb,
                            float boxX, float boxY, float size, int alpha) {
-        int shadow = LostTalesChatVisualStyle.shadowAlpha(alpha);
+        int shadow = LostTalesUiInk.shadowAlpha(alpha);
         if (shadow > 0) {
             drawMarker(minecraft, iconName, rgb,
-                    boxX + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                    boxY + LostTalesChatVisualStyle.SHADOW_OFFSET, size, shadow,
+                    boxX + LostTalesUiInk.SHADOW_OFFSET,
+                    boxY + LostTalesUiInk.SHADOW_OFFSET, size, shadow,
                     true);
         }
         drawMarker(minecraft, iconName, rgb, boxX, boxY, size, alpha, false);

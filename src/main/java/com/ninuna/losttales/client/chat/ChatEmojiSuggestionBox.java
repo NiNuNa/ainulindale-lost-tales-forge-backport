@@ -1,5 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.PointerRegions;
+import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.emoji.ChatEmojiSuggester;
@@ -17,7 +19,7 @@ final class ChatEmojiSuggestionBox {
     static final int MAX_ROWS = 8;
     private static final int ROW_HEIGHT = 12;
     /** The rows stand two pixels inside the frame's ink, as a framed button's content does. */
-    private static final int PADDING = LostTalesChatVisualStyle.POPUP_INSET;
+    private static final int PADDING = WindowStyle.POPUP_INSET;
     /** Between the emoji's slot and its shortcode. */
     private static final int ICON_GAP = 4;
     /**
@@ -118,7 +120,7 @@ final class ChatEmojiSuggestionBox {
     }
 
     void draw(Minecraft minecraft, FontRenderer font,
-              ChatPointerRegions regions, int screenHeight,
+              PointerRegions regions, int screenHeight,
               int inputX, double mouseX, double mouseY) {
         if (!isActive()) {
             return;
@@ -131,7 +133,7 @@ final class ChatEmojiSuggestionBox {
             this.selectedIndex = hoveredRow;
         }
         regions.add(inputX, top, inputX + width, bottom);
-        LostTalesChatVisualStyle.drawPopupList(inputX, top, inputX + width,
+        WindowStyle.drawPopupList(inputX, top, inputX + width,
                 bottom, top + PADDING, ROW_HEIGHT,
                 this.selectedIndex < this.matches.size()
                         ? this.selectedIndex : -1);

@@ -11,7 +11,7 @@ import net.minecraft.util.StatCollector;
 import org.lwjgl.input.Keyboard;
 
 /**
- * Every shortcut the chat has, as Chat Settings lists them (Nils,
+ * Every shortcut the chat has, as Settings lists them (Nils,
  * 2026-09-24: "ALL of them"): what each does beside how it is done —
  * keys in the mod's own key icons, a mouse press in words, and what is
  * typed as the chat's inline code — in groups by what they work on. A

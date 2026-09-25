@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiItemIcon;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import java.util.ArrayList;
@@ -102,7 +103,7 @@ final class ChatItemPicker extends ChatPickerPanel {
                    int width, int alpha, boolean hovered) {
         ChatShareCandidates.ItemEntry item =
                 (ChatShareCandidates.ItemEntry)entry.value;
-        ChatInlineIcons.drawItem(minecraft, item.stack,
+        LostTalesUiItemIcon.drawFitted(minecraft, item.stack,
                 x + (CELL_SIZE - ChatInlineIcons.CONTENT_SIZE) / 2.0F,
                 y + (CELL_SIZE - ChatInlineIcons.CONTENT_SIZE) / 2.0F,
                 ChatInlineIcons.CONTENT_SIZE, alpha);

@@ -1,9 +1,17 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.PointerRegions;
+import com.ninuna.losttales.client.window.SubWindow;
+import com.ninuna.losttales.client.window.SubWindowContent;
+import com.ninuna.losttales.client.window.TabIcons;
+import com.ninuna.losttales.client.window.WheelStep;
+import com.ninuna.losttales.client.window.WindowHover;
+import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiCaret;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import java.util.ArrayList;
@@ -20,11 +28,10 @@ import com.ninuna.losttales.client.motion.MotionIds;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.util.StatCollector;
-import org.lwjgl.opengl.GL11;
 
 /**
  * What the share pickers toggled from the small buttons beside the chat
- * input have in common: the button on the bar, and a small window holding
+ * input have in common: the button on the bar, and a sub-window holding
  * a search field on top and collapsible sections of cells below.
  * Subclasses supply the sections for a query, draw one cell, and say what
  * a chosen cell inserts; everything else — search input, section folding,
@@ -34,7 +41,7 @@ import org.lwjgl.opengl.GL11;
  * the window scrolls inside it (mouse wheel over the list), clipped to
  * the body below the search row.
  */
-abstract class ChatPickerPanel extends ChatSmallWindowContent {
+abstract class ChatPickerPanel extends SubWindowContent {
     /**
      * The toggle's own beat. It stays risen while its window is out, as
      * well as under the pointer, so the button reads as held down by
@@ -58,7 +65,7 @@ abstract class ChatPickerPanel extends ChatSmallWindowContent {
      * and the gap an icon keeps from its label in the chat's lists.
      */
     private static final int SEARCH_ICON_RUN =
-            LostTalesUiSheet.SEARCH.getWidth() + ChatChannelIcons.GAP;
+            LostTalesUiSheet.SEARCH.getWidth() + TabIcons.GAP;
     static final int LABEL_HEIGHT = 10;
     /**
      * Anchor-to-window-bottom distance where a picker first opens: just
@@ -104,13 +111,13 @@ abstract class ChatPickerPanel extends ChatSmallWindowContent {
     }
 
     @Override
-    void opened() {
+    public void opened() {
         this.shown = true;
     }
 
     /** A picker closes empty: the next opening starts at the top, nothing typed. */
     @Override
-    void closed() {
+    public void closed() {
         this.shown = false;
         this.scroll = 0;
         this.renderedScroll = 0.0D;
@@ -121,14 +128,14 @@ abstract class ChatPickerPanel extends ChatSmallWindowContent {
     }
 
     @Override
-    boolean holdsKeys() {
+    public boolean holdsKeys() {
         return this.shown && this.searchField != null
                 && this.searchField.isFocused();
     }
 
     /** A pick is written into the input, so the window waits for a bar. */
     @Override
-    boolean needsInputBar() {
+    public boolean needsInputBar() {
         return true;
     }
 
@@ -140,7 +147,7 @@ abstract class ChatPickerPanel extends ChatSmallWindowContent {
      * handled before the picker is asked.
      */
     @Override
-    boolean keyTyped(char typedChar, int keyCode) {
+    public boolean keyTyped(char typedChar, int keyCode) {
         if (!holdsKeys()) {
             return false;
         }
@@ -166,7 +173,7 @@ abstract class ChatPickerPanel extends ChatSmallWindowContent {
 
     /** The search gives the keys back, as the screen moves them elsewhere. */
     @Override
-    void releaseKeys() {
+    public void releaseKeys() {
         if (this.searchField != null) {
             this.searchField.setFocused(false);
         }
@@ -178,9 +185,9 @@ abstract class ChatPickerPanel extends ChatSmallWindowContent {
      * wheel turns accumulate and stay responsive.
      */
     @Override
-    void scrollBy(int lines) {
+    public void scrollBy(int lines) {
         this.scroll = Math.max(0,
-                this.scroll + ChatWheelStep.pickerPixels(lines));
+                this.scroll + WheelStep.pixels(lines, ChatMenu.ROW_HEIGHT));
     }
 
     /**
@@ -239,10 +246,10 @@ abstract class ChatPickerPanel extends ChatSmallWindowContent {
 
     /**
      * The button on the live bar. {@code pointerX}/{@code pointerY} is
-     * the pointer while the button has it, else {@link ChatHover#AWAY}.
+     * the pointer while the button has it, else {@link WindowHover#AWAY}.
      * It stands risen while its window is out.
      */
-    void drawButton(ChatPointerRegions regions, int anchorRight,
+    void drawButton(PointerRegions regions, int anchorRight,
                     int anchorY, double pointerX, double pointerY) {
         int left = buttonLeft(anchorRight);
         int top = buttonTop(anchorY);
@@ -272,7 +279,7 @@ abstract class ChatPickerPanel extends ChatSmallWindowContent {
         int width = naturalWidth();
         int height = Math.min(naturalHeight(width),
                 Math.max(minHeight(), anchorY - PANEL_BOTTOM_MARGIN
-                        - ChatSmallWindow.STRIP_HEIGHT - 2));
+                        - SubWindow.STRIP_HEIGHT - 2));
         return new LostTalesUiHitBox(anchorRight - width - BUTTON_MARGIN,
                 anchorY - PANEL_BOTTOM_MARGIN - height, width, height);
     }
@@ -280,12 +287,12 @@ abstract class ChatPickerPanel extends ChatSmallWindowContent {
     /* ---- The window's content ---- */
 
     @Override
-    LostTalesUiSheet stripIcon() {
+    public LostTalesUiSheet stripIcon() {
         return buttonGlyph();
     }
 
     @Override
-    int naturalWidth() {
+    public int naturalWidth() {
         return naturalColumns() * cellWidth() + PADDING * 2;
     }
 
@@ -295,7 +302,7 @@ abstract class ChatPickerPanel extends ChatSmallWindowContent {
      * beyond which it scrolls.
      */
     @Override
-    int naturalHeight(int width) {
+    public int naturalHeight(int width) {
         int columns = columnsFor(width);
         int body = 0;
         for (Section section : buildSections(searchQuery())) {
@@ -313,13 +320,13 @@ abstract class ChatPickerPanel extends ChatSmallWindowContent {
     }
 
     @Override
-    int minWidth() {
+    public int minWidth() {
         return stretchesCells() ? MIN_LIST_WIDTH
                 : MIN_GRID_COLUMNS * cellWidth() + PADDING * 2;
     }
 
     @Override
-    int minHeight() {
+    public int minHeight() {
         return FRAME_HEIGHT + LABEL_HEIGHT + cellHeight();
     }
 
@@ -341,7 +348,7 @@ abstract class ChatPickerPanel extends ChatSmallWindowContent {
     }
 
     @Override
-    ChatHover hoverAt(LostTalesUiHitBox box, double x, double y) {
+    public ChatHover hoverAt(LostTalesUiHitBox box, double x, double y) {
         Layout layout = buildLayout(box);
         Cell cell = cellAt(layout, x, y);
         ChatHover hover = new ChatHover(cell != null
@@ -420,7 +427,7 @@ abstract class ChatPickerPanel extends ChatSmallWindowContent {
     }
 
     @Override
-    void draw(Minecraft minecraft, LostTalesUiHitBox box, double clipX,
+    public void draw(Minecraft minecraft, LostTalesUiHitBox box, double clipX,
               double clipY, double pointerX, double pointerY, int alpha,
               int surfaceAlpha) {
         this.hoveredEntry = null;
@@ -437,8 +444,8 @@ abstract class ChatPickerPanel extends ChatSmallWindowContent {
             LostTalesChatOverlayRenderer.recolourSurface(lit.x,
                     Math.max(layout.bodyTop, lit.y), lit.x + layout.cellWidth,
                     Math.min(layout.bodyBottom, lit.y + cellHeight()),
-                    surfaceAlpha, LostTalesChatVisualStyle.SURFACE_RGB,
-                    LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB);
+                    surfaceAlpha, LostTalesUiInk.SURFACE_RGB,
+                    LostTalesUiInk.SURFACE_HIGHLIGHT_RGB);
         }
         drawSearchRow(font, layout, alpha, this.searchField != null
                 && (this.searchField.isFocused()
@@ -450,7 +457,7 @@ abstract class ChatPickerPanel extends ChatSmallWindowContent {
                 layout.bodyTop + clipY - box.top, layout.width,
                 Math.max(0, layout.bodyBottom - layout.bodyTop));
         try {
-            LostTalesChatVisualStyle.beginContent();
+            LostTalesUiInk.beginContent();
             for (Label label : layout.labels) {
                 if (!layout.showsRow(label.y, LABEL_HEIGHT)) {
                     continue;
@@ -491,14 +498,14 @@ abstract class ChatPickerPanel extends ChatSmallWindowContent {
                         / layout.maxScroll;
         int thumbBottom = thumbTop + thumbHeight;
         int x = layout.left + layout.width - 2;
-        int track = LostTalesChatVisualStyle.argb(
-                LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB,
+        int track = LostTalesUiInk.argb(
+                LostTalesUiInk.SURFACE_HIGHLIGHT_RGB,
                 Math.min(alpha, 120));
         Gui.drawRect(x, layout.bodyTop, x + 1, thumbTop, track);
         Gui.drawRect(x, thumbBottom, x + 1, layout.bodyBottom, track);
         Gui.drawRect(x, thumbTop, x + 1, thumbBottom,
-                LostTalesChatVisualStyle.argb(
-                        LostTalesChatVisualStyle.IVORY, Math.min(alpha, 200)));
+                LostTalesUiInk.argb(
+                        LostTalesUiInk.IVORY, Math.min(alpha, 200)));
     }
 
     /**
@@ -513,18 +520,18 @@ abstract class ChatPickerPanel extends ChatSmallWindowContent {
                                boolean lit) {
         Gui.drawRect(layout.left + PADDING, layout.bodyTop - 1,
                 layout.left + layout.width - PADDING, layout.bodyTop,
-                LostTalesChatVisualStyle.argb(
-                        LostTalesChatVisualStyle.SURFACE_HIGHLIGHT_RGB,
+                LostTalesUiInk.argb(
+                        LostTalesUiInk.SURFACE_HIGHLIGHT_RGB,
                         Math.min(alpha, 0xA0)));
         this.magnifierMotion.advance(System.nanoTime(), lit, false, false);
         // The magnifier stands on the capitals of what is typed beside
         // it, as every icon in a chat row does. It is not a button of
         // its own, so it lights with the field and never travels.
-        LostTalesChatVisualStyle.beginContent();
+        LostTalesUiInk.beginContent();
         LostTalesUiButton.drawGlyph(LostTalesUiSheet.SEARCH,
                 LostTalesUiSheet.SEARCH_HOVER, this.magnifierMotion,
                 layout.left + PADDING + 1,
-                layout.searchY + LostTalesChatOverlayRenderer.centredBoxTop(
+                layout.searchY + WindowStyle.centredBoxTop(
                         LostTalesUiSheet.SEARCH.getHeight()), alpha);
         if (this.searchField == null) {
             return;
@@ -537,7 +544,7 @@ abstract class ChatPickerPanel extends ChatSmallWindowContent {
                             "gui.losttales.chat.share.search"),
                     this.searchField.xPosition + this.searchField.getWidth()
                             - x);
-            LostTalesChatVisualStyle.drawColored(font, "§o" + prompt, x,
+            LostTalesUiInk.drawText(font, "§o" + prompt, x,
                     layout.searchY, LostTalesChatVisualStyle.asideRgb(),
                     alpha);
         }
@@ -546,22 +553,22 @@ abstract class ChatPickerPanel extends ChatSmallWindowContent {
 
     /** The hovered cell's name, as the chat's pointer tip is drawn. */
     @Override
-    void drawTip(Minecraft minecraft, int tipX, int tipY, int screenWidth) {
+    public void drawTip(Minecraft minecraft, int tipX, int tipY, int screenWidth) {
         Entry entry = this.hoveredEntry;
         String label = entry == null ? null : tooltip(entry);
         if (label == null || label.length() == 0) {
             return;
         }
         FontRenderer font = minecraft.fontRenderer;
-        int width = LostTalesChatVisualStyle.popupLineWidth(font, label);
+        int width = WindowStyle.popupLineWidth(font, label);
         int x = Math.max(2, Math.min(screenWidth - width - 2,
                 tipX - width / 2));
-        int y = tipY - 3 - LostTalesChatVisualStyle.POPUP_LINE_HEIGHT;
+        int y = tipY - 3 - WindowStyle.POPUP_LINE_HEIGHT;
         // Beside the pointer, so it keeps pace with the cursor rather
         // than with the interface grid, as every other tooltip does.
         LostTalesTooltipSmoothing.begin(tipX, tipY);
         try {
-            LostTalesChatVisualStyle.drawPopupLine(font, label, x, y, 1.0F);
+            WindowStyle.drawPopupLine(font, label, x, y, 1.0F);
         } finally {
             LostTalesTooltipSmoothing.end();
         }
@@ -573,7 +580,7 @@ abstract class ChatPickerPanel extends ChatSmallWindowContent {
                     SEARCH_HEIGHT).plainText();
             this.searchField.setMaxStringLength(32);
             this.searchField.setEnableBackgroundDrawing(false);
-            this.searchField.setTextColor(LostTalesChatVisualStyle.IVORY);
+            this.searchField.setTextColor(LostTalesUiInk.IVORY);
         }
     }
 

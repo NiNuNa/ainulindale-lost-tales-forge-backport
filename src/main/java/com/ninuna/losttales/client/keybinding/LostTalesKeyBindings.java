@@ -3,12 +3,12 @@ package com.ninuna.losttales.client.keybinding;
 import com.ninuna.losttales.client.camera.ThirdPersonCameraRuntime;
 import com.ninuna.losttales.client.camera.ThirdPersonTargetLockController;
 import com.ninuna.losttales.client.character.room.CharacterRoomSession;
+import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.config.client.LostTalesThirdPersonConfig;
 import com.ninuna.losttales.gui.hud.LostTalesHudHelper;
 import com.ninuna.losttales.gui.hud.loot.LostTalesQuickLootHudRenderer;
 import com.ninuna.losttales.gui.screen.LostTalesCharacterMenuGui;
 import com.ninuna.losttales.gui.screen.LostTalesHudPlacementGui;
-import com.ninuna.losttales.client.chat.LostTalesChatGui;
 import com.ninuna.losttales.gui.screen.party.PartyPage;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
@@ -72,10 +72,10 @@ public class LostTalesKeyBindings {
             minecraft.displayGuiScreen(new LostTalesCharacterMenuGui(minecraft.currentScreen));
         }
         if (QUEST_JOURNAL.isPressed()) {
-            LostTalesChatGui.openPage(QuestJournalPage.PAGE_ID);
+            WindowScreen.openPage(QuestJournalPage.PAGE_ID);
         }
         if (PARTY.isPressed()) {
-            LostTalesChatGui.openPage(PartyPage.PAGE_ID);
+            WindowScreen.openPage(PartyPage.PAGE_ID);
         }
         if (MAP.isPressed() && minecraft.currentScreen == null) {
             LostTalesLotrMapGui.open();
@@ -158,6 +158,10 @@ public class LostTalesKeyBindings {
 
     public static KeyBinding getMapKeyBinding() {
         return MAP;
+    }
+
+    public static KeyBinding getPartyKeyBinding() {
+        return PARTY;
     }
 
     public static boolean isModifierKeyDown() {

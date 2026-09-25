@@ -11,7 +11,6 @@ import com.ninuna.losttales.compat.lotr.LotrAccessoryMapHooks;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.AccessoryEffectSyncPacket;
 import com.ninuna.losttales.party.server.PartyTrackingSyncManager;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLiving;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;

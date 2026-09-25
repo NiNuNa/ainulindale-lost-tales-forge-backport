@@ -9,7 +9,6 @@ import com.ninuna.losttales.network.packet.LostTalesThirdPersonAimPacket;
 import com.ninuna.losttales.network.packet.LostTalesThirdPersonBlockActionPacket;
 import com.ninuna.losttales.network.packet.LostTalesThirdPersonEntityActionPacket;
 import com.ninuna.losttales.network.packet.LostTalesChargeTierSyncPacket;
-import java.io.IOException;
 import org.junit.Test;
 
 /** Guards common packet and authority classes against client-only linkage. */

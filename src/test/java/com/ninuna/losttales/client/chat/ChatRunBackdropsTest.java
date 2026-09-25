@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import java.util.List;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.event.HoverEvent;
@@ -163,7 +164,7 @@ public final class ChatRunBackdropsTest {
     public void litWordsTurnIvory() {
         int seafoam = ChatMentionColors.PLAYER_RGB;
         assertEquals(seafoam, ChatRunBackdrops.wordsRgb(seafoam, 0.0F));
-        assertEquals(LostTalesChatVisualStyle.IVORY, ChatRunBackdrops.wordsRgb(seafoam, 1.0F));
+        assertEquals(LostTalesUiInk.IVORY, ChatRunBackdrops.wordsRgb(seafoam, 1.0F));
     }
 
     /**

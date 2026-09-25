@@ -9,7 +9,6 @@ import com.ninuna.losttales.party.model.Party;
 import com.ninuna.losttales.party.model.PartyColor;
 import com.ninuna.losttales.party.model.PartyMember;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.UUID;
 import org.junit.After;
 import org.junit.Test;

@@ -1,9 +1,11 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.PointerRegions;
+import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelSuggester;
-import com.ninuna.losttales.chat.emoji.ChatEmoji;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import java.util.Collections;
 import java.util.List;
 import net.minecraft.client.Minecraft;
@@ -21,7 +23,7 @@ final class ChatChannelSuggestionBox {
     static final int MAX_ROWS = 8;
     private static final int ROW_HEIGHT = 11;
     /** The rows stand two pixels inside the frame's ink, as a framed button's content does. */
-    private static final int PADDING = LostTalesChatVisualStyle.POPUP_INSET;
+    private static final int PADDING = WindowStyle.POPUP_INSET;
     private static final int ICON_SIZE = 8;
     private static final int ICON_GAP = 3;
     /**
@@ -124,7 +126,7 @@ final class ChatChannelSuggestionBox {
     }
 
     void draw(Minecraft minecraft, FontRenderer font,
-              ChatPointerRegions regions, int screenHeight, int inputX,
+              PointerRegions regions, int screenHeight, int inputX,
               double mouseX, double mouseY) {
         if (!isActive()) {
             return;
@@ -137,7 +139,7 @@ final class ChatChannelSuggestionBox {
             this.selectedIndex = hoveredRow;
         }
         regions.add(inputX, top, inputX + width, bottom);
-        LostTalesChatVisualStyle.drawPopupList(inputX, top, inputX + width,
+        WindowStyle.drawPopupList(inputX, top, inputX + width,
                 bottom, top + PADDING, ROW_HEIGHT,
                 this.selectedIndex < this.matches.size()
                         ? this.selectedIndex : -1);
@@ -148,7 +150,7 @@ final class ChatChannelSuggestionBox {
             // while it is linked, over the one shadow.
             ChatChannelIcons.drawChannelEmoji(minecraft, channel,
                     inputX + PADDING, rowTop + 1, ICON_SIZE, 255);
-            LostTalesChatVisualStyle.drawColored(font, label(channel),
+            LostTalesUiInk.drawText(font, label(channel),
                     inputX + PADDING + ICON_SIZE + ICON_GAP, rowTop + 2,
                     ClientChatChannelState.displayColor(channel), 255);
         }

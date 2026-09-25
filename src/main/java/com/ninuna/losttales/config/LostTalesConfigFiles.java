@@ -11,7 +11,7 @@ import java.io.File;
  * <pre>
  * config/losttales/
  *   client/   client.cfg, third-person.cfg, camera_presets/, chat/, map_markers.txt,
- *             chat/layouts/&lt;account uuid&gt;.txt, templates/&lt;account uuid&gt;.txt
+ *             windows/&lt;account uuid&gt;.txt, templates/&lt;account uuid&gt;.txt
  *   server/   server.cfg, roles.cfg, channels.cfg
  *   lore_characters/   content both sides read; not configuration
  * </pre>
@@ -43,11 +43,11 @@ public final class LostTalesConfigFiles {
     /** The editable camera presets, a folder under the client folder. */
     public static final String CAMERA_PRESETS = "camera_presets";
     /**
-     * The chat window layouts, a folder under the client folder holding
+     * The window layouts, a folder under the client folder holding
      * one file per Minecraft account: windows are the account's, so two
      * people sharing a machine keep their own arrangement.
      */
-    public static final String CHAT_LAYOUTS = "chat/layouts";
+    public static final String WINDOW_LAYOUTS = "windows";
     /** Emoji favourites and use counts, under the client folder. */
     public static final String CHAT_EMOJIS = "chat/emojis.txt";
     /** The ignore list, under the client folder. */

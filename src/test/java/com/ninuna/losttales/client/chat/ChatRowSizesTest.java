@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import java.util.List;
 import net.minecraft.client.gui.ChatLine;
 import net.minecraft.util.ChatComponentText;
@@ -340,9 +341,9 @@ public final class ChatRowSizesTest {
         float top = LostTalesChatOverlayRenderer.stampTextTop(0, LINE, 0,
                 small);
         float wordsMiddle = -TEXT_OFFSET
-                + LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT / 2.0F;
+                + LostTalesUiInk.CAP_HEIGHT / 2.0F;
         float stampMiddle = top
-                + LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT * small / 2.0F;
+                + LostTalesUiInk.CAP_HEIGHT * small / 2.0F;
         assertTrue(stampMiddle <= wordsMiddle + 0.0001F);
         assertTrue(stampMiddle > wordsMiddle - 1.0F);
     }

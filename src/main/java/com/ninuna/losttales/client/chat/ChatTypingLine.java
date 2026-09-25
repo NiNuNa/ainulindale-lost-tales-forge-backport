@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import java.util.List;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.util.StatCollector;
@@ -53,11 +54,11 @@ final class ChatTypingLine {
         int rgb = LostTalesChatVisualStyle.asideRgb();
         String shown = font.trimStringToWidth(words,
                 Math.max(0, room - dotsWidth(font)));
-        LostTalesChatVisualStyle.drawColored(font, "§o" + shown, x, y, rgb,
+        LostTalesUiInk.drawText(font, "§o" + shown, x, y, rgb,
                 alpha);
         int dotX = x + font.getStringWidth(shown);
         for (int index = 0; index < ChatTypingDots.COUNT; index++) {
-            LostTalesChatVisualStyle.drawColored(font, "§o" + DOT, dotX, y,
+            LostTalesUiInk.drawText(font, "§o" + DOT, dotX, y,
                     rgb, Math.round(alpha
                             * ChatTypingDots.opacity(index, nowNanos)));
             dotX += font.getStringWidth(DOT);

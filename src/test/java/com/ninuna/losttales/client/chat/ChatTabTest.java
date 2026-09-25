@@ -1,6 +1,9 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.client.window.WindowLayout;
+import com.ninuna.losttales.client.window.WindowLayoutStore;
+import com.ninuna.losttales.client.window.WindowTab;
 import java.util.Arrays;
 import java.util.List;
 import org.junit.After;
@@ -17,7 +20,7 @@ public final class ChatTabTest {
 
     @After
     public void cleanUp() {
-        ChatWindowLayout.reset();
+        ChatLayout.reset();
         ClientChatChannelState.clear();
         ChatChannel.resetToBuiltIn();
     }
@@ -109,64 +112,65 @@ public final class ChatTabTest {
 
     @Test
     public void whispersOpenOnceInTheAskingWindowAndPersist() {
-        ChatTab steve = ChatWindowLayout.openWhisper("Steve", "w2");
+        ChatTab steve = ChatLayout.openWhisper("Steve", "w2");
         assertNotNull(steve);
-        assertTrue(ChatWindowLayout.window("w2").contains(steve));
+        assertTrue(WindowLayout.window("w2").contains(steve));
         // Opened again, the same tab with its original casing, wherever
         // it was asked for; the front tab is left alone.
-        ChatTab again = ChatWindowLayout.openWhisper("steve", "w1");
+        ChatTab again = ChatLayout.openWhisper("steve", "w1");
         assertEquals(steve, again);
         assertEquals("Steve", again.getPartner());
-        assertFalse(ChatWindowLayout.window("w1").contains(steve));
+        assertFalse(WindowLayout.window("w1").contains(steve));
         assertEquals(ChatTab.of(ChatChannel.GLOBAL),
-                ChatWindowLayout.window("w2").getActiveTab());
+                WindowLayout.window("w2").getActiveTab());
         assertEquals(1, countWhispers());
         // A locked preferred window is passed over for an unlocked one.
-        ChatWindowLayout.setLocked("w1", true);
-        ChatTab alex = ChatWindowLayout.openWhisper("Alex", "w1");
-        assertTrue(ChatWindowLayout.window("w2").contains(alex));
+        WindowLayout.setLocked("w1", true);
+        ChatTab alex = ChatLayout.openWhisper("Alex", "w1");
+        assertTrue(WindowLayout.window("w2").contains(alex));
         // Whispers cycle like any tab and never count as closed channels.
         ClientChatChannelState.select(steve);
         assertEquals(steve, ClientChatChannelState.getSelected());
-        assertTrue(ChatWindowLayout.closedChannels().isEmpty());
-        ChatWindowLayout.close(steve);
-        assertTrue(ChatWindowLayout.closedChannels().isEmpty());
-        assertFalse(ChatWindowLayout.isOpen(steve));
-        assertNull(ChatWindowLayout.openWhisper("", "w2"));
+        assertTrue(ChatLayout.closedChannels().isEmpty());
+        ChatLayout.close(steve);
+        assertTrue(ChatLayout.closedChannels().isEmpty());
+        assertFalse(ChatLayout.isOpen(steve));
+        assertNull(ChatLayout.openWhisper("", "w2"));
         // Conversations are not layout: neither the tab nor its mute is
         // written, and an older file's whisper tab is dropped on load.
-        ChatWindowLayout.setMuted(alex, true);
-        assertTrue(ChatWindowLayout.isMuted(alex));
-        List<String> lines = ChatWindowLayoutStore.describe();
+        ChatLayout.setMuted(alex, true);
+        assertTrue(ChatLayout.isMuted(alex));
+        List<String> lines = WindowLayoutStore.describe();
         assertFalse(lines.contains("muted whisper:Alex"));
         for (String line : lines) {
             assertFalse(line.contains("whisper:"));
         }
         lines.add("muted npc:Grey Wanderer");
-        ChatWindowLayout.reset();
-        ChatWindowLayoutStore.load(lines);
-        assertFalse(ChatWindowLayout.isOpen(alex));
-        assertFalse(ChatWindowLayout.isMuted(alex));
+        ChatLayout.reset();
+        WindowLayoutStore.load(lines);
+        assertFalse(ChatLayout.isOpen(alex));
+        assertFalse(ChatLayout.isMuted(alex));
         assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.PROXIMITY,
                 ChatChannel.FACTION, ChatChannel.OOC,
-                ChatChannel.PARTY), ChatWindowLayout.window("w2").getChannels());
+                ChatChannel.PARTY), ChatTab.channelsOf(WindowLayout.window("w2")));
         // They also end with the session: closed along with the history.
-        ChatTab wanderer = ChatWindowLayout.openTab(
+        ChatTab wanderer = ChatLayout.openTab(
                 ChatTab.npc("Grey Wanderer"), "w2");
-        ChatWindowLayout.detach(wanderer, 0.0D, 0.0D);
-        assertEquals(3, ChatWindowLayout.windows().size());
-        ChatWindowLayout.closeConversations();
-        assertEquals(2, ChatWindowLayout.windows().size());
-        assertFalse(ChatWindowLayout.isOpen(wanderer));
+        WindowLayout.detach(wanderer, 0.0D, 0.0D);
+        assertEquals(3, WindowLayout.windows().size());
+        ChatLayout.closeConversations();
+        assertEquals(2, WindowLayout.windows().size());
+        assertFalse(ChatLayout.isOpen(wanderer));
         assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.PROXIMITY,
                 ChatChannel.FACTION, ChatChannel.OOC,
-                ChatChannel.PARTY), ChatWindowLayout.window("w2").getChannels());
+                ChatChannel.PARTY), ChatTab.channelsOf(WindowLayout.window("w2")));
     }
 
     private static int countWhispers() {
         int count = 0;
-        for (ChatTab tab : ChatWindowLayout.order()) {
-            if (tab.isWhisper()) {
+        for (WindowTab each : WindowLayout.order()) {
+            ChatTab tab = ChatTab.from(each);
+            if (tab != null && tab.isWhisper()) {
                 count++;
             }
         }

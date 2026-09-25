@@ -1,11 +1,20 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.client.window.PageContent;
+import com.ninuna.losttales.client.window.PageTab;
+import com.ninuna.losttales.client.window.Window;
+import com.ninuna.losttales.client.window.WindowFrame;
+import com.ninuna.losttales.client.window.WindowLayout;
+import com.ninuna.losttales.client.window.WindowLayoutStore;
+import com.ninuna.losttales.client.window.WindowPages;
+import com.ninuna.losttales.client.window.WindowTab;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import java.util.Arrays;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiTextField;
+import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
 import org.junit.After;
@@ -28,17 +37,34 @@ import static org.junit.Assert.assertTrue;
  */
 public final class ChatPagesTest {
     private static final String PAGE = "test_page";
+    /** A page like the map's: it fills the screen the first time, has no tool strip, and can be out of reach. */
+    private static final String FILLING = "test_filling_page";
+    private static boolean fillingAvailable = true;
+    /** The filling page's key, M's key code. */
+    private static final int FILLING_KEY = 50;
     /** The tone the test page gives itself. */
     private static final int TONE = 0x3E3B66;
 
     @BeforeClass
     public static void registerPage() {
-        if (ChatPages.byId(PAGE) == null) {
-            ChatPages.register(PAGE, "gui.test.page",
-                    new ItemStack(Items.book), new ChatPages.Factory() {
+        if (WindowPages.byId(PAGE) == null) {
+            WindowPages.register(PAGE, "gui.test.page",
+                    new ItemStack(Items.book), new WindowPages.Factory() {
                         @Override
-                        public ChatPageContent create() {
+                        public PageContent create() {
                             return new EmptyPage();
+                        }
+                    });
+        }
+        if (WindowPages.byId(FILLING) == null) {
+            WindowPages.register(FILLING, "gui.test.filling",
+                    new ItemStack(Items.map), Window.ScreenFill.FULL,
+                    new KeyBinding("key.test.filling", FILLING_KEY,
+                            "key.categories.test"),
+                    new WindowPages.Factory() {
+                        @Override
+                        public PageContent create() {
+                            return new FillingPage();
                         }
                     });
         }
@@ -46,72 +72,70 @@ public final class ChatPagesTest {
 
     @Before
     public void reset() {
-        ChatWindowLayout.reset();
+        fillingAvailable = true;
+        ChatLayout.reset();
         ClientChatChannelState.clear();
     }
 
     @After
     public void cleanUp() {
-        ChatWindowLayout.reset();
-        ChatWindowLayout.setChangeListener(null);
+        ChatLayout.reset();
+        WindowLayout.setChangeListener(null);
         ClientChatChannelState.clear();
     }
 
     @Test
-    public void aPageIsATabOfItsOwnWithNoChannel() {
-        ChatTab page = ChatTab.page(PAGE);
+    public void aPageIsATabOfItsOwnAndNoConversation() {
+        PageTab page = WindowPages.tab(PAGE);
         assertNotNull(page);
-        assertTrue(page.isPage());
-        assertNull(page.getChannel());
-        assertFalse(page.isWhisper());
-        assertFalse(page.isNpc());
-        assertSame("one tab per page", page, ChatTab.page(PAGE));
+        assertSame("one tab per page", page, WindowPages.tab(PAGE));
         assertEquals("page:" + PAGE, page.id());
-        assertEquals(page, ChatTab.fromId(page.id()));
+        assertEquals(page, WindowTab.fromId(page.id()));
+        assertNull("a page is no conversation", ChatTab.from(page));
+        assertNull("no channel goes by a page's id", ChatTab.fromId(page.id()));
         assertFalse(page.equals(ChatTab.of(ChatChannel.GLOBAL)));
         assertFalse(ChatTab.of(ChatChannel.GLOBAL).equals(page));
-        assertSame("no conversation stands behind it", page, ChatTab.viewed(page));
-        assertNull("an unregistered page is no tab", ChatTab.page("nobody"));
-        assertNull(ChatTab.fromId("page:nobody"));
+        assertNull("an unregistered page is no tab", WindowPages.tab("nobody"));
+        assertNull(WindowTab.fromId("page:nobody"));
     }
 
     @Test
     public void aPageOpensInAWindowOfItsOwnAtAPagesSize() {
-        ChatTab page = ChatTab.page(PAGE);
-        ChatWindow window = ChatWindowLayout.showPage(page);
+        PageTab page = WindowPages.tab(PAGE);
+        Window window = WindowLayout.showPage(page);
         assertNotNull(window);
         assertEquals(Arrays.asList(page), window.getTabs());
         assertEquals(page, window.getActiveTab());
-        assertEquals(ChatWindowLayout.PAGE_LINES, window.getMaxLines(), 1.0E-9D);
-        assertEquals(ChatWindowLayout.PAGE_WIDTH, window.getWidth());
+        assertEquals(WindowLayout.PAGE_HEIGHT, window.getOwnHeight(), 1.0E-9D);
+        assertEquals(WindowLayout.PAGE_WIDTH, window.getOwnWidth());
         assertSame("shown again, the same window comes forward", window,
-                ChatWindowLayout.showPage(page));
+                WindowLayout.showPage(page));
     }
 
     @Test
     public void aClosedPageComesBackWhereItsWindowStood() {
-        ChatTab page = ChatTab.page(PAGE);
-        ChatWindow window = ChatWindowLayout.showPage(page);
-        ChatWindowLayout.setPosition(window.getId(), 20.0D, 30.0D, false);
-        ChatWindowLayout.close(page);
-        assertNull(ChatWindowLayout.windowOf(page));
-        ChatWindow again = ChatWindowLayout.showPage(page);
+        PageTab page = WindowPages.tab(PAGE);
+        Window window = WindowLayout.showPage(page);
+        WindowLayout.setPosition(window.getId(), 20.0D, 30.0D, false);
+        WindowLayout.close(page);
+        assertNull(WindowLayout.windowOf(page));
+        Window again = WindowLayout.showPage(page);
         assertEquals(20.0D, again.getOffsetX(), 1.0E-9D);
         assertEquals(30.0D, again.getOffsetY(), 1.0E-9D);
-        List<String> described = ChatWindowLayoutStore.describe();
-        assertTrue(described.toString(), described.contains("page " + PAGE
-                + " x=20.00 y=30.00 lines=18.00 width=360"));
+        List<String> described = WindowLayoutStore.describe();
+        assertTrue(described.toString(), described.contains("place page:" + PAGE
+                + " x=20.00 y=30.00 height=292.00 width=366"));
     }
 
     @Test
     public void aConversationPickedComesInFrontOfAPageInItsWindow() {
         ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
-        ChatWindow window = ChatWindowLayout.windowOf(global);
+        Window window = WindowLayout.windowOf(global);
         ClientChatChannelState.select(global);
-        ChatTab page = ChatTab.page(PAGE);
-        ChatWindowLayout.openTab(page, window.getId());
-        ChatWindowLayout.showPage(page);
-        assertTrue(ChatWindowLayout.showsPage(window));
+        PageTab page = WindowPages.tab(PAGE);
+        WindowLayout.openTab(page, window.getId());
+        WindowLayout.showPage(page);
+        assertTrue(WindowLayout.showsPage(window));
 
         ChatTabActions actions = new ChatTabActions(new ChatInputBar(),
                 new ChatInputCompletion(null), new ChatComposer());
@@ -121,26 +145,112 @@ public final class ChatPagesTest {
         assertEquals("the pick beats the page", global,
                 window.getActiveTab());
         assertEquals(global, ClientChatChannelState.getSelected());
-        assertFalse(ChatWindowLayout.showsPage(window));
+        assertFalse(WindowLayout.showsPage(window));
     }
 
     @Test
     public void aPagesTabWearsTheToneThePageGivesItself() {
-        assertEquals(TONE, ClientChatChannelState.displayColor(
-                ChatTab.page(PAGE)));
+        assertEquals(TONE, WindowPages.tab(PAGE).tone());
     }
 
     @Test
     public void aPageNeverOpensAWindowPastTheEight() {
-        for (int index = ChatWindowLayout.windows().size();
-             index < ChatWindowLayout.MAX_WINDOWS; index++) {
-            ChatWindowLayout.openInNewWindow(ChatTab.whisper("friend" + index));
+        for (int index = WindowLayout.windows().size();
+             index < WindowLayout.MAX_WINDOWS; index++) {
+            WindowLayout.openInNewWindow(ChatTab.whisper("friend" + index));
         }
-        assertNull(ChatWindowLayout.showPage(ChatTab.page(PAGE)));
+        assertNull(WindowLayout.showPage(WindowPages.tab(PAGE)));
+    }
+
+    @Test
+    public void aFillingPageFillsTheScreenTheFirstTimeAndThenWhereItWasLeft() {
+        PageTab page = WindowPages.tab(FILLING);
+        Window window = WindowLayout.showPage(page);
+        assertEquals("the first time, the whole screen",
+                Window.ScreenFill.FULL, window.getFill());
+        assertEquals("the page's size to go back to", WindowLayout.PAGE_HEIGHT,
+                window.getOwnHeight(), 1.0E-9D);
+        WindowLayout.setFill(window.getId(), Window.ScreenFill.NONE, false);
+        WindowLayout.setPosition(window.getId(), 10.0D, 20.0D, false);
+        WindowLayout.close(page);
+        Window again = WindowLayout.showPage(page);
+        assertEquals("where it was left: its own box",
+                Window.ScreenFill.NONE, again.getFill());
+        assertEquals(10.0D, again.getOffsetX(), 1.0E-9D);
+        WindowLayout.setFill(again.getId(), Window.ScreenFill.FULL, false);
+        WindowLayout.close(page);
+        assertEquals(Window.ScreenFill.FULL,
+                WindowLayout.showPage(page).getFill());
+        WindowLayout.close(page);
+        List<String> described = WindowLayoutStore.describe();
+        assertTrue(described.toString(), described.contains("place page:"
+                + FILLING + " x=10.00 y=20.00 height=292.00 width=366 fill=full"));
+    }
+
+    @Test
+    public void aPageOutOfReachWaitsUnseenAndHasNoStrip() {
+        PageTab page = WindowPages.tab(FILLING);
+        assertFalse("its window has no tool strip", page.hasToolStrip());
+        assertTrue(WindowPages.tab(PAGE).hasToolStrip());
+        Window window = WindowLayout.showPage(page);
+        assertTrue(WindowFrame.visibleTabs(window).contains(page));
+        fillingAvailable = false;
+        assertFalse(page.isAvailable());
+        assertFalse("it waits in its window unseen",
+                WindowFrame.visibleTabs(window).contains(page));
+    }
+
+    @Test
+    public void aPageKeyNamesItsPageAndNoKeyNamesNone() {
+        assertSame(WindowPages.tab(FILLING),
+                WindowPages.tabForKey(FILLING_KEY));
+        assertNull("a key no page has", WindowPages.tabForKey(51));
+        assertNull("no key at all", WindowPages.tabForKey(0));
+    }
+
+    @Test
+    public void aPageClosingWithTheScreenClosesAndComesBackWhereItWasLeft() {
+        PageTab filling = WindowPages.tab(FILLING);
+        PageTab other = WindowPages.tab(PAGE);
+        Window window = WindowLayout.showPage(filling);
+        WindowLayout.setFill(window.getId(), Window.ScreenFill.NONE, false);
+        WindowLayout.setPosition(window.getId(), 30.0D, 40.0D, false);
+        WindowLayout.showPage(other);
+        WindowPages.closeThoseClosingWithScreen();
+        assertFalse("it closed with the screen", WindowLayout.isOpen(filling));
+        assertTrue("a page that stays, stays", WindowLayout.isOpen(other));
+        Window again = WindowLayout.showPage(filling);
+        assertEquals(Window.ScreenFill.NONE, again.getFill());
+        assertEquals(30.0D, again.getOffsetX(), 1.0E-9D);
+        assertEquals(40.0D, again.getOffsetY(), 1.0E-9D);
+    }
+
+    /** A page like the map's: no tool strip, a key, and it closes with the screen. */
+    private static final class FillingPage extends PageContent {
+        @Override
+        public boolean closesWithScreen() {
+            return true;
+        }
+
+        @Override
+        public boolean isAvailable() {
+            return fillingAvailable;
+        }
+
+        @Override
+        public boolean hasToolStrip() {
+            return false;
+        }
+
+        @Override
+        public void draw(Minecraft minecraft, LostTalesUiHitBox box,
+                         double clipX, double clipY, double pointerX,
+                         double pointerY, float partialTicks, int alpha) {
+        }
     }
 
     /** A page with nothing on it but its tone. */
-    private static final class EmptyPage extends ChatPageContent {
+    private static final class EmptyPage extends PageContent {
         @Override
         public int tone() {
             return TONE;

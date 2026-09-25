@@ -1,6 +1,9 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.PointerRegions;
+import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
+import com.ninuna.losttales.gui.style.LostTalesUiItemIcon;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareSuggester;
@@ -23,7 +26,7 @@ final class ChatShareSuggestionBox {
     static final int MAX_ROWS = 8;
     private static final int ROW_HEIGHT = 12;
     /** The rows stand two pixels inside the frame's ink, as a framed button's content does. */
-    private static final int PADDING = LostTalesChatVisualStyle.POPUP_INSET;
+    private static final int PADDING = WindowStyle.POPUP_INSET;
     /** Between the glyph's slot and its name. */
     private static final int ICON_GAP = 4;
     /**
@@ -179,7 +182,7 @@ final class ChatShareSuggestionBox {
     }
 
     void draw(Minecraft minecraft, FontRenderer font,
-              ChatPointerRegions regions, int screenHeight,
+              PointerRegions regions, int screenHeight,
               int inputX, double mouseX, double mouseY) {
         if (!isActive()) {
             return;
@@ -192,7 +195,7 @@ final class ChatShareSuggestionBox {
             this.selectedIndex = hoveredRow;
         }
         regions.add(inputX, top, inputX + width, bottom);
-        LostTalesChatVisualStyle.drawPopupList(inputX, top, inputX + width,
+        WindowStyle.drawPopupList(inputX, top, inputX + width,
                 bottom, top + PADDING, ROW_HEIGHT,
                 this.selectedIndex < this.matches.size()
                         ? this.selectedIndex : -1);
@@ -215,7 +218,7 @@ final class ChatShareSuggestionBox {
         float boxX = ChatInlineIcons.boxLeft(x, ICON_SLOT);
         float boxY = ChatInlineIcons.boxTop(y + 1, ICON_SLOT);
         if (entry instanceof ChatShareCandidates.ItemEntry) {
-            ChatInlineIcons.drawItem(minecraft,
+            LostTalesUiItemIcon.drawFitted(minecraft,
                     ((ChatShareCandidates.ItemEntry)entry).stack,
                     boxX, boxY, ChatInlineIcons.CONTENT_SIZE, 255);
         } else if (entry instanceof ChatShareCandidates.MarkerEntry) {

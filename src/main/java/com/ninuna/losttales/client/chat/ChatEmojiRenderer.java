@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
@@ -67,7 +68,7 @@ final class ChatEmojiRenderer {
                     alpha, left, top, right, bottom);
             return;
         }
-        LostTalesSilhouetteRenderState.begin(LostTalesChatVisualStyle.SHADOW);
+        LostTalesSilhouetteRenderState.begin(LostTalesUiInk.SHADOW);
         try {
             drawRegion(minecraft, emoji, x, y, size, 1.0F, 1.0F, 1.0F,
                     alpha, left, top, right, bottom);

@@ -10,6 +10,21 @@ import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.chat.ChatReportReason;
 import com.ninuna.losttales.chat.ChatStatusLine;
 import com.ninuna.losttales.client.input.LostTalesKeyPress;
+import com.ninuna.losttales.client.window.PageContent;
+import com.ninuna.losttales.client.window.PageTab;
+import com.ninuna.losttales.client.window.SubWindow;
+import com.ninuna.losttales.client.window.SubWindowAnchor;
+import com.ninuna.losttales.client.window.SubWindowKind;
+import com.ninuna.losttales.client.window.SubWindowPlaces;
+import com.ninuna.losttales.client.window.SubWindows;
+import com.ninuna.losttales.client.window.TabMark;
+import com.ninuna.losttales.client.window.TabRow;
+import com.ninuna.losttales.client.window.Window;
+import com.ninuna.losttales.client.window.WindowLayout;
+import com.ninuna.losttales.client.window.WindowPages;
+import com.ninuna.losttales.client.window.WindowPlacement;
+import com.ninuna.losttales.client.window.WindowStyle;
+import com.ninuna.losttales.client.window.WindowTab;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
@@ -37,7 +52,7 @@ import net.minecraft.util.StatCollector;
 import org.lwjgl.input.Keyboard;
 
 /**
- * Every menu the chat screen opens, each in a small window of its own, and
+ * Every menu the chat screen opens, each in a sub-window of its own, and
  * what its rows do: a tab's settings, a window's own menu and the palette
  * its colour rows open, the tab search, the {@code +} menu of closed
  * channels and conversations, the menu over a message and its report, the
@@ -94,8 +109,8 @@ final class ChatScreenMenus {
     private static final String ENTRY_JUMP_UNREAD = "jump_unread";
     private static final String ENTRY_WINDOW_UNSTICK = "window_unstick";
     private static final String ENTRY_WINDOW_RESET = "window_reset";
-    /** The window menu's last row, which opens Chat Settings beside it. */
-    private static final String ENTRY_CHAT_SETTINGS = "chat_settings";
+    /** The window menu's last row, which opens Settings beside it. */
+    private static final String ENTRY_SETTINGS = "settings";
     /** How often an open menu reads its rows again. */
     private static final long REFRESH_NANOS = 500L * 1000000L;
 
@@ -141,12 +156,12 @@ final class ChatScreenMenus {
     private final ChatTabActions tabActions;
     private final ChatComposer composer;
     private final ChatNoticeSink notices;
-    /** What the Chat Settings window's rows are and do. */
+    /** What the Settings window's rows are and do. */
     private final ChatSettings settings;
     /** Each kind's menu; one that came back with the chat is the one it was. */
-    private final Map<ChatSmallWindowKind, ChatMenu> menus =
-            new EnumMap<ChatSmallWindowKind, ChatMenu>(ChatSmallWindowKind.class);
-    private ChatSmallWindows windows;
+    private final Map<SubWindowKind, ChatMenu> menus =
+            new EnumMap<SubWindowKind, ChatMenu>(SubWindowKind.class);
+    private SubWindows windows;
     private Minecraft mc;
     private FontRenderer font;
     private GuiTextField field;
@@ -168,7 +183,7 @@ final class ChatScreenMenus {
 
     /** Called from {@code initGui}, which also runs on every resize. */
     void bind(Minecraft mc, FontRenderer font, GuiTextField field,
-              ChatSmallWindows windows, int screenWidth, int screenHeight) {
+              SubWindows windows, int screenWidth, int screenHeight) {
         this.mc = mc;
         this.font = font;
         this.field = field;
@@ -180,8 +195,8 @@ final class ChatScreenMenus {
     /* ---- What is open ---- */
 
     /** Whether the window of the kind's menu is out. */
-    boolean isOpen(ChatSmallWindowKind kind) {
-        ChatSmallWindow window = this.windows == null ? null
+    boolean isOpen(SubWindowKind kind) {
+        SubWindow window = this.windows == null ? null
                 : this.windows.find(kind, "");
         return window != null && window.isOpen();
     }
@@ -192,7 +207,7 @@ final class ChatScreenMenus {
      * empty screen, or the tab menu for a tab. The control that opened
      * it shows it.
      */
-    boolean isOpenFor(ChatSmallWindowKind kind, Object about) {
+    boolean isOpenFor(SubWindowKind kind, Object about) {
         return isOpen(kind) && sameAbout(menu(kind).about, about);
     }
 
@@ -206,15 +221,15 @@ final class ChatScreenMenus {
      * The window whose message toolbar opened the message menu that is
      * out, or null: the toolbar's menu button stays lit while its menu is.
      */
-    ChatWindowFrame toolbarMenuFrame() {
+    ChatFrame toolbarMenuFrame() {
         MessageAim aim = openMessageAim();
         return aim == null || aim.toolbarWindowId == null ? null
-                : ChatWindowFrame.find(aim.toolbarWindowId);
+                : ChatFrame.find(aim.toolbarWindowId);
     }
 
     private MessageAim openMessageAim() {
-        return isOpen(ChatSmallWindowKind.MESSAGE)
-                ? messageOf(menu(ChatSmallWindowKind.MESSAGE)) : null;
+        return isOpen(SubWindowKind.MESSAGE)
+                ? messageOf(menu(SubWindowKind.MESSAGE)) : null;
     }
 
     /**
@@ -245,7 +260,7 @@ final class ChatScreenMenus {
         }
         this.refreshedNanos = now;
         for (ChatMenu menu : new ArrayList<ChatMenu>(this.menus.values())) {
-            ChatSmallWindow window = this.windows.find(menu.kind, "");
+            SubWindow window = this.windows.find(menu.kind, "");
             if (window == null || !window.isOpen()) {
                 continue;
             }
@@ -265,7 +280,7 @@ final class ChatScreenMenus {
      * about what it was while that still stands and with what was typed
      * into its field; one whose subject has gone stays closed.
      */
-    void restore(ChatSmallWindowPlacements.Reopening open) {
+    void restore(SubWindowPlaces.Reopening open) {
         if (!(open.state instanceof ChatMenu)) {
             return;
         }
@@ -288,7 +303,7 @@ final class ChatScreenMenus {
                 // still open in some window.
                 MessageAim aim = messageOf(menu);
                 return aim != null
-                        && (aim.tab == null || ChatWindowLayout.isOpen(aim.tab))
+                        && (aim.tab == null || ChatLayout.isOpen(aim.tab))
                         && stillHeld(aim.chatLineId);
             }
             case REPORT:
@@ -297,10 +312,10 @@ final class ChatScreenMenus {
                 return targetOf(menu) != null;
             case TAB:
                 return menu.about instanceof ChatTab
-                        && ChatWindowLayout.isOpen((ChatTab)menu.about);
+                        && ChatLayout.isOpen((ChatTab)menu.about);
             case WINDOW: {
-                ChatWindow window = menu.about instanceof String
-                        ? ChatWindowLayout.window((String)menu.about) : null;
+                Window window = menu.about instanceof String
+                        ? WindowLayout.window((String)menu.about) : null;
                 return window != null && !window.isLocked();
             }
             case PALETTE:
@@ -332,23 +347,23 @@ final class ChatScreenMenus {
      * window leaves it standing with its rows read again, and its field
      * hands the keys back to the bar, as a picker does after a pick.
      */
-    String take(ChatSmallWindow window, ChatMenu.Entry entry) {
+    String take(SubWindow window, ChatMenu.Entry entry) {
         return take(window, entry, false);
     }
 
     /**
-     * A row pressed with the right button: in Chat Settings a few-word
+     * A row pressed with the right button: in Settings a few-word
      * setting steps back; everywhere else it does nothing.
      */
-    void takeBack(ChatSmallWindow window, ChatMenu.Entry entry) {
+    void takeBack(SubWindow window, ChatMenu.Entry entry) {
         if (window != null && window.content instanceof ChatMenu
                 && ((ChatMenu)window.content).kind
-                        == ChatSmallWindowKind.SETTINGS) {
+                        == SubWindowKind.SETTINGS) {
             take(window, entry, true);
         }
     }
 
-    private String take(ChatSmallWindow window, ChatMenu.Entry entry,
+    private String take(SubWindow window, ChatMenu.Entry entry,
                         boolean back) {
         this.pendingCommand = null;
         if (window == null || !(window.content instanceof ChatMenu)
@@ -379,7 +394,7 @@ final class ChatScreenMenus {
      * narrowing its rows as it goes. Answers a command for the screen to
      * send, or null.
      */
-    String keyTyped(ChatSmallWindow window, LostTalesKeyPress press) {
+    String keyTyped(SubWindow window, LostTalesKeyPress press) {
         if (window == null || !(window.content instanceof ChatMenu)) {
             return null;
         }
@@ -391,9 +406,9 @@ final class ChatScreenMenus {
             ChatMenu.Entry found = firstFound(menu);
             return found == null ? null : take(window, found);
         }
-        if (menu.edit(press) && (menu.kind == ChatSmallWindowKind.TAB_SEARCH
-                || menu.kind == ChatSmallWindowKind.CHARACTERS
-                || menu.kind == ChatSmallWindowKind.SETTINGS)) {
+        if (menu.edit(press) && (menu.kind == SubWindowKind.TAB_SEARCH
+                || menu.kind == SubWindowKind.CHARACTERS
+                || menu.kind == SubWindowKind.SETTINGS)) {
             rebuild(menu);
         }
         return null;
@@ -407,7 +422,7 @@ final class ChatScreenMenus {
      * report is sent by its reasons alone.
      */
     private static ChatMenu.Entry firstFound(ChatMenu menu) {
-        boolean statusLine = menu.kind == ChatSmallWindowKind.STATUS_LINE;
+        boolean statusLine = menu.kind == SubWindowKind.STATUS_LINE;
         if (!statusLine && menu.filter().length() == 0) {
             return null;
         }
@@ -415,8 +430,8 @@ final class ChatScreenMenus {
             if (!entry.isTakeable()) {
                 continue;
             }
-            if (statusLine || menu.kind == ChatSmallWindowKind.TAB_SEARCH
-                    || menu.kind == ChatSmallWindowKind.SETTINGS
+            if (statusLine || menu.kind == SubWindowKind.TAB_SEARCH
+                    || menu.kind == SubWindowKind.SETTINGS
                     || entry.id.startsWith(ENTRY_CHARACTER_PREFIX)) {
                 return entry;
             }
@@ -429,12 +444,12 @@ final class ChatScreenMenus {
      * button — answering whether its window stays open.
      */
     private boolean act(ChatMenu menu, ChatMenu.Entry entry,
-                        ChatSmallWindow window, boolean back) {
+                        SubWindow window, boolean back) {
         switch (menu.kind) {
             case SETTINGS: {
                 String role = this.settings.take(entry, back);
                 if (role != null) {
-                    show(ChatSmallWindowKind.PALETTE, role, besideWindow(window),
+                    show(SubWindowKind.PALETTE, role, besideWindow(window),
                             true);
                 }
                 return true;
@@ -447,12 +462,12 @@ final class ChatScreenMenus {
             case PERSON:
                 return actOnPerson(targetOf(menu), entry);
             case TAB:
-                return actOnTab((ChatTab)menu.about, entry);
+                return actOnTab((WindowTab)menu.about, entry);
             case WINDOW:
                 return actOnWindow((String)menu.about, entry, window);
             case PALETTE:
                 ChatSettings.chooseColor((String)menu.about, entry);
-                rebuildIfOpen(ChatSmallWindowKind.SETTINGS);
+                rebuildIfOpen(SubWindowKind.SETTINGS);
                 return true;
             case OPEN:
                 openFromRestoreMenu((String)menu.about, entry);
@@ -467,7 +482,7 @@ final class ChatScreenMenus {
                 return false;
             case CHARACTERS:
                 if (ENTRY_STATUS_LINE.equals(entry.id)) {
-                    show(ChatSmallWindowKind.STATUS_LINE,
+                    show(SubWindowKind.STATUS_LINE,
                             ClientChatPresence.speakerOf(
                                     ClientChatChannelState.getSelected()),
                             besideWindow(window), true);
@@ -490,7 +505,7 @@ final class ChatScreenMenus {
     }
 
     /** Reads the kind's rows again at once where its window is out: what one window changed shows in another. */
-    private void rebuildIfOpen(ChatSmallWindowKind kind) {
+    private void rebuildIfOpen(SubWindowKind kind) {
         if (isOpen(kind)) {
             rebuild(menu(kind));
         }
@@ -499,7 +514,7 @@ final class ChatScreenMenus {
     /* ---- Showing a menu ---- */
 
     /** The kind's menu, made the first time it is asked for. */
-    private ChatMenu menu(ChatSmallWindowKind kind) {
+    private ChatMenu menu(SubWindowKind kind) {
         ChatMenu menu = this.menus.get(kind);
         if (menu == null) {
             menu = new ChatMenu(kind);
@@ -518,7 +533,7 @@ final class ChatScreenMenus {
     }
 
     /** Hung from a control or the pointer, in its window; none for no anchor. */
-    private static FirstPlace hangingFrom(final ChatMenu.Anchor anchor) {
+    private static FirstPlace hangingFrom(final SubWindowAnchor anchor) {
         return anchor == null ? null : new FirstPlace() {
             @Override
             public String windowId() {
@@ -533,8 +548,8 @@ final class ChatScreenMenus {
         };
     }
 
-    /** Beside the small window whose row opened it, in the same chat window. */
-    private static FirstPlace besideWindow(final ChatSmallWindow window) {
+    /** Beside the sub-window whose row opened it, in the same window. */
+    private static FirstPlace besideWindow(final SubWindow window) {
         return new FirstPlace() {
             @Override
             public String windowId() {
@@ -554,7 +569,7 @@ final class ChatScreenMenus {
      * screen: what a shortcut opens with no control to hang from.
      */
     private static FirstPlace centredInTypedWindow() {
-        ChatWindow typed = ChatWindowLayout.windowOf(
+        Window typed = WindowLayout.windowOf(
                 ClientChatChannelState.getSelected());
         final String windowId = typed == null ? null : typed.getId();
         return new FirstPlace() {
@@ -580,7 +595,7 @@ final class ChatScreenMenus {
 
     /**
      * Shows the kind's menu about {@code about}. Out already about the
-     * same thing in the same chat window, a {@code toggle} — its control
+     * same thing in the same window, a {@code toggle} — its control
      * pressed again — puts it away and anything else brings it in front.
      * Out about something else, it turns to {@code about} where it
      * stands; pressed for in another chat window, it moves there. Not
@@ -588,13 +603,13 @@ final class ChatScreenMenus {
      * {@code place}; with no place it does not open. A menu with no rows
      * to show does not open.
      */
-    private void show(ChatSmallWindowKind kind, Object about,
+    private void show(SubWindowKind kind, Object about,
                       FirstPlace place, boolean toggle) {
         if (this.windows == null) {
             return;
         }
         ChatMenu menu = menu(kind);
-        ChatSmallWindow window = this.windows.find(kind, "");
+        SubWindow window = this.windows.find(kind, "");
         boolean out = window != null && window.isOpen();
         String parent = parentFor(place);
         boolean elsewhere = out && place != null && !window.belongsTo(parent);
@@ -625,7 +640,7 @@ final class ChatScreenMenus {
             return;
         }
         boolean fading = window != null;
-        ChatSmallWindow opened = this.windows.open(kind, "", menu, parent,
+        SubWindow opened = this.windows.open(kind, "", menu, parent,
                 place.contentBox(menu, this.windows.roomOf(parent)));
         if (fading) {
             this.windows.refit(opened);
@@ -635,7 +650,7 @@ final class ChatScreenMenus {
     /**
      * What a menu opening, or turning to something else, starts with in
      * its field: nothing typed, or for the status line the line it has.
-     * The tab search's and Chat Settings' fields name the shortcut that
+     * The tab search's and Settings' fields name the shortcut that
      * opens them. The character menu makes its field as it reads its
      * rows.
      */
@@ -694,14 +709,13 @@ final class ChatScreenMenus {
                 break;
             }
             case TAB: {
-                ChatTab tab = (ChatTab)menu.about;
-                menu.setTitle(ClientChatChannelState.displayName(tab),
-                        LostTalesUiSheet.COG);
+                WindowTab tab = (WindowTab)menu.about;
+                menu.setTitle(tab.title(), LostTalesUiSheet.COG);
                 menu.setRows(tabRows(tab));
                 break;
             }
             case WINDOW: {
-                ChatWindow window = ChatWindowLayout.window((String)menu.about);
+                Window window = WindowLayout.window((String)menu.about);
                 menu.setTitle(windowTitle(window), LostTalesUiSheet.MORE);
                 menu.setRows(windowRows(window));
                 break;
@@ -765,6 +779,13 @@ final class ChatScreenMenus {
         return one == null ? other == null : one.equals(other);
     }
 
+    /**
+     * The message lines Reset Size gives a window: enough to read a
+     * conversation back without scrolling, and a whole number, so the
+     * topmost row is never a clipped one.
+     */
+    private static final int RESET_LINES = 10;
+
     /* ---- The strip's menus ---- */
 
     /**
@@ -780,22 +801,22 @@ final class ChatScreenMenus {
      * the tab and nothing else: a row that only repeats the button beside
      * it is a second way to lose a tab by accident.
      */
-    void showTabMenu(ChatTab tab, ChatMenu.Anchor anchor, boolean toggle) {
+    void showTabMenu(WindowTab tab, SubWindowAnchor anchor, boolean toggle) {
         if (tab != null) {
-            show(ChatSmallWindowKind.TAB, tab, hangingFrom(anchor), toggle);
+            show(SubWindowKind.TAB, tab, hangingFrom(anchor), toggle);
         }
     }
 
-    private static List<ChatMenu.Entry> tabRows(ChatTab channel) {
+    private static List<ChatMenu.Entry> tabRows(WindowTab tab) {
         List<ChatMenu.Entry> entries = new ArrayList<ChatMenu.Entry>(6);
-        if (channel.isPage()) {
+        if (tab instanceof PageTab) {
             // A page has nothing to read, mute or hide: its own rows,
             // under their heading with the chosen one marked in honey, as
             // a chosen status is, and a window of its own.
-            ChatPageContent page = ChatPages.contentOf(channel);
+            PageContent page = ((PageTab)tab).content();
             List<ChatMenu.Entry> rows = new ArrayList<ChatMenu.Entry>();
-            for (ChatPageContent.Choice choice : page == null
-                    ? Collections.<ChatPageContent.Choice>emptyList()
+            for (PageContent.Choice choice : page == null
+                    ? Collections.<PageContent.Choice>emptyList()
                     : page.choices()) {
                 rows.add(new ChatMenu.Entry(ENTRY_PAGE_PREFIX + choice.id,
                         choice.label, false, choice.chosen
@@ -807,9 +828,10 @@ final class ChatScreenMenus {
             } else {
                 entries.addAll(rows);
             }
-            addDetach(entries, channel);
+            addDetach(entries, tab);
             return entries;
         }
+        ChatTab channel = (ChatTab)tab;
         if (ClientChatChannelViews.hasUnread(channel)
                 || ClientChatChannelViews.unreadDividerLine(channel) != null) {
             entries.add(new ChatMenu.Entry(ENTRY_MARK_READ,
@@ -823,17 +845,17 @@ final class ChatScreenMenus {
         }
         entries.add(new ChatMenu.Entry(ENTRY_MUTE,
                 StatCollector.translateToLocal(
-                        ChatWindowLayout.isMuted(channel)
+                        ChatLayout.isMuted(channel)
                                 ? "gui.losttales.chat.tab.unmute"
                                 : "gui.losttales.chat.tab.mute")));
         entries.add(new ChatMenu.Entry(ENTRY_PINGS,
                 StatCollector.translateToLocal(
-                        ChatWindowLayout.isPingsMuted(channel)
+                        ChatLayout.isPingsMuted(channel)
                                 ? "gui.losttales.chat.tab.unmute_mentions"
                                 : "gui.losttales.chat.tab.mute_mentions")));
         entries.add(new ChatMenu.Entry(ENTRY_HIDE,
                 StatCollector.translateToLocal(
-                        ChatWindowLayout.isHidden(channel)
+                        ChatLayout.isHidden(channel)
                                 ? "gui.losttales.chat.tab.unhide"
                                 : "gui.losttales.chat.tab.hide")));
         addDetach(entries, channel);
@@ -844,12 +866,12 @@ final class ChatScreenMenus {
      * A layout action the row may have no room for: a window of its own,
      * offered whenever the layout would allow it.
      */
-    private static void addDetach(List<ChatMenu.Entry> entries, ChatTab tab) {
-        ChatWindow window = ChatWindowLayout.windowOf(tab);
+    private static void addDetach(List<ChatMenu.Entry> entries, WindowTab tab) {
+        Window window = WindowLayout.windowOf(tab);
         if (window != null && !window.isLocked()
                 && window.getTabs().size() > 1
-                && ChatWindowLayout.windows().size()
-                        < ChatWindowLayout.MAX_WINDOWS) {
+                && WindowLayout.windows().size()
+                        < WindowLayout.MAX_WINDOWS) {
             entries.add(new ChatMenu.Entry(ENTRY_DETACH,
                     StatCollector.translateToLocal(
                             "gui.losttales.chat.tab.detach")));
@@ -857,32 +879,38 @@ final class ChatScreenMenus {
     }
 
     /** One row of the tab's menu: the switches stay, the actions are done with it. */
-    private boolean actOnTab(ChatTab channel, ChatMenu.Entry entry) {
+    private boolean actOnTab(WindowTab tab, ChatMenu.Entry entry) {
         if (entry.id.startsWith(ENTRY_PAGE_PREFIX)) {
-            ChatPageContent page = ChatPages.contentOf(channel);
+            PageContent page = WindowPages.contentOf(tab);
             if (page != null) {
                 page.choose(entry.id.substring(ENTRY_PAGE_PREFIX.length()));
             }
             return true;
         }
+        if (ENTRY_DETACH.equals(entry.id)) {
+            this.tabActions.detachChannel(tab, this.screenWidth,
+                    this.screenHeight);
+            return false;
+        }
+        ChatTab channel = ChatTab.from(tab);
+        if (channel == null) {
+            return false;
+        }
         if (ENTRY_MUTE.equals(entry.id)) {
-            ChatWindowLayout.setMuted(channel, !ChatWindowLayout.isMuted(channel));
+            ChatLayout.setMuted(channel, !ChatLayout.isMuted(channel));
             return true;
         }
         if (ENTRY_PINGS.equals(entry.id)) {
-            ChatWindowLayout.setPingsMuted(channel,
-                    !ChatWindowLayout.isPingsMuted(channel));
+            ChatLayout.setPingsMuted(channel,
+                    !ChatLayout.isPingsMuted(channel));
             return true;
         }
         if (ENTRY_HIDE.equals(entry.id)) {
-            ChatWindowLayout.setHidden(channel,
-                    !ChatWindowLayout.isHidden(channel));
+            ChatLayout.setHidden(channel,
+                    !ChatLayout.isHidden(channel));
             return true;
         }
-        if (ENTRY_DETACH.equals(entry.id)) {
-            this.tabActions.detachChannel(channel, this.screenWidth,
-                    this.screenHeight);
-        } else if (ENTRY_MARK_READ.equals(entry.id)) {
+        if (ENTRY_MARK_READ.equals(entry.id)) {
             ClientChatChannelViews.markViewed(channel);
             ClientChatChannelViews.dismissDivider(channel);
         } else if (ENTRY_JUMP_UNREAD.equals(entry.id)) {
@@ -909,37 +937,36 @@ final class ChatScreenMenus {
      * neighbour, and the size entry puts the window back to the chat's
      * default shape. A locked window offers no dots, so it never reaches
      * this menu, and one locked while the menu stands closes it. Its last
-     * row opens Chat Settings beside it: the colours and every other chat
+     * row opens Settings beside it: the colours and every other chat
      * preference are the chat's, not one window's.
      */
-    void showWindowMenu(ChatWindow window, ChatMenu.Anchor anchor,
+    void showWindowMenu(Window window, SubWindowAnchor anchor,
                         boolean toggle) {
         if (window != null && !window.isLocked()) {
-            show(ChatSmallWindowKind.WINDOW, window.getId(),
+            show(SubWindowKind.WINDOW, window.getId(),
                     hangingFrom(anchor), toggle);
         }
     }
 
     /**
-     * {@code Ctrl+,}: Chat Settings, from anywhere in the chat, opening in
-     * the middle of the screen until the player has placed it; a switch,
-     * as the window menu's row is.
+     * {@code Ctrl+,}: Settings, from anywhere on the screen, opening in
+     * the middle of the window typed in until the player has placed it; a
+     * switch, as the window menu's row is.
      */
-    void toggleChatSettings() {
-        show(ChatSmallWindowKind.SETTINGS, null, centredInTypedWindow(),
+    void toggleSettings() {
+        show(SubWindowKind.SETTINGS, null, centredInTypedWindow(),
                 true);
     }
 
     /** The window menu's name: the window's tab in front, which names it on its row. */
-    private static String windowTitle(ChatWindow window) {
-        ChatTab front = window == null ? null : ChatWindowFrame.activeTab(
-                window, ChatWindowFrame.visibleTabs(window));
+    private static String windowTitle(Window window) {
+        WindowTab front = window == null ? null : ChatFrame.activeTab(
+                window, ChatFrame.visibleTabs(window));
         return front == null ? null : StatCollector.translateToLocalFormatted(
-                "gui.losttales.chat.small_window.window_of",
-                ClientChatChannelState.displayName(front));
+                "gui.losttales.chat.small_window.window_of", front.title());
     }
 
-    private static List<ChatMenu.Entry> windowRows(ChatWindow window) {
+    private static List<ChatMenu.Entry> windowRows(Window window) {
         List<ChatMenu.Entry> entries = new ArrayList<ChatMenu.Entry>(3);
         if (window == null) {
             return entries;
@@ -952,9 +979,9 @@ final class ChatScreenMenus {
         entries.add(new ChatMenu.Entry(ENTRY_WINDOW_RESET,
                 StatCollector.translateToLocal(
                         "gui.losttales.chat.window.reset_size")));
-        entries.add(new ChatMenu.Entry(ENTRY_CHAT_SETTINGS,
+        entries.add(new ChatMenu.Entry(ENTRY_SETTINGS,
                 StatCollector.translateToLocal(
-                        "gui.losttales.chat.window.chat_settings"))
+                        "gui.losttales.chat.window.settings"))
                 .withSprite(LostTalesUiSheet.COG, LostTalesUiSheet.COG_HOVER,
                         false));
         return entries;
@@ -962,37 +989,42 @@ final class ChatScreenMenus {
 
     /**
      * One row of the window's own menu, answering whether the menu stays
-     * open: Chat Settings opens beside it, or goes away when it is out,
+     * open: Settings opens beside it, or goes away when it is out,
      * and the menu stays; the rest are done with it.
      */
     private boolean actOnWindow(String windowId, ChatMenu.Entry entry,
-                                ChatSmallWindow menuWindow) {
-        if (ENTRY_CHAT_SETTINGS.equals(entry.id)) {
-            show(ChatSmallWindowKind.SETTINGS, null, besideWindow(menuWindow),
+                                SubWindow menuWindow) {
+        if (ENTRY_SETTINGS.equals(entry.id)) {
+            show(SubWindowKind.SETTINGS, null, besideWindow(menuWindow),
                     true);
             return true;
         }
-        ChatWindow window = ChatWindowLayout.window(windowId);
+        Window window = WindowLayout.window(windowId);
         if (window == null) {
             return false;
         }
         if (ENTRY_WINDOW_UNSTICK.equals(entry.id)) {
-            ChatWindowLayout.unlink(window.getId());
+            WindowLayout.unlink(window.getId());
         } else if (ENTRY_WINDOW_RESET.equals(entry.id)) {
-            // The chat's own default: a whole number of message lines,
-            // so the topmost row is never a clipped one, and just wide
+            // A page's window goes back to a page's size. Any other
+            // takes the chat's own: a whole number of message lines, so
+            // the topmost row is never a clipped one, and just wide
             // enough to show every one of the window's tabs whole. A
             // row that cannot be measured leaves the width alone, and
             // the window keeps following the game's chat-width setting.
             // A window filling a part of the screen takes the size it
             // is given, as the entry says.
-            ChatWindowLayout.setFill(window.getId(),
-                    ChatWindow.ScreenFill.NONE, false);
-            ChatWindowLayout.setWindowLines(window.getId(),
-                    ChatWindowLayout.DEFAULT_WINDOW_LINES, false);
-            ChatWindowLayout.setWindowWidth(window.getId(),
-                    ChatChannelTabBar.chatWidthForWholeRow(this.mc, window),
-                    true);
+            boolean page = WindowLayout.showsPage(window);
+            WindowLayout.setFill(window.getId(),
+                    Window.ScreenFill.NONE, false);
+            WindowLayout.setWindowHeight(window.getId(), page
+                    ? WindowLayout.PAGE_HEIGHT
+                    : WindowPlacement.heightForRoom(
+                            RESET_LINES * WindowStyle.LINE_HEIGHT, this.mc),
+                    false);
+            WindowLayout.setWindowWidth(window.getId(), page
+                    ? WindowLayout.PAGE_WIDTH
+                    : TabRow.boxWidthForWholeRow(this.mc, window), true);
         }
         return false;
     }
@@ -1008,11 +1040,11 @@ final class ChatScreenMenus {
      * another, it turns to this one and starts afresh, since the words
      * typed for the other are not this one's.
      */
-    void toggleSearchPanel(ChatWindow window, ChatMenu.Anchor anchor,
-                           ChatMenu.Anchor emptyPlus) {
+    void toggleSearchPanel(Window window, SubWindowAnchor anchor,
+                           SubWindowAnchor emptyPlus) {
         String windowId = emptyPlus != null || window == null ? null
                 : window.getId();
-        show(ChatSmallWindowKind.TAB_SEARCH, windowId, hangingFrom(
+        show(SubWindowKind.TAB_SEARCH, windowId, hangingFrom(
                 anchor != null ? anchor : keyboardAnchor(windowId, emptyPlus)),
                 true);
     }
@@ -1023,11 +1055,11 @@ final class ChatScreenMenus {
      * typed in, else from the empty state's own {@code +}; a switch like
      * its control. Nothing opens while there is nothing to open.
      */
-    void toggleChannelMenu(ChatWindow window, ChatMenu.Anchor anchor,
-                           ChatMenu.Anchor emptyPlus) {
+    void toggleChannelMenu(Window window, SubWindowAnchor anchor,
+                           SubWindowAnchor emptyPlus) {
         String windowId = emptyPlus != null || window == null ? null
                 : window.getId();
-        show(ChatSmallWindowKind.OPEN, windowId, hangingFrom(
+        show(SubWindowKind.OPEN, windowId, hangingFrom(
                 anchor != null ? anchor : keyboardAnchor(windowId, emptyPlus)),
                 true);
     }
@@ -1037,19 +1069,19 @@ final class ChatScreenMenus {
      * its tab row, where the row's first controls stand; the empty
      * state's {@code +} for the empty screen.
      */
-    private ChatMenu.Anchor keyboardAnchor(String windowId,
-                                           ChatMenu.Anchor emptyPlus) {
+    private SubWindowAnchor keyboardAnchor(String windowId,
+                                           SubWindowAnchor emptyPlus) {
         if (windowId == null) {
             return emptyPlus;
         }
-        ChatWindowFrame frame = ChatWindowFrame.find(windowId);
+        ChatFrame frame = ChatFrame.find(windowId);
         if (frame == null || !frame.drawn) {
             return null;
         }
         int left = (int)Math.floor(frame.drawnLeft()) + 2;
         int rowBottom = (int)Math.floor(frame.tabRowBottom());
-        return ChatMenu.Anchor.inward(left,
-                ChatChannelTabBar.rowTop(rowBottom), left + 8, rowBottom,
+        return SubWindowAnchor.inward(left,
+                TabRow.rowTop(rowBottom), left + 8, rowBottom,
                 frame, this.screenWidth, this.screenHeight);
     }
 
@@ -1064,20 +1096,19 @@ final class ChatScreenMenus {
     List<ChatMenu.Entry> searchEntries(String filter) {
         List<ChatMenu.Entry> entries = new ArrayList<ChatMenu.Entry>();
         List<ChatMenu.Entry> open = new ArrayList<ChatMenu.Entry>();
-        List<ChatWindow> windows = ChatWindowLayout.windows();
+        List<Window> windows = WindowLayout.windows();
         for (int index = 0; index < windows.size(); index++) {
-            List<ChatTab> tabs = ChatWindowFrame.visibleTabs(
+            List<WindowTab> tabs = ChatFrame.visibleTabs(
                     windows.get(index));
             for (int at = 0; at < tabs.size(); at++) {
-                ChatTab tab = tabs.get(at);
-                String name = ClientChatChannelState.displayName(tab);
+                WindowTab tab = tabs.get(at);
+                String name = tab.title();
                 if (!matchesFilter(name, filter)) {
                     continue;
                 }
                 open.add(new ChatMenu.Entry(
-                        ENTRY_OPEN_PREFIX + tab.id(), name,
-                        ChatWindowLayout.isMuted(tab),
-                        ClientChatChannelState.displayColor(tab), tab));
+                        ENTRY_OPEN_PREFIX + tab.id(), name, tab.isMuted(),
+                        tab.tone(), tab));
             }
         }
         addSection(entries, "gui.losttales.chat.search.open", open);
@@ -1086,7 +1117,7 @@ final class ChatScreenMenus {
             String name = ClientChatChannelState.displayName(channel);
             if (matchesFilter(name, filter)) {
                 closed.add(new ChatMenu.Entry(channel.getId(), name,
-                        ChatWindowLayout.isMuted(channel),
+                        ChatLayout.isMuted(channel),
                         ClientChatChannelState.displayColor(channel),
                         ChatTab.of(channel)));
             }
@@ -1095,10 +1126,10 @@ final class ChatScreenMenus {
         List<ChatMenu.Entry> players = new ArrayList<ChatMenu.Entry>();
         for (String name : whisperCandidates(this.mc)) {
             ChatTab conversation = ChatTab.whisper(name, "");
-            if (conversation != null && !ChatWindowLayout.isOpen(conversation)
+            if (conversation != null && !ChatLayout.isOpen(conversation)
                     && matchesFilter(name, filter)) {
                 players.add(new ChatMenu.Entry(conversation.id(),
-                        name, ChatWindowLayout.isMuted(conversation), -1,
+                        name, ChatLayout.isMuted(conversation), -1,
                         conversation));
             }
         }
@@ -1130,35 +1161,12 @@ final class ChatScreenMenus {
     }
 
     /**
-     * Where a menu opened from a control on a window's tab row hangs: the
-     * row's band at {@code x}, where the pointer is on the control, and
-     * toward the window's middle, which is under the row.
-     */
-    ChatMenu.Anchor stripAnchor(ChatWindowFrame frame,
-                                ChatChannelTabBar.Row row, int x) {
-        return ChatMenu.Anchor.inward(x - 4,
-                ChatChannelTabBar.rowTop(row.rowBottom), x + 4, row.rowBottom,
-                frame, this.screenWidth, this.screenHeight);
-    }
-
-    /**
-     * Where a menu opened from a control on a window's tool strip hangs:
-     * the strip's band at {@code x}, toward the window's middle.
-     */
-    ChatMenu.Anchor toolStripAnchor(ChatWindowFrame frame,
-                                    ChatChannelTabBar.Row row, int x) {
-        return ChatMenu.Anchor.inward(x - 4, row.rowBottom, x + 4,
-                row.rowBottom + ChatWindowPlacement.TOOL_STRIP_HEIGHT, frame,
-                this.screenWidth, this.screenHeight);
-    }
-
-    /**
      * Where a menu opened over the lines hangs: the pointer, toward the
      * middle of the window it is in.
      */
-    private ChatMenu.Anchor pointerAnchor(int mouseX, int mouseY) {
-        return ChatMenu.Anchor.inward(mouseX, mouseY, mouseX, mouseY,
-                ChatWindowFrame.drawnAt(mouseX, mouseY), this.screenWidth,
+    private SubWindowAnchor pointerAnchor(int mouseX, int mouseY) {
+        return SubWindowAnchor.inward(mouseX, mouseY, mouseX, mouseY,
+                ChatFrame.drawnAt(mouseX, mouseY), this.screenWidth,
                 this.screenHeight);
     }
 
@@ -1166,10 +1174,10 @@ final class ChatScreenMenus {
      * Where a window opens that takes another's place as that one
      * closes: its top left on the other's.
      */
-    private static ChatMenu.Anchor inPlaceOf(ChatSmallWindow window) {
+    private static SubWindowAnchor inPlaceOf(SubWindow window) {
         int left = (int)Math.round(window.left);
-        int top = (int)Math.round(window.top) - ChatMenu.Anchor.REACH;
-        return new ChatMenu.Anchor(left, top, left, top, true, false,
+        int top = (int)Math.round(window.top) - SubWindowAnchor.REACH;
+        return new SubWindowAnchor(left, top, left, top, true, false,
                 window.parentId);
     }
 
@@ -1193,7 +1201,7 @@ final class ChatScreenMenus {
             for (ChatChannel channel : closed) {
                 entries.add(new ChatMenu.Entry(channel.getId(),
                         ClientChatChannelState.displayName(channel),
-                        ChatWindowLayout.isMuted(channel),
+                        ChatLayout.isMuted(channel),
                         ClientChatChannelState.displayColor(channel),
                         ChatTab.of(channel)));
             }
@@ -1206,17 +1214,16 @@ final class ChatScreenMenus {
             for (String name : players) {
                 ChatTab conversation = ChatTab.whisper(name, "");
                 entries.add(new ChatMenu.Entry(conversation.id(),
-                        name, ChatWindowLayout.isMuted(conversation), -1,
+                        name, ChatLayout.isMuted(conversation), -1,
                         conversation));
             }
         }
-        // The pages no window holds: the quest journal, the party.
+        // The pages no window holds: the quest journal, the party, the map.
         List<ChatMenu.Entry> pages = new ArrayList<ChatMenu.Entry>();
-        for (ChatPages.Page page : ChatPages.all()) {
-            ChatTab tab = ChatTab.page(page.id);
-            if (tab != null && !ChatWindowLayout.isOpen(tab)) {
-                pages.add(new ChatMenu.Entry(tab.id(), page.title(), false,
-                        -1, tab));
+        for (WindowPages.Page page : WindowPages.all()) {
+            if (!WindowLayout.isOpen(page.tab()) && page.tab().isAvailable()) {
+                pages.add(new ChatMenu.Entry(page.tab().id(), page.title(),
+                        false, -1, page.tab()));
             }
         }
         if (!pages.isEmpty()) {
@@ -1234,44 +1241,34 @@ final class ChatScreenMenus {
      * a window of its own when none is left.
      */
     private void openFromRestoreMenu(String windowId, ChatMenu.Entry entry) {
-        ChatWindow target = ChatWindowLayout.window(windowId);
+        Window target = WindowLayout.window(windowId);
         if (target == null) {
-            target = ChatWindowLayout.firstWindow();
+            target = WindowLayout.firstWindow();
         }
         ChatChannel channel = ChatChannel.fromId(entry.id);
-        ChatTab tab = channel != null ? ChatTab.of(channel)
-                : ChatTab.fromId(entry.id);
-        if (tab == null || (channel == null && !tab.isPage()
-                && (!tab.isWhisper() || tab.isNpc()))) {
+        WindowTab tab = channel != null ? ChatTab.of(channel)
+                : WindowTab.fromId(entry.id);
+        ChatTab conversation = ChatTab.from(tab);
+        if (tab == null || (channel == null && conversation != null
+                && (!conversation.isWhisper() || conversation.isNpc()))) {
             return;
         }
-        if (tab.isPage() && target == null) {
+        if (tab instanceof PageTab && target == null) {
             // From the empty screen a page opens where it last stood.
-            ChatWindowLayout.showPage(tab);
+            WindowLayout.showPage((PageTab)tab);
             return;
         }
-        ChatTab opened = target == null
-                ? ChatWindowLayout.openInNewWindow(tab)
-                : ChatWindowLayout.openTab(tab, target.getId());
+        WindowTab opened = target == null
+                ? WindowLayout.openInNewWindow(tab)
+                : WindowLayout.openTab(tab, target.getId());
         if (opened != null) {
             this.tabActions.selectChannel(opened);
         }
     }
 
-    /** Whether a page no window holds can be opened from the {@code +}. */
-    static boolean hasClosedPages() {
-        for (ChatPages.Page page : ChatPages.all()) {
-            ChatTab tab = ChatTab.page(page.id);
-            if (tab != null && !ChatWindowLayout.isOpen(tab)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     /** Closed channels the player could see if they were open. */
     static List<ChatChannel> restorableChannels() {
-        List<ChatChannel> closed = ChatWindowLayout.closedChannels();
+        List<ChatChannel> closed = ChatLayout.closedChannels();
         List<ChatChannel> result = new ArrayList<ChatChannel>(closed.size());
         for (int index = 0; index < closed.size(); index++) {
             if (ClientChatChannelState.isAvailable(closed.get(index))) {
@@ -1353,12 +1350,12 @@ final class ChatScreenMenus {
      * their pings on the tile, else the white sphere while any holds
      * something unread.
      */
-    static ChatIconMark closedMark() {
+    static TabMark closedMark() {
         List<ChatTab> closed = new ArrayList<ChatTab>();
         for (ChatChannel channel : restorableChannels()) {
             closed.add(ChatTab.of(channel));
         }
-        return ChatIconMark.combined(closed);
+        return TabMark.combined(closed);
     }
 
     /** Sum of the unread counts of the channels the {@code +} would list. */
@@ -1387,16 +1384,16 @@ final class ChatScreenMenus {
         // message by, so the menu is about the message that was lit.
         LostTalesChatOverlayRenderer.Band band =
                 LostTalesChatOverlayRenderer.bandAt(this.mc,
-                        (float)ChatWindowPlacement.preciseMouseX(this.mc,
+                        (float)WindowPlacement.preciseMouseX(this.mc,
                                 this.screenWidth),
-                        (float)ChatWindowPlacement.preciseMouseY(this.mc,
+                        (float)WindowPlacement.preciseMouseY(this.mc,
                                 this.screenHeight));
         if (band == null || band.lines == null
                 || band.viewIndex >= band.lines.size()
                 || band.lines.get(band.viewIndex) == null) {
             return false;
         }
-        show(ChatSmallWindowKind.MESSAGE, messageAim(text,
+        show(SubWindowKind.MESSAGE, messageAim(text,
                         band.lines.get(band.viewIndex).getChatLineID(),
                         band.lines, band.viewIndex, null),
                 hangingFrom(pointerAnchor(mouseX, mouseY)), false);
@@ -1410,8 +1407,8 @@ final class ChatScreenMenus {
      * which may be the row above; it hangs from the control's box toward
      * the middle of the window. A switch, as the control is.
      */
-    boolean toggleToolbarMessageMenu(ChatWindowFrame frame, int chatLineId,
-                                     int row, ChatMenu.Anchor anchor) {
+    boolean toggleToolbarMessageMenu(ChatFrame frame, int chatLineId,
+                                     int row, SubWindowAnchor anchor) {
         if (frame == null || row < 0 || row >= frame.lines.size()) {
             return false;
         }
@@ -1419,7 +1416,7 @@ final class ChatScreenMenus {
         if (text.length() == 0) {
             return false;
         }
-        show(ChatSmallWindowKind.MESSAGE, messageAim(text, chatLineId,
+        show(SubWindowKind.MESSAGE, messageAim(text, chatLineId,
                 frame.lines, row, frame.windowId), hangingFrom(anchor), true);
         return true;
     }
@@ -1522,7 +1519,7 @@ final class ChatScreenMenus {
      * report where the menu stood; the rest are done with it.
      */
     private boolean actOnMessage(ChatMenu menu, ChatMenu.Entry entry,
-                                 ChatSmallWindow window) {
+                                 SubWindow window) {
         MessageAim aim = messageOf(menu);
         if (ENTRY_DELETE.equals(entry.id)) {
             if (!isOwnMessage(aim) && !canModerateMessage(aim)) {
@@ -1553,7 +1550,7 @@ final class ChatScreenMenus {
                         "gui.losttales.chat.copied"));
             }
         } else if (ENTRY_REPORT.equals(entry.id)) {
-            show(ChatSmallWindowKind.REPORT, aim,
+            show(SubWindowKind.REPORT, aim,
                     hangingFrom(inPlaceOf(window)), false);
         }
         return false;
@@ -1665,7 +1662,7 @@ final class ChatScreenMenus {
                         this.mc.thePlayer.getUniqueID()))) {
             return false;
         }
-        show(ChatSmallWindowKind.PERSON, person,
+        show(SubWindowKind.PERSON, person,
                 hangingFrom(pointerAnchor(mouseX, mouseY)), false);
         return true;
     }
@@ -1762,8 +1759,8 @@ final class ChatScreenMenus {
      * alone, since nothing there chooses an identity, with no roster and
      * no search field.
      */
-    void toggleCharacterMenu(ChatMenu.Anchor anchor) {
-        show(ChatSmallWindowKind.CHARACTERS, null, hangingFrom(anchor), true);
+    void toggleCharacterMenu(SubWindowAnchor anchor) {
+        show(SubWindowKind.CHARACTERS, null, hangingFrom(anchor), true);
     }
 
     /** The character menu's field, name and rows, for the tab typed in now. */

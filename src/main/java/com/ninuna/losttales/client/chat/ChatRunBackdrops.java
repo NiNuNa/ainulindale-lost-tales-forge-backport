@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.event.ClickEvent;
@@ -37,7 +38,7 @@ final class ChatRunBackdrops {
     /** Where a backdrop starts against its text's top: two rows above the capitals. */
     static final int TOP = -2;
     /** Where it ends: two rows below the capitals, the descenders and their shadow inside. */
-    static final int BOTTOM = LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT + 2;
+    static final int BOTTOM = LostTalesUiInk.CAP_HEIGHT + 2;
     /** A player mention's backdrop. */
     static final int PLAYER_RGB = LostTalesColors.rgb(LostTalesColors.SLATE_BLUE);
     /** How opaque a backdrop is against its words. */
@@ -179,7 +180,7 @@ final class ChatRunBackdrops {
             return PLAYER_RGB;
         }
         return LostTalesColors.darkestShade(colours ? wordsRgb
-                : LostTalesChatVisualStyle.IVORY, surfaceRgb);
+                : LostTalesUiInk.IVORY, surfaceRgb);
     }
 
     /**
@@ -219,7 +220,7 @@ final class ChatRunBackdrops {
     /** The words of a backdrop lit {@code lit}: their own colour crossed toward ivory. */
     static int wordsRgb(int rgb, float lit) {
         return lit <= 0.0F ? rgb
-                : LostTalesChatVisualStyle.blend(rgb, LostTalesChatVisualStyle.IVORY, lit);
+                : LostTalesUiInk.blend(rgb, LostTalesUiInk.IVORY, lit);
     }
 
     /**
@@ -311,7 +312,7 @@ final class ChatRunBackdrops {
             left += motion.wordX(pill.firstWord, words);
             right += motion.wordX(pill.lastWord, words);
         }
-        fill(left, TOP, right, BOTTOM, LostTalesChatVisualStyle.blend(pill.rgb,
+        fill(left, TOP, right, BOTTOM, LostTalesUiInk.blend(pill.rgb,
                 LostTalesChatVisualStyle.lighterShadeOf(pill.rgb), pill.lit),
                 wordsAlpha);
         return null;

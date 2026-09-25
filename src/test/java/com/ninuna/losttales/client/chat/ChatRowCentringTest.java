@@ -1,5 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.WindowStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import org.junit.Test;
@@ -23,11 +25,11 @@ public final class ChatRowCentringTest {
 
     private static final int LINE = LostTalesChatOverlayRenderer.LINE_HEIGHT;
     private static final int TEXT_TOP =
-            LostTalesChatOverlayRenderer.ROW_TEXT_TOP;
+            WindowStyle.ROW_TEXT_TOP;
     private static final int TEXT_OFFSET =
             LostTalesChatOverlayRenderer.TEXT_OFFSET;
     private static final int CAPS =
-            LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT;
+            LostTalesUiInk.CAP_HEIGHT;
     private static final int BOX =
             LostTalesChatOverlayRenderer.CONTENT_BOX_HEIGHT;
 
@@ -65,7 +67,7 @@ public final class ChatRowCentringTest {
         int capsMiddle = 2 * TEXT_TOP + CAPS;
         for (int height = 1; height < LINE; height++) {
             int top = TEXT_TOP
-                    + LostTalesChatOverlayRenderer.centredBoxTop(height);
+                    + WindowStyle.centredBoxTop(height);
             // Middles doubled: equal, or the box's one less, which is
             // half a pixel higher on the screen.
             int boxMiddle = 2 * top + height;
@@ -77,25 +79,25 @@ public final class ChatRowCentringTest {
             assertTrue(top + height <= LINE);
         }
         // A box as tall as the row fills it.
-        assertEquals(0, TEXT_TOP + LostTalesChatOverlayRenderer.centredBoxTop(
+        assertEquals(0, TEXT_TOP + WindowStyle.centredBoxTop(
                 LINE));
         // A one-row rule is the capitals' middle row, where a divider's
         // rule runs.
         assertEquals(LostTalesChatOverlayRenderer.DIVIDER_RULE_OFFSET,
-                TEXT_TOP + LostTalesChatOverlayRenderer.centredBoxTop(1));
+                TEXT_TOP + WindowStyle.centredBoxTop(1));
     }
 
     @Test
     public void theContentBoxStandsTwoRowsAboveTheText() {
         assertEquals(10, BOX);
-        int top = TEXT_TOP + LostTalesChatOverlayRenderer.centredBoxTop(BOX);
+        int top = TEXT_TOP + WindowStyle.centredBoxTop(BOX);
         assertEquals(0, top);
         assertEquals(2, LINE - top - BOX);
         // Emoji, item and marker glyphs and a mark standing for a head are
         // all drawn in this one box, placed from the text's top edge the
         // same way in a message row, the input field, the pickers and the
         // completion lists.
-        assertEquals(LostTalesChatOverlayRenderer.centredBoxTop(BOX),
+        assertEquals(WindowStyle.centredBoxTop(BOX),
                 ChatInlineIcons.CONTENT_TOP_OFFSET);
         assertEquals(ChatInlineIcons.CONTENT_TOP_OFFSET,
                 ChatInlineIcons.boxTop(0.0F, ChatInlineIcons.SLOT_WIDTH),
@@ -113,7 +115,7 @@ public final class ChatRowCentringTest {
         int top = TEXT_TOP + (int)offset;
         assertEquals(1, top);
         assertEquals(3, LINE - top - size);
-        assertEquals(LostTalesChatOverlayRenderer.centredBoxTop(size),
+        assertEquals(WindowStyle.centredBoxTop(size),
                 (int)offset);
     }
 
@@ -182,7 +184,7 @@ public final class ChatRowCentringTest {
         // A reply's quote and the typing line place it as a box of its
         // own: six rows, the pill and its tail, half a pixel above the
         // capitals' middle — on their top row, a row above their foot.
-        int top = LostTalesChatOverlayRenderer.centredBoxTop(height);
+        int top = WindowStyle.centredBoxTop(height);
         assertEquals(2, TEXT_TOP + top);
         assertEquals(4, LINE - (TEXT_TOP + top + height));
         // A link to a message stands it in the content box of the slot
@@ -199,7 +201,7 @@ public final class ChatRowCentringTest {
     public void aSpriteInTheContentBoxFollowsTheRowsRule() {
         for (int extent = 1; extent <= BOX; extent++) {
             assertEquals("extent " + extent,
-                    LostTalesChatOverlayRenderer.centredBoxTop(extent),
+                    WindowStyle.centredBoxTop(extent),
                     ChatInlineIcons.spriteTop(
                             ChatInlineIcons.boxTop(0.0F,
                                     ChatInlineIcons.SLOT_WIDTH),
@@ -215,7 +217,7 @@ public final class ChatRowCentringTest {
         int rule = TEXT_TOP + LostTalesChatVisualStyle.UNDERLINE_ROW;
         assertEquals(TEXT_TOP + CAPS + 1, rule);
         assertEquals(LINE - 2, rule);
-        assertEquals(LINE - 1, rule + LostTalesChatVisualStyle.SHADOW_OFFSET);
+        assertEquals(LINE - 1, rule + LostTalesUiInk.SHADOW_OFFSET);
     }
 
     @Test

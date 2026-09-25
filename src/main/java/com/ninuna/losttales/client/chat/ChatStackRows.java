@@ -29,7 +29,7 @@ import net.minecraft.util.IChatComponent;
  * line list, its length or the divider's row changes, against arrays
  * reused across frames.</p>
  */
-final class ChatStackRows {
+public final class ChatStackRows {
     /** A message's row, a day's rule, and the unread divider's own line. */
     static final int LINE_HEIGHT = LostTalesChatOverlayRenderer.LINE_HEIGHT;
     /**
@@ -65,13 +65,13 @@ final class ChatStackRows {
      * Lays the rows of a view's line list out, the divider's row
      * included, at the sizes {@code chatOpen} draws them at.
      */
-    void reset(List<ChatLine> lines, int dividerIndex, boolean chatOpen) {
+    public void reset(List<ChatLine> lines, int dividerIndex, boolean chatOpen) {
         this.chatOpen = chatOpen;
         reset(lines, dividerIndex);
     }
 
     /** Lays the rows out for the open window's sizes. */
-    void reset(List<ChatLine> lines, int dividerIndex) {
+    public void reset(List<ChatLine> lines, int dividerIndex) {
         this.source = lines;
         this.sourceSize = lines == null ? 0 : lines.size();
         this.dividerIndex = dividerIndex;
@@ -101,7 +101,7 @@ final class ChatStackRows {
     }
 
     /** Rows of the given heights, oldest last; the geometry's own test hook. */
-    void reset(int[] heights) {
+    public void reset(int[] heights) {
         this.source = null;
         this.sourceSize = 0;
         this.dividerIndex = -1;
@@ -127,7 +127,7 @@ final class ChatStackRows {
      * at the heights every kind of row takes on the display, and in the
      * state, as they are now.
      */
-    boolean describes(List<ChatLine> lines, int size, int dividerIndex,
+    public boolean describes(List<ChatLine> lines, int size, int dividerIndex,
                       boolean chatOpen) {
         return this.source == lines && this.sourceSize == size
                 && this.dividerIndex == dividerIndex
@@ -139,7 +139,7 @@ final class ChatStackRows {
     }
 
     /** As above for the open window's sizes. */
-    boolean describes(List<ChatLine> lines, int size, int dividerIndex) {
+    public boolean describes(List<ChatLine> lines, int size, int dividerIndex) {
         return describes(lines, size, dividerIndex, true);
     }
 
@@ -267,12 +267,12 @@ final class ChatStackRows {
                 : top(this.dividerIndex + 1) + this.dividerGapBelow;
     }
 
-    int count() {
+    public int count() {
         return this.count;
     }
 
     /** Height of the whole stack. */
-    int total() {
+    public int total() {
         return this.tops[this.count];
     }
 
@@ -297,7 +297,7 @@ final class ChatStackRows {
      * The distance a scroll offset stands for: whole rows and the
      * fraction of the row the offset is inside.
      */
-    double offsetOf(double rows) {
+    public double offsetOf(double rows) {
         double bounded = Math.max(0.0D, rows);
         int whole = (int)Math.floor(bounded);
         if (whole >= this.count) {
@@ -312,7 +312,7 @@ final class ChatStackRows {
      * inverse of {@link #offsetOf}: nothing below the baseline, and
      * past the stack's end whole lines of nothing.
      */
-    double rowsAt(double pixels) {
+    public double rowsAt(double pixels) {
         if (pixels <= 0.0D || this.count == 0) {
             return 0.0D;
         }

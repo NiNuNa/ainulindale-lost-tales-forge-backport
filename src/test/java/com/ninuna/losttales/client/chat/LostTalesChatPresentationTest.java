@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatRoleFixtures;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatEpithet;
 import com.ninuna.losttales.config.LostTalesConfig;
@@ -679,6 +680,35 @@ public final class LostTalesChatPresentationTest {
                 LostTalesChatPresentation.asSentence("Really?"));
         assertEquals("", LostTalesChatPresentation.asSentence(""));
         assertEquals("", LostTalesChatPresentation.asSentence(null));
+    }
+
+    /**
+     * What the Server says of its own accord reads in the yellow of a
+     * join or a leave, a warning in red.
+     */
+    @Test
+    public void theServersOwnWordsReadInTheJoinYellow() {
+        for (ChatConsoleEvent.Kind kind : new ChatConsoleEvent.Kind[] {
+                ChatConsoleEvent.Kind.SERVER, ChatConsoleEvent.Kind.MODERATION,
+                ChatConsoleEvent.Kind.ROLES, ChatConsoleEvent.Kind.CONFIG}) {
+            assertEquals(kind.name(), EnumChatFormatting.YELLOW,
+                    LostTalesChatPresentation.consoleWordsColour(consoleEntry(
+                            kind, ChatConsoleEvent.Severity.NOTICE)));
+        }
+        assertEquals(EnumChatFormatting.RED,
+                LostTalesChatPresentation.consoleWordsColour(consoleEntry(
+                        ChatConsoleEvent.Kind.WARNING,
+                        ChatConsoleEvent.Severity.WARNING)));
+        assertEquals(EnumChatFormatting.RED,
+                LostTalesChatPresentation.consoleWordsColour(consoleEntry(
+                        ChatConsoleEvent.Kind.CONFIG,
+                        ChatConsoleEvent.Severity.WARNING)));
+    }
+
+    private static ChatConsoleEvent consoleEntry(ChatConsoleEvent.Kind kind,
+                                                 ChatConsoleEvent.Severity severity) {
+        return new ChatConsoleEvent(1L, 0L, kind, severity, "Server",
+                "Server started");
     }
 
     /**

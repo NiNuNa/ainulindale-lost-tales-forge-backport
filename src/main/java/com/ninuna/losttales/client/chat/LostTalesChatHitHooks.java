@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.WindowScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiNewChat;
 import net.minecraft.util.IChatComponent;
@@ -25,7 +26,7 @@ public final class LostTalesChatHitHooks {
             return minecraft != null && chat != null
                     && minecraft.ingameGUI != null
                     && minecraft.ingameGUI.getChatGUI() == chat
-                    && minecraft.currentScreen instanceof LostTalesChatGui;
+                    && minecraft.currentScreen instanceof WindowScreen;
         } catch (RuntimeException ignored) {
             return false;
         }
@@ -44,7 +45,7 @@ public final class LostTalesChatHitHooks {
                     || minecraft.displayHeight <= 0) {
                 return null;
             }
-            LostTalesChatGui screen = (LostTalesChatGui)minecraft.currentScreen;
+            WindowScreen screen = (WindowScreen)minecraft.currentScreen;
             // The exact fractional GUI position, so third parties get
             // the same answer the drawn cursor tip stands on, and the
             // screen's own answer about it: a run of the lines only when
@@ -56,7 +57,7 @@ public final class LostTalesChatHitHooks {
                     - rawMouseY * (float)screen.height
                             / minecraft.displayHeight - 1.0F;
             LostTalesChatOverlayRenderer.Hit hit =
-                    screen.lineHitAt(guiX, guiY);
+                    ChatScreenPart.lineHitAt(screen, guiX, guiY);
             return hit == null ? null : hit.component;
         } catch (RuntimeException ignored) {
             return null;

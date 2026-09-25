@@ -2,6 +2,9 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.profanity.ChatProfanityMode;
+import com.ninuna.losttales.client.window.Window;
+import com.ninuna.losttales.client.window.WindowLayout;
+import com.ninuna.losttales.client.window.WindowTab;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import java.util.ArrayList;
@@ -15,18 +18,19 @@ import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.StatCollector;
 
 /**
- * The Chat Settings window's rows and what they do (Nils, 2026-09-24,
- * S1-S8): every chat option in one place, each taking effect and saved
- * the moment it changes — a switch flips on a click, a few-word option
- * steps forward on a click and back on a right-click, a colour opens the
- * palette beside the window — in sections under a search field: Look,
- * Messages, Mentions, Typing and Closed Feed, then every channel's
- * switches, everyone ignored, and every shortcut the chat has. The
- * game's own chat options the chat reads are written to the game's
- * options, so its own screen and this window always agree. Restore
- * Defaults puts every setting of the first five sections back as the mod
- * and the game ship it, after asking in its own place. A row is acted on
- * by its id, so a list read again as it is typed into acts the same.
+ * The Settings window's rows and what they do (Nils, 2026-09-24, S1-S8,
+ * and 2026-09-25, G4): every option in one place, each taking effect and
+ * saved the moment it changes — a switch flips on a click, a few-word
+ * option steps forward on a click and back on a right-click, a colour
+ * opens the palette beside the window — in sections under a search
+ * field: Windows first, what reaches every window, then the chat's Look,
+ * Messages, Mentions, Typing and Closed Feed, every channel's switches,
+ * everyone ignored, and every shortcut the chat has. The game's own
+ * options read here are written to the game's options, so its own
+ * screens and this window always agree. Restore Defaults puts every
+ * setting of the first six sections back as the mod and the game ship
+ * it, after asking in its own place. A row is acted on by its id, so a
+ * list read again as it is typed into acts the same.
  */
 final class ChatSettings {
     /** Marks a setting's row; the rest of the id is its key. */
@@ -236,7 +240,56 @@ final class ChatSettings {
 
     /* ---- The settings ---- */
 
-    /** The Look section's settings, after its colours. */
+    /**
+     * The Windows section's settings, after the windows' colour: what
+     * reaches every window. Window Opacity is the game's own chat opacity
+     * underneath (G5), so the game's Chat Settings screen agrees with it.
+     */
+    private static List<Setting> windows() {
+        List<Setting> windows = new ArrayList<Setting>();
+        windows.add(new GamePercent("chatOpacity",
+                "gui.losttales.chat.settings.opacity", GAME_CHAT_OPACITY) {
+            @Override
+            float get(GameSettings options) {
+                return options.chatOpacity;
+            }
+
+            @Override
+            void set(GameSettings options, float share) {
+                options.chatOpacity = share;
+            }
+        });
+        windows.add(new ModSwitch("enableChatBackgroundBlur",
+                "gui.losttales.chat.settings.blur") {
+            @Override
+            boolean get() {
+                return LostTalesConfig.enableChatBackgroundBlur;
+            }
+
+            @Override
+            void set(boolean on) {
+                LostTalesConfig.enableChatBackgroundBlur = on;
+            }
+        });
+        windows.add(new ModSwitch("hideHudWhileChatting",
+                "gui.losttales.chat.settings.hide_hud") {
+            @Override
+            boolean get() {
+                return LostTalesConfig.hideHudWhileChatting;
+            }
+
+            @Override
+            void set(boolean on) {
+                LostTalesConfig.hideHudWhileChatting = on;
+            }
+        });
+        return windows;
+    }
+
+    /**
+     * The Look section's settings, after its colours: the chat's own.
+     * Chat Scale sizes the chat's words and nothing else (G5).
+     */
     private static List<Setting> look() {
         List<Setting> look = new ArrayList<Setting>();
         look.add(new GamePercent("chatScale",
@@ -251,18 +304,6 @@ final class ChatSettings {
                 options.chatScale = share;
             }
         });
-        look.add(new GamePercent("chatOpacity",
-                "gui.losttales.chat.settings.opacity", GAME_CHAT_OPACITY) {
-            @Override
-            float get(GameSettings options) {
-                return options.chatOpacity;
-            }
-
-            @Override
-            void set(GameSettings options, float share) {
-                options.chatOpacity = share;
-            }
-        });
         look.add(size("chatSpeakerSize", "gui.losttales.chat.settings.speaker_size"));
         look.add(size("chatQuoteSize", "gui.losttales.chat.settings.quote_size"));
         look.add(new ModSwitch("enableChatMessageGrouping",
@@ -275,30 +316,6 @@ final class ChatSettings {
             @Override
             void set(boolean on) {
                 LostTalesConfig.enableChatMessageGrouping = on;
-            }
-        });
-        look.add(new ModSwitch("enableChatBackgroundBlur",
-                "gui.losttales.chat.settings.blur") {
-            @Override
-            boolean get() {
-                return LostTalesConfig.enableChatBackgroundBlur;
-            }
-
-            @Override
-            void set(boolean on) {
-                LostTalesConfig.enableChatBackgroundBlur = on;
-            }
-        });
-        look.add(new ModSwitch("hideHudWhileChatting",
-                "gui.losttales.chat.settings.hide_hud") {
-            @Override
-            boolean get() {
-                return LostTalesConfig.hideHudWhileChatting;
-            }
-
-            @Override
-            void set(boolean on) {
-                LostTalesConfig.hideHudWhileChatting = on;
             }
         });
         return look;
@@ -572,6 +589,7 @@ final class ChatSettings {
     /** Every setting the sections hold, in their order: what Restore Defaults restores. */
     private static List<Setting> all() {
         List<Setting> all = new ArrayList<Setting>();
+        all.addAll(windows());
         all.addAll(look());
         all.addAll(messages());
         all.addAll(mentions());
@@ -601,6 +619,7 @@ final class ChatSettings {
         String wanted = filter == null ? ""
                 : filter.trim().toLowerCase(Locale.ROOT);
         List<ChatMenu.Entry> rows = new ArrayList<ChatMenu.Entry>();
+        section(rows, "windows", windowRows(), wanted);
         section(rows, "look", lookRows(), wanted);
         section(rows, "messages", settingRows(messages()), wanted);
         section(rows, "mentions", settingRows(mentions()), wanted);
@@ -676,10 +695,17 @@ final class ChatSettings {
         return words.toString();
     }
 
-    /** The colours, then the look's other settings. */
-    private static List<ChatMenu.Entry> lookRows() {
+    /** The windows' colour, then what else reaches every window. */
+    private static List<ChatMenu.Entry> windowRows() {
         List<ChatMenu.Entry> rows = new ArrayList<ChatMenu.Entry>();
         rows.add(colorRow(COLOR_BACKGROUND));
+        rows.addAll(settingRows(windows()));
+        return rows;
+    }
+
+    /** The chat's colours, then the look's other settings. */
+    private static List<ChatMenu.Entry> lookRows() {
+        List<ChatMenu.Entry> rows = new ArrayList<ChatMenu.Entry>();
         rows.add(colorRow(COLOR_SELECTED));
         rows.add(colorRow(COLOR_MENTION));
         rows.add(colorRow(COLOR_SELECTED_MENTION));
@@ -732,9 +758,10 @@ final class ChatSettings {
                 addChannel(rows, ChatTab.of(channel));
             }
         }
-        for (ChatWindow window : ChatWindowLayout.windows()) {
-            for (ChatTab tab : window.getTabs()) {
-                if (tab.isWhisper() && !tab.isNpc()) {
+        for (Window window : WindowLayout.windows()) {
+            for (WindowTab each : window.getTabs()) {
+                ChatTab tab = ChatTab.from(each);
+                if (tab != null && tab.isWhisper() && !tab.isNpc()) {
                     addChannel(rows, tab);
                 }
             }
@@ -748,15 +775,15 @@ final class ChatSettings {
         rows.add(new ChatMenu.Entry(CHANNEL_MUTE_PREFIX + tab.id(),
                 StatCollector.translateToLocal(
                         "gui.losttales.chat.settings.channel.mute"))
-                .withValue(onOff(ChatWindowLayout.isMuted(tab))));
+                .withValue(onOff(ChatLayout.isMuted(tab))));
         rows.add(new ChatMenu.Entry(CHANNEL_PINGS_PREFIX + tab.id(),
                 StatCollector.translateToLocal(
                         "gui.losttales.chat.settings.channel.pings"))
-                .withValue(onOff(ChatWindowLayout.isPingsMuted(tab))));
+                .withValue(onOff(ChatLayout.isPingsMuted(tab))));
         rows.add(new ChatMenu.Entry(CHANNEL_HIDE_PREFIX + tab.id(),
                 StatCollector.translateToLocal(
                         "gui.losttales.chat.settings.channel.hide"))
-                .withValue(onOff(ChatWindowLayout.isHidden(tab))));
+                .withValue(onOff(ChatLayout.isHidden(tab))));
     }
 
     /** Everyone ignored, each with the way to stop; a line saying so where nobody is. */
@@ -820,18 +847,18 @@ final class ChatSettings {
         } else if (id.startsWith(CHANNEL_MUTE_PREFIX)) {
             ChatTab tab = ChatTab.fromId(id.substring(CHANNEL_MUTE_PREFIX.length()));
             if (tab != null) {
-                ChatWindowLayout.setMuted(tab, !ChatWindowLayout.isMuted(tab));
+                ChatLayout.setMuted(tab, !ChatLayout.isMuted(tab));
             }
         } else if (id.startsWith(CHANNEL_PINGS_PREFIX)) {
             ChatTab tab = ChatTab.fromId(id.substring(CHANNEL_PINGS_PREFIX.length()));
             if (tab != null) {
-                ChatWindowLayout.setPingsMuted(tab,
-                        !ChatWindowLayout.isPingsMuted(tab));
+                ChatLayout.setPingsMuted(tab,
+                        !ChatLayout.isPingsMuted(tab));
             }
         } else if (id.startsWith(CHANNEL_HIDE_PREFIX)) {
             ChatTab tab = ChatTab.fromId(id.substring(CHANNEL_HIDE_PREFIX.length()));
             if (tab != null) {
-                ChatWindowLayout.setHidden(tab, !ChatWindowLayout.isHidden(tab));
+                ChatLayout.setHidden(tab, !ChatLayout.isHidden(tab));
             }
         } else if (id.startsWith(IGNORED_ACCOUNT_PREFIX)) {
             stopIgnoring(id.substring(IGNORED_ACCOUNT_PREFIX.length()), null,

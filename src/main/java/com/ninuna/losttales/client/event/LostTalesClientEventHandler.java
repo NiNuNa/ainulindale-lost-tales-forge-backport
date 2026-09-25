@@ -6,6 +6,8 @@ import com.ninuna.losttales.accessory.player.AccessoryInventory;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.client.LostTalesClientThread;
+import com.ninuna.losttales.client.chat.ChatLayout;
+import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.config.client.ClientServerConfigCache;
 import com.ninuna.losttales.client.accessory.ClientAccessoryEffectCache;
 import com.ninuna.losttales.client.accessory.WraithWorldVisualEffect;
@@ -30,9 +32,9 @@ import com.ninuna.losttales.client.character.ClientCharacterCreationCatalogCache
 import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
-import com.ninuna.losttales.client.chat.ChatPages;
+import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.chat.ChatSpeechBubbles;
-import com.ninuna.losttales.client.chat.ChatWindowLayout;
+import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.chat.LostTalesSpeechBubbleRenderer;
 import com.ninuna.losttales.client.chat.ClientChatChannelState;
 import com.ninuna.losttales.client.chat.ClientChatIgnores;
@@ -83,7 +85,6 @@ import com.ninuna.losttales.gui.hud.mapmarker.LostTalesMapMarkerHudRenderer;
 import com.ninuna.losttales.gui.hud.party.LostTalesPartyHudRenderer;
 import com.ninuna.losttales.gui.hud.quest.LostTalesQuestHudRenderer;
 import com.ninuna.losttales.gui.hud.quest.LostTalesWorldQuestMarkerRenderer;
-import com.ninuna.losttales.client.chat.LostTalesChatGui;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.item.weapon.LostTalesItemBattleaxe;
@@ -129,7 +130,7 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.world.WorldEvent;
 import com.ninuna.losttales.client.chat.ChatPartyInvitationAnswers;
-import com.ninuna.losttales.client.chat.ChatSmallWindowPlacements;
+import com.ninuna.losttales.client.window.SubWindowPlaces;
 
 public class LostTalesClientEventHandler implements IResourceManagerReloadListener {
 
@@ -164,7 +165,8 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     }
 
     private static void clearSessionState() {
-        ChatPages.forgetContents();
+        WindowScreen.leaveWorld();
+        WindowPages.forgetContents();
         LostTalesClientQuestProgressStore.clear();
         LostTalesClientQuestNotificationStore.clear();
         LostTalesClientQuestDefinitionStore.clearDynamicQuestDefinitions();
@@ -197,7 +199,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         ClientLoreCharacterCache.clear();
         ClientPartyStateCache.clear();
         ChatPartyInvitationAnswers.clear();
-        ChatSmallWindowPlacements.forgetOpen();
+        SubWindowPlaces.forgetOpen();
         ClientPartyMemberStatusCache.clear();
         ClientPartyTrackingCache.clear();
         // Words over a head belong to the world they were spoken in.
@@ -275,7 +277,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         }
         // The place's remembered whisper tabs come back where they were,
         // before anything is replayed into them.
-        ChatWindowLayout.restoreConversations(ClientChatSession.currentKey());
+        ChatLayout.restoreConversations(ClientChatSession.currentKey());
         // So do the statuses chosen here, told once the player stands in
         // the world.
         ClientChatPresence.beginSession(ClientChatSession.currentKey());
@@ -328,6 +330,14 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void replaceCharacterRoomPauseMenu(GuiOpenEvent event) {
         CharacterRoomSession.replacePauseMenu(event);
+    }
+
+    /** The pages that close with the window screen close once the game shows no screen. */
+    @SubscribeEvent
+    public void closePagesLeftWithScreen(TickEvent.ClientTickEvent event) {
+        if (event != null && event.phase == TickEvent.Phase.END) {
+            WindowScreen.onClientTick(Minecraft.getMinecraft());
+        }
     }
 
     /** Returns the native pointer as soon as Minecraft leaves its GUI layer. */
@@ -537,13 +547,15 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         } else if (event.gui != null
                 && event.gui.getClass() == LOTRGuiRedBook.class) {
             // LOTR's quest book is the journal, a page of the chat.
-            GuiScreen journal = LostTalesChatGui.screenForPage(
+            GuiScreen journal = WindowScreen.screenForPage(
                     QuestJournalPage.PAGE_ID);
             if (journal != null) {
                 event.gui = journal;
             }
         } else if (event.gui != null
                 && event.gui.getClass() == LOTRGuiMap.class) {
+            // The ordinary map opens in its window; LOTR's special maps
+            // keep a screen of their own.
             event.gui = LostTalesLotrMapGui.replace(
                     (LOTRGuiMap)event.gui);
         } else if (event.gui != null

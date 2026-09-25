@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.mapmarker;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.gui.animation.LostTalesControlBarAnimation;
 import com.ninuna.losttales.core.LostTalesClassTransformer;
+import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
@@ -44,6 +45,17 @@ public final class LostTalesLotrMapLayout {
                     return new ArrayDeque<Boolean>();
                 }
             };
+
+    /**
+     * Where the map drawn in a window stands, in the display's pixels: its
+     * box's left edge and its bottom edge, counted from the display's
+     * bottom as scissors are, and the box's height in GUI pixels. Unused
+     * while the map is a screen of its own.
+     */
+    private static boolean inWindow;
+    private static int windowPixelLeft;
+    private static int windowPixelBottom;
+    private static int windowHeight;
 
     private static Field fullscreenField;
     private static Field mapWidthField;
@@ -174,11 +186,9 @@ public final class LostTalesLotrMapLayout {
      * render, and returns what it should render instead.</p>
      */
     public static String[] filterFullscreenSubtitles(String[] lines) {
+        LostTalesLotrMapGui map = LostTalesLotrMapGui.drawing();
         if (lines == null || lines.length == 0
-                || !isFullscreenLayoutActive(
-                        Minecraft.getMinecraft() == null ? null
-                                : asMapGui(Minecraft.getMinecraft()
-                                        .currentScreen))) {
+                || !isFullscreenLayoutActive(map)) {
             return lines;
         }
         String template = translate(TELEPORT_SUBTITLE_KEY);
@@ -194,13 +204,7 @@ public final class LostTalesLotrMapLayout {
                 filtered = kept.toArray(new String[kept.size()]);
             }
         }
-        Minecraft minecraft = Minecraft.getMinecraft();
-        if (minecraft != null
-                && minecraft.currentScreen instanceof LostTalesLotrMapGui) {
-            return ((LostTalesLotrMapGui)minecraft.currentScreen)
-                    .resolveCursorSubtitles(filtered);
-        }
-        return filtered;
+        return map.resolveCursorSubtitles(filtered);
     }
 
     /**
@@ -233,10 +237,6 @@ public final class LostTalesLotrMapLayout {
         } catch (Throwable ignored) {
             return "";
         }
-    }
-
-    private static LOTRGuiMap asMapGui(Object screen) {
-        return screen instanceof LOTRGuiMap ? (LOTRGuiMap)screen : null;
     }
 
     /** Called from LOTR's border renderer before it draws the framed panel. */
@@ -365,26 +365,81 @@ public final class LostTalesLotrMapLayout {
     static boolean beginViewportClip(
             int viewportXMin, int viewportXMax,
             int viewportYMin, int viewportYMax) {
+        if (Minecraft.getMinecraft() == null) {
+            return false;
+        }
+        GL11.glPushAttrib(GL11.GL_SCISSOR_BIT | GL11.GL_ENABLE_BIT);
+        GL11.glEnable(GL11.GL_SCISSOR_TEST);
+        scissor(viewportXMin, viewportYMin, viewportXMax, viewportYMax);
+        return true;
+    }
+
+    /**
+     * The map is about to be drawn in a window whose box's whole pixels
+     * stand at {@code left}, {@code top} on the screen, {@code height} GUI
+     * pixels tall: every scissor the map cuts in its own space is moved
+     * there, until {@link #endWindow}.
+     */
+    static void beginWindow(double left, double top, int height) {
         Minecraft minecraft = Minecraft.getMinecraft();
-        if (minecraft == null) {
-            return false;
+        int scale = LostTalesDisplayPixels.scaleFactor();
+        inWindow = minecraft != null;
+        windowPixelLeft = (int)Math.round(left * scale);
+        windowPixelBottom = minecraft == null ? 0 : minecraft.displayHeight
+                - (int)Math.round((top + height) * scale);
+        windowHeight = height;
+    }
+
+    static void endWindow() {
+        inWindow = false;
+    }
+
+    /**
+     * Cuts drawing to a rectangle of the map's own GUI space — its
+     * viewport, or part of it — wherever the map stands: on its own
+     * screen, or in a window's box. Scissors count display pixels from
+     * the display's bottom; the scissor test itself is the caller's.
+     */
+    static void scissor(int xMin, int yMin, int xMax, int yMax) {
+        int scale = LostTalesDisplayPixels.scaleFactor();
+        int width = Math.max(0, xMax - xMin) * scale;
+        int height = Math.max(0, yMax - yMin) * scale;
+        if (inWindow) {
+            GL11.glScissor(windowPixelLeft + xMin * scale,
+                    windowPixelBottom + (windowHeight - yMax) * scale,
+                    width, height);
+            return;
         }
-        try {
-            ScaledResolution resolution = new ScaledResolution(minecraft,
-                    minecraft.displayWidth, minecraft.displayHeight);
-            int scaleFactor = Math.max(1, resolution.getScaleFactor());
-            GL11.glPushAttrib(GL11.GL_SCISSOR_BIT | GL11.GL_ENABLE_BIT);
-            GL11.glEnable(GL11.GL_SCISSOR_TEST);
-            GL11.glScissor(
-                    viewportXMin * scaleFactor,
-                    (resolution.getScaledHeight() - viewportYMax)
-                            * scaleFactor,
-                    Math.max(0, viewportXMax - viewportXMin) * scaleFactor,
-                    Math.max(0, viewportYMax - viewportYMin) * scaleFactor);
-            return true;
-        } catch (Throwable ignored) {
-            return false;
+        Minecraft minecraft = Minecraft.getMinecraft();
+        ScaledResolution resolution = new ScaledResolution(minecraft,
+                minecraft.displayWidth, minecraft.displayHeight);
+        GL11.glScissor(xMin * scale,
+                (resolution.getScaledHeight() - yMax) * scale, width, height);
+    }
+
+    /**
+     * LOTR's own map scissor, called in its place by the transformer: moved
+     * to the window the map stands in, else as LOTR asked for it.
+     */
+    public static void lotrScissor(int x, int y, int width, int height) {
+        if (inWindow) {
+            GL11.glScissor(x + windowPixelLeft, y + windowPixelBottom,
+                    width, height);
+        } else {
+            GL11.glScissor(x, y, width, height);
         }
+    }
+
+    /**
+     * Whether the map can stand in a window: its full-screen layout and the
+     * scissor that follows the window's box are both patched in.
+     */
+    static boolean canStandInWindow() {
+        return ensureReflection()
+                && Boolean.getBoolean(LostTalesClassTransformer
+                        .LOTR_MAP_FULLSCREEN_ACTIVE_PROPERTY)
+                && Boolean.getBoolean(LostTalesClassTransformer
+                        .LOTR_MAP_WINDOW_CLIP_ACTIVE_PROPERTY);
     }
 
     static void endViewportClip(boolean clipped) {

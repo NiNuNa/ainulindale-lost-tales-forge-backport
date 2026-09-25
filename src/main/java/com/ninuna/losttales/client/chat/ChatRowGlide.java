@@ -40,7 +40,7 @@ import net.minecraft.util.IChatComponent;
  * Trips run on the chat's animation duration and only while chat
  * animations are on.</p>
  */
-final class ChatRowGlide {
+public final class ChatRowGlide {
     private static final int KIND_WORDS = 0;
     private static final int KIND_SPEAKER = 1;
     private static final int KIND_QUOTE = 2;
@@ -72,7 +72,7 @@ final class ChatRowGlide {
      * drawn now, and every row it adds fades in; otherwise the trips
      * under way go on and no other starts.
      */
-    void relaid(List<ChatLine> lines, ChatStackRows rows, int dividerIndex,
+    public void relaid(List<ChatLine> lines, ChatStackRows rows, int dividerIndex,
                 long now) {
         int count = lines == null ? 0 : lines.size();
         Key[] nextKeys = new Key[count];
@@ -189,7 +189,7 @@ final class ChatRowGlide {
     }
 
     /** Forgets the layout along with the view's history. */
-    void clear() {
+    public void clear() {
         this.keys = new Key[0];
         this.places = new int[0];
         this.messages = new long[0];

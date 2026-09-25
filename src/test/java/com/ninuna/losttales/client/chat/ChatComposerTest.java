@@ -21,6 +21,7 @@ public final class ChatComposerTest {
 
     @Before
     public void selectGlobal() {
+        ChatLayout.reset();
         ClientChatChannelState.clear();
         ClientChatChannelState.select(ChatChannel.GLOBAL);
     }

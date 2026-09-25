@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.gui;
 
+import com.ninuna.losttales.gui.style.LostTalesUiCornerMark;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
@@ -45,7 +46,7 @@ public final class LostTalesPlayerListOverlay extends Gui {
      * past it. Every row keeps the same column, so a row whose account
      * this client cannot place still lines up with the rest.
      */
-    static final int ICON_WIDTH = HEAD_SIZE + ChatPresenceMark.OVERHANG_X;
+    static final int ICON_WIDTH = HEAD_SIZE + LostTalesUiCornerMark.OVERHANG_X;
     static final int HEAD_GAP = 2;
     private static final int PING_WIDTH = 10;
     private static final int PING_HEIGHT = 8;

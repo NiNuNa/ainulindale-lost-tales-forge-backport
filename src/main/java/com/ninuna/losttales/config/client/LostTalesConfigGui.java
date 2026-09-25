@@ -131,7 +131,7 @@ public class LostTalesConfigGui extends GuiConfig {
                 "enableQuestDialogue",
                 "showWorldQuestMarkers", "showDiscoveredWorldMapMarkers",
                 "worldQuestMarkerMaxDistance", "showQuestChatFeedback", "playQuestSounds")));
-        // The chat's own Chat Settings window holds every chat option but
+        // The Settings window holds every chat option but
         // the history's length, which is a safety bound.
         elements.add(group("chat", "losttales.config.category.client.chat",
                 pick(client, "chatHistoryLines")));
@@ -207,7 +207,7 @@ public class LostTalesConfigGui extends GuiConfig {
                 }
             }
         }
-        // The chat's Chat Settings sets these, and nothing else shows them.
+        // Settings sets these, and nothing else shows them.
         used.addAll(LostTalesConfig.CHAT_SETTINGS_KEYS);
         for (IConfigElement element : source) {
             if (element != null && !used.contains(element.getName())) {

@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import static org.junit.Assert.assertEquals;
 
+import com.ninuna.losttales.gui.style.LostTalesUiCornerMark;
 import org.junit.Test;
 
 /**
@@ -22,7 +23,7 @@ public final class ChatAvatarTest {
 
     @Test
     public void theIconIsTheAvatarAndItsSphere() {
-        assertEquals(ChatAvatar.SIZE + ChatPresenceMark.OVERHANG_X,
+        assertEquals(ChatAvatar.SIZE + LostTalesUiCornerMark.OVERHANG_X,
                 ChatAvatar.ICON_WIDTH);
     }
 

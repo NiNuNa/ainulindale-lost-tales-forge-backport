@@ -1,5 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.WindowStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
@@ -135,9 +137,9 @@ public final class ChatWindowLinesDayDividerTest {
         int clearAbove = rows.top(4) - (ruleBottom + 1);
         assertEquals(14, clearBelow);
         assertEquals(13, clearAbove);
-        assertEquals(clearBelow + LostTalesChatOverlayRenderer.ROW_TEXT_TOP,
+        assertEquals(clearBelow + WindowStyle.ROW_TEXT_TOP,
                 clearAbove + LostTalesChatOverlayRenderer.TEXT_OFFSET
-                        - LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT);
+                        - LostTalesUiInk.CAP_HEIGHT);
     }
 
     /** The rule's gaps are its own: laid whether the runs asked for a blank row or not. */
@@ -191,7 +193,7 @@ public final class ChatWindowLinesDayDividerTest {
         assertEquals(-1, ChatWindowLines.dateDividerOver(lines, 7));
         assertEquals(-1, ChatWindowLines.dateDividerOver(null, 0));
         assertEquals(-1, ChatWindowLines.dateDividerOver(lines, -1));
-        ChatWindowFrame frame = ChatWindowFrame.feed();
+        ChatFrame frame = ChatFrame.feed();
         try {
             frame.resolveDividerRow(lines, Integer.valueOf(3));
             assertEquals(-1, frame.dividerLineIndex);
@@ -201,7 +203,7 @@ public final class ChatWindowLinesDayDividerTest {
             assertEquals(4, frame.dividerLineIndex);
             assertEquals(-1, frame.dividerDateLineIndex);
         } finally {
-            ChatWindowFrame.clear();
+            ChatFrame.clear();
         }
     }
 

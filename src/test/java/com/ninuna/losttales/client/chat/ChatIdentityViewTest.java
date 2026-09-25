@@ -44,7 +44,7 @@ public final class ChatIdentityViewTest {
         ClientChatChannelState.clear();
         ClientChatTypingState.clear();
         ChatSpeechBubbles.clear();
-        ChatWindowLayout.reset();
+        ChatLayout.reset();
     }
 
     @Test

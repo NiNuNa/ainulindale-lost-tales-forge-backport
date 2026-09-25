@@ -21,10 +21,17 @@ public final class PartyInvitationNotice {
 
     private PartyInvitationNotice() {}
 
-    /** The line for the invited player: who invites them, then the two answers. */
+    /**
+     * The line for the invited player: who invites them, then the two
+     * answers. The words are the Server's own, in the yellow of a join or
+     * a leave; the answers keep their green and red.
+     */
     public static IChatComponent line(String inviterName, UUID invitationId) {
-        return new ChatComponentTranslation(KEY, inviterName,
-                answer(true, invitationId), answer(false, invitationId));
+        ChatComponentTranslation line = new ChatComponentTranslation(KEY,
+                inviterName, answer(true, invitationId),
+                answer(false, invitationId));
+        line.getChatStyle().setColor(EnumChatFormatting.YELLOW);
+        return line;
     }
 
     /** Whether the line is an invitation: it is addressed to its reader, as a mention is. */

@@ -2,17 +2,22 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatTabIds;
+import com.ninuna.losttales.client.window.TabMark;
+import com.ninuna.losttales.client.window.ToolStrip;
+import com.ninuna.losttales.client.window.Window;
+import com.ninuna.losttales.client.window.WindowTab;
+import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.UUID;
+import net.minecraft.client.Minecraft;
+import net.minecraft.util.StatCollector;
 
 /**
- * What a tab stands for: a channel, and for a whisper the <em>identity</em>
+ * A conversation's tab: a channel, and for a whisper the <em>identity</em>
  * the conversation is with, the identity of this player's own it is held
  * as — or the NPC, since LOTR speech is addressed to one player and reads
- * as a whisper from the NPC — or a page, which is no conversation at all:
- * the quest journal, the party ({@link ChatPages}). A page tab has no
- * channel; it is never the tab typed into and never holds a line.
+ * as a whisper from the NPC. It is the chat's kind of {@link WindowTab}.
  *
  * <p>A conversation is between two people as they present themselves,
  * not between the accounts behind them: whispering someone speaking as
@@ -31,11 +36,14 @@ import java.util.UUID;
  * compared case-insensitively — and are what windows hold, lines are
  * filed under, and the selection points at.</p>
  */
-public final class ChatTab {
+public final class ChatTab extends WindowTab {
+    /** The timestamp area's button: the person, for the heads the area holds. */
+    private static final ToolStrip.Panel AREA_PANEL = new ToolStrip.Panel(
+            LostTalesUiSheet.AREA, LostTalesUiSheet.AREA_HOVER,
+            "gui.losttales.chat.area.show", "gui.losttales.chat.area.hide");
+
     private static final String WHISPER_ID_PREFIX = ChatTabIds.WHISPER_PREFIX;
     private static final String NPC_ID_PREFIX = ChatTabIds.NPC_PREFIX;
-    /** What a page tab's id opens with, before the page's code name. */
-    private static final String PAGE_ID_PREFIX = "page:";
     /**
      * Between the account and the identity in a tab's id. A Minecraft
      * account name cannot hold one, so the account is always the part
@@ -60,11 +68,7 @@ public final class ChatTab {
      */
     private static final java.util.Map<String, ChatTab> PLAIN =
             new java.util.concurrent.ConcurrentHashMap<String, ChatTab>();
-    /** One interned tab per page, by the page's code name. */
-    private static final java.util.Map<String, ChatTab> PAGES =
-            new java.util.concurrent.ConcurrentHashMap<String, ChatTab>();
 
-    /** The channel; null for a page. */
     private final ChatChannel channel;
     private final String partner;
     private final String partnerKey;
@@ -73,17 +77,9 @@ public final class ChatTab {
     /** This player's identity the conversation is held as; empty for the account. */
     private final String ownerKey;
     private final boolean npc;
-    /** The page's code name; empty for a conversation. */
-    private final String pageId;
 
     private ChatTab(ChatChannel channel, String partner, String identity,
                     String ownerKey, boolean npc) {
-        this(channel, partner, identity, ownerKey, npc, "");
-    }
-
-    private ChatTab(ChatChannel channel, String partner, String identity,
-                    String ownerKey, boolean npc, String pageId) {
-        this.pageId = pageId;
         this.channel = channel;
         this.partner = partner == null ? "" : partner.trim();
         this.partnerKey = this.partner.toLowerCase(Locale.ROOT);
@@ -122,17 +118,32 @@ public final class ChatTab {
         return cached;
     }
 
-    /** The tab of a registered page; null for a code name no page is registered under. */
-    public static ChatTab page(String pageId) {
-        if (ChatPages.byId(pageId) == null) {
-            return null;
+    /** A conversation's tab, or null for any other kind of tab. */
+    public static ChatTab from(WindowTab tab) {
+        return tab instanceof ChatTab ? (ChatTab)tab : null;
+    }
+
+    /** The conversation in front of a window; null for a page in front, or no window. */
+    public static ChatTab frontOf(Window window) {
+        return window == null ? null : from(window.getActiveTab());
+    }
+
+    /** The channel of the conversation in front of a window, or null. */
+    public static ChatChannel frontChannelOf(Window window) {
+        ChatTab front = frontOf(window);
+        return front == null ? null : front.getChannel();
+    }
+
+    /** The channels of a window's conversations, in row order; whispers as WHISPER. */
+    public static java.util.List<ChatChannel> channelsOf(Window window) {
+        java.util.List<ChatChannel> result = new java.util.ArrayList<ChatChannel>();
+        for (WindowTab tab : window.getTabs()) {
+            ChatTab conversation = from(tab);
+            if (conversation != null) {
+                result.add(conversation.getChannel());
+            }
         }
-        ChatTab cached = PAGES.get(pageId);
-        if (cached == null) {
-            cached = new ChatTab(null, "", "", "", false, pageId);
-            PAGES.put(pageId, cached);
-        }
-        return cached;
+        return result;
     }
 
     /**
@@ -146,8 +157,7 @@ public final class ChatTab {
      * the identity, and nothing else in the layout has to know.
      */
     public static ChatTab viewed(ChatTab tab) {
-        if (tab == null || tab.isPage() || tab.npc
-                || tab.ownerKey.length() > 0) {
+        if (tab == null || tab.npc || tab.ownerKey.length() > 0) {
             return tab;
         }
         if (tab.isWhisper()) {
@@ -237,14 +247,7 @@ public final class ChatTab {
                 : new ChatTab(ChatChannel.WHISPER, trimmed, trimmed, "", true);
     }
 
-    /** The channel; null for a page. */
     public ChatChannel getChannel() { return this.channel; }
-    /** Whether the tab is a page rather than a conversation. */
-    public boolean isPage() { return this.pageId.length() > 0; }
-    /** The page the tab shows; null for a conversation. */
-    public ChatPages.Page page() { return ChatPages.byId(this.pageId); }
-    /** The page's code name; empty for a conversation. */
-    public String getPageId() { return this.pageId; }
     /** The account a whisper is routed to; empty otherwise. */
     public String getPartner() { return this.partner; }
     /**
@@ -262,7 +265,7 @@ public final class ChatTab {
     public String getOwnerKey() { return this.ownerKey; }
     /** Whether the conversation is with the account rather than a character. */
     public boolean isAccountConversation() {
-        return !isPage() && this.identityKey.equals(this.partnerKey);
+        return this.identityKey.equals(this.partnerKey);
     }
     public boolean isWhisper() { return this.channel == ChatChannel.WHISPER; }
     /** Whether the partner is an NPC rather than a player. */
@@ -285,10 +288,8 @@ public final class ChatTab {
      * channel read as one identity, {@code whisper:Name},
      * {@code whisper:Name|Identity|own:<character id>} or {@code npc:Name}.
      */
+    @Override
     public String id() {
-        if (isPage()) {
-            return PAGE_ID_PREFIX + this.pageId;
-        }
         if (this.npc) {
             return NPC_ID_PREFIX + this.partner;
         }
@@ -324,9 +325,6 @@ public final class ChatTab {
         if (trimmed.toLowerCase(Locale.ROOT).startsWith(NPC_ID_PREFIX)) {
             return npc(trimmed.substring(NPC_ID_PREFIX.length()));
         }
-        if (trimmed.startsWith(PAGE_ID_PREFIX)) {
-            return page(trimmed.substring(PAGE_ID_PREFIX.length()));
-        }
         String scope = "";
         String channelPart = trimmed;
         int separator = trimmed.indexOf(IDENTITY_SEPARATOR);
@@ -354,9 +352,6 @@ public final class ChatTab {
             return false;
         }
         ChatTab tab = (ChatTab)other;
-        if (isPage() || tab.isPage()) {
-            return this.pageId.equals(tab.pageId);
-        }
         // By the channel's id, never the object: a channel a server
         // defines is registered again with every access broadcast, and
         // two tabs naming the same channel must stay the same tab across
@@ -370,16 +365,136 @@ public final class ChatTab {
 
     @Override
     public int hashCode() {
-        if (isPage()) {
-            return this.pageId.hashCode() * 31 + 7;
-        }
         return (((this.channel.getId().hashCode() * 31 + this.partnerKey.hashCode())
                 * 31 + this.identityKey.hashCode()) * 31 + this.ownerKey.hashCode()) * 2
                 + (this.npc ? 1 : 0);
     }
 
+    /** The channel's shown name; for a whisper the partner's. */
     @Override
-    public String toString() {
-        return id();
+    public String title() {
+        return ClientChatChannelState.displayName(this);
+    }
+
+    @Override
+    public int tone() {
+        return ClientChatChannelState.displayColor(this);
+    }
+
+    @Override
+    public boolean hasIcon() {
+        return ChatChannelIcons.iconOf(this) != null;
+    }
+
+    @Override
+    public void drawIcon(Minecraft minecraft, float x, float y, int alpha,
+                         TabMark mark) {
+        ChatChannelIcons.draw(minecraft, this, x, y, alpha, mark);
+    }
+
+    /**
+     * Its pings on the tile — every unread line, for a conversation with
+     * one person — else the sphere while anything is unread.
+     */
+    @Override
+    public TabMark mark() {
+        if (isWhisper()) {
+            return TabMark.pings(ClientChatChannelViews.unreadCount(this));
+        }
+        int pings = ClientChatChannelViews.unreadPingCount(this);
+        if (pings > 0) {
+            return TabMark.pings(pings);
+        }
+        return ClientChatChannelViews.unreadOtherCount(this) > 0
+                ? TabMark.UNREAD : TabMark.NONE;
+    }
+
+    /** Unsent words, unless it is the tab being typed in: those are in the field. */
+    @Override
+    public boolean hasDraft() {
+        return !equals(ClientChatChannelState.getSelected())
+                && ClientChatChannelState.getDraft(this).length() > 0;
+    }
+
+    /** Its lines kept out of the closed feed. */
+    @Override
+    public boolean isMuted() {
+        return ChatLayout.isMuted(this);
+    }
+
+    @Override
+    public boolean isAvailable() {
+        return ClientChatChannelState.isAvailable(this);
+    }
+
+    /**
+     * Only a plain channel's own tab: a whisper and one conversation of
+     * a scoped channel end with the session. The row holds the channel;
+     * which conversation it shows follows the identity being read.
+     */
+    @Override
+    public ToolStrip.Panel panel() {
+        return AREA_PANEL;
+    }
+
+    /** The timestamp area is a conversation's panel. */
+    @Override
+    public boolean isPanelOut(Window window) {
+        return !ChatLayout.isAreaHidden(window);
+    }
+
+    @Override
+    public void togglePanel(Window window) {
+        ChatLayout.setAreaHidden(window.getId(),
+                !ChatLayout.isAreaHidden(window));
+    }
+
+    @Override
+    public boolean hasMemberList() {
+        return true;
+    }
+
+    @Override
+    public boolean isMemberListOut(Window window) {
+        return !ChatLayout.isMembersHidden(window);
+    }
+
+    @Override
+    public void toggleMemberList(Window window) {
+        ChatLayout.setMembersHidden(window.getId(),
+                !ChatLayout.isMembersHidden(window));
+    }
+
+    @Override
+    public String searchPrompt() {
+        return StatCollector.translateToLocalFormatted(
+                "gui.losttales.chat.message_search.prompt", title());
+    }
+
+    /** A conversation's search is walked, the match stood on of how many. */
+    @Override
+    public boolean walksSearch() {
+        return true;
+    }
+
+    @Override
+    public int searchFound() {
+        return ChatSearch.matchCount();
+    }
+
+    @Override
+    public String searchCount() {
+        return ChatSearch.position() + "/" + ChatSearch.matchCount();
+    }
+
+    @Override
+    public String settingsTip() {
+        return StatCollector.translateToLocal(
+                "gui.losttales.chat.tab.settings");
+    }
+
+    @Override
+    public boolean isKeptInLayout() {
+        return !isWhisper() && this.ownerKey.length() == 0;
     }
 }

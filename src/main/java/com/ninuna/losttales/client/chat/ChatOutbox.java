@@ -133,7 +133,7 @@ final class ChatOutbox {
      */
     private void sendToTab(ChatTab tab, String outgoing,
                            ChatReplyReference reply) {
-        if (tab == null || tab.isPage()) {
+        if (tab == null) {
             return;
         }
         ClientChatIdentitySelection.update();
@@ -382,7 +382,7 @@ final class ChatOutbox {
     }
 
     private static void sendTyping(ChatTab tab, boolean typing) {
-        if (tab == null || tab.isPage()) {
+        if (tab == null) {
             return;
         }
         // The identity the message will be sent as, stated the same way

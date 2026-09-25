@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatMarkdown;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import org.junit.Test;
 
 import static org.junit.Assert.assertArrayEquals;
@@ -31,7 +32,7 @@ public final class ChatInputStylesTest {
 
     @Test
     public void eachStyleWearsItsOwnColour() {
-        int ivory = LostTalesChatVisualStyle.IVORY;
+        int ivory = LostTalesUiInk.IVORY;
         assertEquals(ivory, ChatInputStyles.colorOf(ChatMarkdown.Span.PLAIN));
         assertEquals(ivory, ChatInputStyles.colorOf(ChatMarkdown.Span.BOLD));
         assertFalse(ivory == ChatInputStyles.colorOf(ChatMarkdown.Span.SPOILER));

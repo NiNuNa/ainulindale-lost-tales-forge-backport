@@ -105,6 +105,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.lotrQuestTrackerTransformer.active";
     public static final String LOTR_MAP_ROTATION_ACTIVE_PROPERTY =
             "losttales.lotrMapRotationTransformer.active";
+    public static final String LOTR_MAP_WINDOW_CLIP_ACTIVE_PROPERTY =
+            "losttales.lotrMapWindowClipTransformer.active";
+    public static final String LOTR_MAP_WINDOW_NEWS_ACTIVE_PROPERTY =
+            "losttales.lotrMapWindowNewsTransformer.active";
     public static final String GUI_ANIMATION_ACTIVE_PROPERTY =
             "losttales.guiAnimationTransformer.active";
     public static final String SMOOTH_INVENTORY_ACTIVE_PROPERTY =
@@ -191,6 +195,10 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "lotr/client/render/entity/LOTRNPCRendering";
     private static final String LOTR_GUI_MAP =
             "lotr.client.gui.LOTRGuiMap";
+    private static final String LOTR_CLIENT_PROXY =
+            "lotr.client.LOTRClientProxy";
+    private static final String LOTR_MAP_PAGE_HOOK_OWNER =
+            "com/ninuna/losttales/client/mapmarker/LostTalesMapPage";
     private static final String LOTR_GUI_MINIQUEST_TRACKER =
             "lotr.client.gui.LOTRGuiMiniquestTracker";
     private static final String LOTR_LEVEL_DATA =
@@ -488,6 +496,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         }
         if (LOTR_GUI_MINIQUEST_TRACKER.equals(transformedName)) {
             return transformLotrQuestTracker(basicClass);
+        }
+        if (LOTR_CLIENT_PROXY.equals(transformedName)) {
+            return transformLotrClientProxy(basicClass);
         }
         if ("lotr.client.gui.LOTRGuiRendererMap".equals(transformedName)) {
             return transformLotrMapScene(basicClass, true);
@@ -1281,6 +1292,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             boolean rotationHookPresent = false;
             boolean labelRotationHookPresent = false;
             boolean compassHookPresent = false;
+            boolean windowClipHookPresent = false;
             for (Object value : owner.methods) {
                 MethodNode method = (MethodNode)value;
                 if ("renderPlayers".equals(method.name)
@@ -1426,6 +1438,16 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             "drawMapLabel")) {
                         changed |= restyleLotrMapLabels(method);
                     }
+                } else if ("setupMapClipping".equals(method.name)
+                        && "()V".equals(method.desc)) {
+                    windowClipHookPresent = containsHook(
+                            method, LOTR_MAP_LAYOUT_HOOK_OWNER,
+                            "lotrScissor");
+                    if (!windowClipHookPresent) {
+                        windowClipHookPresent =
+                                redirectLotrMapScissor(method);
+                        changed |= windowClipHookPresent;
+                    }
                 } else if ("transformMapCoords".equals(method.name)
                         && "(FF)[F".equals(method.desc)) {
                     rotationHookPresent = containsHook(
@@ -1488,6 +1510,14 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 warn("Could not patch LOTR map coordinates; "
                         + "map rotation will stay disabled");
             }
+            if (windowClipHookPresent) {
+                System.setProperty(
+                        LOTR_MAP_WINDOW_CLIP_ACTIVE_PROPERTY, "true");
+            } else {
+                System.clearProperty(LOTR_MAP_WINDOW_CLIP_ACTIVE_PROPERTY);
+                warn("Could not patch LOTR map clipping; the map keeps a "
+                        + "screen of its own instead of a window");
+            }
             if (miniQuestFilterHookPresent) {
                 System.setProperty(
                         LOTR_MAP_MINIQUEST_FILTER_ACTIVE_PROPERTY, "true");
@@ -1504,6 +1534,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             System.clearProperty(
                     LOTR_MAP_MINIQUEST_FILTER_ACTIVE_PROPERTY);
             System.clearProperty(LOTR_MAP_ROTATION_ACTIVE_PROPERTY);
+            System.clearProperty(LOTR_MAP_WINDOW_CLIP_ACTIVE_PROPERTY);
             warn("Failed to patch LOTR map rendering: "
                     + throwable);
             return basicClass;
@@ -1527,6 +1558,112 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         method.instructions.insert(hook);
         info("Patched LOTR map player icons with smooth Lost Tales rendering");
         return true;
+    }
+
+    /**
+     * Sends LOTR's map scissor through the one that knows where the map
+     * stands, so a map drawn in a window's box is cut to the box. On a
+     * screen of its own the scissor is LOTR's, unchanged.
+     */
+    private static boolean redirectLotrMapScissor(MethodNode method) {
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (!(instruction instanceof MethodInsnNode)) {
+                continue;
+            }
+            MethodInsnNode call = (MethodInsnNode)instruction;
+            if (call.getOpcode() != Opcodes.INVOKESTATIC
+                    || !"org/lwjgl/opengl/GL11".equals(call.owner)
+                    || !"glScissor".equals(call.name)
+                    || !"(IIII)V".equals(call.desc)) {
+                continue;
+            }
+            call.owner = LOTR_MAP_LAYOUT_HOOK_OWNER;
+            call.name = "lotrScissor";
+            info("Patched the LOTR map scissor to follow its window");
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * LOTR tells the open map whether the player is an operator, and why a
+     * waypoint cannot stand, only while the map is the screen. Where it
+     * reads the screen, it is handed the map in a window instead, while
+     * the window screen shows one.
+     */
+    private static byte[] transformLotrClientProxy(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            boolean changed = false;
+            boolean isOpPatched = false;
+            boolean protectionPatched = false;
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                boolean isOp = "setMapIsOp".equals(method.name)
+                        && "(Z)V".equals(method.desc);
+                boolean protection = "setMapCWPProtectionMessage"
+                        .equals(method.name)
+                        && "(Lnet/minecraft/util/IChatComponent;)V"
+                        .equals(method.desc);
+                if (!isOp && !protection) {
+                    continue;
+                }
+                boolean patched = containsHook(method,
+                        LOTR_MAP_PAGE_HOOK_OWNER, "screenOf");
+                if (!patched) {
+                    patched = redirectCurrentScreen(method);
+                    changed |= patched;
+                }
+                if (isOp) {
+                    isOpPatched = patched;
+                } else {
+                    protectionPatched = patched;
+                }
+            }
+            if (isOpPatched && protectionPatched) {
+                System.setProperty(
+                        LOTR_MAP_WINDOW_NEWS_ACTIVE_PROPERTY, "true");
+                info("Patched LOTR's map news to reach the map in a window");
+            } else {
+                System.clearProperty(LOTR_MAP_WINDOW_NEWS_ACTIVE_PROPERTY);
+                warn("Could not patch LOTR's map news; a map in a window "
+                        + "will not hear of operator teleports or protected "
+                        + "waypoints");
+            }
+            return changed ? write(owner) : basicClass;
+        } catch (Throwable throwable) {
+            System.clearProperty(LOTR_MAP_WINDOW_NEWS_ACTIVE_PROPERTY);
+            warn("Failed to patch LOTR's map news: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /** Reads the screen a map's news goes to where the method reads the current screen. */
+    private static boolean redirectCurrentScreen(MethodNode method) {
+        boolean redirected = false;
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null;) {
+            AbstractInsnNode next = instruction.getNext();
+            if (instruction instanceof FieldInsnNode
+                    && instruction.getOpcode() == Opcodes.GETFIELD) {
+                FieldInsnNode field = (FieldInsnNode)instruction;
+                if ("net/minecraft/client/Minecraft".equals(field.owner)
+                        && ("currentScreen".equals(field.name)
+                        || "field_71462_r".equals(field.name))
+                        && "Lnet/minecraft/client/gui/GuiScreen;"
+                        .equals(field.desc)) {
+                    method.instructions.set(instruction, new MethodInsnNode(
+                            Opcodes.INVOKESTATIC, LOTR_MAP_PAGE_HOOK_OWNER,
+                            "screenOf",
+                            "(Lnet/minecraft/client/Minecraft;)"
+                                    + "Lnet/minecraft/client/gui/GuiScreen;"));
+                    redirected = true;
+                }
+            }
+            instruction = next;
+        }
+        return redirected;
     }
 
     private static boolean injectLotrMapEdgeFill(MethodNode method) {

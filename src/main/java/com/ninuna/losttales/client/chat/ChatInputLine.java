@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiCaret;
 
 /**
@@ -47,7 +48,7 @@ final class ChatInputLine {
     private ChatInputLine(int leftDividerX, int rightDividerX,
                           int counterLeft) {
         this.leftDividerX = leftDividerX;
-        this.wellLeft = leftDividerX + LostTalesChatVisualStyle.DIVIDER_WIDTH
+        this.wellLeft = leftDividerX + WindowStyle.DIVIDER_WIDTH
                 + WELL_GAP;
         this.wellRight = rightDividerX - WELL_GAP;
         this.fieldLeft = this.wellLeft + ChatInputBar.BAR_GAP;
@@ -68,7 +69,7 @@ final class ChatInputLine {
                 - Math.max(0, counterWidth);
         return new ChatInputLine(dividerAfter(buttonsRight),
                 counterLeft - ChatInputBar.BAR_GAP
-                        - LostTalesChatVisualStyle.DIVIDER_WIDTH,
+                        - WindowStyle.DIVIDER_WIDTH,
                 counterLeft);
     }
 

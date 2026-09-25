@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.TabRow;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -20,8 +21,8 @@ public final class ChatTabReorderTest {
     private static final int GAP = 1;
 
     private static int slot(int left, int current,
-                            ChatChannelTabBar.ReorderLatch latch) {
-        return ChatChannelTabBar.reorderSlot(left, current, REST, WIDTHS,
+                            TabRow.ReorderLatch latch) {
+        return TabRow.reorderSlot(left, current, REST, WIDTHS,
                 GAP, latch);
     }
 
@@ -29,18 +30,18 @@ public final class ChatTabReorderTest {
     public void aThirdOfTheWayOntoTheNeighbourTakesItsPlace() {
         // Rightward from rest at 100: the line lies a third into the
         // neighbour, plus the guard's lean — twelve pixels of travel.
-        assertEquals(0, slot(111, 0, new ChatChannelTabBar.ReorderLatch()));
-        assertEquals(1, slot(112, 0, new ChatChannelTabBar.ReorderLatch()));
+        assertEquals(0, slot(111, 0, new TabRow.ReorderLatch()));
+        assertEquals(1, slot(112, 0, new TabRow.ReorderLatch()));
         // Leftward from rest at 131: the same third back over the tab
         // now standing on 100.
-        assertEquals(1, slot(119, 1, new ChatChannelTabBar.ReorderLatch()));
-        assertEquals(0, slot(118, 1, new ChatChannelTabBar.ReorderLatch()));
+        assertEquals(1, slot(119, 1, new TabRow.ReorderLatch()));
+        assertEquals(0, slot(118, 1, new TabRow.ReorderLatch()));
     }
 
     @Test
     public void aFreshSwapHoldsUntilARealRetreat() {
-        ChatChannelTabBar.ReorderLatch latch =
-                new ChatChannelTabBar.ReorderLatch();
+        TabRow.ReorderLatch latch =
+                new TabRow.ReorderLatch();
         assertEquals(1, slot(112, 0, latch));
         // The run now stands well past the leftward line of the place
         // it just won; read cold that would swap it straight back. The
@@ -53,8 +54,8 @@ public final class ChatTabReorderTest {
 
     @Test
     public void slidingOnPastTheFarLineDoesNotFlapAroundIt() {
-        ChatChannelTabBar.ReorderLatch latch =
-                new ChatChannelTabBar.ReorderLatch();
+        TabRow.ReorderLatch latch =
+                new TabRow.ReorderLatch();
         assertEquals(1, slot(112, 0, latch));
         // Sliding on across the far line at 119 does not yet arm the
         // way back, so the tremors of a slow hand around that line
@@ -72,14 +73,14 @@ public final class ChatTabReorderTest {
 
     @Test
     public void aFastDragCrossesSeveralBoundariesAtOnce() {
-        assertEquals(2, slot(170, 0, new ChatChannelTabBar.ReorderLatch()));
-        assertEquals(0, slot(101, 2, new ChatChannelTabBar.ReorderLatch()));
+        assertEquals(2, slot(170, 0, new TabRow.ReorderLatch()));
+        assertEquals(0, slot(101, 2, new TabRow.ReorderLatch()));
     }
 
     @Test
     public void aLeftwardSwapDoesNotBounceBackEither() {
-        ChatChannelTabBar.ReorderLatch latch =
-                new ChatChannelTabBar.ReorderLatch();
+        TabRow.ReorderLatch latch =
+                new TabRow.ReorderLatch();
         // Between the middle boundary's two lines — past the leftward
         // one at 150, not yet back over the rightward one at 143 — the
         // swap left lands and must stand, though the run still leans
@@ -103,8 +104,8 @@ public final class ChatTabReorderTest {
      */
     @Test
     public void aSlowJitteringSweepNeverRocksBack() {
-        ChatChannelTabBar.ReorderLatch latch =
-                new ChatChannelTabBar.ReorderLatch();
+        TabRow.ReorderLatch latch =
+                new TabRow.ReorderLatch();
         int current = 0;
         for (int left = 100; left <= 190; left++) {
             int forward = slot(left, current, latch);
@@ -126,7 +127,7 @@ public final class ChatTabReorderTest {
 
     @Test
     public void aRowWithNothingElseHasOnePlace() {
-        assertEquals(0, ChatChannelTabBar.reorderSlot(500, 0, new int[0],
-                new int[0], GAP, new ChatChannelTabBar.ReorderLatch()));
+        assertEquals(0, TabRow.reorderSlot(500, 0, new int[0],
+                new int[0], GAP, new TabRow.ReorderLatch()));
     }
 }

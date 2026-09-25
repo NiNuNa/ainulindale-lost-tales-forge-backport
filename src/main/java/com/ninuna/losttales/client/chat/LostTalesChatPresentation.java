@@ -21,6 +21,9 @@ import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.chat.share.ChatShowcase;
+import com.ninuna.losttales.client.window.Window;
+import com.ninuna.losttales.client.window.WindowLayout;
+import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
@@ -219,11 +222,11 @@ public final class LostTalesChatPresentation {
         // Asking with the conversation's own tab would find no window
         // holding it and open a second Faction tab beside the first.
         ChatTab row = ChatTab.row(tab);
-        if (row != null && !ChatWindowLayout.isOpen(row)) {
-            if (!ChatWindowLayout.isHidden(row)) {
-                ChatWindowLayout.openTab(row, windowIdOfSelection());
+        if (row != null && !ChatLayout.isOpen(row)) {
+            if (!ChatLayout.isHidden(row)) {
+                ChatLayout.openTab(row, windowIdOfSelection());
             } else if (!replayed && row.isWhisper() && !row.isNpc()) {
-                ChatWindowLayout.reopenConversation(row, windowIdOfSelection());
+                ChatLayout.reopenConversation(row, windowIdOfSelection());
             }
         }
         if (tab == null) {
@@ -283,7 +286,7 @@ public final class LostTalesChatPresentation {
             // line was said before this player arrived and sounds no cue,
             // and neither does a whisper to a character the player is not
             // playing right now: it waits, counted, for that identity.
-            if (!replayed && ChatWindowLayout.isPingAudible(tab)
+            if (!replayed && ChatLayout.isPingAudible(tab)
                     && ClientChatChannelState.isAvailable(tab)) {
                 playPingSound(minecraft, tab);
             }
@@ -803,7 +806,7 @@ public final class LostTalesChatPresentation {
         LostTalesChatMessagePacket packet = signedPacket(minecraft, tab,
                 message, showcases, reply, ClientChatMessageIds.nextLocal(),
                 System.currentTimeMillis());
-        if (ChatWindowLayout.openTab(tab, windowIdOfSelection()) == null) {
+        if (ChatLayout.openTab(tab, windowIdOfSelection()) == null) {
             return false;
         }
         // An NPC conversation never passes through the server, so the
@@ -815,7 +818,7 @@ public final class LostTalesChatPresentation {
         int chatLineId = print(minecraft, packet, tab, mentioned);
         if (mentioned) {
             markPinged(chatLineId);
-            if (ChatWindowLayout.isPingAudible(tab)) {
+            if (ChatLayout.isPingAudible(tab)) {
                 playPingSound(minecraft, tab);
             }
         }
@@ -972,7 +975,7 @@ public final class LostTalesChatPresentation {
      * channel.
      */
     static String windowIdOfSelection() {
-        ChatWindow window = ChatWindowLayout.windowOf(
+        Window window = WindowLayout.windowOf(
                 ClientChatChannelState.getSelected());
         return window == null ? null : window.getId();
     }
@@ -1087,7 +1090,7 @@ public final class LostTalesChatPresentation {
         // The tab typed in is in front only while no page stands before it.
         ChatTab typedIn = ClientChatChannelState.getSelected();
         ClientChatChannelViews.record(chatLineId, tab,
-                ChatWindowLayout.showsPage(ChatWindowLayout.windowOf(typedIn))
+                WindowLayout.showsPage(WindowLayout.windowOf(typedIn))
                         ? null : typedIn, mentioned,
                 serverId, timestampMillis, receivingReplayed);
         ClientChatChannelViews.recordTime(chatLineId, timestampMillis);
@@ -1398,7 +1401,7 @@ public final class LostTalesChatPresentation {
         }
         if (fade.frame != frameIndex) {
             fade.frame = frameIndex;
-            fade.value = LostTalesChatVisualStyle.hoverFade(fade.value,
+            fade.value = WindowStyle.hoverFade(fade.value,
                     hovered, frameElapsedSeconds);
         }
         if (fade.value <= 0.0F && !hovered) {
@@ -1449,7 +1452,7 @@ public final class LostTalesChatPresentation {
         }
         if (fade.frame != frameIndex) {
             fade.frame = frameIndex;
-            fade.value = LostTalesChatVisualStyle.hoverFade(fade.value,
+            fade.value = WindowStyle.hoverFade(fade.value,
                     hovered, frameElapsedSeconds);
         }
         if (fade.value <= 0.0F && !hovered) {
@@ -2110,6 +2113,8 @@ public final class LostTalesChatPresentation {
         }
         ChatComponentTranslation plain = new ChatComponentTranslation(
                 "chat.losttales.console.admin", arguments[0], arguments[1]);
+        // The Server's own word, in the yellow of a join or a leave.
+        plain.getChatStyle().setColor(EnumChatFormatting.YELLOW);
         for (Object argument : arguments) {
             if (argument instanceof IChatComponent) {
                 ((IChatComponent)argument).getChatStyle()
@@ -2180,9 +2185,9 @@ public final class LostTalesChatPresentation {
         boolean adminNotice = ChatSystemLineClassifier.isAdminNotice(message);
         ChatTab asked = channel == ChatChannel.CLIENT_CONSOLE && !adminNotice
                 ? commandOutputTab() : null;
-        if (asked == null && !ChatWindowLayout.isOpen(tab)
-                && !ChatWindowLayout.isHidden(tab)) {
-            ChatWindowLayout.openTab(tab, windowIdOfSelection());
+        if (asked == null && !ChatLayout.isOpen(tab)
+                && !ChatLayout.isHidden(tab)) {
+            ChatLayout.openTab(tab, windowIdOfSelection());
         }
         // A system line naming a player — an achievement, a death, a
         // join — names them the way a typed mention does: @Name in the
@@ -2226,7 +2231,7 @@ public final class LostTalesChatPresentation {
         }
         if (mentioned) {
             markPinged(chatLineId);
-            if (audibleMentionCue && ChatWindowLayout.isPingAudible(tab)) {
+            if (audibleMentionCue && ChatLayout.isPingAudible(tab)) {
                 playPingSound(minecraft, tab);
             }
         }
@@ -2277,9 +2282,9 @@ public final class LostTalesChatPresentation {
             body = reportNotice(minecraft, event, mentioned);
         } else {
             // What happened, said plainly: who did it as a mention, then
-            // the words as a sentence; a warning in red. The server's own
-            // doings name no actor, since the line is the Server's
-            // already.
+            // the words as a sentence, in the yellow of a join or a leave,
+            // a warning in red. The server's own doings name no actor,
+            // since the line is the Server's already.
             ChatComponentText line = new ChatComponentText("");
             String actor = event.getActor();
             if (actor.length() > 0 && !isServerActor(actor)) {
@@ -2288,8 +2293,7 @@ public final class LostTalesChatPresentation {
                 line.appendSibling(text(" ", null, false));
             }
             line.appendSibling(text(asSentence(event.getText()),
-                    event.getSeverity() == ChatConsoleEvent.Severity.WARNING
-                            ? EnumChatFormatting.RED : null, false));
+                    consoleWordsColour(event), false));
             body = line;
         }
         // Under the entry's own id, on the clock messages take theirs
@@ -2310,9 +2314,32 @@ public final class LostTalesChatPresentation {
         }
         if (mentioned[0]) {
             markPinged(chatLineId);
-            if (!replayed && ChatWindowLayout.isPingAudible(console)) {
+            if (!replayed && ChatLayout.isPingAudible(console)) {
                 playPingSound(minecraft, console);
             }
+        }
+    }
+
+    /**
+     * The colour a plain console entry's words wear: red for a warning,
+     * and the yellow of a join or a leave for everything else the Server
+     * says of its own accord — the server starting and stopping, a
+     * moderator's doing, a role or a setting changed, a Discord link. A
+     * command and a report are drawn their own way and keep the line's
+     * ink.
+     */
+    static EnumChatFormatting consoleWordsColour(ChatConsoleEvent event) {
+        if (event.getSeverity() == ChatConsoleEvent.Severity.WARNING) {
+            return EnumChatFormatting.RED;
+        }
+        switch (event.getKind()) {
+            case SERVER:
+            case MODERATION:
+            case ROLES:
+            case CONFIG:
+                return EnumChatFormatting.YELLOW;
+            default:
+                return null;
         }
     }
 
@@ -2509,8 +2536,8 @@ public final class LostTalesChatPresentation {
                                        long timestampMillis,
                                        ChatReplyReference reply,
                                        long messageId) {
-        if (!ChatWindowLayout.isOpen(tab) && !ChatWindowLayout.isHidden(tab)) {
-            ChatWindowLayout.openTab(tab, windowIdOfSelection());
+        if (!ChatLayout.isOpen(tab) && !ChatLayout.isHidden(tab)) {
+            ChatLayout.openTab(tab, windowIdOfSelection());
         }
         return print(minecraft, serverPacket(tab, body, timestampMillis, reply,
                 messageId), tab, mentioned, ChatBodyKind.ANSWER, body);
@@ -2806,8 +2833,8 @@ public final class LostTalesChatPresentation {
                 || minecraft.thePlayer == null) {
             return;
         }
-        if (!ChatWindowLayout.isOpen(tab) && !ChatWindowLayout.isHidden(tab)) {
-            ChatWindowLayout.openTab(tab, windowIdOfSelection());
+        if (!ChatLayout.isOpen(tab) && !ChatLayout.isHidden(tab)) {
+            ChatLayout.openTab(tab, windowIdOfSelection());
         }
         long now = System.currentTimeMillis();
         LostTalesChatMessagePacket packet = signedPacket(minecraft, tab,
@@ -2864,12 +2891,12 @@ public final class LostTalesChatPresentation {
         if (asked != null && lastCommandEcho != null) {
             rememberAnswer(chatLineId, lastCommandEcho.getMessage());
         }
-        if (!ChatWindowLayout.isOpen(tab) && !ChatWindowLayout.isHidden(tab)) {
-            ChatWindowLayout.openTab(tab, windowIdOfSelection());
+        if (!ChatLayout.isOpen(tab) && !ChatLayout.isHidden(tab)) {
+            ChatLayout.openTab(tab, windowIdOfSelection());
         }
         if (repliedTo) {
             markPinged(chatLineId);
-            if (ChatWindowLayout.isPingAudible(tab)) {
+            if (ChatLayout.isPingAudible(tab)) {
                 playPingSound(minecraft, tab);
             }
         }
@@ -3172,18 +3199,18 @@ public final class LostTalesChatPresentation {
         ChatChannelIcons.rememberNpcFaction(npcId, factionName);
         ClientChatChannelState.rememberPartnerColor(tab,
                 nameColor & 0xFFFFFF);
-        if (tab.isWhisper() && !ChatWindowLayout.isOpen(tab)) {
+        if (tab.isWhisper() && !ChatLayout.isOpen(tab)) {
             // The NPC's conversation is a whisper like a player's: it
             // opens for the speech, and one closed by hand opens again
             // when the NPC speaks. Where no window can take it, the
             // speech is filed under it all the same — counted unread,
             // in the closed feed, there once the tab is opened — and
             // never left as a line of its own in the Console.
-            if (ChatWindowLayout.isHidden(tab)) {
-                ChatWindowLayout.reopenConversation(tab,
+            if (ChatLayout.isHidden(tab)) {
+                ChatLayout.reopenConversation(tab,
                         windowIdOfSelection());
             } else {
-                ChatWindowLayout.openTab(tab, windowIdOfSelection());
+                ChatLayout.openTab(tab, windowIdOfSelection());
             }
         }
         // An NPC speaking this player's name is addressing them: the
@@ -3211,7 +3238,7 @@ public final class LostTalesChatPresentation {
         noteLinePrinted(chatLineId, tab, mentioned, now);
         if (mentioned) {
             markPinged(chatLineId);
-            if (ChatWindowLayout.isPingAudible(tab)) {
+            if (ChatLayout.isPingAudible(tab)) {
                 playPingSound(minecraft, tab);
             }
         }

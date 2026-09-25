@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
 import net.minecraft.client.gui.FontRenderer;
 
 /**
@@ -30,9 +31,9 @@ final class ChatTrailingStrip {
         this.room = room;
     }
 
-    static ChatTrailingStrip of(ChatWindowFrame frame, FontRenderer font) {
+    static ChatTrailingStrip of(ChatFrame frame, FontRenderer font) {
         ChatTimestampColumn columns = ChatTimestampColumn.of(frame, font);
-        double originX = ChatWindowFrame.snapToDisplayPixels(
+        double originX = LostTalesDisplayPixels.snap(
                 frame.drawnLeft() + columns.messageX() * frame.scale);
         double originY = frame.drawnBaseline();
         int wholeX = (int)Math.floor(originX);

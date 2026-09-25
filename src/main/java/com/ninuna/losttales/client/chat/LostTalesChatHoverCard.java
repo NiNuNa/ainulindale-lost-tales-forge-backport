@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
@@ -7,6 +8,7 @@ import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterDisplayNames;
@@ -26,7 +28,7 @@ import org.lwjgl.opengl.GL11;
 import java.util.Locale;
 
 /**
- * The bounded player card: opened in a small window of its own by a
+ * The bounded player card: opened in a sub-window of its own by a
  * click on the head or name of a chat line, on a mention or on a member,
  * and shown in brief under the pointer for the identity the head button
  * speaks as. A chat line supplies its snapshotted identity; the details —
@@ -81,7 +83,7 @@ final class LostTalesChatHoverCard {
         GL11.glPushMatrix();
         try {
             GL11.glTranslatef(0.0F, 0.0F, 300.0F);
-            LostTalesChatVisualStyle.drawPopup(x, y, x + laid.width,
+            WindowStyle.drawPopup(x, y, x + laid.width,
                     y + laid.height, 1.0F);
             drawLaid(minecraft, laid, x, y, 255);
         } finally {
@@ -336,7 +338,7 @@ final class LostTalesChatHoverCard {
         if (laid.head) {
             drawHead(minecraft, laid.target, x + PADDING, y + PADDING);
         }
-        LostTalesChatVisualStyle.beginContent();
+        LostTalesUiInk.beginContent();
         drawColored(font, laid.name, textX, textY, laid.nameColor, alpha);
         if (laid.suffix.length() > 0) {
             drawColored(font, laid.suffix, textX + laid.nameWidth, textY,
@@ -877,7 +879,7 @@ final class LostTalesChatHoverCard {
 
     private static void drawColored(FontRenderer font, String text,
                                     int x, int y, int color, int alpha) {
-        LostTalesChatVisualStyle.drawColored(font,
+        LostTalesUiInk.drawText(font,
                 LostTalesChatVisualStyle.removeColorCodes(text),
                 x, y, color, alpha);
     }
@@ -918,7 +920,7 @@ final class LostTalesChatHoverCard {
         GL11.glPushMatrix();
         try {
             GL11.glTranslatef(0.0F, 0.0F, 300.0F);
-            LostTalesChatVisualStyle.drawPopup(x, y, x + width, y + height,
+            WindowStyle.drawPopup(x, y, x + width, y + height,
                     1.0F);
             int textY = y + PADDING;
             for (int index = 0; index < lines.size(); index++) {

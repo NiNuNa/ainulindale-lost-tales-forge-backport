@@ -2,7 +2,6 @@ package com.ninuna.losttales.config.server;
 
 import com.ninuna.losttales.config.LostTalesConfig;
 import net.minecraftforge.common.config.Configuration;
-import net.minecraftforge.common.config.Property;
 import org.junit.Test;
 
 import java.util.List;

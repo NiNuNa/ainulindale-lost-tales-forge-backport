@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiCaret;
 import org.junit.Test;
 
@@ -27,7 +28,7 @@ public final class ChatInputLineTest {
     public void theLinesGapsAreThreePixelsSaveTwoBetweenEachDividerAndTheWell() {
         ChatInputLine line = line();
         int gap = ChatInputBar.BAR_GAP;
-        int divider = LostTalesChatVisualStyle.DIVIDER_WIDTH;
+        int divider = WindowStyle.DIVIDER_WIDTH;
         assertEquals(2, ChatInputLine.WELL_GAP);
         // From the controls' last pixel of ink to the first divider.
         assertEquals(gap, line.leftDividerX - BUTTONS_RIGHT);
@@ -51,7 +52,7 @@ public final class ChatInputLineTest {
     public void theWellStandsBetweenTheDividersAndHoldsTheField() {
         ChatInputLine line = line();
         assertTrue(line.wellLeft > line.leftDividerX
-                + LostTalesChatVisualStyle.DIVIDER_WIDTH);
+                + WindowStyle.DIVIDER_WIDTH);
         assertTrue(line.wellRight < line.rightDividerX);
         assertTrue(line.fieldLeft > line.wellLeft);
         assertTrue(line.fieldRight + LostTalesUiCaret.WIDTH

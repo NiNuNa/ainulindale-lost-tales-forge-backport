@@ -3,18 +3,14 @@ package com.ninuna.losttales.client.gui;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.MotionTransition;
-import java.nio.ByteBuffer;
+import com.ninuna.losttales.gui.style.LostTalesUiLayerFade;
 import java.util.EnumSet;
 import java.util.Set;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiChat;
 import net.minecraft.client.gui.GuiSleepMP;
-import net.minecraft.client.gui.ScaledResolution;
-import net.minecraft.client.renderer.OpenGlHelper;
-import net.minecraft.client.renderer.Tessellator;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent.ElementType;
-import org.lwjgl.opengl.GL11;
 
 /**
  * The HUD stepping aside while the chat is open: the game's own
@@ -51,9 +47,8 @@ public final class LostTalesHudFade {
             new MotionTransition(MotionIds.HUD_CHAT_HIDE);
     /** How much of the HUD shows this frame: 1 fully, 0 not at all. */
     private static float shown = 1.0F;
-    private static int texture = -1;
-    private static int textureWidth = -1;
-    private static int textureHeight = -1;
+    private static final LostTalesUiLayerFade LAYER =
+            new LostTalesUiLayerFade();
     /** Whether a copy of the frame waits to be laid back this frame. */
     private static boolean captured;
     /** Whether copying failed this frame; the fade then falls back to a cut. */
@@ -153,12 +148,7 @@ public final class LostTalesHudFade {
         shown = 1.0F;
         captured = false;
         captureFailed = false;
-        if (texture >= 0) {
-            GL11.glDeleteTextures(texture);
-        }
-        texture = -1;
-        textureWidth = -1;
-        textureHeight = -1;
+        LAYER.release();
     }
 
     private static boolean isGone() {
@@ -181,96 +171,28 @@ public final class LostTalesHudFade {
         shown = TRANSITION.clamped();
     }
 
-    /** Copies the frame as it stands into the fade's texture. */
+    /** Copies the frame as it stands. */
     private static boolean capture(Minecraft minecraft) {
-        if (captureFailed || minecraft == null || minecraft.displayWidth <= 0
-                || minecraft.displayHeight <= 0) {
+        if (captureFailed) {
             return false;
         }
-        int bound = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
-        try {
-            ensureTexture(minecraft);
-            GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture);
-            GL11.glCopyTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, 0, 0,
-                    minecraft.displayWidth, minecraft.displayHeight);
-            return true;
-        } catch (RuntimeException failure) {
+        if (!LAYER.beginDisplay(minecraft)) {
             captureFailed = true;
             return false;
-        } finally {
-            GL11.glBindTexture(GL11.GL_TEXTURE_2D, bound);
         }
+        return true;
     }
 
     /**
      * Lays the copy back over what was drawn since it was taken, at the
      * share of the way the HUD has gone: what was drawn shows at exactly
-     * the fade's opacity. The quad covers the overlay's exact fractional
-     * size, which is what its projection maps onto the display.
+     * the fade's strength.
      */
     private static void restore(Minecraft minecraft) {
         if (!captured) {
             return;
         }
         captured = false;
-        float opacity = 1.0F - shown;
-        if (texture < 0 || minecraft == null || opacity <= 0.0F) {
-            return;
-        }
-        ScaledResolution resolution = new ScaledResolution(minecraft,
-                minecraft.displayWidth, minecraft.displayHeight);
-        double width = resolution.getScaledWidth_double();
-        double height = resolution.getScaledHeight_double();
-        int bound = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
-        GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_COLOR_BUFFER_BIT
-                | GL11.GL_CURRENT_BIT);
-        try {
-            GL11.glEnable(GL11.GL_TEXTURE_2D);
-            GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture);
-            GL11.glDisable(GL11.GL_DEPTH_TEST);
-            GL11.glDisable(GL11.GL_ALPHA_TEST);
-            GL11.glDisable(GL11.GL_LIGHTING);
-            GL11.glEnable(GL11.GL_BLEND);
-            OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA,
-                    GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
-            GL11.glColor4f(1.0F, 1.0F, 1.0F, opacity);
-            // The copy reads bottom-up; the overlay counts down from the top.
-            Tessellator tessellator = Tessellator.instance;
-            tessellator.startDrawingQuads();
-            tessellator.addVertexWithUV(0.0D, height, 0.0D, 0.0D, 0.0D);
-            tessellator.addVertexWithUV(width, height, 0.0D, 1.0D, 0.0D);
-            tessellator.addVertexWithUV(width, 0.0D, 0.0D, 1.0D, 1.0D);
-            tessellator.addVertexWithUV(0.0D, 0.0D, 0.0D, 0.0D, 1.0D);
-            tessellator.draw();
-        } finally {
-            GL11.glPopAttrib();
-            GL11.glBindTexture(GL11.GL_TEXTURE_2D, bound);
-        }
-    }
-
-    /** A texture the display's size, made again when the display is resized. */
-    private static void ensureTexture(Minecraft minecraft) {
-        if (texture >= 0 && textureWidth == minecraft.displayWidth
-                && textureHeight == minecraft.displayHeight) {
-            return;
-        }
-        if (texture >= 0) {
-            GL11.glDeleteTextures(texture);
-        }
-        textureWidth = minecraft.displayWidth;
-        textureHeight = minecraft.displayHeight;
-        texture = GL11.glGenTextures();
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture);
-        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER,
-                GL11.GL_NEAREST);
-        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER,
-                GL11.GL_NEAREST);
-        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S,
-                GL11.GL_CLAMP);
-        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T,
-                GL11.GL_CLAMP);
-        GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGB8, textureWidth,
-                textureHeight, 0, GL11.GL_RGB, GL11.GL_UNSIGNED_BYTE,
-                (ByteBuffer)null);
+        LAYER.end(minecraft, shown);
     }
 }

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.Window;
 import org.junit.After;
 import org.junit.Test;
 
@@ -22,12 +23,12 @@ public final class ChatWindowFrameToolbarTest {
 
     @After
     public void cleanUp() {
-        ChatWindowFrame.clear();
+        ChatFrame.clear();
     }
 
     @Test
     public void eachControlAnswersAcrossItsSquare() {
-        ChatWindowFrame frame = ChatWindowFrame.of(new ChatWindow("w9"));
+        ChatFrame frame = ChatFrame.of(new Window("w9"));
         frame.drawn = true;
         // Five fourteen-pixel squares inside one frame's two-pixel edge,
         // as tall as a framed button.
@@ -68,7 +69,7 @@ public final class ChatWindowFrameToolbarTest {
      */
     @Test
     public void theToolbarWaitsForTheHistoryAndThePointerToRest() {
-        ChatWindowFrame frame = ChatWindowFrame.of(new ChatWindow("w3"));
+        ChatFrame frame = ChatFrame.of(new Window("w3"));
         long second = 1000000000L;
         assertEquals(0.0F, frame.toolbarShare(7, true, second), 0.0F);
         // The history rests; the pointer has not rested long yet.
@@ -85,14 +86,14 @@ public final class ChatWindowFrameToolbarTest {
 
     @Test
     public void onlyTheControlThePointerIsOnLights() {
-        ChatWindowFrame first = ChatWindowFrame.of(new ChatWindow("w1"));
-        ChatWindowFrame second = ChatWindowFrame.of(new ChatWindow("w2"));
-        ChatWindowFrame.noteHoveredControls(first, REPLY, second);
+        ChatFrame first = ChatFrame.of(new Window("w1"));
+        ChatFrame second = ChatFrame.of(new Window("w2"));
+        ChatFrame.noteHoveredControls(first, REPLY, second);
         assertEquals(REPLY, first.hoveredToolbarKind);
         assertFalse(first.jumpHovered);
         assertEquals(-1, second.hoveredToolbarKind);
         assertTrue(second.jumpHovered);
-        ChatWindowFrame.noteHoveredControls(null, -1, null);
+        ChatFrame.noteHoveredControls(null, -1, null);
         assertEquals(-1, first.hoveredToolbarKind);
         assertFalse(second.jumpHovered);
     }

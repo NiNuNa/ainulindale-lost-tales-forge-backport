@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatSystemLineClassifier;
+import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.config.LostTalesConfig;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.FMLLog;
@@ -66,7 +67,7 @@ public final class LostTalesChatClientHandler {
             return;
         }
         try {
-            event.gui = new LostTalesChatGui(
+            event.gui = new WindowScreen(
                     (String)DEFAULT_INPUT.get(event.gui));
         } catch (IllegalAccessException refused) {
             // Keeping the original GUI is safer than losing command input.
@@ -193,9 +194,9 @@ public final class LostTalesChatClientHandler {
                         ? null : messages.get(0);
             }
             ChatTab console = ChatTab.of(ChatChannel.CLIENT_CONSOLE);
-            if (!ChatWindowLayout.isOpen(console)
-                    && !ChatWindowLayout.isHidden(console)) {
-                ChatWindowLayout.openTab(console,
+            if (!ChatLayout.isOpen(console)
+                    && !ChatLayout.isHidden(console)) {
+                ChatLayout.openTab(console,
                         LostTalesChatPresentation.windowIdOfSelection());
             }
         } catch (RuntimeException ignored) {

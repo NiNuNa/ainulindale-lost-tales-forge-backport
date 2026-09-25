@@ -67,7 +67,7 @@ public final class LostTalesConfig {
     public static final Set<String> CLIENT_CATEGORIES = Collections.unmodifiableSet(
             new HashSet<String>(Arrays.asList(CATEGORY_CLIENT)));
     /**
-     * The client options the chat sets in its own Chat Settings window
+     * The client options the Settings window sets
      * and saves the moment they are chosen: every chat option but the
      * history's length, a safety bound (Nils, 2026-09-24, S2 a). The
      * Config Screen leaves them to the chat: they stay in the client

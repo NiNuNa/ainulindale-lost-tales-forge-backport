@@ -18,7 +18,7 @@ import org.lwjgl.opengl.GL11;
  * texels; the sheet is drawn 1:1 in GUI pixels, so a sprite's width and
  * height are also its size on screen. The padlock's frames are the one
  * thing not held here: they are a regular grid, and
- * {@link ChatLockAnimation} walks it. {@code LostTalesUiSheetTest} locks
+ * {@link LockAnimation} walks it. {@code LostTalesUiSheetTest} locks
  * the constants to the bundled PNG the way the emoji sheet is locked.
  */
 public enum LostTalesUiSheet {

@@ -1,9 +1,7 @@
 package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.chat.ChatChannel;
-import com.ninuna.losttales.chat.ChatPresentationMode;
 import com.ninuna.losttales.chat.ChatMessageValidator;
-import com.ninuna.losttales.chat.ChatRecipientRule;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatReactionSummary;

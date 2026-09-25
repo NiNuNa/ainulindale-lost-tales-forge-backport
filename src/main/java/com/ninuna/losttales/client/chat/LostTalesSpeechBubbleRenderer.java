@@ -1,9 +1,11 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
+import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.core.LostTalesClassTransformer;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import java.util.Collections;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
@@ -61,7 +63,7 @@ public final class LostTalesSpeechBubbleRenderer {
     private static final int EMOJI_ADVANCE = 9;
     /** The chat's black behind the words: half, as the chat's own is. */
     private static final int BACKDROP_ALPHA =
-            LostTalesChatVisualStyle.SURFACE_ALPHA;
+            WindowStyle.SURFACE_ALPHA;
     /**
      * How far LOTR's floating alignment is lifted so it clears what a
      * speaker wears: the anchor, plus a name and the rows of speech that
@@ -216,7 +218,7 @@ public final class LostTalesSpeechBubbleRenderer {
                     MAX_WIDTH);
             for (int part = 0; part < wrapped.size(); part++) {
                 rows.add(Row.of(font, String.valueOf(wrapped.get(part)),
-                        opacity, LostTalesChatVisualStyle.IVORY, 0));
+                        opacity, LostTalesUiInk.IVORY, 0));
             }
         }
         while (rows.size() > MAX_ROWS) {
@@ -246,7 +248,7 @@ public final class LostTalesSpeechBubbleRenderer {
             // FontRenderer treats an alpha under four as fully opaque, so
             // a line at the very end of its fade would flash back at full
             // strength instead of going out. Nothing is drawn there.
-            if (alpha >= LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+            if (alpha >= LostTalesUiInk.MIN_VISIBLE_ALPHA) {
                 int half = row.width / 2;
                 drawBackdrop(-half - PADDING_X, y - PADDING_Y,
                         half + PADDING_X, y + ROW_STRIDE - 1 - PADDING_Y,
@@ -264,7 +266,7 @@ public final class LostTalesSpeechBubbleRenderer {
     /** One row: its runs of text and its emoji, left to right. */
     private static void drawRow(Minecraft minecraft, FontRenderer font,
                                 Row row, int left, int y, int alpha) {
-        int shadowAlpha = LostTalesChatVisualStyle.shadowAlpha(alpha);
+        int shadowAlpha = LostTalesUiInk.shadowAlpha(alpha);
         int x = left;
         for (int index = 0; index < row.parts.size(); index++) {
             ChatEmojiParser.Segment part = row.parts.get(index);
@@ -275,15 +277,15 @@ public final class LostTalesSpeechBubbleRenderer {
                 continue;
             }
             String text = part.getText();
-            if (shadowAlpha >= LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
+            if (shadowAlpha >= LostTalesUiInk.MIN_VISIBLE_ALPHA) {
                 font.drawString(text,
-                        x + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                        y + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                        LostTalesChatVisualStyle.argb(
-                                LostTalesChatVisualStyle.SHADOW, shadowAlpha));
+                        x + LostTalesUiInk.SHADOW_OFFSET,
+                        y + LostTalesUiInk.SHADOW_OFFSET,
+                        LostTalesUiInk.argb(
+                                LostTalesUiInk.SHADOW, shadowAlpha));
             }
             font.drawString(text, x, y,
-                    LostTalesChatVisualStyle.argb(row.rgb, alpha));
+                    LostTalesUiInk.argb(row.rgb, alpha));
             x += font.getStringWidth(text);
         }
     }
@@ -328,23 +330,23 @@ public final class LostTalesSpeechBubbleRenderer {
         for (int index = 0; index < ChatTypingDots.COUNT; index++) {
             int x = left + index * (ChatTypingDots.DOT_SIZE + ChatTypingDots.GAP);
             int dotAlpha = Math.round(alpha * ChatTypingDots.opacity(index, nowNanos));
-            int shadowAlpha = LostTalesChatVisualStyle.shadowAlpha(dotAlpha);
-            if (shadowAlpha >= LostTalesChatVisualStyle.MIN_VISIBLE_ALPHA) {
-                fillQuad(x + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                        top + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                        x + ChatTypingDots.DOT_SIZE + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                        top + ChatTypingDots.DOT_SIZE + LostTalesChatVisualStyle.SHADOW_OFFSET,
-                        LostTalesChatVisualStyle.SHADOW, shadowAlpha);
+            int shadowAlpha = LostTalesUiInk.shadowAlpha(dotAlpha);
+            if (shadowAlpha >= LostTalesUiInk.MIN_VISIBLE_ALPHA) {
+                fillQuad(x + LostTalesUiInk.SHADOW_OFFSET,
+                        top + LostTalesUiInk.SHADOW_OFFSET,
+                        x + ChatTypingDots.DOT_SIZE + LostTalesUiInk.SHADOW_OFFSET,
+                        top + ChatTypingDots.DOT_SIZE + LostTalesUiInk.SHADOW_OFFSET,
+                        LostTalesUiInk.SHADOW, shadowAlpha);
             }
             fillQuad(x, top, x + ChatTypingDots.DOT_SIZE, top + ChatTypingDots.DOT_SIZE,
-                    LostTalesChatVisualStyle.IVORY, dotAlpha);
+                    LostTalesUiInk.IVORY, dotAlpha);
         }
     }
 
     /** The chat's own black, behind one row of speech. */
     private static void drawBackdrop(float left, float top, float right,
                                      float bottom, float opacity) {
-        fillQuad(left, top, right, bottom, LostTalesChatVisualStyle.SURFACE_RGB,
+        fillQuad(left, top, right, bottom, LostTalesUiInk.SURFACE_RGB,
                 Math.round(BACKDROP_ALPHA * opacity));
     }
 
@@ -393,7 +395,7 @@ public final class LostTalesSpeechBubbleRenderer {
         /** The typing marks as a row of their own width. */
         static Row dots() {
             return new Row(Collections.<ChatEmojiParser.Segment>emptyList(),
-                    ChatTypingDots.WIDTH, 1.0F, LostTalesChatVisualStyle.IVORY, 0,
+                    ChatTypingDots.WIDTH, 1.0F, LostTalesUiInk.IVORY, 0,
                     true);
         }
 

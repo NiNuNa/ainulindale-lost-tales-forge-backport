@@ -8,7 +8,6 @@ import lotr.common.LOTRConfig;
 import lotr.common.world.genlayer.LOTRGenLayerWorld;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
-import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.texture.DynamicTexture;
@@ -242,19 +241,13 @@ final class LostTalesLotrSmoothMapRenderer {
         if (!sheeted || minecraft == null) {
             return;
         }
-        ScaledResolution resolution = new ScaledResolution(minecraft,
-                minecraft.displayWidth, minecraft.displayHeight);
-        int scaleFactor = Math.max(1, resolution.getScaleFactor());
         GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_SCISSOR_BIT
                 | GL11.GL_DEPTH_BUFFER_BIT);
         GL11.glDisable(GL11.GL_DEPTH_TEST);
         GL11.glDepthMask(false);
         GL11.glEnable(GL11.GL_SCISSOR_TEST);
-        GL11.glScissor(
-                viewportXMin * scaleFactor,
-                (resolution.getScaledHeight() - viewportYMax) * scaleFactor,
-                Math.max(0, viewportXMax - viewportXMin) * scaleFactor,
-                Math.max(0, viewportYMax - viewportYMin) * scaleFactor);
+        LostTalesLotrMapLayout.scissor(viewportXMin, viewportYMin,
+                viewportXMax, viewportYMax);
     }
 
     private static void endSheetClipping(boolean sheeted) {

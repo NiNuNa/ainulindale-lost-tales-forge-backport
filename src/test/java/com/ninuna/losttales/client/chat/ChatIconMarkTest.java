@@ -1,6 +1,8 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.client.window.TabIcons;
+import com.ninuna.losttales.client.window.TabMark;
 import com.ninuna.losttales.gui.style.LostTalesUiCornerCut;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import java.awt.image.BufferedImage;
@@ -24,7 +26,7 @@ import static org.junit.Assert.assertTrue;
  * a pixel, as Nils's mock-ups draw it.
  */
 public final class ChatIconMarkTest {
-    private static final float ICON = ChatChannelIcons.SIZE;
+    private static final float ICON = TabIcons.SIZE;
 
     @Before
     public void setUp() {
@@ -40,15 +42,15 @@ public final class ChatIconMarkTest {
     public void pingsComeBeforeTheSphereAndNothingReadWearsNone() {
         ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
         ChatTab selected = ChatTab.of(ChatChannel.OOC);
-        assertTrue(ChatIconMark.of(global).isNone());
+        assertTrue(TabMark.of(global).isNone());
         ClientChatChannelViews.record(-1, global, selected, false);
-        assertSame(ChatIconMark.UNREAD, ChatIconMark.of(global));
+        assertSame(TabMark.UNREAD, TabMark.of(global));
         assertSame(LostTalesUiSheet.PRESENCE_SELECTED,
-                ChatIconMark.of(global).figure());
+                TabMark.of(global).figure());
         ClientChatChannelViews.record(-2, global, selected, true);
         ClientChatChannelViews.record(-3, global, selected, true);
-        assertEquals(2, ChatIconMark.of(global).pingCount());
-        assertSame(LostTalesUiSheet.COUNT_2, ChatIconMark.of(global).figure());
+        assertEquals(2, TabMark.of(global).pingCount());
+        assertSame(LostTalesUiSheet.COUNT_2, TabMark.of(global).figure());
     }
 
     @Test
@@ -57,35 +59,35 @@ public final class ChatIconMarkTest {
         ChatTab proximity = ChatTab.of(ChatChannel.PROXIMITY);
         ChatTab selected = ChatTab.of(ChatChannel.OOC);
         ClientChatChannelViews.record(-1, proximity, selected, false);
-        assertSame(ChatIconMark.UNREAD,
-                ChatIconMark.combined(Arrays.asList(global, proximity)));
+        assertSame(TabMark.UNREAD,
+                TabMark.combined(Arrays.asList(global, proximity)));
         ClientChatChannelViews.record(-2, global, selected, true);
         ClientChatChannelViews.record(-3, proximity, selected, true);
-        assertEquals(2, ChatIconMark.combined(Arrays.asList(global, proximity))
+        assertEquals(2, TabMark.combined(Arrays.asList(global, proximity))
                 .pingCount());
     }
 
     /** Past nine the tile shows the plus, and keeps its width. */
     @Test
     public void pastNineTheTileShowsThePlus() {
-        assertSame(LostTalesUiSheet.COUNT_MORE, ChatIconMark.pings(42).figure());
-        assertSame(LostTalesUiSheet.COUNT_MORE, ChatIconMark.pings(10).figure());
-        assertSame(LostTalesUiSheet.COUNT_9, ChatIconMark.pings(9).figure());
-        assertSame(LostTalesUiSheet.COUNT_1, ChatIconMark.pings(1).figure());
-        assertEquals(ChatIconMark.TILE_WIDTH, ChatIconMark.pings(42).width());
+        assertSame(LostTalesUiSheet.COUNT_MORE, TabMark.pings(42).figure());
+        assertSame(LostTalesUiSheet.COUNT_MORE, TabMark.pings(10).figure());
+        assertSame(LostTalesUiSheet.COUNT_9, TabMark.pings(9).figure());
+        assertSame(LostTalesUiSheet.COUNT_1, TabMark.pings(1).figure());
+        assertEquals(TabMark.TILE_WIDTH, TabMark.pings(42).width());
         assertEquals(LostTalesUiSheet.PRESENCE_SELECTED.getWidth(),
-                ChatIconMark.TILE_WIDTH);
-        assertTrue(ChatIconMark.pings(0).isNone());
+                TabMark.TILE_WIDTH);
+        assertTrue(TabMark.pings(0).isNone());
     }
 
     /** Both marks hang two pixels past the icon's right edge and one below its bottom. */
     @Test
     public void theMarkStandsWhereAHeadsSphereStands() {
-        ChatIconMark tile = ChatIconMark.pings(2);
+        TabMark tile = TabMark.pings(2);
         assertEquals(7.0F, tile.markX(0.0F, ICON), 0.0F);
         assertEquals(4.0F, tile.markY(0.0F, ICON), 0.0F);
-        assertEquals(7.0F, ChatIconMark.UNREAD.markX(0.0F, ICON), 0.0F);
-        assertEquals(6.0F, ChatIconMark.UNREAD.markY(0.0F, ICON), 0.0F);
+        assertEquals(7.0F, TabMark.UNREAD.markX(0.0F, ICON), 0.0F);
+        assertEquals(6.0F, TabMark.UNREAD.markY(0.0F, ICON), 0.0F);
     }
 
     /**
@@ -96,7 +98,7 @@ public final class ChatIconMarkTest {
      */
     @Test
     public void theSpheresCutFollowsItsRoundOutline() {
-        LostTalesUiCornerCut cut = ChatIconMark.UNREAD.cut(0.0F, 0.0F, ICON);
+        LostTalesUiCornerCut cut = TabMark.UNREAD.cut(0.0F, 0.0F, ICON);
         for (int row = 0; row < 5; row++) {
             assertFalse("row " + row, cut.cuts(ICON - 1, row));
         }
@@ -109,7 +111,7 @@ public final class ChatIconMarkTest {
     /** Nils's mock-up of the "2" tile: the row over it cut from its left edge, the rows beside it a pixel further left. */
     @Test
     public void theTilesCutIsItsBoxGrownByAPixel() {
-        LostTalesUiCornerCut cut = ChatIconMark.pings(2).cut(0.0F, 0.0F, ICON);
+        LostTalesUiCornerCut cut = TabMark.pings(2).cut(0.0F, 0.0F, ICON);
         for (int row = 0; row < 3; row++) {
             assertFalse("row " + row, cut.cuts(ICON - 1, row));
         }
@@ -134,7 +136,7 @@ public final class ChatIconMarkTest {
                 LostTalesUiSheet.COUNT_7, LostTalesUiSheet.COUNT_8,
                 LostTalesUiSheet.COUNT_9, LostTalesUiSheet.COUNT_MORE};
         for (LostTalesUiSheet tile : tiles) {
-            assertEquals(tile.toString(), ChatIconMark.TILE_INK_LEFT.length,
+            assertEquals(tile.toString(), TabMark.TILE_INK_LEFT.length,
                     tile.getHeight());
             for (int row = 0; row < tile.getHeight(); row++) {
                 int first = tile.getWidth();
@@ -147,7 +149,7 @@ public final class ChatIconMarkTest {
                     }
                 }
                 assertEquals(tile + " row " + row,
-                        ChatIconMark.TILE_INK_LEFT[row], first);
+                        TabMark.TILE_INK_LEFT[row], first);
             }
         }
     }

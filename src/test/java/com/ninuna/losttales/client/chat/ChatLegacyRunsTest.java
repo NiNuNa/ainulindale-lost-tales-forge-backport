@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import java.util.List;
 import net.minecraft.util.EnumChatFormatting;
 import org.junit.Test;
@@ -23,7 +24,7 @@ public final class ChatLegacyRunsTest {
         assertEquals(LostTalesChatVisualStyle.paletteRgb(EnumChatFormatting.GREEN),
                 runs.get(0).rgb);
         assertEquals(" plain ", runs.get(1).text);
-        assertEquals(LostTalesChatVisualStyle.IVORY, runs.get(1).rgb);
+        assertEquals(LostTalesUiInk.IVORY, runs.get(1).rgb);
         // A colour clears the decorations set before it, as vanilla does;
         // one set after it rides the run.
         assertEquals("italic grey", runs.get(2).text);
@@ -35,7 +36,7 @@ public final class ChatLegacyRunsTest {
         assertEquals(LostTalesChatVisualStyle.paletteRgb(EnumChatFormatting.DARK_PURPLE),
                 styled.get(0).rgb);
         assertEquals(" done", styled.get(1).text);
-        assertEquals(LostTalesChatVisualStyle.IVORY, styled.get(1).rgb);
+        assertEquals(LostTalesUiInk.IVORY, styled.get(1).rgb);
     }
 
     @Test

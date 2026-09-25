@@ -2,6 +2,8 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMessageIds;
+import com.ninuna.losttales.client.window.Window;
+import com.ninuna.losttales.client.window.WindowLayout;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -16,13 +18,13 @@ import static org.junit.Assert.assertTrue;
 public final class ChatScreenMenusTest {
     @Before
     public void setUp() {
-        ChatWindowLayout.reset();
+        ChatLayout.reset();
         ClientChatChannelState.clear();
     }
 
     @After
     public void tearDown() {
-        ChatWindowLayout.reset();
+        ChatLayout.reset();
         ClientChatChannelState.clear();
     }
 
@@ -47,14 +49,14 @@ public final class ChatScreenMenusTest {
     @Test
     public void restorableChannelsAreTheClosedOnesThePlayerCouldSee() {
         List<ChatChannel> expected = new ArrayList<ChatChannel>();
-        for (ChatChannel channel : ChatWindowLayout.closedChannels()) {
+        for (ChatChannel channel : ChatLayout.closedChannels()) {
             if (ClientChatChannelState.isAvailable(channel)) {
                 expected.add(channel);
             }
         }
         assertEquals(expected, ChatScreenMenus.restorableChannels());
         for (ChatChannel channel : ChatScreenMenus.restorableChannels()) {
-            assertFalse(ChatWindowLayout.isOpen(ChatTab.of(channel)));
+            assertFalse(ChatLayout.isOpen(ChatTab.of(channel)));
         }
     }
 
@@ -102,8 +104,8 @@ public final class ChatScreenMenusTest {
         List<ChatMenu.Entry> entries = menus.searchEntries("");
         assertFalse(entries.isEmpty());
         int openTabs = 0;
-        for (ChatWindow window : ChatWindowLayout.windows()) {
-            openTabs += ChatWindowFrame.visibleTabs(window).size();
+        for (Window window : WindowLayout.windows()) {
+            openTabs += ChatFrame.visibleTabs(window).size();
         }
         int rows = 0;
         for (ChatMenu.Entry entry : entries) {
@@ -112,10 +114,10 @@ public final class ChatScreenMenusTest {
             }
             rows++;
             if (entry.id.startsWith("open:")) {
-                assertTrue(ChatWindowLayout.isOpen(
+                assertTrue(ChatLayout.isOpen(
                         ChatTab.fromId(entry.id.substring("open:".length()))));
             } else {
-                assertFalse(ChatWindowLayout.isOpen(
+                assertFalse(ChatLayout.isOpen(
                         ChatTab.of(ChatChannel.fromId(entry.id))));
             }
         }

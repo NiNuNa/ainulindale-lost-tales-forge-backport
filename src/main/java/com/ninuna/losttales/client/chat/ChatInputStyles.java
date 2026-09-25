@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatMarkdown;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import java.util.Arrays;
 import net.minecraft.util.EnumChatFormatting;
 
@@ -114,6 +115,6 @@ final class ChatInputStyles {
         if ((style & ChatMarkdown.Span.SPOILER) != 0) {
             return SPOILER_RGB;
         }
-        return LostTalesChatVisualStyle.IVORY;
+        return LostTalesUiInk.IVORY;
     }
 }

@@ -1,6 +1,13 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.client.window.PageTab;
+import com.ninuna.losttales.client.window.TabSelection;
+import com.ninuna.losttales.client.window.Window;
+import com.ninuna.losttales.client.window.WindowGestures;
+import com.ninuna.losttales.client.window.WindowLayout;
+import com.ninuna.losttales.client.window.WindowPlacement;
+import com.ninuna.losttales.client.window.WindowTab;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiTextField;
@@ -12,13 +19,10 @@ import net.minecraft.util.StatCollector;
  * keeps the screen consistent afterwards — the window being typed in
  * comes to the front, drafts change hands with the tab, a completion
  * walked in the tab just left is over, a reply aimed at it is put down
- * — and the verbs that open a whisper, close a tab or a window, lock a
- * window to its neighbour, detach a tab into a window of its own, or
- * bring an open tab forward.
+ * — and the verbs that open a whisper, close a tab or a window, detach a
+ * tab into a window of its own, or bring an open tab forward.
  */
-final class ChatTabActions {
-    /** Distance from another window's edge at which a drag snaps and links. */
-    static final int LINK_SNAP = 6;
+public final class ChatTabActions {
     /** Where a detached window's row lands: a little below its old one. */
     private static final int DETACH_DROP = 40;
 
@@ -76,10 +80,10 @@ final class ChatTabActions {
         // always holds it: a tab that has gone is forgotten, and moving
         // the input off the set — to another tab, or another window —
         // ends it.
-        ChatTabSelection.prune();
-        if (ChatTabSelection.windowId() != null
-                && !ChatTabSelection.isSelected(selected)) {
-            ChatTabSelection.clear();
+        TabSelection.prune();
+        if (TabSelection.windowId() != null
+                && !TabSelection.isSelected(selected)) {
+            TabSelection.clear();
         }
         // The selected tab is always the front tab of its window, whether
         // the selection just changed or the layout came back from its
@@ -90,7 +94,7 @@ final class ChatTabActions {
         // which stays where it stands; with none, the input waits behind
         // the page with no bar.
         boolean moved = false;
-        if (ChatWindowLayout.showsPage(ChatWindowLayout.windowOf(selected))) {
+        if (WindowLayout.showsPage(WindowLayout.windowOf(selected))) {
             ChatTab elsewhere = frontConversationElsewhere();
             if (elsewhere != null) {
                 ClientChatChannelState.select(elsewhere);
@@ -98,8 +102,8 @@ final class ChatTabActions {
                 moved = true;
             }
         }
-        if (!ChatWindowLayout.showsPage(ChatWindowLayout.windowOf(selected))) {
-            ChatWindowLayout.setActiveTab(selected);
+        if (!WindowLayout.showsPage(WindowLayout.windowOf(selected))) {
+            WindowLayout.setActiveTab(selected);
         }
         if (!selected.equals(this.lastSelected)) {
             ChatTab previous = this.lastSelected;
@@ -109,20 +113,20 @@ final class ChatTabActions {
             // unread divider: it was there to be seen, and it was.
             this.completion.dismissCompletion();
             ClientChatChannelViews.dismissSeenDivider(previous);
-            ChatWindow selectedWindow = ChatWindowLayout.windowOf(selected);
+            Window selectedWindow = WindowLayout.windowOf(selected);
             if (selectedWindow != null && !moved) {
-                ChatWindowLayout.raise(selectedWindow.getId());
+                WindowLayout.raise(selectedWindow.getId());
             }
             this.bar.updateInputBounds();
             swapDraft(previous, selected);
 
         }
-        List<ChatWindow> windows = ChatWindowLayout.windows();
+        List<Window> windows = WindowLayout.windows();
         for (int index = 0; index < windows.size(); index++) {
-            ChatWindow window = windows.get(index);
-            ChatTab front = ChatWindowFrame.activeTab(window,
-                    ChatWindowFrame.visibleTabs(window));
-            if (front != null && !front.isPage()) {
+            Window window = windows.get(index);
+            ChatTab front = ChatTab.from(ChatFrame.activeTab(window,
+                    ChatFrame.visibleTabs(window)));
+            if (front != null) {
                 ClientChatChannelViews.markViewed(front);
             }
         }
@@ -133,11 +137,11 @@ final class ChatTabActions {
      * those that show one; null while every window shows a page.
      */
     private static ChatTab frontConversationElsewhere() {
-        List<ChatWindow> stacked = ChatWindowLayout.stacked();
+        List<Window> stacked = WindowLayout.stacked();
         for (int index = stacked.size() - 1; index >= 0; index--) {
-            ChatWindow window = stacked.get(index);
-            ChatTab front = ChatWindowFrame.activeTab(window,
-                    ChatWindowFrame.visibleTabs(window));
+            Window window = stacked.get(index);
+            ChatTab front = ChatTab.from(ChatFrame.activeTab(window,
+                    ChatFrame.visibleTabs(window)));
             if (front != null && ClientChatChannelState.isSelectable(front)) {
                 return front;
             }
@@ -150,15 +154,15 @@ final class ChatTabActions {
      * one, so what is typed goes where the player just clicked. Does
      * nothing for the window that already has it.
      */
-    void selectWindow(ChatWindow window) {
+    public void selectWindow(Window window) {
         if (window == null) {
             return;
         }
-        ChatTab front = ChatWindowFrame.activeTab(window,
-                ChatWindowFrame.visibleTabs(window));
-        if (front != null && front.isPage()) {
+        WindowTab front = ChatFrame.activeTab(window,
+                ChatFrame.visibleTabs(window));
+        if (front instanceof PageTab) {
             // A page takes no input: its window only comes forward.
-            ChatWindowLayout.raise(window.getId());
+            WindowLayout.raise(window.getId());
             return;
         }
         if (front != null && !front.equals(
@@ -167,7 +171,7 @@ final class ChatTabActions {
         }
     }
 
-    void selectChannel(ChatChannel channel) {
+    public void selectChannel(ChatChannel channel) {
         selectChannel(ChatTab.of(channel));
     }
 
@@ -178,21 +182,22 @@ final class ChatTabActions {
      * the field takes focus, and the mention candidates — shaped per
      * channel identity — are rebuilt.
      */
-    void selectChannel(ChatTab tab) {
-        if (tab != null && tab.isPage()) {
+    public void selectChannel(WindowTab picked) {
+        if (picked instanceof PageTab) {
             // A page is never typed into: it comes in front of its
             // window, and the input moves off it.
-            ChatWindowLayout.showPage(tab);
+            WindowLayout.showPage((PageTab)picked);
             syncSelection();
             return;
         }
+        ChatTab tab = ChatTab.from(picked);
         this.composer.onTabSelected(tab);
         ClientChatChannelState.select(tab);
         if (tab != null && tab.equals(ClientChatChannelState.getSelected())) {
             // The conversation picked comes in front of its window, over a
             // page there too; a page only moves the input when it is the
             // one brought forward.
-            ChatWindowLayout.setActiveTab(tab);
+            WindowLayout.setActiveTab(tab);
         }
         syncSelection();
         this.field.setFocused(true);
@@ -225,9 +230,9 @@ final class ChatTabActions {
                     "chat.losttales.whisper.self"));
             return null;
         }
-        ChatWindow current = ChatWindowLayout.windowOf(
+        Window current = WindowLayout.windowOf(
                 ClientChatChannelState.getSelected());
-        ChatTab tab = ChatWindowLayout.openWhisper(name, identity,
+        ChatTab tab = ChatLayout.openWhisper(name, identity,
                 current == null ? null : current.getId());
         if (tab != null) {
             selectChannel(tab);
@@ -240,130 +245,26 @@ final class ChatTabActions {
      * channels behind them keep receiving, so nothing is lost — they are
      * offered back by the {@code +} control and by the empty state.
      */
-    void closeWindow(ChatWindow window) {
+    void closeWindow(Window window) {
         if (window == null
-                || !ChatWindowLayout.closeWindow(window.getId())) {
+                || !WindowLayout.closeWindow(window.getId())) {
             return;
         }
-        ChatTabSelection.prune();
+        TabSelection.prune();
         syncSelection();
     }
 
     /**
-     * Lets a window fill a part of the screen, or gives it back the
-     * place and size it had, which filling the screen leaves as they
-     * were. The window comes to the front either way, since it is the
-     * one being looked at.
+     * Closes one tab, a conversation through the chat and a page as any
+     * window's tab; the group it was marked with ends with it.
      */
-    void setWindowFill(ChatWindow window, ChatWindow.ScreenFill fill) {
-        if (window == null) {
-            return;
-        }
-        ChatWindowLayout.raise(window.getId());
-        ChatWindowLayout.setFill(window.getId(), fill, true);
-    }
-
-    /**
-     * Locks or unlocks a window, and with it whether it is stuck to a
-     * neighbour: a window locked while it touches another sticks to it
-     * and moves with it from then on, and unlocking lets go again. The
-     * locked window is the one that follows, since a locked window is
-     * the one that cannot be dragged.
-     */
-    void setWindowLocked(ChatWindow window, boolean locked) {
-        if (window == null) {
-            return;
-        }
-        ChatWindowLayout.setLocked(window.getId(), locked);
-        if (!locked) {
-            ChatWindowLayout.unlink(window.getId());
-            return;
-        }
-        ChatWindowFrame frame = ChatWindowFrame.find(window.getId());
-        if (frame == null || !frame.drawn) {
-            return;
-        }
-        ChatWindow neighbour = touchingWindow(frame);
-        if (neighbour != null
-                // The window it touches may already be stuck to this one;
-                // two windows never hold each other.
-                && !window.getId().equals(neighbour.getLinkTarget())) {
-            ChatWindowLayout.link(window.getId(), neighbour.getId(),
-                    touchingSide(frame, neighbour));
-        }
-    }
-
-    /** The window this one is resting against, or null. */
-    private static ChatWindow touchingWindow(ChatWindowFrame frame) {
-        List<ChatWindowFrame> frames = ChatWindowFrame.drawnFrames();
-        for (int index = 0; index < frames.size(); index++) {
-            ChatWindowFrame other = frames.get(index);
-            if (other == frame) {
-                continue;
-            }
-            ChatWindow candidate = ChatWindowLayout.window(other.windowId);
-            // A window filling the screen has no edge of its own to be
-            // stuck to.
-            if (candidate != null
-                    && candidate.getFill() == ChatWindow.ScreenFill.NONE
-                    && touchingSide(frame, candidate) != null) {
-                return candidate;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Which of a neighbour's edges this window is resting against, or
-     * null when it is against none of them. The same margin a snap uses,
-     * so a window that showed the touch highlight is one that sticks.
-     */
-    private static ChatWindow.LinkSide touchingSide(ChatWindowFrame frame,
-                                                    ChatWindow neighbour) {
-        ChatWindowFrame other = ChatWindowFrame.find(neighbour.getId());
-        if (other == null || !other.drawn) {
-            return null;
-        }
-        return touchingSide(frame, other);
-    }
-
-    /** As above between two drawn frames. */
-    static ChatWindow.LinkSide touchingSide(ChatWindowFrame frame,
-                                            ChatWindowFrame other) {
-        int margin = ChatWindowPlacement.WINDOW_GAP;
-        boolean overlapsColumn = frame.boxLeft < other.boxRight + margin
-                && frame.boxRight + margin > other.boxLeft;
-        boolean overlapsRow = frame.boxTop < other.boxBottom + margin
-                && frame.boxBottom + margin > other.boxTop;
-        if (overlapsColumn) {
-            if (Math.abs(other.boxTop - margin - frame.boxBottom)
-                    <= LINK_SNAP) {
-                return ChatWindow.LinkSide.ABOVE;
-            }
-            if (Math.abs(frame.boxTop - (other.boxBottom + margin))
-                    <= LINK_SNAP) {
-                return ChatWindow.LinkSide.BELOW;
-            }
-        }
-        if (overlapsRow) {
-            if (Math.abs(frame.boxRight + margin - other.boxLeft)
-                    <= LINK_SNAP) {
-                return ChatWindow.LinkSide.LEFT;
-            }
-            if (Math.abs(frame.boxLeft - (other.boxRight + margin))
-                    <= LINK_SNAP) {
-                return ChatWindow.LinkSide.RIGHT;
-            }
-        }
-        return null;
-    }
-
-    /** Closes one tab; the group it was marked with ends with it. */
-    void closeChannel(ChatTab channel) {
-        if (ClientChatChannelState.close(channel)) {
+    void closeTab(WindowTab tab) {
+        ChatTab conversation = ChatTab.from(tab);
+        if (conversation != null ? ClientChatChannelState.close(conversation)
+                : WindowLayout.close(tab)) {
             // What is left of the marks would be anchored on a tab that
             // has gone.
-            ChatTabSelection.clear();
+            TabSelection.clear();
             syncSelection();
         }
     }
@@ -376,18 +277,21 @@ final class ChatTabActions {
      * closable closes nothing.
      */
     void closeMarkedOrActiveTabs() {
-        if (!ChatTabSelection.isGroup()) {
-            closeChannel(ClientChatChannelState.getSelected());
+        if (!TabSelection.isGroup()) {
+            closeTab(ClientChatChannelState.getSelected());
             return;
         }
-        List<ChatTab> marked = ChatTabSelection.selectedIn(
-                ChatWindowLayout.window(ChatTabSelection.windowId()));
+        List<WindowTab> marked = TabSelection.selectedIn(
+                WindowLayout.window(TabSelection.windowId()));
         boolean closed = false;
         for (int index = 0; index < marked.size(); index++) {
-            closed |= ClientChatChannelState.close(marked.get(index));
+            ChatTab conversation = ChatTab.from(marked.get(index));
+            closed |= conversation != null
+                    ? ClientChatChannelState.close(conversation)
+                    : WindowLayout.close(marked.get(index));
         }
         if (closed) {
-            ChatTabSelection.clear();
+            TabSelection.clear();
             syncSelection();
         }
     }
@@ -397,25 +301,25 @@ final class ChatTabActions {
      * new window lands a little below its old row, kept on screen, and
      * the channel stays selected there.
      */
-    void detachChannel(ChatTab channel, int screenWidth, int screenHeight) {
-        ChatWindow window = ChatWindowLayout.windowOf(channel);
+    void detachChannel(WindowTab channel, int screenWidth, int screenHeight) {
+        Window window = WindowLayout.windowOf(channel);
         if (window == null) {
             return;
         }
-        ChatTabSelection.clear();
-        ChatWindowFrame frame = ChatWindowFrame.of(window);
-        ChatWindowPlacement.Anchor anchor = ChatWindowPlacement.constrainWindow(
+        TabSelection.clear();
+        ChatFrame frame = ChatFrame.of(window);
+        WindowPlacement.Anchor anchor = WindowPlacement.constrainWindow(
                 null, this.mc, frame.boxLeft,
                 frame.tabRowBottom() + DETACH_DROP
-                        + ChatWindowPlacement.lineHeight(this.mc),
+                        + WindowPlacement.lineHeight(this.mc),
                 screenWidth, screenHeight);
-        ChatWindow detached = ChatWindowLayout.detach(channel,
-                ChatWindowPlacement.windowPercentX(anchor.x, this.mc,
+        Window detached = WindowLayout.detach(channel,
+                WindowPlacement.windowPercentX(anchor.x, this.mc,
                         screenWidth),
-                ChatWindowPlacement.windowPercentY(null, anchor.baseline,
+                WindowPlacement.windowPercentY(null, anchor.baseline,
                         this.mc, screenHeight));
         if (detached != null) {
-            ChatWindowFrame.of(detached).beginAppearing();
+            ChatFrame.of(detached).beginAppearing();
             selectChannel(channel);
         }
     }
@@ -426,12 +330,12 @@ final class ChatTabActions {
      * panel does.
      */
     void jumpToTab(ChatTab tab) {
-        ChatWindow window = tab == null ? null
-                : ChatWindowLayout.windowOf(tab);
+        Window window = tab == null ? null
+                : WindowLayout.windowOf(tab);
         if (window == null) {
             return;
         }
-        ChatWindowLayout.raise(window.getId());
+        WindowLayout.raise(window.getId());
         selectChannel(tab);
     }
 }

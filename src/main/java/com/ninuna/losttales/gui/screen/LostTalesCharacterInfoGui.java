@@ -15,11 +15,11 @@ import com.ninuna.losttales.character.registry.CharacterRaceGameplayProfile;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
+import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.gui.screen.character.LostTalesCharacterCapeGui;
 import com.ninuna.losttales.gui.screen.character.LostTalesCharacterProfileEditGui;
 import com.ninuna.losttales.gui.screen.character.LostTalesCharacterProfileRouterGui;
 import com.ninuna.losttales.gui.screen.character.LostTalesCharacterRosterGui;
-import com.ninuna.losttales.client.chat.LostTalesChatGui;
 import com.ninuna.losttales.gui.screen.party.PartyPage;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
@@ -531,7 +531,7 @@ public class LostTalesCharacterInfoGui extends GuiScreen
     @Override
     protected void actionPerformed(GuiButton button) {
         if (button.id == BUTTON_PARTY) {
-            LostTalesChatGui.openPage(PartyPage.PAGE_ID);
+            WindowScreen.openPage(PartyPage.PAGE_ID);
             return;
         }
         if (button.id == BUTTON_CAPE) {
@@ -638,7 +638,7 @@ public class LostTalesCharacterInfoGui extends GuiScreen
             return;
         }
         if (LostTalesKeyBindings.isQuestJournalKey(keyCode)) {
-            LostTalesChatGui.openPage(QuestJournalPage.PAGE_ID);
+            WindowScreen.openPage(QuestJournalPage.PAGE_ID);
             return;
         }
         super.keyTyped(typedChar, keyCode);

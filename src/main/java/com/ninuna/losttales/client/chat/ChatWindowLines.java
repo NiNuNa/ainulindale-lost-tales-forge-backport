@@ -1,6 +1,9 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.client.window.Window;
+import com.ninuna.losttales.client.window.WindowPlacement;
+import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
 import cpw.mods.fml.common.FMLLog;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -62,7 +65,7 @@ import net.minecraft.util.IChatComponent;
  * laid out in, so an arriving message lays out one message rather than
  * the whole history.</p>
  */
-final class ChatWindowLines {
+public final class ChatWindowLines {
     /**
      * The one component every blank row is made of, between two runs
      * and on either side of a day's rule: it draws nothing, measures
@@ -87,7 +90,7 @@ final class ChatWindowLines {
     private ChatWindowLines() {}
 
     /** Whether a window can be laid out for itself at all. */
-    static boolean isAvailable() {
+    public static boolean isAvailable() {
         return CHAT_LINES != null;
     }
 
@@ -152,7 +155,7 @@ final class ChatWindowLines {
      * none does. What tells the unread divider that a day's rule already
      * stands where it would.
      */
-    static int dateDividerOver(List<ChatLine> lines, int index) {
+    public static int dateDividerOver(List<ChatLine> lines, int index) {
         if (lines == null || index < 0) {
             return -1;
         }
@@ -409,7 +412,7 @@ final class ChatWindowLines {
      */
     static synchronized List<ChatLine> forWindow(Minecraft minecraft,
                                                  GuiNewChat chat,
-                                                 ChatWindow window,
+                                                 Window window,
                                                  ChatLineFilter filter,
                                                  int chatWidth,
                                                  int unreadLineId) {
@@ -421,11 +424,11 @@ final class ChatWindowLines {
         // list at its right come out of the room the messages may wrap
         // to, as far as each stands in the window, so a line never runs
         // out under the window's edge to pay for them.
-        ChatWindowFrame frame = ChatWindowFrame.of(window);
+        ChatFrame frame = ChatFrame.of(window);
         ChatTimestampColumn columns =
                 ChatTimestampColumn.of(frame, minecraft.fontRenderer);
         return forView(minecraft, chat, window.getId(), filter,
-                ChatWindowPlacement.wrapWidth(chatWidth,
+                WindowPlacement.wrapWidth(chatWidth,
                         chat.func_146244_h())
                         - (int)Math.ceil(columns.messageX() - 2.0F
                                 + ChatMemberList.drawnWidth(frame)),
@@ -444,9 +447,9 @@ final class ChatWindowLines {
         if (minecraft == null || chat == null) {
             return null;
         }
-        return forView(minecraft, chat, ChatWindowFrame.feed().windowId,
-                filter, ChatWindowPlacement.wrapWidth(
-                        ChatWindowPlacement.chatWidth(minecraft),
+        return forView(minecraft, chat, ChatFrame.feed().windowId,
+                filter, WindowPlacement.wrapWidth(
+                        WindowPlacement.chatWidth(minecraft),
                         chat.func_146244_h()), false, true, 0);
     }
 
@@ -477,7 +480,7 @@ final class ChatWindowLines {
         boolean colours = LostTalesChatVisualStyle.chatColoursEnabled();
         // An item's slot is laid out for the display scale, so a change
         // of GUI scale lays the lines out again.
-        int displayScale = ChatWindowFrame.displayScaleFactor();
+        int displayScale = LostTalesDisplayPixels.scaleFactor();
         // A row drawn at another size than the words has another width
         // in its own text, so a size chosen in the config lays the lines
         // out again.
@@ -521,12 +524,12 @@ final class ChatWindowLines {
      * vanilla has trimmed them from its history. Every detached window
      * closed in a session left one until the world was left.
      *
-     * <p>Called from the draw beside {@link ChatWindowFrame#prune}: the
+     * <p>Called from the draw beside {@link WindowFrame#prune}: the
      * two per-window caches answer to one question — which windows are
      * still real — and are let go together. The feed is not a window and
      * is never pruned.</p>
      */
-    static synchronized void prune(List<ChatWindow> windows) {
+    static synchronized void prune(List<Window> windows) {
         // Nothing to sweep while the cache holds no more than the feed
         // and one entry per window. A window drawn before its first
         // layout makes this miss by one, which only puts the sweep off
@@ -541,8 +544,8 @@ final class ChatWindowLines {
      * is neither the feed's nor a live window's goes. Separate from the
      * cache it is run over so it can be exercised without a screen.
      */
-    static void pruneViews(Map<String, ?> views, List<ChatWindow> windows) {
-        String feedId = ChatWindowFrame.feed().windowId;
+    static void pruneViews(Map<String, ?> views, List<Window> windows) {
+        String feedId = ChatFrame.feed().windowId;
         Iterator<String> iterator = views.keySet().iterator();
         while (iterator.hasNext()) {
             String viewId = iterator.next();
@@ -706,7 +709,7 @@ final class ChatWindowLines {
         return null;
     }
 
-    static void logUnavailableOnce() {
+    public static void logUnavailableOnce() {
         if (unavailableLogged) {
             return;
         }

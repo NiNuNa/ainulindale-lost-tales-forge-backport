@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatChannelSuggester;
@@ -12,6 +13,8 @@ import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiCaret;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.gui.style.LostTalesUiItemIcon;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import cpw.mods.fml.common.FMLLog;
 import java.lang.reflect.Field;
@@ -88,7 +91,7 @@ import net.minecraft.util.EnumChatFormatting;
  * Without it the field falls back to vanilla's own drawing rather than
  * showing the wrong text.</p>
  */
-final class ChatInputField extends GuiTextField {
+public final class ChatInputField extends GuiTextField {
     private static final Field LINE_SCROLL_OFFSET =
             resolve("lineScrollOffset", "field_146225_q");
     private static boolean fallbackLogged;
@@ -113,7 +116,7 @@ final class ChatInputField extends GuiTextField {
     /** When the field last took a key or moved its caret: the caret's blink starts there. */
     private long caretNanos = System.nanoTime();
 
-    ChatInputField(FontRenderer font, int x, int y, int width, int height) {
+    public ChatInputField(FontRenderer font, int x, int y, int width, int height) {
         super(font, x, y, width, height);
         this.font = font;
         this.fieldHeight = height;
@@ -124,7 +127,7 @@ final class ChatInputField extends GuiTextField {
      * markup — as a search field's text, which is looked up rather than
      * sent, should be.
      */
-    ChatInputField plainText() {
+    public ChatInputField plainText() {
         this.plainText = true;
         return this;
     }
@@ -263,7 +266,7 @@ final class ChatInputField extends GuiTextField {
 
     /** Top of that band for text drawn at {@code textTop} in the well. */
     static int caretTop(int textTop) {
-        return textTop - LostTalesChatOverlayRenderer.ROW_TEXT_TOP
+        return textTop - WindowStyle.ROW_TEXT_TOP
                 + (LostTalesChatOverlayRenderer.LINE_HEIGHT
                         - CONTENT_HEIGHT) / 2;
     }
@@ -326,12 +329,12 @@ final class ChatInputField extends GuiTextField {
 
     /** A run of the field's text as it is typed, in ivory. */
     private void drawRun(String run, int x, int y) {
-        LostTalesChatVisualStyle.drawColored(this.font, run, x, y,
-                LostTalesChatVisualStyle.IVORY, ChatInputBar.faded(255));
+        LostTalesUiInk.drawText(this.font, run, x, y,
+                LostTalesUiInk.IVORY, ChatInputBar.faded(255));
     }
 
     /** The selection band's wash: the palette's steel blue, translucent. */
-    private static final int SELECTION_ARGB = LostTalesChatVisualStyle.argb(
+    private static final int SELECTION_ARGB = LostTalesUiInk.argb(
             LostTalesColors.rgb(LostTalesColors.STEEL_BLUE), 0x66);
 
     /**
@@ -599,7 +602,7 @@ final class ChatInputField extends GuiTextField {
             found.add(new TokenPreview(hash, link.end, TokenKind.CHANNEL,
                     null, null, "", null, label, rgb, rgb,
                     LostTalesColors.darkestShade(rgb,
-                            LostTalesChatVisualStyle.SURFACE_RGB),
+                            LostTalesUiInk.SURFACE_RGB),
                     toMessage, ChatRunBackdrops.PAD
                             + this.font.getStringWidth(label)
                             + (toMessage ? ChatInlineIcons.SLOT_WIDTH : 0)
@@ -629,7 +632,7 @@ final class ChatInputField extends GuiTextField {
             found.add(new TokenPreview(mention.start, mention.end,
                     TokenKind.MENTION, null, null, "", null, label, rgb, rgb,
                     role ? LostTalesColors.darkestShade(rgb,
-                            LostTalesChatVisualStyle.SURFACE_RGB)
+                            LostTalesUiInk.SURFACE_RGB)
                             : ChatRunBackdrops.PLAYER_RGB,
                     false, ChatRunBackdrops.PAD
                             + this.font.getStringWidth(label)
@@ -687,7 +690,7 @@ final class ChatInputField extends GuiTextField {
         return new TokenPreview(token.start, token.end, TokenKind.SHARE,
                 token.kind, stack, markerIcon, null, name, rgb, iconRgb,
                 LostTalesColors.darkestShade(rgb,
-                        LostTalesChatVisualStyle.SURFACE_RGB), false, width);
+                        LostTalesUiInk.SURFACE_RGB), false, width);
     }
 
     /** The slot a shared thing's icon takes, as the message lines give it. */
@@ -774,7 +777,7 @@ final class ChatInputField extends GuiTextField {
             int style = ChatInputStyles.styleAt(styles, start);
             String run = ChatInputStyles.prefixOf(style)
                     + text.substring(start, end);
-            LostTalesChatVisualStyle.drawColored(this.font, run, cursor, y,
+            LostTalesUiInk.drawText(this.font, run, cursor, y,
                     ChatInputStyles.colorOf(style), ChatInputBar.faded(255));
             cursor += rawWidth(text, start, end);
             start = end;
@@ -840,7 +843,7 @@ final class ChatInputField extends GuiTextField {
             float boxY = ChatInlineIcons.boxTop(y, slot);
             float size = ChatInlineIcons.contentSize(slot);
             if (preview.shareKind == ChatShareKind.ITEM) {
-                ChatInlineIcons.drawItem(minecraft, preview.stack, boxX, boxY,
+                LostTalesUiItemIcon.drawFitted(minecraft, preview.stack, boxX, boxY,
                         size, alpha);
             } else if (preview.shareKind == ChatShareKind.QUEST) {
                 LostTalesUiSheet.QUEST.drawWithShadow(boxX, boxY, alpha);
@@ -848,11 +851,11 @@ final class ChatInputField extends GuiTextField {
                 ChatInlineIcons.drawMarker(minecraft, preview.markerIcon,
                         preview.iconRgb, boxX, boxY, size, alpha);
             }
-            LostTalesChatVisualStyle.drawColored(this.font,
+            LostTalesUiInk.drawText(this.font,
                     " " + preview.label, cursor + slot, y, preview.rgb, alpha);
             return x + preview.width;
         }
-        LostTalesChatVisualStyle.drawColored(this.font, preview.label, cursor,
+        LostTalesUiInk.drawText(this.font, preview.label, cursor,
                 y, preview.rgb, alpha);
         if (preview.bubble) {
             int slotX = cursor + this.font.getStringWidth(preview.label);

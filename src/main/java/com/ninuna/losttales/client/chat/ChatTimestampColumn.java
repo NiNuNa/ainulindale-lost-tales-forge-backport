@@ -1,5 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import net.minecraft.client.gui.FontRenderer;
 
 /**
@@ -95,7 +97,7 @@ final class ChatTimestampColumn {
         }
         return forTimeWidth(timeRoom(widestTimeFootprint(font),
                 LostTalesChatVisualStyle.stackSmallScale(),
-                ChatWindowFrame.displayScaleFactor()
+                LostTalesDisplayPixels.scaleFactor()
                         * LostTalesChatVisualStyle.chatScale()));
     }
 
@@ -103,7 +105,7 @@ final class ChatTimestampColumn {
      * A window's area as it stands this frame: the open window's, driven
      * out as far as the window's own motion has taken it.
      */
-    static ChatTimestampColumn of(ChatWindowFrame frame, FontRenderer font) {
+    static ChatTimestampColumn of(ChatFrame frame, FontRenderer font) {
         return current(font).drivenTo(frame == null ? 1.0F : frame.areaShare());
     }
 
@@ -167,7 +169,7 @@ final class ChatTimestampColumn {
      */
     static int widestTimeFootprint(FontRenderer font) {
         return widestTime(font) + 2 * ITALIC_LEAN
-                + LostTalesChatVisualStyle.SHADOW_OFFSET;
+                + LostTalesUiInk.SHADOW_OFFSET;
     }
 
     /**

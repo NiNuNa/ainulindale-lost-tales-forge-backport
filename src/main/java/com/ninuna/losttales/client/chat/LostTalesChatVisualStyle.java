@@ -1,5 +1,8 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.WindowStyle;
+import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
+import com.ninuna.losttales.gui.style.LostTalesUiItemIcon;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.chat.ChatChannel;
@@ -10,9 +13,6 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
-import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
-import com.ninuna.losttales.client.motion.Motions;
-import com.ninuna.losttales.client.motion.MotionIds;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
@@ -27,12 +27,12 @@ import org.lwjgl.opengl.GL11;
 /**
  * Lost Tales' ivory text and plum-black shadow treatment for chat. Every
  * chat element — text, emojis, head icons, item and marker icons — draws
- * its shadow as a flat {@link #SHADOW} silhouette offset by one pixel at
+ * its shadow as a flat {@link LostTalesUiInk#SHADOW} silhouette offset by one pixel at
  * two-thirds opacity, so the relationship between content and shadow is
  * identical at every GUI scale; inline glyphs share the box and baseline
  * rules of {@link ChatInlineIcons}.
  *
- * <p>Every one of those draws goes through {@link #beginContent()} first,
+ * <p>Every one of those draws goes through {@link LostTalesUiInk#beginContent()} first,
  * which turns blending on. It has to: {@code Gui.drawRect} — which every
  * panel, strip and bar in the chat is built from — <em>disables</em>
  * blending when it is done, and text or a sprite drawn after one would
@@ -43,55 +43,7 @@ import org.lwjgl.opengl.GL11;
  * screen is open (the tabs already say which channel a line belongs
  * to), and layout markers advance the cursor without drawing.</p>
  */
-final class LostTalesChatVisualStyle {
-    static final int IVORY = LostTalesUiInk.IVORY;
-    static final int SHADOW = LostTalesUiInk.SHADOW;
-    /**
-     * The one opacity of every surface the chat lays out — backdrop,
-     * strips, tabs, bars: half, thinned by the game's chat opacity.
-     * Text and icons are always fully opaque.
-     */
-    static final int SURFACE_ALPHA = 0x80;
-    /** Alpha-free surface tones for what animates its own opacity. */
-    static final int SURFACE_RGB = LostTalesUiInk.SURFACE_RGB;
-    static final int SURFACE_HIGHLIGHT_RGB = LostTalesUiInk.SURFACE_HIGHLIGHT_RGB;
-    /**
-     * Where a carried window will land, lit: the edge of the window it
-     * sticks to, and the zone of a snap layout it fills. Honey, the
-     * palette's yellow.
-     */
-    static final int LANDING_RGB = LostTalesColors.rgb(LostTalesColors.HONEY);
-    /**
-     * The frame a popup wears inside its footprint: a chat window's, a
-     * pixel of surface with the ink inside it (Nils, 2026-09-24).
-     */
-    static final int POPUP_FRAME = LostTalesUiWindowFrame.WIDTH;
-    /**
-     * From a popup's edge to what it shows: the frame and two clear
-     * pixels, as round a framed button's content.
-     */
-    static final int POPUP_INSET = POPUP_FRAME + 2;
-    /** A one-line popup's height: the capitals and their shadow, the inset above and below. */
-    static final int POPUP_LINE_HEIGHT = POPUP_INSET * 2
-            + LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT
-            + LostTalesUiInk.SHADOW_OFFSET;
-    /**
-     * A margin, a well or a tab has a surface of its own, a step darker
-     * than the half-opacity surface beside it: two thirds. The surface
-     * beside it stops where it begins rather than running under it, so
-     * each area is one flat colour and no two backgrounds are ever laid
-     * over each other — the timestamp column beside the panel, the
-     * typing well in a hole cut out of the input bar, a tab in the hole
-     * the tab strip leaves for it.
-     */
-    static final int INSET_ALPHA = Math.round(255.0F * 2.0F / 3.0F);
-    /**
-     * The chat's inset surface: plum black, the palette's darkest, at two
-     * thirds. The typing well, the timestamp column and a tab nobody has
-     * picked or is pointing at all wear exactly this.
-     */
-    static final int SURFACE_INSET = LostTalesSkyrimUiStyle.withAlpha(
-            LostTalesSkyrimUiStyle.PLUM_BLACK, INSET_ALPHA);
+public final class LostTalesChatVisualStyle {
 
     /**
      * The chat's one tone for what is said about a line rather than in
@@ -103,41 +55,8 @@ final class LostTalesChatVisualStyle {
      * rather than kept, so a server that recolours the Console recolours
      * every one of them with it.
      */
-    static int asideRgb() {
+    public static int asideRgb() {
         return ClientChatChannelState.displayColor(ChatChannel.CLIENT_CONSOLE);
-    }
-
-    /**
-     * The open chat's history panel and the rows framing it, in the
-     * palette colour the client chose; plum black until it chooses.
-     * Read on every draw, so a choice made in a window's menu shows the
-     * same frame.
-     */
-    static int backdropRgb() {
-        return paletteRgb(LostTalesConfig.chatBackgroundColor,
-                LostTalesColors.PLUM_BLACK);
-    }
-
-    /**
-     * The game's chat opacity as the chat applies it, never below a
-     * tenth: what the panel and every surface beside it are thinned by.
-     */
-    static float chatOpacity(Minecraft minecraft) {
-        return minecraft.gameSettings.chatOpacity * 0.9F + 0.1F;
-    }
-
-    /**
-     * The chat's surface at {@code share} of its opacity: the panel's
-     * own colour at half, so a window's strips and its bar are one flat
-     * stretch of exactly what its history is drawn in.
-     */
-    static int surfaceArgb(float share) {
-        return argb(backdropRgb(), Math.round(SURFACE_ALPHA * share));
-    }
-
-    /** The inset surface at {@code share} of its opacity. */
-    static int insetArgb(float share) {
-        return argb(SURFACE_RGB, Math.round(INSET_ALPHA * share));
     }
 
     /** The line under the pointer, in the client's chosen palette colour; plum grey until it chooses. */
@@ -198,189 +117,8 @@ final class LostTalesChatVisualStyle {
     private static int paletteRgb(String name, int fallback) {
         return LostTalesColors.rgb(LostTalesColors.paletteColor(name, fallback));
     }
-    /** Shadow offset shared by text, sprites, and icons. */
-    static final int SHADOW_OFFSET = LostTalesUiInk.SHADOW_OFFSET;
-    /** Shared palette opacity for every chat text, icon and portrait shadow. */
-    static final float SHADOW_OPACITY = LostTalesUiInk.SHADOW_OPACITY;
-    /**
-     * Lowest alpha FontRenderer honours: a colour whose alpha is below four
-     * is treated as opaque, so a near-invisible shadow would flash at full
-     * strength. Anything under this is not drawn at all.
-     */
-    static final int MIN_VISIBLE_ALPHA = LostTalesUiInk.MIN_VISIBLE_ALPHA;
-    /** How much of its opacity a control that cannot be taken here is drawn at. */
-    static final float UNAVAILABLE_OPACITY = 0.5F;
 
     private LostTalesChatVisualStyle() {}
-
-    /**
-     * Shadow alpha for content drawn at {@code alpha}, or 0 when the shadow
-     * would fall under {@link #MIN_VISIBLE_ALPHA} and must be skipped.
-     */
-    static int shadowAlpha(int alpha) {
-        return LostTalesUiInk.shadowAlpha(alpha);
-    }
-
-    /** Width of the hairline the chat divides two controls with. */
-    static final int DIVIDER_WIDTH = 1;
-    /** Quiet enough to divide without reading as an edge of its own. */
-    static final int DIVIDER_ALPHA = 0x66;
-
-    /**
-     * A divider between two controls: a one-pixel column of the chat's
-     * ivory, strongest at its middle and fading to nothing at both ends,
-     * so it parts them without drawing an edge across their strip. The
-     * tab row and the input bar both come through here, so their
-     * dividers cannot drift apart.
-     */
-    static void drawDivider(int x, int top, int height, int alpha) {
-        LostTalesChatOverlayRenderer.drawVerticalRule(x, x + DIVIDER_WIDTH,
-                top, top + height, alpha);
-    }
-
-    /**
-     * A popup's surface over {@code [left, right)} by {@code [top,
-     * bottom)}: what follows the pointer or the caret and never moves
-     * wears the small windows' surface — the chat's inset plum black at
-     * two thirds, thinned by the chat opacity and by {@code opacity} —
-     * and a chat window's frame inside its footprint, as the snap panels
-     * do (Nils, 2026-09-24). The lit row — {@code [rowLeft, rowRight)} by
-     * {@code [rowTop, rowBottom)}, what a press or Enter would take — is
-     * the surface in the highlight's tone, cut to the frame's inside;
-     * surface and row lie side by side, never one over another, and the
-     * frame's edges lie over its ring as on a window. A row with no area
-     * lights nothing.
-     */
-    static void drawPopup(float left, float top, float right, float bottom,
-                          float opacity, float rowLeft, float rowTop,
-                          float rowRight, float rowBottom) {
-        float share = Math.max(0.0F, Math.min(1.0F, opacity));
-        float boxLeft = left + POPUP_FRAME;
-        float boxTop = top + POPUP_FRAME;
-        float boxRight = right - POPUP_FRAME;
-        float boxBottom = bottom - POPUP_FRAME;
-        int surfaceAlpha = Math.round(INSET_ALPHA * share
-                * chatOpacity(Minecraft.getMinecraft()));
-        if (surfaceAlpha < MIN_VISIBLE_ALPHA || boxRight <= boxLeft
-                || boxBottom <= boxTop) {
-            return;
-        }
-        int surface = argb(SURFACE_RGB, surfaceAlpha);
-        float litLeft = Math.max(boxLeft, rowLeft);
-        float litTop = Math.max(boxTop, rowTop);
-        float litRight = Math.min(boxRight, rowRight);
-        float litBottom = Math.min(boxBottom, rowBottom);
-        fillAround(boxLeft, boxTop, boxRight, boxBottom, litLeft, litTop,
-                litRight, litBottom, surface);
-        if (litRight > litLeft && litBottom > litTop) {
-            LostTalesUiInk.fillRect(litLeft, litTop, litRight, litBottom,
-                    argb(SURFACE_HIGHLIGHT_RGB, surfaceAlpha));
-        }
-        LostTalesUiWindowFrame.drawSurface(boxLeft, boxTop, boxRight,
-                boxBottom, surface);
-        LostTalesUiWindowFrame.drawEdges(boxLeft, boxTop, boxRight,
-                boxBottom, Math.round(255.0F * share));
-    }
-
-    /** A popup with no row lit. */
-    static void drawPopup(float left, float top, float right, float bottom,
-                          float opacity) {
-        drawPopup(left, top, right, bottom, opacity, 0.0F, 0.0F, 0.0F, 0.0F);
-    }
-
-    /** A one-line popup's width for {@code text}: the text, the inset either side. */
-    static int popupLineWidth(FontRenderer font, String text) {
-        return font.getStringWidth(text) + POPUP_INSET * 2;
-    }
-
-    /**
-     * A one-line popup with its top left at {@code x}, {@code y},
-     * {@link #popupLineWidth} wide and {@link #POPUP_LINE_HEIGHT} tall:
-     * the framed surface at {@code opacity}, and {@code text} two clear
-     * pixels inside the frame. The pointer's tip, a picker's tip and the
-     * bar's notice are each one.
-     */
-    static void drawPopupLine(FontRenderer font, String text, int x, int y,
-                              float opacity) {
-        drawPopup(x, y, x + popupLineWidth(font, text), y + POPUP_LINE_HEIGHT,
-                opacity);
-        drawPlain(font, text, x + POPUP_INSET, y + POPUP_INSET,
-                Math.round(255.0F * Math.max(0.0F, Math.min(1.0F, opacity))));
-    }
-
-    /**
-     * A list's popup: rows {@code rowHeight} apart from {@code rowsTop},
-     * which stand {@link #POPUP_INSET} inside its edges, row
-     * {@code litRow} lit across the frame's inside; none for -1.
-     */
-    static void drawPopupList(int left, int top, int right, int bottom,
-                              int rowsTop, int rowHeight, int litRow) {
-        int rowTop = rowsTop + litRow * rowHeight;
-        drawPopup(left, top, right, bottom, 1.0F, left, rowTop, right,
-                litRow < 0 ? rowTop : rowTop + rowHeight);
-    }
-
-    /**
-     * A surface over {@code [left, right)} by {@code [top, bottom)} with
-     * a rectangular hole left unpainted: the full height either side of
-     * the hole, and between them the rows above and below it. A hole
-     * with no area inside the surface leaves the surface whole.
-     */
-    static void fillAround(float left, float top, float right, float bottom,
-                           float holeLeft, float holeTop, float holeRight,
-                           float holeBottom, int argb) {
-        float cutLeft = Math.max(left, holeLeft);
-        float cutRight = Math.min(right, holeRight);
-        float cutTop = Math.max(top, holeTop);
-        float cutBottom = Math.min(bottom, holeBottom);
-        if (cutRight <= cutLeft || cutBottom <= cutTop) {
-            LostTalesUiInk.fillRect(left, top, right, bottom,
-                    argb);
-            return;
-        }
-        LostTalesUiInk.fillRect(left, top, cutLeft, bottom,
-                argb);
-        LostTalesUiInk.fillRect(cutRight, top, right, bottom,
-                argb);
-        LostTalesUiInk.fillRect(cutLeft, top, cutRight, cutTop,
-                argb);
-        LostTalesUiInk.fillRect(cutLeft, cutBottom, cutRight,
-                bottom, argb);
-    }
-
-    /**
-     * One step of a control's crossfade toward {@code hovered}: 0 while
-     * it rests, 1 while the pointer is on it, and on the way between
-     * them the share of the hovered artwork to lay over the resting one.
-     * Every control the chat draws in two states steps with this, so
-     * they all answer the pointer at the same pace.
-     */
-    static float hoverFade(float progress, boolean hovered,
-                           double elapsed) {
-        float target = hovered ? 1.0F : 0.0F;
-        float value = (float)Motions.follow(MotionIds.CHAT_HOVER_FADE,
-                progress, target, elapsed);
-        return Math.abs(target - value) < 0.02F ? target : value;
-    }
-
-    /**
-     * One colour a share of the way to another, so a control's tones
-     * cross with its artwork rather than snapping at the same moment.
-     */
-    static int blend(int fromRgb, int toRgb, float progress) {
-        return LostTalesUiInk.blend(fromRgb, toRgb, progress);
-    }
-
-    /**
-     * Puts the pipeline into the state every chat element is drawn in:
-     * blended, so a shadow's two-thirds opacity and a fading line's alpha both
-     * mean what they say. Called by every draw in this class, and by the
-     * chat's sprite drawing, so no call site has to know what the last
-     * rectangle left behind.
-     */
-    static void beginContent() {
-        LostTalesSkyrimUiStyle.beginContent();
-    }
 
     /**
      * The widest of the font's ten digits, its spacing column included:
@@ -418,7 +156,7 @@ final class LostTalesChatVisualStyle {
      */
     static float smallTextTopOffset(int displayScaleFactor) {
         int factor = Math.max(1, displayScaleFactor);
-        int spare = LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT
+        int spare = LostTalesUiInk.CAP_HEIGHT
                 * (factor - Math.max(1, factor - 1));
         return (spare / 2) / (float)factor;
     }
@@ -449,7 +187,7 @@ final class LostTalesChatVisualStyle {
      * chat's one rule ({@link #smallDrop}).
      */
     static float stackSmallTopOffset() {
-        int factor = ChatWindowFrame.displayScaleFactor();
+        int factor = LostTalesDisplayPixels.scaleFactor();
         float chat = chatScale();
         return smallDrop(chat, factor) / (float)factor / chat;
     }
@@ -488,7 +226,7 @@ final class LostTalesChatVisualStyle {
         if (step == 0) {
             return 1.0F;
         }
-        int factor = ChatWindowFrame.displayScaleFactor();
+        int factor = LostTalesDisplayPixels.scaleFactor();
         float chat = chatScale();
         float scale = rowPixels(chat, factor, step) / (float)factor / chat;
         // A display with no smaller size to offer keeps the words' own,
@@ -563,7 +301,7 @@ final class LostTalesChatVisualStyle {
     static int smallDrop(float chatScale, int displayScaleFactor) {
         float words = Math.max(0.0F, chatScale)
                 * Math.max(1, displayScaleFactor);
-        float spare = LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT
+        float spare = LostTalesUiInk.CAP_HEIGHT
                 * (words - smallPixels(chatScale, displayScaleFactor));
         return Math.max(0, (int)Math.floor(spare / 2.0F + 0.001F));
     }
@@ -589,7 +327,7 @@ final class LostTalesChatVisualStyle {
      * them and a reply's quote gives its room back there.
      */
     static float stackRowTopOffset(float rowScale) {
-        int factor = ChatWindowFrame.displayScaleFactor();
+        int factor = LostTalesDisplayPixels.scaleFactor();
         float chat = chatScale();
         float words = Math.max(0.001F, factor * chat);
         return -rowRise(chat, factor,
@@ -635,17 +373,17 @@ final class LostTalesChatVisualStyle {
                               final boolean chatOpen,
                               final ChatRowMotion motion,
                               final int chatLineId) {
-        if (font == null || line == null || alpha < MIN_VISIBLE_ALPHA) {
+        if (font == null || line == null || alpha < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
             return;
         }
-        beginContent();
-        final int shadow = shadowAlpha(alpha);
+        LostTalesUiInk.beginContent();
+        final int shadow = LostTalesUiInk.shadowAlpha(alpha);
         LostTalesUiFlatLayers.Layers layers = new LostTalesUiFlatLayers.Layers() {
             @Override
             public void draw() {
                 if (shadow > 0) {
                     drawComponentPass(font, line, metadata,
-                            x + SHADOW_OFFSET, y + SHADOW_OFFSET, shadow, true,
+                            x + LostTalesUiInk.SHADOW_OFFSET, y + LostTalesUiInk.SHADOW_OFFSET, shadow, true,
                             chatOpen, motion, chatLineId);
                     // The line stands over its shadow, so a line fading
                     // does not show the shadow through its strokes.
@@ -674,13 +412,7 @@ final class LostTalesChatVisualStyle {
 
     static void drawPlain(FontRenderer font, String text,
                           int x, int y, int alpha) {
-        drawColored(font, text, x, y, IVORY, alpha);
-    }
-
-    /** Text in an explicit colour with the shared shadow treatment. */
-    static void drawColored(FontRenderer font, String text,
-                            int x, int y, int rgb, int alpha) {
-        drawColored(font, text, x, y, rgb, alpha, 1.0F);
+        LostTalesUiInk.drawText(font, text, x, y, LostTalesUiInk.IVORY, alpha);
     }
 
     /**
@@ -698,7 +430,7 @@ final class LostTalesChatVisualStyle {
         }
         int cursor = x;
         for (LegacyRun run : legacyRuns(text)) {
-            drawColored(font, run.text, cursor, y, run.rgb, alpha);
+            LostTalesUiInk.drawText(font, run.text, cursor, y, run.rgb, alpha);
             cursor += font.getStringWidth(run.text);
         }
     }
@@ -715,7 +447,7 @@ final class LostTalesChatVisualStyle {
         if (text == null || text.length() == 0) {
             return runs;
         }
-        int rgb = IVORY;
+        int rgb = LostTalesUiInk.IVORY;
         StringBuilder styles = new StringBuilder();
         StringBuilder pending = new StringBuilder();
         for (int index = 0; index < text.length(); index++) {
@@ -743,7 +475,7 @@ final class LostTalesChatVisualStyle {
                 continue;
             }
             styles.setLength(0);
-            rgb = formatting == EnumChatFormatting.RESET ? IVORY
+            rgb = formatting == EnumChatFormatting.RESET ? LostTalesUiInk.IVORY
                     : paletteRgb(formatting);
         }
         if (pending.length() > 0) {
@@ -779,56 +511,6 @@ final class LostTalesChatVisualStyle {
     }
 
     /**
-     * As above for text drawn inside a scaled matrix: the offset is
-     * given in that matrix's units so the shadow still lands one screen
-     * pixel away, which is what every other shadow in the chat does.
-     * A scale of one is the plain case.
-     */
-    static void drawColored(final FontRenderer font, final String text,
-                            final int x, final int y, final int rgb,
-                            final int alpha, float scale) {
-        if (font == null || text == null || alpha < MIN_VISIBLE_ALPHA) {
-            return;
-        }
-        beginContent();
-        final int shadow = shadowAlpha(alpha);
-        final int offset = scale <= 0.0F ? SHADOW_OFFSET
-                : Math.max(1, Math.round(SHADOW_OFFSET / scale));
-        if (alpha >= 255 || LostTalesUiFlatLayers.isActive()) {
-            drawColoredLayers(font, text, x, y, rgb, alpha, shadow, offset);
-            return;
-        }
-        // Words fading fade as one picture with their shadow, so the
-        // shadow never shows through their strokes.
-        LostTalesUiFlatLayers.draw(alpha, x, y,
-                x + font.getStringWidth(text) + offset,
-                y + font.FONT_HEIGHT + offset,
-                new LostTalesUiFlatLayers.Layers() {
-                    @Override
-                    public void draw() {
-                        drawColoredLayers(font, text, x, y, rgb, alpha,
-                                shadow, offset);
-                    }
-                });
-    }
-
-    /** The shadow, then the words standing over it as the next layer. */
-    private static void drawColoredLayers(FontRenderer font, String text,
-                                          int x, int y, int rgb, int alpha,
-                                          int shadow, int offset) {
-        if (shadow > 0) {
-            font.drawString(text, x + offset, y + offset,
-                    argb(SHADOW, shadow));
-            LostTalesUiFlatLayers.nextLayer();
-        }
-        font.drawString(text, x, y, argb(rgb, alpha));
-    }
-
-    static int argb(int rgb, int alpha) {
-        return LostTalesUiInk.argb(rgb, alpha);
-    }
-
-    /**
      * The palette entry a vanilla colour code stands for, so text the
      * chat did not compose itself — an achievement from vanilla or from
      * LOTR, another mod's notice, a player's own {@code &}-codes — reads
@@ -839,7 +521,7 @@ final class LostTalesChatVisualStyle {
      */
     static int paletteRgb(EnumChatFormatting formatting) {
         if (formatting == null) {
-            return IVORY;
+            return LostTalesUiInk.IVORY;
         }
         switch (formatting) {
             case BLACK:
@@ -888,7 +570,7 @@ final class LostTalesChatVisualStyle {
                 return LostTalesSkyrimUiStyle.rgb(
                         LostTalesSkyrimUiStyle.HONEY);
             default:
-                return IVORY;
+                return LostTalesUiInk.IVORY;
         }
     }
 
@@ -934,7 +616,7 @@ final class LostTalesChatVisualStyle {
             return link.intValue();
         }
         return part.getChatStyle().getColor() != null
-                ? paletteRgb(part.getChatStyle().getColor()) : IVORY;
+                ? paletteRgb(part.getChatStyle().getColor()) : LostTalesUiInk.IVORY;
     }
 
     /**
@@ -1192,7 +874,7 @@ final class LostTalesChatVisualStyle {
             boolean closesSpan = identitySpan && marker == null
                     && text.startsWith(">");
             boolean underlined = false;
-            int underlineColor = IVORY;
+            int underlineColor = LostTalesUiInk.IVORY;
             int width;
             // A run that wears a backdrop stands inside its padding, and
             // the pointer lights the backdrop and turns its words ivory
@@ -1251,10 +933,10 @@ final class LostTalesChatVisualStyle {
                 width = ChatReplyMarker.ICON_SLOT_WIDTH;
                 Integer quoteColor = ChatReplyMarker.colorOf(part);
                 LostTalesUiSheet bubble = LostTalesUiSheet.SPEECH_BUBBLE;
-                bubble.drawSilhouette(shadowPass ? SHADOW
-                                : !colours || quoteColor == null ? IVORY
+                bubble.drawSilhouette(shadowPass ? LostTalesUiInk.SHADOW
+                                : !colours || quoteColor == null ? LostTalesUiInk.IVORY
                                         : quoteColor.intValue(),
-                        cursor, y + LostTalesChatOverlayRenderer
+                        cursor, y + WindowStyle
                                 .centredBoxTop(bubble.getHeight()),
                         alpha);
             } else if (ChatChannelLinkMarker.isIconSlot(part)) {
@@ -1270,7 +952,7 @@ final class LostTalesChatVisualStyle {
                         ChatInlineIcons.boxTop(y, width),
                         ChatInlineIcons.contentSize(width),
                         ChatRunBackdrops.wordsRgb(!colours || linkColor == null
-                                ? IVORY : linkColor.intValue(), backdropLit),
+                                ? LostTalesUiInk.IVORY : linkColor.intValue(), backdropLit),
                         alpha, shadowPass);
             } else {
                 String rendered;
@@ -1304,13 +986,13 @@ final class LostTalesChatVisualStyle {
                 int glyphColor;
                 if (!colours) {
                     rendered = stripCodes(formatting + text);
-                    color = shadowPass ? SHADOW : IVORY;
-                    glyphColor = IVORY;
+                    color = shadowPass ? LostTalesUiInk.SHADOW : LostTalesUiInk.IVORY;
+                    glyphColor = LostTalesUiInk.IVORY;
                 } else if (shadowPass) {
                     rendered = styleCodesOnly(formatting)
                             + removeColorCodes(text);
-                    color = SHADOW;
-                    glyphColor = SHADOW;
+                    color = LostTalesUiInk.SHADOW;
+                    glyphColor = LostTalesUiInk.SHADOW;
                 } else if (share != null) {
                     rendered = styleCodesOnly(formatting)
                             + removeColorCodes(text);
@@ -1354,8 +1036,8 @@ final class LostTalesChatVisualStyle {
                     glyphColor = color;
                 } else {
                     rendered = removeExplicitWhite(formatting + text);
-                    color = IVORY;
-                    glyphColor = lastInlineColor(rendered, IVORY);
+                    color = LostTalesUiInk.IVORY;
+                    glyphColor = lastInlineColor(rendered, LostTalesUiInk.IVORY);
                 }
                 if (backdropped && !shadowPass) {
                     color = ChatRunBackdrops.wordsRgb(color, backdropLit);
@@ -1364,24 +1046,24 @@ final class LostTalesChatVisualStyle {
                 // them is drawn by code of its own, and whatever that leaves
                 // behind must not decide what the next run's shadow looks
                 // like.
-                beginContent();
+                LostTalesUiInk.beginContent();
                 if (motion == null) {
-                    font.drawString(rendered, cursor, y, argb(color, alpha));
+                    font.drawString(rendered, cursor, y, LostTalesUiInk.argb(color, alpha));
                 } else if (ChatBodyMarker.isMarker(part)) {
                     // The chevron steps on its own, lit toward a lighter
                     // shade of the speaker's colour; its shadow stays
                     // the shadow.
                     runShift = motion.chevronX();
-                    int lit = shadowPass ? color : blend(color,
+                    int lit = shadowPass ? color : LostTalesUiInk.blend(color,
                             lighterShadeOf(color), motion.brighten());
                     GL11.glPushMatrix();
                     GL11.glTranslatef(runShift, 0.0F, 0.0F);
-                    font.drawString(rendered, cursor, y, argb(lit, alpha));
+                    font.drawString(rendered, cursor, y, LostTalesUiInk.argb(lit, alpha));
                     GL11.glPopMatrix();
                 } else {
                     runShift = motion.wordX(word, words);
                     word = drawWords(font, rendered, cursor, y,
-                            argb(color, alpha), motion, word, words);
+                            LostTalesUiInk.argb(color, alpha), motion, word, words);
                 }
                 int declared = ChatInlineIcons.declaredWidth(part);
                 width = declared >= 0 ? declared
@@ -1394,7 +1076,7 @@ final class LostTalesChatVisualStyle {
                     // title and the spacers between included, under one
                     // rule in the name's colour.
                     underlined = true;
-                    underlineColor = !colours ? IVORY
+                    underlineColor = !colours ? LostTalesUiInk.IVORY
                             : marker != null ? marker.nameColor
                             : metadata != null ? metadata.nameColor
                             : glyphColor;
@@ -1614,7 +1296,7 @@ final class LostTalesChatVisualStyle {
                 break;
             }
         }
-        return blend(wanted, IVORY, LIGHTER_SHADE_SHARE);
+        return LostTalesUiInk.blend(wanted, LostTalesUiInk.IVORY, LIGHTER_SHADE_SHARE);
     }
 
     /** How far toward ivory a colour off the palette is taken for its lighter shade. */
@@ -1646,8 +1328,8 @@ final class LostTalesChatVisualStyle {
                     LostTalesChatOverlayRenderer.CHIP_DEPTH);
             LostTalesUiFramedButton.drawSurface(left, top, chip.width,
                     ChatReactionMarker.HEIGHT, lit,
-                    Math.round(alpha * INSET_ALPHA / 255.0F));
-            beginContent();
+                    Math.round(alpha * WindowStyle.INSET_ALPHA / 255.0F));
+            LostTalesUiInk.beginContent();
             int emojiTop = chipEmojiTop(top);
             if (chip.emoji != null) {
                 ChatInlineIcons.drawEmoji(Minecraft.getMinecraft(),
@@ -1657,10 +1339,10 @@ final class LostTalesChatVisualStyle {
                 drawUnknownEmoji(font, left + ChatReactionMarker.PAD,
                         emojiTop, y, alpha);
             }
-            beginContent();
-            drawColored(font, chip.countText(), left + ChatReactionMarker.PAD
+            LostTalesUiInk.beginContent();
+            LostTalesUiInk.drawText(font, chip.countText(), left + ChatReactionMarker.PAD
                     + ChatReactionMarker.ICON + ChatReactionMarker.GAP, y,
-                    chip.mine && colours ? accent : IVORY, alpha);
+                    chip.mine && colours ? accent : LostTalesUiInk.IVORY, alpha);
             LostTalesUiFramedButton.drawInk(left, top, chip.width,
                     ChatReactionMarker.HEIGHT, lit, alpha);
         } finally {
@@ -1676,7 +1358,7 @@ final class LostTalesChatVisualStyle {
      * lit as far as {@code lit}.
      */
     static void drawReactionAddButton(int x, int alpha, float lit) {
-        if (alpha < MIN_VISIBLE_ALPHA) {
+        if (alpha < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
             return;
         }
         int top = -ChatReactionMarker.TEXT_DROP;
@@ -1686,8 +1368,8 @@ final class LostTalesChatVisualStyle {
                     LostTalesChatOverlayRenderer.CHIP_DEPTH);
             LostTalesUiFramedButton.drawSurface(x, top,
                     ChatReactionMarker.ADD_WIDTH, ChatReactionMarker.HEIGHT,
-                    lit, Math.round(alpha * INSET_ALPHA / 255.0F));
-            beginContent();
+                    lit, Math.round(alpha * WindowStyle.INSET_ALPHA / 255.0F));
+            LostTalesUiInk.beginContent();
             LostTalesUiSheet.drawPairWithShadow(LostTalesUiSheet.EMOJI,
                     LostTalesUiSheet.EMOJI_HOVER, lit,
                     x + ChatReactionMarker.PAD, chipEmojiTop(top), alpha);
@@ -1785,7 +1467,7 @@ final class LostTalesChatVisualStyle {
     private static void drawUnknownEmoji(FontRenderer font, int x, int top,
                                          int y, int alpha) {
         int size = ChatReactionMarker.ICON;
-        int tile = argb(LostTalesColors.rgb(LostTalesColors.PLUM_GRAY), alpha);
+        int tile = LostTalesUiInk.argb(LostTalesColors.rgb(LostTalesColors.PLUM_GRAY), alpha);
         Gui.drawRect(x + 1, top, x + size - 1, top + size, tile);
         Gui.drawRect(x, top + 1, x + 1, top + size - 1, tile);
         Gui.drawRect(x + size - 1, top + 1, x + size, top + size - 1, tile);
@@ -1794,7 +1476,7 @@ final class LostTalesChatVisualStyle {
         }
         // The advance ends in the font's one-pixel gap; the ink is the rest.
         int ink = Math.max(0, font.getStringWidth(UNKNOWN_EMOJI_GLYPH) - 1);
-        drawColored(font, UNKNOWN_EMOJI_GLYPH, x + (size - ink) / 2, y, IVORY,
+        LostTalesUiInk.drawText(font, UNKNOWN_EMOJI_GLYPH, x + (size - ink) / 2, y, LostTalesUiInk.IVORY,
                 alpha);
     }
 
@@ -1831,16 +1513,16 @@ final class LostTalesChatVisualStyle {
         if (end - 1 <= start) {
             return;
         }
-        int shadow = shadowAlpha(alpha);
+        int shadow = LostTalesUiInk.shadowAlpha(alpha);
         if (shadow > 0) {
-            LostTalesUiInk.fillRect(start + SHADOW_OFFSET,
-                    y + UNDERLINE_ROW + SHADOW_OFFSET,
-                    end - 1 + SHADOW_OFFSET,
-                    y + UNDERLINE_ROW + 1 + SHADOW_OFFSET,
-                    argb(SHADOW, shadow));
+            LostTalesUiInk.fillRect(start + LostTalesUiInk.SHADOW_OFFSET,
+                    y + UNDERLINE_ROW + LostTalesUiInk.SHADOW_OFFSET,
+                    end - 1 + LostTalesUiInk.SHADOW_OFFSET,
+                    y + UNDERLINE_ROW + 1 + LostTalesUiInk.SHADOW_OFFSET,
+                    LostTalesUiInk.argb(LostTalesUiInk.SHADOW, shadow));
         }
         LostTalesUiInk.fillRect(start, y + UNDERLINE_ROW,
-                end - 1, y + UNDERLINE_ROW + 1, argb(color, alpha));
+                end - 1, y + UNDERLINE_ROW + 1, LostTalesUiInk.argb(color, alpha));
     }
 
     /** Whether the run opens a web address on a click. */
@@ -1912,7 +1594,7 @@ final class LostTalesChatVisualStyle {
         if (share.kind == ChatShareKind.ITEM) {
             ItemStack stack = ClientChatShowcaseStore.getItem(share.showcaseId);
             if (stack != null) {
-                ChatInlineIcons.drawItem(minecraft, stack, boxX, boxY, size,
+                LostTalesUiItemIcon.drawFitted(minecraft, stack, boxX, boxY, size,
                         alpha, shadowPass);
             }
             return;

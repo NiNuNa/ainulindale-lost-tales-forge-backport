@@ -1,7 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
-import com.ninuna.losttales.chat.ChatChannel;
-import java.util.Collections;
+import com.ninuna.losttales.client.window.Window;
+import com.ninuna.losttales.client.window.WindowLayout;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,12 +24,12 @@ public final class ChatWindowLinesPruneTest {
 
     @Before
     public void reset() {
-        ChatWindowLayout.reset();
+        ChatLayout.reset();
     }
 
     @After
     public void cleanUp() {
-        ChatWindowLayout.reset();
+        ChatLayout.reset();
     }
 
     private static Map<String, Object> views(String... viewIds) {
@@ -42,7 +42,7 @@ public final class ChatWindowLinesPruneTest {
 
     @Test
     public void aClosedWindowsLayoutIsDropped() {
-        List<ChatWindow> windows = ChatWindowLayout.windows();
+        List<Window> windows = WindowLayout.windows();
         assertFalse("the layout needs a window to test", windows.isEmpty());
         String live = windows.get(0).getId();
 
@@ -56,9 +56,9 @@ public final class ChatWindowLinesPruneTest {
 
     @Test
     public void theFeedIsNotAWindowAndIsNeverSwept() {
-        String feedId = ChatWindowFrame.feed().windowId;
+        String feedId = ChatFrame.feed().windowId;
         Map<String, Object> cache = views(feedId, "w404");
-        ChatWindowLines.pruneViews(cache, ChatWindowLayout.windows());
+        ChatWindowLines.pruneViews(cache, WindowLayout.windows());
         assertTrue(cache.containsKey(feedId));
         assertFalse(cache.containsKey("w404"));
     }

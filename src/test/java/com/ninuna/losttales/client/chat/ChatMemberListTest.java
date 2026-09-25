@@ -124,19 +124,16 @@ public final class ChatMemberListTest {
     @Test
     public void theListsWidthIsBoundedByItsHeadsAndAThirdOfTheWindow() {
         ChatMemberList.State state = new ChatMemberList.State();
-        ChatMemberList.measure(state, null, 600.0F, 38.0F);
+        ChatMemberList.measure(state, 0.0D, 600.0F, 38.0F);
         assertEquals(ChatMemberList.DEFAULT_WIDTH, state.width, 0.001F);
         assertEquals(200.0F, state.maxWidth, 0.001F);
-        ChatWindow window = new ChatWindow("w");
-        window.setMembersWidth(150.5D);
-        ChatMemberList.measure(state, window, 600.0F, 38.0F);
+        ChatMemberList.measure(state, 150.5D, 600.0F, 38.0F);
         assertEquals(150.5F, state.width, 0.001F);
         // A narrower window holds the list to a third of itself.
-        ChatMemberList.measure(state, window, 300.0F, 38.0F);
+        ChatMemberList.measure(state, 150.5D, 300.0F, 38.0F);
         assertEquals(100.0F, state.width, 0.001F);
         // Dragged past its heads, it stops at them.
-        window.setMembersWidth(1.0D);
-        ChatMemberList.measure(state, window, 600.0F, 38.0F);
+        ChatMemberList.measure(state, 1.0D, 600.0F, 38.0F);
         assertEquals(ChatMemberList.minWidth(), state.width, 0.001F);
     }
 
@@ -148,18 +145,17 @@ public final class ChatMemberListTest {
     @Test
     public void aNarrowerWindowNarrowsItsListDownToItsHeads() {
         ChatMemberList.State state = new ChatMemberList.State();
-        ChatWindow window = new ChatWindow("w");
-        window.setMembersWidth(150.0D);
+        double chosen = 150.0D;
         float messageX = 38.0F;
         float roomy = messageX + ChatMemberList.MIN_MESSAGE_WIDTH + 90.0F;
-        ChatMemberList.measure(state, window, roomy, messageX);
+        ChatMemberList.measure(state, chosen, roomy, messageX);
         assertEquals(90.0F, state.width, 0.001F);
-        ChatMemberList.measure(state, window, roomy - 30.0F, messageX);
+        ChatMemberList.measure(state, chosen, roomy - 30.0F, messageX);
         assertEquals(60.0F, state.width, 0.001F);
-        ChatMemberList.measure(state, window, 120.0F, messageX);
+        ChatMemberList.measure(state, chosen, 120.0F, messageX);
         assertEquals(ChatMemberList.minWidth(), state.width, 0.001F);
         // Wide again, the list is the width it was dragged to.
-        ChatMemberList.measure(state, window, 900.0F, messageX);
+        ChatMemberList.measure(state, chosen, 900.0F, messageX);
         assertEquals(150.0F, state.width, 0.001F);
     }
 

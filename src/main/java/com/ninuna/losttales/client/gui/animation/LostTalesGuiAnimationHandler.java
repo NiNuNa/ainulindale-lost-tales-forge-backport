@@ -1,7 +1,6 @@
 package com.ninuna.losttales.client.gui.animation;
 
 import com.ninuna.losttales.client.LostTalesClientThread;
-import com.ninuna.losttales.client.chat.LostTalesChatGui;
 import com.ninuna.losttales.config.LostTalesConfig;
 import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
@@ -162,15 +161,15 @@ public final class LostTalesGuiAnimationHandler
     }
 
     /**
-     * Screens the automatic fade never touches. Chat is one of them: it
-     * is opened and closed constantly during play and is meant to read
-     * over the world rather than in front of it, so the full-screen
-     * fade and blur leave it alone; its windows carry their own opening
-     * motion and blur only their own boxes ({@link LostTalesGuiRegionBlur}).
+     * Screens the automatic fade never touches. The chat is one of them,
+     * and the window screen, which is the game's chat screen underneath:
+     * it is opened and closed constantly during play and is meant to read
+     * over the world rather than in front of it, so the full-screen fade
+     * and blur leave it alone; its windows carry their own opening motion
+     * and blur only their own boxes ({@link LostTalesGuiRegionBlur}).
      */
     private static boolean isExcluded(GuiScreen screen) {
         return screen instanceof GuiChat
-                || screen instanceof LostTalesChatGui
                 || screen instanceof GuiDownloadTerrain
                 || screen instanceof GuiGameOver
                 || screen instanceof GuiSleepMP;

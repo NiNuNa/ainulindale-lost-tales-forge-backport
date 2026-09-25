@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -38,7 +39,7 @@ public final class ChatLineBandColourTest {
 
     @Test
     public void aMentionStillArrivingIsPartWayThere() {
-        assertEquals(LostTalesChatVisualStyle.blend(PANEL, MENTION, 0.5F),
+        assertEquals(LostTalesUiInk.blend(PANEL, MENTION, 0.5F),
                 band(true, 0.5F, 0.0F, 0.0F));
     }
 
@@ -54,9 +55,9 @@ public final class ChatLineBandColourTest {
      */
     @Test
     public void aFlashBurningOutCrossesBackIntoTheLinesOwnColour() {
-        assertEquals(LostTalesChatVisualStyle.blend(MENTION, FLASH, 0.5F),
+        assertEquals(LostTalesUiInk.blend(MENTION, FLASH, 0.5F),
                 band(true, 1.0F, 0.5F, 0.0F));
-        assertEquals(LostTalesChatVisualStyle.blend(PANEL, FLASH, 0.25F),
+        assertEquals(LostTalesUiInk.blend(PANEL, FLASH, 0.25F),
                 band(false, 1.0F, 0.25F, 0.0F));
     }
 
@@ -77,7 +78,7 @@ public final class ChatLineBandColourTest {
 
     @Test
     public void thePointersShadeCrossesInPartWay() {
-        assertEquals(LostTalesChatVisualStyle.blend(MENTION, SELECTED_MENTION,
+        assertEquals(LostTalesUiInk.blend(MENTION, SELECTED_MENTION,
                 0.5F), band(true, 1.0F, 0.0F, 0.5F));
     }
 }

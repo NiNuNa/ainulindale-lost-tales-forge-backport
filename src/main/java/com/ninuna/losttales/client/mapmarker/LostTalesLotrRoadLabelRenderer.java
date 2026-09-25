@@ -14,7 +14,6 @@ import lotr.common.world.genlayer.LOTRGenLayerWorld;
 import lotr.common.world.map.LOTRRoads;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.gui.ScaledResolution;
 import org.lwjgl.opengl.GL11;
 
 /**
@@ -372,10 +371,6 @@ final class LostTalesLotrRoadLabelRenderer {
          * them, so what was there is saved and given straight back.
          */
         private void beginClip() {
-            ScaledResolution resolution = new ScaledResolution(
-                    this.minecraft, this.minecraft.displayWidth,
-                    this.minecraft.displayHeight);
-            int scale = resolution.getScaleFactor();
             GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_SCISSOR_BIT
                     | GL11.GL_DEPTH_BUFFER_BIT);
             // The last map pass that was still being depth-tested against
@@ -383,11 +378,9 @@ final class LostTalesLotrRoadLabelRenderer {
             GL11.glDisable(GL11.GL_DEPTH_TEST);
             GL11.glDepthMask(false);
             GL11.glEnable(GL11.GL_SCISSOR_TEST);
-            GL11.glScissor(
-                    this.mapXMin * scale,
-                    (this.gui.height - this.mapYMax) * scale,
-                    this.mapWidth * scale,
-                    this.mapHeight * scale);
+            LostTalesLotrMapLayout.scissor(this.mapXMin,
+                    this.mapYMax - this.mapHeight,
+                    this.mapXMin + this.mapWidth, this.mapYMax);
         }
 
         private void endClip() {

@@ -2,7 +2,6 @@ package com.ninuna.losttales.client.render.player;
 
 import com.ninuna.losttales.character.registry.CharacterBodyModelDefinition;
 import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
-import com.ninuna.losttales.character.registry.CharacterChestTypeDefinition;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinLayout;
 import net.minecraft.client.model.ModelBiped;

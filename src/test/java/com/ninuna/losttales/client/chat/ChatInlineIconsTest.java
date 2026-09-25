@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.share.ChatShareKind;
+import com.ninuna.losttales.gui.style.LostTalesUiItemIcon;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
 import org.junit.Test;
@@ -16,13 +17,13 @@ import static org.junit.Assert.assertTrue;
  */
 public final class ChatInlineIconsTest {
 
-    private static final int TEXELS = ChatInlineIcons.ICON_TEXELS;
+    private static final int TEXELS = LostTalesUiItemIcon.ICON_TEXELS;
     private static final double BOX = ChatInlineIcons.CONTENT_SIZE;
-    private static final double ROOM = BOX + 2 * ChatInlineIcons.ITEM_OVERFLOW;
+    private static final double ROOM = BOX + 2 * LostTalesUiItemIcon.ITEM_OVERFLOW;
 
     /** Display pixels per texel for the ten-pixel box at a GUI scale. */
     private static int pixelsPerTexel(int guiScale) {
-        return ChatInlineIcons.wholePixelsPerTexel(BOX * guiScale,
+        return LostTalesUiItemIcon.wholePixelsPerTexel(BOX * guiScale,
                 ROOM * guiScale, TEXELS);
     }
 
@@ -47,14 +48,14 @@ public final class ChatInlineIconsTest {
     public void aSizePastTheRoomGivesWayToTheLargestThatFits() {
         // Thirty-two is nearest a box of thirty, but a room of thirty
         // has no place for it.
-        assertEquals(1, ChatInlineIcons.wholePixelsPerTexel(30, 30, TEXELS));
-        assertEquals(2, ChatInlineIcons.wholePixelsPerTexel(30, 32, TEXELS));
+        assertEquals(1, LostTalesUiItemIcon.wholePixelsPerTexel(30, 30, TEXELS));
+        assertEquals(2, LostTalesUiItemIcon.wholePixelsPerTexel(30, 32, TEXELS));
         // An exact fit is its own nearest.
-        assertEquals(2, ChatInlineIcons.wholePixelsPerTexel(32, 34, TEXELS));
+        assertEquals(2, LostTalesUiItemIcon.wholePixelsPerTexel(32, 34, TEXELS));
         // Nothing fits nothing.
-        assertEquals(0, ChatInlineIcons.wholePixelsPerTexel(10, 12, TEXELS));
-        assertEquals(0, ChatInlineIcons.wholePixelsPerTexel(0, 12, TEXELS));
-        assertEquals(0, ChatInlineIcons.wholePixelsPerTexel(10, 12, 0));
+        assertEquals(0, LostTalesUiItemIcon.wholePixelsPerTexel(10, 12, TEXELS));
+        assertEquals(0, LostTalesUiItemIcon.wholePixelsPerTexel(0, 12, TEXELS));
+        assertEquals(0, LostTalesUiItemIcon.wholePixelsPerTexel(10, 12, 0));
     }
 
     @Test
@@ -71,7 +72,7 @@ public final class ChatInlineIconsTest {
         assertEquals(10, ChatInlineIcons.itemSlotWidth(-1));
         // Never past the box and its clear rows on both sides, which
         // is what the twelve-pixel row keeps between two boxes.
-        assertTrue(2 * ChatInlineIcons.ITEM_OVERFLOW
+        assertTrue(2 * LostTalesUiItemIcon.ITEM_OVERFLOW
                 <= LostTalesChatOverlayRenderer.LINE_HEIGHT
                         - LostTalesChatOverlayRenderer.CONTENT_BOX_HEIGHT);
         for (int factor = 1; factor <= 12; factor++) {
@@ -79,7 +80,7 @@ public final class ChatInlineIconsTest {
             assertTrue("factor " + factor,
                     slot >= ChatInlineIcons.SLOT_WIDTH
                             && slot <= ChatInlineIcons.SLOT_WIDTH
-                                    + 2 * ChatInlineIcons.ITEM_OVERFLOW);
+                                    + 2 * LostTalesUiItemIcon.ITEM_OVERFLOW);
         }
     }
 

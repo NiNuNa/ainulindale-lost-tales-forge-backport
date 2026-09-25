@@ -10,7 +10,6 @@ import java.util.Comparator;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.util.MovingObjectPosition;
 import net.minecraft.util.Vec3;

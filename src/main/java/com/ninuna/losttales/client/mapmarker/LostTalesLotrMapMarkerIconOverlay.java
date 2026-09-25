@@ -45,7 +45,6 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.StatCollector;
-import net.minecraft.world.World;
 import org.lwjgl.opengl.GL11;
 
 /**
@@ -2995,18 +2994,10 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     }
 
     private static void beginMenuMapClipping(RenderContext context) {
-        ScaledResolution resolution = new ScaledResolution(
-                context.minecraft,
-                context.minecraft.displayWidth,
-                context.minecraft.displayHeight);
-        int scale = resolution.getScaleFactor();
         GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_SCISSOR_BIT);
         GL11.glEnable(GL11.GL_SCISSOR_TEST);
-        GL11.glScissor(
-                context.mapXMin * scale,
-                (context.gui.height - context.mapYMax) * scale,
-                (context.mapXMax - context.mapXMin) * scale,
-                (context.mapYMax - context.mapYMin) * scale);
+        LostTalesLotrMapLayout.scissor(context.mapXMin, context.mapYMin,
+                context.mapXMax, context.mapYMax);
     }
 
     private static void endMenuMapClipping() {

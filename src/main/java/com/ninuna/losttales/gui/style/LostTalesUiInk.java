@@ -1,5 +1,6 @@
 package com.ninuna.losttales.gui.style;
 
+import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.renderer.Tessellator;
 
 /**
@@ -42,6 +43,9 @@ public final class LostTalesUiInk {
             LostTalesColors.rgb(LostTalesColors.PLUM_GRAY);
     /** The square an inline icon is drawn in, and the row height it sets. */
     public static final int ICON_SIZE = 10;
+
+    /** Rows the font's capitals stand, from their top to their baseline. */
+    public static final int CAP_HEIGHT = 7;
 
     private LostTalesUiInk() {}
 
@@ -142,5 +146,57 @@ public final class LostTalesUiInk {
      */
     public static void beginContent() {
         LostTalesSkyrimUiStyle.beginContent();
+    }
+
+    /** Text in an explicit colour with the shared shadow treatment. */
+    public static void drawText(FontRenderer font, String text,
+                            int x, int y, int rgb, int alpha) {
+        drawText(font, text, x, y, rgb, alpha, 1.0F);
+    }
+
+    /**
+     * Text drawn inside a scaled matrix: the offset is
+     * given in that matrix's units so the shadow still lands one screen
+     * pixel away, which is what every other shadow in the chat does.
+     * A scale of one is the plain case.
+     */
+    public static void drawText(final FontRenderer font, final String text,
+                            final int x, final int y, final int rgb,
+                            final int alpha, float scale) {
+        if (font == null || text == null || alpha < MIN_VISIBLE_ALPHA) {
+            return;
+        }
+        beginContent();
+        final int shadow = shadowAlpha(alpha);
+        final int offset = scale <= 0.0F ? SHADOW_OFFSET
+                : Math.max(1, Math.round(SHADOW_OFFSET / scale));
+        if (alpha >= 255 || LostTalesUiFlatLayers.isActive()) {
+            drawTextLayers(font, text, x, y, rgb, alpha, shadow, offset);
+            return;
+        }
+        // Words fading fade as one picture with their shadow, so the
+        // shadow never shows through their strokes.
+        LostTalesUiFlatLayers.draw(alpha, x, y,
+                x + font.getStringWidth(text) + offset,
+                y + font.FONT_HEIGHT + offset,
+                new LostTalesUiFlatLayers.Layers() {
+                    @Override
+                    public void draw() {
+                        drawTextLayers(font, text, x, y, rgb, alpha,
+                                shadow, offset);
+                    }
+                });
+    }
+
+    /** The shadow, then the words standing over it as the next layer. */
+    private static void drawTextLayers(FontRenderer font, String text,
+                                          int x, int y, int rgb, int alpha,
+                                          int shadow, int offset) {
+        if (shadow > 0) {
+            font.drawString(text, x + offset, y + offset,
+                    argb(SHADOW, shadow));
+            LostTalesUiFlatLayers.nextLayer();
+        }
+        font.drawString(text, x, y, argb(rgb, alpha));
     }
 }

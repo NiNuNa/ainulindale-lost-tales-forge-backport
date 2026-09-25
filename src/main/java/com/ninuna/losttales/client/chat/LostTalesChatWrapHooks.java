@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.WindowPlacement;
 import cpw.mods.fml.common.FMLLog;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,7 +38,7 @@ public final class LostTalesChatWrapHooks {
             // With chat colours off the renderer strips every code before
             // drawing, so the layout must measure the same stripped text.
             final boolean colours = LostTalesChatVisualStyle.chatColoursEnabled();
-            int width = ChatWindowPlacement.wrapWidth(
+            int width = WindowPlacement.wrapWidth(
                     chat.func_146228_f(), chat.func_146244_h());
             List<IChatComponent> lines = ChatLineWrapper.wrap(
                     new ChatLineWrapper.TextMetrics() {

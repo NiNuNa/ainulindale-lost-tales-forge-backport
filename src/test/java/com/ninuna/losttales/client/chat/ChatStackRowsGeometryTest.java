@@ -1,5 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.WindowStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.gui.ChatLine;
@@ -152,7 +154,7 @@ public final class ChatStackRowsGeometryTest {
      */
     private static int capsClearBelow(ChatStackRows rows, int dividerRow) {
         return ruleClearBelow(rows, dividerRow)
-                + LostTalesChatOverlayRenderer.ROW_TEXT_TOP;
+                + WindowStyle.ROW_TEXT_TOP;
     }
 
     /**
@@ -163,7 +165,7 @@ public final class ChatStackRowsGeometryTest {
     private static int capsClearAbove(ChatStackRows rows, int olderMessageRow) {
         return ruleClearAbove(rows, olderMessageRow)
                 + LostTalesChatOverlayRenderer.TEXT_OFFSET
-                - LostTalesChatOverlayRenderer.GLYPH_CAP_HEIGHT;
+                - LostTalesUiInk.CAP_HEIGHT;
     }
 
     /**

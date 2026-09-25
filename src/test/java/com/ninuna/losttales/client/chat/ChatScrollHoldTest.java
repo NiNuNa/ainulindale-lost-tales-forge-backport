@@ -42,9 +42,9 @@ public final class ChatScrollHoldTest {
         return lines;
     }
 
-    private static ChatWindowFrame frameOver(List<ChatLine> lines,
+    private static ChatFrame frameOver(List<ChatLine> lines,
                                              int dividerLineIndex) {
-        ChatWindowFrame frame = ChatWindowFrame.feed();
+        ChatFrame frame = ChatFrame.feed();
         frame.lines = lines;
         frame.dividerLineIndex = dividerLineIndex;
         return frame;
@@ -114,7 +114,7 @@ public final class ChatScrollHoldTest {
         ChatTab tab = ChatTab.of(ChatChannel.OOC);
         List<ChatLine> lines = history(10, 9, 8, 7, 6, 5, 4, 3, 2, 1);
         // The divider stands over the line at index 2; its row is row 3.
-        ChatWindowFrame frame = frameOver(lines, 2);
+        ChatFrame frame = frameOver(lines, 2);
         ClientChatChannelViews.scrollTo(tab, 3.5D, lines.size() + 1, 3.0D);
         ClientChatChannelViews.holdPosition(tab, frame);
         // The line above the divider (index 3, id 7) stands this far
@@ -128,7 +128,7 @@ public final class ChatScrollHoldTest {
         // A message arrives and the divider moves onto it; the line with
         // id 7 is at index 4 now.
         List<ChatLine> grown = history(11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1);
-        ChatWindowFrame after = frameOver(grown, 0);
+        ChatFrame after = frameOver(grown, 0);
         ClientChatChannelViews.holdPosition(tab, after);
         double scroll = ClientChatChannelViews.getScroll(tab,
                 grown.size() + 1, 3.0D);
@@ -163,7 +163,7 @@ public final class ChatScrollHoldTest {
     public void aTallerWindowLowersTheCeilingWithoutAJitter() {
         ChatTab tab = ChatTab.of(ChatChannel.GLOBAL);
         List<ChatLine> lines = history(10, 9, 8, 7, 6, 5, 4, 3, 2, 1);
-        ChatWindowFrame frame = frameOver(lines, -1);
+        ChatFrame frame = frameOver(lines, -1);
         // Three lines of room: the ceiling is seven rows up.
         frame.room = 3 * LostTalesChatOverlayRenderer.LINE_HEIGHT;
         ClientChatChannelViews.scroll(tab, 7, lines.size(), 3.0D);

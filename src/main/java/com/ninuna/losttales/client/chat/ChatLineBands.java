@@ -11,7 +11,7 @@ import java.util.Arrays;
  * all already baked into the recorded rectangles. Backed by arrays that are
  * reused frame to frame; nothing is allocated while recording.
  */
-final class ChatLineBands {
+public final class ChatLineBands {
     private static final int INITIAL_CAPACITY = 24;
 
     private int[] viewIndex = new int[INITIAL_CAPACITY];
@@ -38,7 +38,7 @@ final class ChatLineBands {
     private int sourceSize;
 
     /** Starts a new frame; {@code source} identifies the line list drawn. */
-    void reset(Object source, int sourceSize, float scale) {
+    public void reset(Object source, int sourceSize, float scale) {
         this.count = 0;
         this.source = source;
         this.sourceSize = sourceSize;
