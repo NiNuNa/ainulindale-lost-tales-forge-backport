@@ -2017,8 +2017,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             RenderContext context, String title, String body,
             float anchorX, float anchorY) {
         int bottom = context.mapYMax
-                - (LostTalesLotrMapLayout.isControlBarVisible(context.gui)
-                        ? LostTalesLotrMapControlBar.HEIGHT : 0);
+                - LostTalesLotrMapLayout.controlBarHeight(context.gui);
         LostTalesMapMarkerTooltip.render(
                 context.fontRenderer, title, body, anchorX, anchorY,
                 context.mapXMin, context.mapXMax,

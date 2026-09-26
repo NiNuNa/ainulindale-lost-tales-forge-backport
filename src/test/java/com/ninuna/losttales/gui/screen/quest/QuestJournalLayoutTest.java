@@ -1,6 +1,5 @@
 package com.ninuna.losttales.gui.screen.quest;
 
-import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import org.junit.Test;
 
@@ -24,12 +23,8 @@ public final class QuestJournalLayoutTest {
 
         assertEquals("the body starts a margin under the window's strip",
                 QuestJournalLayout.MARGIN, layout.bodyTop());
-        assertEquals("the action strip ends at the bottom", TALL,
-                (int)layout.actions().bottom());
-        assertEquals("its rule sits directly over it",
-                layout.actions().top, layout.actionRule().bottom(), 0.0D);
-        assertEquals(layout.bodyBottom() + QuestJournalLayout.MARGIN,
-                (int)layout.actionRule().top);
+        assertEquals("and ends a margin over the window's bar",
+                TALL - QuestJournalLayout.MARGIN, layout.bodyBottom());
     }
 
     @Test
@@ -122,41 +117,5 @@ public final class QuestJournalLayoutTest {
                 bar.bottom(), bottom.bottom(), 0.001D);
         assertTrue("and never smaller than a square",
                 bottom.height >= QuestJournalLayout.SCROLLBAR_WIDTH * 2);
-    }
-
-    @Test
-    public void aRowOfButtonsIsLaidOutLeftToRightAndCentredInItsStrip() {
-        LostTalesUiHitBox strip = new LostTalesUiHitBox(0, 200, 480, 26);
-        int[] widths = {40, 60, 30};
-
-        LostTalesUiHitBox first = QuestJournalLayout.buttonAt(strip, 8, widths, 0);
-        LostTalesUiHitBox second = QuestJournalLayout.buttonAt(strip, 8, widths, 1);
-        LostTalesUiHitBox third = QuestJournalLayout.buttonAt(strip, 8, widths, 2);
-
-        assertEquals(8.0D, first.left, 0.0D);
-        assertEquals(first.right() + QuestJournalLayout.CONTROL_GAP,
-                second.left, 0.0D);
-        assertEquals(second.right() + QuestJournalLayout.CONTROL_GAP,
-                third.left, 0.0D);
-        assertEquals(LostTalesUiFramedButton.HEIGHT, (int)first.height);
-        assertEquals("every button stands on the same row", first.top,
-                third.top, 0.0D);
-        assertEquals("and the row is centred in the strip",
-                Math.floor(strip.top
-                        + (strip.height - LostTalesUiFramedButton.HEIGHT) / 2.0D),
-                first.top, 0.0D);
-    }
-
-    @Test
-    public void aButtonIsAtLeastItsFramesSizeHoweverShortItsLabel() {
-        assertEquals(LostTalesUiFramedButton.MIN_SIZE,
-                QuestJournalLayout.buttonWidthFor(0));
-        assertEquals(30 + 2 * LostTalesUiFramedButton.WIDE_INSET,
-                QuestJournalLayout.buttonWidthFor(30));
-        // A width under the frame's minimum is grown, not drawn clipped.
-        LostTalesUiHitBox strip = new LostTalesUiHitBox(0, 0, 100, 26);
-        assertEquals(LostTalesUiFramedButton.MIN_SIZE,
-                (int)QuestJournalLayout.buttonAt(strip, 0, new int[] {1}, 0)
-                        .width);
     }
 }

@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
+import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.registry.CharacterBodyModelRegistry;
 import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
@@ -32,12 +33,18 @@ public final class LoreCharacterDefinitionJsonParser {
     private static final Pattern IDENTIFIER = Pattern.compile(
             "[a-z0-9_.-]+:[a-z0-9_./-]+");
     private static final Set<String> DEFINITION_KEYS = set(
-            "dataVersion", "id", "name", "description", "age", "appearance");
-    /** Every key but {@code age}, which a file may leave out. */
+            "dataVersion", "id", "name", "description", "age", "appearance",
+            "profile");
+    /** Every key but {@code age} and {@code profile}, which a file may leave out. */
     private static final Set<String> REQUIRED_DEFINITION_KEYS = set(
             "dataVersion", "id", "name", "description", "appearance");
     private static final Set<String> APPEARANCE_KEYS = set(
             "raceId", "genderId", "modelId", "skinId");
+    private static final Set<String> PROFILE_KEYS = set(
+            "appearance", "personality", "history", "facts", "glances");
+    private static final Set<String> GLANCE_KEYS = set("emoji", "title", "line");
+    /** A glance's emoji is a chat emoji's name; well past the longest. */
+    private static final int MAX_EMOJI_NAME_LENGTH = 64;
 
     private LoreCharacterDefinitionJsonParser() {}
 
@@ -80,9 +87,11 @@ public final class LoreCharacterDefinitionJsonParser {
             }
             LoreCharacterDefinition.Appearance appearance = parseAppearance(
                     object.get("appearance"), "appearance");
+            CharacterProfile profile = parseProfile(object.get("profile"),
+                    description);
             return new ParseResult(
                     new LoreCharacterDefinition(dataVersion, id, name,
-                            description, age, appearance), errors);
+                            description, age, appearance, profile), errors);
         } catch (RuntimeException e) {
             errors.add(source + ": " + safeMessage(e));
         } catch (IOException e) {
@@ -206,6 +215,125 @@ public final class LoreCharacterDefinitionJsonParser {
         }
         return new LoreCharacterDefinition.Appearance(
                 raceId, genderId, modelId, skinId);
+    }
+
+    /**
+     * The profile a definition gives its character: an object of the
+     * profile's parts, every one optional — {@code appearance},
+     * {@code personality} and {@code history} (up to 512 characters,
+     * paragraphs kept), {@code facts} by name (up to 24 characters each),
+     * and up to five {@code glances}, each the {@code emoji} of the chat's
+     * by its name, a {@code title} and an optional {@code line}. The
+     * History is the description where the profile gives none, and a file
+     * with no profile is its description alone. Held to the bounds a
+     * player's profile is, normalised as one is stored.
+     */
+    private static CharacterProfile parseProfile(JsonElement element,
+                                                 String description) {
+        CharacterProfile profile = CharacterProfile.EMPTY;
+        if (element != null && !element.isJsonNull()) {
+            if (!element.isJsonObject()) {
+                throw invalid("profile must be an object");
+            }
+            JsonObject object = element.getAsJsonObject();
+            validateAllowedKeys(object, PROFILE_KEYS, "profile");
+            for (CharacterProfile.Section section
+                    : CharacterProfile.Section.values()) {
+                if (object.has(section.getId())) {
+                    profile = profile.withSection(section, string(
+                            object.get(section.getId()),
+                            "profile." + section.getId(),
+                            CharacterProfile.MAX_SECTION_LENGTH, true));
+                }
+            }
+            if (object.has("facts")) {
+                profile = parseFacts(profile, object.get("facts"));
+            }
+            if (object.has("glances")) {
+                profile = profile.withGlances(parseGlances(
+                        object.get("glances")));
+            }
+        }
+        if (profile.section(CharacterProfile.Section.HISTORY).length() == 0) {
+            profile = profile.withSection(CharacterProfile.Section.HISTORY,
+                    description);
+        }
+        CharacterProfile stored = CharacterValidator.normalizeProfile(profile);
+        for (CharacterProfile.Section section : CharacterProfile.Section.values()) {
+            if (!CharacterValidator.isValidSection(stored.section(section))) {
+                throw invalid("profile." + section.getId()
+                        + " holds characters a profile may not");
+            }
+        }
+        for (int index = 0; index < stored.glances().size(); index++) {
+            if (!CharacterValidator.isValidGlance(stored.glances().get(index))) {
+                throw invalid("profile.glances[" + index + "] needs one of the"
+                        + " chat's emoji by its name and a title");
+            }
+        }
+        return stored;
+    }
+
+    private static CharacterProfile parseFacts(CharacterProfile profile,
+                                               JsonElement element) {
+        if (element == null || !element.isJsonObject()) {
+            throw invalid("profile.facts must be an object");
+        }
+        JsonObject facts = element.getAsJsonObject();
+        Set<String> names = new LinkedHashSet<String>();
+        for (CharacterProfile.Fact fact : CharacterProfile.Fact.values()) {
+            names.add(fact.getId());
+        }
+        validateAllowedKeys(facts, names, "profile.facts");
+        CharacterProfile read = profile;
+        for (CharacterProfile.Fact fact : CharacterProfile.Fact.values()) {
+            if (facts.has(fact.getId())) {
+                String value = string(facts.get(fact.getId()),
+                        "profile.facts." + fact.getId(),
+                        CharacterProfile.MAX_FACT_LENGTH, true);
+                if (!CharacterValidator.isValidLine(
+                        CharacterValidator.normalizeLine(value),
+                        CharacterProfile.MAX_FACT_LENGTH)) {
+                    throw invalid("profile.facts." + fact.getId()
+                            + " must be one line");
+                }
+                read = read.withFact(fact, value);
+            }
+        }
+        return read;
+    }
+
+    private static List<CharacterProfile.Glance> parseGlances(
+            JsonElement element) {
+        if (element == null || !element.isJsonArray()) {
+            throw invalid("profile.glances must be an array");
+        }
+        JsonArray array = element.getAsJsonArray();
+        if (array.size() > CharacterProfile.MAX_GLANCES) {
+            throw invalid("profile.glances holds more than "
+                    + CharacterProfile.MAX_GLANCES);
+        }
+        List<CharacterProfile.Glance> glances =
+                new ArrayList<CharacterProfile.Glance>(array.size());
+        for (int index = 0; index < array.size(); index++) {
+            String path = "profile.glances[" + index + "]";
+            JsonElement entry = array.get(index);
+            if (entry == null || !entry.isJsonObject()) {
+                throw invalid(path + " must be an object");
+            }
+            JsonObject glance = entry.getAsJsonObject();
+            validateAllowedKeys(glance, GLANCE_KEYS, path);
+            glances.add(new CharacterProfile.Glance(
+                    requiredString(glance.get("emoji"), path + ".emoji",
+                            MAX_EMOJI_NAME_LENGTH),
+                    requiredString(glance.get("title"), path + ".title",
+                            CharacterProfile.MAX_GLANCE_TITLE_LENGTH),
+                    glance.has("line") ? string(glance.get("line"),
+                            path + ".line",
+                            CharacterProfile.MAX_GLANCE_LINE_LENGTH, true)
+                            : ""));
+        }
+        return glances;
     }
 
     private static boolean isCompatibleModel(String raceId, String modelId) {

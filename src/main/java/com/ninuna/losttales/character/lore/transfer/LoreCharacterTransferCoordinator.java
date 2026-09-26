@@ -506,7 +506,7 @@ public final class LoreCharacterTransferCoordinator {
                 .startingFaction(faction)
                 .createdAt(System.currentTimeMillis())
                 .startingWaypoint(waypoint)
-                .description(definition.getDescription())
+                .profile(definition.getProfile())
                 .build();
     }
 

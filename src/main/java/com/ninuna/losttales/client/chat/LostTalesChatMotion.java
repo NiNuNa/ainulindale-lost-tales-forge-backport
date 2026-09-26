@@ -5,9 +5,8 @@ import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.client.motion.MotionIds;
 
 /**
- * The chat's two entrances whose shape is its own: the newest message
- * and the input bars. Their times and distances are their motions'
- * ({@link MotionIds#CHAT_LINE_APPEAR}, {@link MotionIds#CHAT_BAR_APPEAR}).
+ * The newest message's entrance, whose shape is the chat's own. Its
+ * times and distances are its motion's ({@link MotionIds#CHAT_LINE_APPEAR}).
  */
 final class LostTalesChatMotion {
     private LostTalesChatMotion() {}
@@ -35,19 +34,6 @@ final class LostTalesChatMotion {
                 rise * (1.0F - settled),
                 smoothStep(clamp(p / fadeLead)),
                 slideIn + swing);
-    }
-
-    /** Entry of the input bars: up from below with a brief overshoot. */
-    static float inputOffset(float progress) {
-        String id = MotionIds.CHAT_BAR_APPEAR;
-        float distance = Motions.param(id, "distance", 13.0F);
-        float swing = Motions.param(id, "swing", 1.25F);
-        float swings = Motions.param(id, "swings", 2.5F);
-        float p = clamp(progress);
-        float settled = smoothStep(p);
-        float followThrough = (float)Math.sin(p * Math.PI * swings)
-                * (1.0F - p) * (1.0F - p);
-        return distance * (1.0F - settled) + swing * followThrough;
     }
 
     static float smoothStep(float value) {

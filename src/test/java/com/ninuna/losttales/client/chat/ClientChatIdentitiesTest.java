@@ -121,7 +121,7 @@ public final class ClientChatIdentitiesTest {
                     id.equals(ARAGORN) ? "Aragorn" : "Legolas", "human", "male",
                     "skin", RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
                     RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, 30, "GONDOR", 1, 0L, 1L,
-                    RoleplayCharacter.CURRENT_DATA_VERSION, "", "", ""));
+                    RoleplayCharacter.CURRENT_DATA_VERSION, "", ""));
         }
         ClientCharacterRosterCache.acceptRoster(0, new CharacterRosterSnapshot(
                 OWNER, Math.max(1, summaries.size()), active, 1L,

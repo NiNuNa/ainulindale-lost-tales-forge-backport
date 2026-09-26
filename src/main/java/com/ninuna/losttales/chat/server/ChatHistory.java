@@ -1,6 +1,7 @@
 package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatChannelSuggester;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatChannelScope;
 import com.ninuna.losttales.chat.ChatMessageIds;
@@ -267,6 +268,72 @@ public final class ChatHistory {
     }
 
     /**
+     * The message a player may forward, as the server holds it, or null:
+     * one they were sent or may read now — what they may react to — said
+     * by a player or a Discord member, never by the Server, in a
+     * conversation a link can name. The forward names it by that link and
+     * by its author, wearing the head the line was drawn with.
+     */
+    public static synchronized Forwardable forwardable(long messageId,
+                                                       Requester requester) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        if (entry == null || requester == null || requester.accountId == null
+                || !(entry.seenBy.contains(requester.accountId)
+                        || entry.audience.admits(requester, entry))
+                || LostTalesChatMessagePacket.isSystemSender(
+                        entry.forOthers.getSenderId())) {
+            return null;
+        }
+        ChatChannel channel = ChatChannel.fromId(entry.channelId);
+        String link = channel == null ? null : ChatChannelSuggester.messageLink(
+                channel, entry.forOthers.getScopeValue(), messageId);
+        ChatReplyReference reference = ChatReplyReference.forward(messageId,
+                entry.author, entry.forOthers.getNameColor(), link);
+        if (!reference.exists()) {
+            return null;
+        }
+        return new Forwardable(entry.forOthers.getMessage(),
+                forwardedShowcases(entry.forOthers.getShowcases()),
+                withHead(reference, entry));
+    }
+
+    /**
+     * What a message shares, as a forward carries it: a quest card no
+     * longer takes anyone into the quest, which is its author's to offer.
+     */
+    private static List<ChatShowcase> forwardedShowcases(
+            List<ChatShowcase> showcases) {
+        List<ChatShowcase> carried =
+                new ArrayList<ChatShowcase>(showcases.size());
+        for (ChatShowcase showcase : showcases) {
+            carried.add(showcase.getKind() == ChatShareKind.QUEST
+                    && showcase.isQuestJoinable()
+                    ? ChatShowcase.quest(showcase.getTokenIndex(),
+                            showcase.getQuestReference(),
+                            showcase.getQuestTitle(),
+                            showcase.getQuestCategory(),
+                            showcase.getQuestObjective(),
+                            showcase.getQuestReward(), false)
+                    : showcase);
+        }
+        return carried;
+    }
+
+    /** A message as a forward carries it: its words, what it shares, and the quote naming it. */
+    public static final class Forwardable {
+        public final String text;
+        public final List<ChatShowcase> showcases;
+        public final ChatReplyReference reference;
+
+        Forwardable(String text, List<ChatShowcase> showcases,
+                    ChatReplyReference reference) {
+            this.text = text;
+            this.showcases = Collections.unmodifiableList(showcases);
+            this.reference = reference;
+        }
+    }
+
+    /**
      * The message a player may report, as the server holds it, or null:
      * one they were shown, or one said for everyone, spoken by another
      * player or a Discord member — never by the Server, the Client or
@@ -426,20 +493,33 @@ public final class ChatHistory {
     /* ---- Reactions ---- */
 
     /**
-     * What one reaction changed: everyone to tell, and how many players
-     * reacted with the emoji before and after — what decides whether the
-     * bridge's own reaction on Discord comes or goes.
+     * What one reaction changed: everyone to tell, the emoji, and who
+     * stood behind it before and after — what decides whether the
+     * bridge's own reaction on each Discord copy comes or goes.
      */
     public static final class ReactionChange {
         public final Set<UUID> readers;
-        public final int gameCountBefore;
-        public final int gameCountAfter;
+        public final String emoji;
+        public final ChatReactions.Stand before;
+        public final ChatReactions.Stand after;
 
-        ReactionChange(Set<UUID> readers, int gameCountBefore,
-                       int gameCountAfter) {
+        ReactionChange(Set<UUID> readers, String emoji,
+                       ChatReactions.Stand before, ChatReactions.Stand after) {
             this.readers = readers;
-            this.gameCountBefore = gameCountBefore;
-            this.gameCountAfter = gameCountAfter;
+            this.emoji = emoji;
+            this.before = before;
+            this.after = after;
+        }
+    }
+
+    /** What a Discord clear changed: everyone to tell, and each emoji whose stand moved. */
+    public static final class ReactionClear {
+        public final Set<UUID> readers;
+        public final List<ReactionChange> changes;
+
+        ReactionClear(Set<UUID> readers, List<ReactionChange> changes) {
+            this.readers = readers;
+            this.changes = Collections.unmodifiableList(changes);
         }
     }
 
@@ -458,6 +538,13 @@ public final class ChatHistory {
                                                     Requester requester,
                                                     UUID reactor, String name,
                                                     String emoji, boolean add) {
+        return react(messageId, requester, reactor, name, emoji, "", add);
+    }
+
+    private static ReactionChange react(long messageId, Requester requester,
+                                        UUID reactor, String name,
+                                        String emoji, String origin,
+                                        boolean add) {
         Entry entry = ENTRIES.get(Long.valueOf(messageId));
         if (entry == null || reactor == null) {
             return null;
@@ -466,8 +553,8 @@ public final class ChatHistory {
                 || entry.audience.admits(requester, entry))) {
             return null;
         }
-        int before = entry.reactions.gameCount(emoji);
-        if (!entry.reactions.set(emoji, reactor, name, add)) {
+        ChatReactions.Stand before = entry.reactions.standOf(emoji);
+        if (!entry.reactions.set(emoji, reactor, name, origin, add)) {
             return null;
         }
         if (requester != null) {
@@ -476,7 +563,7 @@ public final class ChatHistory {
         changed();
         return new ReactionChange(
                 Collections.unmodifiableSet(new HashSet<UUID>(entry.seenBy)),
-                before, entry.reactions.gameCount(emoji));
+                emoji, before, entry.reactions.standOf(emoji));
     }
 
     /**
@@ -487,11 +574,12 @@ public final class ChatHistory {
      * takes the key with that id that holds the member, so a rename on
      * Discord neither opens a second chip nor strands a reaction.
      * {@code emoji} is null for an emoji Discord sent without a name,
-     * {@code customId} empty for a Unicode emoji.
+     * {@code customId} empty for a Unicode emoji; {@code origin} is the
+     * Discord channel the member reacted in.
      */
     public static synchronized ReactionChange reactFromDiscord(
             long messageId, UUID reactor, String name, String emoji,
-            String customId, boolean add) {
+            String customId, String origin, boolean add) {
         Entry entry = ENTRIES.get(Long.valueOf(messageId));
         if (entry == null || reactor == null) {
             return null;
@@ -499,24 +587,43 @@ public final class ChatHistory {
         String key = entry.reactions.discordKeyOf(emoji, customId, reactor,
                 add);
         return key == null ? null
-                : react(messageId, null, reactor, name, key, add);
+                : react(messageId, null, reactor, name, key, origin, add);
     }
 
     /**
-     * Takes back every Discord member's reaction to a kept message — with
-     * one emoji, or with every emoji when {@code emoji} is null and
-     * {@code customId} empty — and answers with everyone to tell, or null
-     * when nothing changed. A custom emoji is cleared by its id, from
-     * every key it is kept under ({@link ChatReactions#clearDiscord(String, String)}).
+     * Takes back the reactions Discord members made in the Discord
+     * channel {@code origin} to a kept message — with one emoji, or with
+     * every emoji when {@code emoji} is null and {@code customId} empty —
+     * and answers with what changed, or null when nothing did. A custom
+     * emoji is cleared by its id, from every key it is kept under
+     * ({@link ChatReactions#clearDiscord(String, String, String)}).
      */
-    public static synchronized Set<UUID> clearDiscordReactions(
-            long messageId, String emoji, String customId) {
+    public static synchronized ReactionClear clearDiscordReactions(
+            long messageId, String emoji, String customId, String origin) {
         Entry entry = ENTRIES.get(Long.valueOf(messageId));
-        if (entry == null || !entry.reactions.clearDiscord(emoji, customId)) {
+        if (entry == null) {
+            return null;
+        }
+        Map<String, ChatReactions.Stand> before =
+                new LinkedHashMap<String, ChatReactions.Stand>();
+        for (String key : entry.reactions.emoji()) {
+            before.put(key, entry.reactions.standOf(key));
+        }
+        if (!entry.reactions.clearDiscord(emoji, customId, origin)) {
             return null;
         }
         changed();
-        return Collections.unmodifiableSet(new HashSet<UUID>(entry.seenBy));
+        Set<UUID> readers =
+                Collections.unmodifiableSet(new HashSet<UUID>(entry.seenBy));
+        List<ReactionChange> changes = new ArrayList<ReactionChange>();
+        for (Map.Entry<String, ChatReactions.Stand> kind : before.entrySet()) {
+            ChatReactions.Stand after = entry.reactions.standOf(kind.getKey());
+            if (!after.equals(kind.getValue())) {
+                changes.add(new ReactionChange(readers, kind.getKey(),
+                        kind.getValue(), after));
+            }
+        }
+        return new ReactionClear(readers, changes);
     }
 
     /** The reactions on a kept message as {@code viewer} is shown them. */

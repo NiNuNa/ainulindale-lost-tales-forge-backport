@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.PointerRegions;
 import com.ninuna.losttales.client.window.SubWindow;
 import com.ninuna.losttales.client.window.SubWindowContent;
@@ -187,7 +188,7 @@ abstract class ChatPickerPanel extends SubWindowContent {
     @Override
     public void scrollBy(int lines) {
         this.scroll = Math.max(0,
-                this.scroll + WheelStep.pixels(lines, ChatMenu.ROW_HEIGHT));
+                this.scroll + WheelStep.pixels(lines, MenuWindow.ROW_HEIGHT));
     }
 
     /**

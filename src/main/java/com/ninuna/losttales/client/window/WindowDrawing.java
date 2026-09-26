@@ -54,15 +54,14 @@ public final class WindowDrawing {
 
     /**
      * The page's box in a page window as drawn this frame: the window's
-     * width under its tool strip, or right under its row for a page with
-     * none, down to its foot, laid on the display's grid.
+     * width from under its tool strip down to its input bar's rule, laid
+     * on the display's grid.
      */
     public static LostTalesUiHitBox pageBox(WindowFrame frame) {
         double left = frame.drawnLeft();
-        double top = LostTalesDisplayPixels.snap(hasToolStrip(frame)
-                ? frame.historyTop() : frame.tabRowBottom());
+        double top = LostTalesDisplayPixels.snap(frame.historyTop());
         double bottom = LostTalesDisplayPixels.snap(
-                frame.boxBottom + frame.motionY);
+                frame.barTop() + frame.motionY);
         return new LostTalesUiHitBox(left, top, frame.boxRight - frame.boxLeft,
                 Math.max(0.0D, bottom - top));
     }
@@ -76,8 +75,9 @@ public final class WindowDrawing {
 
     /**
      * A page window's surface under its tool strip, in one layer with the
-     * frame's ring beside and under it: the sub-windows' surface, the
-     * inset plum black thinned by the windows' opacity.
+     * frame's ring beside it: the sub-windows' surface, the inset plum
+     * black thinned by the windows' opacity. The bar carries the ring
+     * beside and under itself.
      */
     public static void drawPageSurface(Minecraft minecraft, WindowFrame frame,
                                        LostTalesGuiAnimationSample opening) {
@@ -86,7 +86,6 @@ public final class WindowDrawing {
             return;
         }
         LostTalesUiHitBox page = pageBox(frame);
-        int ring = WindowPlacement.FRAME_WIDTH;
         float left = (float)page.left;
         float right = (float)(page.left + page.width);
         float top = (float)page.top;
@@ -95,26 +94,6 @@ public final class WindowDrawing {
                 * WindowStyle.opacity(minecraft));
         LostTalesUiInk.fillRect(left, top, right, bottom, surface);
         fillFrameSides(left, right, top, bottom, surface, surface);
-        LostTalesUiInk.fillRect(left - ring, bottom, right + ring,
-                bottom + ring - 1, surface);
-        LostTalesUiInk.fillRect(left - ring + 1, bottom + ring - 1,
-                right + ring - 1, bottom + ring, surface);
-    }
-
-    /** A page window's frame edges all round: it has no bar to carry the lower ones. */
-    public static void drawPageFrameEdges(Minecraft minecraft,
-                                          WindowFrame frame,
-                                          LostTalesGuiAnimationSample opening) {
-        if (minecraft == null || frame == null || !frame.drawn
-                || opening == null) {
-            return;
-        }
-        float left = (float)frame.drawnLeft();
-        LostTalesUiWindowFrame.drawEdges(left,
-                (float)(frame.boxTop + frame.motionY),
-                left + (float)(frame.boxRight - frame.boxLeft),
-                (float)(frame.boxBottom + frame.motionY),
-                Math.round(255.0F * opening.getOpacity()));
     }
 
     /**
@@ -180,15 +159,8 @@ public final class WindowDrawing {
                 strip.drawnStripArgb);
         fillFrameSides(left, right, top, stripRule, strip.drawnStripArgb,
                 strip.drawnStripArgb);
-        if (hasToolStrip(frame)) {
-            fillFrameSides(left, right, stripRule, historyTop,
-                    strip.drawnToolArgb, strip.drawnToolArgb);
-        }
-    }
-
-    /** Whether the window shows a tool strip: every window but one whose page has none. */
-    private static boolean hasToolStrip(WindowFrame frame) {
-        return frame.page == null || frame.page.hasToolStrip();
+        fillFrameSides(left, right, stripRule, historyTop,
+                strip.drawnToolArgb, strip.drawnToolArgb);
     }
 
     /**

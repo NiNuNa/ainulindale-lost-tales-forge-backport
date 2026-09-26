@@ -7,13 +7,13 @@ import java.util.List;
 import net.minecraft.client.Minecraft;
 
 /**
- * What a page holds: the quest journal, the party. A page is a tab a
- * window holds beside its other tabs; while it is the tab in front the
- * window shows the page under its tab row and tool strip instead of a
- * conversation's lines, member list and input bar. The window owns the
- * frame, the row, the strip, the surface and the place; the page draws
- * itself in the box it is given and answers the pointer and the keys
- * there.
+ * What a page holds: the quest journal, the party, the map. A page is a
+ * tab a window holds beside its other tabs; while it is the tab in front
+ * the window shows the page between its tool strip and its input bar
+ * instead of a conversation's lines and member list. The window owns the
+ * frame, the row, the strip, the bar, the surface and the place; the page
+ * draws itself in the box it is given, says what stands on the bar
+ * ({@link #barItems}), and answers the pointer and the keys.
  *
  * <p>The strip is the same as over a conversation, with the page's own
  * parts in it: the button of the page's panel at its left end, where a
@@ -28,16 +28,27 @@ import net.minecraft.client.Minecraft;
  * in the same space, or NaN while it is not on the page.</p>
  */
 public abstract class PageContent {
-    /** One row a page puts in its tab's menu; the chosen one is marked. */
+    /**
+     * One row a page puts in its tab's menu; the chosen one is marked, and
+     * one that cannot be taken now is greyed and says why.
+     */
     public static final class Choice {
         public final String id;
         public final String label;
         public final boolean chosen;
+        /** Why the row cannot be taken now; empty while it can. */
+        public final String unavailable;
 
         public Choice(String id, String label, boolean chosen) {
+            this(id, label, chosen, "");
+        }
+
+        public Choice(String id, String label, boolean chosen,
+                      String unavailable) {
             this.id = id;
             this.label = label == null ? "" : label;
             this.chosen = chosen;
+            this.unavailable = unavailable == null ? "" : unavailable;
         }
     }
 
@@ -99,6 +110,23 @@ public abstract class PageContent {
     }
 
     /**
+     * What stands on the page's input bar, left to right, made afresh each
+     * frame: the page's actions, its field, its quiet words and glyphs.
+     * An action that cannot be taken now is there, greyed, saying why.
+     * Empty for a bare bar.
+     */
+    public List<BarItem> barItems() {
+        return Collections.emptyList();
+    }
+
+    /**
+     * An item of the bar was pressed: a button or a glyph, the field's well
+     * ({@code offer} -1), or a row of the field's list ({@code offer} its
+     * index). Greyed items are never pressed.
+     */
+    public void barPressed(String id, int offer) {}
+
+    /**
      * Draws the page in {@code box} at {@code alpha} (0-255), on the
      * window's own surface. {@code clipX}/{@code clipY} is where the box's
      * whole pixels really stand on the screen, for a scissor.
@@ -145,13 +173,23 @@ public abstract class PageContent {
         return true;
     }
 
-    /**
-     * Whether the page stands under a tool strip. One that does not takes
-     * the strip's room too, right under the tab row.
-     */
-    public boolean hasToolStrip() {
-        return true;
+    /* ---- The quick switcher ---- */
+
+    /** The heading over what the quick switcher finds of the page, as a lang key; empty for a page it finds nothing in. */
+    public String findHeading() {
+        return "";
     }
+
+    /**
+     * What the quick switcher finds of the page by {@code words}, which
+     * are never empty: a quest, a character, each row's id the page's own.
+     */
+    public List<MenuWindow.Entry> find(String words) {
+        return Collections.emptyList();
+    }
+
+    /** One of the rows the page {@link #find found} was chosen: the page, come forward, shows it. */
+    public void show(String id) {}
 
     /**
      * Whether the page is drawn with depth testing on, as a screen of its
@@ -178,15 +216,6 @@ public abstract class PageContent {
      * Otherwise a page's key over it opens that page, or closes this one.
      */
     public boolean holdsKeys() {
-        return false;
-    }
-
-    /**
-     * Whether the page closes with the screen: its tab leaves its window
-     * once the game shows no screen, and it opens again where it was
-     * left. A screen opened over the windows and gone back from keeps it.
-     */
-    public boolean closesWithScreen() {
         return false;
     }
 

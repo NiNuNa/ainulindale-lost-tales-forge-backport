@@ -42,7 +42,7 @@ public final class LostTalesLotrMapCompass {
         }
         try {
             boolean fixedToControlBar =
-                    LostTalesLotrMapLayout.isControlBarVisible(gui);
+                    LostTalesLotrMapLayout.drawsControlBar(gui);
             if (fixedToControlBar) {
                 LostTalesControlBarAnimation.pushFixed(gui);
             }
@@ -88,10 +88,10 @@ public final class LostTalesLotrMapCompass {
 
     /** Height at the bottom of the screen the map's own panels have taken. */
     private static int reservedBottom(LostTalesLotrMapGui gui) {
-        if (!LostTalesLotrMapLayout.isControlBarVisible(gui)) {
+        if (!LostTalesLotrMapLayout.hasFooterLayout(gui)) {
             return 0;
         }
-        return LostTalesLotrMapControlBar.HEIGHT
+        return LostTalesLotrMapLayout.controlBarHeight(gui)
                 + LostTalesLotrMapLegend.getAnimatedReservedHeight(gui);
     }
 

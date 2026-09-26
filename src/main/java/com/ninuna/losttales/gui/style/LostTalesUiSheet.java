@@ -126,9 +126,8 @@ public enum LostTalesUiSheet {
     REPLY_HOVER(60, 32, 4, 5),
     /**
      * An arrow curling on to the right, with its lit artwork: forwarding a
-     * message to another conversation. Nothing draws it yet, as there is
-     * no forwarding; it is here so the sheet and these constants stay one
-     * description of the artwork.
+     * message to another conversation, on the message toolbar, over the
+     * list of conversations, and where a forward's row opens.
      */
     FORWARD(65, 32, 4, 5),
     FORWARD_HOVER(70, 32, 4, 5),

@@ -5,7 +5,7 @@ import com.ninuna.losttales.client.window.WindowHover;
 
 /**
  * What of the chat is under the pointer: the bar and its lists, the
- * menus and pickers, and a conversation's lines, member list, toolbar,
+ * pickers, and a conversation's lines, member list, toolbar,
  * scrollbar and jump pill. The window screen finds it through the chat's
  * part ({@link ChatScreenPart}) at the points of its search where the
  * chat's things are drawn: the completion lists over everything, the
@@ -15,18 +15,12 @@ import com.ninuna.losttales.client.window.WindowHover;
 public final class ChatHover extends WindowHover {
     /** What of the chat the pointer is on. */
     public enum Kind {
-        /** A row of a menu's window that does something. */
-        MENU_ENTRY,
-        /** A menu's window where no row answers: a header, a display row, the field, padding. */
-        MENU,
         /** The {@code +} the empty state offers. */
         EMPTY_PLUS,
         /** A row of an open completion list. */
         SUGGESTION,
         /** An open completion list's own padding. */
         SUGGESTIONS,
-        /** A row of the list a menu's field opens. */
-        FIELD_SUGGESTION,
         /** A cell of a picker's window. */
         PICKER_CELL,
         /** A section label of a picker's window that folds. */
@@ -60,14 +54,9 @@ public final class ChatHover extends WindowHover {
     }
 
     final Kind chatKind;
-    ChatMenu.Entry menuEntry;
-    /** Why the menu's row under the pointer cannot be taken; empty for none. */
-    String menuTip = "";
     ChatPickerPanel picker;
     ChatPickerPanel.Entry pickerEntry;
     ChatInputCompletion.Slot suggestion;
-    /** The row of a field's list the pointer is on; -1 between rows. */
-    int fieldSuggestion = -1;
     int toolbarKind = -1;
     /**
      * On a window's lines, the chat line id of the message whose
@@ -107,10 +96,8 @@ public final class ChatHover extends WindowHover {
     @Override
     public boolean acts() {
         switch (this.chatKind) {
-            case MENU_ENTRY:
             case EMPTY_PLUS:
             case SUGGESTION:
-            case FIELD_SUGGESTION:
             case PICKER_CELL:
             case PICKER_LABEL:
             case OTHER_BAR:

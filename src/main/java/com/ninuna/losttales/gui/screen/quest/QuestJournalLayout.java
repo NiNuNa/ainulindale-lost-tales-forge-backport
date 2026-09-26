@@ -1,16 +1,15 @@
 package com.ninuna.losttales.gui.screen.quest;
 
-import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 
 /**
  * Where every part of the quest journal stands, worked out from the
  * page's box alone.
  *
- * <p>The page is read top to bottom: the body, split by one rule into
- * the quest list and what the chosen quest says, and an action strip
- * under it. Its name, its filters and its search are the window's: its
- * tab, its tool strip's cog and its well. The list is a panel the strip's
+ * <p>The page is its body, split by one rule into the quest list and what
+ * the chosen quest says. Its name, its filters, its search and its actions
+ * are the window's: its tab, its tool strip's cog and well, and its input
+ * bar. The list is a panel the strip's
  * left button folds away, and a page too narrow for both halves shows
  * one of them over the whole body: the list while it is out, else the
  * details. Each area is a box, and the drawing and the pointer ask the
@@ -22,9 +21,6 @@ import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
  */
 public final class QuestJournalLayout {
 
-    /** The strip at the bottom, a framed button with room above and below. */
-    public static final int ACTION_HEIGHT =
-            LostTalesUiFramedButton.HEIGHT + 2 * 4;
     /** Clear pixels between the page's edge and anything drawn. */
     public static final int MARGIN = 8;
     /** One quest's row: the chat's line stride, so text sits the same. */
@@ -38,8 +34,6 @@ public final class QuestJournalLayout {
     public static final int LIST_MAX_WIDTH = 220;
     /** The scrollbar's column, inside the list's right edge. */
     public static final int SCROLLBAR_WIDTH = 3;
-    /** Clear pixels between two buttons standing side by side. */
-    public static final int CONTROL_GAP = 4;
     /**
      * The narrowest page the two halves both fit on. Under it they take
      * turns: the list while it is out, else the details.
@@ -72,26 +66,13 @@ public final class QuestJournalLayout {
         return isWide() && this.listOut;
     }
 
-    /** The strip across the bottom. */
-    public LostTalesUiHitBox actions() {
-        return new LostTalesUiHitBox(0,
-                Math.max(0, this.pageHeight - ACTION_HEIGHT),
-                this.pageWidth, ACTION_HEIGHT);
-    }
-
-    /** The one-pixel rule over the action strip. */
-    public LostTalesUiHitBox actionRule() {
-        return new LostTalesUiHitBox(0, actions().top - 1,
-                this.pageWidth, 1);
-    }
-
     /** The first row of the body, and the row past its last. */
     public int bodyTop() {
         return MARGIN;
     }
 
     public int bodyBottom() {
-        return (int)actions().top - 1 - MARGIN;
+        return Math.max(MARGIN, this.pageHeight - MARGIN);
     }
 
     /** The whole body between the margins, which one half takes when they take turns. */
@@ -194,35 +175,5 @@ public final class QuestJournalLayout {
                 : Math.max(0.0D, Math.min(1.0D, scroll / hidden));
         return new LostTalesUiHitBox(bar.left, bar.top + travel * at,
                 bar.width, handle);
-    }
-
-    /**
-     * A row of framed buttons laid left to right from {@code left},
-     * vertically centred in {@code strip}: the box of the button at
-     * {@code index} given every button's width in order.
-     */
-    public static LostTalesUiHitBox buttonAt(LostTalesUiHitBox strip,
-                                             double left, int[] widths,
-                                             int index) {
-        if (strip == null || widths == null || index < 0
-                || index >= widths.length) {
-            return none();
-        }
-        double x = left;
-        for (int before = 0; before < index; before++) {
-            x += Math.max(LostTalesUiFramedButton.MIN_SIZE, widths[before])
-                    + CONTROL_GAP;
-        }
-        double top = strip.top
-                + (strip.height - LostTalesUiFramedButton.HEIGHT) / 2.0D;
-        return new LostTalesUiHitBox(x, Math.floor(top),
-                Math.max(LostTalesUiFramedButton.MIN_SIZE, widths[index]),
-                LostTalesUiFramedButton.HEIGHT);
-    }
-
-    /** The width a framed button needs to hold {@code contentWidth}. */
-    public static int buttonWidthFor(int contentWidth) {
-        return Math.max(LostTalesUiFramedButton.MIN_SIZE,
-                contentWidth + 2 * LostTalesUiFramedButton.WIDE_INSET);
     }
 }

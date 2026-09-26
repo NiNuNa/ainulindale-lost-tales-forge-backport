@@ -1,5 +1,6 @@
 package com.ninuna.losttales.character.lore;
 
+import com.ninuna.losttales.character.model.CharacterProfile;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -47,6 +48,62 @@ public final class LoreCharacterRegistryTest {
         assertEquals("a file without an age is eighteen",
                 LoreCharacterDefinition.DEFAULT_AGE,
                 result.getDefinition().getAge());
+    }
+
+    /**
+     * A definition may give the whole profile the character is claimed
+     * with; its History is the description where the profile names none.
+     */
+    @Test
+    public void aProfileIsReadAndTheDescriptionIsTheHistoryOtherwise() {
+        LoreCharacterDefinitionJsonParser.ParseResult given = parse(
+                "{\"dataVersion\":1,\"id\":\"losttales:profiled\","
+                        + "\"name\":\"Profiled\",\"description\":\"A grey wanderer.\","
+                        + "\"appearance\":null,\"profile\":{"
+                        + "\"appearance\":\"Tall,  grey.\","
+                        + "\"personality\":\"Patient.\\n\\n\\nKind.\","
+                        + "\"facts\":{\"eyes\":\"Grey\",\"home\":\"Nowhere long\"},"
+                        + "\"glances\":[{\"emoji\":\"smiley\",\"title\":\"Pipe\","
+                        + "\"line\":\"Always smoking.\"},"
+                        + "{\"emoji\":\"grinning\",\"title\":\"Staff\"}]}}");
+        assertTrue(given.getErrors().toString(), given.isValid());
+        CharacterProfile profile = given.getDefinition().getProfile();
+        assertEquals("Tall, grey.",
+                profile.section(CharacterProfile.Section.APPEARANCE));
+        assertEquals("Patient.\n\nKind.",
+                profile.section(CharacterProfile.Section.PERSONALITY));
+        assertEquals("A grey wanderer.",
+                profile.section(CharacterProfile.Section.HISTORY));
+        assertEquals("Grey", profile.fact(CharacterProfile.Fact.EYES));
+        assertEquals(2, profile.glances().size());
+        assertEquals("", profile.glances().get(1).getLine());
+
+        LoreCharacterDefinitionJsonParser.ParseResult plain = parse(
+                "{\"dataVersion\":1,\"id\":\"losttales:plain\","
+                        + "\"name\":\"Plain\",\"description\":\"Of Bree.\","
+                        + "\"appearance\":null}");
+        assertTrue(plain.getErrors().toString(), plain.isValid());
+        assertEquals(CharacterProfile.EMPTY.withSection(
+                CharacterProfile.Section.HISTORY, "Of Bree."),
+                plain.getDefinition().getProfile());
+    }
+
+    @Test
+    public void aProfileOutsideItsBoundsIsRefused() {
+        String head = "{\"dataVersion\":1,\"id\":\"losttales:bad\","
+                + "\"name\":\"Bad\",\"description\":\"\",\"appearance\":null,"
+                + "\"profile\":";
+        String[] profiles = {
+                "{\"mood\":\"Grim\"}",
+                "{\"facts\":{\"weight\":\"Heavy\"}}",
+                "{\"facts\":{\"eyes\":\"Grey and green and blue and more\"}}",
+                "{\"glances\":[{\"emoji\":\"not_an_emoji\",\"title\":\"Pipe\"}]}",
+                "{\"glances\":[{\"emoji\":\"smiley\"}]}",
+                "{\"glances\":[{},{},{},{},{},{}]}",
+                "\"A string\""};
+        for (String profile : profiles) {
+            assertFalse(profile, parse(head + profile + "}").isValid());
+        }
     }
 
     @Test

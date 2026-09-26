@@ -5,6 +5,7 @@ import static org.junit.Assert.assertTrue;
 
 import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
+import com.ninuna.losttales.chat.ChatRoleplayStatus;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -85,6 +86,30 @@ public final class ChatPresenceServiceTest {
         Map<ChatPresenceIdentity, String> told =
                 ChatPresenceService.shownLines(shown, kept);
         assertEquals(Collections.singletonMap(ALDRIC, "Out hunting"), told);
+    }
+
+    /**
+     * Every identity shown tells its role-play status: the one chosen,
+     * else its own default — a character in character, the account out
+     * of it — and a hidden identity tells none.
+     */
+    @Test
+    public void aShownIdentityTellsItsRolePlayStatus() {
+        Map<ChatPresenceIdentity, ChatPresence> shown =
+                ChatPresenceService.shown(Collections.singletonMap(BERIC,
+                        ChatPresence.INVISIBLE), false, IN_USE);
+        Map<ChatPresenceIdentity, ChatRoleplayStatus> chosen =
+                new HashMap<ChatPresenceIdentity, ChatRoleplayStatus>();
+        chosen.put(ALDRIC, ChatRoleplayStatus.LOOKING_FOR_SCENE);
+        chosen.put(BERIC, ChatRoleplayStatus.OUT_OF_CHARACTER);
+        Map<ChatPresenceIdentity, ChatRoleplayStatus> told =
+                ChatPresenceService.shownRoleplay(shown, chosen);
+        assertEquals(2, told.size());
+        assertEquals(ChatRoleplayStatus.LOOKING_FOR_SCENE, told.get(ALDRIC));
+        assertEquals(ChatRoleplayStatus.OUT_OF_CHARACTER,
+                told.get(ChatPresenceIdentity.ACCOUNT));
+        assertEquals(ChatRoleplayStatus.IN_CHARACTER, ChatPresenceService
+                .shownRoleplay(shown, null).get(ALDRIC));
     }
 
     @Test

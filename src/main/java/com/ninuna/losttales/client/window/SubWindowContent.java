@@ -80,6 +80,27 @@ public abstract class SubWindowContent {
         return false;
     }
 
+    /**
+     * A press on what {@link #hoverAt} or {@link #popupHoverAt} found, at
+     * {@code x}, {@code y} in the content's whole pixels; answers whether
+     * the content took it. The content that answers for itself takes its
+     * presses here, before any system's part is asked.
+     */
+    public boolean pressed(WindowHover hover, double x, double y,
+                           int button) {
+        return false;
+    }
+
+    /**
+     * The pointer moving with the left button held that went down on the
+     * content, at {@code x}, {@code y} in its whole pixels: a slider's knob
+     * following the hand.
+     */
+    public void dragged(double x, double y) {}
+
+    /** The left button that went down on the content has come up. */
+    public void released() {}
+
     /** A wheel turn over the content, in lines, positive toward later rows. */
     public void scrollBy(int lines) {}
 

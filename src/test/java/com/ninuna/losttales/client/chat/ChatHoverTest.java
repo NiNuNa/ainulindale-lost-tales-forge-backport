@@ -18,7 +18,6 @@ public final class ChatHoverTest {
     @Test
     public void theHandIsWhereAPressActs() {
         for (ChatHover.Kind kind : new ChatHover.Kind[] {
-                ChatHover.Kind.MENU_ENTRY,
                 ChatHover.Kind.EMPTY_PLUS, ChatHover.Kind.SUGGESTION,
                 ChatHover.Kind.PICKER_CELL, ChatHover.Kind.PICKER_LABEL,
                 ChatHover.Kind.OTHER_BAR,
@@ -35,8 +34,7 @@ public final class ChatHoverTest {
     @Test
     public void theArrowIsWhereAPressOnlyLands() {
         for (ChatHover.Kind kind : new ChatHover.Kind[] {
-                ChatHover.Kind.MENU, ChatHover.Kind.SUGGESTIONS,
-                ChatHover.Kind.PICKER}) {
+                ChatHover.Kind.SUGGESTIONS, ChatHover.Kind.PICKER}) {
             assertEquals(kind.name(), LostTalesMapCursor.Pose.ARROW,
                     new ChatHover(kind).pose());
         }

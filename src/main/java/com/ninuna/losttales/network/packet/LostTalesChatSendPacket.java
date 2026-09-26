@@ -36,7 +36,7 @@ public final class LostTalesChatSendPacket implements IMessage {
     /** Speak as one of the sender's own roster characters. */
     public static final int IDENTITY_CHARACTER = 2;
 
-    private static final int MAX_PACKET_BYTES = 1300
+    private static final int MAX_PACKET_BYTES = 1308
             + ChatMessageValidator.MAX_UTF8_BYTES
             + ChatShareTokenParser.MAX_TOKENS
             * (ChatShareReference.MAX_MARKER_ID_BYTES + 8);
@@ -122,9 +122,40 @@ public final class LostTalesChatSendPacket implements IMessage {
      * knows before it draws any head for it. Only with a quote.
      */
     private int quoteSource = QUOTE_OTHER;
+    /**
+     * The server's message this request carries on into the channel, or
+     * {@link ChatMessageIds#NONE}. A forward has no words of its own: the
+     * server takes the message's words, author and place from its own
+     * record, and only for a sender who may read it.
+     */
+    private long forwardOf = ChatMessageIds.NONE;
     private boolean malformed;
 
     public LostTalesChatSendPacket() {}
+
+    /**
+     * A request to forward the server's message {@code forwardOf} into a
+     * conversation, addressed as a line typed there would be.
+     */
+    public static LostTalesChatSendPacket forward(ChatChannel channel,
+                                                  String target,
+                                                  int identityKind,
+                                                  UUID identityCharacterId,
+                                                  String targetIdentity,
+                                                  UUID targetCharacterId,
+                                                  long forwardOf) {
+        LostTalesChatSendPacket packet = new LostTalesChatSendPacket();
+        packet.channelId = channel == null ? "" : channel.getId();
+        packet.target = target == null ? "" : target.trim();
+        packet.identityKind = identityKind;
+        packet.identityCharacterId = identityCharacterId;
+        packet.targetIdentity = targetIdentity == null ? ""
+                : targetIdentity.trim();
+        packet.targetCharacterId = targetCharacterId;
+        packet.forwardOf = forwardOf;
+        packet.validate();
+        return packet;
+    }
 
     public LostTalesChatSendPacket(ChatChannel channel, String message) {
         this(channel, message, null);
@@ -291,18 +322,15 @@ public final class LostTalesChatSendPacket implements IMessage {
             long most = buffer.readLong();
             long least = buffer.readLong();
             this.targetCharacterId = targeted ? new UUID(most, least) : null;
-            // Last, and only when there is one: the quote of a line nobody
-            // named — its author, its words, and whose line it is.
-            this.quoteAuthor = "";
-            this.quoteExcerpt = "";
-            this.quoteSource = QUOTE_OTHER;
-            if (buffer.isReadable()) {
-                this.quoteAuthor = LostTalesPacketCodec.readUtf8String(
-                        buffer, ChatReplyReference.MAX_AUTHOR_BYTES).trim();
-                this.quoteExcerpt = LostTalesPacketCodec.readUtf8String(
-                        buffer, ChatReplyReference.MAX_EXCERPT_BYTES).trim();
-                this.quoteSource = buffer.readUnsignedByte();
-            }
+            // The quote of a line nobody named — its author, its words,
+            // and whose line it is — empty for none; then the message a
+            // forward carries on.
+            this.quoteAuthor = LostTalesPacketCodec.readUtf8String(
+                    buffer, ChatReplyReference.MAX_AUTHOR_BYTES).trim();
+            this.quoteExcerpt = LostTalesPacketCodec.readUtf8String(
+                    buffer, ChatReplyReference.MAX_EXCERPT_BYTES).trim();
+            this.quoteSource = buffer.readUnsignedByte();
+            this.forwardOf = buffer.readLong();
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
@@ -318,6 +346,7 @@ public final class LostTalesChatSendPacket implements IMessage {
             this.replyToMessageId = ChatMessageIds.NONE;
             this.targetIdentity = "";
             this.echoNonce = 0L;
+            this.forwardOf = ChatMessageIds.NONE;
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -362,13 +391,12 @@ public final class LostTalesChatSendPacket implements IMessage {
                 : this.targetCharacterId.getMostSignificantBits());
         buffer.writeLong(this.targetCharacterId == null ? 0L
                 : this.targetCharacterId.getLeastSignificantBits());
-        if (this.quoteAuthor.length() > 0) {
-            LostTalesPacketCodec.writeUtf8String(buffer, this.quoteAuthor,
-                    ChatReplyReference.MAX_AUTHOR_BYTES);
-            LostTalesPacketCodec.writeUtf8String(buffer, this.quoteExcerpt,
-                    ChatReplyReference.MAX_EXCERPT_BYTES);
-            buffer.writeByte(this.quoteSource);
-        }
+        LostTalesPacketCodec.writeUtf8String(buffer, this.quoteAuthor,
+                ChatReplyReference.MAX_AUTHOR_BYTES);
+        LostTalesPacketCodec.writeUtf8String(buffer, this.quoteExcerpt,
+                ChatReplyReference.MAX_EXCERPT_BYTES);
+        buffer.writeByte(this.quoteSource);
+        buffer.writeLong(this.forwardOf);
     }
 
     /**
@@ -423,7 +451,9 @@ public final class LostTalesChatSendPacket implements IMessage {
                         this.channelId, MAX_CHANNEL_BYTES)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.message, ChatMessageValidator.MAX_UTF8_BYTES)
-                || !ChatMessageValidator.isValid(this.message)
+                || (this.forwardOf == ChatMessageIds.NONE
+                        ? !ChatMessageValidator.isValid(this.message)
+                        : !isBareForward())
                 || this.references.size() > ChatShareTokenParser.MAX_TOKENS) {
             throw new IllegalArgumentException("invalid chat request");
         }
@@ -432,6 +462,18 @@ public final class LostTalesChatSendPacket implements IMessage {
                 throw new IllegalArgumentException("invalid share reference");
             }
         }
+    }
+
+    /**
+     * A forward names a message of the server's and nothing else of its
+     * own: no words, no shares, no reply, no quote and no echo, since the
+     * line it becomes is the server's to build.
+     */
+    private boolean isBareForward() {
+        return ChatMessageIds.isServerId(this.forwardOf)
+                && this.message.length() == 0 && this.references.isEmpty()
+                && this.replyToMessageId == ChatMessageIds.NONE
+                && this.quoteAuthor.length() == 0 && this.echoNonce == 0L;
     }
 
     public ChatChannel getChannel() {
@@ -464,6 +506,8 @@ public final class LostTalesChatSendPacket implements IMessage {
     public String getQuoteExcerpt() { return this.quoteExcerpt; }
     /** Whose that line is, as the sender claims: one of the {@code QUOTE_*} constants. */
     public int getQuoteSource() { return this.quoteSource; }
+    /** The message a forward carries on; {@code NONE} for a line of its own. */
+    public long getForwardOf() { return this.forwardOf; }
     public boolean isMalformed() { return this.malformed; }
 
     public static final class Handler implements IMessageHandler<

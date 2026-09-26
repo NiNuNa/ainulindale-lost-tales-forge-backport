@@ -62,6 +62,7 @@ import com.ninuna.losttales.chat.ChatNarrator;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -115,14 +116,28 @@ public final class LostTalesChatService {
         if (sender == null || request == null) {
             return;
         }
-        send(sender, request.getChannel(), request.getMessage(),
+        ChatHistory.Forwardable forward = null;
+        if (request.getForwardOf() != ChatMessageIds.NONE) {
+            // A forward carries on a message the sender may read, in the
+            // words, author and place the server holds; everything else
+            // about the line is decided as for one typed there.
+            forward = ChatHistory.forwardable(request.getForwardOf(),
+                    requesterFor(sender));
+            if (forward == null) {
+                sender.addChatMessage(new ChatComponentTranslation(
+                        "chat.losttales.forward.unavailable"));
+                return;
+            }
+        }
+        send(sender, request.getChannel(),
+                forward == null ? request.getMessage() : forward.text,
                 request.getReferences(), request.getTarget(),
                 request.getIdentityKind(),
                 request.getIdentityCharacterId(),
                 request.getReplyToMessageId(), request.getTargetIdentity(),
                 request.getEchoNonce(), request.getTargetCharacterId(),
                 request.getQuoteAuthor(), request.getQuoteExcerpt(),
-                request.getQuoteSource());
+                request.getQuoteSource(), forward);
     }
 
     private static void send(EntityPlayerMP sender,
@@ -133,7 +148,8 @@ public final class LostTalesChatService {
                              long replyToMessageId, String requestedIdentity,
                              long echoNonce, UUID targetCharacterId,
                              String quoteAuthor, String quoteExcerpt,
-                             int quoteSource) {
+                             int quoteSource,
+                             ChatHistory.Forwardable forward) {
         String targetIdentity = requestedIdentity == null ? "" : requestedIdentity;
         if (sender == null || sender.worldObj == null
                 || sender.worldObj.isRemote || channel == null
@@ -251,8 +267,10 @@ public final class LostTalesChatService {
                 : narrator ? ChatNarrator.SKIN_ID : worn.getSkinId();
         String title = accountLine || narrator ? "" : presentation.title;
         String factionName = accountLine || narrator ? "" : presentation.factionName;
-        List<ChatShowcase> showcases =
-                resolveShowcases(sender, message, references);
+        // A forward shares what its message shared; a line of the
+        // sender's own shares what the server finds on them now.
+        List<ChatShowcase> showcases = forward != null ? forward.showcases
+                : resolveShowcases(sender, message, references);
         // The roles the line wears are the account's and the worn
         // character's own: a character-scoped role shows on that
         // character's lines and on nobody else's.
@@ -267,7 +285,9 @@ public final class LostTalesChatService {
         String replyScope = ChatChannelPolicy.scopeValueOf(
                 channel, party, factionId);
         ChatReplyReference reply;
-        if (replyToMessageId != ChatMessageIds.NONE) {
+        if (forward != null) {
+            reply = forward.reference;
+        } else if (replyToMessageId != ChatMessageIds.NONE) {
             reply = ChatHistory.quoteFor(replyToMessageId,
                     sender.getUniqueID(), channel, replyScope);
             if (!reply.exists() && channel == ChatChannel.SERVER_CONSOLE) {
@@ -331,8 +351,12 @@ public final class LostTalesChatService {
                 // here or gone, players or Discord members: kept with the
                 // line, so every client shows and pings the same people
                 // from the one record, live and in every replay.
-                .withNamedPlayers(ChatMentionTargets.of(sender, channel,
-                        whisperTarget, message));
+                // A forward reaches nobody by name: the names in it were
+                // the original's to call.
+                .withNamedPlayers(forward != null
+                        ? Collections.<ChatNamedPlayer>emptyList()
+                        : ChatMentionTargets.of(sender, channel,
+                                whisperTarget, message));
 
         FMLLog.info("[losttales/chat/%s] <%s (%s)> %s%s%s",
                 logName(channel, replyScope), identityName, accountName, message,
@@ -909,9 +933,9 @@ public final class LostTalesChatService {
      * exactly what a reply may quote — and the name they react as, the
      * one their line in that channel would be signed with. A reaction
      * puts something in front of the readers, so a mute refuses one as
-     * it refuses an edit. The bridge's own reaction on a Discord copy
-     * stands for the players: it comes with the first of them and goes
-     * with the last. {@code emojiName} is a reaction key: a player may
+     * it refuses an edit. The bridge's own reaction on each Discord copy
+     * stands for everyone who reacted elsewhere, the players among them
+     * ({@link #relayReaction}). {@code emojiName} is a reaction key: a player may
      * react with a foreign emoji only where the message already carries
      * it, which {@link ChatReactions} decides.
      */
@@ -954,20 +978,16 @@ public final class LostTalesChatService {
             return;
         }
         tellReactions(messageId, change.readers);
-        if (change.gameCountBefore == 0 && change.gameCountAfter > 0) {
-            LostTalesDiscordBridge.getInstance().relayReaction(messageId,
-                    emojiName, true);
-        } else if (change.gameCountBefore > 0 && change.gameCountAfter == 0) {
-            LostTalesDiscordBridge.getInstance().relayReaction(messageId,
-                    emojiName, false);
-        }
+        relayReaction(messageId, change);
     }
 
     /**
      * A Discord member's reaction to a message that crossed the bridge,
      * delivered on the server thread: kept under the sender id the
-     * bridge signs that member with, and told to every reader. Nothing
-     * goes back to Discord — the reaction came from there. {@code emoji}
+     * bridge signs that member with, with the Discord channel
+     * {@code originChannelId} they reacted in, told to every reader, and
+     * carried on to the message's copies in the other linked Discord
+     * channels as the bridge's own reaction. {@code emoji}
      * is a reaction key, foreign for an emoji the registry lacks, or null
      * for a custom emoji Discord sent without a name. {@code emojiId} is
      * a custom emoji's id, empty for a Unicode one: a custom emoji is
@@ -976,7 +996,8 @@ public final class LostTalesChatService {
      */
     public static void reactFromDiscord(long messageId, String discordUserId,
                                         String name, String emoji,
-                                        String emojiId, boolean add) {
+                                        String emojiId, String originChannelId,
+                                        boolean add) {
         boolean named = ChatForeignEmoji.isReactionKey(emoji);
         boolean byId = ChatForeignEmoji.isCustomId(emojiId);
         if (!(named || byId) || discordUserId == null
@@ -986,24 +1007,51 @@ public final class LostTalesChatService {
         ChatHistory.ReactionChange change = ChatHistory.reactFromDiscord(
                 messageId,
                 LostTalesChatMessagePacket.discordSenderId(discordUserId),
-                name, named ? emoji : null, byId ? emojiId : "", add);
+                name, named ? emoji : null, byId ? emojiId : "",
+                originChannelId, add);
         if (change != null) {
             tellReactions(messageId, change.readers);
+            relayReaction(messageId, change);
         }
     }
 
     /**
-     * Discord took every member's reaction off a message that crossed
-     * the bridge — with one emoji, or with all when {@code emoji} is null
-     * and {@code emojiId} empty. A custom emoji is cleared by its id from
-     * every key it is kept under. The players' own reactions stay.
+     * Discord took the members' reactions off a message that crossed the
+     * bridge in the Discord channel {@code originChannelId} — with one
+     * emoji, or with all when {@code emoji} is null and {@code emojiId}
+     * empty. A custom emoji is cleared by its id from every key it is
+     * kept under. The players' own reactions stay, and so do those made
+     * in the other linked Discord channels; the bridge's reaction on
+     * their copies follows what is left.
      */
     public static void clearDiscordReactions(long messageId, String emoji,
-                                             String emojiId) {
-        Set<UUID> readers = ChatHistory.clearDiscordReactions(messageId,
-                emoji, emojiId);
-        if (readers != null) {
-            tellReactions(messageId, readers);
+                                             String emojiId,
+                                             String originChannelId) {
+        ChatHistory.ReactionClear clear = ChatHistory.clearDiscordReactions(
+                messageId, emoji, emojiId, originChannelId);
+        if (clear == null) {
+            return;
+        }
+        tellReactions(messageId, clear.readers);
+        Set<String> relayed = new HashSet<String>();
+        for (ChatHistory.ReactionChange change : clear.changes) {
+            // Two keys of one custom emoji are one reaction on Discord.
+            if (relayed.add(ChatForeignEmoji.discordForm(change.emoji))) {
+                relayReaction(messageId, change);
+            }
+        }
+    }
+
+    /**
+     * Carries a change in who stands behind an emoji to the bridge, whose
+     * own reaction on each Discord copy follows it: on the copy in a
+     * Discord channel it stands for everyone who reacted anywhere else.
+     */
+    private static void relayReaction(long messageId,
+                                      ChatHistory.ReactionChange change) {
+        if (!change.before.equals(change.after)) {
+            LostTalesDiscordBridge.getInstance().relayReaction(messageId,
+                    change.emoji, change.before, change.after);
         }
     }
 

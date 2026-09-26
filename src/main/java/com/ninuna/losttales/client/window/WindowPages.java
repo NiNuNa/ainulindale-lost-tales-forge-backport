@@ -163,23 +163,6 @@ public final class WindowPages {
         return null;
     }
 
-    /**
-     * Closes every open page that closes with the screen (the map), its
-     * place kept for the next time. A locked window keeps it.
-     */
-    public static void closeThoseClosingWithScreen() {
-        boolean closed = false;
-        for (Page page : all()) {
-            PageTab tab = page.tab();
-            if (WindowLayout.isOpen(tab) && tab.content().closesWithScreen()) {
-                closed |= WindowLayout.close(tab);
-            }
-        }
-        if (closed) {
-            TabSelection.prune();
-        }
-    }
-
     /** The content of a page's tab; null for any other tab. */
     public static PageContent contentOf(WindowTab tab) {
         return tab instanceof PageTab ? ((PageTab)tab).content() : null;

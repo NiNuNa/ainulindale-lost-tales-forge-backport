@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
+import com.ninuna.losttales.chat.ChatRoleplayStatus;
 import com.ninuna.losttales.chat.ChatStatusLine;
 import com.ninuna.losttales.client.character.LostTalesClientAccount;
 import com.ninuna.losttales.config.LostTalesConfigFiles;
@@ -30,9 +31,10 @@ import java.util.UUID;
  *
  * <p>A choice is the chooser's own, so it lives with the client's other
  * preferences: one file per account under the client folder, a line per
- * server and identity — its status, or its status line after the word
- * {@code line} — written as the choice is made. Bounded, the choices
- * touched longest ago going first.</p>
+ * server and identity — its status, its status line after the word
+ * {@code line}, or its role-play status after the word {@code roleplay}
+ * — written as the choice is made. Bounded, the choices touched longest
+ * ago going first.</p>
  */
 public final class ClientChatPresenceChoices {
     /** The folder under the client's, one file per account. */
@@ -54,6 +56,11 @@ public final class ClientChatPresenceChoices {
             new LinkedHashMap<String, String>(32, 0.75F, true);
     /** What a status line's record says in place of a status. */
     private static final String LINE_WORD = "line";
+    /** The role-play statuses, an identity's default never kept. */
+    private static final LinkedHashMap<String, ChatRoleplayStatus> ROLEPLAY =
+            new LinkedHashMap<String, ChatRoleplayStatus>(32, 0.75F, true);
+    /** What a role-play status's record says in place of a status. */
+    private static final String ROLEPLAY_WORD = "roleplay";
 
     private ClientChatPresenceChoices() {}
 
@@ -74,6 +81,7 @@ public final class ClientChatPresenceChoices {
                         accountId.toString() + ".txt");
         CHOICES.clear();
         LINES.clear();
+        ROLEPLAY.clear();
         List<String> lines = readLines(storeFile);
         if (lines != null) {
             load(lines);
@@ -122,6 +130,47 @@ public final class ClientChatPresenceChoices {
         return found;
     }
 
+    /** The role-play statuses kept for one server, by identity. */
+    static synchronized Map<ChatPresenceIdentity, ChatRoleplayStatus> roleplayForPlace(
+            String serverKey) {
+        Map<ChatPresenceIdentity, ChatRoleplayStatus> found =
+                new LinkedHashMap<ChatPresenceIdentity, ChatRoleplayStatus>();
+        if (!isUsableKey(serverKey)) {
+            return found;
+        }
+        String prefix = serverKey + SEPARATOR;
+        for (Map.Entry<String, ChatRoleplayStatus> entry : ROLEPLAY.entrySet()) {
+            if (entry.getKey().startsWith(prefix)) {
+                ChatPresenceIdentity identity = ChatPresenceIdentity.fromText(
+                        entry.getKey().substring(prefix.length()));
+                if (identity != null) {
+                    found.put(identity, entry.getValue());
+                }
+            }
+        }
+        return found;
+    }
+
+    /**
+     * Keeps a role-play status for one identity on one server, and writes
+     * the file; the identity's default is forgotten.
+     */
+    static synchronized void rememberRoleplay(String serverKey,
+                                              ChatPresenceIdentity identity,
+                                              ChatRoleplayStatus status) {
+        if (!isUsableKey(serverKey) || identity == null || status == null) {
+            return;
+        }
+        String key = serverKey + SEPARATOR + identity.toText();
+        if (status == ChatRoleplayStatus.defaultFor(identity)) {
+            ROLEPLAY.remove(key);
+        } else {
+            ROLEPLAY.put(key, status);
+            trim();
+        }
+        save();
+    }
+
     /**
      * Keeps a status line for one identity on one server, cleaned, and
      * writes the file; an empty one is forgotten.
@@ -165,13 +214,18 @@ public final class ClientChatPresenceChoices {
     static synchronized List<String> describe() {
         List<String> lines = new ArrayList<String>(CHOICES.size() + 1);
         lines.add("# Lost Tales chat statuses: server, identity, status;"
-                + " or server, identity, line, status line.");
+                + " or server, identity, line, status line;"
+                + " or server, identity, roleplay, role-play status.");
         for (Map.Entry<String, ChatPresence> choice : CHOICES.entrySet()) {
             lines.add(choice.getKey() + SEPARATOR + choice.getValue().getId());
         }
         for (Map.Entry<String, String> line : LINES.entrySet()) {
             lines.add(line.getKey() + SEPARATOR + LINE_WORD + SEPARATOR
                     + line.getValue());
+        }
+        for (Map.Entry<String, ChatRoleplayStatus> status : ROLEPLAY.entrySet()) {
+            lines.add(status.getKey() + SEPARATOR + ROLEPLAY_WORD + SEPARATOR
+                    + status.getValue().getId());
         }
         return lines;
     }
@@ -184,6 +238,19 @@ public final class ClientChatPresenceChoices {
                 continue;
             }
             String[] parts = line.split(String.valueOf(SEPARATOR));
+            if (parts.length == 4 && ROLEPLAY_WORD.equals(parts[2])
+                    && isUsableKey(parts[0])) {
+                ChatPresenceIdentity identity =
+                        ChatPresenceIdentity.fromText(parts[1]);
+                ChatRoleplayStatus status = ChatRoleplayStatus.fromId(parts[3]);
+                if (identity != null && status != null
+                        && status != ChatRoleplayStatus.defaultFor(identity)) {
+                    ROLEPLAY.put(parts[0] + SEPARATOR + identity.toText(),
+                            status);
+                    trim();
+                }
+                continue;
+            }
             if (parts.length == 4 && LINE_WORD.equals(parts[2])
                     && isUsableKey(parts[0])) {
                 ChatPresenceIdentity identity =
@@ -214,6 +281,7 @@ public final class ClientChatPresenceChoices {
     static synchronized void clear() {
         CHOICES.clear();
         LINES.clear();
+        ROLEPLAY.clear();
     }
 
     private static boolean isUsableKey(String serverKey) {
@@ -229,6 +297,11 @@ public final class ClientChatPresenceChoices {
         }
         while (LINES.size() > MAX_CHOICES) {
             Iterator<String> oldest = LINES.keySet().iterator();
+            oldest.next();
+            oldest.remove();
+        }
+        while (ROLEPLAY.size() > MAX_CHOICES) {
+            Iterator<String> oldest = ROLEPLAY.keySet().iterator();
             oldest.next();
             oldest.remove();
         }

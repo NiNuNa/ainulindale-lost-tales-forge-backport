@@ -75,7 +75,12 @@ public final class LostTalesRequestRateLimiter {
         // making somebody, switching, deleting, claiming a lore character.
         // They are all deliberate, and a screen full of them is a handful
         // of clicks rather than a stream.
-        CHARACTER_REQUEST(40, 5000L);
+        CHARACTER_REQUEST(40, 5000L),
+        // A profile is asked for as a card, a person's profile or the
+        // roster's selection shows one, and again only after half a
+        // minute; a player clicking through a crowd's cards stays inside
+        // a dozen in five seconds.
+        CHARACTER_PROFILE(12, 5000L);
 
         private final int maximumRequests;
         private final long windowMillis;

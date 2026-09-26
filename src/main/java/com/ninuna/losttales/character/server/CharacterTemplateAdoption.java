@@ -32,7 +32,7 @@ public final class CharacterTemplateAdoption {
     private final String skinId;
     private final String bodyTypeId;
     private final String chestTypeId;
-    private final String description;
+    private final String history;
     private final int age;
     private final boolean showMinecraftCape;
     private final int cosmeticCapeId;
@@ -46,7 +46,7 @@ public final class CharacterTemplateAdoption {
     public CharacterTemplateAdoption(long expectedRosterRevision, boolean offered,
                                      String name, String raceId, String genderId,
                                      String skinId, String bodyTypeId,
-                                     String chestTypeId, String description,
+                                     String chestTypeId, String history,
                                      int age, boolean showMinecraftCape,
                                      int cosmeticCapeId) {
         this.expectedRosterRevision = expectedRosterRevision;
@@ -59,7 +59,7 @@ public final class CharacterTemplateAdoption {
         this.skinId = text(skinId);
         this.bodyTypeId = text(bodyTypeId);
         this.chestTypeId = text(chestTypeId);
-        this.description = text(description);
+        this.history = text(history);
         this.age = age;
     }
 
@@ -71,7 +71,7 @@ public final class CharacterTemplateAdoption {
     public String getSkinId() { return this.skinId; }
     public String getBodyTypeId() { return this.bodyTypeId; }
     public String getChestTypeId() { return this.chestTypeId; }
-    public String getDescription() { return this.description; }
+    public String getHistory() { return this.history; }
     public int getAge() { return this.age; }
     /** Whether the account's own Minecraft cape is worn when no cosmetic cape is. */
     public boolean isMinecraftCapeVisible() { return this.showMinecraftCape; }

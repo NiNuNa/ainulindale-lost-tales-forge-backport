@@ -8,6 +8,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarker;
+import com.ninuna.losttales.client.window.TabIcons;
 import net.minecraft.client.Minecraft;
 
 /**
@@ -82,13 +83,8 @@ final class ChatInlineIcons {
     static final int NAME_GAP = 2;
     /** Common inline content box edge; also the emoji sprite's native size. */
     static final float CONTENT_SIZE = 10.0F;
-    /**
-     * Box top relative to the text's top edge wherever a glyph stands
-     * beside text: two rows above the glyphs, the box's middle half a
-     * pixel above the capitals' middle — the chat's one rule for a
-     * ten-row box ({@link LostTalesChatOverlayRenderer#centredBoxTop}).
-     */
-    static final int CONTENT_TOP_OFFSET = -2;
+    /** Box top relative to the text's top edge wherever a glyph stands beside text: the windows' one rule. */
+    static final int CONTENT_TOP_OFFSET = TabIcons.CONTENT_TOP_OFFSET;
     private ChatInlineIcons() {}
 
     /**

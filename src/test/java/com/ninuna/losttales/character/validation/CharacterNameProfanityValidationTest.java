@@ -3,6 +3,7 @@ package com.ninuna.losttales.character.validation;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
@@ -11,6 +12,7 @@ import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
 import com.ninuna.losttales.chat.profanity.ChatProfanityWords;
+import java.util.Collections;
 import java.util.UUID;
 import org.junit.After;
 import org.junit.Test;
@@ -57,12 +59,23 @@ public final class CharacterNameProfanityValidationTest {
     }
 
     @Test
-    public void aListedWordInADescriptionIsRefused() {
-        assertEquals(CharacterErrorId.INVALID_DESCRIPTION_PROFANE,
-                CharacterValidator.validateProfile("A shitty ranger.", 30)
-                        .getErrorId());
+    public void aListedWordInAProfileIsRefused() {
+        assertEquals(CharacterErrorId.INVALID_PROFILE_TEXT_PROFANE,
+                CharacterValidator.validateProfile(history("A shitty ranger."),
+                        30).getErrorId());
         assertTrue(CharacterValidator.validateProfile(
-                "A ranger of the North.", 30).isValid());
+                history("A ranger of the North."), 30).isValid());
+        assertEquals("a glance is held to the same words",
+                CharacterValidator.validateProfile(CharacterProfile.EMPTY
+                        .withGlances(Collections.singletonList(
+                                new CharacterProfile.Glance("smiley",
+                                        "Shitty", ""))), 30).getErrorId(),
+                CharacterErrorId.INVALID_PROFILE_TEXT_PROFANE);
+    }
+
+    private static CharacterProfile history(String text) {
+        return CharacterProfile.EMPTY.withSection(
+                CharacterProfile.Section.HISTORY, text);
     }
 
     @Test

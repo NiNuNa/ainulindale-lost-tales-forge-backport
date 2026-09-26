@@ -20,6 +20,7 @@ import com.ninuna.losttales.chat.server.ChatChannelPolicy;
 import com.ninuna.losttales.chat.server.ChatHistory;
 import com.ninuna.losttales.chat.server.ChatIdentitySelection;
 import com.ninuna.losttales.chat.server.ChatMemberWatches;
+import com.ninuna.losttales.chat.server.ChatReactions;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.compat.discord.gateway.DiscordGatewayClient;
 import com.ninuna.losttales.compat.discord.gateway.DiscordGatewayProtocol;
@@ -696,26 +697,31 @@ public final class LostTalesDiscordBridge {
     }
 
     /**
-     * Says that the players' reaction with an emoji came to a game
-     * message, or went from it, so the bot's own reaction on each of its
-     * live Discord copies comes or goes with it: one reaction on Discord
-     * stands for every player who reacted, since a bot is one member
-     * there. {@code emoji} is a reaction key: a registry emoji goes as
-     * its Unicode form, a foreign one as Discord named it. An emoji of
-     * the mod's own, with no Unicode form, has nothing to be on Discord
-     * and stays in the game.
+     * Says that who stands behind an emoji on a game message changed, so
+     * the bot's own reaction on each of its live Discord copies follows:
+     * a bot is one member on Discord, so its one reaction on the copy in
+     * a Discord channel stands for everyone who reacted anywhere else —
+     * the players, and the members of the other linked Discord channels
+     * ({@link ChatReactions.Stand#standsFor}). The worker reacts or takes
+     * its reaction back only on the copies where that turned.
+     * {@code emoji} is a reaction key: a registry emoji goes as its
+     * Unicode form, a foreign one as Discord named it. An emoji of the
+     * mod's own, with no Unicode form, has nothing to be on Discord and
+     * stays in the game.
      */
-    public void relayReaction(long messageId, String emoji, boolean add) {
+    public void relayReaction(long messageId, String emoji,
+                              ChatReactions.Stand before,
+                              ChatReactions.Stand after) {
         String form = ChatForeignEmoji.discordForm(emoji);
         if (form.length() == 0 || !isPosting()) {
             return;
         }
         ChatChannel channel = ChatHistory.channelOf(messageId);
         if (channel != null) {
-            enqueueOutbound(new Outbound(add ? Outbound.Kind.REACT
-                    : Outbound.Kind.UNREACT, "", "", form,
+            enqueueOutbound(new Outbound(Outbound.Kind.REACTION, "", "", form,
                     messageId, ChatReplyReference.NONE, null, "", channel,
-                    ChatHistory.factionScopeOf(messageId)));
+                    ChatHistory.factionScopeOf(messageId), null, 0L, "",
+                    Collections.<ChatNamedPlayer>emptyList(), before, after));
         }
     }
 
@@ -971,11 +977,11 @@ public final class LostTalesDiscordBridge {
                         : message.text;
                 if (message.kind == Inbound.Kind.REACT_CLEAR) {
                     LostTalesChatService.clearDiscordReactions(target, emoji,
-                            message.emojiId);
+                            message.emojiId, message.discordChannelId);
                 } else {
                     LostTalesChatService.reactFromDiscord(target,
                             message.authorId, message.name, emoji,
-                            message.emojiId,
+                            message.emojiId, message.discordChannelId,
                             message.kind == Inbound.Kind.REACT_ADD);
                 }
             }
@@ -1693,14 +1699,16 @@ public final class LostTalesDiscordBridge {
             }
             if (batch.size() == LostTalesChatPresenceSyncPacket.MAX_ACCOUNTS) {
                 LostTalesNetworkHandler.CHANNEL.sendTo(
-                        new LostTalesChatPresenceSyncPacket(batch, lines), player);
+                        new LostTalesChatPresenceSyncPacket(batch, lines, null),
+                        player);
                 batch = new LinkedHashMap<UUID, Map<ChatPresenceIdentity, ChatPresence>>();
                 lines = new LinkedHashMap<UUID, Map<ChatPresenceIdentity, String>>();
             }
         }
         if (!batch.isEmpty()) {
             LostTalesNetworkHandler.CHANNEL.sendTo(
-                    new LostTalesChatPresenceSyncPacket(batch, lines), player);
+                    new LostTalesChatPresenceSyncPacket(batch, lines, null),
+                    player);
         }
     }
 
@@ -2073,7 +2081,7 @@ public final class LostTalesDiscordBridge {
 
     private static final class Outbound {
         /** What the worker is to do with the entry. */
-        enum Kind { POST, EDIT, DELETE, REACT, UNREACT }
+        enum Kind { POST, EDIT, DELETE, REACTION }
 
         final Kind kind;
         final String username;
@@ -2117,6 +2125,12 @@ public final class LostTalesDiscordBridge {
          * edit does not. Empty for anything else.
          */
         final List<ChatNamedPlayer> pings;
+        /**
+         * For a reaction, who stood behind its emoji before the change
+         * and after it; null for anything else.
+         */
+        final ChatReactions.Stand standBefore;
+        final ChatReactions.Stand standAfter;
 
         Outbound(Kind kind, String username, String avatarUrl,
                  String message, long messageId, ChatReplyReference reply,
@@ -2144,6 +2158,19 @@ public final class LostTalesDiscordBridge {
                  String factionScope, UUID senderId,
                  long queuedAtMillis, String originChannelId,
                  List<ChatNamedPlayer> pings) {
+            this(kind, username, avatarUrl, message, messageId, reply, notice,
+                    bindingKey, channel, factionScope, senderId,
+                    queuedAtMillis, originChannelId, pings, null, null);
+        }
+
+        Outbound(Kind kind, String username, String avatarUrl,
+                 String message, long messageId,
+                 ChatReplyReference reply, DiscordNotice notice,
+                 String bindingKey, ChatChannel channel,
+                 String factionScope, UUID senderId,
+                 long queuedAtMillis, String originChannelId,
+                 List<ChatNamedPlayer> pings, ChatReactions.Stand standBefore,
+                 ChatReactions.Stand standAfter) {
             this.kind = kind;
             this.username = username;
             this.avatarUrl = avatarUrl;
@@ -2159,6 +2186,8 @@ public final class LostTalesDiscordBridge {
             this.originChannelId = originChannelId == null ? "" : originChannelId;
             this.pings = pings == null ? Collections.<ChatNamedPlayer>emptyList()
                     : pings;
+            this.standBefore = standBefore;
+            this.standAfter = standAfter;
         }
 
         /** Whether this is a player's line whose sender is told how its post goes. */
@@ -3243,8 +3272,7 @@ public final class LostTalesDiscordBridge {
                     }
                     continue;
                 }
-                if (next.kind == Outbound.Kind.REACT
-                        || next.kind == Outbound.Kind.UNREACT) {
+                if (next.kind == Outbound.Kind.REACTION) {
                     routeReaction(next);
                     continue;
                 }
@@ -3309,7 +3337,9 @@ public final class LostTalesDiscordBridge {
 
         /**
          * The bot's own reaction put on, or taken off, the copy of a
-         * message that lives on {@code lane}. Answers how long Discord
+         * message that lives on {@code lane}, where the change turned what
+         * it stands for there: nothing is sent where it did not. Answers
+         * how long Discord
          * asked to wait when it limited the request, {@link #DELIVERED}
          * when it took the reaction, and {@link #SPENT} when the entry is
          * done without it: no live copy there, no channel to name, no bot
@@ -3343,7 +3373,11 @@ public final class LostTalesDiscordBridge {
             if (channelId.length() == 0 || token.length() == 0) {
                 return 0L;
             }
-            DiscordHttp.Reply reply = next.kind == Outbound.Kind.REACT
+            boolean stands = next.standAfter.standsFor(channelId);
+            if (stands == next.standBefore.standsFor(channelId)) {
+                return 0L;
+            }
+            DiscordHttp.Reply reply = stands
                     ? DiscordHttp.putOwnReaction(token, channelId,
                             copy.discordId, next.message)
                     : DiscordHttp.deleteOwnReaction(token, channelId,
@@ -3429,8 +3463,7 @@ public final class LostTalesDiscordBridge {
          * other failure throws, and its lane backs off.
          */
         private long send(String webhook, Outbound next) throws IOException {
-            if (next.kind == Outbound.Kind.REACT
-                    || next.kind == Outbound.Kind.UNREACT) {
+            if (next.kind == Outbound.Kind.REACTION) {
                 return sendReaction(webhook, next);
             }
             DiscordHttp.Reply reply;
@@ -3583,6 +3616,12 @@ public final class LostTalesDiscordBridge {
         private String replyHeader(Outbound next, String webhookUrl) {
             if (next.reply == null || !next.reply.exists()) {
                 return "";
+            }
+            if (next.reply.isForward()) {
+                // A forward's message lives in another game channel, so
+                // no copy of it is in this Discord channel to point at.
+                return DiscordMessageSanitizer.forwardHeader(
+                        next.reply.getAuthor(), next.reply.getForwardedFrom());
             }
             String jumpUrl = "";
             // The copy in the very channel this post goes to, while it is

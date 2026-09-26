@@ -60,6 +60,8 @@ import com.ninuna.losttales.network.packet.character.CharacterSelectRequestPacke
 import com.ninuna.losttales.network.packet.character.LoreCharacterClaimRequestPacket;
 import com.ninuna.losttales.network.packet.character.LoreCharacterReleaseRequestPacket;
 import com.ninuna.losttales.network.packet.character.LoreCharacterSyncPacket;
+import com.ninuna.losttales.network.packet.character.CharacterProfilePacket;
+import com.ninuna.losttales.network.packet.character.CharacterProfileRequestPacket;
 import com.ninuna.losttales.network.packet.party.PartyActionRequestPacket;
 import com.ninuna.losttales.network.packet.party.PartyMemberStatusSyncPacket;
 import com.ninuna.losttales.network.packet.party.PartyOperationResultPacket;
@@ -154,5 +156,7 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(LostTalesChatMembersPacket.Handler.class, LostTalesChatMembersPacket.class, 63, Side.CLIENT);
         CHANNEL.registerMessage(CharacterProfileUpdateRequestPacket.Handler.class, CharacterProfileUpdateRequestPacket.class, 64, Side.SERVER);
         CHANNEL.registerMessage(LostTalesChatReportPacket.Handler.class, LostTalesChatReportPacket.class, 65, Side.SERVER);
+        CHANNEL.registerMessage(CharacterProfileRequestPacket.Handler.class, CharacterProfileRequestPacket.class, 66, Side.SERVER);
+        CHANNEL.registerMessage(CharacterProfilePacket.Handler.class, CharacterProfilePacket.class, 67, Side.CLIENT);
     }
 }

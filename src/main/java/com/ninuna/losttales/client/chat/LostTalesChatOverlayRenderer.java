@@ -2,7 +2,6 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.client.chat.ChatFeedPlacement;
 import com.ninuna.losttales.client.window.PageTab;
-import com.ninuna.losttales.client.window.TabRow;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowDrawing;
 import com.ninuna.losttales.client.window.WindowLayout;
@@ -21,8 +20,6 @@ import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiItemIcon;
 import com.ninuna.losttales.gui.style.LostTalesUiRules;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
-import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
-import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.chat.ChatChannel;
@@ -38,7 +35,6 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import java.lang.reflect.Field;
 import java.nio.FloatBuffer;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ChatLine;
@@ -56,7 +52,6 @@ import net.minecraft.util.StatCollector;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 import net.minecraft.client.renderer.OpenGlHelper;
-import org.lwjgl.opengl.GLContext;
 import org.lwjgl.opengl.GL14;
 
 /**
@@ -2550,13 +2545,15 @@ public final class LostTalesChatOverlayRenderer {
     static final int TOOLBAR_LINK = 4;
     /** Open the message's menu, the one a right click on it opens. */
     static final int TOOLBAR_MORE = 5;
+    /** Carry the message on to another conversation. */
+    static final int TOOLBAR_FORWARD = 6;
     /**
      * The toolbar's controls, left to right, on every message alike, the
      * menu's last as on a messenger's bar: one that cannot be taken on a
      * message stands muted in its place and says why under the pointer.
      */
     public static final int[] TOOLBAR_KINDS = {TOOLBAR_REACT, TOOLBAR_REPLY,
-            TOOLBAR_COPY, TOOLBAR_LINK, TOOLBAR_MORE};
+            TOOLBAR_FORWARD, TOOLBAR_COPY, TOOLBAR_LINK, TOOLBAR_MORE};
     /**
      * The link glyph's pixels: two rings of a chain holding each other,
      * standing in until the link's own artwork is drawn.
@@ -2745,8 +2742,10 @@ public final class LostTalesChatOverlayRenderer {
                     ? LostTalesChatPresentation.whyNotReactable(chatLineId)
                     : kind == TOOLBAR_REPLY
                             ? LostTalesChatPresentation.whyNotRepliable(chatLineId)
+                            : kind == TOOLBAR_FORWARD
+                            ? LostTalesChatPresentation.whyNotForwardable(chatLineId)
                             : kind == TOOLBAR_LINK
-                                    ? ChatScreenMenus.whyNotLinkable(chatLineId)
+                                    ? ChatMenus.whyNotLinkable(chatLineId)
                                     : "";
         }
         return why;
@@ -2891,6 +2890,10 @@ public final class LostTalesChatOverlayRenderer {
             case TOOLBAR_REPLY:
                 resting = LostTalesUiSheet.REPLY;
                 hovered = LostTalesUiSheet.REPLY_HOVER;
+                break;
+            case TOOLBAR_FORWARD:
+                resting = LostTalesUiSheet.FORWARD;
+                hovered = LostTalesUiSheet.FORWARD_HOVER;
                 break;
             case TOOLBAR_COPY:
                 resting = LostTalesUiSheet.COPY;
@@ -3592,19 +3595,8 @@ public final class LostTalesChatOverlayRenderer {
     }
 
     /** Whether the context has the blend equations the recolour needs. */
-    private static Boolean recolourSupported;
-
     private static boolean canRecolour() {
-        if (recolourSupported == null) {
-            boolean supported;
-            try {
-                supported = GLContext.getCapabilities().OpenGL14;
-            } catch (RuntimeException unavailable) {
-                supported = false;
-            }
-            recolourSupported = Boolean.valueOf(supported);
-        }
-        return recolourSupported.booleanValue();
+        return WindowStyle.canRecolour();
     }
 
     /**
@@ -3635,8 +3627,8 @@ public final class LostTalesChatOverlayRenderer {
     static void recolourSurface(float left, float top, float right,
                                 float bottom, int alpha, int fromRgb,
                                 int toRgb) {
-        recolour(left, left, top, right, bottom, alpha, fromRgb, toRgb,
-                FLAT_WEIGHTS);
+        WindowStyle.recolourFlat(left, top, right, bottom, alpha, fromRgb,
+                toRgb);
     }
 
     /**

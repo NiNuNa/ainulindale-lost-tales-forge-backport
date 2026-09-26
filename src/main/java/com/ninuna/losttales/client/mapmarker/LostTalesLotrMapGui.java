@@ -214,6 +214,20 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
     private int panLastY;
     /** The page the map stands on in a window; null on a screen of its own. */
     private LostTalesMapPage page;
+    /**
+     * What LOTR says about the place under the pointer — its region and
+     * its coordinates — kept for the window's bar, where the map in a
+     * window shows them.
+     */
+    private String[] cursorLines = new String[0];
+    /** Waiting for a press on the map to teleport there: an operator's Teleport on the bar. */
+    private boolean teleportArmed;
+    /** Find Location in a window's well: every place, what the words found, and which is shown. */
+    private List<LostTalesMapSearchPrompt.Entry> places;
+    private List<LostTalesMapSearchPrompt.Entry> placesFound =
+            Collections.emptyList();
+    private String placeWords = "";
+    private int placeShown = -1;
     /** The map being drawn this moment, which LOTR's hooks ask about; null between frames. */
     private static LostTalesLotrMapGui drawing;
 
@@ -268,6 +282,102 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
     /** Stands the map on a page in a window: the window screen draws it and hands it the pointer and the keys. */
     void embedIn(LostTalesMapPage owner) {
         this.page = owner;
+    }
+
+    /** Whether the map stands in a window rather than on a screen of its own. */
+    boolean inWindow() {
+        return this.page != null;
+    }
+
+    /* ---- What the window's strip and bar ask of the map ---- */
+
+    /** Keeps what LOTR says about the place under the pointer, for the bar. */
+    void keepCursorLines(String[] lines) {
+        this.cursorLines = lines == null ? new String[0] : lines;
+    }
+
+    /** The region and coordinates under the pointer, as one line; empty for none. */
+    String cursorWords() {
+        StringBuilder words = new StringBuilder();
+        for (String line : this.cursorLines) {
+            if (line != null && line.trim().length() > 0) {
+                if (words.length() > 0) {
+                    words.append("   ");
+                }
+                words.append(line.trim());
+            }
+        }
+        return words.toString();
+    }
+
+    /** Whether the player stands in Middle-earth, where the map can show them and a waypoint can be made. */
+    boolean isInMiddleEarth() {
+        return this.mc != null && this.mc.thePlayer != null
+                && this.mc.thePlayer.dimension
+                == LOTRDimension.MIDDLE_EARTH.dimensionID;
+    }
+
+    /** One step of the wheel's zoom about the map's middle: in for a positive step, out for a negative. */
+    void zoomStep(int direction) {
+        if (direction == 0 || isModalOpen() || !this.smoothZoomInitialized) {
+            return;
+        }
+        clearSearchSelectionFrame();
+        adjustSmoothZoom(Math.signum((float)direction)
+                * SMOOTH_ZOOM_WHEEL_INCREMENT, System.nanoTime());
+    }
+
+    /** Arms the operator's teleport, or takes it back: the next press on the map teleports there. */
+    void toggleTeleport() {
+        this.teleportArmed = this.isPlayerOp && !this.teleportArmed;
+    }
+
+    boolean isTeleportArmed() {
+        return this.teleportArmed && this.isPlayerOp;
+    }
+
+    /**
+     * Finds places by the well's words and takes the map to the first,
+     * as a find takes the view to its first match; the same words find
+     * nothing new.
+     */
+    void findPlaces(String words) {
+        String typed = words == null ? "" : words.trim();
+        if (typed.equals(this.placeWords)) {
+            return;
+        }
+        this.placeWords = typed;
+        if (typed.length() == 0) {
+            this.placesFound = Collections.emptyList();
+            this.placeShown = -1;
+            return;
+        }
+        if (this.places == null) {
+            this.places = LostTalesMapSearchPrompt.places(
+                    LostTalesClientMapMarkerStore.getMapMarkers(
+                            ClientPartyTrackingCache.getMapMarkers()));
+        }
+        this.placesFound = LostTalesMapSearchPrompt.filter(this.places,
+                typed);
+        this.placeShown = this.placesFound.isEmpty() ? -1 : 0;
+        if (this.placeShown >= 0) {
+            goToPlace(this.placesFound.get(0).getMarker());
+        }
+    }
+
+    /** How many places the well's words found; -1 while it holds none. */
+    int placesFound() {
+        return this.placeWords.length() == 0 ? -1 : this.placesFound.size();
+    }
+
+    /** Walks to the next place found, or the one before, and takes the map there. */
+    void walkPlaces(int step) {
+        if (this.placesFound.isEmpty()) {
+            return;
+        }
+        int size = this.placesFound.size();
+        this.placeShown = ((this.placeShown + step) % size + size) % size;
+        goToPlace(this.placesFound.get(this.placeShown).getMarker());
     }
 
     /** The map being drawn now, on its own screen or in a window; null between frames. */
@@ -1226,6 +1336,8 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
     }
 
     private void drawMap(int mouseX, int mouseY, float partialTicks) {
+        // LOTR says anew each frame what lies under the pointer, or nothing.
+        this.cursorLines = new String[0];
         this.cursorPosition.beginFrame(this, mouseX, mouseY);
         LostTalesLotrMapLayout.prepareForDraw(this);
         this.roadsRenderedBelowClouds = false;
@@ -1377,7 +1489,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
      * own position rather than at a marker, so it arrives the same way and can
      * be interrupted the same way.</p>
      */
-    private void focusCurrentLocation() {
+    void focusCurrentLocation() {
         if (this.mc == null || this.mc.thePlayer == null
                 || this.mc.thePlayer.dimension
                 != LOTRDimension.MIDDLE_EARTH.dimensionID) {
@@ -1431,9 +1543,14 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         if (marker == null) {
             return;
         }
+        clearSearchPrompt();
+        goToPlace(marker);
+    }
+
+    /** Frames a place found and takes the camera there. */
+    private void goToPlace(LostTalesMapMarkerData marker) {
         float[] target = LostTalesLotrMapMarkerIconOverlay
                 .resolveMapImagePosition(marker, null);
-        clearSearchPrompt();
         LostTalesLotrMapMarkerIconOverlay.setSelectedMarkerFrame(
                 this, marker, null);
         this.searchSelectionFrameActive = true;
@@ -1665,6 +1782,18 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
     protected void mouseClicked(int mouseX, int mouseY, int button) {
         if (LostTalesKeyBindings.isMapMouseButton(button)) {
             closeMap();
+            return;
+        }
+        if (isTeleportArmed() && !isModalOpen()) {
+            // An armed Teleport takes the press: a left press sends the
+            // player there, as LOTR's key does at the pointer, and any
+            // other puts the teleport away.
+            this.teleportArmed = false;
+            if (button == 0) {
+                this.cursorPosition.syncNativeCoordinates(this);
+                super.keyTyped('\0',
+                        LOTRKeyHandler.keyBindingMapTeleport.getKeyCode());
+            }
             return;
         }
         int fixedMouseX = LostTalesGuiAnimations.forwardMouseX(
@@ -2268,7 +2397,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
      * <p>LOTR creates the waypoint where the player is standing, not where
      * the map is looking, so there is nothing to pick on the map first.</p>
      */
-    private void openWaypointPrompt() {
+    void openWaypointPrompt() {
         if (this.mc == null || this.mc.thePlayer == null
                 || this.mc.fontRenderer == null
                 || this.mc.thePlayer.dimension
@@ -2561,6 +2690,10 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             toggleMapLegend();
             return;
         }
+        if (this.teleportArmed && keyCode == Keyboard.KEY_ESCAPE) {
+            this.teleportArmed = false;
+            return;
+        }
         if (this.mapLegendOpen && keyCode == Keyboard.KEY_ESCAPE) {
             this.mapLegendOpen = false;
             return;
@@ -2575,9 +2708,9 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         super.keyTyped(typedChar, keyCode);
     }
 
-    private void toggleMapLegend() {
+    void toggleMapLegend() {
         if (!this.mapLegendOpen
-                && !LostTalesLotrMapLayout.isControlBarVisible(this)) {
+                && !LostTalesLotrMapLayout.hasFooterLayout(this)) {
             return;
         }
         this.mapLegendOpen = !this.mapLegendOpen;

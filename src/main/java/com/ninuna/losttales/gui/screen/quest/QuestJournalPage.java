@@ -5,13 +5,16 @@ import com.ninuna.losttales.client.quest.ClientQuestEntry;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
+import com.ninuna.losttales.client.window.BarItem;
+import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.PageContent;
 import com.ninuna.losttales.client.window.PageSearch;
 import com.ninuna.losttales.client.window.ToolStrip;
+import com.ninuna.losttales.client.window.WindowBar;
+import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
-import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
@@ -39,19 +42,21 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
+import net.minecraft.init.Items;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.StatCollector;
 import org.lwjgl.input.Keyboard;
-import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
 import com.ninuna.losttales.quest.LostTalesQuestTimeText;
 import com.ninuna.losttales.quest.LostTalesQuestRewardText;
 /**
- * The quest journal, a page a chat window holds: the quests on the left,
- * the one being read on the right, its actions under it. The window's
- * strip holds the rest: the list's button at its left, the filters behind
- * its cog, and the search in its well. It reads the shared presentation
- * assembled from Lost Tales and LOTR's synchronized quest state, and
- * draws itself in the box its window gives it.
+ * The quest journal, a page a window holds: the quests on the left, the
+ * one being read on the right. The window holds the rest: the list's
+ * button at its tool strip's left, the filters behind its cog, the search
+ * in its well, and the quest's actions on its input bar (U4 a), where
+ * Abandon and Clear ask first. It reads the shared presentation assembled
+ * from Lost Tales and LOTR's synchronized quest state, and draws itself
+ * in the box its window gives it.
  */
 public final class QuestJournalPage extends PageContent {
     /** The code name the page is registered and remembered under. */
@@ -75,15 +80,18 @@ public final class QuestJournalPage extends PageContent {
             "gui.losttales.quest.list.hide");
 
     /** What the pointer is on: asked once a frame, read by every draw. */
-    private enum Hovered { NOTHING, CATEGORY, QUEST, ACTION }
+    private enum Hovered { NOTHING, CATEGORY, QUEST }
 
     /** The filters, in the order the tab's menu lists them. */
     private static final QuestFilter[] FILTERS = QuestFilter.values();
 
-    /** The actions a quest being read offers, in the order they stand. */
-    private enum QuestAction { TRACK, SHARE, ABANDON, CLEAR }
-
-    private static final QuestAction[] ACTIONS = QuestAction.values();
+    /** The bar's items: their ids, which the page is told when one is pressed. */
+    private static final String TRACK = "track";
+    private static final String SHARE = "share";
+    private static final String ABANDON = "abandon";
+    private static final String CLEAR = "clear";
+    /** The key that tracks the quest being read, as the tip names it. */
+    private static final int TRACK_KEY = Keyboard.KEY_SPACE;
 
     private final Minecraft mc = Minecraft.getMinecraft();
     private FontRenderer fontRendererObj;
@@ -97,14 +105,11 @@ public final class QuestJournalPage extends PageContent {
     private int hoveredIndex = -1;
     private String hoveredCategory = "";
     /**
-     * A motion each for the controls the pointer can press, so they dip,
-     * rise and settle the way every other button in the mod does. A
-     * labelled button carries words, and a category's plus and minus are
-     * four-fold symmetric, so both only lift
+     * A motion each for the categories' plus and minus, so they dip, rise
+     * and settle the way every other button in the mod does. The glyphs
+     * are four-fold symmetric, so they only lift
      * ({@code LostTalesUiGlyphTurnTest} says which glyphs may turn).
      */
-    private final Map<String, LostTalesUiButtonMotion> labelMotions =
-            new HashMap<String, LostTalesUiButtonMotion>();
     private final Map<String, LostTalesUiButtonMotion> categoryMotions =
             new HashMap<String, LostTalesUiButtonMotion>();
     /** The frame the visible list was built for; see {@link #getVisibleQuests}. */
@@ -137,6 +142,8 @@ public final class QuestJournalPage extends PageContent {
     private double selectionShown = Double.NaN;
     private long lastFrameNanos;
     private int selectedQuestIndex;
+    /** A quest the quick switcher found, picked as the journal next draws; null for none. */
+    private String pendingShow;
     private int listScroll;
     private int detailScroll;
     private QuestFilter filter = QuestFilter.ALL;
@@ -196,16 +203,14 @@ public final class QuestJournalPage extends PageContent {
         this.wasWide = Boolean.valueOf(wide);
         advanceMotion();
         clampSelectionAndScroll();
+        showPending();
         QuestJournalLayout layout = layout();
         this.hovered = hoverAt(layout, mouseX, mouseY);
-
-        drawBackdrop(layout);
 
         List<ClientQuestEntry> quests = getVisibleQuests();
         drawDivider(layout);
         drawQuestList(quests, layout);
         drawQuestDetails(quests, layout);
-        drawActions(layout);
     }
 
     /**
@@ -271,32 +276,12 @@ public final class QuestJournalPage extends PageContent {
                 this.listOut);
     }
 
-    /**
-     * The action strip's surface on the window's own, its own flat
-     * colour, so nothing is ever two translucent layers deep.
-     */
-    private void drawBackdrop(QuestJournalLayout layout) {
-        drawStrip(layout.actions());
-        drawRule(layout.actionRule(), LostTalesColors.BORDER);
-    }
-
-    private void drawStrip(LostTalesUiHitBox box) {
-        Gui.drawRect((int)box.left, (int)box.top, (int)box.right(),
-                (int)box.bottom(),
-                LostTalesColors.withAlpha(LostTalesColors.PLUM_DARK, 0x9A));
-    }
-
     private void drawRule(LostTalesUiHitBox box, int color) {
         if (box.width <= 0.0D || box.height <= 0.0D) {
             return;
         }
         Gui.drawRect((int)box.left, (int)box.top, (int)box.right(),
                 (int)box.bottom(), color);
-    }
-
-    /** The row a line of text stands on to be centred in a strip. */
-    private static int textTop(LostTalesUiHitBox strip) {
-        return (int)Math.round(strip.top + (strip.height - 8) / 2.0D);
     }
 
     /* ---- The window's strip ---- */
@@ -404,40 +389,64 @@ public final class QuestJournalPage extends PageContent {
         return false;
     }
 
+    /* ---- The quick switcher ---- */
+
+    @Override
+    public String findHeading() {
+        return "gui.losttales.quest.find";
+    }
+
+    /** Every quest whose title or category holds the words, the state it is in beside it. */
+    @Override
+    public List<MenuWindow.Entry> find(String words) {
+        PageSearch search = PageSearch.of(words);
+        List<MenuWindow.Entry> found = new ArrayList<MenuWindow.Entry>();
+        for (ClientQuestEntry quest : ClientQuestCatalog.getEntries(this.mc)) {
+            if (search.matches(quest.getTitle(), quest.getCategory())) {
+                found.add(new MenuWindow.Entry(quest.getReference(),
+                        quest.getTitle()).withValue(statusWord(quest)));
+            }
+        }
+        return found;
+    }
+
+    /** The quest found is picked in the list as the journal next draws. */
+    @Override
+    public void show(String reference) {
+        this.pendingShow = reference;
+    }
+
     /**
-     * A framed button holding one label, centred: the surface in the
-     * hole the strip leaves for it, the frame at its lit share, and the
-     * label inside the frame's clear pixels.
+     * Picks the quest the switcher found, the filter opened to every quest
+     * where the one in force hides it; a narrow journal shows its details.
      */
-    private void drawFramedLabel(LostTalesUiHitBox box, String label,
-                                 boolean selected, boolean hovered,
-                                 int rgb) {
-        if (box.width < LostTalesUiFramedButton.MIN_SIZE) {
+    private void showPending() {
+        String reference = this.pendingShow;
+        this.pendingShow = null;
+        if (reference == null) {
             return;
         }
-        LostTalesUiButtonMotion motion = labelMotion(label);
-        motion.advance(System.nanoTime(), selected || hovered, hovered,
-                hovered && Mouse.isButtonDown(0));
-        float lit = motion.lit();
-        // The frame stands still; only what it holds moves, so a row of
-        // buttons keeps its shape while one of them answers.
-        LostTalesUiFramedButton.drawSurface((float)box.left, (float)box.top,
-                (float)box.width, (float)box.height, lit, 0xC8);
-        LostTalesUiFramedButton.drawInk((float)box.left, (float)box.top,
-                (int)box.width, (int)box.height, lit, 0xFF);
-        LostTalesSkyrimUiStyle.beginContent();
-        int width = this.fontRendererObj.getStringWidth(label);
-        int textX = (int)Math.round(box.left + (box.width - width) / 2.0D);
-        int textY = textTop(box);
-        LostTalesUiButton.beginPose(motion, textX, textY, width, 8);
-        try {
-            this.fontRendererObj.drawStringWithShadow(label, textX, textY,
-                    LostTalesUiInk.blend(
-                            LostTalesColors.rgb(LostTalesColors.TEXT_MUTED),
-                            rgb, lit));
-        } finally {
-            LostTalesUiButton.endPose();
+        if (indexOfQuest(reference) < 0) {
+            setFilter(QuestFilter.ALL);
         }
+        int index = indexOfQuest(reference);
+        if (index < 0) {
+            return;
+        }
+        if (!layout().isWide()) {
+            this.listOut = false;
+        }
+        setSelectedQuestIndex(index);
+    }
+
+    private int indexOfQuest(String reference) {
+        List<ClientQuestEntry> quests = getVisibleQuests();
+        for (int index = 0; index < quests.size(); index++) {
+            if (reference.equals(quests.get(index).getReference())) {
+                return index;
+            }
+        }
+        return -1;
     }
 
     /** How a quest's state reads on its own line. */
@@ -452,21 +461,6 @@ public final class QuestJournalPage extends PageContent {
             return translate("gui.losttales.quest.status.completed");
         }
         return translate("gui.losttales.quest.status.active");
-    }
-
-    /**
-     * The motion of a labelled button, made on first sight and kept by
-     * the words it carries, so a button that changes its label — Track
-     * becoming Stop tracking — keeps moving rather than starting over.
-     */
-    private LostTalesUiButtonMotion labelMotion(String key) {
-        LostTalesUiButtonMotion motion = this.labelMotions.get(key);
-        if (motion == null) {
-            motion = new LostTalesUiButtonMotion(
-                    LostTalesUiButtonMotion.Character.LIFT);
-            this.labelMotions.put(key, motion);
-        }
-        return motion;
     }
 
     private LostTalesUiButtonMotion categoryMotion(String category) {
@@ -778,103 +772,110 @@ public final class QuestJournalPage extends PageContent {
         this.fontRendererObj.drawStringWithShadow(line.text, x, y, line.color);
     }
 
+    /* ---- The window's bar ---- */
+
     /**
-     * The actions for the quest being read: framed buttons on the strip
-     * across the bottom.
+     * The quest being read's actions: Track (or Stop tracking) and Share
+     * from the left, Abandon last in red, or Clear for a finished LOTR
+     * quest, which only such a quest may leave History by. Each is there
+     * whatever is read, greyed and saying why when it cannot be taken.
      */
-    private void drawActions(QuestJournalLayout layout) {
+    @Override
+    public List<BarItem> barItems() {
         ClientQuestEntry quest = getSelectedQuest();
+        List<BarItem> items = new ArrayList<BarItem>(3);
+        String track = translate(quest != null && quest.isTracked()
+                ? "gui.losttales.quest.action.untrack"
+                : "gui.losttales.quest.action.track");
+        items.add(runningOnly(BarItem.button(TRACK, track,
+                        new ItemStack(Items.compass))
+                .tip(WindowBar.withKey(track, TRACK_KEY)), quest,
+                "gui.losttales.quest.action.why.track"));
+        String share = translate("gui.losttales.quest.action.share");
+        items.add(runningOnly(BarItem.button(SHARE, share,
+                        LostTalesUiSheet.SEND, LostTalesUiSheet.SEND_HOVER)
+                .tip(share), quest, "gui.losttales.quest.action.why.share"));
+        if (clears(quest)) {
+            String clear = translate("gui.losttales.quest.action.clear");
+            items.add(BarItem.button(CLEAR, clear, LostTalesUiSheet.CLOSE,
+                    LostTalesUiSheet.CLOSE_HOVER).tip(clear).ending());
+        } else {
+            String abandon = translate("gui.losttales.quest.action.abandon");
+            items.add(runningOnly(BarItem.button(ABANDON, abandon,
+                            LostTalesUiSheet.CLOSE, LostTalesUiSheet.CLOSE_HOVER)
+                    .tip(abandon).ending(), quest,
+                    "gui.losttales.quest.action.why.abandon"));
+        }
+        return items;
+    }
+
+    /** Greys an action for a quest not running, or with none read, saying why. */
+    private static BarItem runningOnly(BarItem item, ClientQuestEntry quest,
+                                       String whyKey) {
+        if (quest == null) {
+            return item.unavailable(translate(
+                    "gui.losttales.quest.action.why.none"));
+        }
+        return quest.isActive() ? item : item.unavailable(translate(whyKey));
+    }
+
+    /**
+     * Whether the quest leaves History by Clear: a finished Middle-earth
+     * quest, as LOTR's own quest book clears one. A Lost Tales quest's
+     * History decides whether it may be taken again, so it stays.
+     */
+    private static boolean clears(ClientQuestEntry quest) {
+        return quest != null && quest.getSource() == ClientQuestEntry.Source.LOTR
+                && (quest.isCompleted() || quest.isFailed());
+    }
+
+    @Override
+    public void barPressed(String id, int offer) {
+        final ClientQuestEntry quest = getSelectedQuest();
         if (quest == null) {
             return;
         }
-        LostTalesUiHitBox strip = layout.actions();
-        int[] widths = actionWidths(quest);
-        double left = QuestJournalLayout.MARGIN;
-        for (int index = 0; index < ACTIONS.length; index++) {
-            if (!actionOffered(quest, ACTIONS[index])) {
-                continue;
-            }
-            drawFramedLabel(QuestJournalLayout.buttonAt(strip, left, widths,
-                            index),
-                    actionLabel(quest, ACTIONS[index]), false,
-                    this.hovered == Hovered.ACTION && this.hoveredIndex == index,
-                    LostTalesColors.rgb(ACTIONS[index] == QuestAction.ABANDON
-                            || ACTIONS[index] == QuestAction.CLEAR
-                            ? LostTalesColors.RED
-                            : LostTalesColors.TEXT_BRIGHT));
-        }
-    }
-
-    /** Each action button's width; one it does not offer takes none. */
-    private int[] actionWidths(ClientQuestEntry quest) {
-        int[] widths = new int[ACTIONS.length];
-        for (int index = 0; index < ACTIONS.length; index++) {
-            widths[index] = actionOffered(quest, ACTIONS[index])
-                    ? QuestJournalLayout.buttonWidthFor(
-                            this.fontRendererObj.getStringWidth(
-                                    actionLabel(quest, ACTIONS[index])))
-                    : 0;
-        }
-        return widths;
-    }
-
-    /** Whether the quest being read offers the action at all. */
-    private static boolean actionOffered(ClientQuestEntry quest,
-                                         QuestAction action) {
-        if (quest == null) {
-            return false;
-        }
-        if (action == QuestAction.CLEAR) {
-            // Only a Middle-earth quest leaves History: a Lost Tales one
-            // decides whether the quest may be taken again.
-            return quest.getSource() == ClientQuestEntry.Source.LOTR
-                    && (quest.isCompleted() || quest.isFailed());
-        }
-        // Tracking and sharing are for a quest still running: a finished
-        // one has nothing left to follow, and the server shares no other.
-        return quest.isActive();
-    }
-
-    private static String actionLabel(ClientQuestEntry quest,
-                                      QuestAction action) {
-        if (action == QuestAction.TRACK) {
-            return translate(quest.isTracked()
-                    ? "gui.losttales.quest.action.untrack"
-                    : "gui.losttales.quest.action.track");
-        }
-        if (action == QuestAction.SHARE) {
-            return translate("gui.losttales.quest.action.share");
-        }
-        if (action == QuestAction.CLEAR) {
-            return translate("gui.losttales.quest.action.clear");
-        }
-        return translate("gui.losttales.quest.action.abandon");
-    }
-
-    /** Runs the action on the quest being read. */
-    private void runAction(ClientQuestEntry quest, QuestAction action) {
-        if (!actionOffered(quest, action)) {
-            return;
-        }
-        if (action == QuestAction.TRACK) {
+        if (TRACK.equals(id)) {
             toggleSelectedQuestTracking(quest);
-            return;
-        }
-        if (action == QuestAction.SHARE) {
+        } else if (SHARE.equals(id)) {
             // The quest's own token goes into the field being typed in,
             // so the share is written the way a player writes one.
-            if (this.mc.currentScreen instanceof WindowScreen) {
-                ((WindowScreen)this.mc.currentScreen).insertIntoInput(
-                        ChatShareTokenParser.buildToken(ChatShareKind.QUEST,
-                                quest.getTitle(), 1));
+            WindowScreen screen = WindowScreen.current();
+            if (screen != null) {
+                screen.insertIntoInput(ChatShareTokenParser.buildToken(
+                        ChatShareKind.QUEST, quest.getTitle(), 1));
             }
+        } else if (ABANDON.equals(id) || CLEAR.equals(id)) {
+            ask(quest, CLEAR.equals(id));
+        }
+    }
+
+    /**
+     * Asks before a quest is abandoned or cleared (U4 a): one click used to
+     * lose a quest's progress. The answer acts on the quest asked about,
+     * whatever is read by then.
+     */
+    private void ask(final ClientQuestEntry quest, final boolean clear) {
+        WindowScreen screen = WindowScreen.current();
+        if (screen == null) {
             return;
         }
-        LostTalesNetworkHandler.CHANNEL.sendToServer(
-                new LostTalesQuestActionPacket(action == QuestAction.CLEAR
-                        ? LostTalesQuestActionPacket.ACTION_CLEAR
-                        : LostTalesQuestActionPacket.ACTION_ABANDON,
-                        quest.getReference()));
+        String kind = clear ? "clear" : "abandon";
+        screen.ask(WindowPages.tab(PAGE_ID),
+                translate("gui.losttales.quest.ask." + kind + ".title"),
+                translate("gui.losttales.quest.ask." + kind + ".detail",
+                        quest.getTitle()),
+                translate("gui.losttales.quest.action." + kind),
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        LostTalesNetworkHandler.CHANNEL.sendToServer(
+                                new LostTalesQuestActionPacket(clear
+                                        ? LostTalesQuestActionPacket.ACTION_CLEAR
+                                        : LostTalesQuestActionPacket.ACTION_ABANDON,
+                                        quest.getReference()));
+                    }
+                });
     }
 
     /**
@@ -886,18 +887,6 @@ public final class QuestJournalPage extends PageContent {
                             int mouseY) {
         this.hoveredIndex = -1;
         this.hoveredCategory = "";
-        ClientQuestEntry selected = getSelectedQuest();
-        if (selected != null) {
-            int[] actions = actionWidths(selected);
-            for (int index = 0; index < ACTIONS.length; index++) {
-                if (actions[index] > 0 && QuestJournalLayout.buttonAt(
-                        layout.actions(), QuestJournalLayout.MARGIN, actions,
-                        index).contains(mouseX, mouseY)) {
-                    this.hoveredIndex = index;
-                    return Hovered.ACTION;
-                }
-            }
-        }
         return questRowHover(layout, mouseX, mouseY);
     }
 
@@ -1533,11 +1522,6 @@ public final class QuestJournalPage extends PageContent {
         int mouseY = pageY(box, y);
         if (mouseButton == 0) {
             QuestJournalLayout layout = layout();
-            Hovered where = hoverAt(layout, mouseX, mouseY);
-            if (where == Hovered.ACTION) {
-                runAction(getSelectedQuest(), ACTIONS[this.hoveredIndex]);
-                return true;
-            }
             QuestListRow row = rowAt(buildQuestListRows(getVisibleQuests()),
                     layout, mouseX, mouseY);
             if (row != null && row.category) {

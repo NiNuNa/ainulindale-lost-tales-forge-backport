@@ -2,7 +2,8 @@ package com.ninuna.losttales.client.window;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -99,8 +100,7 @@ public final class SubWindowPlaces {
     }
 
     private static final Map<SubWindowKind, Placement> PLACED =
-            new EnumMap<SubWindowKind, Placement>(
-                    SubWindowKind.class);
+            new HashMap<SubWindowKind, Placement>();
     /** The windows open as the screen last closed, back to front. */
     private static final List<Reopening> OPEN_AT_CLOSE =
             new ArrayList<Reopening>();
@@ -150,10 +150,17 @@ public final class SubWindowPlaces {
         }
     }
 
-    /** Everything remembered, for the layout file. */
+    /** Everything remembered, for the layout file, in the order the kinds were registered. */
     static synchronized Map<SubWindowKind, Placement> all() {
-        return Collections.unmodifiableMap(
-                new EnumMap<SubWindowKind, Placement>(PLACED));
+        Map<SubWindowKind, Placement> all =
+                new LinkedHashMap<SubWindowKind, Placement>();
+        for (SubWindowKind kind : SubWindowKind.all()) {
+            Placement placement = PLACED.get(kind);
+            if (placement != null) {
+                all.put(kind, placement);
+            }
+        }
+        return Collections.unmodifiableMap(all);
     }
 
     /** Notes the windows open as the screen closes, back to front, so they come back with it. */

@@ -431,12 +431,16 @@ public final class ChatLayout {
     }
 
     /**
-     * Opens a conversation tab (a player's or an NPC's) where a tab that
-     * opens by itself belongs, and answers it as the layout holds it.
+     * Opens a conversation's tab where a tab that opens by itself belongs,
+     * and answers it as the layout holds it. The row holds one entry per
+     * channel and per person, so a conversation held as one character
+     * opens as its row entry: a line's own tab never stands in a window
+     * beside the one that shows it.
      */
     public static synchronized ChatTab openTab(ChatTab tab,
                                                String preferredWindowId) {
-        return ChatTab.from(WindowLayout.openTab(tab, preferredWindowId));
+        return ChatTab.from(WindowLayout.openTab(ChatTab.row(tab),
+                preferredWindowId));
     }
 
     public static synchronized boolean moveTab(ChatChannel channel,
@@ -532,7 +536,7 @@ public final class ChatLayout {
             return null;
         }
         HIDDEN.remove(ChatTab.row(row));
-        return openTab(ChatTab.row(row), preferredWindowId);
+        return openTab(row, preferredWindowId);
     }
 
     /**

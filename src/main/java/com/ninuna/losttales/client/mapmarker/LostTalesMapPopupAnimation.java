@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiEasing;
+import com.ninuna.losttales.client.gui.animation.LostTalesGuiOrigin;
 import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.Motions;
 import cpw.mods.fml.relauncher.Side;
@@ -16,7 +17,6 @@ import org.lwjgl.opengl.GL11;
  */
 @SideOnly(Side.CLIENT)
 final class LostTalesMapPopupAnimation {
-    private static final float GUI_MODELVIEW_Z = -2000.0F;
     private static final Map<Object, Long> STARTS =
             new WeakHashMap<Object, Long>();
 
@@ -46,17 +46,15 @@ final class LostTalesMapPopupAnimation {
     static void push(Object popup, int pivotX, int pivotY) {
         Sample sample = sample(popup);
         GL11.glPushMatrix();
-        GL11.glLoadIdentity();
-        GL11.glTranslatef(pivotX, pivotY + sample.offsetY,
-                GUI_MODELVIEW_Z);
+        LostTalesGuiOrigin.load();
+        GL11.glTranslatef(pivotX, pivotY + sample.offsetY, 0.0F);
         GL11.glScalef(sample.scale, sample.scale, 1.0F);
         GL11.glTranslatef(-pivotX, -pivotY, 0.0F);
     }
 
     static void pushFixed() {
         GL11.glPushMatrix();
-        GL11.glLoadIdentity();
-        GL11.glTranslatef(0.0F, 0.0F, GUI_MODELVIEW_Z);
+        LostTalesGuiOrigin.load();
     }
 
     static void pop() {

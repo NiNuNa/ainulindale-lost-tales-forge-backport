@@ -29,12 +29,12 @@ import com.ninuna.losttales.gui.hud.LostTalesNotificationHud;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterFigureRenderer;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterCreationCatalogCache;
+import com.ninuna.losttales.client.character.ClientCharacterProfileCache;
 import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
 import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.chat.ChatSpeechBubbles;
-import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.chat.LostTalesSpeechBubbleRenderer;
 import com.ninuna.losttales.client.chat.ClientChatChannelState;
 import com.ninuna.losttales.client.chat.ClientChatIgnores;
@@ -165,7 +165,6 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     }
 
     private static void clearSessionState() {
-        WindowScreen.leaveWorld();
         WindowPages.forgetContents();
         LostTalesClientQuestProgressStore.clear();
         LostTalesClientQuestNotificationStore.clear();
@@ -192,6 +191,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         CharacterClientTaskQueue.clear();
         LostTalesCharacterFigureRenderer.clear();
         ClientCharacterAppearanceCache.clear();
+        ClientCharacterProfileCache.clear();
         PlayerAppearanceResolver.clear();
         LostTalesAccountSkins.clear();
         ChestPhysicsStates.clear();
@@ -330,14 +330,6 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void replaceCharacterRoomPauseMenu(GuiOpenEvent event) {
         CharacterRoomSession.replacePauseMenu(event);
-    }
-
-    /** The pages that close with the window screen close once the game shows no screen. */
-    @SubscribeEvent
-    public void closePagesLeftWithScreen(TickEvent.ClientTickEvent event) {
-        if (event != null && event.phase == TickEvent.Phase.END) {
-            WindowScreen.onClientTick(Minecraft.getMinecraft());
-        }
     }
 
     /** Returns the native pointer as soon as Minecraft leaves its GUI layer. */

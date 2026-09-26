@@ -22,8 +22,6 @@ import java.util.UUID;
  * {@link CharacterSummary} for the owner only.
  */
 public final class CharacterAppearance {
-    /** Biography length bound, the same one character creation enforces. */
-    public static final int MAX_DESCRIPTION_LENGTH = 256;
 
     private final CharacterAppearanceKind kind;
     private final UUID playerId;
@@ -46,7 +44,6 @@ public final class CharacterAppearance {
     private final String startingFactionId;
     private final int roleplayLevel;
     private final int age;
-    private final String description;
 
     /**
      * Preview constructor carrying chosen body and chest types. A type the
@@ -59,7 +56,7 @@ public final class CharacterAppearance {
         this(playerId, "", "", raceId, genderId, skinId,
                 RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
                 RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID,
-                "", 0, 0, "", bodyTypeId, chestTypeId);
+                "", 0, 0, bodyTypeId, chestTypeId);
     }
 
     /** Preview projection carrying capes and chosen body and chest types. */
@@ -69,7 +66,7 @@ public final class CharacterAppearance {
                                               boolean showMinecraftCape,
                                               int cosmeticCapeId) {
         return new CharacterAppearance(playerId, "", "", raceId, genderId, skinId,
-                showMinecraftCape, cosmeticCapeId, "", 0, 0, "", bodyTypeId, chestTypeId);
+                showMinecraftCape, cosmeticCapeId, "", 0, 0, bodyTypeId, chestTypeId);
     }
 
     /**
@@ -77,20 +74,21 @@ public final class CharacterAppearance {
      * removal. The account name is the public one from the tab list, which
      * lets clients pair a tab-list account with its active character
      * without a second roster sync. A level or age of zero and an empty
-     * faction or description mean "not known", which is what previews and
-     * removals carry; the card omits those lines.
+     * faction mean "not known", which is what previews and removals
+     * carry; the card omits those lines. What the character says about
+     * itself is not here: it is fetched when somebody opens it.
      */
     public CharacterAppearance(UUID playerId, String accountName,
                                String characterName,
                                String raceId, String genderId, String skinId,
                                boolean showMinecraftCape, int cosmeticCapeId,
                                String startingFactionId, int roleplayLevel,
-                               int age, String description, String bodyTypeId,
+                               int age, String bodyTypeId,
                                String chestTypeId) {
         this(CharacterAppearanceKind.CHARACTER, playerId, accountName,
                 characterName, raceId, genderId, skinId, showMinecraftCape,
                 cosmeticCapeId, startingFactionId, roleplayLevel, age,
-                description, bodyTypeId, chestTypeId);
+                bodyTypeId, chestTypeId);
     }
 
     /**
@@ -103,11 +101,11 @@ public final class CharacterAppearance {
                                String raceId, String genderId, String skinId,
                                boolean showMinecraftCape, int cosmeticCapeId,
                                String startingFactionId, int roleplayLevel,
-                               int age, String description, String bodyTypeId,
+                               int age, String bodyTypeId,
                                String chestTypeId) {
         this(kind, playerId, null, accountName, characterName, raceId, genderId,
                 skinId, showMinecraftCape, cosmeticCapeId, startingFactionId,
-                roleplayLevel, age, description, bodyTypeId, chestTypeId);
+                roleplayLevel, age, bodyTypeId, chestTypeId);
     }
 
     /** The canonical projection with the character's stable id; see {@link #getCharacterId}. */
@@ -117,7 +115,7 @@ public final class CharacterAppearance {
                                String raceId, String genderId, String skinId,
                                boolean showMinecraftCape, int cosmeticCapeId,
                                String startingFactionId, int roleplayLevel,
-                               int age, String description, String bodyTypeId,
+                               int age, String bodyTypeId,
                                String chestTypeId) {
         if (playerId == null) {
             throw new IllegalArgumentException("playerId must not be null");
@@ -142,7 +140,6 @@ public final class CharacterAppearance {
                 ? "" : startingFactionId.trim();
         this.roleplayLevel = Math.max(0, roleplayLevel);
         this.age = Math.max(0, age);
-        this.description = normalizeDescription(description);
         this.kind = kind == null || this.raceId.isEmpty()
                 ? CharacterAppearanceKind.NONE : kind;
     }
@@ -159,8 +156,7 @@ public final class CharacterAppearance {
         return new CharacterAppearance(CharacterAppearanceKind.ACCOUNT, playerId,
                 accountName, "", CharacterRaceRegistry.HUMAN, "",
                 CharacterSkinRegistry.ACCOUNT_SKIN_ID, showMinecraftCape,
-                cosmeticCapeId, "", 0, 0, "",
-                CharacterBodyTypeRegistry.normalizeOrWide(bodyTypeId),
+                cosmeticCapeId, "", 0, 0, CharacterBodyTypeRegistry.normalizeOrWide(bodyTypeId),
                 CharacterChestTypeRegistry.NONE);
     }
 
@@ -203,7 +199,6 @@ public final class CharacterAppearance {
                         active.getStartingFactionId(),
                         active.getRoleplayLevel(),
                         active.getAge(),
-                        active.getDescription(),
                         active.getBodyTypeId(),
                         active.getChestTypeId());
     }
@@ -214,7 +209,7 @@ public final class CharacterAppearance {
                 this.accountName, this.characterName, this.raceId, this.genderId,
                 this.skinId, this.showMinecraftCape, this.cosmeticCapeId,
                 this.startingFactionId, this.roleplayLevel, this.age,
-                this.description, this.bodyTypeId, this.chestTypeId);
+                this.bodyTypeId, this.chestTypeId);
     }
 
     public static CharacterAppearance removed(UUID playerId) {
@@ -222,7 +217,7 @@ public final class CharacterAppearance {
                 "", "", "", "", "",
                 RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
                 RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID,
-                "", 0, 0, "", "", "");
+                "", 0, 0, "", "");
     }
 
     public CharacterAppearanceKind getKind() {
@@ -291,10 +286,6 @@ public final class CharacterAppearance {
         return this.age;
     }
 
-    /** Player-written biography; empty when none. */
-    public String getDescription() {
-        return this.description;
-    }
 
     /** Whether there is an identity to draw at all; false for a removal. */
     public boolean isPresent() {
@@ -324,12 +315,6 @@ public final class CharacterAppearance {
         return name.length() > 64 ? name.substring(0, 64) : name;
     }
 
-    private static String normalizeDescription(String value) {
-        String description = value == null ? "" : value.trim();
-        return description.length() > MAX_DESCRIPTION_LENGTH
-                ? description.substring(0, MAX_DESCRIPTION_LENGTH)
-                : description;
-    }
 
     /**
      * Whether the other appearance shows the same thing: every field the
@@ -352,8 +337,7 @@ public final class CharacterAppearance {
                 && this.cosmeticCapeId == other.cosmeticCapeId
                 && same(this.startingFactionId, other.startingFactionId)
                 && this.roleplayLevel == other.roleplayLevel
-                && this.age == other.age
-                && same(this.description, other.description);
+                && this.age == other.age;
     }
 
     private static boolean same(Object a, Object b) {

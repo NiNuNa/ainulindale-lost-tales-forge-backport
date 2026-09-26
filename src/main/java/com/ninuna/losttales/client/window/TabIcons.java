@@ -17,5 +17,12 @@ public final class TabIcons {
     /** Gap between the icon and the text. */
     public static final int GAP = 3;
 
+    /**
+     * Where a ten-row icon's box stands from the top of the capitals it
+     * sits beside: two rows above them, so its middle is half a pixel
+     * above the capitals' middle — the one rule for a ten-row box.
+     */
+    public static final int CONTENT_TOP_OFFSET = -2;
+
     private TabIcons() {}
 }

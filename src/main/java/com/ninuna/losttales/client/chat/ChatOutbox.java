@@ -127,6 +127,30 @@ final class ChatOutbox {
     }
 
     /**
+     * Forwards the server's message {@code messageId} into {@code tab},
+     * addressed as a line typed there would be, and says where it went.
+     * The server builds the line from its own record, so nothing is shown
+     * before it arrives.
+     */
+    void forward(ChatTab tab, long messageId) {
+        if (tab == null || !ChatMessageIds.isServerId(messageId)) {
+            return;
+        }
+        ClientChatIdentitySelection.update();
+        LostTalesNetworkHandler.CHANNEL.sendToServer(
+                LostTalesChatSendPacket.forward(tab.getChannel(),
+                        tab.getPartner(), ClientChatIdentities.wireKind(tab),
+                        ClientChatIdentities.wireCharacterId(tab),
+                        tab.isWhisper() ? tab.getPartnerIdentity() : "",
+                        tab.isWhisper()
+                                ? ClientChatChannelState.partnerCharacterIdOf(tab)
+                                : null,
+                        messageId));
+        this.notices.showNotice(StatCollector.translateToLocalFormatted(
+                "gui.losttales.chat.forwarded", tab.title()));
+    }
+
+    /**
      * Shows the line at once, named so the copy that comes back replaces
      * it rather than arriving underneath it, and sends it with the
      * references the server re-checks.

@@ -17,6 +17,10 @@ import java.util.UUID;
  * <p>The id is kept as well as the text: it is what a click on the quote
  * jumps to, and what a later edit or removal of the original would be
  * matched against. {@link #NONE} is a line that replies to nothing.</p>
+ *
+ * <p>A forwarded message wears one too ({@link #forward}): the message it
+ * carries on from, with the link to where that was said, and no excerpt,
+ * since the forward's own words are the whole message.</p>
  */
 public final class ChatReplyReference {
     /** An author whose colour the quote was not told. */
@@ -35,6 +39,8 @@ public final class ChatReplyReference {
     private static final String ELLIPSIS = "...";
     /** The quoted sender's skin id, bounded as the message packet bounds its own. */
     public static final int MAX_SKIN_ID_BYTES = 128;
+    /** A forward's link to where its message was said: {@code #code/id}. */
+    public static final int MAX_LINK_BYTES = 128;
 
     private final long messageId;
     private final String author;
@@ -55,17 +61,23 @@ public final class ChatReplyReference {
      * never travels.
      */
     private final boolean npcLine;
+    /**
+     * For a forward, the link to the message it carries on, as
+     * {@code #code/id} names it; empty for a reply.
+     */
+    private final String forwardedFrom;
 
     private ChatReplyReference(long messageId, String author,
                                String excerpt, int authorColor) {
         this(messageId, author, excerpt, authorColor, null, false, "",
-                false);
+                false, "");
     }
 
     private ChatReplyReference(long messageId, String author,
                                String excerpt, int authorColor,
                                UUID senderId, boolean accountLine,
-                               String skinId, boolean npcLine) {
+                               String skinId, boolean npcLine,
+                               String forwardedFrom) {
         this.messageId = messageId;
         this.author = author == null ? "" : author;
         this.excerpt = excerpt == null ? "" : excerpt;
@@ -74,6 +86,7 @@ public final class ChatReplyReference {
         this.accountLine = accountLine;
         this.skinId = skinId == null ? "" : skinId;
         this.npcLine = npcLine;
+        this.forwardedFrom = forwardedFrom == null ? "" : forwardedFrom;
     }
 
     /**
@@ -89,7 +102,7 @@ public final class ChatReplyReference {
         }
         return new ChatReplyReference(this.messageId, this.author,
                 this.excerpt, this.authorColor, senderId, accountLine,
-                skinId, false);
+                skinId, false, this.forwardedFrom);
     }
 
     /**
@@ -103,7 +116,7 @@ public final class ChatReplyReference {
         }
         return new ChatReplyReference(this.messageId, this.author,
                 this.excerpt, this.authorColor, npcId, false, texturePath,
-                true);
+                true, this.forwardedFrom);
     }
 
     /**
@@ -199,6 +212,33 @@ public final class ChatReplyReference {
         }
         return new ChatReplyReference(ChatMessageIds.NONE, name,
                 excerptOf(message), authorColor);
+    }
+
+    /**
+     * The message {@code messageId} carried on to another conversation,
+     * said by {@code author} where {@code link} names — {@code #ooc/42} —
+     * whose words the forward is. Nameless, without an id or without a
+     * link, it is {@link #NONE}.
+     */
+    public static ChatReplyReference forward(long messageId, String author,
+                                             int authorColor, String link) {
+        String name = author == null ? "" : author.trim();
+        if (messageId == ChatMessageIds.NONE || name.length() == 0
+                || link == null || link.length() == 0) {
+            return NONE;
+        }
+        return new ChatReplyReference(messageId, name, "", authorColor, null,
+                false, "", false, link);
+    }
+
+    /** Whether this is a forward's: the message a forward carries on. */
+    public boolean isForward() {
+        return this.forwardedFrom.length() > 0;
+    }
+
+    /** A forward's link to where its message was said; empty for a reply. */
+    public String getForwardedFrom() {
+        return this.forwardedFrom;
     }
 
     /** The message as one glanceable line, cut with a trailing mark. */

@@ -12,7 +12,7 @@ import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.config.client.LostTalesSettingsHubGui;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
-import com.ninuna.losttales.gui.screen.character.LostTalesCharacterProfileRouterGui;
+import com.ninuna.losttales.gui.screen.character.CharactersPage;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -292,7 +292,7 @@ public class LostTalesCharacterMenuGui extends GuiScreen
         }
         switch (option) {
             case OPTION_PROFILE:
-                this.mc.displayGuiScreen(new LostTalesCharacterProfileRouterGui(this));
+                WindowScreen.openPage(CharactersPage.PAGE_ID);
                 break;
             case OPTION_QUESTS:
                 WindowScreen.openPage(QuestJournalPage.PAGE_ID);

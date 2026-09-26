@@ -5,6 +5,7 @@ import static org.junit.Assert.assertTrue;
 
 import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
+import com.ninuna.losttales.chat.ChatRoleplayStatus;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -82,6 +83,40 @@ public final class ClientChatPresenceChoicesTest {
                 "server\tnobody\tline\tHello",
                 "server\taccount\tnote\tHello"));
         assertTrue(ClientChatPresenceChoices.linesForPlace("server").isEmpty());
+    }
+
+    /**
+     * A role-play status is kept per server and identity beside the
+     * status and the line, an identity's own default is no record, and
+     * the file keeps it.
+     */
+    @Test
+    public void aRolePlayStatusIsKeptUnlessItIsTheDefault() {
+        ClientChatPresenceChoices.initialize(null, null);
+        ClientChatPresenceChoices.rememberRoleplay("server",
+                ChatPresenceIdentity.character(ALDRIC),
+                ChatRoleplayStatus.LOOKING_FOR_SCENE);
+        ClientChatPresenceChoices.rememberRoleplay("server",
+                ChatPresenceIdentity.ACCOUNT, ChatRoleplayStatus.IN_CHARACTER);
+        ClientChatPresenceChoices.rememberRoleplay("server",
+                ChatPresenceIdentity.ACCOUNT,
+                ChatRoleplayStatus.OUT_OF_CHARACTER);
+        Map<ChatPresenceIdentity, ChatRoleplayStatus> here =
+                ClientChatPresenceChoices.roleplayForPlace("server");
+        assertEquals(1, here.size());
+        assertEquals(ChatRoleplayStatus.LOOKING_FOR_SCENE,
+                here.get(ChatPresenceIdentity.character(ALDRIC)));
+        List<String> lines = ClientChatPresenceChoices.describe();
+        ClientChatPresenceChoices.clear();
+        ClientChatPresenceChoices.load(lines);
+        assertEquals(here, ClientChatPresenceChoices.roleplayForPlace("server"));
+        ClientChatPresenceChoices.clear();
+        ClientChatPresenceChoices.load(Arrays.asList(
+                "server\taccount\troleplay\tout_of_character",
+                "server\taccount\troleplay\tdancing",
+                "server\tnobody\troleplay\tin_character"));
+        assertTrue(ClientChatPresenceChoices.roleplayForPlace("server")
+                .isEmpty());
     }
 
     @Test

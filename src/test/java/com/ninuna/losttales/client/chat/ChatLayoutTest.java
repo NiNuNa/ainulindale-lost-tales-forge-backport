@@ -671,37 +671,38 @@ public final class ChatLayoutTest {
     }
 
     @Test
-    public void windowCountIsBounded() {
+    public void onlyTheTabsBoundHowManyWindowsStand() {
         List<ChatChannel> order = ChatChannel.presentationOrder();
-        int detached = 0;
         for (ChatChannel channel : order) {
             Window source = ChatLayout.windowOf(channel);
-            if (ChatTab.channelsOf(source).size() > 1
-                    && ChatLayout.detach(channel, 0.0D, 0.0D) != null) {
-                detached++;
+            if (ChatTab.channelsOf(source).size() > 1) {
+                assertNotNull(ChatLayout.detach(channel, 0.0D, 0.0D));
             }
         }
-        // Every window that could be split was, once: six new windows,
-        // one per channel, which with eight channels fills the cap.
-        assertEquals(6, detached);
-        assertEquals(WindowLayout.MAX_WINDOWS,
-                WindowLayout.windows().size());
         for (Window window : WindowLayout.windows()) {
             assertEquals(1, ChatTab.channelsOf(window).size());
         }
-        // A place freed by closing a tab is taken by a conversation, and
-        // the cap refuses the next one a window of its own.
-        assertTrue(ChatLayout.close(ChatChannel.SERVER_CONSOLE));
-        assertEquals(WindowLayout.MAX_WINDOWS - 1,
-                WindowLayout.windows().size());
-        ChatTab frodo = ChatLayout.openTab(ChatTab.whisper("Frodo"), "w2");
-        assertNotNull(WindowLayout.detach(frodo, 0.0D, 0.0D));
-        assertEquals(WindowLayout.MAX_WINDOWS,
-                WindowLayout.windows().size());
-        ChatTab sam = ChatLayout.openTab(ChatTab.whisper("Sam"), "w2");
-        assertNull(WindowLayout.detach(sam, 0.0D, 0.0D));
-        assertEquals(WindowLayout.MAX_WINDOWS,
-                WindowLayout.windows().size());
+        // Past every channel's own window, each whisper gets one too:
+        // no count of windows refuses a tab its own.
+        int before = WindowLayout.windows().size();
+        for (int index = 0; index < 12; index++) {
+            ChatTab friend = ChatLayout.openTab(
+                    ChatTab.whisper("Friend" + index), "w2");
+            assertNotNull(WindowLayout.detach(friend, 0.0D, 0.0D));
+        }
+        assertEquals(before + 12, WindowLayout.windows().size());
+        // A window holds at least one tab and a tab stands once, so
+        // there are never more windows than tabs.
+        assertTrue(WindowLayout.windows().size() <= WindowLayout.order().size());
+    }
+
+    @Test
+    public void aWindowAddedWithAnOpenTabLeavesItWhereItIs() {
+        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
+        Window holding = WindowLayout.windowOf(global);
+        assertNull("nothing new to hold", WindowLayout.addWindow(
+                Collections.singletonList(global), global, 0.0D, 0.0D));
+        assertSame(holding, WindowLayout.windowOf(global));
     }
 
     @Test

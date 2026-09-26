@@ -1,5 +1,6 @@
 package com.ninuna.losttales.network.packet.character;
 
+import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.server.CharacterNetworkRequestHandler;
 import com.ninuna.losttales.character.server.CharacterServerPacketDispatcher;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
@@ -10,13 +11,13 @@ import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
 
-import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 /**
  * Client request to change what one owned character says about itself:
- * its description and its age. The wire only bounds the text; the server
- * normalises it and holds both to the bounds creation uses.
+ * its profile — the About texts, the facts and the glances — and its age.
+ * The wire only bounds the words; the server normalises them and holds
+ * them to the profile's bounds and the profanity list.
  */
 public final class CharacterProfileUpdateRequestPacket implements IMessage {
 
@@ -25,7 +26,7 @@ public final class CharacterProfileUpdateRequestPacket implements IMessage {
     private int requestId;
     private long expectedRosterRevision;
     private UUID characterId;
-    private String description = "";
+    private CharacterProfile profile = CharacterProfile.EMPTY;
     private int age;
     private boolean malformed;
 
@@ -34,19 +35,17 @@ public final class CharacterProfileUpdateRequestPacket implements IMessage {
     public CharacterProfileUpdateRequestPacket(int requestId,
                                                long expectedRosterRevision,
                                                UUID characterId,
-                                               String description,
+                                               CharacterProfile profile,
                                                int age) {
-        String text = description == null ? "" : description;
         if (expectedRosterRevision < 0L || characterId == null
                 || NIL_UUID.equals(characterId)
-                || text.getBytes(StandardCharsets.UTF_8).length
-                > CharacterPacketCodec.MAX_DESCRIPTION_BYTES) {
+                || !CharacterPacketCodec.fits(profile)) {
             throw new IllegalArgumentException("invalid profile update request");
         }
         this.requestId = requestId;
         this.expectedRosterRevision = expectedRosterRevision;
         this.characterId = characterId;
-        this.description = text;
+        this.profile = profile;
         this.age = age;
     }
 
@@ -56,8 +55,7 @@ public final class CharacterProfileUpdateRequestPacket implements IMessage {
             this.requestId = buffer.readInt();
             this.expectedRosterRevision = buffer.readLong();
             this.characterId = CharacterPacketCodec.readUuid(buffer);
-            this.description = CharacterPacketCodec.readString(buffer,
-                    CharacterPacketCodec.MAX_DESCRIPTION_BYTES);
+            this.profile = CharacterPacketCodec.readProfile(buffer);
             this.age = buffer.readInt();
             CharacterPacketCodec.requireFinished(buffer);
             if (this.expectedRosterRevision < 0L) {
@@ -69,6 +67,7 @@ public final class CharacterProfileUpdateRequestPacket implements IMessage {
             }
         } catch (RuntimeException exception) {
             this.malformed = true;
+            this.profile = CharacterProfile.EMPTY;
         }
     }
 
@@ -77,8 +76,7 @@ public final class CharacterProfileUpdateRequestPacket implements IMessage {
         buffer.writeInt(this.requestId);
         buffer.writeLong(this.expectedRosterRevision);
         CharacterPacketCodec.writeUuid(buffer, this.characterId);
-        CharacterPacketCodec.writeString(buffer, this.description,
-                CharacterPacketCodec.MAX_DESCRIPTION_BYTES);
+        CharacterPacketCodec.writeProfile(buffer, this.profile);
         buffer.writeInt(this.age);
     }
 
@@ -86,8 +84,8 @@ public final class CharacterProfileUpdateRequestPacket implements IMessage {
         return this.characterId;
     }
 
-    public String getDescription() {
-        return this.description;
+    public CharacterProfile getProfile() {
+        return this.profile;
     }
 
     public int getAge() {
@@ -110,7 +108,7 @@ public final class CharacterProfileUpdateRequestPacket implements IMessage {
             final int requestId = message.requestId;
             final long expectedRosterRevision = message.expectedRosterRevision;
             final UUID characterId = message.characterId;
-            final String description = message.description;
+            final CharacterProfile profile = message.profile;
             final int age = message.age;
             CharacterServerPacketDispatcher.submit(
                     player,
@@ -126,7 +124,7 @@ public final class CharacterProfileUpdateRequestPacket implements IMessage {
                                     requestId,
                                     expectedRosterRevision,
                                     characterId,
-                                    description,
+                                    profile,
                                     age);
                         }
                     }

@@ -142,6 +142,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
             + 4
             // The quoted sender's head: id, account flag and skin.
             + 1 + 16 + 1 + 4 + ChatReplyReference.MAX_SKIN_ID_BYTES
+            // A forward's link to where its message was said.
+            + 4 + ChatReplyReference.MAX_LINK_BYTES
             // A server line's own component, and the players it names.
             + 4 + MAX_BODY_BYTES
             + 1 + ChatNamedPlayer.MAX_PER_LINE * (IDENTITY_ID_TAIL_BYTES
@@ -609,6 +611,23 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 this.reply = this.reply.withHead(quotedSender,
                         quotedAccountLine, quotedSkin);
             }
+            // A forward's link to where its message was said: the quote
+            // then names that message and carries none of its words,
+            // which are the line's own.
+            String forwardedFrom = LostTalesPacketCodec.readUtf8String(
+                    buffer, ChatReplyReference.MAX_LINK_BYTES);
+            if (forwardedFrom.length() > 0) {
+                if (!this.reply.isAnchored()
+                        || this.reply.getExcerpt().length() > 0
+                        || forwardedFrom.charAt(0) != '#') {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "invalid chat forward");
+                }
+                this.reply = ChatReplyReference.forward(
+                        this.reply.getMessageId(), this.reply.getAuthor(),
+                        this.reply.getAuthorColor(), forwardedFrom)
+                        .withHeadOf(this.reply);
+            }
             String body = LostTalesPacketCodec.readUtf8String(
                     buffer, MAX_BODY_BYTES);
             if (body.length() > 0 && !isSystemSender(this.senderId)) {
@@ -818,6 +837,9 @@ public final class LostTalesChatMessagePacket implements IMessage {
         buffer.writeBoolean(this.reply.isAccountLine());
         LostTalesPacketCodec.writeUtf8String(buffer, this.reply.getSkinId(),
                 ChatReplyReference.MAX_SKIN_ID_BYTES);
+        LostTalesPacketCodec.writeUtf8String(buffer,
+                this.reply.getForwardedFrom(),
+                ChatReplyReference.MAX_LINK_BYTES);
         LostTalesPacketCodec.writeUtf8String(buffer, this.bodyJson,
                 MAX_BODY_BYTES);
         LostTalesPacketCodec.writeCount(buffer, this.namedPlayers.size(),
@@ -902,6 +924,9 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.reply.getSkinId(),
                         ChatReplyReference.MAX_SKIN_ID_BYTES)
+                || !LostTalesPacketCodec.isUtf8WithinLimit(
+                        this.reply.getForwardedFrom(),
+                        ChatReplyReference.MAX_LINK_BYTES)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.bodyJson, MAX_BODY_BYTES)
                 || (this.bodyJson.length() > 0

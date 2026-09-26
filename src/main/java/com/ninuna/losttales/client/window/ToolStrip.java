@@ -217,8 +217,8 @@ public final class ToolStrip {
             return;
         }
         WindowTab front = row.selected;
-        if (front == null || !row.toolStrip) {
-            // A window with no strip keeps nothing of one.
+        if (front == null) {
+            // A window with no tab in front keeps nothing of a strip.
             frame.toolStrip.layout = null;
             frame.tabBar.setToolStripHole(null);
             return;
@@ -547,20 +547,20 @@ public final class ToolStrip {
             case MEMBERS_TOGGLE:
                 return StatCollector.translateToLocal(
                         front.isMemberListOut(window)
-                                ? "gui.losttales.chat.members.hide"
-                                : "gui.losttales.chat.members.show");
+                                ? "gui.losttales.window.members.hide"
+                                : "gui.losttales.window.members.show");
             case ICON:
                 return WindowSearch.isOpenOn(window.getId())
                         && WindowSearch.query().length() > 0
                         ? StatCollector.translateToLocal(
-                                "gui.losttales.chat.search.close")
+                                "gui.losttales.window.search.close")
                         : "";
             case PREVIOUS:
                 return StatCollector.translateToLocal(
-                        "gui.losttales.chat.search.previous");
+                        "gui.losttales.window.search.previous");
             case NEXT:
                 return StatCollector.translateToLocal(
-                        "gui.losttales.chat.search.next");
+                        "gui.losttales.window.search.next");
             default:
                 return "";
         }

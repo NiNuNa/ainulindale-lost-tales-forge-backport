@@ -29,8 +29,6 @@ import java.util.Set;
  * caller asks for it.</p>
  */
 public final class WindowLayout {
-    /** Bound on windows; more than this is a broken file, not a layout. */
-    public static final int MAX_WINDOWS = 8;
     /**
      * Absolute floor on a stored width or height, in GUI pixels, so a
      * hand-edited file cannot leave a window nothing fits in. What a drag
@@ -101,17 +99,26 @@ public final class WindowLayout {
      * Adds a window holding {@code tabs}, {@code active} in front, at a
      * place in percent of the screen's travel: how a system lays out its
      * windows for a new player, or gives tabs a loaded layout placed
-     * nowhere a home. Null past the cap or with no tabs.
+     * nowhere a home. Null with no tabs; a tab already open elsewhere
+     * stays where it is.
      */
     public static synchronized Window addWindow(List<? extends WindowTab> tabs,
                                                 WindowTab active,
                                                 double offsetX,
                                                 double offsetY) {
-        if (tabs == null || tabs.isEmpty() || WINDOWS.size() >= MAX_WINDOWS) {
+        List<WindowTab> fresh = new ArrayList<WindowTab>();
+        if (tabs != null) {
+            for (WindowTab tab : tabs) {
+                if (tab != null && !isOpen(tab) && !fresh.contains(tab)) {
+                    fresh.add(tab);
+                }
+            }
+        }
+        if (fresh.isEmpty()) {
             return null;
         }
         Window window = newWindow();
-        window.tabs().addAll(tabs);
+        window.tabs().addAll(fresh);
         window.setActiveTab(active);
         window.setOffsets(clampWindowPercent(offsetX),
                 clampWindowPercent(offsetY));
@@ -162,9 +169,6 @@ public final class WindowLayout {
             raise(holding.getId());
             changed();
             return holding;
-        }
-        if (WINDOWS.size() >= MAX_WINDOWS) {
-            return null;
         }
         Window created = newWindow();
         Place place = PLACES.get(page.id());
@@ -367,20 +371,12 @@ public final class WindowLayout {
                 return window;
             }
         }
-        if (WINDOWS.size() < MAX_WINDOWS) {
-            Window created = newWindow();
-            cascadeFrom(created, preferred != null ? preferred : frontWindow());
-            WINDOWS.add(created);
-            // A window that has just opened stands in front of the rest.
-            raise(created.getId());
-            return created;
-        }
-        for (int index = 0; index < byRecency.size(); index++) {
-            if (!byRecency.get(index).isLocked()) {
-                return byRecency.get(index);
-            }
-        }
-        return firstWindow();
+        Window created = newWindow();
+        cascadeFrom(created, preferred != null ? preferred : frontWindow());
+        WINDOWS.add(created);
+        // A window that has just opened stands in front of the rest.
+        raise(created.getId());
+        return created;
     }
 
     /**
@@ -436,10 +432,10 @@ public final class WindowLayout {
      * Opens a tab in a window of its own, cascaded from the front
      * window: how a tab comes back when no window is left to put it
      * in, and what the screen's empty state offers. Refused for a tab
-     * that is already open and once {@link #MAX_WINDOWS} exist.
+     * that is already open.
      */
     public static synchronized WindowTab openInNewWindow(WindowTab tab) {
-        if (tab == null || isOpen(tab) || WINDOWS.size() >= MAX_WINDOWS) {
+        if (tab == null || isOpen(tab)) {
             return null;
         }
         Window created = newWindow();
@@ -571,7 +567,7 @@ public final class WindowLayout {
      * percent position, as tall and as wide as the window it came from;
      * a page's own tab takes the size its window last had, or a page's.
      * A window's only tab dragged out just moves that window. Refused
-     * for a locked source and once {@link #MAX_WINDOWS} exist.
+     * for a locked source.
      */
     public static synchronized Window detach(WindowTab tab, double offsetX,
                                              double offsetY) {
@@ -597,9 +593,6 @@ public final class WindowLayout {
                     clampWindowPercent(offsetY));
             changed();
             return source;
-        }
-        if (WINDOWS.size() >= MAX_WINDOWS) {
-            return null;
         }
         WindowTab active = source.getActiveTab();
         source.tabs().removeAll(moved);
@@ -682,7 +675,7 @@ public final class WindowLayout {
         nextWindowNumber = highestNumber + 1;
         if (specs != null) {
             for (WindowSpec spec : specs) {
-                if (spec == null || WINDOWS.size() >= MAX_WINDOWS) {
+                if (spec == null) {
                     continue;
                 }
                 String id = spec.id;
@@ -1117,7 +1110,7 @@ public final class WindowLayout {
             return group;
         }
         group.add(window);
-        for (int pass = 0; pass < MAX_WINDOWS; pass++) {
+        for (int pass = 0; pass < WINDOWS.size(); pass++) {
             boolean grew = false;
             for (Window candidate : WINDOWS) {
                 if (group.contains(candidate)) {
@@ -1149,7 +1142,7 @@ public final class WindowLayout {
      */
     public static synchronized Window linkRoot(Window window) {
         Window root = window;
-        for (int step = 0; step < MAX_WINDOWS && root != null
+        for (int step = 0; step < WINDOWS.size() && root != null
                 && root.isLinked(); step++) {
             Window target = window(root.getLinkTarget());
             if (target == null || target == window) {

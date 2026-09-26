@@ -32,8 +32,8 @@ import static org.junit.Assert.assertTrue;
 /**
  * A page is a tab no conversation stands behind: it has no channel, one
  * tab per page, an id of its own the layout file keeps, and a window of
- * its own that opens at a page's size, comes back where it last stood,
- * and is never more than the eight windows the chat may have.
+ * its own that opens at a page's size and comes back where it last stood,
+ * however many windows stand.
  */
 public final class ChatPagesTest {
     private static final String PAGE = "test_page";
@@ -149,17 +149,54 @@ public final class ChatPagesTest {
     }
 
     @Test
+    public void aConversationCoveredByAPageStaysTheLastUsed() {
+        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
+        ChatTab friend = ChatTab.whisper("friend");
+        WindowLayout.openInNewWindow(friend);
+        Window window = WindowLayout.windowOf(global);
+        ClientChatChannelState.select(global);
+        PageTab page = WindowPages.tab(PAGE);
+        WindowLayout.openTab(page, window.getId());
+        WindowLayout.showPage(page);
+
+        ChatTabActions actions = new ChatTabActions(new ChatInputBar(),
+                new ChatInputCompletion(null), new ChatComposer());
+        actions.bind(null, new GuiTextField(null, 0, 0, 100, 12));
+        actions.syncSelection();
+
+        assertEquals("the input is lent to the other window", friend,
+                ClientChatChannelState.getSelected());
+        assertEquals("the chat key brings the covered one back", global,
+                ClientChatChannelState.lastUsed());
+        ClientChatChannelState.markUsed();
+        assertEquals("typed in, the lent one is the last used", friend,
+                ClientChatChannelState.lastUsed());
+    }
+
+    @Test
+    public void beforeAnyPickTheChatKeyBringsTheTopWindowsConversation() {
+        ChatTab friend = ChatTab.whisper("friend");
+        WindowLayout.openInNewWindow(friend);
+        ClientChatChannelState.clear();
+        assertEquals("the top window's, as the layout left it", friend,
+                ClientChatChannelState.lastUsed());
+        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
+        ClientChatChannelState.select(global);
+        assertEquals("then the one picked", global,
+                ClientChatChannelState.lastUsed());
+    }
+
+    @Test
     public void aPagesTabWearsTheToneThePageGivesItself() {
         assertEquals(TONE, WindowPages.tab(PAGE).tone());
     }
 
     @Test
-    public void aPageNeverOpensAWindowPastTheEight() {
-        for (int index = WindowLayout.windows().size();
-             index < WindowLayout.MAX_WINDOWS; index++) {
+    public void aPageOpensAWindowHoweverManyStand() {
+        for (int index = 0; index < 12; index++) {
             WindowLayout.openInNewWindow(ChatTab.whisper("friend" + index));
         }
-        assertNull(WindowLayout.showPage(WindowPages.tab(PAGE)));
+        assertNotNull(WindowLayout.showPage(WindowPages.tab(PAGE)));
     }
 
     @Test
@@ -188,10 +225,8 @@ public final class ChatPagesTest {
     }
 
     @Test
-    public void aPageOutOfReachWaitsUnseenAndHasNoStrip() {
+    public void aPageOutOfReachWaitsUnseen() {
         PageTab page = WindowPages.tab(FILLING);
-        assertFalse("its window has no tool strip", page.hasToolStrip());
-        assertTrue(WindowPages.tab(PAGE).hasToolStrip());
         Window window = WindowLayout.showPage(page);
         assertTrue(WindowFrame.visibleTabs(window).contains(page));
         fillingAvailable = false;
@@ -208,38 +243,11 @@ public final class ChatPagesTest {
         assertNull("no key at all", WindowPages.tabForKey(0));
     }
 
-    @Test
-    public void aPageClosingWithTheScreenClosesAndComesBackWhereItWasLeft() {
-        PageTab filling = WindowPages.tab(FILLING);
-        PageTab other = WindowPages.tab(PAGE);
-        Window window = WindowLayout.showPage(filling);
-        WindowLayout.setFill(window.getId(), Window.ScreenFill.NONE, false);
-        WindowLayout.setPosition(window.getId(), 30.0D, 40.0D, false);
-        WindowLayout.showPage(other);
-        WindowPages.closeThoseClosingWithScreen();
-        assertFalse("it closed with the screen", WindowLayout.isOpen(filling));
-        assertTrue("a page that stays, stays", WindowLayout.isOpen(other));
-        Window again = WindowLayout.showPage(filling);
-        assertEquals(Window.ScreenFill.NONE, again.getFill());
-        assertEquals(30.0D, again.getOffsetX(), 1.0E-9D);
-        assertEquals(40.0D, again.getOffsetY(), 1.0E-9D);
-    }
-
-    /** A page like the map's: no tool strip, a key, and it closes with the screen. */
+    /** A page like the map's: a key, and out of reach at times. */
     private static final class FillingPage extends PageContent {
-        @Override
-        public boolean closesWithScreen() {
-            return true;
-        }
-
         @Override
         public boolean isAvailable() {
             return fillingAvailable;
-        }
-
-        @Override
-        public boolean hasToolStrip() {
-            return false;
         }
 
         @Override

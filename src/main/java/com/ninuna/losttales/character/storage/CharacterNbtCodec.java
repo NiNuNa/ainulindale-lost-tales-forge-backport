@@ -2,6 +2,7 @@ package com.ninuna.losttales.character.storage;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
+import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.model.CharacterProgression;
 import com.ninuna.losttales.character.model.CharacterKind;
 import com.ninuna.losttales.character.model.CharacterRoster;
@@ -65,7 +66,21 @@ public final class CharacterNbtCodec {
     private static final String TAG_SKIN_ID = "SkinId";
     private static final String TAG_BODY_TYPE_ID = "BodyTypeId";
     private static final String TAG_CHEST_TYPE_ID = "ChestTypeId";
-    private static final String TAG_DESCRIPTION = "Description";
+    private static final String TAG_PROFILE = "Profile";
+    private static final String TAG_PROFILE_APPEARANCE = "Appearance";
+    private static final String TAG_PROFILE_PERSONALITY = "Personality";
+    private static final String TAG_PROFILE_HISTORY = "History";
+    private static final String TAG_PROFILE_FACTS = "Facts";
+    private static final String TAG_FACT_HEIGHT = "Height";
+    private static final String TAG_FACT_BUILD = "Build";
+    private static final String TAG_FACT_EYES = "Eyes";
+    private static final String TAG_FACT_HAIR = "Hair";
+    private static final String TAG_FACT_BIRTHPLACE = "Birthplace";
+    private static final String TAG_FACT_HOME = "Home";
+    private static final String TAG_PROFILE_GLANCES = "Glances";
+    private static final String TAG_GLANCE_EMOJI = "Emoji";
+    private static final String TAG_GLANCE_TITLE = "Title";
+    private static final String TAG_GLANCE_LINE = "Line";
     private static final String TAG_SHOW_MINECRAFT_CAPE = "ShowMinecraftCape";
     private static final String TAG_COSMETIC_CAPE_ID = "CosmeticCapeId";
     private static final String TAG_AGE = "Age";
@@ -313,7 +328,7 @@ public final class CharacterNbtCodec {
         tag.setString(TAG_SKIN_ID, character.getSkinId());
         tag.setString(TAG_BODY_TYPE_ID, character.getBodyTypeId());
         tag.setString(TAG_CHEST_TYPE_ID, character.getChestTypeId());
-        tag.setString(TAG_DESCRIPTION, character.getDescription());
+        tag.setTag(TAG_PROFILE, writeProfile(character.getProfile()));
         tag.setBoolean(TAG_SHOW_MINECRAFT_CAPE, character.isMinecraftCapeVisible());
         tag.setInteger(TAG_COSMETIC_CAPE_ID, character.getCosmeticCapeId());
         tag.setInteger(TAG_AGE, character.getAge());
@@ -325,6 +340,165 @@ public final class CharacterNbtCodec {
         tag.setLong(TAG_CREATION_TIMESTAMP, character.getCreationTimestamp());
         tag.setTag(TAG_PROGRESSION, writeProgression(character.getProgression()));
         return tag;
+    }
+
+    /** A profile: its About texts, its facts, and its glances in order. */
+    private static NBTTagCompound writeProfile(CharacterProfile profile) {
+        NBTTagCompound tag = new NBTTagCompound();
+        for (CharacterProfile.Section section : CharacterProfile.Section.values()) {
+            tag.setString(sectionKey(section), profile.section(section));
+        }
+        NBTTagCompound facts = new NBTTagCompound();
+        for (CharacterProfile.Fact fact : CharacterProfile.Fact.values()) {
+            facts.setString(factKey(fact), profile.fact(fact));
+        }
+        tag.setTag(TAG_PROFILE_FACTS, facts);
+        NBTTagList glances = new NBTTagList();
+        for (CharacterProfile.Glance glance : profile.glances()) {
+            NBTTagCompound entry = new NBTTagCompound();
+            entry.setString(TAG_GLANCE_EMOJI, glance.getEmoji());
+            entry.setString(TAG_GLANCE_TITLE, glance.getTitle());
+            entry.setString(TAG_GLANCE_LINE, glance.getLine());
+            glances.appendTag(entry);
+        }
+        tag.setTag(TAG_PROFILE_GLANCES, glances);
+        return tag;
+    }
+
+    private static String sectionKey(CharacterProfile.Section section) {
+        switch (section) {
+            case APPEARANCE:
+                return TAG_PROFILE_APPEARANCE;
+            case PERSONALITY:
+                return TAG_PROFILE_PERSONALITY;
+            default:
+                return TAG_PROFILE_HISTORY;
+        }
+    }
+
+    private static String factKey(CharacterProfile.Fact fact) {
+        switch (fact) {
+            case HEIGHT:
+                return TAG_FACT_HEIGHT;
+            case BUILD:
+                return TAG_FACT_BUILD;
+            case EYES:
+                return TAG_FACT_EYES;
+            case HAIR:
+                return TAG_FACT_HAIR;
+            case BIRTHPLACE:
+                return TAG_FACT_BIRTHPLACE;
+            default:
+                return TAG_FACT_HOME;
+        }
+    }
+
+    /** A profile read back, and whether any part of it had to be repaired. */
+    private static final class ProfileReadResult {
+        final CharacterProfile profile;
+        final boolean repaired;
+
+        ProfileReadResult(CharacterProfile profile, boolean repaired) {
+            this.profile = profile;
+            this.repaired = repaired;
+        }
+    }
+
+    /**
+     * The profile a character record holds. A part that is missing, or no
+     * longer valid as stored, is read as empty, a glance that no longer is
+     * one is left out, and so is one past the fifth; the record is then
+     * repaired, so it is written back as read. The profanity list is not
+     * asked here: it may change after the words were accepted.
+     */
+    private static ProfileReadResult readProfile(NBTTagCompound tag,
+                                                 UUID characterId,
+                                                 UUID ownerId) {
+        if (!tag.hasKey(TAG_PROFILE, Constants.NBT.TAG_COMPOUND)) {
+            warn("Assigning an empty profile to character %s owned by %s",
+                    characterId, ownerId);
+            return new ProfileReadResult(CharacterProfile.EMPTY, true);
+        }
+        NBTTagCompound stored = tag.getCompoundTag(TAG_PROFILE);
+        boolean repaired = false;
+        CharacterProfile profile = CharacterProfile.EMPTY;
+        for (CharacterProfile.Section section : CharacterProfile.Section.values()) {
+            String key = sectionKey(section);
+            String text = readBoundedString(stored, key,
+                    CharacterProfile.MAX_SECTION_LENGTH);
+            String kept = CharacterValidator.normalizeSection(text);
+            if (!CharacterValidator.isValidSection(kept)) {
+                kept = "";
+            }
+            if (!stored.hasKey(key, Constants.NBT.TAG_STRING)
+                    || !kept.equals(text)) {
+                repaired = true;
+            }
+            profile = profile.withSection(section, kept);
+        }
+        NBTTagCompound facts = stored.getCompoundTag(TAG_PROFILE_FACTS);
+        if (!stored.hasKey(TAG_PROFILE_FACTS, Constants.NBT.TAG_COMPOUND)) {
+            repaired = true;
+        }
+        for (CharacterProfile.Fact fact : CharacterProfile.Fact.values()) {
+            String key = factKey(fact);
+            String value = readBoundedString(facts, key,
+                    CharacterProfile.MAX_FACT_LENGTH);
+            String kept = CharacterValidator.normalizeLine(value);
+            if (!CharacterValidator.isValidLine(kept,
+                    CharacterProfile.MAX_FACT_LENGTH)) {
+                kept = "";
+            }
+            if (!facts.hasKey(key, Constants.NBT.TAG_STRING)
+                    || !kept.equals(value)) {
+                repaired = true;
+            }
+            profile = profile.withFact(fact, kept);
+        }
+        List<CharacterProfile.Glance> glances =
+                new ArrayList<CharacterProfile.Glance>();
+        if (!stored.hasKey(TAG_PROFILE_GLANCES, Constants.NBT.TAG_LIST)) {
+            repaired = true;
+        }
+        NBTTagList storedGlances = stored.getTagList(TAG_PROFILE_GLANCES,
+                Constants.NBT.TAG_COMPOUND);
+        for (int index = 0; index < storedGlances.tagCount(); index++) {
+            NBTTagCompound entry = storedGlances.getCompoundTagAt(index);
+            CharacterProfile.Glance read = new CharacterProfile.Glance(
+                    readBoundedString(entry, TAG_GLANCE_EMOJI,
+                            MAX_STABLE_IDENTIFIER_LENGTH),
+                    readBoundedString(entry, TAG_GLANCE_TITLE,
+                            CharacterProfile.MAX_GLANCE_TITLE_LENGTH),
+                    readBoundedString(entry, TAG_GLANCE_LINE,
+                            CharacterProfile.MAX_GLANCE_LINE_LENGTH));
+            CharacterProfile.Glance glance =
+                    CharacterValidator.normalizeGlance(read);
+            if (glances.size() >= CharacterProfile.MAX_GLANCES
+                    || !CharacterValidator.isValidGlance(glance)) {
+                repaired = true;
+                continue;
+            }
+            if (!glance.equals(read)) {
+                repaired = true;
+            }
+            glances.add(glance);
+        }
+        if (repaired) {
+            warn("Repairing the profile of character %s owned by %s",
+                    characterId, ownerId);
+        }
+        return new ProfileReadResult(profile.withGlances(glances), repaired);
+    }
+
+    /**
+     * A string as stored, or empty for one missing or so long that no
+     * normalising could bring it within {@code limit} characters.
+     */
+    private static String readBoundedString(NBTTagCompound tag, String key,
+                                            int limit) {
+        String value = tag.hasKey(key, Constants.NBT.TAG_STRING)
+                ? tag.getString(key) : "";
+        return value.length() > limit * 2 ? "" : value;
     }
 
     private static NBTTagCompound writeProgression(CharacterProgression progression) {
@@ -628,21 +802,10 @@ public final class CharacterNbtCodec {
             }
         }
 
-        boolean hasDescription = tag.hasKey(
-                TAG_DESCRIPTION, Constants.NBT.TAG_STRING);
-        String storedDescription = hasDescription
-                ? tag.getString(TAG_DESCRIPTION) : "";
-        String description = storedDescription.length()
-                > CharacterValidator.MAX_DESCRIPTION_LENGTH * 2
-                ? "" : CharacterValidator.normalizeDescription(
-                        storedDescription);
-        if (!CharacterValidator.isValidDescription(description)) {
-            description = "";
-        }
-        if (!hasDescription || !description.equals(storedDescription)) {
+        ProfileReadResult profileResult = readProfile(tag, characterId,
+                rosterOwnerId);
+        if (profileResult.repaired) {
             repaired = true;
-            warn("Repairing character description for %s owned by %s",
-                    characterId, rosterOwnerId);
         }
 
         boolean hasShowMinecraftCape = tag.hasKey(
@@ -745,7 +908,7 @@ public final class CharacterNbtCodec {
                 .cosmeticCape(cosmeticCapeId)
                 .startingWaypoint(startingWaypointId)
                 .unconventionalSettings(unconventionalSettings)
-                .description(description)
+                .profile(profileResult.profile)
                 .bodyType(bodyTypeId)
                 .chestType(chestTypeId)
                 .kind(kind)

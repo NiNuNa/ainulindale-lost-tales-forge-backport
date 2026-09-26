@@ -68,6 +68,15 @@ final class LostTalesMapSearchPrompt {
     static LostTalesMapSearchPrompt open(
             FontRenderer font, int screenWidth, int screenHeight,
             List<LostTalesMapMarkerData> markers) {
+        return new LostTalesMapSearchPrompt(
+                font, screenWidth, screenHeight, places(markers));
+    }
+
+    /**
+     * Every place the player may be told about, sorted by name: what Find
+     * Location searches, in its popup or in a window's well.
+     */
+    static List<Entry> places(List<LostTalesMapMarkerData> markers) {
         ArrayList<Entry> entries = new ArrayList<Entry>();
         if (markers != null) {
             for (LostTalesMapMarkerData marker : markers) {
@@ -93,8 +102,7 @@ final class LostTalesMapSearchPrompt {
                                 right.marker.getId());
             }
         });
-        return new LostTalesMapSearchPrompt(
-                font, screenWidth, screenHeight, entries);
+        return entries;
     }
 
     /**

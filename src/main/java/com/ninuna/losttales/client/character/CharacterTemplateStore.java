@@ -1,6 +1,6 @@
 package com.ninuna.losttales.client.character;
 
-import com.ninuna.losttales.character.validation.CharacterValidator;
+import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.config.LostTalesConfigFiles;
 
 import java.io.BufferedReader;
@@ -45,7 +45,7 @@ public final class CharacterTemplateStore {
     /** The most a template file may weigh before it is not read at all. */
     static final long MAX_FILE_BYTES = 32L * 1024L;
     /** A stored value is bounded by the longest field a template holds. */
-    static final int MAX_VALUE_LENGTH = CharacterValidator.MAX_DESCRIPTION_LENGTH;
+    static final int MAX_VALUE_LENGTH = CharacterProfile.MAX_SECTION_LENGTH;
 
     private static final String KEY_NAME = "name";
     private static final String KEY_RACE = "race";
@@ -54,7 +54,7 @@ public final class CharacterTemplateStore {
     private static final String KEY_BODY = "body";
     private static final String KEY_CHEST = "chest";
     private static final String KEY_FACTION = "faction";
-    private static final String KEY_DESCRIPTION = "description";
+    private static final String KEY_HISTORY = "history";
     private static final String KEY_AGE = "age";
     private static final String KEY_UNCONVENTIONAL = "unconventional";
     private static final String KEY_MINECRAFT_CAPE = "minecraft_cape";
@@ -92,7 +92,7 @@ public final class CharacterTemplateStore {
                 values.get(KEY_NAME), values.get(KEY_RACE),
                 values.get(KEY_GENDER), values.get(KEY_SKIN),
                 values.get(KEY_BODY), values.get(KEY_CHEST),
-                values.get(KEY_FACTION), values.get(KEY_DESCRIPTION),
+                values.get(KEY_FACTION), values.get(KEY_HISTORY),
                 parseNonNegative(values.get(KEY_AGE)),
                 Boolean.parseBoolean(values.get(KEY_UNCONVENTIONAL)),
                 // A file without the key shows the cape.
@@ -120,7 +120,7 @@ public final class CharacterTemplateStore {
         values.put(KEY_BODY, template.getBodyTypeId());
         values.put(KEY_CHEST, template.getChestTypeId());
         values.put(KEY_FACTION, template.getStartingFactionId());
-        values.put(KEY_DESCRIPTION, template.getDescription());
+        values.put(KEY_HISTORY, template.getHistory());
         values.put(KEY_AGE, String.valueOf(template.getAge()));
         values.put(KEY_UNCONVENTIONAL,
                 String.valueOf(template.hasUnconventionalSettings()));

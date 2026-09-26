@@ -260,7 +260,7 @@ public final class ChatIdentityViewTest {
         return new CharacterSummary(id, slot, name, "human", "male",
                 "human_male_0", RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
                 RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, 30, faction, 1, 0L, 1L,
-                RoleplayCharacter.CURRENT_DATA_VERSION, "", "", "");
+                RoleplayCharacter.CURRENT_DATA_VERSION, "", "");
     }
 
     private static String keyOf(UUID characterId) {

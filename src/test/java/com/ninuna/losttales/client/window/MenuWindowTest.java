@@ -1,16 +1,16 @@
-package com.ninuna.losttales.client.chat;
+package com.ninuna.losttales.client.window;
 
-import com.ninuna.losttales.client.window.SubWindow;
-import com.ninuna.losttales.client.window.SubWindowAnchor;
-import com.ninuna.losttales.client.window.SubWindowKind;
+import com.ninuna.losttales.client.input.LostTalesKeyPress;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
 /**
  * A menu's window first opens where the menu always hung: toward the
@@ -19,7 +19,7 @@ import static org.junit.Assert.assertSame;
  * Its rows answer the pointer where they are drawn, and a header or a
  * row that cannot be taken is nobody's press.
  */
-public final class ChatMenuTest {
+public final class MenuWindowTest {
     private static final int SCREEN_WIDTH = 480;
     private static final int SCREEN_HEIGHT = 270;
     private static final int STRIP = SubWindow.STRIP_HEIGHT;
@@ -28,10 +28,19 @@ public final class ChatMenuTest {
             new LostTalesUiHitBox(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
     /** From the control to the window's box: the gap and the frame. */
     private static final int REACH = SubWindowAnchor.REACH;
+    /** An owner that takes nothing. */
+    private static final MenuWindow.Owner NOBODY = new MenuWindow.Owner() {
+        @Override
+        public void take(MenuWindow menu, MenuWindow.Entry entry,
+                         boolean back) {}
+
+        @Override
+        public void keyTyped(MenuWindow menu, LostTalesKeyPress press) {}
+    };
 
     @Test
     public void aMenuHangsBelowAControlInTheUpperHalfFromItsLeftEdge() {
-        ChatMenu menu = menuOf(4);
+        MenuWindow menu = menuOf(4);
         SubWindowAnchor anchor = SubWindowAnchor.inward(100, 20, 108, 30,
                 0.0D, 0.0D, SCREEN_WIDTH, SCREEN_HEIGHT, null);
         LostTalesUiHitBox box = menu.firstContentBox(anchor, 80, SCREEN);
@@ -43,7 +52,7 @@ public final class ChatMenuTest {
 
     @Test
     public void aMenuHangsAboveAControlInTheLowerHalfFromItsRightEdge() {
-        ChatMenu menu = menuOf(4);
+        MenuWindow menu = menuOf(4);
         SubWindowAnchor anchor = SubWindowAnchor.inward(400, 240, 408, 250,
                 0.0D, 0.0D, SCREEN_WIDTH, SCREEN_HEIGHT, null);
         LostTalesUiHitBox box = menu.firstContentBox(anchor, 80, SCREEN);
@@ -54,7 +63,7 @@ public final class ChatMenuTest {
 
     @Test
     public void aMenuTurnsRoundOnlyWhereTheOtherSideHoldsMoreOfIt() {
-        ChatMenu menu = menuOf(8);
+        MenuWindow menu = menuOf(8);
         // In the upper half of its window, but near the screen's foot: the
         // room below holds no row, the room above all of them.
         SubWindowAnchor anchor = SubWindowAnchor.inward(100, 230, 108, 240,
@@ -66,45 +75,61 @@ public final class ChatMenuTest {
 
     @Test
     public void aLongMenuOpensTwelveRowsLong() {
-        ChatMenu menu = menuOf(30);
+        MenuWindow menu = menuOf(30);
         SubWindowAnchor anchor = SubWindowAnchor.inward(100, 20, 108, 30,
                 0.0D, 0.0D, SCREEN_WIDTH, SCREEN_HEIGHT, null);
         LostTalesUiHitBox box = menu.firstContentBox(anchor, 80, SCREEN);
-        assertEquals(menuOf(ChatMenu.MAX_VISIBLE_ROWS).naturalHeight(80),
+        assertEquals(menuOf(MenuWindow.MAX_VISIBLE_ROWS).naturalHeight(80),
                 box.height, 1.0E-9D);
     }
 
     @Test
     public void aRowAnswersWhereItIsDrawnAndOnlyARowThatActsIsPressed() {
-        ChatMenu menu = new ChatMenu(SubWindowKind.TAB);
-        List<ChatMenu.Entry> rows = new ArrayList<ChatMenu.Entry>();
-        rows.add(ChatMenu.Entry.header("Channels"));
-        ChatMenu.Entry open = new ChatMenu.Entry("a", "Open");
+        MenuWindow menu = new MenuWindow(SubWindowKind.TAB, NOBODY);
+        List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
+        rows.add(MenuWindow.Entry.header("Channels"));
+        MenuWindow.Entry open = new MenuWindow.Entry("a", "Open");
         rows.add(open);
-        rows.add(new ChatMenu.Entry("b", "Closed").unavailable("Not here"));
+        rows.add(new MenuWindow.Entry("b", "Closed").unavailable("Not here"));
         menu.setRows(rows);
         LostTalesUiHitBox box = new LostTalesUiHitBox(10, 20, 80,
-                3 * ChatMenu.ROW_HEIGHT + 6);
+                3 * MenuWindow.ROW_HEIGHT + 6);
         int rowsTop = 20 + 3;
-        ChatHover header = menu.hoverAt(box, 20, rowsTop + 5);
-        assertEquals(ChatHover.Kind.MENU, header.chatKind);
+        WindowHover header = menu.hoverAt(box, 20, rowsTop + 5);
+        assertEquals(WindowHover.Kind.SUB_WINDOW, header.kind);
         assertNull(header.menuEntry);
-        ChatHover row = menu.hoverAt(box, 20, rowsTop + ChatMenu.ROW_HEIGHT + 5);
-        assertEquals(ChatHover.Kind.MENU_ENTRY, row.chatKind);
+        assertFalse(header.acts());
+        WindowHover row = menu.hoverAt(box, 20,
+                rowsTop + MenuWindow.ROW_HEIGHT + 5);
         assertSame(open, row.menuEntry);
-        ChatHover closed = menu.hoverAt(box, 20,
-                rowsTop + 2 * ChatMenu.ROW_HEIGHT + 5);
-        assertEquals(ChatHover.Kind.MENU, closed.chatKind);
-        assertEquals("it says why", "Not here", closed.menuTip);
-        assertEquals("the padding is nobody's", ChatHover.Kind.MENU,
-                menu.hoverAt(box, 20, 21).chatKind);
+        assertTrue(row.acts());
+        WindowHover closed = menu.hoverAt(box, 20,
+                rowsTop + 2 * MenuWindow.ROW_HEIGHT + 5);
+        assertNull(closed.menuEntry);
+        assertEquals("it says why", "Not here", closed.tip);
+        assertNull("the padding is nobody's",
+                menu.hoverAt(box, 20, 21).menuEntry);
     }
 
-    private static ChatMenu menuOf(int count) {
-        ChatMenu menu = new ChatMenu(SubWindowKind.TAB);
-        List<ChatMenu.Entry> rows = new ArrayList<ChatMenu.Entry>();
+    /** A row a page found keeps everything it shows under the id the quick switcher gives it. */
+    @Test
+    public void aRenamedRowKeepsItsLook() {
+        MenuWindow.Entry found = new MenuWindow.Entry("q1", "The Lost Ring")
+                .withValue("Active").withLabelColor(7).unavailable("Not now");
+        MenuWindow.Entry renamed = found.renamed("find:journal:q1");
+        assertEquals("find:journal:q1", renamed.id);
+        assertEquals("The Lost Ring", renamed.label);
+        assertEquals("Active", renamed.value);
+        assertEquals(7, renamed.labelColor);
+        assertEquals("Not now", renamed.unavailable);
+        assertFalse(renamed.isTakeable());
+    }
+
+    private static MenuWindow menuOf(int count) {
+        MenuWindow menu = new MenuWindow(SubWindowKind.TAB, NOBODY);
+        List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
         for (int index = 0; index < count; index++) {
-            rows.add(new ChatMenu.Entry("row" + index, "Row " + index));
+            rows.add(new MenuWindow.Entry("row" + index, "Row " + index));
         }
         menu.setRows(rows);
         return menu;

@@ -82,7 +82,6 @@ public final class ClientCharacterAppearanceCache {
                         active.getStartingFactionId(),
                         active.getRoleplayLevel(),
                         active.getAge(),
-                        active.getDescription(),
                         active.getBodyTypeId(),
                         active.getChestTypeId());
             }

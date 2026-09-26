@@ -30,9 +30,10 @@ final class LostTalesLotrMapLegend {
 
     static int getReservedHeight(LostTalesLotrMapGui gui) {
         return gui != null && gui.isMapLegendOpen()
-                && LostTalesLotrMapLayout.isControlBarVisible(gui)
+                && LostTalesLotrMapLayout.hasFooterLayout(gui)
                 && calculateLayout(
                         gui.width, gui.height,
+                        LostTalesLotrMapLayout.controlBarHeight(gui),
                         LostTalesMapLegendRegistry.getCategories().size(),
                         gui.getMapLegendScrollIndex()).visible
                 ? HEIGHT + GAP_ABOVE_CONTROL_BAR : 0;
@@ -51,7 +52,7 @@ final class LostTalesLotrMapLegend {
     static boolean render(
             LostTalesLotrMapGui gui, int mouseX, int mouseY) {
         if (gui == null || !gui.isMapLegendOpen()
-                || !LostTalesLotrMapLayout.isControlBarVisible(gui)) {
+                || !LostTalesLotrMapLayout.hasFooterLayout(gui)) {
             return false;
         }
         Minecraft minecraft = Minecraft.getMinecraft();
@@ -63,8 +64,9 @@ final class LostTalesLotrMapLegend {
         }
 
         Layout layout = calculateLayout(
-                gui.width, gui.height, categories.size(),
-                gui.getMapLegendScrollIndex());
+                gui.width, gui.height,
+                LostTalesLotrMapLayout.controlBarHeight(gui),
+                categories.size(), gui.getMapLegendScrollIndex());
         if (!layout.visible) {
             return false;
         }
@@ -213,11 +215,12 @@ final class LostTalesLotrMapLegend {
 
     private static Layout currentLayout(LostTalesLotrMapGui gui) {
         if (gui == null || !gui.isMapLegendOpen()
-                || !LostTalesLotrMapLayout.isControlBarVisible(gui)) {
+                || !LostTalesLotrMapLayout.hasFooterLayout(gui)) {
             return Layout.hidden();
         }
         return calculateLayout(
                 gui.width, gui.height,
+                LostTalesLotrMapLayout.controlBarHeight(gui),
                 LostTalesMapLegendRegistry.getCategories().size(),
                 gui.getMapLegendScrollIndex());
     }
@@ -281,14 +284,17 @@ final class LostTalesLotrMapLegend {
                 color);
     }
 
+    /**
+     * The legend on a map {@code screenWidth} by {@code screenHeight}
+     * whose own strip takes {@code footer} rows at its foot: none in a
+     * window, whose bar stands below the map.
+     */
     static Layout calculateLayout(
-            int screenWidth, int screenHeight,
+            int screenWidth, int screenHeight, int footer,
             int categoryCount, int requestedFirstIndex) {
         int availableWidth = Math.max(0,
                 screenWidth - OUTER_MARGIN * 2);
-        int panelBottom = screenHeight
-                - LostTalesLotrMapControlBar.HEIGHT
-                - GAP_ABOVE_CONTROL_BAR;
+        int panelBottom = screenHeight - footer - GAP_ABOVE_CONTROL_BAR;
         if (categoryCount <= 0 || availableWidth < 60
                 || panelBottom < HEIGHT) {
             return Layout.hidden();

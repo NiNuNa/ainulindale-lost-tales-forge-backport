@@ -12,7 +12,6 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -36,8 +35,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * <pre>
  * window w1 locked=false x=0.00 y=0.00 active=client_console tabs=client_console,operator
  * window w2 locked=true x=62.50 y=100.00 height=180.40 width=326 fill=full active=global tabs=global,ooc,page:journal link=w1:above
- * small emoji from=br dx=0.00 dy=0.00 w=120 h=160
- * small tab from=tl dx=12.00 dy=40.00
+ * sub emoji from=br dx=0.00 dy=0.00 w=120 h=160
+ * sub tab from=tl dx=12.00 dy=40.00
  * place page:party x=40.00 y=60.00 height=292.00 width=366 fill=full
  * </pre>
  */
@@ -69,6 +68,8 @@ public final class WindowLayoutStore {
     /** The folder under the client's, one file per account. */
     static final String FOLDER = LostTalesConfigFiles.WINDOW_LAYOUTS;
     private static final Charset UTF_8 = Charset.forName("UTF-8");
+    /** The most lines a layout file is read to; a layout is a few dozen. */
+    static final int MAX_LINES = 4096;
     private static final List<Part> PARTS = new CopyOnWriteArrayList<Part>();
 
     private static File storeFile;
@@ -172,8 +173,7 @@ public final class WindowLayoutStore {
         List<WindowLayout.WindowSpec> specs =
                 new ArrayList<WindowLayout.WindowSpec>();
         Map<SubWindowKind, SubWindowPlaces.Placement> placed =
-                new EnumMap<SubWindowKind, SubWindowPlaces.Placement>(
-                        SubWindowKind.class);
+                new LinkedHashMap<SubWindowKind, SubWindowPlaces.Placement>();
         Map<String, WindowLayout.Place> places =
                 new LinkedHashMap<String, WindowLayout.Place>();
         for (String raw : lines) {
@@ -192,9 +192,9 @@ public final class WindowLayoutStore {
                 if (place != null) {
                     places.put(parts[1], place);
                 }
-            } else if (parts.length >= 2 && "small".equals(parts[0])) {
+            } else if (parts.length >= 2 && "sub".equals(parts[0])) {
                 SubWindowKind kind = SubWindowKind.fromId(parts[1]);
-                SubWindowPlaces.Placement placement = parseSmallWindow(parts);
+                SubWindowPlaces.Placement placement = parseSubWindow(parts);
                 if (kind != null && placement != null) {
                     placed.put(kind, placement);
                 }
@@ -256,7 +256,7 @@ public final class WindowLayoutStore {
      * corner or a distance is missing, a size stands alone or anything is
      * unreadable, which leaves the kind to open where its popup did.
      */
-    private static SubWindowPlaces.Placement parseSmallWindow(
+    private static SubWindowPlaces.Placement parseSubWindow(
             String[] parts) {
         String corner = null;
         double x = Double.NaN;
@@ -425,9 +425,9 @@ public final class WindowLayoutStore {
             lines.add(line.toString());
         }
         for (Map.Entry<SubWindowKind, SubWindowPlaces.Placement>
-                small : SubWindowPlaces.all().entrySet()) {
-            SubWindowPlaces.Placement placement = small.getValue();
-            lines.add("small " + small.getKey().id
+                sub : SubWindowPlaces.all().entrySet()) {
+            SubWindowPlaces.Placement placement = sub.getValue();
+            lines.add("sub " + sub.getKey().id
                     + " from=" + placement.corner()
                     + " dx=" + format(placement.dx)
                     + " dy=" + format(placement.dy)
@@ -510,6 +510,10 @@ public final class WindowLayoutStore {
         }
     }
 
+    /**
+     * The file's lines, at most {@link #MAX_LINES} of them: a layout is a
+     * few dozen, so a longer file is broken and only its start is read.
+     */
     private static List<String> readLines(File file) {
         if (file == null || !file.isFile()) {
             return null;
@@ -520,7 +524,8 @@ public final class WindowLayoutStore {
                     new FileInputStream(file), UTF_8));
             List<String> lines = new ArrayList<String>();
             String line;
-            while ((line = reader.readLine()) != null) {
+            while (lines.size() < MAX_LINES
+                    && (line = reader.readLine()) != null) {
                 lines.add(line);
             }
             return lines;

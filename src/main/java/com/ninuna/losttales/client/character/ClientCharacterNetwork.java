@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.character;
 
+import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.server.CharacterCreationRequest;
 import com.ninuna.losttales.character.server.CharacterTemplateAdoption;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
@@ -122,7 +123,7 @@ public final class ClientCharacterNetwork {
 
     public static int updateProfile(final long expectedRosterRevision,
                                     final UUID characterId,
-                                    final String description,
+                                    final CharacterProfile profile,
                                     final int age) {
         if (expectedRosterRevision < 0L || characterId == null) {
             throw new IllegalArgumentException("revision and character must be valid");
@@ -136,7 +137,7 @@ public final class ClientCharacterNetwork {
                                 requestId,
                                 expectedRosterRevision,
                                 characterId,
-                                description,
+                                profile,
                                 age));
             }
         });

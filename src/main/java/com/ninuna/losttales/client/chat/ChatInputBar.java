@@ -6,13 +6,14 @@ import com.ninuna.losttales.client.window.SubWindowKind;
 import com.ninuna.losttales.client.window.TabIcons;
 import com.ninuna.losttales.client.window.TabRow;
 import com.ninuna.losttales.client.window.Window;
+import com.ninuna.losttales.client.window.WindowBar;
 import com.ninuna.losttales.client.window.WindowLayout;
+import com.ninuna.losttales.client.window.WindowOpening;
 import com.ninuna.losttales.client.window.WindowPlacement;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
 import com.ninuna.losttales.gui.style.LostTalesUiCornerMark;
 import com.ninuna.losttales.gui.style.LostTalesUiFading;
-import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import com.ninuna.losttales.gui.style.LostTalesUiCaret;
 import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
@@ -28,7 +29,8 @@ import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.client.motion.Motions;
-import com.ninuna.losttales.client.motion.MotionIds;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
@@ -132,8 +134,6 @@ public final class ChatInputBar {
     private ChatInputField restingField;
     private int screenHeight;
 
-    /** When the bars' entrance began: the screen opening. */
-    private long entranceNanos = System.nanoTime();
     /**
      * The indicator's marquee, as a tab's: how long the pointer has
      * rested on it, how far its cut name is slid left, and when the
@@ -451,16 +451,9 @@ public final class ChatInputBar {
         return opacity * fadeShare;
     }
 
-    /** The bars' entrance from below, timed from the screen's opening. */
+    /** The bars' entrance from below, every window's alike. */
     float entranceOffset() {
-        long duration = Motions.travelNanos(MotionIds.CHAT_BAR_APPEAR);
-        if (duration <= 0L) {
-            return 0.0F;
-        }
-        float progress = Math.max(0.0F, Math.min(1.0F,
-                (System.nanoTime() - this.entranceNanos)
-                        / (float)duration));
-        return LostTalesChatMotion.inputOffset(progress);
+        return WindowOpening.barOffset();
     }
 
     /* ---- The pickers ---- */
@@ -483,36 +476,35 @@ public final class ChatInputBar {
     /** The kind of window a picker opens in. */
     SubWindowKind kindOf(ChatPickerPanel picker) {
         if (picker == this.reactionPicker) {
-            return SubWindowKind.REACTIONS;
+            return ChatSubWindows.REACTIONS;
         }
         if (picker == this.itemPicker) {
-            return SubWindowKind.ITEMS;
+            return ChatSubWindows.ITEMS;
         }
         if (picker == this.markerPicker) {
-            return SubWindowKind.MARKERS;
+            return ChatSubWindows.MARKERS;
         }
         if (picker == this.questPicker) {
-            return SubWindowKind.QUESTS;
+            return ChatSubWindows.QUESTS;
         }
-        return SubWindowKind.EMOJI;
+        return ChatSubWindows.EMOJI;
     }
 
     /** The picker a kind of window holds; null for a kind no picker opens in. */
     ChatPickerPanel pickerOf(SubWindowKind kind) {
-        switch (kind) {
-            case EMOJI:
-                return this.emojiPicker;
-            case REACTIONS:
-                return this.reactionPicker;
-            case ITEMS:
-                return this.itemPicker;
-            case MARKERS:
-                return this.markerPicker;
-            case QUESTS:
-                return this.questPicker;
-            default:
-                return null;
+        if (kind == ChatSubWindows.EMOJI) {
+            return this.emojiPicker;
         }
+        if (kind == ChatSubWindows.REACTIONS) {
+            return this.reactionPicker;
+        }
+        if (kind == ChatSubWindows.ITEMS) {
+            return this.itemPicker;
+        }
+        if (kind == ChatSubWindows.MARKERS) {
+            return this.markerPicker;
+        }
+        return kind == ChatSubWindows.QUESTS ? this.questPicker : null;
     }
 
     /**
@@ -616,61 +608,31 @@ public final class ChatInputBar {
         int surface = LostTalesUiInk.argb(
                 LostTalesUiInk.SURFACE_HIGHLIGHT_RGB,
                 Math.round(WindowStyle.INSET_ALPHA * opacity));
-        // Up to the indicator's frame plain; the indicator's frame, then
-        // up to the divider around the character button's frame where
-        // the tab has one — each frame's corner pixels are the bar's,
-        // outside the frame's rounding; from the divider on, around the
-        // typing well.
-        LostTalesUiInk.fillRect(this.left, this.top + 1,
-                fit.frameLeft, barBottom, surface);
-        WindowStyle.fillAround(fit.frameLeft, this.top + 1,
-                fit.frameRight, barBottom, fit.frameLeft, frameTop,
-                fit.frameRight, frameTop + LostTalesUiFramedButton.HEIGHT, surface);
-        LostTalesUiFramedButton.fillCorners(fit.frameLeft, frameTop,
-                fit.frameRight - fit.frameLeft, LostTalesUiFramedButton.HEIGHT,
-                surface);
+        // Holes for the indicator's frame, the character button's where
+        // the tab has one, and the typing well; each frame's corner pixels
+        // are the bar's, outside the frame's rounding.
+        List<int[]> holes = new ArrayList<int[]>();
+        holes.add(new int[] {fit.frameLeft, frameTop, fit.frameRight,
+                frameTop + LostTalesUiFramedButton.HEIGHT, 1});
         if (hasCharacterButton(fit.channel)) {
             int characterLeft = characterButtonLeft(fit);
             int characterTop = characterButtonTop();
-            WindowStyle.fillAround(fit.frameRight, this.top + 1,
-                    line.leftDividerX, barBottom, characterLeft, characterTop,
+            holes.add(new int[] {characterLeft, characterTop,
                     characterLeft + CHARACTER_BUTTON_SIZE,
-                    characterTop + CHARACTER_BUTTON_SIZE, surface);
-            LostTalesUiFramedButton.fillCorners(characterLeft, characterTop,
-                    CHARACTER_BUTTON_SIZE, CHARACTER_BUTTON_SIZE, surface);
-        } else {
-            LostTalesUiInk.fillRect(fit.frameRight, this.top + 1,
-                    line.leftDividerX, barBottom, surface);
+                    characterTop + CHARACTER_BUTTON_SIZE, 1});
         }
-        WindowStyle.fillAround(line.leftDividerX, this.top + 1,
-                barRight, barBottom, line.wellLeft, wellTop, line.wellRight,
-                wellBottom, surface);
+        holes.add(new int[] {line.wellLeft, wellTop, line.wellRight,
+                wellBottom, 0});
+        WindowBar.fillWithHoles(this.left, this.top + 1, barRight, barBottom,
+                holes, surface);
         drawWell(line, wellTop, wellBottom,
                 WindowStyle.insetArgb(opacity));
-        // The frame's surface beside and under the bar, a frame wide, in
-        // the bar's own surface, the colour it runs beside (Nils), the
-        // row the window's bottom rule stands on included; the frame's
-        // edges lie over it.
-        int ring = WindowPlacement.FRAME_WIDTH;
-        LostTalesUiInk.fillRect(this.left - ring, this.top,
-                this.left, barBottom, surface);
-        LostTalesUiInk.fillRect(barRight, this.top,
-                barRight + ring, barBottom, surface);
-        LostTalesUiInk.fillRect(this.left - ring, barBottom,
-                barRight + ring, barBottom + ring - 1, surface);
-        // The ring's outermost corner pixels lie outside the frame's
-        // rounding, as a framed button's footprint corners do.
-        LostTalesUiInk.fillRect(this.left - ring + 1,
-                barBottom + ring - 1, barRight + ring - 1, barBottom + ring,
-                surface);
-        // The frame's edges beside and under the bar and its two bottom
-        // corners, on the whole window's ramps: the window's box reaches
-        // as far above the bar's foot here as it does on screen.
-        if (frame != null) {
-            LostTalesUiWindowFrame.drawEdgesBelow(this.left,
-                    barBottom - (float)(frame.boxBottom - frame.boxTop),
-                    barRight, barBottom, this.top, faded(255));
-        }
+        // The frame's surface beside and under the bar and its edges over
+        // it, on the whole window's ramps: the window's box reaches as far
+        // above the bar's foot here as it does on screen.
+        WindowBar.drawFoot(this.left, this.top, barRight, surface,
+                frame == null ? 0.0F : (float)(frame.boxBottom - frame.boxTop),
+                faded(255));
     }
 
     /**

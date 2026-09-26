@@ -1,7 +1,11 @@
 package com.ninuna.losttales.client.window;
 
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiItemIcon;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.client.Minecraft;
+import net.minecraft.util.StatCollector;
 
 /**
  * The tab of a page: the quest journal, the party. One per page, made by
@@ -54,9 +58,33 @@ public final class PageTab extends WindowTab {
         return content().isAvailable();
     }
 
+    /**
+     * The page's own rows, under their heading with the chosen one marked
+     * in honey, as a chosen status is; one that cannot be taken greyed.
+     */
     @Override
-    public boolean hasToolStrip() {
-        return content().hasToolStrip();
+    public List<MenuWindow.Entry> menuRows() {
+        PageContent page = content();
+        List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
+        for (PageContent.Choice choice : page.choices()) {
+            rows.add(new MenuWindow.Entry(choice.id, choice.label, false,
+                    choice.chosen ? LostTalesColors.rgb(LostTalesColors.HONEY)
+                            : -1, null).unavailable(choice.unavailable));
+        }
+        if (rows.isEmpty() || page.choicesHeading().length() == 0) {
+            return rows;
+        }
+        List<MenuWindow.Entry> headed = new ArrayList<MenuWindow.Entry>();
+        WindowMenus.addSection(headed, StatCollector.translateToLocal(
+                page.choicesHeading()), rows);
+        return headed;
+    }
+
+    /** A choice taken; the menu stays for the next. */
+    @Override
+    public boolean takeMenuRow(String id) {
+        content().choose(id);
+        return true;
     }
 
     @Override

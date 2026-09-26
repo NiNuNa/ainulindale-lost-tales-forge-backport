@@ -9,6 +9,7 @@ import com.ninuna.losttales.gui.hud.LostTalesHudHelper;
 import com.ninuna.losttales.gui.hud.loot.LostTalesQuickLootHudRenderer;
 import com.ninuna.losttales.gui.screen.LostTalesCharacterMenuGui;
 import com.ninuna.losttales.gui.screen.LostTalesHudPlacementGui;
+import com.ninuna.losttales.gui.screen.character.CharactersPage;
 import com.ninuna.losttales.gui.screen.party.PartyPage;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
@@ -29,6 +30,8 @@ public class LostTalesKeyBindings {
     private static final KeyBinding QUEST_JOURNAL = new KeyBinding("key.losttales.questJournal", Keyboard.KEY_J, CATEGORY);
     /** Unbound until the player gives it a key. */
     private static final KeyBinding PARTY = new KeyBinding("key.losttales.party", Keyboard.KEY_NONE, CATEGORY);
+    /** Unbound until the player gives it a key, as the Party key is (C4 a). */
+    private static final KeyBinding CHARACTERS = new KeyBinding("key.losttales.characters", Keyboard.KEY_NONE, CATEGORY);
     private static final KeyBinding MAP = new KeyBinding(
             "key.losttales.map", Keyboard.KEY_M, CATEGORY);
     private static final KeyBinding TOGGLE_HUD = new KeyBinding("key.losttales.toggleHud", Keyboard.KEY_H, CATEGORY);
@@ -43,6 +46,7 @@ public class LostTalesKeyBindings {
         ClientRegistry.registerKeyBinding(CHARACTER_MENU);
         ClientRegistry.registerKeyBinding(QUEST_JOURNAL);
         ClientRegistry.registerKeyBinding(PARTY);
+        ClientRegistry.registerKeyBinding(CHARACTERS);
         ClientRegistry.registerKeyBinding(MAP);
         ClientRegistry.registerKeyBinding(TOGGLE_HUD);
         ClientRegistry.registerKeyBinding(USE);
@@ -76,6 +80,9 @@ public class LostTalesKeyBindings {
         }
         if (PARTY.isPressed()) {
             WindowScreen.openPage(PartyPage.PAGE_ID);
+        }
+        if (CHARACTERS.isPressed()) {
+            WindowScreen.openPage(CharactersPage.PAGE_ID);
         }
         if (MAP.isPressed() && minecraft.currentScreen == null) {
             LostTalesLotrMapGui.open();
@@ -162,6 +169,10 @@ public class LostTalesKeyBindings {
 
     public static KeyBinding getPartyKeyBinding() {
         return PARTY;
+    }
+
+    public static KeyBinding getCharactersKeyBinding() {
+        return CHARACTERS;
     }
 
     public static boolean isModifierKeyDown() {

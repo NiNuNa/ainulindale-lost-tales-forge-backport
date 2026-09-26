@@ -3,6 +3,7 @@ package com.ninuna.losttales.network.packet;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
+import com.ninuna.losttales.chat.server.ChatMessageIdAllocator;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import java.util.UUID;
@@ -15,8 +16,9 @@ import static org.junit.Assert.assertTrue;
 /**
  * A quote of a line no server named says whose line it was, as far as
  * the sender can tell: the Server's or the Client's, the sender's own,
- * or anybody else's. The claim travels after the quote's words and only
- * with them.
+ * or anybody else's. The claim travels after the quote's words, and the
+ * message a forward carries on after it; a forward has no words of its
+ * own.
  */
 public final class LostTalesChatSendPacketQuoteSourceTest {
 
@@ -56,7 +58,8 @@ public final class LostTalesChatSendPacketQuoteSourceTest {
     public void anUnknownSourceIsRefused() {
         ByteBuf buffer = Unpooled.buffer();
         quoting(LostTalesChatSendPacket.QUOTE_OWN).toBytes(buffer);
-        buffer.setByte(buffer.writerIndex() - 1, 9);
+        // The source, before the eight bytes of the message a forward names.
+        buffer.setByte(buffer.writerIndex() - 9, 9);
         LostTalesChatSendPacket decoded = new LostTalesChatSendPacket();
         decoded.fromBytes(buffer);
         assertTrue(decoded.isMalformed());
@@ -71,6 +74,42 @@ public final class LostTalesChatSendPacketQuoteSourceTest {
                 LostTalesChatSendPacket.QUOTE_SYSTEM);
         assertEquals(LostTalesChatSendPacket.QUOTE_OTHER,
                 plain.getQuoteSource());
+    }
+
+    @Test
+    public void aForwardNamesItsMessageAndSaysNothingOfItsOwn() {
+        long original = ChatMessageIdAllocator.next();
+        LostTalesChatSendPacket forward = LostTalesChatSendPacket.forward(
+                ChatChannel.WHISPER, "Beren",
+                LostTalesChatSendPacket.IDENTITY_DEFAULT, null, "", null,
+                original);
+        ByteBuf buffer = Unpooled.buffer();
+        forward.toBytes(buffer);
+        LostTalesChatSendPacket decoded = new LostTalesChatSendPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals(original, decoded.getForwardOf());
+        assertEquals("", decoded.getMessage());
+        assertEquals("Beren", decoded.getTarget());
+
+        LostTalesChatSendPacket plain = quoting(
+                LostTalesChatSendPacket.QUOTE_OTHER);
+        assertEquals(ChatMessageIds.NONE, plain.getForwardOf());
+        // Words beside a forward are refused off the wire.
+        buffer = Unpooled.buffer();
+        plain.toBytes(buffer);
+        buffer.setLong(buffer.writerIndex() - 8, original);
+        decoded = new LostTalesChatSendPacket();
+        decoded.fromBytes(buffer);
+        assertTrue(decoded.isMalformed());
+        assertEquals(ChatMessageIds.NONE, decoded.getForwardOf());
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void aForwardOfNoServerMessageIsRefused() {
+        LostTalesChatSendPacket.forward(ChatChannel.GLOBAL, "",
+                LostTalesChatSendPacket.IDENTITY_DEFAULT, null, "", null,
+                ChatMessageIds.NONE - 1);
     }
 
     @Test

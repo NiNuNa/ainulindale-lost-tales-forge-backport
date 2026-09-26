@@ -2,17 +2,20 @@ package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.input.LostTalesKeyPress;
-import net.minecraft.client.gui.GuiTextField;
+import java.util.List;
 
 /**
  * A system with work of its own on the window screen besides what its
  * tabs show: the chat, with its input bar, its menus, its completion
  * lists and its conversations. The screen makes one of each registered
- * part when it opens ({@link WindowScreen#addPart}) and asks it at fixed
- * points of every key, press, turn of the wheel and frame, in the order
- * the screen handles them; each method says where. Everything is
- * optional: a part leaves alone what it has no part in, and a method that
- * answers whether it took something answers false for that.
+ * part when it opens ({@link WindowScreen#addPart}), and the part adds its
+ * kinds of menu and its sections of Settings to the screen's as it is
+ * made ({@link WindowScreen#menus}, {@link WindowScreen#settings}). The
+ * screen asks it at fixed points of every key, press, turn of the wheel
+ * and frame, in the order the screen handles them; each method says
+ * where. Everything is optional: a part leaves alone what it has no part
+ * in, and a method that answers whether it took something answers false
+ * for that.
  */
 public abstract class ScreenPart {
     /** Makes a screen's part; each screen that opens gets its own. */
@@ -27,6 +30,14 @@ public abstract class ScreenPart {
     }
 
     /* ---- Life ---- */
+
+    /**
+     * The screen is opening, before anything else is asked: for the page
+     * whose key or button opened it, or for no page (null) when the chat's
+     * key did. Not asked on a resize, nor when the screen comes back from
+     * one opened over it.
+     */
+    public void opening(PageTab forPage) {}
 
     /** Before the screen builds its field: the screen was made or resized. */
     public void beforeInit() {}
@@ -68,10 +79,6 @@ public abstract class ScreenPart {
         return false;
     }
 
-    /** The field the tool strip's search well types into; null to leave it to another part. */
-    public GuiTextField makeSearchField() {
-        return null;
-    }
 
     /** Writes words a page hands over into the field typed in; false for a part with none. */
     public boolean insertText(String token) {
@@ -103,31 +110,18 @@ public abstract class ScreenPart {
     /** A window moved or changed its size: whatever of the part follows it follows. */
     public void windowsMoved() {}
 
-    /** Opens a tab's menu, or with {@code toggle} puts it away when it is out. */
-    public boolean showTabMenu(WindowTab tab, SubWindowAnchor anchor,
-                               boolean toggle) {
-        return false;
-    }
+    /**
+     * Adds the part's own rows to the {@code +} and to the tab search: what
+     * it can open, in headed sections, each row's id its tab's, narrowed to
+     * the names that hold {@code filter}. The {@code search} lists the
+     * open tabs itself, so it leaves out what is open already.
+     */
+    public void addOpenable(List<MenuWindow.Entry> entries, String filter,
+                            boolean search) {}
 
-    /** Opens a window's menu, or with {@code toggle} puts it away when it is out. */
-    public boolean showWindowMenu(Window window, SubWindowAnchor anchor,
-                                  boolean toggle) {
-        return false;
-    }
-
-    /** The {@code +}'s list of what can be opened again, a switch. */
-    public boolean toggleRestoreMenu(Window window, SubWindowAnchor anchor) {
-        return false;
-    }
-
-    /** The tab search's list, a switch. */
-    public boolean toggleTabSearch(Window window, SubWindowAnchor anchor) {
-        return false;
-    }
-
-    /** Whether a menu of this kind about this subject is out: its control rests lit. */
-    public boolean isMenuOpenFor(SubWindowKind kind, Object about) {
-        return false;
+    /** Where the empty screen's {@code +} the part draws stands, as an anchor to hang a menu from; null for none. */
+    public SubWindowAnchor emptyPlusAnchor() {
+        return null;
     }
 
     /** Whether the part has anything closed to offer again under the {@code +}. */

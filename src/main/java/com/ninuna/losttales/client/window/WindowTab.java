@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.window;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import net.minecraft.client.Minecraft;
@@ -94,9 +95,18 @@ public abstract class WindowTab {
 
     /* ---- What the window's tool strip offers while the tab is in front ---- */
 
-    /** Whether the window shows a tool strip under its row while the tab is in front. */
-    public boolean hasToolStrip() {
-        return true;
+    /**
+     * The rows the tab puts in its menu behind the tool strip's cog: a
+     * page's choices, a conversation's switches. The menu adds a window of
+     * its own for the tab after them.
+     */
+    public List<MenuWindow.Entry> menuRows() {
+        return Collections.emptyList();
+    }
+
+    /** One of its menu's rows taken; answers whether the menu stays open. */
+    public boolean takeMenuRow(String id) {
+        return false;
     }
 
     /** The panel button at the strip's left end; null for none. */
@@ -151,7 +161,7 @@ public abstract class WindowTab {
     /** What the cog says under the pointer. */
     public String settingsTip() {
         return StatCollector.translateToLocalFormatted(
-                "gui.losttales.chat.page.settings", title());
+                "gui.losttales.window.page.settings", title());
     }
 
     @Override

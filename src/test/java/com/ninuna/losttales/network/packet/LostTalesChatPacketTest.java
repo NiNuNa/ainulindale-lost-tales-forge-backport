@@ -595,6 +595,42 @@ public final class LostTalesChatPacketTest {
         assertEquals("Aldric", decoded.getReply().getAuthor());
     }
 
+    /**
+     * A forward's quote travels with its link to where the message was
+     * said, its author and head, and none of its words, which are the
+     * line's own; every copy a client makes of the line keeps it.
+     */
+    @Test
+    public void aForwardCarriesItsLinkOverTheWire() {
+        long original = ChatMessageIdAllocator.next();
+        UUID quoted = UUID.randomUUID();
+        ChatReplyReference forward = ChatReplyReference.forward(original,
+                "Aldric", 0x4A90D9, "#ooc/" + original)
+                .withHead(quoted, false, "skin-7");
+        LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
+                ChatChannel.GLOBAL, UUID.randomUUID(), "Beren", "Steve", "",
+                0xFFFFFF, 0xFFFFFF, "meet me at the gate", 1L, "", null, "",
+                "", 0, false, ChatMessageIdAllocator.next(), forward);
+        ByteBuf buffer = Unpooled.buffer();
+        packet.toBytes(buffer);
+        LostTalesChatMessagePacket decoded =
+                new LostTalesChatMessagePacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertTrue(decoded.getReply().isForward());
+        assertEquals("#ooc/" + original, decoded.getReply().getForwardedFrom());
+        assertEquals(original, decoded.getReply().getMessageId());
+        assertEquals("Aldric", decoded.getReply().getAuthor());
+        assertEquals("", decoded.getReply().getExcerpt());
+        assertEquals(quoted, decoded.getReply().getSenderId());
+        assertTrue(decoded.withMessage("changed").getReply().isForward());
+        assertFalse("a forward names a message",
+                ChatReplyReference.forward(ChatMessageIds.NONE, "Aldric",
+                        0, "#ooc/1").exists());
+        assertFalse("a reply is no forward", ChatReplyReference.of(original,
+                "Aldric", "hi").isForward());
+    }
+
     /** The quoted sender's head travels with the quote, so it is drawn whether or not the reader holds the line. */
     @Test
     public void aQuoteCarriesTheQuotedSendersHead() {
@@ -1193,8 +1229,8 @@ public final class LostTalesChatPacketTest {
         LostTalesPacketCodec.writeUtf8String(probe, scopeValue, 128);
         // Behind the scope, for a line quoting nothing: the empty quote
         // of a line nobody named (author, words, colour), then the
-        // quote's head, a server line's component and its named
-        // players, every one of them empty.
+        // quote's head, a forward's link, a server line's component and
+        // its named players, every one of them empty.
         LostTalesPacketCodec.writeUtf8String(probe, "", 256);
         LostTalesPacketCodec.writeUtf8String(probe, "", 297);
         probe.writeInt(0);
@@ -1202,6 +1238,7 @@ public final class LostTalesChatPacketTest {
         probe.writeLong(0L);
         probe.writeLong(0L);
         probe.writeBoolean(false);
+        LostTalesPacketCodec.writeUtf8String(probe, "", 128);
         LostTalesPacketCodec.writeUtf8String(probe, "", 128);
         LostTalesPacketCodec.writeUtf8String(probe, "", 8192);
         probe.writeInt(0);

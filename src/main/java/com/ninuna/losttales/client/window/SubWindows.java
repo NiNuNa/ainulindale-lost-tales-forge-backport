@@ -25,8 +25,7 @@ import org.lwjgl.opengl.GL11;
  * <p>A window closes by its cross, by Escape while it is the one in front,
  * or by the control that opened it; it closes with its window, too.
  * One of each kind is open at most, but a card for each person: pressed
- * for in another window, a kind's window moves there. None counts
- * toward the eight windows there may be.</p>
+ * for in another window, a kind's window moves there.</p>
  *
  * <p>"In front" is the window the player last pressed or opened; a press
  * anywhere else on the screen leaves no sub-window in front, and Escape

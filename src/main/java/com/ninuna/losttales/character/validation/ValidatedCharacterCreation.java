@@ -11,7 +11,7 @@ public final class ValidatedCharacterCreation {
     private final String skinId;
     private final String bodyTypeId;
     private final String chestTypeId;
-    private final String description;
+    private final String history;
     private final int age;
     private final String startingFactionId;
     private final String startingWaypointId;
@@ -23,7 +23,7 @@ public final class ValidatedCharacterCreation {
                                       String startingFactionId,
                                       String startingWaypointId,
                                       boolean unconventionalSettings,
-                                      String description, String bodyTypeId,
+                                      String history, String bodyTypeId,
                                       String chestTypeId) {
         this.slotIndex = slotIndex;
         this.name = name;
@@ -33,7 +33,7 @@ public final class ValidatedCharacterCreation {
         this.skinId = skinId;
         this.bodyTypeId = bodyTypeId;
         this.chestTypeId = chestTypeId;
-        this.description = description;
+        this.history = history;
         this.age = age;
         this.startingFactionId = startingFactionId;
         this.startingWaypointId = startingWaypointId;
@@ -48,7 +48,7 @@ public final class ValidatedCharacterCreation {
     public String getSkinId() { return this.skinId; }
     public String getBodyTypeId() { return this.bodyTypeId; }
     public String getChestTypeId() { return this.chestTypeId; }
-    public String getDescription() { return this.description; }
+    public String getHistory() { return this.history; }
     public int getAge() { return this.age; }
     public String getStartingFactionId() { return this.startingFactionId; }
     public String getStartingWaypointId() { return this.startingWaypointId; }

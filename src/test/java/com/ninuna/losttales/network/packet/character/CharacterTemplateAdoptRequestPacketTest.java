@@ -31,7 +31,7 @@ public final class CharacterTemplateAdoptRequestPacketTest {
         assertEquals("human_male_1", decoded.getSkinId());
         assertEquals("slim", decoded.getBodyTypeId());
         assertEquals("flat", decoded.getChestTypeId());
-        assertEquals("A ranger of the north.", decoded.getDescription());
+        assertEquals("A ranger of the north.", decoded.getHistory());
         assertEquals(34, decoded.getAge());
     }
 

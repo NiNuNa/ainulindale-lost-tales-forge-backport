@@ -1,30 +1,13 @@
-package com.ninuna.losttales.client.chat;
+package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.client.input.LostTalesInputBinding;
 import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
 import com.ninuna.losttales.client.input.LostTalesKeyPress;
 import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.Motions;
-import com.ninuna.losttales.chat.emoji.ChatEmoji;
-import com.ninuna.losttales.chat.emoji.ChatEmojiSuggester;
-import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
-import com.ninuna.losttales.client.window.PointerRegions;
-import com.ninuna.losttales.client.window.SubWindow;
-import com.ninuna.losttales.client.window.SubWindowAnchor;
-import com.ninuna.losttales.client.window.SubWindowContent;
-import com.ninuna.losttales.client.window.SubWindowKind;
-import com.ninuna.losttales.client.window.TabIcons;
-import com.ninuna.losttales.client.window.TabMark;
-import com.ninuna.losttales.client.window.TabRow;
-import com.ninuna.losttales.client.window.WheelStep;
-import com.ninuna.losttales.client.window.WindowPlacement;
-import com.ninuna.losttales.client.window.WindowStyle;
-import com.ninuna.losttales.client.window.WindowTab;
-import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiCaret;
-import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
@@ -33,22 +16,20 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.util.StatCollector;
-import org.lwjgl.input.Keyboard;
 
 /**
  * A menu in a sub-window of its own: the rows a control or the pointer
- * opens — a tab's settings behind the tool strip's cog, the closed
- * channels and conversations behind the {@code +}, a message's or a
- * person's actions.
+ * opens — a tab's menu behind the tool strip's cog, what can be opened
+ * behind the {@code +}, Settings, a message's or a person's actions.
  * Each kind of menu has one window. The menu lays its rows out in the
  * window's content box, draws them, hit tests them and scrolls them;
- * what the rows are, what they are about and what they do is
- * {@link ChatScreenMenus}' business, which hands the menu new rows
+ * what the rows are, what they are about and what they do is its
+ * owner's business ({@link WindowMenus}), which hands the menu new rows
  * whenever what they say has changed. A list may carry <em>header</em>
  * rows — a section label over a hairline, never taken — and a list longer
  * than its window scrolls by the wheel, a honey hairline on an edge
@@ -57,10 +38,10 @@ import org.lwjgl.input.Keyboard;
  * <p>A menu may hold a field above its rows, which takes what is typed
  * while its window is in front and until a row is taken: a search that
  * narrows the rows, or a note or a line to be kept. The menu holds the
- * text and draws the field; which rows a filter leaves is the screen's
- * menus' business.</p>
+ * text and draws the field ({@link WindowFields}); which rows a filter
+ * leaves is its owner's business.</p>
  */
-public final class ChatMenu extends SubWindowContent {
+public final class MenuWindow extends SubWindowContent {
     public static final int ROW_HEIGHT = 11;
     private static final int PADDING_X = 6;
     private static final int PADDING_Y = 3;
@@ -69,12 +50,12 @@ public final class ChatMenu extends SubWindowContent {
      * A row tall enough for the mod's key icons at their own size, as the
      * settings' rows are, since some of them show a shortcut's keys.
      */
-    static final int TALL_ROW_HEIGHT =
+    public static final int TALL_ROW_HEIGHT =
             LostTalesInputIconRenderer.BASE_ICON_HEIGHT + 2;
     /** Rows a window opens with at most; a longer list scrolls behind them. */
-    static final int MAX_VISIBLE_ROWS = 12;
+    public static final int MAX_VISIBLE_ROWS = 12;
     /** Longest thing a field takes unless told otherwise; far past any tab's name. */
-    static final int MAX_FILTER_LENGTH = 48;
+    public static final int MAX_FILTER_LENGTH = 48;
     /** Seam between a shortcut's key icons and the + joining them. */
     private static final int KEY_GAP = 2;
     private static final int[] NO_KEYS = new int[0];
@@ -92,17 +73,43 @@ public final class ChatMenu extends SubWindowContent {
     /** The hairline under a section's name: nearly opaque, a firmer line than the field's. */
     private static final int HEADER_RULE_ALPHA = 0xE0;
 
-    static final class Entry {
-        final String id;
-        final String label;
+    /**
+     * A picture standing in a row's icon column: a person's head. It is
+     * drawn from the column's left and the label's capitals' top.
+     */
+    public interface Picture {
+        void draw(Minecraft minecraft, float iconX, float labelTop,
+                  int alpha);
+    }
+
+    /** How a row's label is measured and drawn where it is not plain words: emoji shortcodes as their sprites. */
+    public interface Label {
+        int width(FontRenderer font, String text);
+
+        void draw(Minecraft minecraft, FontRenderer font, String text,
+                  String style, int x, int y, int rgb, int alpha);
+    }
+
+    /** Who takes a menu's rows and its keys: its {@link WindowMenus}. */
+    public interface Owner {
+        /** A row taken; with {@code back}, pressed with the right button. */
+        void take(MenuWindow menu, Entry entry, boolean back);
+
+        /** A key for the menu's field while it holds the keys. */
+        void keyTyped(MenuWindow menu, LostTalesKeyPress press);
+    }
+
+    public static final class Entry {
+        public final String id;
+        public final String label;
         /** A section label over a hairline; never hovered, never taken. */
-        final boolean header;
+        public final boolean header;
         /** A display row that cannot be taken. */
-        final boolean passive;
+        public final boolean passive;
         /** Drawn italic: a muted channel, like its tab. */
-        final boolean dim;
+        public final boolean dim;
         /** The channel's colour, shown as a small bar before the name; -1 for none. */
-        final int color;
+        public final int color;
         /**
          * Whether the colour is the row's subject rather than its
          * channel's mark: a palette entry shows it as a chip wide
@@ -110,9 +117,9 @@ public final class ChatMenu extends SubWindowContent {
          */
         boolean chip;
         /** The tab whose icon stands before the name, or null for none. */
-        final WindowTab icon;
-        /** Player whose head stands before the name, or null for none. */
-        ChatHeadOwner head;
+        public final WindowTab icon;
+        /** A picture before the name, a person's head; null for none. */
+        Picture picture;
         /** A sheet sprite before the name, or null. */
         LostTalesUiSheet sprite;
         /**
@@ -123,24 +130,24 @@ public final class ChatMenu extends SubWindowContent {
         LostTalesUiSheet litSprite;
         /** Whether the row is the one chosen, which keeps its sprite lit. */
         boolean chosen;
-        /** Whether the label's emoji shortcodes are drawn as their sprites. */
-        boolean emojis;
+        /** How the label is drawn where it is not plain words; null for plain words. */
+        Label labelStyle;
         /**
          * The colour the label is drawn in; -1 for the menu's ivory. An
          * operator's action wears the Operator channel's crimson, so a
          * row that reaches beyond this player's own words is told apart
          * at a glance.
          */
-        int labelColor = -1;
+        public int labelColor = -1;
         /**
          * Why the row's action cannot be taken here, or empty for a row
          * that can: such a row stands in its place, muted, answers no
          * click, and says why under the pointer, so every menu of its kind
          * keeps the same rows.
          */
-        String unavailable = "";
+        public String unavailable = "";
         /** What the row's setting reads now, at its right end; empty for none. */
-        String value = "";
+        public String value = "";
         /** A colour chip before the value, a colour setting's; -1 for none. */
         int valueChip = -1;
         /**
@@ -148,61 +155,62 @@ public final class ChatMenu extends SubWindowContent {
          * key, drawn in the mod's key icons, and words between and after
          * them; empty for none.
          */
-        Object[] keys = NO_PARTS;
+        public Object[] keys = NO_PARTS;
         /**
          * A group's name over the rows after it — a channel's, its icon
-         * before it, or a part of the chat's — in its own colour, at the
+         * before it, or a part of a system's — in its own colour, at the
          * padding as a header is; never taken.
          */
-        boolean group;
+        public boolean group;
 
-        Entry(String id, String label) {
+        public Entry(String id, String label) {
             this(id, label, false, false, false, -1, null);
         }
 
         /** The same entry showing what its setting reads now. */
-        Entry withValue(String value) {
+        public Entry withValue(String value) {
             this.value = value == null ? "" : value;
             return this;
         }
 
         /** The same entry with a colour chip before its value. */
-        Entry withValueChip(int rgb) {
+        public Entry withValueChip(int rgb) {
             this.valueChip = rgb;
             return this;
         }
 
         /** The same entry showing a shortcut's keys; see {@link #keys}. */
-        Entry withKeys(Object... keys) {
+        public Entry withKeys(Object... keys) {
             this.keys = keys == null ? NO_PARTS : keys;
             return this;
         }
 
         /** The same entry, muted and closed for {@code reason}. */
-        Entry unavailable(String reason) {
+        public Entry unavailable(String reason) {
             this.unavailable = reason == null ? "" : reason;
             return this;
         }
 
         /** The same entry with its label in the given colour. */
-        Entry withLabelColor(int color) {
+        public Entry withLabelColor(int color) {
             this.labelColor = color;
             return this;
         }
 
         /** The same entry showing its colour as a chip; a palette row. */
-        Entry asChip() {
+        public Entry asChip() {
             this.chip = true;
             return this;
         }
 
-        /** The same entry drawing its label's emojis, as a status line's row does. */
-        Entry withEmojis() {
-            this.emojis = true;
+        /** The same entry drawing its label in {@code style}: a status line's, its emoji as sprites. */
+        public Entry withLabel(Label style) {
+            this.labelStyle = style;
             return this;
         }
 
-        Entry(String id, String label, boolean dim, int color, WindowTab icon) {
+        public Entry(String id, String label, boolean dim, int color,
+                     WindowTab icon) {
             this(id, label, false, false, dim, color, icon);
         }
 
@@ -218,29 +226,30 @@ public final class ChatMenu extends SubWindowContent {
         }
 
         /** A section label: {@code Channels}, {@code Direct Messages}. */
-        static Entry header(String label) {
+        public static Entry header(String label) {
             return new Entry("", label, true, false, false, -1, null);
         }
 
         /** A display row that cannot be taken. */
-        static Entry passive(String label) {
+        public static Entry passive(String label) {
             return new Entry("", label, false, true, false, -1, null);
         }
 
         /** A group's name in {@code rgb}, a channel's {@code icon} before it or none. */
-        static Entry group(String label, WindowTab icon, int rgb) {
+        public static Entry group(String label, WindowTab icon, int rgb) {
             Entry entry = new Entry("", label, false, true, false, -1, icon);
             entry.group = true;
             entry.labelColor = rgb;
             return entry;
         }
 
-        Entry withHead(UUID owner, String skinId) {
-            this.head = new ChatHeadOwner(owner, skinId);
+        /** The same entry with a picture before its name. */
+        public Entry withPicture(Picture drawn) {
+            this.picture = drawn;
             return this;
         }
 
-        Entry withSprite(LostTalesUiSheet sprite) {
+        public Entry withSprite(LostTalesUiSheet sprite) {
             this.sprite = sprite;
             return this;
         }
@@ -249,31 +258,40 @@ public final class ChatMenu extends SubWindowContent {
          * The same entry with a sprite that lights: under the pointer,
          * and for as long as the row is {@code chosen}.
          */
-        Entry withSprite(LostTalesUiSheet sprite, LostTalesUiSheet litSprite,
-                         boolean chosen) {
+        public Entry withSprite(LostTalesUiSheet sprite,
+                                LostTalesUiSheet litSprite, boolean chosen) {
             this.sprite = sprite;
             this.litSprite = litSprite;
             this.chosen = chosen;
             return this;
         }
 
+        /** The same row under another id, everything else as it is: a page's row in the quick switcher. */
+        Entry renamed(String newId) {
+            Entry copy = new Entry(newId, this.label, this.header,
+                    this.passive, this.dim, this.color, this.icon);
+            copy.chip = this.chip;
+            copy.picture = this.picture;
+            copy.sprite = this.sprite;
+            copy.litSprite = this.litSprite;
+            copy.chosen = this.chosen;
+            copy.labelStyle = this.labelStyle;
+            copy.labelColor = this.labelColor;
+            copy.unavailable = this.unavailable;
+            copy.value = this.value;
+            copy.valueChip = this.valueChip;
+            copy.keys = this.keys;
+            copy.group = this.group;
+            return copy;
+        }
+
         /** Whether a press on the row does something. */
-        boolean isTakeable() {
+        public boolean isTakeable() {
             return !this.header && !this.passive
                     && this.unavailable.length() == 0;
         }
     }
 
-    /** The head a row wears: an account's, or a character skin's. */
-    static final class ChatHeadOwner {
-        final UUID owner;
-        final String skinId;
-
-        ChatHeadOwner(UUID owner, String skinId) {
-            this.owner = owner;
-            this.skinId = skinId == null ? "" : skinId;
-        }
-    }
 
     /** Where the field and the rows stand in a content box, in whole pixels. */
     private static final class Layout {
@@ -302,13 +320,15 @@ public final class ChatMenu extends SubWindowContent {
         }
     }
 
-    final SubWindowKind kind;
+    public final SubWindowKind kind;
+    /** The menus of the screen it stands on; a menu that comes back with a new screen takes that screen's. */
+    private Owner owner;
     /**
-     * What the menu is about, {@link ChatScreenMenus}' own: the message,
-     * the person, the tab or the window it was opened for; null for a
-     * menu about nothing in particular.
+     * What the menu is about, its owner's own: the message, the person,
+     * the tab or the window it was opened for; null for a menu about
+     * nothing in particular.
      */
-    Object about;
+    private Object about;
     private String title = "";
     private LostTalesUiSheet icon;
     private List<Entry> entries = Collections.emptyList();
@@ -322,30 +342,28 @@ public final class ChatMenu extends SubWindowContent {
     private double scrollRows;
     /**
      * The row offset the list is drawn at, easing toward
-     * {@link #scrollRows} with the chat's shared scroll motion so a
+     * {@link #scrollRows} with the windows' shared scroll motion so a
      * wheel turn glides the rows instead of jumping them. Hit testing
      * reads this too, so it always answers for what is on screen.
      */
     private double renderedScrollRows;
     private long scrollNanos;
     /**
-     * The field above the rows — the chat's one text field, caret,
+     * The field above the rows — the windows' one text field, caret,
      * selection and clipboard and all — or null for a menu without one.
      * It holds the keys from its window coming in front until a row is
      * taken.
      */
-    private ChatInputField field;
+    private GuiTextField field;
     /** What the empty field reads while nothing has been typed. */
     private String filterPrompt = "";
     /** The icon the field opens with: the magnifier for a search. */
     private LostTalesUiSheet fieldIcon = LostTalesUiSheet.SEARCH;
     /** The keys of the shortcut shown beside it, or empty for none. */
     private int[] filterHint = NO_KEYS;
-    /** Whether the field shows its emoji, and offers the emoji list: a status line's does. */
-    private boolean fieldShowsEmoji;
-    /** The emoji list the field opens while a {@code :name} is typed at its caret. */
-    private final ChatEmojiSuggestionBox emojiList = new ChatEmojiSuggestionBox();
-    /** Where the field's row stood as it was last drawn: the emoji list hangs above it. */
+    /** The list the field opens as it is typed in — a status line's emoji list — or null. */
+    private WindowFields.FieldList fieldList;
+    /** Where the field's row stood as it was last drawn: its list hangs above it. */
     private int fieldRowLeft;
     private int fieldRowTop;
     /**
@@ -358,20 +376,34 @@ public final class ChatMenu extends SubWindowContent {
     private final Map<String, Float> labelFades = new HashMap<String, Float>();
     private long spriteNanos;
 
-    ChatMenu(SubWindowKind kind) {
+    MenuWindow(SubWindowKind kind, Owner owner) {
         this.kind = kind;
+        this.owner = owner;
     }
 
-    /* ---- What the screen's menus hand it ---- */
+    /* ---- What its owner hands it ---- */
+
+    /** What the menu is about; null for nothing in particular. */
+    public Object about() {
+        return this.about;
+    }
+
+    void setAbout(Object subject) {
+        this.about = subject;
+    }
+
+    void setOwner(Owner menus) {
+        this.owner = menus;
+    }
 
     /** The name and the glyph on the window's strip. */
-    void setTitle(String title, LostTalesUiSheet icon) {
+    public void setTitle(String title, LostTalesUiSheet icon) {
         this.title = title == null ? "" : title;
         this.icon = icon;
     }
 
     /** How tall every row is: a menu's own, or taller to hold key icons. */
-    void setRowHeight(int height) {
+    public void setRowHeight(int height) {
         this.rowHeight = Math.max(ROW_HEIGHT, height);
     }
 
@@ -380,7 +412,7 @@ public final class ChatMenu extends SubWindowContent {
      * each row's light carried on, so a list handed over again as it is
      * typed into, or as what it says changes, does not jump.
      */
-    void setRows(List<Entry> rows) {
+    public void setRows(List<Entry> rows) {
         this.entries = rows == null ? Collections.<Entry>emptyList()
                 : new ArrayList<Entry>(rows);
         boolean swatches = false;
@@ -392,7 +424,7 @@ public final class ChatMenu extends SubWindowContent {
             }
             swatches |= entry.color >= 0;
             chips |= entry.color >= 0 && entry.chip;
-            icons |= entry.icon != null || entry.head != null
+            icons |= entry.icon != null || entry.picture != null
                     || entry.sprite != null;
         }
         // One swatch column and one icon column for the whole list, so
@@ -404,7 +436,7 @@ public final class ChatMenu extends SubWindowContent {
     }
 
     /** The rows, top first. */
-    List<Entry> entries() {
+    public List<Entry> entries() {
         return Collections.unmodifiableList(this.entries);
     }
 
@@ -427,35 +459,31 @@ public final class ChatMenu extends SubWindowContent {
      * status line is drawn once set; any other shows what is typed as it
      * is.
      */
-    void openField(String prompt, int[] hint, LostTalesUiSheet icon,
-                   int limit, boolean showsEmoji) {
-        ChatInputField made = new ChatInputField(
-                Minecraft.getMinecraft().fontRenderer, 0, 0, 1,
-                LostTalesUiCaret.HEIGHT);
-        made.setEnableBackgroundDrawing(false);
-        made.setMaxStringLength(Math.max(1, limit));
-        made.setFocused(false);
-        this.field = showsEmoji ? made.emojiOnly() : made.plainText();
-        this.fieldShowsEmoji = showsEmoji;
+    public void openField(String prompt, int[] hint, LostTalesUiSheet icon,
+                          int limit, boolean showsEmoji) {
+        this.field = WindowFields.make(LostTalesUiCaret.HEIGHT,
+                Math.max(1, limit), showsEmoji);
+        this.field.setFocused(false);
+        this.fieldList = WindowFields.listFor(this.field, showsEmoji);
         this.filterPrompt = prompt == null ? "" : prompt;
         this.filterHint = hint == null ? NO_KEYS : hint;
         this.fieldIcon = icon == null ? LostTalesUiSheet.SEARCH : icon;
     }
 
     /** Takes the field away: the rows alone. */
-    void closeField() {
+    public void closeField() {
         this.field = null;
-        this.fieldShowsEmoji = false;
+        this.fieldList = null;
         this.filterPrompt = "";
         this.filterHint = NO_KEYS;
     }
 
-    boolean hasField() {
+    public boolean hasField() {
         return this.field != null;
     }
 
     /** What has been typed into the field; empty when nothing has, or there is none. */
-    String filter() {
+    public String filter() {
         return this.field == null ? "" : this.field.getText();
     }
 
@@ -463,7 +491,7 @@ public final class ChatMenu extends SubWindowContent {
      * Puts {@code text} in the field, as far as it holds, the caret after
      * it: what a field for editing something opens with.
      */
-    void setFilter(String text) {
+    public void setFilter(String text) {
         if (this.field == null) {
             return;
         }
@@ -482,119 +510,111 @@ public final class ChatMenu extends SubWindowContent {
         }
         String before = this.field.getText();
         this.field.textboxKeyTyped(press.character, press.key);
-        refreshEmojiList();
+        refreshList();
         return !before.equals(this.field.getText());
     }
 
-    /** Brings the emoji list up to date with the field: out while a {@code :name} stands at the caret. */
-    private void refreshEmojiList() {
-        if (this.field != null && this.fieldShowsEmoji
-                && LostTalesConfig.enableChatEmojis) {
-            this.emojiList.update(this.field.getText(),
-                    this.field.getCursorPosition());
-        } else {
-            this.emojiList.update("", 0);
+    /** Brings the field's list up to date with the field. */
+    private void refreshList() {
+        if (this.fieldList != null && this.field != null) {
+            this.fieldList.update(this.field);
         }
     }
 
     /**
-     * Offers a press to the field's emoji list while it is out, as the
-     * bar's list takes one: Up and Down walk it, Tab and Enter take the
-     * emoji. Answers whether the list took the press.
+     * Offers a press to the field's list while it is out: Up and Down
+     * walk it, Tab and Enter take the row chosen. Answers whether the
+     * list took the press.
      */
     boolean serveList(LostTalesKeyPress press) {
-        refreshEmojiList();
-        if (!this.emojiList.isActive()) {
-            return false;
-        }
-        if (press.is(Keyboard.KEY_UP) || press.is(Keyboard.KEY_DOWN)) {
-            this.emojiList.moveSelection(press.is(Keyboard.KEY_UP) ? -1 : 1);
-            return true;
-        }
-        if (press.is(Keyboard.KEY_TAB) || press.is(Keyboard.KEY_RETURN)
-                || press.is(Keyboard.KEY_NUMPADENTER)) {
-            takeEmoji(this.emojiList.getSelected());
-            return true;
-        }
-        return false;
-    }
-
-    /** Takes the emoji on a row of the list, as a press on it does. */
-    void takeListRow(int row) {
-        takeEmoji(this.emojiList.at(row));
-    }
-
-    /**
-     * The emoji in place of the {@code :name} typed at the caret, a space
-     * after it, as the bar takes one from its list.
-     */
-    private void takeEmoji(ChatEmoji emoji) {
-        ChatEmojiSuggester.Query query = this.emojiList.getQuery();
-        if (emoji == null || query == null || this.field == null) {
-            return;
-        }
-        String text = this.field.getText();
-        int start = Math.max(0, Math.min(query.colonIndex, text.length()));
-        int cursor = Math.max(start, Math.min(this.field.getCursorPosition(),
-                text.length()));
-        String replacement = emoji.getShortcode() + " ";
-        this.field.setText(text.substring(0, start) + replacement
-                + text.substring(cursor));
-        this.field.setCursorPosition(Math.min(this.field.getText().length(),
-                start + replacement.length()));
-        refreshEmojiList();
+        refreshList();
+        return this.fieldList != null && this.fieldList.isActive()
+                && this.fieldList.serve(this.field, press);
     }
 
     @Override
     public boolean dismissPopup() {
-        refreshEmojiList();
-        if (!this.emojiList.isActive()) {
+        refreshList();
+        if (this.fieldList == null || !this.fieldList.isActive()) {
             return false;
         }
-        this.emojiList.dismiss();
+        this.fieldList.dismiss();
         return true;
     }
 
-    /** The emoji list, over everything, a clear pixel above the field's row. */
+    /** The field's list, over everything, a clear pixel above the field's row. */
     @Override
     public void drawPopups(Minecraft minecraft, PointerRegions regions,
                     double pointerX, double pointerY) {
-        refreshEmojiList();
-        if (this.emojiList.isActive()) {
-            this.emojiList.draw(minecraft, minecraft.fontRenderer, regions,
-                    listAnchor(), this.fieldRowLeft, pointerX, pointerY);
+        refreshList();
+        if (this.fieldList != null && this.fieldList.isActive()) {
+            this.fieldList.draw(minecraft, regions, this.fieldRowLeft,
+                    this.fieldRowTop, pointerX, pointerY);
         }
     }
 
     @Override
-    public ChatHover popupHoverAt(double x, double y) {
-        FontRenderer font = Minecraft.getMinecraft().fontRenderer;
-        if (!this.emojiList.isActive() || !this.emojiList.contains(font, x, y,
-                listAnchor(), this.fieldRowLeft)) {
+    public WindowHover popupHoverAt(double x, double y) {
+        if (this.fieldList == null || !this.fieldList.isActive()) {
             return null;
         }
-        ChatHover hover = new ChatHover(ChatHover.Kind.FIELD_SUGGESTION);
-        hover.fieldSuggestion = this.emojiList.rowAt(font, x, y, listAnchor(),
-                this.fieldRowLeft);
+        int row = this.fieldList.rowAt(x, y, this.fieldRowLeft,
+                this.fieldRowTop);
+        if (row < -1) {
+            return null;
+        }
+        WindowHover hover = new WindowHover(WindowHover.Kind.SUB_WINDOW);
+        hover.listRow = row;
+        hover.acts = row >= 0;
         return hover;
-    }
-
-    private int listAnchor() {
-        return ChatEmojiSuggestionBox.anchorEndingAt(this.fieldRowTop - 1);
     }
 
     /**
      * A press on the field puts the caret where it landed; answers
      * whether the press was on it.
      */
-    boolean pressField(double x, double y) {
+    private boolean pressField(double x, double y) {
         if (this.field == null || !this.field.isFocused()
                 || !LostTalesUiHitBox.contains(x, y, this.field.xPosition,
                         this.field.yPosition - 2, this.field.width,
-                        LostTalesChatOverlayRenderer.LINE_HEIGHT)) {
+                        WindowStyle.LINE_HEIGHT)) {
             return false;
         }
         this.field.mouseClicked((int)Math.floor(x), this.field.yPosition, 0);
+        return true;
+    }
+
+    /**
+     * A row taken, a row of the field's list taken into the field, or the
+     * field given the caret where the press landed; a right-click takes a
+     * row back where the owner steps settings back.
+     */
+    @Override
+    public boolean pressed(WindowHover hover, double x, double y,
+                           int button) {
+        if (hover.listRow >= 0) {
+            if (button == 0 && this.fieldList != null) {
+                this.fieldList.take(this.field, hover.listRow);
+                refreshList();
+            }
+            return true;
+        }
+        if (hover.menuEntry != null) {
+            if (button == 0 || button == 1) {
+                this.owner.take(this, hover.menuEntry, button == 1);
+            }
+            return true;
+        }
+        if (button == 0) {
+            pressField(x, y);
+        }
+        return true;
+    }
+
+    /** A key for the field while it holds the keys: its owner's. */
+    @Override
+    public boolean keyTyped(char typedChar, int keyCode) {
+        this.owner.keyTyped(this, LostTalesKeyPress.read(typedChar, keyCode));
         return true;
     }
 
@@ -639,7 +659,8 @@ public final class ChatMenu extends SubWindowContent {
 
     /** The width a row takes whole: from the window's edge to its value's end. */
     private int rowWidth(Minecraft minecraft, FontRenderer font, Entry entry) {
-        int label = entry.emojis ? ChatInlineText.width(font, entry.label, "")
+        int label = entry.labelStyle != null
+                ? entry.labelStyle.width(font, entry.label)
                 : font.getStringWidth(entry.label);
         if (entry.header) {
             return PADDING_X + label + PADDING_X;
@@ -679,13 +700,14 @@ public final class ChatMenu extends SubWindowContent {
      * side holds up to {@link #MAX_VISIBLE_ROWS}, and on the other side
      * only where that holds more of them.
      */
-    LostTalesUiHitBox firstContentBox(SubWindowAnchor anchor, LostTalesUiHitBox room) {
+    public LostTalesUiHitBox firstContentBox(SubWindowAnchor anchor,
+                                             LostTalesUiHitBox room) {
         return firstContentBox(anchor, naturalWidth(), room);
     }
 
     /** As above for a window {@code width} wide. */
-    LostTalesUiHitBox firstContentBox(SubWindowAnchor anchor, int width,
-                                      LostTalesUiHitBox room) {
+    public LostTalesUiHitBox firstContentBox(SubWindowAnchor anchor, int width,
+                                             LostTalesUiHitBox room) {
         int roomLeft = (int)Math.ceil(room.left);
         int roomTop = (int)Math.ceil(room.top);
         int roomRight = (int)Math.floor(room.left + room.width);
@@ -720,7 +742,7 @@ public final class ChatMenu extends SubWindowContent {
      * where the right has no room, its top on the other's, as many rows
      * as the room below holds up to {@link #MAX_VISIBLE_ROWS}.
      */
-    LostTalesUiHitBox firstContentBoxBeside(LostTalesUiHitBox sibling,
+    public LostTalesUiHitBox firstContentBoxBeside(LostTalesUiHitBox sibling,
                                             LostTalesUiHitBox room) {
         int width = naturalWidth();
         double roomRight = room.left + room.width;
@@ -750,7 +772,7 @@ public final class ChatMenu extends SubWindowContent {
      * {@link #MAX_VISIBLE_ROWS}: what a keyboard shortcut opens where
      * no control stands to hang it from.
      */
-    LostTalesUiHitBox firstContentBoxCentred(LostTalesUiHitBox room) {
+    public LostTalesUiHitBox firstContentBoxCentred(LostTalesUiHitBox room) {
         int width = naturalWidth();
         int frame = SubWindow.STRIP_HEIGHT + PADDING_Y * 2
                 + fieldHeight();
@@ -789,17 +811,21 @@ public final class ChatMenu extends SubWindowContent {
         return this.fieldIcon.getWidth() + TabIcons.GAP;
     }
 
+    /**
+     * A row the menu takes, or the menu's bare content, which says why a
+     * row it keeps in its place cannot be taken.
+     */
     @Override
-    public ChatHover hoverAt(LostTalesUiHitBox box, double x, double y) {
+    public WindowHover hoverAt(LostTalesUiHitBox box, double x, double y) {
         Layout at = layOut(box);
         clampScroll(at);
         int index = rowIndexAt(at, x, y);
         Entry row = index < 0 ? null : this.entries.get(index);
         boolean takes = row != null && row.isTakeable();
-        ChatHover hover = new ChatHover(takes ? ChatHover.Kind.MENU_ENTRY
-                : ChatHover.Kind.MENU);
+        WindowHover hover = new WindowHover(WindowHover.Kind.SUB_WINDOW);
         hover.menuEntry = takes ? row : null;
-        hover.menuTip = row == null ? "" : row.unavailable;
+        hover.acts = takes;
+        hover.tip = row == null ? "" : row.unavailable;
         return hover;
     }
 
@@ -837,7 +863,7 @@ public final class ChatMenu extends SubWindowContent {
         releaseKeys();
     }
 
-    /** The menu itself comes back with the chat: what it is about, its field and its place in the list. */
+    /** The menu itself comes back with the screen: what it is about, its field and its place in the list. */
     @Override
     public Object sessionState() {
         return this;
@@ -875,7 +901,7 @@ public final class ChatMenu extends SubWindowContent {
         // band, before anything lands on it.
         if (hoveredIndex >= 0) {
             int litTop = firstY + (hoveredIndex - firstRow) * this.rowHeight;
-            LostTalesChatOverlayRenderer.recolourSurface(at.left,
+            WindowStyle.recolourFlat(at.left,
                     Math.max(at.rowsTop, litTop), at.left + at.width,
                     Math.min(at.rowsBottom, litTop + this.rowHeight),
                     surfaceAlpha, LostTalesUiInk.SURFACE_RGB,
@@ -951,7 +977,7 @@ public final class ChatMenu extends SubWindowContent {
         }
         drawRowIcon(minecraft, at, entry, labelTop, hovered, elapsed, alpha);
         int labelRgb = entry.unavailable.length() > 0
-                ? LostTalesChatVisualStyle.asideRgb()
+                ? WindowStyle.asideRgb()
                 : entry.labelColor >= 0 ? entry.labelColor
                 : LostTalesUiInk.IVORY;
         if (entry.icon != null) {
@@ -967,10 +993,10 @@ public final class ChatMenu extends SubWindowContent {
                     alpha);
             right -= value + VALUE_GAP;
         }
-        if (entry.emojis) {
-            // Emoji cannot be cut by the letter; the clip cuts a line
-            // longer than the window at its edge.
-            ChatInlineText.draw(minecraft, font, entry.label,
+        if (entry.labelStyle != null) {
+            // A styled label cannot be cut by the letter; the clip cuts a
+            // line longer than the window at its edge.
+            entry.labelStyle.draw(minecraft, font, entry.label,
                     entry.dim ? "§o" : "", labelLeft, labelTop, labelRgb,
                     alpha);
         } else {
@@ -983,14 +1009,14 @@ public final class ChatMenu extends SubWindowContent {
 
     /**
      * A group's name at the padding, as a header's is, a channel's icon
-     * before it, in the group's own colour — sand for a part of the chat.
+     * before it, in the group's own colour — sand for a part of a system.
      */
     private void drawGroup(Minecraft minecraft, FontRenderer font, Layout at,
                            Entry entry, int labelTop, int alpha) {
         int x = at.left + PADDING_X;
         if (entry.icon != null) {
             entry.icon.drawIcon(minecraft, x,
-                    labelTop + ChatInlineIcons.CONTENT_TOP_OFFSET, alpha,
+                    labelTop + TabIcons.CONTENT_TOP_OFFSET, alpha,
                     TabMark.of(entry.icon));
             x += TabIcons.SLOT + TabIcons.GAP;
         }
@@ -1021,14 +1047,14 @@ public final class ChatMenu extends SubWindowContent {
 
     /**
      * A row's value from {@code x}: a colour's chip, a square on the
-     * words' capitals, then the words in the chat's aside tone, then a
+     * words' capitals, then the words in the aside tone, then a
      * shortcut's keys in the mod's own key icons on the row's middle,
      * words between them a seam's width clear.
      */
     private void drawValue(Minecraft minecraft, FontRenderer font,
                            Entry entry, int x, int rowY, int labelTop,
                            int alpha) {
-        int aside = LostTalesChatVisualStyle.asideRgb();
+        int aside = WindowStyle.asideRgb();
         if (entry.valueChip >= 0) {
             Gui.drawRect(x, labelTop, x + CHIP_WIDTH,
                     labelTop + LostTalesUiInk.CAP_HEIGHT,
@@ -1060,8 +1086,8 @@ public final class ChatMenu extends SubWindowContent {
     }
 
     /**
-     * An icon or a head beside the label as it stands in a message row:
-     * centred on the label's capitals by the chat's one rule, on whole
+     * An icon or a picture beside the label as it stands in a message
+     * row: centred on the label's capitals by the one rule, on whole
      * pixels, since both are pixel art. A row naming a tab wears the
      * tab's own icon, its unread mark in its corner, as the tab does.
      */
@@ -1072,35 +1098,10 @@ public final class ChatMenu extends SubWindowContent {
                 - TabIcons.GAP;
         if (entry.icon != null) {
             entry.icon.drawIcon(minecraft, iconX,
-                    labelTop + ChatInlineIcons.CONTENT_TOP_OFFSET, alpha,
+                    labelTop + TabIcons.CONTENT_TOP_OFFSET, alpha,
                     TabMark.of(entry.icon));
-        } else if (entry.head != null) {
-            // A head drawn as the tabs draw theirs: eight pixels, centred
-            // across the icon's box, fading as one picture.
-            final Minecraft game = minecraft;
-            final ChatHeadOwner head = entry.head;
-            final float headX = iconX + 1.0F;
-            final float headY = labelTop
-                    + LostTalesChatOverlayRenderer.HEAD_TOP_OFFSET;
-            final float opacity = alpha / 255.0F;
-            LostTalesUiFlatLayers.draw(alpha, headX - 1.0F, headY - 1.0F,
-                    headX + 10.0F, headY + 10.0F,
-                    new LostTalesUiFlatLayers.Layers() {
-                        @Override
-                        public void draw() {
-                            if (head.skinId.length() == 0) {
-                                LostTalesCharacterHeadIconRenderer
-                                        .drawAccountHead(game, head.owner,
-                                                headX, headY, 8.0F, 1.0F,
-                                                opacity);
-                            } else {
-                                LostTalesCharacterHeadIconRenderer
-                                        .drawSnapshotHead(game, head.owner,
-                                                head.skinId, headX, headY,
-                                                8.0F, 1.0F, opacity);
-                            }
-                        }
-                    });
+        } else if (entry.picture != null) {
+            entry.picture.draw(minecraft, iconX, labelTop, alpha);
         } else if (entry.sprite != null) {
             // Centred in the icon column and on the label's capitals, the
             // odd pixel left and up.
@@ -1122,11 +1123,11 @@ public final class ChatMenu extends SubWindowContent {
 
     /**
      * The field above the rows: the icon it opens with; what has been
-     * typed, or while it is empty the prompt in the chat's aside tone and
-     * italics, as the input bar's hint is; the shortcut that opens the
+     * typed, or while it is empty the prompt in the aside tone and
+     * italics, as an input bar's hint is; the shortcut that opens the
      * menu at the right end while it is empty and there is room; and the
-     * chat's caret blinking after the text while the field holds the
-     * keys. A hairline under it parts it from the rows.
+     * one caret blinking after the text while the field holds the keys.
+     * A hairline under it parts it from the rows.
      */
     private void drawField(Minecraft minecraft, FontRenderer font, Layout at,
                            int alpha) {
@@ -1141,7 +1142,7 @@ public final class ChatMenu extends SubWindowContent {
         int textY = top + LostTalesUiInk.centredStart(height - 1,
                 LostTalesUiInk.CAP_HEIGHT);
         // The icon stands on the capitals of what is typed beside it, as
-        // every icon in a chat row does.
+        // every icon in a message row does.
         LostTalesUiInk.beginContent();
         this.fieldIcon.drawWithShadow(at.left + PADDING_X,
                 textY + WindowStyle.centredBoxTop(
@@ -1157,23 +1158,17 @@ public final class ChatMenu extends SubWindowContent {
             String prompt = trimmed(font, this.filterPrompt, right - promptX
                     - (hinted ? hintWidth + SWATCH_GAP : 0));
             LostTalesUiInk.drawText(font, "§o" + prompt,
-                    promptX, textY, LostTalesChatVisualStyle.asideRgb(),
-                    alpha);
+                    promptX, textY, WindowStyle.asideRgb(), alpha);
         }
         if (hinted) {
             drawHint(minecraft, font, right - hintWidth, top, height, alpha);
         }
-        // The field itself, the input bar's own, at the window's fade: it
-        // scrolls to its caret as the bar's does.
+        // The field itself, the windows' own, at the window's fade: it
+        // scrolls to its caret as a bar's does.
         this.field.xPosition = textX;
         this.field.yPosition = textY;
         this.field.width = Math.max(1, right - textX - LostTalesUiCaret.WIDTH);
-        ChatInputBar.beginFade(alpha / 255.0F);
-        try {
-            this.field.drawTextBox();
-        } finally {
-            ChatInputBar.endFade();
-        }
+        WindowFields.draw(this.field, alpha);
         Gui.drawRect(at.left + PADDING_X, top + height - 1, right,
                 top + height, LostTalesUiInk.argb(
                         LostTalesUiInk.SURFACE_HIGHLIGHT_RGB,
@@ -1260,7 +1255,7 @@ public final class ChatMenu extends SubWindowContent {
 
     /**
      * Advances the drawn offset toward its target, once per drawn frame;
-     * with chat animations off it simply arrives.
+     * with animations off it simply arrives.
      */
     private void advanceScrollEasing() {
         long now = System.nanoTime();

@@ -1947,8 +1947,8 @@ public final class WindowGestures {
 
     /**
      * Tears the dragged tabs off into a window of their own, placed so
-     * its row lands under the pointer. Refused at the window cap, where
-     * the tabs stay in their row and the drag goes on as a ghost.
+     * its row lands under the pointer. Refused for a locked window, whose
+     * tabs stay in their row while the drag goes on as a ghost.
      */
     private void tearOff(TabDrag drag) {
         // Placed for the window it is about to become, which is as tall

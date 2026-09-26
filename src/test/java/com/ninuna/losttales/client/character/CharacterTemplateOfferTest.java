@@ -33,7 +33,7 @@ public final class CharacterTemplateOfferTest {
         assertEquals("human_male_1", adoption.getSkinId());
         assertEquals("slim", adoption.getBodyTypeId());
         assertEquals("flat", adoption.getChestTypeId());
-        assertEquals("A ranger of the north.", adoption.getDescription());
+        assertEquals("A ranger of the north.", adoption.getHistory());
         assertEquals(34, adoption.getAge());
     }
 

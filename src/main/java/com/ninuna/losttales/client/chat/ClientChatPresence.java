@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
+import com.ninuna.losttales.chat.ChatRoleplayStatus;
 import com.ninuna.losttales.chat.ChatStatusLine;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatPresencePacket;
@@ -46,6 +47,12 @@ public final class ClientChatPresence {
     /** This player's own status lines on the server it is on; none is no entry. */
     private static final Map<ChatPresenceIdentity, String> CHOSEN_LINES =
             new LinkedHashMap<ChatPresenceIdentity, String>();
+    /** The role-play status the server says each shown identity has. */
+    private static final Map<UUID, Map<ChatPresenceIdentity, ChatRoleplayStatus>> SHOWN_ROLEPLAY =
+            new HashMap<UUID, Map<ChatPresenceIdentity, ChatRoleplayStatus>>();
+    /** This player's own role-play statuses on the server it is on; an identity's default is no entry. */
+    private static final Map<ChatPresenceIdentity, ChatRoleplayStatus> CHOSEN_ROLEPLAY =
+            new LinkedHashMap<ChatPresenceIdentity, ChatRoleplayStatus>();
     private static String serverKey = "";
     /**
      * Whether the server follows Discord members' own statuses, which it
@@ -78,9 +85,13 @@ public final class ClientChatPresence {
         CHOSEN.clear();
         SHOWN_LINES.clear();
         CHOSEN_LINES.clear();
+        SHOWN_ROLEPLAY.clear();
+        CHOSEN_ROLEPLAY.clear();
         serverKey = key == null ? "" : key;
         CHOSEN.putAll(ClientChatPresenceChoices.forPlace(serverKey));
         CHOSEN_LINES.putAll(ClientChatPresenceChoices.linesForPlace(serverKey));
+        CHOSEN_ROLEPLAY.putAll(ClientChatPresenceChoices.roleplayForPlace(
+                serverKey));
         statePending = true;
         idle = false;
         sampled = false;
@@ -96,9 +107,12 @@ public final class ClientChatPresence {
                 : packet.getAccounts().entrySet()) {
             Map<ChatPresenceIdentity, String> lines =
                     packet.getLines().get(account.getKey());
+            Map<ChatPresenceIdentity, ChatRoleplayStatus> roleplay =
+                    packet.getRoleplay().get(account.getKey());
             if (account.getValue().isEmpty()) {
                 SHOWN.remove(account.getKey());
                 SHOWN_LINES.remove(account.getKey());
+                SHOWN_ROLEPLAY.remove(account.getKey());
             } else {
                 SHOWN.put(account.getKey(),
                         new HashMap<ChatPresenceIdentity, ChatPresence>(
@@ -106,6 +120,10 @@ public final class ClientChatPresence {
                 SHOWN_LINES.put(account.getKey(), lines == null
                         ? new HashMap<ChatPresenceIdentity, String>()
                         : new HashMap<ChatPresenceIdentity, String>(lines));
+                SHOWN_ROLEPLAY.put(account.getKey(), roleplay == null
+                        ? new HashMap<ChatPresenceIdentity, ChatRoleplayStatus>()
+                        : new HashMap<ChatPresenceIdentity, ChatRoleplayStatus>(
+                                roleplay));
             }
         }
     }
@@ -121,6 +139,56 @@ public final class ClientChatPresence {
         String line = lines == null || identity == null ? null
                 : lines.get(identity);
         return line == null ? "" : ChatStatusLine.clean(line);
+    }
+
+    /**
+     * The role-play status an identity of an account shows; null for an
+     * identity the server says nothing of.
+     */
+    public static synchronized ChatRoleplayStatus roleplayOf(UUID account,
+                                                             ChatPresenceIdentity identity) {
+        Map<ChatPresenceIdentity, ChatRoleplayStatus> shown =
+                account == null ? null : SHOWN_ROLEPLAY.get(account);
+        return shown == null || identity == null ? null : shown.get(identity);
+    }
+
+    /** The role-play status this player chose for one of its identities, its default where none was chosen. */
+    public static synchronized ChatRoleplayStatus chosenRoleplay(
+            ChatPresenceIdentity identity) {
+        ChatRoleplayStatus status = identity == null ? null
+                : CHOSEN_ROLEPLAY.get(identity);
+        return status == null ? ChatRoleplayStatus.defaultFor(identity) : status;
+    }
+
+    /**
+     * Chooses the role-play status of one of this player's identities:
+     * remembered for this server, shown here at once, and told to the
+     * server. The identity's default is no choice at all.
+     */
+    public static void chooseRoleplay(ChatPresenceIdentity identity,
+                                      ChatRoleplayStatus status) {
+        if (identity == null || status == null) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getMinecraft();
+        UUID self = minecraft == null || minecraft.thePlayer == null ? null
+                : minecraft.thePlayer.getUniqueID();
+        String key;
+        synchronized (ClientChatPresence.class) {
+            if (status == ChatRoleplayStatus.defaultFor(identity)) {
+                CHOSEN_ROLEPLAY.remove(identity);
+            } else {
+                CHOSEN_ROLEPLAY.put(identity, status);
+            }
+            Map<ChatPresenceIdentity, ChatRoleplayStatus> shown =
+                    self == null ? null : SHOWN_ROLEPLAY.get(self);
+            if (shown != null && shown.containsKey(identity)) {
+                shown.put(identity, status);
+            }
+            key = serverKey;
+        }
+        ClientChatPresenceChoices.rememberRoleplay(key, identity, status);
+        send();
     }
 
     /** The status line this player set for one of its identities; empty for none. */
@@ -340,7 +408,9 @@ public final class ClientChatPresence {
         synchronized (ClientChatPresence.class) {
             packet = new LostTalesChatPresencePacket(idle,
                     new LinkedHashMap<ChatPresenceIdentity, ChatPresence>(CHOSEN),
-                    new LinkedHashMap<ChatPresenceIdentity, String>(CHOSEN_LINES));
+                    new LinkedHashMap<ChatPresenceIdentity, String>(CHOSEN_LINES),
+                    new LinkedHashMap<ChatPresenceIdentity, ChatRoleplayStatus>(
+                            CHOSEN_ROLEPLAY));
         }
         LostTalesNetworkHandler.CHANNEL.sendToServer(packet);
     }
@@ -351,6 +421,8 @@ public final class ClientChatPresence {
         CHOSEN.clear();
         SHOWN_LINES.clear();
         CHOSEN_LINES.clear();
+        SHOWN_ROLEPLAY.clear();
+        CHOSEN_ROLEPLAY.clear();
         serverKey = "";
         discordStatuses = false;
         statePending = false;

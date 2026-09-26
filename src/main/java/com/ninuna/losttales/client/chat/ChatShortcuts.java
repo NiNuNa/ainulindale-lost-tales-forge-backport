@@ -1,11 +1,10 @@
 package com.ninuna.losttales.client.chat;
 
-import com.ninuna.losttales.client.input.LostTalesInputBinding;
+import com.ninuna.losttales.client.window.MenuWindow;
+import com.ninuna.losttales.client.window.WindowKeys;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
-import net.minecraft.client.Minecraft;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.StatCollector;
 import org.lwjgl.input.Keyboard;
@@ -91,14 +90,14 @@ final class ChatShortcuts {
     }
 
     /** Every area's name over its shortcuts, each a row that is read, not taken. */
-    static List<ChatMenu.Entry> rows() {
-        List<ChatMenu.Entry> rows = new ArrayList<ChatMenu.Entry>();
+    static List<MenuWindow.Entry> rows() {
+        List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
         for (Area area : areas()) {
-            rows.add(ChatMenu.Entry.group(StatCollector.translateToLocal(
+            rows.add(MenuWindow.Entry.group(StatCollector.translateToLocal(
                     area.labelKey), null,
                     LostTalesColors.rgb(LostTalesColors.SAND)));
             for (Shortcut shortcut : area.shortcuts) {
-                rows.add(ChatMenu.Entry.passive(StatCollector.translateToLocal(
+                rows.add(MenuWindow.Entry.passive(StatCollector.translateToLocal(
                         shortcut.labelKey)).withKeys(shown(shortcut.parts)));
             }
         }
@@ -133,7 +132,7 @@ final class ChatShortcuts {
             Object part = parts[index];
             if (part instanceof Integer
                     && ((Integer)part).intValue() == COMMAND) {
-                shown[index] = Integer.valueOf(commandKey());
+                shown[index] = Integer.valueOf(WindowKeys.commandKey());
             } else if (part instanceof Word) {
                 shown[index] = StatCollector.translateToLocal(((Word)part).key);
             } else if (part instanceof String) {
@@ -143,27 +142,6 @@ final class ChatShortcuts {
             }
         }
         return shown;
-    }
-
-    /** The key the chat's shortcuts are made with here. */
-    static int commandKey() {
-        return Minecraft.isRunningOnMac ? Keyboard.KEY_LMETA
-                : Keyboard.KEY_LCONTROL;
-    }
-
-    /** The command key with {@code keys}, held together, as a field's hint names them. */
-    static int[] withCommand(int... keys) {
-        int[] held = new int[keys.length + 1];
-        held[0] = commandKey();
-        System.arraycopy(keys, 0, held, 1, keys.length);
-        return held;
-    }
-
-    /** A key as the search finds it by: its name as a key icon writes it. */
-    static String keyName(int keyCode) {
-        return LostTalesInputBinding.getFallbackLabel(
-                LostTalesInputBinding.Type.KEYBOARD, keyCode)
-                .toLowerCase(Locale.ROOT);
     }
 
     /** Every area, in the order the list shows them. */
@@ -233,6 +211,7 @@ final class ChatShortcuts {
                         shortcut("menus.settings", COMMAND, PLUS, Keyboard.KEY_COMMA),
                         shortcut("menus.open", COMMAND, PLUS, Keyboard.KEY_N),
                         shortcut("menus.tab_search", COMMAND, PLUS, SHIFT, PLUS, Keyboard.KEY_A),
+                        shortcut("menus.switcher", COMMAND, PLUS, Keyboard.KEY_K),
                         shortcut("menus.toggle", CLICK),
                         shortcut("menus.close_front", ESCAPE),
                         shortcut("menus.first_found", RETURN),
@@ -277,7 +256,7 @@ final class ChatShortcuts {
                         shortcut("scrolling.lines", WHEEL),
                         shortcut("scrolling.line", SHIFT, PLUS, WHEEL),
                         shortcut("scrolling.page", PAGE_UP, OR, PAGE_DOWN),
-                        shortcut("scrolling.small_window", WHEEL))
+                        shortcut("scrolling.sub_window", WHEEL))
         };
     }
 }

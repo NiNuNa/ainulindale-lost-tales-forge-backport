@@ -24,7 +24,7 @@ public final class LostTalesLotrMapControlBar {
     private LostTalesLotrMapControlBar() {}
 
     static boolean render(LostTalesLotrMapGui gui) {
-        if (!LostTalesLotrMapLayout.isControlBarVisible(gui)) {
+        if (!LostTalesLotrMapLayout.drawsControlBar(gui)) {
             return false;
         }
         Minecraft minecraft = Minecraft.getMinecraft();

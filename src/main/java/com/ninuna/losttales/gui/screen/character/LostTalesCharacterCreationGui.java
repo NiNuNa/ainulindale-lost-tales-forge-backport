@@ -1,6 +1,7 @@
 package com.ninuna.losttales.gui.screen.character;
 
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
+import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceGameplayProfile;
@@ -147,7 +148,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
     private int waypointIndex;
     private String draftName = "";
     private int draftAge = DEFAULT_AGE;
-    private String draftDescription = "";
+    private String draftHistory = "";
     private boolean unconventionalSettings;
     private boolean showMinecraftCape = true;
     /** None first, then the catalogue in its own order. */
@@ -171,7 +172,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
     private CreatorControl focusedControl;
     private CreatorControl pressedControl;
     private CreatorTextControl nameControl;
-    private CreatorTextControl descriptionControl;
+    private CreatorTextControl historyControl;
     private int scroll;
     private int contentHeight;
 
@@ -244,7 +245,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         this.draftName = template.getName();
         this.draftAge = template.getAge() > 0
                 ? template.getAge() : this.draftAge;
-        this.draftDescription = template.getDescription();
+        this.draftHistory = template.getHistory();
         this.unconventionalSettings = template.hasUnconventionalSettings();
         this.showMinecraftCape = template.isMinecraftCapeVisible();
         int cape = this.capeIds.indexOf(Integer.valueOf(template.getCosmeticCapeId()));
@@ -573,7 +574,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         this.focusedControl = null;
         this.pressedControl = null;
         this.nameControl = null;
-        this.descriptionControl = null;
+        this.historyControl = null;
         this.scroll = 0;
         switch (this.category) {
             case RACE:
@@ -709,13 +710,13 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         }, I18n.format("gui.losttales.character.creator.age.oldest")));
         this.controls.add(new CreatorNote(this.context,
                 I18n.format("gui.losttales.character.creator.age.hint")));
-        this.descriptionControl = new CreatorTextControl(this.context,
-                I18n.format("gui.losttales.character.description"),
-                this.draftDescription, CharacterValidator.MAX_DESCRIPTION_LENGTH,
+        this.historyControl = new CreatorTextControl(this.context,
+                I18n.format("gui.losttales.character.profile.history"),
+                this.draftHistory, CharacterProfile.MAX_SECTION_LENGTH,
                 true);
-        this.controls.add(this.descriptionControl);
+        this.controls.add(this.historyControl);
         this.controls.add(new CreatorNote(this.context,
-                I18n.format("gui.losttales.character.description.hint")));
+                I18n.format("gui.losttales.character.profile.history.hint")));
     }
 
     private void buildOriginPage() {
@@ -1745,7 +1746,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
                 snapshot.getRevision(), this.slotIndex, normalizedName,
                 raceId, genderId, skinId, this.draftAge, factionId,
                 waypointId, this.unconventionalSettings,
-                CharacterValidator.normalizeDescription(this.draftDescription),
+                CharacterValidator.normalizeSection(this.draftHistory),
                 selected(this.bodyTypeIds, this.bodyTypeIndex),
                 selected(this.chestTypeIds, this.chestTypeIndex),
                 this.showMinecraftCape, selectedCapeId());
@@ -1776,7 +1777,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
                 selected(this.bodyTypeIds, this.bodyTypeIndex),
                 selected(this.chestTypeIds, this.chestTypeIndex),
                 selected(this.factionIds, this.factionIndex),
-                CharacterValidator.normalizeDescription(this.draftDescription),
+                CharacterValidator.normalizeSection(this.draftHistory),
                 this.draftAge, this.unconventionalSettings,
                 this.showMinecraftCape, selectedCapeId());
         boolean saved = CharacterTemplateStore.save(
@@ -1797,8 +1798,8 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         if (this.nameControl != null) {
             this.draftName = this.nameControl.getText();
         }
-        if (this.descriptionControl != null) {
-            this.draftDescription = this.descriptionControl.getText();
+        if (this.historyControl != null) {
+            this.draftHistory = this.historyControl.getText();
         }
         this.draftAge = Math.max(CharacterValidator.MIN_AGE,
                 Math.min(CharacterValidator.MAX_AGE, this.draftAge));

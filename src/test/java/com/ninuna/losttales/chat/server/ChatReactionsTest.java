@@ -33,6 +33,8 @@ public final class ChatReactionsTest {
     /** The same custom emoji as {@link #PARROT}, renamed on Discord. */
     private static final String RENAMED = "parrot_dance:556";
     private static final String UNICORN = "🦄";
+    private static final String CHANNEL = "900000000000000001";
+    private static final String OTHER_CHANNEL = "900000000000000002";
 
     @Test
     public void aForeignEmojiComesOnlyFromDiscordAndPlayersJoinIt() {
@@ -42,7 +44,7 @@ public final class ChatReactionsTest {
         assertTrue(reactions.set(PARROT, DISCORD_MEMBER, "Nils", true));
         assertTrue("on a message that carries it, a player may add theirs",
                 reactions.set(PARROT, ALICE, "Aldric", true));
-        assertEquals(1, reactions.gameCount(PARROT));
+        assertTrue(reactions.standOf(PARROT).players());
         assertTrue(reactions.hasForeign());
 
         assertTrue(reactions.set(PARROT, DISCORD_MEMBER, "", false));
@@ -72,11 +74,11 @@ public final class ChatReactionsTest {
     @Test
     public void theSaveRestoresAForeignEmojiAPlayerHoldsAlone() {
         ChatReactions reactions = new ChatReactions();
-        assertTrue(reactions.restore(PARROT, ALICE, "Aldric"));
+        assertTrue(reactions.restore(PARROT, ALICE, "Aldric", ""));
         assertFalse("a reactor twice is still refused",
-                reactions.restore(PARROT, ALICE, "Aldric"));
-        assertFalse(reactions.restore("not_an_emoji", BOB, "Beren"));
-        assertEquals(1, reactions.gameCount(PARROT));
+                reactions.restore(PARROT, ALICE, "Aldric", ""));
+        assertFalse(reactions.restore("not_an_emoji", BOB, "Beren", ""));
+        assertTrue(reactions.standOf(PARROT).players());
         assertTrue(reactions.summaryFor(ALICE).find(PARROT).mine);
     }
 
@@ -88,26 +90,26 @@ public final class ChatReactionsTest {
     @Test
     public void aSavedForeignKeyTheRegistryNowCarriesIsMergedUnderItsName() {
         ChatReactions reactions = new ChatReactions();
-        assertTrue(reactions.restore("grinning", ALICE, "Aldric"));
+        assertTrue(reactions.restore("grinning", ALICE, "Aldric", ""));
         assertFalse(reactions.renamedOnRestore());
-        assertTrue(reactions.restore("😀", DISCORD_MEMBER, "Nils"));
+        assertTrue(reactions.restore("😀", DISCORD_MEMBER, "Nils", ""));
         assertTrue("the same reaction under two keys is kept once",
-                reactions.restore("grinning_face:123", ALICE, "Aldric"));
+                reactions.restore("grinning_face:123", ALICE, "Aldric", ""));
         assertTrue(reactions.renamedOnRestore());
         assertEquals(1, reactions.snapshot().size());
         assertEquals(2, reactions.summaryFor(ALICE).find("grinning").count);
         assertTrue(reactions.summaryFor(ALICE).find("grinning").mine);
         assertFalse(reactions.hasForeign());
         // A kind the save wrote under its own name still takes a reactor once.
-        assertTrue(reactions.restore("smile", BOB, "Beren"));
-        assertFalse(reactions.restore("smile", BOB, "Beren"));
+        assertTrue(reactions.restore("smile", BOB, "Beren", ""));
+        assertFalse(reactions.restore("smile", BOB, "Beren", ""));
 
         ChatReactions reversed = new ChatReactions();
-        assertTrue(reversed.restore("😀", ALICE, "Aldric"));
+        assertTrue(reversed.restore("😀", ALICE, "Aldric", ""));
         assertTrue("whichever key the save wrote first",
-                reversed.restore("grinning", ALICE, "Aldric"));
+                reversed.restore("grinning", ALICE, "Aldric", ""));
         assertEquals(1, reversed.total());
-        assertFalse(reversed.restore("grinning_face:0123", BOB, "Beren"));
+        assertFalse(reversed.restore("grinning_face:0123", BOB, "Beren", ""));
     }
 
     @Test
@@ -183,14 +185,14 @@ public final class ChatReactionsTest {
     @Test
     public void twoKeysOfOneIdAreResolvedByTheReactor() {
         ChatReactions reactions = new ChatReactions();
-        assertTrue(reactions.restore(PARROT, DISCORD_MEMBER, "Nils"));
-        assertTrue(reactions.restore(RENAMED, SECOND_MEMBER, "Ana"));
-        assertTrue(reactions.restore(RENAMED, ALICE, "Aldric"));
+        assertTrue(reactions.restore(PARROT, DISCORD_MEMBER, "Nils", ""));
+        assertTrue(reactions.restore(RENAMED, SECOND_MEMBER, "Ana", ""));
+        assertTrue(reactions.restore(RENAMED, ALICE, "Aldric", ""));
         assertEquals(Arrays.asList(PARROT, RENAMED),
                 reactions.customKeysOf("556"));
-        assertEquals("players on either key count for the emoji",
-                1, reactions.gameCount(PARROT));
-        assertEquals(1, reactions.gameCount(RENAMED));
+        assertTrue("players on either key count for the emoji",
+                reactions.standOf(PARROT).players());
+        assertTrue(reactions.standOf(RENAMED).players());
 
         assertEquals(RENAMED,
                 reactions.discordKeyOf(PARROT, "556", SECOND_MEMBER, false));
@@ -205,17 +207,17 @@ public final class ChatReactionsTest {
     @Test
     public void aModeratorClearOfOneEmojiTakesEveryKeyOfItsId() {
         ChatReactions reactions = new ChatReactions();
-        reactions.restore(PARROT, DISCORD_MEMBER, "Nils");
-        reactions.restore(RENAMED, SECOND_MEMBER, "Ana");
-        reactions.restore(RENAMED, ALICE, "Aldric");
+        reactions.restore(PARROT, DISCORD_MEMBER, "Nils", "");
+        reactions.restore(RENAMED, SECOND_MEMBER, "Ana", "");
+        reactions.restore(RENAMED, ALICE, "Aldric", "");
         reactions.set(UNICORN, DISCORD_MEMBER, "Nils", true);
 
         assertFalse("an id with no key clears nothing, never everything",
-                reactions.clearDiscord(null, "557"));
-        assertFalse(reactions.clearDiscord("pepe:557", "557"));
+                reactions.clearDiscord(null, "557", CHANNEL));
+        assertFalse(reactions.clearDiscord("pepe:557", "557", CHANNEL));
         assertEquals(4, reactions.total());
 
-        assertTrue(reactions.clearDiscord("parrot_party:556", "556"));
+        assertTrue(reactions.clearDiscord("parrot_party:556", "556", CHANNEL));
         assertNull(reactions.summaryFor(ALICE).find(PARROT));
         assertEquals("the player's stays", 1,
                 reactions.summaryFor(ALICE).find(RENAMED).count);
@@ -223,7 +225,7 @@ public final class ChatReactionsTest {
                 reactions.summaryFor(ALICE).find(UNICORN).count);
 
         assertTrue("no emoji and no id is every emoji",
-                reactions.clearDiscord(null, ""));
+                reactions.clearDiscord(null, "", CHANNEL));
         assertNull(reactions.summaryFor(ALICE).find(UNICORN));
         assertEquals(1, reactions.total());
     }
@@ -233,7 +235,7 @@ public final class ChatReactionsTest {
         ChatReactions reactions = new ChatReactions();
         reactions.set(UNICORN, DISCORD_MEMBER, "Nils", true);
         reactions.set(UNICORN, ALICE, "Aldric", true);
-        assertTrue(reactions.clearDiscord(UNICORN));
+        assertTrue(reactions.clearDiscord(UNICORN, "", CHANNEL));
         assertEquals(1, reactions.summaryFor(ALICE).find(UNICORN).count);
         assertTrue(reactions.summaryFor(ALICE).find(UNICORN).mine);
     }
@@ -331,16 +333,46 @@ public final class ChatReactionsTest {
         reactions.set("smile", ALICE, "Aldric", true);
         reactions.set("smile", DISCORD_MEMBER, "Nils", true);
         reactions.set("joy", DISCORD_MEMBER, "Nils", true);
-        assertEquals("the bridge's own reaction stands for the players alone",
-                1, reactions.gameCount("smile"));
-        assertEquals(0, reactions.gameCount("joy"));
+        assertTrue(reactions.standOf("smile").players());
+        assertFalse(reactions.standOf("joy").players());
 
-        assertTrue(reactions.clearDiscord("joy"));
+        assertTrue(reactions.clearDiscord("joy", "", CHANNEL));
         assertNull(reactions.summaryFor(ALICE).find("joy"));
         assertEquals(2, reactions.summaryFor(ALICE).find("smile").count);
 
-        assertTrue(reactions.clearDiscord(null));
+        assertTrue(reactions.clearDiscord(null, "", CHANNEL));
         assertEquals(1, reactions.summaryFor(ALICE).find("smile").count);
-        assertFalse(reactions.clearDiscord(null));
+        assertFalse(reactions.clearDiscord(null, "", CHANNEL));
+    }
+
+    /**
+     * The bot is one member on Discord, so its reaction on the copy in a
+     * Discord channel stands for everyone who reacted anywhere else, and
+     * a moderator's clear there takes only what was made there.
+     */
+    @Test
+    public void theBotsReactionStandsForEveryoneWhoReactedElsewhere() {
+        ChatReactions reactions = new ChatReactions();
+        assertFalse(reactions.standOf(UNICORN).standsFor(CHANNEL));
+        assertTrue(reactions.set(UNICORN, DISCORD_MEMBER, "Nils", CHANNEL,
+                true));
+        ChatReactions.Stand one = reactions.standOf(UNICORN);
+        assertFalse("not on the copy it was made on", one.standsFor(CHANNEL));
+        assertTrue("on every other linked copy", one.standsFor(OTHER_CHANNEL));
+        assertFalse(one.players());
+
+        assertTrue(reactions.set(UNICORN, SECOND_MEMBER, "Ana", OTHER_CHANNEL,
+                true));
+        assertTrue(reactions.standOf(UNICORN).standsFor(CHANNEL));
+        assertEquals(OTHER_CHANNEL, reactions.originOf(UNICORN, SECOND_MEMBER));
+        assertEquals("", reactions.originOf(UNICORN, ALICE));
+
+        assertTrue(reactions.clearDiscord(UNICORN, "", CHANNEL));
+        assertEquals("the other channel's reaction stays", 1,
+                reactions.summaryFor(ALICE).find(UNICORN).count);
+        assertFalse(reactions.standOf(UNICORN).standsFor(OTHER_CHANNEL));
+        assertTrue(reactions.set(UNICORN, SECOND_MEMBER, "", false));
+        assertEquals("", reactions.originOf(UNICORN, SECOND_MEMBER));
+        assertEquals(ChatReactions.Stand.NOBODY, reactions.standOf(UNICORN));
     }
 }

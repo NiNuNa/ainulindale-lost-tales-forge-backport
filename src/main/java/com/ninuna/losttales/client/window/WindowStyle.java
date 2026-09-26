@@ -10,6 +10,11 @@ import com.ninuna.losttales.gui.style.LostTalesUiRules;
 import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.renderer.OpenGlHelper;
+import net.minecraft.client.renderer.Tessellator;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL14;
+import org.lwjgl.opengl.GLContext;
 
 /**
  * How every window looks, whatever it holds: its surfaces and how
@@ -243,6 +248,71 @@ public final class WindowStyle {
                 boxBottom, surface);
         LostTalesUiWindowFrame.drawEdges(boxLeft, boxTop, boxRight,
                 boxBottom, Math.round(255.0F * share));
+    }
+
+    /** Whether the blend equations a recolour needs are there; asked once. */
+    private static Boolean recolourSupported;
+
+    /** Whether a surface can be recoloured in place rather than laid over. */
+    public static boolean canRecolour() {
+        if (recolourSupported == null) {
+            boolean supported;
+            try {
+                supported = GLContext.getCapabilities().OpenGL14;
+            } catch (RuntimeException unavailable) {
+                supported = false;
+            }
+            recolourSupported = Boolean.valueOf(supported);
+        }
+        return recolourSupported.booleanValue();
+    }
+
+    /**
+     * A stretch of a surface laid in one flat colour — a menu's row, the
+     * timestamp area, the member list — given another colour in place:
+     * the surface's own share there is taken back out, its colour
+     * subtracted at {@code alpha}, and {@code toRgb} at the same alpha
+     * added in its place, so the stretch reads as the surface painted in
+     * the new colour and the world behind it is darkened once. Only for
+     * area the surface covers and nothing has been drawn over since;
+     * where the blend equations are missing the new colour is laid over
+     * the surface instead.
+     */
+    public static void recolourFlat(float left, float top, float right,
+                                    float bottom, int alpha, int fromRgb,
+                                    int toRgb) {
+        int safeAlpha = Math.max(0, Math.min(255, alpha));
+        if (right <= left || bottom <= top || safeAlpha <= 0) {
+            return;
+        }
+        if (!canRecolour()) {
+            LostTalesUiInk.fillRect(left, top, right, bottom,
+                    LostTalesUiInk.argb(toRgb, safeAlpha));
+            return;
+        }
+        try {
+            GL14.glBlendEquation(GL14.GL_FUNC_REVERSE_SUBTRACT);
+            flatQuad(left, top, right, bottom, safeAlpha, fromRgb);
+            GL14.glBlendEquation(GL14.GL_FUNC_ADD);
+            flatQuad(left, top, right, bottom, safeAlpha, toRgb);
+        } finally {
+            GL14.glBlendEquation(GL14.GL_FUNC_ADD);
+        }
+    }
+
+    /** One quad added to the framebuffer at its own alpha, leaving the framebuffer's alpha as it is. */
+    private static void flatQuad(float left, float top, float right,
+                                 float bottom, int alpha, int rgb) {
+        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
+        OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE,
+                GL11.GL_ZERO, GL11.GL_ONE);
+        // The GUI pass culls back faces: the backdrops' own winding.
+        tessellator.setColorRGBA_I(rgb, alpha);
+        tessellator.addVertex(right, bottom, 0.0D);
+        tessellator.addVertex(right, top, 0.0D);
+        tessellator.addVertex(left, top, 0.0D);
+        tessellator.addVertex(left, bottom, 0.0D);
+        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
     }
 
     /** A popup with no row lit. */

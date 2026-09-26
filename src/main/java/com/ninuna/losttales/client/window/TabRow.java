@@ -663,8 +663,6 @@ public final class TabRow {
          * the pointer, since no hand is on an edge.
          */
         public boolean gliding;
-        /** Whether the tool strip hangs under the row; a map's window has none. */
-        public boolean toolStrip = true;
     }
 
     /**
@@ -720,7 +718,7 @@ public final class TabRow {
     static boolean inStripBand(Row row, double mouseY) {
         double y = mouseY - row.fractionY;
         return y >= rowTop(row.rowBottom) && y < row.rowBottom
-                + (row.toolStrip ? WindowPlacement.TOOL_STRIP_HEIGHT : 0);
+                + WindowPlacement.TOOL_STRIP_HEIGHT;
     }
 
     /**
@@ -1167,11 +1165,6 @@ public final class TabRow {
         // tool strip's own surface, which runs under it, as it runs under
         // the strip's rule (Nils).
         float stripLeft = row.offsetX + row.left - STRIP_INSET;
-        if (!row.toolStrip) {
-            regions.addWindow(row.offsetX + row.left - STRIP_INSET,
-                    rowTop(bottom), (int)Math.ceil(stripRight), bottom);
-            return;
-        }
         int toolBottom = bottom + WindowPlacement.TOOL_STRIP_HEIGHT;
         int toolArgb = toolSurfaceArgb();
         this.drawnToolArgb = toolArgb;

@@ -91,6 +91,7 @@ public final class ChatHistoryNbtCodec {
     private static final String TAG_REACTION_REACTORS = "Reactors";
     private static final String TAG_REACTOR_ID = "Id";
     private static final String TAG_REACTOR_NAME = "Name";
+    private static final String TAG_REACTOR_ORIGIN = "Origin";
     private static final String TAG_UUID_MOST = "Most";
     private static final String TAG_UUID_LEAST = "Least";
     /** The Server Console's events, written beside the lines. */
@@ -470,7 +471,11 @@ public final class ChatHistoryNbtCodec {
         return tag;
     }
 
-    /** Each emoji, and under it each reactor by id with the name they reacted as. */
+    /**
+     * Each emoji, and under it each reactor by id with the name they
+     * reacted as, and a Discord member's with the Discord channel they
+     * reacted in.
+     */
     private static NBTTagList writeReactions(ChatReactions reactions) {
         NBTTagList kinds = new NBTTagList();
         for (Map.Entry<String, Map<UUID, String>> kind
@@ -482,6 +487,11 @@ public final class ChatHistoryNbtCodec {
                 NBTTagCompound reactorTag = new NBTTagCompound();
                 writeUuid(reactorTag, TAG_REACTOR_ID, reactor.getKey());
                 reactorTag.setString(TAG_REACTOR_NAME, reactor.getValue());
+                String origin = reactions.originOf(kind.getKey(),
+                        reactor.getKey());
+                if (origin.length() > 0) {
+                    reactorTag.setString(TAG_REACTOR_ORIGIN, origin);
+                }
                 reactors.appendTag(reactorTag);
             }
             kindTag.setTag(TAG_REACTION_REACTORS, reactors);
@@ -494,8 +504,9 @@ public final class ChatHistoryNbtCodec {
      * The reactions an entry was written with, or null when they cannot
      * be read back whole: a list of the wrong kind, an emoji that is no
      * reaction key, a foreign emoji without its layout, a reactor
-     * without an id, one named twice under
-     * one emoji, or more than the bounds allow. Such an entry is
+     * without an id, one named twice under one emoji, a channel that is
+     * no Discord id or one on a player's reaction, or more than the
+     * bounds allow. Such an entry is
      * quarantined whole rather than kept with part of its reactions.
      */
     private static ChatReactions readReactions(NBTTagCompound raw,
@@ -531,13 +542,31 @@ public final class ChatHistoryNbtCodec {
                 NBTTagCompound reactor = reactors.getCompoundTagAt(index);
                 UUID id = reactor.hasKey(TAG_REACTOR_ID + TAG_UUID_MOST)
                         ? readUuid(reactor, TAG_REACTOR_ID) : null;
-                if (id == null || !reactions.restore(emoji, id,
-                        reactor.getString(TAG_REACTOR_NAME))) {
+                String origin = reactor.getString(TAG_REACTOR_ORIGIN);
+                if (id == null || (origin.length() > 0
+                        && !(isDiscordChannelId(origin)
+                                && LostTalesChatMessagePacket.isDiscordSender(id)))
+                        || !reactions.restore(emoji, id,
+                                reactor.getString(TAG_REACTOR_NAME), origin)) {
                     return null;
                 }
             }
         }
         return reactions;
+    }
+
+    /** A Discord channel's id: one to twenty digits. */
+    private static boolean isDiscordChannelId(String value) {
+        if (value.length() == 0 || value.length() > 20) {
+            return false;
+        }
+        for (int index = 0; index < value.length(); index++) {
+            char each = value.charAt(index);
+            if (each < '0' || each > '9') {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static EntryReadResult readEntry(NBTTagCompound raw) {

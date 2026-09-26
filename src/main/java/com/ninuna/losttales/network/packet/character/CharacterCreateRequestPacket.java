@@ -23,7 +23,7 @@ public final class CharacterCreateRequestPacket implements IMessage {
     private String raceId = "";
     private String genderId = "";
     private String skinId = "";
-    private String description = "";
+    private String history = "";
     private int age;
     private String startingFactionId = "";
     private String startingWaypointId = "";
@@ -47,7 +47,7 @@ public final class CharacterCreateRequestPacket implements IMessage {
         this.raceId = request.getRaceId();
         this.genderId = request.getGenderId();
         this.skinId = request.getSkinId();
-        this.description = request.getDescription();
+        this.history = request.getHistory();
         this.age = request.getAge();
         this.startingFactionId = request.getStartingFactionId();
         this.startingWaypointId = request.getStartingWaypointId();
@@ -70,8 +70,8 @@ public final class CharacterCreateRequestPacket implements IMessage {
                     buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             this.skinId = CharacterPacketCodec.readString(
                     buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-            this.description = CharacterPacketCodec.readString(
-                    buffer, CharacterPacketCodec.MAX_DESCRIPTION_BYTES);
+            this.history = CharacterPacketCodec.readString(
+                    buffer, CharacterPacketCodec.MAX_SECTION_BYTES);
             this.age = buffer.readInt();
             this.startingFactionId = CharacterPacketCodec.readString(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             this.startingWaypointId = CharacterPacketCodec.readString(
@@ -113,7 +113,7 @@ public final class CharacterCreateRequestPacket implements IMessage {
         CharacterPacketCodec.writeString(
                 buffer, this.skinId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
         CharacterPacketCodec.writeString(
-                buffer, this.description, CharacterPacketCodec.MAX_DESCRIPTION_BYTES);
+                buffer, this.history, CharacterPacketCodec.MAX_SECTION_BYTES);
         buffer.writeInt(this.age);
         CharacterPacketCodec.writeString(buffer, this.startingFactionId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
         CharacterPacketCodec.writeString(buffer, this.startingWaypointId,
@@ -141,7 +141,7 @@ public final class CharacterCreateRequestPacket implements IMessage {
                 this.startingFactionId,
                 this.startingWaypointId,
                 this.unconventionalSettings,
-                this.description,
+                this.history,
                 this.bodyTypeId,
                 this.chestTypeId,
                 this.showMinecraftCape,

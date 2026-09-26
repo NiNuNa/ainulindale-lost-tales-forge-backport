@@ -46,12 +46,4 @@ public final class LostTalesChatMotionTest {
         assertEquals(0.0F,
                 LostTalesChatMotion.message(1.0F).slideOffsetX, EPSILON);
     }
-
-    @Test
-    public void motionInputsAreClamped() {
-        assertEquals(LostTalesChatMotion.inputOffset(0.0F),
-                LostTalesChatMotion.inputOffset(-2.0F), EPSILON);
-        assertEquals(0.0F,
-                LostTalesChatMotion.inputOffset(2.0F), EPSILON);
-    }
 }

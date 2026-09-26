@@ -932,12 +932,16 @@ public final class LostTalesChatVisualStyle {
                 // bubble reads as a smudge.
                 width = ChatReplyMarker.ICON_SLOT_WIDTH;
                 Integer quoteColor = ChatReplyMarker.colorOf(part);
-                LostTalesUiSheet bubble = LostTalesUiSheet.SPEECH_BUBBLE;
+                // A forward opens with the forward arrow, standing where
+                // the bubble's middle would.
+                LostTalesUiSheet bubble = ChatReplyMarker.isForwardIcon(part)
+                        ? LostTalesUiSheet.FORWARD : LostTalesUiSheet.SPEECH_BUBBLE;
                 bubble.drawSilhouette(shadowPass ? LostTalesUiInk.SHADOW
                                 : !colours || quoteColor == null ? LostTalesUiInk.IVORY
                                         : quoteColor.intValue(),
-                        cursor, y + WindowStyle
-                                .centredBoxTop(bubble.getHeight()),
+                        cursor + (LostTalesUiSheet.SPEECH_BUBBLE.getWidth()
+                                - bubble.getWidth()) / 2,
+                        y + WindowStyle.centredBoxTop(bubble.getHeight()),
                         alpha);
             } else if (ChatChannelLinkMarker.isIconSlot(part)) {
                 // The bubble of a link to a message, in the link's own

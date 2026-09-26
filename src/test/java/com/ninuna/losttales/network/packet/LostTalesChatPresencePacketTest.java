@@ -6,6 +6,7 @@ import static org.junit.Assert.assertTrue;
 
 import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
+import com.ninuna.losttales.chat.ChatRoleplayStatus;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import java.util.Collections;
@@ -16,8 +17,9 @@ import org.junit.Test;
 
 /**
  * A player's stated presence and the server's word on what accounts
- * show both survive the wire; anything outside their bounds is refused
- * whole, and neither carries a status it has no business carrying.
+ * show both survive the wire, role-play statuses with them; anything
+ * outside their bounds is refused whole, and neither carries a status it
+ * has no business carrying.
  */
 public final class LostTalesChatPresencePacketTest {
     private static final UUID STEVE = new UUID(1L, 2L);
@@ -40,8 +42,18 @@ public final class LostTalesChatPresencePacketTest {
         // An identity may have a line and no choice of status.
         lines.put(ChatPresenceIdentity.character(ALEX), "Brewing");
         lines.put(ChatPresenceIdentity.ACCOUNT, "   ");
+        Map<ChatPresenceIdentity, ChatRoleplayStatus> roleplay =
+                new LinkedHashMap<ChatPresenceIdentity, ChatRoleplayStatus>();
+        roleplay.put(ChatPresenceIdentity.ACCOUNT,
+                ChatRoleplayStatus.LOOKING_FOR_SCENE);
+        // An identity's own default is no choice, and does not travel.
+        roleplay.put(ChatPresenceIdentity.character(ALDRIC),
+                ChatRoleplayStatus.IN_CHARACTER);
+        roleplay.put(ChatPresenceIdentity.character(ALEX),
+                ChatRoleplayStatus.OUT_OF_CHARACTER);
         ByteBuf wire = Unpooled.buffer();
-        new LostTalesChatPresencePacket(true, choices, lines).toBytes(wire);
+        new LostTalesChatPresencePacket(true, choices, lines, roleplay)
+                .toBytes(wire);
         LostTalesChatPresencePacket decoded = new LostTalesChatPresencePacket();
         decoded.fromBytes(wire);
         assertFalse(decoded.isMalformed());
@@ -55,13 +67,18 @@ public final class LostTalesChatPresencePacketTest {
                 decoded.getLines().get(ChatPresenceIdentity.character(ALDRIC)));
         assertEquals("Brewing",
                 decoded.getLines().get(ChatPresenceIdentity.character(ALEX)));
+        assertEquals(2, decoded.getRoleplay().size());
+        assertEquals(ChatRoleplayStatus.LOOKING_FOR_SCENE,
+                decoded.getRoleplay().get(ChatPresenceIdentity.ACCOUNT));
+        assertEquals(ChatRoleplayStatus.OUT_OF_CHARACTER, decoded.getRoleplay()
+                .get(ChatPresenceIdentity.character(ALEX)));
     }
 
     @Test
     public void offlineIsNeverSentAsAChoice() {
         LostTalesChatPresencePacket packet = new LostTalesChatPresencePacket(
                 false, Collections.singletonMap(ChatPresenceIdentity.ACCOUNT,
-                        ChatPresence.OFFLINE), null);
+                        ChatPresence.OFFLINE), null, null);
         assertTrue(packet.getChoices().isEmpty());
     }
 
@@ -104,9 +121,14 @@ public final class LostTalesChatPresencePacketTest {
         long_.writeByte(0x80 | (over & 0x7F)).writeByte(over >>> 7);
         long_.writeBytes(new byte[over]);
         assertBadStatement(long_);
+        // A role-play status this build does not know.
+        assertBadStatement(Unpooled.buffer().writeByte(0).writeByte(0)
+                .writeByte(0).writeByte(1)
+                .writeByte(LostTalesChatPresencePacket.KIND_ACCOUNT)
+                .writeByte(9));
         // Something after the end.
         assertBadStatement(Unpooled.buffer().writeByte(0).writeByte(0)
-                .writeByte(0).writeByte(0));
+                .writeByte(0).writeByte(0).writeByte(0));
     }
 
     @Test
@@ -127,7 +149,10 @@ public final class LostTalesChatPresencePacketTest {
         steveLines.put(ChatPresenceIdentity.character(ALEX), "Hidden");
         ByteBuf wire = Unpooled.buffer();
         new LostTalesChatPresenceSyncPacket(accounts,
-                Collections.singletonMap(STEVE, steveLines)).toBytes(wire);
+                Collections.singletonMap(STEVE, steveLines),
+                Collections.singletonMap(STEVE, Collections.singletonMap(
+                        ChatPresenceIdentity.character(ALDRIC),
+                        ChatRoleplayStatus.LOOKING_FOR_SCENE))).toBytes(wire);
         LostTalesChatPresenceSyncPacket decoded = new LostTalesChatPresenceSyncPacket();
         decoded.fromBytes(wire);
         assertFalse(decoded.isMalformed());
@@ -137,6 +162,14 @@ public final class LostTalesChatPresencePacketTest {
                         ChatPresenceIdentity.character(ALDRIC), "Out hunting"),
                 decoded.getLines().get(STEVE));
         assertTrue(decoded.getLines().get(ALEX).isEmpty());
+        // Every identity shown travels with its status, its default where
+        // none was given.
+        assertEquals(ChatRoleplayStatus.LOOKING_FOR_SCENE, decoded
+                .getRoleplay().get(STEVE).get(ChatPresenceIdentity.character(
+                        ALDRIC)));
+        assertEquals(ChatRoleplayStatus.OUT_OF_CHARACTER, decoded
+                .getRoleplay().get(STEVE).get(ChatPresenceIdentity.ACCOUNT));
+        assertTrue(decoded.getRoleplay().get(ALEX).isEmpty());
     }
 
     /** A full batch stays inside what one payload may carry. */
@@ -172,7 +205,8 @@ public final class LostTalesChatPresencePacketTest {
             lines.put(id, said);
         }
         ByteBuf wire = Unpooled.buffer();
-        new LostTalesChatPresenceSyncPacket(accounts, lines).toBytes(wire);
+        new LostTalesChatPresenceSyncPacket(accounts, lines, null)
+                .toBytes(wire);
         assertTrue(wire.readableBytes() < 32767);
         LostTalesChatPresenceSyncPacket decoded = new LostTalesChatPresenceSyncPacket();
         decoded.fromBytes(wire);
@@ -186,7 +220,7 @@ public final class LostTalesChatPresencePacketTest {
         shown.put(ChatPresenceIdentity.ACCOUNT, ChatPresence.INVISIBLE);
         shown.put(ChatPresenceIdentity.character(ALDRIC), ChatPresence.OFFLINE);
         LostTalesChatPresenceSyncPacket packet = new LostTalesChatPresenceSyncPacket(
-                Collections.singletonMap(STEVE, shown), null);
+                Collections.singletonMap(STEVE, shown), null, null);
         assertTrue(packet.getAccounts().get(STEVE).isEmpty());
     }
 
@@ -214,6 +248,12 @@ public final class LostTalesChatPresencePacketTest {
         assertBadSync(Unpooled.buffer().writeShort(
                 LostTalesChatPresenceSyncPacket.MAX_ACCOUNTS + 1));
         assertBadSync(Unpooled.buffer().writeShort(0).writeByte(0));
+        ByteBuf unknown = Unpooled.buffer().writeShort(1);
+        writeAccount(unknown, STEVE, 1);
+        unknown.writeByte(LostTalesChatPresencePacket.KIND_ACCOUNT)
+                .writeByte(ChatPresence.ONLINE.code()).writeByte(0)
+                .writeByte(9);
+        assertBadSync(unknown);
     }
 
     private static void writeAccount(ByteBuf buffer, UUID account, int shown) {

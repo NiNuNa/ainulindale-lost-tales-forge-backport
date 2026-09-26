@@ -2,6 +2,7 @@ package com.ninuna.losttales.proxy;
 
 import com.ninuna.losttales.chat.server.ChatIdentitySelection;
 import com.ninuna.losttales.network.packet.LostTalesChatIdentitySyncPacket;
+import com.ninuna.losttales.network.packet.character.CharacterProfilePacket;
 import java.io.File;
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.LostTalesMetaData;
@@ -328,6 +329,8 @@ public class LostTalesCommonProxy {
     public void handleCharacterOperationResult(CharacterOperationResultPacket packet) {}
 
     public void handleCharacterAppearanceSync(CharacterAppearanceSyncPacket packet) {}
+
+    public void handleCharacterProfile(CharacterProfilePacket packet) {}
 
     public void handleCharacterCreationCatalogSync(CharacterCreationCatalogSyncPacket packet) {}
 

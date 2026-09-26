@@ -4,7 +4,6 @@ import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.client.window.PageTab;
 import com.ninuna.losttales.client.window.TabSelection;
 import com.ninuna.losttales.client.window.Window;
-import com.ninuna.losttales.client.window.WindowGestures;
 import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowPlacement;
 import com.ninuna.losttales.client.window.WindowTab;
@@ -89,15 +88,15 @@ public final class ChatTabActions {
         // the selection just changed or the layout came back from its
         // file with another tab in front; setting what is already set
         // changes nothing.
-        // A page brought in front of the tab typed in sends the input to
+        // A page brought in front of the tab typed in lends the input to
         // the conversation in front of the window last brought forward,
         // which stays where it stands; with none, the input waits behind
-        // the page with no bar.
+        // the page with no bar. The covered tab stays the last used.
         boolean moved = false;
         if (WindowLayout.showsPage(WindowLayout.windowOf(selected))) {
             ChatTab elsewhere = frontConversationElsewhere();
             if (elsewhere != null) {
-                ClientChatChannelState.select(elsewhere);
+                ClientChatChannelState.lendInput(elsewhere);
                 selected = ClientChatChannelState.getSelected();
                 moved = true;
             }

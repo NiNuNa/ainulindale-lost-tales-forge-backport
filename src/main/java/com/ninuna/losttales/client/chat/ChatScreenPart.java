@@ -15,14 +15,14 @@ import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.input.LostTalesKeyPress;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
 import com.ninuna.losttales.client.quest.ClientQuestCatalog;
+import com.ninuna.losttales.client.window.MenuWindow;
+import com.ninuna.losttales.client.window.PageTab;
 import com.ninuna.losttales.client.window.ScreenPart;
 import com.ninuna.losttales.client.window.SubWindow;
 import com.ninuna.losttales.client.window.SubWindowAnchor;
-import com.ninuna.losttales.client.window.SubWindowKind;
 import com.ninuna.losttales.client.window.SubWindowPlaces;
 import com.ninuna.losttales.client.window.TabMark;
 import com.ninuna.losttales.client.window.TabRow;
-import com.ninuna.losttales.client.window.ToolStrip;
 import com.ninuna.losttales.client.window.WheelStep;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowDrawing;
@@ -126,9 +126,8 @@ public final class ChatScreenPart extends ScreenPart {
     /** The selection, and the verbs that open, close and move tabs. */
     private final ChatTabActions tabActions = new ChatTabActions(this.bar,
             this.completion, this.composer);
-    /** Every menu the chat opens, and what their rows do. */
-    private final ChatScreenMenus menus = new ChatScreenMenus(
-            this.tabActions, this.composer, this.notices);
+    /** The chat's own menus, and what their rows do. */
+    private final ChatMenus menus;
     private Minecraft mc;
     private FontRenderer fontRendererObj;
     /** The game's chat field, drawn the chat's way. */
@@ -148,10 +147,36 @@ public final class ChatScreenPart extends ScreenPart {
 
     private ChatScreenPart(WindowScreen screen) {
         super(screen);
+        this.menus = new ChatMenus(screen.menus(), screen.subWindows(),
+                this.tabActions, this.composer, this.notices,
+                new ChatMenus.Host() {
+                    @Override
+                    public void sendCommand(String command) {
+                        ChatScreenPart.this.sendCommand(command);
+                    }
+
+                    @Override
+                    public void identityChosen() {
+                        syncChatIdentity();
+                    }
+
+                    @Override
+                    public void forward(ChatTab tab, long messageId) {
+                        ChatScreenPart.this.outbox.forward(tab, messageId);
+                    }
+                });
+        ChatSettingsSections.addTo(screen.settings(), this.notices);
     }
 
-    /** Gives every window screen opened from now on the chat's part. */
+    /**
+     * Gives every window screen opened from now on the chat's part and
+     * every window's field the chat's look, and registers the chat's kinds
+     * of sub-window before the layout file that remembers their places is
+     * read.
+     */
     public static void install() {
+        ChatSubWindows.install();
+        ChatWindowFields.install();
         WindowScreen.addPart(MAKER);
     }
 
@@ -170,6 +195,25 @@ public final class ChatScreenPart extends ScreenPart {
     }
 
     /* ---- Life ---- */
+
+    /**
+     * Opened by the chat's key, the screen brings back the conversation
+     * last used: in front of its window, over a page there, and the window
+     * over the others.
+     */
+    @Override
+    public void opening(PageTab forPage) {
+        ChatTab last = ClientChatChannelState.lastUsed();
+        if (forPage != null || last == null) {
+            return;
+        }
+        ClientChatChannelState.select(last);
+        WindowLayout.setActiveTab(last);
+        Window window = WindowLayout.windowOf(last);
+        if (window != null) {
+            WindowLayout.raise(window.getId());
+        }
+    }
 
     @Override
     public void beforeInit() {
@@ -223,8 +267,7 @@ public final class ChatScreenPart extends ScreenPart {
         }
         this.composingIdentityKey = ClientChatIdentities.viewIdentityKey();
         this.tabActions.bind(this.mc, styled);
-        this.menus.bind(this.mc, this.fontRendererObj, styled,
-                this.screen.subWindows(), this.screen.width,
+        this.menus.bind(this.mc, styled, this.screen.width,
                 this.screen.height);
         this.tabActions.syncSelection();
     }
@@ -297,11 +340,6 @@ public final class ChatScreenPart extends ScreenPart {
         return this.bar.activeFrame() != null;
     }
 
-    @Override
-    public GuiTextField makeSearchField() {
-        return new ChatInputField(this.screen.font(), 0, 0, 10,
-                ToolStrip.FIELD_HEIGHT).plainText();
-    }
 
     /**
      * Writes {@code token} into the field being typed in as a word of its
@@ -348,53 +386,29 @@ public final class ChatScreenPart extends ScreenPart {
         this.bar.updateInputBounds();
     }
 
+    /** The closed channels, and the people online to open a conversation with. */
     @Override
-    public boolean showTabMenu(WindowTab tab, SubWindowAnchor anchor,
-                               boolean toggle) {
-        this.menus.showTabMenu(tab, anchor, toggle);
-        return true;
-    }
-
-    @Override
-    public boolean showWindowMenu(Window window, SubWindowAnchor anchor,
-                                  boolean toggle) {
-        this.menus.showWindowMenu(window, anchor, toggle);
-        return true;
-    }
-
-    @Override
-    public boolean toggleRestoreMenu(Window window, SubWindowAnchor anchor) {
-        this.menus.toggleChannelMenu(window, anchor, null);
-        return true;
-    }
-
-    @Override
-    public boolean toggleTabSearch(Window window, SubWindowAnchor anchor) {
-        this.menus.toggleSearchPanel(window, anchor, null);
-        return true;
-    }
-
-    @Override
-    public boolean isMenuOpenFor(SubWindowKind kind, Object about) {
-        return this.menus.isOpenFor(kind, about);
+    public void addOpenable(List<MenuWindow.Entry> entries, String filter,
+                            boolean search) {
+        ChatMenus.addOpenable(this.mc, entries, filter, search);
     }
 
     /** Closed channels that can be read, and people online to whisper to. */
     @Override
     public boolean hasRestorable() {
-        return !ChatScreenMenus.restorableChannels().isEmpty()
-                || ChatScreenMenus.hasWhisperCandidates(this.mc);
+        return !ChatMenus.restorableChannels().isEmpty()
+                || ChatMenus.hasWhisperCandidates(this.mc);
     }
 
     @Override
     public TabMark restorableMark() {
-        return ChatScreenMenus.closedMark();
+        return ChatMenus.closedMark();
     }
 
     /** How many unread lines wait in the closed channels, when any do. */
     @Override
     public String restoreTip() {
-        int unread = ChatScreenMenus.closedUnreadCount();
+        int unread = ChatMenus.closedUnreadCount();
         return unread <= 0 ? null : StatCollector.translateToLocalFormatted(
                 "gui.losttales.chat.tab.restore_unread",
                 unread > ClientChatChannelViews.MAX_UNREAD
@@ -460,52 +474,16 @@ public final class ChatScreenPart extends ScreenPart {
             this.composer.cancelComposing(this.inputField);
             return true;
         }
-        // Ctrl+N is the + control by keyboard, and Ctrl+Shift+A the tab
-        // search: both mean something with nothing open, since both are
-        // ways back to a channel, and both are switches, as their
-        // controls are: pressed again, they put the window away.
-        if (press.isCommand(Keyboard.KEY_A) && press.shift) {
-            this.screen.leaveSearchForMenu();
-            this.menus.toggleSearchPanel(WindowLayout.windowOf(
-                    ClientChatChannelState.getSelected()), null,
-                    emptyPlusAnchor());
-            this.screen.syncTypingFocus();
-            return true;
-        }
-        if (press.isCommand(Keyboard.KEY_N)) {
-            this.screen.leaveSearchForMenu();
-            this.menus.toggleChannelMenu(WindowLayout.windowOf(
-                    ClientChatChannelState.getSelected()), null,
-                    emptyPlusAnchor());
-            this.screen.syncTypingFocus();
-            return true;
-        }
-        // Ctrl+, is Settings from anywhere, a switch as the window menu's
-        // row is.
-        if (press.isCommand(Keyboard.KEY_COMMA)) {
-            this.screen.leaveSearchForMenu();
-            this.menus.toggleSettings();
-            this.screen.syncTypingFocus();
-            return true;
-        }
         return false;
     }
 
     /**
-     * A key for the field of the sub-window in front: a menu's goes to
-     * the menus, which may send a command; Enter in a picker's search
-     * takes the first cell it found; anything else is the field's own.
+     * A key for the field of the sub-window in front: Enter in a picker's
+     * search takes the first cell it found; anything else is the field's
+     * own.
      */
     @Override
     public boolean keyIntoSubWindow(SubWindow front, LostTalesKeyPress press) {
-        if (front.content instanceof ChatMenu) {
-            String command = this.menus.keyTyped(front, press);
-            syncChatIdentity();
-            if (command != null) {
-                sendCommand(command);
-            }
-            return true;
-        }
         if ((press.key == Keyboard.KEY_RETURN
                 || press.key == Keyboard.KEY_NUMPADENTER)
                 && front.content instanceof ChatPickerPanel) {
@@ -608,6 +586,7 @@ public final class ChatScreenPart extends ScreenPart {
             return true;
         }
         this.screen.vanillaKeyTyped(press.character, keyCode);
+        ClientChatChannelState.markUsed();
         maybeSpaceTypedShortcode(press.character);
         enforceLimit();
         this.completion.refreshAfterTyping();
@@ -810,13 +789,9 @@ public final class ChatScreenPart extends ScreenPart {
             return null;
         }
         switch (chat.chatKind) {
-            case MENU:
-                // A row the menu keeps in its place but cannot take says
-                // why.
-                return chat.menuTip;
             case EMPTY_PLUS:
                 return StatCollector.translateToLocal(
-                        "gui.losttales.chat.tab.restore");
+                        "gui.losttales.window.tab.restore");
             case REPLY_CHIP:
                 return StatCollector.translateToLocal(
                         "gui.losttales.chat.message.cancel_reply");
@@ -907,16 +882,12 @@ public final class ChatScreenPart extends ScreenPart {
         // The + is the whole of the screen's furniture here, a switch
         // like every +.
         if (button == 0 && ChatHover.is(press, ChatHover.Kind.EMPTY_PLUS)) {
-            this.menus.toggleChannelMenu(null, emptyPlusAnchor(), null);
+            this.screen.toggleOpenFromEmpty();
         }
         return true;
     }
 
-    /**
-     * A press on a menu or a picker, which has just come in front: a
-     * menu's row is taken, a picker's cell chosen, a field's list row
-     * taken, a menu's field given the caret.
-     */
+    /** A press on a picker, which has just come in front: a cell chosen, a label folded. */
     @Override
     public boolean pressSubWindow(WindowHover hover, double x, double y,
                                   int button) {
@@ -925,37 +896,10 @@ public final class ChatScreenPart extends ScreenPart {
             return false;
         }
         switch (press.chatKind) {
-            case MENU_ENTRY:
-                if (button == 0) {
-                    String command = this.menus.take(press.subWindow,
-                            press.menuEntry);
-                    syncChatIdentity();
-                    if (command != null) {
-                        sendCommand(command);
-                    }
-                } else if (button == 1) {
-                    this.menus.takeBack(press.subWindow, press.menuEntry);
-                }
-                return true;
             case PICKER_CELL:
             case PICKER_LABEL:
             case PICKER:
                 clickPickerWindow(press, x, y, button);
-                return true;
-            case FIELD_SUGGESTION:
-                if (button == 0 && press.fieldSuggestion >= 0
-                        && press.subWindow.content instanceof ChatMenu) {
-                    ((ChatMenu)press.subWindow.content).takeListRow(
-                            press.fieldSuggestion);
-                }
-                return true;
-            case MENU:
-                // A press on a menu's field puts its caret there.
-                if (button == 0 && press.subWindow.content instanceof ChatMenu) {
-                    ((ChatMenu)press.subWindow.content).pressField(
-                            x - press.subWindow.fractionX,
-                            y - press.subWindow.fractionY);
-                }
                 return true;
             default:
                 return false;
@@ -1271,23 +1215,19 @@ public final class ChatScreenPart extends ScreenPart {
     /**
      * The chat's sub-windows open as the screen last closed come back
      * where they stood: pickers whose buttons the bar still offers, the
-     * Reactions window while the chat's emoji are on, every card, and
-     * every menu whose subject still stands.
+     * Reactions window while the chat's emoji are on, and every card. Its
+     * menus come back with the screen's.
      */
     @Override
     public boolean reopen(SubWindowPlaces.Reopening open) {
-        if (open.state instanceof ChatMenu) {
-            this.menus.restore(open);
-            return true;
-        }
-        if (open.kind == SubWindowKind.CARD) {
+        if (open.kind == ChatSubWindows.CARD) {
             if (open.state instanceof LostTalesChatHoverCard.Target) {
                 this.screen.subWindows().reopen(open, new ChatPersonCard(
                         (LostTalesChatHoverCard.Target)open.state));
             }
             return true;
         }
-        if (open.kind == SubWindowKind.REACTIONS) {
+        if (open.kind == ChatSubWindows.REACTIONS) {
             if (open.state instanceof Long
                     && LostTalesConfig.enableChatEmojis) {
                 this.screen.subWindows().reopen(open,
@@ -1315,7 +1255,6 @@ public final class ChatScreenPart extends ScreenPart {
     @Override
     public void drawUnderSubWindows(boolean empty, boolean typing,
                                     double pointerX, double pointerY) {
-        this.menus.refresh();
         WindowHover hover = this.screen.hover();
         if (empty) {
             boolean onPlus = ChatHover.is(hover, ChatHover.Kind.EMPTY_PLUS);
@@ -1352,7 +1291,7 @@ public final class ChatScreenPart extends ScreenPart {
                     this.bar.fractionY() + entrance, 0.0F);
             this.bar.drawBar(barRight);
             this.bar.drawCharacterSelectionButton(controlX, controlY,
-                    this.menus.isOpen(SubWindowKind.CHARACTERS));
+                    this.menus.isOpen(ChatSubWindows.CHARACTERS));
             this.bar.drawIndicator(barRight, controlX, controlY);
             this.bar.drawToolbarToggle(barRight, controlX, controlY);
             this.bar.drawPickerButtons(barRight,
@@ -1408,7 +1347,7 @@ public final class ChatScreenPart extends ScreenPart {
         // identity's own brief card, who the roleplaying channels speak
         // as right now, while the button's own menu is not out.
         if (ChatHover.is(hover, ChatHover.Kind.CHARACTER_BUTTON)
-                && !this.menus.isOpen(SubWindowKind.CHARACTERS)) {
+                && !this.menus.isOpen(ChatSubWindows.CHARACTERS)) {
             LostTalesChatHoverCard.drawForIdentity(this.mc,
                     ClientChatChannelState.getSelected(), mouseX, mouseY,
                     this.screen.width, this.screen.height);
@@ -1765,6 +1704,8 @@ public final class ChatScreenPart extends ScreenPart {
                 return "gui.losttales.chat.message.react";
             case LostTalesChatOverlayRenderer.TOOLBAR_REPLY:
                 return "gui.losttales.chat.message.reply";
+            case LostTalesChatOverlayRenderer.TOOLBAR_FORWARD:
+                return "gui.losttales.chat.message.forward";
             case LostTalesChatOverlayRenderer.TOOLBAR_LINK:
                 return "gui.losttales.chat.message.copy_link";
             case LostTalesChatOverlayRenderer.TOOLBAR_MORE:
@@ -2108,7 +2049,7 @@ public final class ChatScreenPart extends ScreenPart {
         int height = card.naturalHeight(width) + SubWindow.STRIP_HEIGHT;
         int x = LostTalesChatHoverCard.cardX(mouseX, width, this.screen.width);
         int y = LostTalesChatHoverCard.cardY(mouseY, height, this.screen.height);
-        this.screen.subWindows().toggle(SubWindowKind.CARD, target.key(), card,
+        this.screen.subWindows().toggle(ChatSubWindows.CARD, target.key(), card,
                 windowIdAt(mouseX, mouseY),
                 new LostTalesUiHitBox(x, y + SubWindow.STRIP_HEIGHT,
                         width, height - SubWindow.STRIP_HEIGHT));
@@ -2141,8 +2082,20 @@ public final class ChatScreenPart extends ScreenPart {
             case LostTalesChatOverlayRenderer.TOOLBAR_REPLY:
                 replyToLine(frame, chatLineId);
                 break;
+            case LostTalesChatOverlayRenderer.TOOLBAR_FORWARD: {
+                float cellLeft = frame.toolbarCellLeft(press.toolbarKind);
+                this.menus.toggleForward(
+                        ClientChatMessageIds.messageIdOf(chatLineId),
+                        SubWindowAnchor.inward((int)Math.floor(cellLeft),
+                                (int)Math.floor(frame.toolbarTop),
+                                (int)Math.ceil(cellLeft
+                                        + frame.toolbarCellWidth),
+                                (int)Math.ceil(frame.toolbarBottom),
+                                frame, this.screen.width, this.screen.height));
+                break;
+            }
             case LostTalesChatOverlayRenderer.TOOLBAR_LINK:
-                copied = ChatScreenMenus.messageLinkFor(chatLineId);
+                copied = ChatMenus.messageLinkFor(chatLineId);
                 break;
             case LostTalesChatOverlayRenderer.TOOLBAR_MORE: {
                 float cellLeft = frame.toolbarCellLeft(press.toolbarKind);
@@ -2208,7 +2161,7 @@ public final class ChatScreenPart extends ScreenPart {
         String excerpt = "";
         int index = firstRowOf(frame.lines, chatLineId);
         if (index >= 0) {
-            name = ChatScreenMenus.messageAccount(frame.lines, index,
+            name = ChatMenus.messageAccount(frame.lines, index,
                     chatLineId);
             excerpt = LostTalesChatClipboard.messageTextOf(frame.lines,
                     index);
@@ -2515,7 +2468,7 @@ public final class ChatScreenPart extends ScreenPart {
         // In the window the reaction was asked for in: the message's, under
         // the pointer, else the one typed in.
         String at = windowIdAt(this.screen.pointerX(), this.screen.pointerY());
-        this.screen.subWindows().open(SubWindowKind.REACTIONS, "", picker,
+        this.screen.subWindows().open(ChatSubWindows.REACTIONS, "", picker,
                 at != null ? at : typedWindowId(),
                 this.bar.firstPickerBox(picker));
         picker.aimAt(messageId);
@@ -2678,7 +2631,8 @@ public final class ChatScreenPart extends ScreenPart {
      * itself, toward the middle of the screen, which is all there is;
      * null while something is open.
      */
-    private SubWindowAnchor emptyPlusAnchor() {
+    @Override
+    public SubWindowAnchor emptyPlusAnchor() {
         return WindowScreen.isEmpty() ? SubWindowAnchor.inward(
                 this.emptyPlusLeft, this.emptyPlusTop, this.emptyPlusRight,
                 this.emptyPlusBottom, 0.0D, 0.0D, this.screen.width, this.screen.height,

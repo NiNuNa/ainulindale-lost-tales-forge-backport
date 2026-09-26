@@ -39,7 +39,7 @@ public final class CharacterTemplate {
     private final String bodyTypeId;
     private final String chestTypeId;
     private final String startingFactionId;
-    private final String description;
+    private final String history;
     private final int age;
     private final boolean unconventionalSettings;
     private final boolean showMinecraftCape;
@@ -49,17 +49,17 @@ public final class CharacterTemplate {
     public CharacterTemplate(String name, String raceId, String genderId,
                              String skinId, String bodyTypeId,
                              String chestTypeId, String startingFactionId,
-                             String description, int age,
+                             String history, int age,
                              boolean unconventionalSettings) {
         this(name, raceId, genderId, skinId, bodyTypeId, chestTypeId,
-                startingFactionId, description, age, unconventionalSettings,
+                startingFactionId, history, age, unconventionalSettings,
                 true, 0);
     }
 
     public CharacterTemplate(String name, String raceId, String genderId,
                              String skinId, String bodyTypeId,
                              String chestTypeId, String startingFactionId,
-                             String description, int age,
+                             String history, int age,
                              boolean unconventionalSettings,
                              boolean showMinecraftCape, int cosmeticCapeId) {
         this.showMinecraftCape = showMinecraftCape;
@@ -71,7 +71,7 @@ public final class CharacterTemplate {
         this.bodyTypeId = trimmed(bodyTypeId);
         this.chestTypeId = trimmed(chestTypeId);
         this.startingFactionId = trimmed(startingFactionId);
-        this.description = trimmed(description);
+        this.history = trimmed(history);
         this.age = Math.max(0, age);
         this.unconventionalSettings = unconventionalSettings;
     }
@@ -89,7 +89,7 @@ public final class CharacterTemplate {
         return new CharacterTemplate(request.getName(), request.getRaceId(),
                 request.getGenderId(), request.getSkinId(),
                 request.getBodyTypeId(), request.getChestTypeId(),
-                request.getStartingFactionId(), request.getDescription(),
+                request.getStartingFactionId(), request.getHistory(),
                 request.getAge(), request.hasUnconventionalSettings(),
                 request.isMinecraftCapeVisible(), request.getCosmeticCapeId());
     }
@@ -101,7 +101,7 @@ public final class CharacterTemplate {
     public String getBodyTypeId() { return this.bodyTypeId; }
     public String getChestTypeId() { return this.chestTypeId; }
     public String getStartingFactionId() { return this.startingFactionId; }
-    public String getDescription() { return this.description; }
+    public String getHistory() { return this.history; }
     public int getAge() { return this.age; }
     public boolean hasUnconventionalSettings() {
         return this.unconventionalSettings;
@@ -120,7 +120,7 @@ public final class CharacterTemplate {
                 && this.bodyTypeId.length() == 0
                 && this.chestTypeId.length() == 0
                 && this.startingFactionId.length() == 0
-                && this.description.length() == 0 && this.age == 0
+                && this.history.length() == 0 && this.age == 0
                 && this.cosmeticCapeId == 0 && this.showMinecraftCape
                 && !this.unconventionalSettings;
     }
@@ -198,7 +198,7 @@ public final class CharacterTemplate {
                 && this.bodyTypeId.equals(that.bodyTypeId)
                 && this.chestTypeId.equals(that.chestTypeId)
                 && this.startingFactionId.equals(that.startingFactionId)
-                && this.description.equals(that.description);
+                && this.history.equals(that.history);
     }
 
     @Override
@@ -210,7 +210,7 @@ public final class CharacterTemplate {
         result = 31 * result + this.bodyTypeId.hashCode();
         result = 31 * result + this.chestTypeId.hashCode();
         result = 31 * result + this.startingFactionId.hashCode();
-        result = 31 * result + this.description.hashCode();
+        result = 31 * result + this.history.hashCode();
         result = 31 * result + this.age;
         result = 31 * result + this.cosmeticCapeId;
         result = 31 * result + (this.showMinecraftCape ? 1 : 0);

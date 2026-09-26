@@ -14,6 +14,8 @@ import org.junit.Test;
 import java.util.Collections;
 import java.util.UUID;
 
+import com.ninuna.losttales.character.model.CharacterProfile;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -116,7 +118,8 @@ public final class LoreCharacterTransferWorldDataTest {
                 .name("Gandalf").race(CharacterRaceRegistry.HUMAN)
                 .gender(CharacterGenderRegistry.MALE).skin(skin).age(18)
                 .startingFaction("lotr:bree").createdAt(1L)
-                .description("A wandering wizard.")
+                .profile(CharacterProfile.EMPTY.withSection(
+                        CharacterProfile.Section.HISTORY, "A wandering wizard."))
                 .build();
     }
 

@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.gui.controlbar;
 
 import com.ninuna.losttales.client.gui.animation.LostTalesControlBarAnimation;
+import com.ninuna.losttales.client.gui.animation.LostTalesGuiOrigin;
 import com.ninuna.losttales.client.input.LostTalesInputBinding.Type;
 import com.ninuna.losttales.client.input.LostTalesInputIconRenderer;
 import com.ninuna.losttales.gui.style.LostTalesColors;
@@ -33,7 +34,6 @@ public final class LostTalesControlBar {
     private static final int STATUS_GAP = 20;
     private static final int SEPARATOR_INSET = 7;
     private static final float INPUT_SCALE = 1.0F;
-    private static final float GUI_MODELVIEW_Z = -2000.0F;
 
     private LostTalesControlBar() {}
 
@@ -206,11 +206,9 @@ public final class LostTalesControlBar {
                 | GL11.GL_CURRENT_BIT | GL11.GL_TEXTURE_BIT);
         GL11.glPushMatrix();
         if (fixedCoordinates) {
-            GL11.glLoadIdentity();
-            GL11.glTranslatef(0.0F, offset, GUI_MODELVIEW_Z);
-        } else {
-            GL11.glTranslatef(0.0F, offset, 0.0F);
+            LostTalesGuiOrigin.load();
         }
+        GL11.glTranslatef(0.0F, offset, 0.0F);
     }
 
     private static void endRender() {

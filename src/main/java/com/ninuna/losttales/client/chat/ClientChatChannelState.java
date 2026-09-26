@@ -41,7 +41,20 @@ public final class ClientChatChannelState {
     /** How often an unavailable faction-name lookup is retried. */
     private static final long FACTION_NAME_RETRY_NANOS = 5000L * 1000000L;
 
+    /** The conversation the input is in. */
     private static ChatTab selected = ChatTab.of(ChatChannel.GLOBAL);
+    /**
+     * The conversation the player last picked or typed in. It stays when a
+     * page covers it and the input is lent to another window, so the chat
+     * key brings it back.
+     */
+    private static ChatTab lastUsed = selected;
+    /**
+     * Whether the player has picked or typed in a conversation since
+     * joining; until then the chat key brings the one in front of the top
+     * window, as the layout file left it (K2 a).
+     */
+    private static boolean lastUsedKnown;
     /** Conversations remembered for their partner's colour; oldest go first. */
     private static final int MAX_PARTNER_COLORS = 64;
     private static final LinkedHashMap<ChatTab, Integer> PARTNER_COLORS =
@@ -155,8 +168,51 @@ public final class ClientChatChannelState {
         return getSelected().getChannel();
     }
 
+    /** The player's own pick: the input goes there, and it is the last used. */
     public static synchronized void select(ChatTab tab) {
-        selected = isSelectable(tab) ? tab : fallbackTab();
+        choose(isSelectable(tab) ? tab : fallbackTab());
+    }
+
+    /**
+     * Moves the input to a conversation while a page covers the one last
+     * used, which is kept for the chat key.
+     */
+    public static synchronized void lendInput(ChatTab tab) {
+        if (isSelectable(tab)) {
+            selected = tab;
+        }
+    }
+
+    /** Something was typed where the input is: that conversation is the last used. */
+    public static synchronized void markUsed() {
+        if (isSelectable(selected)) {
+            lastUsed = selected;
+            lastUsedKnown = true;
+        }
+    }
+
+    /**
+     * The conversation last picked or typed in, while it is still open;
+     * before any since joining, the one in front of the top window that
+     * shows one. Null when there is none.
+     */
+    public static synchronized ChatTab lastUsed() {
+        if (!lastUsedKnown) {
+            List<Window> stacked = WindowLayout.stacked();
+            for (int index = stacked.size() - 1; index >= 0; index--) {
+                ChatTab front = ChatTab.from(stacked.get(index).getActiveTab());
+                if (isSelectable(front)) {
+                    return front;
+                }
+            }
+        }
+        return isSelectable(lastUsed) ? lastUsed : null;
+    }
+
+    private static void choose(ChatTab tab) {
+        selected = tab;
+        lastUsed = tab;
+        lastUsedKnown = true;
     }
 
     public static synchronized void select(ChatChannel channel) {
@@ -181,9 +237,9 @@ public final class ClientChatChannelState {
         ChatTab current = getSelected();
         List<ChatTab> order = selectedWindowOrder(current);
         int index = Math.max(0, order.indexOf(current));
-        selected = order.get(
+        choose(order.get(
                 ((index + step) % order.size() + order.size())
-                        % order.size());
+                        % order.size()));
         return selected;
     }
 
@@ -218,7 +274,7 @@ public final class ClientChatChannelState {
         }
         WindowTab chosen = order.get(index);
         if (chosen instanceof ChatTab) {
-            selected = (ChatTab)chosen;
+            choose((ChatTab)chosen);
         }
         return chosen;
     }
@@ -260,9 +316,9 @@ public final class ClientChatChannelState {
         }
         int index = order.indexOf(current);
         int step = backward ? -1 : 1;
-        selected = order.get(
+        choose(order.get(
                 ((index < 0 ? 0 : index) + step + order.size())
-                        % order.size());
+                        % order.size()));
         return selected;
     }
 
@@ -345,7 +401,7 @@ public final class ClientChatChannelState {
         }
         if (wasSelected) {
             ChatTab neighbour = neighbourIn(window, index);
-            selected = neighbour != null ? neighbour : fallbackTab();
+            choose(neighbour != null ? neighbour : fallbackTab());
         }
         ensureAvailable();
         return true;
@@ -1126,7 +1182,8 @@ public final class ClientChatChannelState {
     }
 
     public static synchronized void clear() {
-        selected = ChatTab.of(ChatChannel.GLOBAL);
+        choose(ChatTab.of(ChatChannel.GLOBAL));
+        lastUsedKnown = false;
         PARTNER_COLORS.clear();
         PARTNER_NAMES.clear();
         PARTNER_CHARACTER_IDS.clear();

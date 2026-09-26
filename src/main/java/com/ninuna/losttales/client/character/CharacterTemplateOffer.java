@@ -115,7 +115,7 @@ public final class CharacterTemplateOffer {
                 template.getName(), template.getRaceId(),
                 template.getGenderId(), template.getSkinId(),
                 template.getBodyTypeId(), template.getChestTypeId(),
-                template.getDescription(),
+                template.getHistory(),
                 // A template that never named an age keeps the one the
                 // record was made with, which is the lowest a character
                 // may have; zero is not an age any server accepts.

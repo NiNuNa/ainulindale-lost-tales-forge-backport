@@ -27,7 +27,7 @@ public final class CharacterBodyTypePacketTest {
         CharacterAppearance appearance = new CharacterAppearance(
                 playerId, "Steve123", "Aragorn", "losttales:human",
                 "losttales:male", CharacterSkinRegistry.ACCOUNT_SKIN_ID,
-                true, 0, "lotr:gondor", 7, 87, "", CharacterBodyTypeRegistry.SLIM,
+                true, 0, "lotr:gondor", 7, 87, CharacterBodyTypeRegistry.SLIM,
                 CharacterChestTypeRegistry.FULL_MEDIUM);
         ByteBuf buffer = Unpooled.buffer();
         try {
@@ -56,7 +56,7 @@ public final class CharacterBodyTypePacketTest {
                 RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID,
                 32, "lotr:bree", 1, 0L, 1L,
                 RoleplayCharacter.CURRENT_DATA_VERSION,
-                "", CharacterBodyTypeRegistry.WIDE, CharacterChestTypeRegistry.NONE);
+                CharacterBodyTypeRegistry.WIDE, CharacterChestTypeRegistry.NONE);
         assertEquals(CharacterBodyTypeRegistry.WIDE, summary.getBodyTypeId());
         assertEquals(CharacterChestTypeRegistry.NONE, summary.getChestTypeId());
         CharacterRosterSnapshot snapshot = new CharacterRosterSnapshot(
@@ -84,7 +84,7 @@ public final class CharacterBodyTypePacketTest {
                 characterId, 0, "Ranger", "losttales:human",
                 "losttales:female", "losttales:human_bree_female_0",
                 true, 0, 32, "lotr:bree", 1, 0L, 1L,
-                RoleplayCharacter.CURRENT_DATA_VERSION, "", "losttales:huge", "");
+                RoleplayCharacter.CURRENT_DATA_VERSION, "losttales:huge", "");
         assertEquals(CharacterBodyTypeRegistry.SLIM, unknown.getBodyTypeId());
     }
 }

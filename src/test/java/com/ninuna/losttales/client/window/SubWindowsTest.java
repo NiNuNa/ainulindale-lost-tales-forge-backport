@@ -17,7 +17,7 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 /**
- * A small window lives in a room — its chat window, or the bare screen —
+ * A sub-window lives in a room — its chat window, or the bare screen —
  * as a window lives on a screen: held inside it and never larger than it
  * down to its least, moved and resized there without sticking to
  * anything, answering its resize band as a chat window does, and
@@ -28,6 +28,13 @@ public final class SubWindowsTest {
     private static final int SCREEN_WIDTH = 480;
     private static final int SCREEN_HEIGHT = 270;
     private static final double MARGIN = WindowPlacement.EDGE_MARGIN;
+    /** Kinds of the tests' own, registered as a system registers its kinds. */
+    private static final SubWindowKind PICKER =
+            SubWindowKind.register("test_picker", "test");
+    private static final SubWindowKind LIST =
+            SubWindowKind.register("test_list", "test");
+    private static final SubWindowKind CARD =
+            SubWindowKind.register("test_card", "test");
 
     @Before
     public void reset() {
@@ -103,9 +110,9 @@ public final class SubWindowsTest {
     public void aKindResizedOpensWhereAndAsLargeAsItWasLeft() {
         SubWindows windows = screen();
         LostTalesUiHitBox room = windows.roomOf(null);
-        SubWindowPlaces.remember(SubWindowKind.EMOJI, 250.0D,
+        SubWindowPlaces.remember(PICKER, 250.0D,
                 40.0D, 200, 150, true, room.width, room.height);
-        SubWindow window = windows.open(SubWindowKind.EMOJI, "",
+        SubWindow window = windows.open(PICKER, "",
                 new StubContent(), null, box(10, 10, 100, 60));
         assertTrue(window.sized);
         assertEquals(200, window.width);
@@ -165,7 +172,7 @@ public final class SubWindowsTest {
     @Test
     public void aWindowWaitingUndrawnIsNotInFront() {
         SubWindows windows = screen();
-        SubWindow window = windows.open(SubWindowKind.EMOJI, "",
+        SubWindow window = windows.open(PICKER, "",
                 new StubContent(), null, box(100, 100, 100, 60));
         assertSame(window, windows.focused());
         window.hidden = true;
@@ -177,7 +184,7 @@ public final class SubWindowsTest {
     @Test
     public void aWindowOpenedForAChatWindowNotDrawnStandsOnTheScreen() {
         SubWindows windows = screen();
-        SubWindow window = windows.open(SubWindowKind.EMOJI, "",
+        SubWindow window = windows.open(PICKER, "",
                 new StubContent(), "w1", box(100, 100, 100, 60));
         assertNull(window.parentId);
         assertTrue(window.belongsTo(null));
@@ -187,31 +194,31 @@ public final class SubWindowsTest {
     public void theLayoutFileKeepsEachKindsPlace() {
         WindowLayoutStore.load(Arrays.asList(
                 "window w1 locked=false x=0.00 y=0.00 active=global tabs=global",
-                "small emoji from=br dx=0.00 dy=12.50 w=120 h=160",
-                "small tab from=tl dx=12.00 dy=40.00",
-                "small quests from=tl dx=10.00 dy=20.00 w=140",
-                "small reactions from=xx dx=1.00 dy=2.00",
-                "small nonsense from=tl dx=1.00 dy=2.00 w=3 h=4"));
-        SubWindowPlaces.Placement emoji =
-                SubWindowPlaces.of(SubWindowKind.EMOJI);
-        assertTrue(emoji.fromRight);
-        assertTrue(emoji.fromBottom);
-        assertEquals(12.5D, emoji.dy, 1.0E-9D);
-        assertEquals(120, emoji.width);
-        assertEquals(160, emoji.height);
+                "sub test_picker from=br dx=0.00 dy=12.50 w=120 h=160",
+                "sub tab from=tl dx=12.00 dy=40.00",
+                "sub test_list from=tl dx=10.00 dy=20.00 w=140",
+                "sub test_card from=xx dx=1.00 dy=2.00",
+                "sub nonsense from=tl dx=1.00 dy=2.00 w=3 h=4"));
+        SubWindowPlaces.Placement picker =
+                SubWindowPlaces.of(PICKER);
+        assertTrue(picker.fromRight);
+        assertTrue(picker.fromBottom);
+        assertEquals(12.5D, picker.dy, 1.0E-9D);
+        assertEquals(120, picker.width);
+        assertEquals(160, picker.height);
         SubWindowPlaces.Placement tab =
                 SubWindowPlaces.of(SubWindowKind.TAB);
         assertEquals(12.0D, tab.dx, 1.0E-9D);
         assertFalse("a place alone keeps no size", tab.isSized());
         assertNull("a size alone is skipped",
-                SubWindowPlaces.of(SubWindowKind.QUESTS));
+                SubWindowPlaces.of(LIST));
         assertNull("a corner that is none is skipped",
-                SubWindowPlaces.of(SubWindowKind.REACTIONS));
+                SubWindowPlaces.of(CARD));
         List<String> described = WindowLayoutStore.describe();
         assertTrue(described.contains(
-                "small emoji from=br dx=0.00 dy=12.50 w=120 h=160"));
+                "sub test_picker from=br dx=0.00 dy=12.50 w=120 h=160"));
         assertTrue("a place alone is written without a size",
-                described.contains("small tab from=tl dx=12.00 dy=40.00"));
+                described.contains("sub tab from=tl dx=12.00 dy=40.00"));
     }
 
     private static SubWindows screen() {
@@ -224,7 +231,7 @@ public final class SubWindowsTest {
     private static SubWindow standing(double x, double y, int width,
                                             int height) {
         SubWindow window = new SubWindow(
-                SubWindowKind.EMOJI, "", new StubContent(), null);
+                PICKER, "", new StubContent(), null);
         window.x = x;
         window.y = y;
         window.wantedWidth = width;

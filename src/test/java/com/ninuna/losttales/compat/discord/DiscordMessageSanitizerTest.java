@@ -112,6 +112,15 @@ public final class DiscordMessageSanitizerTest {
         assertEquals("plain", DiscordMessageSanitizer.outbound("plain"));
     }
 
+    /** A forward says where its message was said, by the channel's code name alone, and who said it. */
+    @Test
+    public void aForwardHeaderNamesItsPlaceAndItsAuthor() {
+        assertEquals("-# ↪ Forwarded from \\#ooc · **Aldric**\n",
+                DiscordMessageSanitizer.forwardHeader("Aldric", "#ooc/1234"));
+        assertEquals("-# ↪ Forwarded from \\#gondor · **x\\_y**\n",
+                DiscordMessageSanitizer.forwardHeader("x_y", "#gondor/9"));
+    }
+
     @Test
     public void replyHeadersQuoteInSubtextAndLinkWhenTheyCan() {
         assertEquals("-# ↩ [**Aldric** — meet me at the gate](https://discord"

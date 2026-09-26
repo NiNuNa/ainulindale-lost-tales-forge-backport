@@ -1,5 +1,6 @@
 package com.ninuna.losttales.character.validation;
 
+import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.registry.CharacterFactionCategory;
 import com.ninuna.losttales.character.registry.CharacterFactionDefinition;
@@ -59,32 +60,32 @@ public final class CharacterUnconventionalCreationValidationTest {
     }
 
     @Test
-    public void descriptionIsNormalizedAndCarriedByValidatedCreation() {
+    public void historyIsNormalizedAndCarriedByValidatedCreation() {
         CharacterCreationValidationResult result = validate(
                 request(humanSkin(), SHIRE_WAYPOINT, true,
                         "  A ranger\tfrom\nBree.  "));
 
         assertTrue(result.isValid());
-        assertEquals("A ranger from Bree.",
-                result.getCreation().getDescription());
+        assertEquals("A ranger from\nBree.",
+                result.getCreation().getHistory());
     }
 
     @Test
-    public void descriptionFormattingCodesAreRejected() {
+    public void historyFormattingCodesAreRejected() {
         CharacterCreationValidationResult result = validate(
                 request(humanSkin(), SHIRE_WAYPOINT, true,
                         "A §cformatted biography"));
 
         assertFalse(result.isValid());
-        assertEquals(CharacterErrorId.INVALID_DESCRIPTION,
+        assertEquals(CharacterErrorId.INVALID_PROFILE_TEXT,
                 result.getErrorId());
     }
 
     @Test
-    public void overlongDescriptionIsRejected() {
+    public void overlongHistoryIsRejected() {
         StringBuilder description = new StringBuilder();
         for (int index = 0;
-             index <= CharacterValidator.MAX_DESCRIPTION_LENGTH; index++) {
+             index <= CharacterProfile.MAX_SECTION_LENGTH; index++) {
             description.append('a');
         }
         CharacterCreationValidationResult result = validate(
@@ -92,7 +93,7 @@ public final class CharacterUnconventionalCreationValidationTest {
                         description.toString()));
 
         assertFalse(result.isValid());
-        assertEquals(CharacterErrorId.INVALID_DESCRIPTION,
+        assertEquals(CharacterErrorId.INVALID_PROFILE_TEXT,
                 result.getErrorId());
     }
 

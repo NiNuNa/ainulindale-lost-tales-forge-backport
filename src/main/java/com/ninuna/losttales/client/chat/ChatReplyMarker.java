@@ -23,6 +23,8 @@ final class ChatReplyMarker {
     private static final Charset UTF_8 = Charset.forName("UTF-8");
     /** What the quote's opening run carries where a head would carry a sender. */
     private static final String BUBBLE = "bubble";
+    /** What a forward's opening run carries in the bubble's place: the forward arrow. */
+    private static final String FORWARD = "forward";
     /**
      * The slot the quote opens with: the chat's speech bubble and the
      * gap after it, the gap the typing line keeps after the same bubble.
@@ -88,24 +90,41 @@ final class ChatReplyMarker {
      */
     static ChatComponentText applyIcon(ChatComponentText component,
                                        int color, long messageId) {
+        return applyIcon(component, color, messageId, false);
+    }
+
+    /** As above, with the forward arrow in the bubble's place for a forward's row. */
+    static ChatComponentText applyIcon(ChatComponentText component,
+                                       int color, long messageId,
+                                       boolean forward) {
         if (component != null) {
             component.setChatStyle(component.getChatStyle()
                     .setChatClickEvent(new ClickEvent(
                             ClickEvent.Action.SUGGEST_COMMAND,
                             PREFIX + colorHex(color) + ':' + messageId
-                                    + ':' + BUBBLE)));
+                                    + ':' + (forward ? FORWARD : BUBBLE))));
         }
         return component;
     }
 
-    /** Whether the run is a quote's bubble slot. */
+    /** Whether the run is a quote's opening slot, the bubble or a forward's arrow. */
     static boolean isIconSlot(IChatComponent component) {
+        String icon = iconOf(component);
+        return BUBBLE.equals(icon) || FORWARD.equals(icon);
+    }
+
+    /** Whether the run is a forward's opening slot, which holds the forward arrow. */
+    static boolean isForwardIcon(IChatComponent component) {
+        return FORWARD.equals(iconOf(component));
+    }
+
+    private static String iconOf(IChatComponent component) {
         String payload = payload(component);
         if (payload == null) {
-            return false;
+            return null;
         }
         String[] fields = payload.split(":", -1);
-        return fields.length == 3 && BUBBLE.equals(fields[2]);
+        return fields.length == 3 ? fields[2] : null;
     }
 
     /**

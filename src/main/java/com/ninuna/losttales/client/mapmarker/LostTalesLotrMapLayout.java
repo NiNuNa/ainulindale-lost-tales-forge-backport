@@ -187,8 +187,11 @@ public final class LostTalesLotrMapLayout {
      */
     public static String[] filterFullscreenSubtitles(String[] lines) {
         LostTalesLotrMapGui map = LostTalesLotrMapGui.drawing();
-        if (lines == null || lines.length == 0
-                || !isFullscreenLayoutActive(map)) {
+        if (lines == null || !isFullscreenLayoutActive(map)) {
+            return lines;
+        }
+        if (lines.length == 0) {
+            map.keepCursorLines(lines);
             return lines;
         }
         String template = translate(TELEPORT_SUBTITLE_KEY);
@@ -204,7 +207,14 @@ public final class LostTalesLotrMapLayout {
                 filtered = kept.toArray(new String[kept.size()]);
             }
         }
-        return map.resolveCursorSubtitles(filtered);
+        String[] resolved = map.resolveCursorSubtitles(filtered);
+        // In a window the lines stand on the window's bar, beside the date
+        // (U3 a); the map draws none of its own.
+        if (map.inWindow()) {
+            map.keepCursorLines(resolved);
+            return new String[0];
+        }
+        return resolved;
     }
 
     /**
@@ -260,7 +270,7 @@ public final class LostTalesLotrMapLayout {
             lostTalesGui.renderControlBar(false);
         }
         boolean transformed = false;
-        if (isControlBarVisible(gui)) {
+        if (drawsControlBar(gui)) {
             try {
                 // Biome and coordinate lines are visually inside the strip,
                 // so they must leave the parent GUI transform and follow the
@@ -278,7 +288,7 @@ public final class LostTalesLotrMapLayout {
 
     /** Keeps native marker tooltips above the control bar. */
     public static void beginMapTooltip(LOTRGuiMap gui) {
-        beginBottomReservedBounds(gui, isControlBarVisible(gui));
+        beginBottomReservedBounds(gui, drawsControlBar(gui));
     }
 
     public static void endMapTooltip() {
@@ -472,7 +482,26 @@ public final class LostTalesLotrMapLayout {
         }
     }
 
-    static boolean isControlBarVisible(LOTRGuiMap gui) {
+    /**
+     * Whether the map draws its own key-hint strip at its foot: on a screen
+     * of its own. In a window the window's bar stands in its place (U3 a).
+     */
+    static boolean drawsControlBar(LOTRGuiMap gui) {
+        return hasFooterLayout(gui) && !(gui instanceof LostTalesLotrMapGui
+                && ((LostTalesLotrMapGui)gui).inWindow());
+    }
+
+    /** How tall the map's own strip stands at its foot: nothing in a window. */
+    static int controlBarHeight(LOTRGuiMap gui) {
+        return drawsControlBar(gui) ? LostTalesLotrMapControlBar.HEIGHT : 0;
+    }
+
+    /**
+     * Whether the map has the Lost Tales layout of its foot: the legend and
+     * the compass laid out over the map's bottom edge, above the key-hint
+     * strip where the map draws one.
+     */
+    static boolean hasFooterLayout(LOTRGuiMap gui) {
         if (!Boolean.getBoolean(
                 LostTalesClassTransformer.LOTR_MAP_CONTROL_BAR_ACTIVE_PROPERTY)
                 || !isFullscreenLayoutActive(gui)) {

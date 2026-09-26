@@ -20,6 +20,8 @@ public final class ChatWindowFrameToolbarTest {
             LostTalesChatOverlayRenderer.TOOLBAR_REPLY;
     private static final int LINK = LostTalesChatOverlayRenderer.TOOLBAR_LINK;
     private static final int MORE = LostTalesChatOverlayRenderer.TOOLBAR_MORE;
+    private static final int FORWARD =
+            LostTalesChatOverlayRenderer.TOOLBAR_FORWARD;
 
     @After
     public void cleanUp() {
@@ -30,32 +32,33 @@ public final class ChatWindowFrameToolbarTest {
     public void eachControlAnswersAcrossItsSquare() {
         ChatFrame frame = ChatFrame.of(new Window("w9"));
         frame.drawn = true;
-        // Five fourteen-pixel squares inside one frame's two-pixel edge,
+        // Six fourteen-pixel squares inside one frame's two-pixel edge,
         // as tall as a framed button.
-        assertEquals(74, LostTalesChatOverlayRenderer.toolbarWidth());
+        assertEquals(88, LostTalesChatOverlayRenderer.toolbarWidth());
         assertEquals(18, LostTalesChatOverlayRenderer.TOOLBAR_HEIGHT);
         // Drawn at half size, as at GUI scale 2.
         frame.toolbarLeft = 100.0F;
         frame.toolbarTop = 20.0F;
-        frame.toolbarRight = 137.0F;
+        frame.toolbarRight = 144.0F;
         frame.toolbarBottom = 29.0F;
         frame.toolbarCellsLeft = 101.0F;
         frame.toolbarCellWidth = 7.0F;
         frame.toolbarKinds = LostTalesChatOverlayRenderer.TOOLBAR_KINDS;
-        frame.toolbarWhy = new String[] {"", "", "", "Only on this computer",
-                ""};
+        frame.toolbarWhy = new String[] {"", "", "", "",
+                "Only on this computer", ""};
         // The frame's edge belongs to the control beside it.
         assertEquals(REACT, frame.toolbarKindAt(100.0D, 25.0D));
         assertEquals(REACT, frame.toolbarKindAt(107.9D, 25.0D));
         assertEquals(REPLY, frame.toolbarKindAt(108.0D, 25.0D));
-        assertEquals(LINK, frame.toolbarKindAt(128.5D, 25.0D));
+        assertEquals(FORWARD, frame.toolbarKindAt(115.0D, 25.0D));
+        assertEquals(LINK, frame.toolbarKindAt(135.5D, 25.0D));
         // The menu's dots stand last, where a menu opens from.
-        assertEquals(MORE, frame.toolbarKindAt(129.0D, 25.0D));
-        assertEquals(MORE, frame.toolbarKindAt(136.5D, 25.0D));
-        assertEquals(129.0F, frame.toolbarCellLeft(MORE), 0.0F);
+        assertEquals(MORE, frame.toolbarKindAt(136.0D, 25.0D));
+        assertEquals(MORE, frame.toolbarKindAt(143.5D, 25.0D));
+        assertEquals(136.0F, frame.toolbarCellLeft(MORE), 0.0F);
         assertEquals(101.0F, frame.toolbarCellLeft(REACT), 0.0F);
         // Past the frame, and below it, is not the toolbar.
-        assertEquals(-1, frame.toolbarKindAt(137.0D, 25.0D));
+        assertEquals(-1, frame.toolbarKindAt(144.0D, 25.0D));
         assertEquals(-1, frame.toolbarKindAt(120.0D, 29.0D));
         // A control that cannot be taken says why; the others say nothing.
         assertEquals("Only on this computer", frame.toolbarWhy(LINK));

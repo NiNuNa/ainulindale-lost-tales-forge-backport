@@ -5,6 +5,7 @@ import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelIconSpec;
 import com.ninuna.losttales.chat.ChatEpithet;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
+import com.ninuna.losttales.chat.ChatRoleplayStatus;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.client.window.TabRow;
@@ -798,12 +799,18 @@ public final class ChatMemberList {
                     ChatEpithet.epithet(member.getGroupName(),
                             member.getTitle())), "", member.getTitleColor()));
         }
+        ChatPresenceIdentity identity = member.getCharacterId() == null
+                ? ChatPresenceIdentity.ACCOUNT
+                : ChatPresenceIdentity.character(member.getCharacterId());
         String statusLine = ClientChatProfanity.filter(
-                ClientChatPresence.lineOf(member.getPlayerId(),
-                        member.getCharacterId() == null
-                                ? ChatPresenceIdentity.ACCOUNT
-                                : ChatPresenceIdentity.character(
-                                        member.getCharacterId())));
+                ClientChatPresence.lineOf(member.getPlayerId(), identity));
+        // The role-play status's mark stands at the end of the name's line,
+        // which gives it its room; an NPC and an offline member wear none.
+        final ChatRoleplayStatus roleplay = member.isNpc() || !member.isOnline()
+                ? null : ChatRoleplayMark.markedFor(member.getPlayerId(),
+                        identity);
+        final float nameRight = roleplay == null ? roomRight
+                : roomRight - ChatRoleplayMark.SIZE - ChatRoleplayMark.GAP;
         final List<Part> statusRun = statusLine.length() == 0
                 ? Collections.<Part>emptyList()
                 : Collections.singletonList(new Part(statusLine, "\u00a7o",
@@ -823,7 +830,7 @@ public final class ChatMemberList {
         boolean lit = member == state.lit;
         boolean rested = member == state.hovered;
         final float nameSlide = lit ? slide(state, rested, true,
-                width(font, nameLine), roomRight - textLeft,
+                width(font, nameLine), nameRight - textLeft,
                 unitScale, elapsed) : 0.0F;
         final float statusSlide = lit && said ? slide(state, rested, false,
                 width(font, statusRun), roomRight - textLeft,
@@ -843,9 +850,17 @@ public final class ChatMemberList {
                                     pixelsPerUnit, alpha);
                             LostTalesUiFlatLayers.nextLayer();
                             drawCutParts(minecraft, font, nameLine,
-                                    textLeft, nameTop, alpha, roomRight,
+                                    textLeft, nameTop, alpha, nameRight,
                                     nameSlide, rowsOriginX, unitScale,
                                     clipTop, clipBottom);
+                            if (roleplay != null) {
+                                LostTalesUiFlatLayers.nextLayer();
+                                ChatRoleplayMark.draw(roleplay,
+                                        roomRight - ChatRoleplayMark.SIZE,
+                                        nameTop + (capitals
+                                                - ChatRoleplayMark.SIZE) / 2,
+                                        alpha);
+                            }
                             if (said) {
                                 LostTalesUiFlatLayers.nextLayer();
                                 drawCutParts(minecraft, font, statusRun,

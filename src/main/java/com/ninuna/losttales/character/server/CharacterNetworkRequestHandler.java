@@ -2,6 +2,7 @@ package com.ninuna.losttales.character.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
+import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
@@ -117,7 +118,7 @@ public final class CharacterNetworkRequestHandler {
                                                   final int requestId,
                                                   final long expectedRosterRevision,
                                                   final UUID characterId,
-                                                  final String description,
+                                                  final CharacterProfile profile,
                                                   final int age) {
         execute(player, requestId, CharacterOperationType.PROFILE_UPDATE,
                 new Operation() {
@@ -127,7 +128,7 @@ public final class CharacterNetworkRequestHandler {
                                 player,
                                 expectedRosterRevision,
                                 characterId,
-                                description,
+                                profile,
                                 age);
                     }
                 });
@@ -210,6 +211,13 @@ public final class CharacterNetworkRequestHandler {
                 if (operationType == CharacterOperationType.LORE_CLAIM
                         || operationType == CharacterOperationType.LORE_RELEASE) {
                     LoreCharacterSyncManager.broadcast(player);
+                }
+                if (operationType == CharacterOperationType.PROFILE_UPDATE
+                        && result.getCharacter() != null) {
+                    // The owner's own view of the profile is the one just
+                    // saved; anyone else reads it afresh when they open it.
+                    CharacterProfileViews.send(player,
+                            result.getCharacter().getCharacterId());
                 }
                 if (touchesGameplay(operationType)) {
                     PartySyncManager.sendState(

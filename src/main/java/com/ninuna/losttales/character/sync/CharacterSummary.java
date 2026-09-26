@@ -20,7 +20,6 @@ public final class CharacterSummary {
     private final String skinId;
     private final String bodyTypeId;
     private final String chestTypeId;
-    private final String description;
     private final boolean showMinecraftCape;
     private final int cosmeticCapeId;
     private final int age;
@@ -36,7 +35,7 @@ public final class CharacterSummary {
                             boolean showMinecraftCape, int cosmeticCapeId,
                             int age, String startingFactionId, int roleplayLevel,
                             long experiencePoints, long creationTimestamp,
-                            int dataVersion, String description, String bodyTypeId,
+                            int dataVersion, String bodyTypeId,
                             String chestTypeId) {
         if (characterId == null) {
             throw new IllegalArgumentException("characterId must not be null");
@@ -53,7 +52,6 @@ public final class CharacterSummary {
         this.chestTypeId = CharacterChestTypeRegistry.contains(chestTypeId)
                 ? CharacterChestTypeRegistry.normalizeIdentifier(chestTypeId)
                 : CharacterChestTypeRegistry.defaultFor(genderId);
-        this.description = description == null ? "" : description;
         this.showMinecraftCape = showMinecraftCape;
         this.cosmeticCapeId = CharacterCapeCatalog.normalizeSelection(cosmeticCapeId);
         this.age = age;
@@ -83,7 +81,6 @@ public final class CharacterSummary {
                 character.getProgression().getExperiencePoints(),
                 character.getCreationTimestamp(),
                 character.getDataVersion(),
-                character.getDescription(),
                 character.getBodyTypeId(),
                 character.getChestTypeId()
         );
@@ -133,10 +130,6 @@ public final class CharacterSummary {
 
     public String getChestTypeId() {
         return this.chestTypeId;
-    }
-
-    public String getDescription() {
-        return this.description;
     }
 
     public boolean isMinecraftCapeVisible() {

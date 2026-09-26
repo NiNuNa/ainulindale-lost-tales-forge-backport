@@ -35,6 +35,8 @@ public class WindowHover {
         SNAP_ASSIST,
         /** A page in a window: the journal, the party. */
         PAGE,
+        /** A page's input bar: one of its items, a row of its field's list, or the bare bar. */
+        BAR,
         /** The band just outside a sub-window, which resizes it. */
         SUB_WINDOW_RESIZE,
         /** The cross on a sub-window's strip. */
@@ -79,6 +81,16 @@ public class WindowHover {
     public WindowGestures.ResizeTarget resize;
     /** Whether a press on the page or the content does something. */
     public boolean acts;
+    /** On a page's bar, the item; null on the bare bar. */
+    public BarItem barItem;
+    /** On a row of a list a field opens — a page's bar field's, a menu field's — which row; -1 anywhere else. */
+    public int listRow = -1;
+    /** On a sub-window's content that answers for itself, which of its parts. */
+    public String part;
+    /** On a menu's row that can be taken, the row; null anywhere else. */
+    public MenuWindow.Entry menuEntry;
+    /** What the pointer's tip says over a sub-window's content: why a menu's row cannot be taken. */
+    public String tip = "";
 
     public WindowHover(Kind kind) {
         this.kind = kind;
@@ -117,7 +129,13 @@ public class WindowHover {
                 return this.assistCard != null;
             case PAGE:
             case CONTENT:
+            case SUB_WINDOW:
                 return this.acts;
+            case BAR:
+                return this.listRow >= 0 || this.barItem != null
+                        && this.barItem.isAvailable()
+                        && this.barItem.kind != BarItem.Kind.FIELD
+                        && this.barItem.kind != BarItem.Kind.WORDS;
             default:
                 return false;
         }

@@ -641,8 +641,8 @@ public final class ChatHistoryTest {
                 BOB, "Beren", "smile", true);
         assertNotNull(change);
         assertTrue(change.readers.contains(ALICE));
-        assertEquals(0, change.gameCountBefore);
-        assertEquals(1, change.gameCountAfter);
+        assertFalse(change.before.players());
+        assertTrue(change.after.players());
         assertNull("the same reaction twice changes nothing",
                 ChatHistory.react(id, reader(BOB), BOB, "Beren", "smile", true));
 
@@ -703,13 +703,12 @@ public final class ChatHistoryTest {
         ChatHistory.ReactionChange change = ChatHistory.react(id, null, member,
                 "Nils", "smile", true);
         assertNotNull(change);
-        assertEquals("a Discord member is not one the bridge reacts for",
-                0, change.gameCountAfter);
+        assertFalse("a Discord member is no player", change.after.players());
         assertFalse(change.readers.contains(member));
         ChatHistory.react(id, reader(BOB), BOB, "Beren", "smile", true);
-        assertNotNull(ChatHistory.clearDiscordReactions(id, null, ""));
+        assertNotNull(ChatHistory.clearDiscordReactions(id, null, "", "7"));
         assertEquals(1, ChatHistory.reactionsFor(id, BOB).find("smile").count);
-        assertNull(ChatHistory.clearDiscordReactions(id, null, ""));
+        assertNull(ChatHistory.clearDiscordReactions(id, null, "", "7"));
     }
 
     @Test
@@ -725,10 +724,9 @@ public final class ChatHistoryTest {
         ChatHistory.ReactionChange change = ChatHistory.react(id, reader(BOB),
                 BOB, "Beren", parrot, true);
         assertNotNull(change);
-        assertEquals("the bot reacts on Discord for the first player",
-                0, change.gameCountBefore);
-        assertEquals(1, change.gameCountAfter);
-        assertNotNull(ChatHistory.clearDiscordReactions(id, parrot, "556"));
+        assertFalse(change.before.players());
+        assertTrue("the first player", change.after.players());
+        assertNotNull(ChatHistory.clearDiscordReactions(id, parrot, "556", "7"));
         assertEquals(1, ChatHistory.reactionsFor(id, BOB).find(parrot).count);
         assertTrue(ChatHistory.reactionsFor(id, BOB).find(parrot).mine);
     }
@@ -741,23 +739,23 @@ public final class ChatHistoryTest {
         UUID first = LostTalesChatMessagePacket.discordSenderId("42");
         UUID second = LostTalesChatMessagePacket.discordSenderId("43");
         assertNotNull(ChatHistory.reactFromDiscord(id, first, "Nils",
-                "pepe:556", "556", true));
+                "pepe:556", "556", "7", true));
 
         assertNotNull("a reaction after the rename joins the chip",
                 ChatHistory.reactFromDiscord(id, second, "Ana",
-                        "pepe_happy:556", "556", true));
+                        "pepe_happy:556", "556", "7", true));
         assertEquals(2, ChatHistory.reactionsFor(id, BOB).find("pepe:556").count);
         assertNull(ChatHistory.reactionsFor(id, BOB).find("pepe_happy:556"));
 
         assertNotNull("a removal after the rename finds it",
                 ChatHistory.reactFromDiscord(id, first, "", "pepe_happy:556",
-                        "556", false));
+                        "556", "7", false));
         assertEquals(1, ChatHistory.reactionsFor(id, BOB).find("pepe:556").count);
         assertNull("a member with no reaction takes nothing back",
-                ChatHistory.reactFromDiscord(id, first, "", null, "556", false));
+                ChatHistory.reactFromDiscord(id, first, "", null, "556", "7", false));
 
         assertNotNull("a removal without a name finds it by the id",
-                ChatHistory.reactFromDiscord(id, second, "", null, "556", false));
+                ChatHistory.reactFromDiscord(id, second, "", null, "556", "7", false));
         assertNull(ChatHistory.reactionsFor(id, BOB).find("pepe:556"));
     }
 
@@ -767,18 +765,18 @@ public final class ChatHistoryTest {
                 Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
         ChatHistory.reactFromDiscord(id,
                 LostTalesChatMessagePacket.discordSenderId("42"), "Nils",
-                "pepe:556", "556", true);
+                "pepe:556", "556", "7", true);
         ChatHistory.ReactionChange joined = ChatHistory.react(id, reader(BOB),
                 BOB, "Beren", "pepe:556", true);
         assertNotNull("a player joins the key they were shown", joined);
-        assertEquals(1, joined.gameCountAfter);
+        assertTrue(joined.after.players());
 
         assertNotNull(ChatHistory.clearDiscordReactions(id, "pepe_happy:556",
-                "556"));
+                "556", "7"));
         assertEquals(1, ChatHistory.reactionsFor(id, BOB).find("pepe:556").count);
         assertTrue(ChatHistory.reactionsFor(id, BOB).find("pepe:556").mine);
         assertNull("nothing of Discord's left to clear",
-                ChatHistory.clearDiscordReactions(id, null, "556"));
+                ChatHistory.clearDiscordReactions(id, null, "556", "7"));
     }
 
     /**
@@ -916,6 +914,38 @@ public final class ChatHistoryTest {
         replay = ChatHistory.replayFor(requester(CAROL), ChatMessageIds.NONE);
         assertEquals(2, replay.size());
         assertTrue(replay.get(1).getNamedPlayers().isEmpty());
+    }
+
+    /**
+     * A reader may forward what they may read, in the words the server
+     * holds, named by its link and author; a line they were never shown
+     * and the Server's own are not theirs to carry on.
+     */
+    @Test
+    public void aForwardCarriesWhatTheReaderMayRead() {
+        long id = record(ChatChannel.OOC, ALICE, "meet at the gate",
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
+        ChatHistory.Forwardable forward = ChatHistory.forwardable(id,
+                reader(BOB));
+        assertNotNull(forward);
+        assertEquals("meet at the gate", forward.text);
+        assertTrue(forward.reference.isForward());
+        assertEquals("#ooc/" + id, forward.reference.getForwardedFrom());
+        assertEquals("Aldric", forward.reference.getAuthor());
+        assertEquals("", forward.reference.getExcerpt());
+        assertEquals(ALICE, forward.reference.getSenderId());
+
+        long whisper = record(ChatChannel.WHISPER, ALICE, "the vault code",
+                Arrays.asList(ALICE, BOB),
+                ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB), false));
+        assertNull(ChatHistory.forwardable(whisper, reader(CAROL)));
+        assertNull("a message not kept is nothing to forward",
+                ChatHistory.forwardable(id + 99, reader(BOB)));
+
+        long server = record(ChatChannel.OOC,
+                LostTalesChatMessagePacket.SERVER_SENDER_ID, "Server restarting",
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
+        assertNull(ChatHistory.forwardable(server, reader(BOB)));
     }
 
     private static long record(ChatChannel channel, UUID author, String text,

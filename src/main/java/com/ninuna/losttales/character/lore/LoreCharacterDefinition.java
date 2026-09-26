@@ -1,6 +1,11 @@
 package com.ninuna.losttales.character.lore;
 
-/** Minimal immutable identity and optional validated visual appearance. */
+import com.ninuna.losttales.character.model.CharacterProfile;
+
+/**
+ * Minimal immutable identity, an optional validated visual appearance,
+ * and the profile the character is claimed with.
+ */
 public final class LoreCharacterDefinition {
 
     public static final int CURRENT_DATA_VERSION = 1;
@@ -13,16 +18,19 @@ public final class LoreCharacterDefinition {
     private final String description;
     private final int age;
     private final Appearance appearance;
+    private final CharacterProfile profile;
 
     public LoreCharacterDefinition(int dataVersion, String id, String name,
                                    String description, int age,
-                                   Appearance appearance) {
+                                   Appearance appearance,
+                                   CharacterProfile profile) {
         this.dataVersion = dataVersion;
         this.id = id == null ? "" : id;
         this.name = name == null ? "" : name;
         this.description = description == null ? "" : description;
         this.age = age;
         this.appearance = appearance;
+        this.profile = profile == null ? CharacterProfile.EMPTY : profile;
     }
 
     public int getDataVersion() {
@@ -51,6 +59,15 @@ public final class LoreCharacterDefinition {
 
     public Appearance getAppearance() {
         return this.appearance;
+    }
+
+    /**
+     * What the character says about itself as it is claimed: the profile
+     * the file gives, its History the description where the file names
+     * none. It belongs to the character's story, so nobody edits it.
+     */
+    public CharacterProfile getProfile() {
+        return this.profile;
     }
 
     /** Fixed visual selection authored by the server, never by a client. */

@@ -248,6 +248,23 @@ public final class DiscordMessageSanitizer {
     }
 
     /**
+     * The line a webhook post opens with when the game message is a
+     * forward: Discord's small subtext, a forward arrow, the conversation
+     * the message was said in by its code name, and its author in bold.
+     * {@code link} is the game's {@code #code/id}; the id means nothing on
+     * Discord and is left off.
+     */
+    public static String forwardHeader(String author, String link) {
+        String place = link == null ? "" : link.trim();
+        int slash = place.indexOf('/');
+        if (slash >= 0) {
+            place = place.substring(0, slash);
+        }
+        return "-# ↪ Forwarded from " + escapeMarkdown(place) + " · **"
+                + escapeMarkdown(outbound(author)) + "**\n";
+    }
+
+    /**
      * Backslash-escapes every character Discord's markdown gives meaning
      * to, the link brackets included, so a name or a quote reads as the
      * text it is wherever the bridge writes it.

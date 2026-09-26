@@ -465,6 +465,32 @@ public final class LostTalesChatPresentation {
                         : "gui.losttales.chat.message.emoji_off");
     }
 
+    /**
+     * Why a line cannot be forwarded, or empty where it can: a line the
+     * server never named, an entry of the Server Console, which stays in
+     * the console, or the Server's own words, which are nobody's to carry
+     * on. The server decides again when the forward arrives.
+     */
+    static String whyNotForwardable(int chatLineId) {
+        String unnamed = unnamedReason(chatLineId);
+        if (unnamed.length() > 0) {
+            return unnamed;
+        }
+        ChatTab tab = ClientChatChannelViews.tabOf(chatLineId);
+        if (tab != null && tab.getChannel() == ChatChannel.SERVER_CONSOLE) {
+            return StatCollector.translateToLocal(
+                    "gui.losttales.chat.message.console_stays");
+        }
+        ClientChatMessages.Remembered held = ClientChatMessages.get(
+                ClientChatMessageIds.messageIdOf(chatLineId));
+        if (held != null && LostTalesChatMessagePacket.isSystemSender(
+                held.packet.getSenderId())) {
+            return StatCollector.translateToLocal(
+                    "gui.losttales.chat.message.not_forwardable");
+        }
+        return "";
+    }
+
     /** Why a line cannot be answered, or empty where it can: a tab this player cannot talk in. */
     static String whyNotRepliable(int chatLineId) {
         return isRepliable(chatLineId) ? "" : StatCollector.translateToLocal(
@@ -513,6 +539,10 @@ public final class LostTalesChatPresentation {
                 // Cut afresh from the new words, keeping the colour the
                 // name was drawn in and the head the quote wore.
                 ChatReplyReference old = entry.packet.getReply();
+                if (old.isForward()) {
+                    // A forward keeps the words it carried on.
+                    continue;
+                }
                 updated = entry.packet.withReply(ChatReplyReference.of(
                         messageId, old.getAuthor(), newText,
                         old.getAuthorColor()).withHeadOf(old));
@@ -1944,6 +1974,11 @@ public final class LostTalesChatPresentation {
         if (name < 0) {
             name = quiet;
         }
+        if (reply.isForward()) {
+            appendForwardQuote(root, reply, name, senderId, accountLine,
+                    npcLine, skinId);
+            return;
+        }
         root.appendSibling(ChatReplyMarker.applyIcon(
                 text("", null, false), quiet, id));
         root.appendSibling(ChatReplyMarker.apply(
@@ -1974,6 +2009,46 @@ public final class LostTalesChatPresentation {
                 text(ClientChatProfanity.filterMessage(reply.getExcerpt()),
                         nearestFormatting(ivory), false),
                 ivory, id));
+    }
+
+    /**
+     * The row a forward opens with: the forward arrow and "Forwarded
+     * from" in the aside tone, the conversation the message was said in
+     * as a link to the message there, and the author's head and name in
+     * the name's own colour. The line's words below are the message's.
+     * Every run of it answers the click that finds the original.
+     */
+    private static void appendForwardQuote(ChatComponentText root,
+                                           ChatReplyReference reply, int name,
+                                           UUID senderId, boolean accountLine,
+                                           boolean npcLine, String skinId) {
+        int aside = LostTalesChatVisualStyle.asideRgb();
+        long id = reply.getMessageId();
+        root.appendSibling(ChatReplyMarker.applyIcon(
+                text("", null, false), aside, id, true));
+        root.appendSibling(ChatReplyMarker.apply(text(
+                StatCollector.translateToLocal(
+                        "gui.losttales.chat.message.forwarded_from") + " ",
+                nearestFormatting(aside), false), aside, id));
+        ChatChannelSuggester.Link link =
+                ChatChannelSuggester.linkAt(reply.getForwardedFrom(), 0);
+        if (link != null) {
+            appendChannelLink(root, link.channel, link.scope, 0, id);
+        } else {
+            root.appendSibling(ChatReplyMarker.apply(text(
+                    reply.getForwardedFrom(), nearestFormatting(aside), false),
+                    aside, id));
+        }
+        root.appendSibling(ChatReplyMarker.apply(
+                text(" ", nearestFormatting(aside), false), aside, id));
+        if (senderId != null) {
+            root.appendSibling(ChatReplyMarker.applyHead(
+                    text("  ", EnumChatFormatting.WHITE, true), name, id,
+                    senderId, accountLine, npcLine, skinId));
+        }
+        root.appendSibling(ChatReplyMarker.apply(
+                text(reply.getAuthor(), nearestFormatting(name), false),
+                name, id));
     }
 
     /**
@@ -2698,10 +2773,10 @@ public final class LostTalesChatPresentation {
         if (remembered != null) {
             return remembered.packet.getIdentityName();
         }
-        String identity = ChatScreenMenus.messageIdentity(lines, index,
+        String identity = ChatMenus.messageIdentity(lines, index,
                 chatLineId);
         return identity.length() > 0 ? identity
-                : ChatScreenMenus.messageAccount(lines, index, chatLineId);
+                : ChatMenus.messageAccount(lines, index, chatLineId);
     }
 
     /**

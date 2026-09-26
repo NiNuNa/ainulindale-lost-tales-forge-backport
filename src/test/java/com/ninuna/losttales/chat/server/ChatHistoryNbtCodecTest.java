@@ -19,6 +19,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -442,6 +443,46 @@ public final class ChatHistoryNbtCodecTest {
                 .getCompoundTagAt(0).getTagList("Reactions",
                         Constants.NBT.TAG_COMPOUND)
                 .getCompoundTagAt(0).setString("Emoji", "not_an_emoji");
+        ChatHistoryNbtCodec.ReadResult result = ChatHistoryNbtCodec.read(written);
+        assertTrue(result.getEntries().isEmpty());
+        assertEquals(1, result.getQuarantineEntriesCopy().size());
+    }
+
+    /**
+     * A Discord member's reaction keeps the Discord channel it was made
+     * in through the save, which a clear there finds; a channel on a
+     * player's reaction is no reaction the codec reads.
+     */
+    @Test
+    public void aDiscordReactionKeepsItsChannelThroughTheSave() {
+        long reacted = ChatMessageIdAllocator.next();
+        ChatHistory.record(reacted, ALICE, "Aldric", null,
+                line(reacted, ChatChannel.OOC, ALICE, "well met", ""),
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
+        ChatHistory.reactFromDiscord(reacted,
+                LostTalesChatMessagePacket.discordSenderId("42"), "Nils", "joy",
+                "", "900000000000000001", true);
+        ChatHistory.react(reacted, new ChatHistory.Requester(BOB, "", 0L,
+                null, EVERY_CHANNEL), BOB, "Beren", "joy", true);
+        NBTTagCompound written = new NBTTagCompound();
+        ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
+                ChatConsoleStream.snapshot(),
+                ChatConsoleStream.reactionsSnapshot(), Collections.<NBTTagCompound>emptyList());
+
+        ChatHistory.clear();
+        ChatHistory.restore(ChatHistoryNbtCodec.read(written).getEntries());
+        assertNull("nothing was made in another channel",
+                ChatHistory.clearDiscordReactions(reacted, null, "",
+                        "900000000000000002"));
+        assertNotNull(ChatHistory.clearDiscordReactions(reacted, null, "",
+                "900000000000000001"));
+
+        NBTTagCompound player = written.getTagList("Entries",
+                Constants.NBT.TAG_COMPOUND).getCompoundTagAt(0)
+                .getTagList("Reactions", Constants.NBT.TAG_COMPOUND)
+                .getCompoundTagAt(0).getTagList("Reactors",
+                        Constants.NBT.TAG_COMPOUND).getCompoundTagAt(1);
+        player.setString("Origin", "900000000000000001");
         ChatHistoryNbtCodec.ReadResult result = ChatHistoryNbtCodec.read(written);
         assertTrue(result.getEntries().isEmpty());
         assertEquals(1, result.getQuarantineEntriesCopy().size());

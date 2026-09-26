@@ -22,6 +22,7 @@ import com.ninuna.losttales.client.character.CharacterTemplateOffer;
 import com.ninuna.losttales.client.character.CharacterTemplateStore;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterCreationCatalogCache;
+import com.ninuna.losttales.client.character.ClientCharacterProfileCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
@@ -30,6 +31,8 @@ import com.ninuna.losttales.client.chat.ChatSpeechBubbles;
 import com.ninuna.losttales.client.window.PageContent;
 import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WindowLayoutStore;
+import com.ninuna.losttales.gui.screen.character.CharacterSubWindows;
+import com.ninuna.losttales.gui.screen.character.CharactersPage;
 import com.ninuna.losttales.gui.screen.party.PartyPage;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import net.minecraft.init.Items;
@@ -114,6 +117,7 @@ import com.ninuna.losttales.network.packet.character.CharacterCreationCatalogSyn
 import com.ninuna.losttales.network.packet.character.CharacterOperationResultPacket;
 import com.ninuna.losttales.network.packet.character.CharacterRosterSyncPacket;
 import com.ninuna.losttales.network.packet.character.LoreCharacterSyncPacket;
+import com.ninuna.losttales.network.packet.character.CharacterProfilePacket;
 import com.ninuna.losttales.network.packet.party.PartyMemberStatusSyncPacket;
 import com.ninuna.losttales.network.packet.party.PartyOperationResultPacket;
 import com.ninuna.losttales.network.packet.party.PartyStateSyncPacket;
@@ -199,8 +203,9 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     }
 
     /**
-     * The quest journal, the party and the map, each a page a window can
-     * hold, with the key that opens it from another page (N1 a).
+     * The quest journal, the party, the map and the characters, each a
+     * page a window can hold, with the key that opens it from another page
+     * (N1 a); and the Characters tab's own kinds of sub-window.
      */
     private static void registerPages() {
         WindowPages.register(QuestJournalPage.PAGE_ID, "gui.losttales.page.journal",
@@ -232,6 +237,17 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                         return new LostTalesMapPage();
                     }
                 });
+        WindowPages.register(CharactersPage.PAGE_ID,
+                "gui.losttales.page.characters", CharactersPage.ICON,
+                Window.ScreenFill.NONE,
+                LostTalesKeyBindings.getCharactersKeyBinding(),
+                new WindowPages.Factory() {
+                    @Override
+                    public PageContent create() {
+                        return new CharactersPage();
+                    }
+                });
+        CharacterSubWindows.install();
     }
 
     @Override
@@ -425,6 +441,11 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         }
         ClientCharacterRosterCache.acceptRoster(packet.getRequestId(), packet.getSnapshot());
         CharacterTemplateOffer.onRoster(packet.getSnapshot());
+    }
+
+    @Override
+    public void handleCharacterProfile(CharacterProfilePacket packet) {
+        ClientCharacterProfileCache.accept(packet);
     }
 
     @Override

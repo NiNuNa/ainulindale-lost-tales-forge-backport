@@ -11,7 +11,6 @@ import org.lwjgl.opengl.GL11;
  * pixels into place ({@link MotionIds#SCREEN_CONTROL_BAR}).
  */
 public final class LostTalesControlBarAnimation {
-    private static final float GUI_MODELVIEW_Z = -2000.0F;
     private static Object currentScreen;
     private static long startedNanos;
 
@@ -31,11 +30,14 @@ public final class LostTalesControlBarAnimation {
         GL11.glPopMatrix();
     }
 
-    /** Draws controls outside the parent GUI transform, using only bar motion. */
+    /**
+     * Draws controls outside the parent GUI transform, from the screen's
+     * {@link LostTalesGuiOrigin}, using only bar motion.
+     */
     public static void pushFixed(Object screen) {
         GL11.glPushMatrix();
-        GL11.glLoadIdentity();
-        GL11.glTranslatef(0.0F, offsetY(screen), GUI_MODELVIEW_Z);
+        LostTalesGuiOrigin.load();
+        GL11.glTranslatef(0.0F, offsetY(screen), 0.0F);
     }
 
     public static int fixedMouseX(GuiScreen screen, int logicalMouseX) {

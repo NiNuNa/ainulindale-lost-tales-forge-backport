@@ -24,7 +24,7 @@ public class RoleplayCharacter {
     private final String skinId;
     private final String bodyTypeId;
     private final String chestTypeId;
-    private final String description;
+    private final CharacterProfile profile;
     private final int age;
     private final String startingFactionId;
     private final String startingWaypointId;
@@ -73,7 +73,7 @@ public class RoleplayCharacter {
                 .cosmeticCape(source.cosmeticCapeId)
                 .startingWaypoint(source.startingWaypointId)
                 .unconventionalSettings(source.unconventionalSettings)
-                .description(source.description)
+                .profile(source.profile)
                 .bodyType(source.bodyTypeId)
                 .chestType(source.chestTypeId);
     }
@@ -93,7 +93,7 @@ public class RoleplayCharacter {
         this.chestTypeId = CharacterChestTypeRegistry.contains(builder.chestTypeId)
                 ? CharacterChestTypeRegistry.normalizeIdentifier(builder.chestTypeId)
                 : CharacterChestTypeRegistry.defaultFor(builder.genderId);
-        this.description = builder.description;
+        this.profile = builder.profile;
         this.age = builder.age;
         this.startingFactionId = builder.startingFactionId;
         this.startingWaypointId = builder.startingWaypointId;
@@ -132,7 +132,7 @@ public class RoleplayCharacter {
         private int cosmeticCapeId = DEFAULT_COSMETIC_CAPE_ID;
         private String startingWaypointId = "";
         private boolean unconventionalSettings;
-        private String description = "";
+        private CharacterProfile profile = CharacterProfile.EMPTY;
         private String bodyTypeId;
         private String chestTypeId;
         private CharacterKind kind = CharacterKind.ROLEPLAY;
@@ -240,8 +240,9 @@ public class RoleplayCharacter {
             return this;
         }
 
-        public Builder description(String description) {
-            this.description = description == null ? "" : description;
+        /** What the character says about itself; null is nothing. */
+        public Builder profile(CharacterProfile profile) {
+            this.profile = profile == null ? CharacterProfile.EMPTY : profile;
             return this;
         }
 
@@ -310,8 +311,9 @@ public class RoleplayCharacter {
         return this.chestTypeId;
     }
 
-    public String getDescription() {
-        return this.description;
+    /** What the character says about itself: its About texts, facts and glances. */
+    public CharacterProfile getProfile() {
+        return this.profile;
     }
 
     public int getAge() {

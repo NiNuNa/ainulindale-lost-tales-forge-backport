@@ -2,6 +2,7 @@ package com.ninuna.losttales.character.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
+import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.deletion.CharacterDeletionService;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipStorage;
@@ -361,7 +362,7 @@ public final class CharacterService {
                         adoption.getName(),
                         adoption.getRaceId(), adoption.getGenderId(),
                         adoption.getSkinId(), adoption.getBodyTypeId(),
-                        adoption.getChestTypeId(), adoption.getDescription(),
+                        adoption.getChestTypeId(), adoption.getHistory(),
                         adoption.getAge());
         if (!appearance.isValid()) {
             return refuseTemplate(data, roster, appearance.getErrorId());
@@ -379,7 +380,8 @@ public final class CharacterService {
                 .skin(wanted.getSkinId())
                 .bodyType(wanted.getBodyTypeId())
                 .chestType(wanted.getChestTypeId())
-                .description(wanted.getDescription())
+                .profile(current.getProfile().withSection(
+                        CharacterProfile.Section.HISTORY, wanted.getHistory()))
                 .age(wanted.getAge())
                 .minecraftCapeVisible(adoption.isMinecraftCapeVisible())
                 .cosmeticCape(adoption.getCosmeticCapeId())
@@ -471,14 +473,14 @@ public final class CharacterService {
     }
 
     /**
-     * A character's description and age, which its player may change at
-     * any time; everything else creation settled stays as it is. A lore
+     * A character's profile and age, which its player may change at any
+     * time; everything else creation settled stays as it is. A lore
      * character's are refused: its record passes from player to player,
      * and what one player wrote would be read as the next one's.
      */
     public synchronized CharacterOperationResult updateProfile(
             EntityPlayerMP player, long expectedRosterRevision, UUID characterId,
-            String requestedDescription, int requestedAge) {
+            CharacterProfile requestedProfile, int requestedAge) {
         CharacterValidationResult playerValidation = validateServerPlayer(player);
         if (!playerValidation.isValid()) {
             return CharacterOperationResult.failure(playerValidation.getErrorId(), null);
@@ -512,21 +514,22 @@ public final class CharacterService {
         if (lore != CharacterErrorId.NONE) {
             return CharacterOperationResult.failure(lore, roster);
         }
-        String description = CharacterValidator.normalizeDescription(
-                requestedDescription);
-        CharacterValidationResult profile = CharacterValidator.validateProfile(
-                description, requestedAge);
-        if (!profile.isValid()) {
-            return CharacterOperationResult.failure(profile.getErrorId(), roster);
+        CharacterProfile profile = CharacterValidator.normalizeProfile(
+                requestedProfile);
+        CharacterValidationResult validation = CharacterValidator.validateProfile(
+                profile, requestedAge);
+        if (!validation.isValid()) {
+            return CharacterOperationResult.failure(validation.getErrorId(),
+                    roster);
         }
 
         RoleplayCharacter current = roster.getCharacter(characterId);
         if (current.getAge() == requestedAge
-                && current.getDescription().equals(description)) {
+                && current.getProfile().equals(profile)) {
             return CharacterOperationResult.success(false, roster, current);
         }
         RoleplayCharacter updated = RoleplayCharacter.builder(current)
-                .description(description)
+                .profile(profile)
                 .age(requestedAge)
                 .build();
         if (!roster.replaceCharacter(updated)) {
@@ -653,7 +656,9 @@ public final class CharacterService {
                     .createdAt(System.currentTimeMillis())
                     .startingWaypoint(creation.getStartingWaypointId())
                     .unconventionalSettings(creation.hasUnconventionalSettings())
-                    .description(creation.getDescription())
+                    .profile(CharacterProfile.EMPTY.withSection(
+                            CharacterProfile.Section.HISTORY,
+                            creation.getHistory()))
                     .bodyType(creation.getBodyTypeId())
                     .chestType(creation.getChestTypeId())
                     .build();

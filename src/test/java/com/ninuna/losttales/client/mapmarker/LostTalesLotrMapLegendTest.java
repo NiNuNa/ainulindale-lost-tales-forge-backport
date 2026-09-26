@@ -11,7 +11,7 @@ public final class LostTalesLotrMapLegendTest {
     public void wideLayoutShowsEveryCategoryWithoutPaging() {
         LostTalesLotrMapLegend.Layout layout =
                 LostTalesLotrMapLegend.calculateLayout(
-                        700, 480, 6, 0);
+                        700, 480, LostTalesLotrMapControlBar.HEIGHT, 6, 0);
 
         assertTrue(layout.visible);
         assertFalse(layout.showArrows);
@@ -29,7 +29,7 @@ public final class LostTalesLotrMapLegendTest {
     public void narrowLayoutPagesAndClampsTheRequestedIndex() {
         LostTalesLotrMapLegend.Layout layout =
                 LostTalesLotrMapLegend.calculateLayout(
-                        320, 240, 6, 99);
+                        320, 240, LostTalesLotrMapControlBar.HEIGHT, 6, 99);
 
         assertTrue(layout.visible);
         assertTrue(layout.showArrows);
@@ -44,7 +44,7 @@ public final class LostTalesLotrMapLegendTest {
     public void tileAndArrowHitboxesRemainInsideThePanel() {
         LostTalesLotrMapLegend.Layout layout =
                 LostTalesLotrMapLegend.calculateLayout(
-                        240, 180, 6, 0);
+                        240, 180, LostTalesLotrMapControlBar.HEIGHT, 6, 0);
 
         assertTrue(layout.showArrows);
         assertTrue(layout.containsLeftArrow(
@@ -58,10 +58,21 @@ public final class LostTalesLotrMapLegendTest {
     }
 
     @Test
+    public void inAWindowTheLegendStandsAtTheMapsOwnFoot() {
+        LostTalesLotrMapLegend.Layout layout =
+                LostTalesLotrMapLegend.calculateLayout(700, 480, 0, 6, 0);
+
+        assertTrue(layout.visible);
+        assertEquals(480 - LostTalesLotrMapLegend.GAP_ABOVE_CONTROL_BAR
+                        - LostTalesLotrMapLegend.HEIGHT,
+                layout.panelY);
+    }
+
+    @Test
     public void layoutHidesWhenTheScaledScreenIsTooShort() {
         LostTalesLotrMapLegend.Layout layout =
                 LostTalesLotrMapLegend.calculateLayout(
-                        320, 70, 6, 0);
+                        320, 70, LostTalesLotrMapControlBar.HEIGHT, 6, 0);
 
         assertFalse(layout.visible);
     }

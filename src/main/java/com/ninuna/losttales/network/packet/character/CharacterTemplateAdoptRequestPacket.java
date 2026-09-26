@@ -39,7 +39,7 @@ public final class CharacterTemplateAdoptRequestPacket implements IMessage {
     private String skinId = "";
     private String bodyTypeId = "";
     private String chestTypeId = "";
-    private String description = "";
+    private String history = "";
     private int age;
     private boolean showMinecraftCape = true;
     private int cosmeticCapeId;
@@ -61,7 +61,7 @@ public final class CharacterTemplateAdoptRequestPacket implements IMessage {
         this.skinId = adoption.getSkinId();
         this.bodyTypeId = adoption.getBodyTypeId();
         this.chestTypeId = adoption.getChestTypeId();
-        this.description = adoption.getDescription();
+        this.history = adoption.getHistory();
         this.age = adoption.getAge();
         this.showMinecraftCape = adoption.isMinecraftCapeVisible();
         this.cosmeticCapeId = adoption.getCosmeticCapeId();
@@ -85,8 +85,8 @@ public final class CharacterTemplateAdoptRequestPacket implements IMessage {
                     buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             this.chestTypeId = CharacterPacketCodec.readString(
                     buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-            this.description = CharacterPacketCodec.readString(
-                    buffer, CharacterPacketCodec.MAX_DESCRIPTION_BYTES);
+            this.history = CharacterPacketCodec.readString(
+                    buffer, CharacterPacketCodec.MAX_SECTION_BYTES);
             this.age = buffer.readInt();
             this.showMinecraftCape = buffer.readBoolean();
             this.cosmeticCapeId = buffer.readInt();
@@ -123,7 +123,7 @@ public final class CharacterTemplateAdoptRequestPacket implements IMessage {
         CharacterPacketCodec.writeString(
                 buffer, this.chestTypeId, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
         CharacterPacketCodec.writeString(
-                buffer, this.description, CharacterPacketCodec.MAX_DESCRIPTION_BYTES);
+                buffer, this.history, CharacterPacketCodec.MAX_SECTION_BYTES);
         buffer.writeInt(this.age);
         // The cape the template chose comes last; the wire layout only grows.
         buffer.writeBoolean(this.showMinecraftCape);
@@ -140,7 +140,7 @@ public final class CharacterTemplateAdoptRequestPacket implements IMessage {
         return new CharacterTemplateAdoption(this.expectedRosterRevision,
                 this.offered, this.name, this.raceId, this.genderId,
                 this.skinId, this.bodyTypeId, this.chestTypeId,
-                this.description, this.age, this.showMinecraftCape,
+                this.history, this.age, this.showMinecraftCape,
                 this.cosmeticCapeId);
     }
 

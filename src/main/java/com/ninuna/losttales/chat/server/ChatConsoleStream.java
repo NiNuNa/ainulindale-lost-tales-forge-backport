@@ -117,7 +117,8 @@ public final class ChatConsoleStream {
             for (Map.Entry<String, Map<UUID, String>> kind
                     : kept.getValue().snapshot().entrySet()) {
                 for (Map.Entry<UUID, String> reactor : kind.getValue().entrySet()) {
-                    copy.restore(kind.getKey(), reactor.getKey(), reactor.getValue());
+                    copy.restore(kind.getKey(), reactor.getKey(), reactor.getValue(),
+                            kept.getValue().originOf(kind.getKey(), reactor.getKey()));
                 }
             }
             copies.put(kept.getKey(), copy);

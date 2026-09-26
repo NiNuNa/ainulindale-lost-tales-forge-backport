@@ -25,6 +25,10 @@
     "about": "The quest journal's lists and its reading marker gliding to where they were scrolled.",
     "follow": 0.09
   },
+  "screen.characters.glide": {
+    "about": "The Characters tab's roster and profile gliding to where they were scrolled, and its figure to the zoom the wheel gave it.",
+    "follow": 0.08
+  },
   "screen.dialogue.glide": {
     "about": "A quest conversation's replies gliding to bring the chosen one to the middle.",
     "follow": 0.08

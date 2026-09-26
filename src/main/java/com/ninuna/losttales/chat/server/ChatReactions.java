@@ -5,6 +5,7 @@ import com.ninuna.losttales.chat.emoji.ChatForeignEmoji;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -32,6 +33,10 @@ import java.util.UUID;
  * one emoji by its Discord id whatever it is called now, so a Discord
  * member's reaction finds its key by the id ({@link #discordKeyOf}),
  * while a player's names the key they were shown.</p>
+ *
+ * <p>A Discord member's reaction also keeps the Discord channel it was
+ * made in, since the bridge's own reaction on each linked copy stands for
+ * everyone who reacted anywhere but on that copy ({@link Stand}).</p>
  */
 public final class ChatReactions {
     public static final int MAX_KINDS = ChatReactionSummary.MAX_KINDS;
@@ -40,6 +45,13 @@ public final class ChatReactions {
 
     private final LinkedHashMap<String, LinkedHashMap<UUID, String>> byEmoji =
             new LinkedHashMap<String, LinkedHashMap<UUID, String>>();
+    /**
+     * Under each emoji, the Discord channel each Discord member reacted
+     * in. A player has none, and neither has a member whose channel is
+     * not known.
+     */
+    private final Map<String, Map<UUID, String>> origins =
+            new HashMap<String, Map<UUID, String>>();
     /** The keys a restore filed a saved key under by another name; null while none. */
     private Set<String> renamedOnRestore;
 
@@ -51,6 +63,15 @@ public final class ChatReactions {
      * changes nothing.
      */
     public boolean set(String emoji, UUID reactor, String name, boolean add) {
+        return set(emoji, reactor, name, "", add);
+    }
+
+    /**
+     * As {@link #set(String, UUID, String, boolean)}, for a Discord member
+     * who reacted in the Discord channel {@code origin}.
+     */
+    public boolean set(String emoji, UUID reactor, String name, String origin,
+                       boolean add) {
         if (emoji == null || reactor == null
                 || !ChatForeignEmoji.isReactionKey(emoji)) {
             return false;
@@ -60,6 +81,7 @@ public final class ChatReactions {
             if (reactors == null || reactors.remove(reactor) == null) {
                 return false;
             }
+            forgetOrigin(emoji, reactor);
             if (reactors.isEmpty()) {
                 this.byEmoji.remove(emoji);
             }
@@ -69,11 +91,12 @@ public final class ChatReactions {
                 && !LostTalesChatMessagePacket.isDiscordSender(reactor)) {
             return false;
         }
-        return put(emoji, reactors, reactor, name);
+        return put(emoji, reactors, reactor, name, origin);
     }
 
     /**
-     * One reaction read back from the save. Any reactor may hold a
+     * One reaction read back from the save, with the Discord channel a
+     * Discord member made it in (empty for a player). Any reactor may hold a
      * foreign emoji here, since the Discord member who brought it may
      * have taken theirs back while a player's stayed. A foreign key the
      * registry has come to carry since it was saved is kept under the
@@ -83,7 +106,7 @@ public final class ChatReactions {
      * refuse: no key, a reactor twice under one key, or one past the
      * bounds.
      */
-    boolean restore(String emoji, UUID reactor, String name) {
+    boolean restore(String emoji, UUID reactor, String name, String origin) {
         String key = ChatForeignEmoji.restoredKey(emoji);
         if (key == null || reactor == null) {
             return false;
@@ -100,7 +123,7 @@ public final class ChatReactions {
                 && this.renamedOnRestore.contains(key)) {
             return true;
         }
-        return put(key, reactors, reactor, name);
+        return put(key, reactors, reactor, name, origin);
     }
 
     /**
@@ -173,7 +196,7 @@ public final class ChatReactions {
     }
 
     private boolean put(String emoji, LinkedHashMap<UUID, String> reactors,
-                        UUID reactor, String name) {
+                        UUID reactor, String name, String origin) {
         if (reactors != null && reactors.containsKey(reactor)) {
             return false;
         }
@@ -186,16 +209,25 @@ public final class ChatReactions {
             this.byEmoji.put(emoji, reactors);
         }
         reactors.put(reactor, shown(name));
+        if (origin != null && origin.length() > 0) {
+            Map<UUID, String> byReactor = this.origins.get(emoji);
+            if (byReactor == null) {
+                byReactor = new HashMap<UUID, String>();
+                this.origins.put(emoji, byReactor);
+            }
+            byReactor.put(reactor, origin);
+        }
         return true;
     }
 
     /**
-     * Takes back every Discord member's reaction — with one emoji, or
-     * with every emoji when {@code emoji} is null — as Discord does when
-     * a moderator clears them there. A player's own reactions stay.
-     * Answers whether anything changed.
+     * Takes back the reactions Discord members made in the Discord
+     * channel {@code channel} with one emoji, or with every emoji when
+     * {@code emoji} is null. A reaction whose channel is not known goes
+     * with them; a player's own reactions stay, and so do those made in
+     * another Discord channel. Answers whether anything changed.
      */
-    public boolean clearDiscord(String emoji) {
+    private boolean clearKey(String emoji, String channel) {
         boolean changed = false;
         Iterator<Map.Entry<String, LinkedHashMap<UUID, String>>> kinds =
                 this.byEmoji.entrySet().iterator();
@@ -206,8 +238,11 @@ public final class ChatReactions {
             }
             Iterator<UUID> reactors = kind.getValue().keySet().iterator();
             while (reactors.hasNext()) {
-                if (LostTalesChatMessagePacket.isDiscordSender(reactors.next())) {
+                UUID reactor = reactors.next();
+                if (LostTalesChatMessagePacket.isDiscordSender(reactor)
+                        && madeIn(kind.getKey(), reactor, channel)) {
                     reactors.remove();
+                    forgetOrigin(kind.getKey(), reactor);
                     changed = true;
                 }
             }
@@ -219,25 +254,26 @@ public final class ChatReactions {
     }
 
     /**
-     * Takes back every Discord member's reaction with one emoji, as
-     * Discord does when a moderator clears that emoji there: every key
-     * of the custom emoji whose id is {@code customId}, whatever name
-     * each is kept under, and with no key for that id the key
-     * {@code emoji}. With no emoji and no id it takes back every Discord
-     * member's reaction, as {@link #clearDiscord(String)} with null does.
-     * A player's own reactions stay. Answers whether anything changed.
+     * Takes back the reactions Discord members made in the Discord
+     * channel {@code channel} with one emoji, as Discord does when a
+     * moderator clears that emoji there: every key of the custom emoji
+     * whose id is {@code customId}, whatever name each is kept under, and
+     * with no key for that id the key {@code emoji}. With no emoji and no
+     * id it takes back every emoji. Reactions made in another Discord
+     * channel stay, since its own moderators did not clear them, and so
+     * do the players' own. Answers whether anything changed.
      */
-    public boolean clearDiscord(String emoji, String customId) {
+    public boolean clearDiscord(String emoji, String customId, String channel) {
         List<String> keys = customKeysOf(customId);
         if (keys.isEmpty()) {
             if (emoji == null && ChatForeignEmoji.isCustomId(customId)) {
                 return false;
             }
-            return clearDiscord(emoji);
+            return clearKey(emoji, channel);
         }
         boolean changed = false;
         for (String key : keys) {
-            if (clearDiscord(key)) {
+            if (clearKey(key, channel)) {
                 changed = true;
             }
         }
@@ -245,31 +281,116 @@ public final class ChatReactions {
     }
 
     /**
-     * How many players — not Discord members — reacted with the emoji:
-     * what the bridge's own reaction on Discord stands for there. A
-     * custom emoji counts every key of its id, since the bot's one
-     * reaction there is by the id.
+     * Who stands behind the emoji, which decides the bridge's own
+     * reaction on each Discord copy. A custom emoji counts every key of
+     * its id, since the bot's one reaction there is by the id.
      */
-    public int gameCount(String emoji) {
+    public Stand standOf(String emoji) {
         if (emoji == null) {
-            return 0;
+            return Stand.NOBODY;
         }
         String customId = customIdOf(emoji);
         List<String> keys = customId == null
                 ? Collections.singletonList(emoji) : customKeysOf(customId);
-        int count = 0;
+        boolean players = false;
+        Set<String> channels = new HashSet<String>();
         for (String key : keys) {
             LinkedHashMap<UUID, String> reactors = this.byEmoji.get(key);
             if (reactors == null) {
                 continue;
             }
             for (UUID reactor : reactors.keySet()) {
-                if (!LostTalesChatMessagePacket.isDiscordSender(reactor)) {
-                    count++;
+                if (LostTalesChatMessagePacket.isDiscordSender(reactor)) {
+                    channels.add(originOf(key, reactor));
+                } else {
+                    players = true;
                 }
             }
         }
-        return count;
+        return new Stand(players, channels);
+    }
+
+    /** The Discord channel a Discord member reacted in; empty for a player, or for a channel not known. */
+    public String originOf(String emoji, UUID reactor) {
+        Map<UUID, String> byReactor = this.origins.get(emoji);
+        String origin = byReactor == null ? null : byReactor.get(reactor);
+        return origin == null ? "" : origin;
+    }
+
+    /** Every emoji on the message, in the order first used. */
+    public List<String> emoji() {
+        return new ArrayList<String>(this.byEmoji.keySet());
+    }
+
+    private boolean madeIn(String emoji, UUID reactor, String channel) {
+        String origin = originOf(emoji, reactor);
+        return origin.length() == 0 || origin.equals(channel);
+    }
+
+    private void forgetOrigin(String emoji, UUID reactor) {
+        Map<UUID, String> byReactor = this.origins.get(emoji);
+        if (byReactor != null && byReactor.remove(reactor) != null
+                && byReactor.isEmpty()) {
+            this.origins.remove(emoji);
+        }
+    }
+
+    /**
+     * Who reacted with one emoji, as the bridge needs it: whether any
+     * player did, and the Discord channels its Discord members reacted
+     * in, empty for one whose channel is not known. The bot is one
+     * member on Discord, so its one reaction on the copy in a Discord
+     * channel stands for everyone who reacted anywhere else.
+     */
+    public static final class Stand {
+        public static final Stand NOBODY =
+                new Stand(false, Collections.<String>emptySet());
+
+        private final boolean players;
+        private final Set<String> channels;
+
+        Stand(boolean players, Set<String> channels) {
+            this.players = players;
+            this.channels = Collections.unmodifiableSet(
+                    new HashSet<String>(channels));
+        }
+
+        /** Whether any player reacted with the emoji. */
+        public boolean players() {
+            return this.players;
+        }
+
+        /**
+         * Whether anyone reacted somewhere other than the Discord channel
+         * {@code discordChannelId}: a player, or a Discord member in
+         * another channel or in one not known.
+         */
+        public boolean standsFor(String discordChannelId) {
+            if (this.players) {
+                return true;
+            }
+            for (String channel : this.channels) {
+                if (!channel.equals(discordChannelId)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            if (!(other instanceof Stand)) {
+                return false;
+            }
+            Stand stand = (Stand) other;
+            return this.players == stand.players
+                    && this.channels.equals(stand.channels);
+        }
+
+        @Override
+        public int hashCode() {
+            return (this.players ? 31 : 0) + this.channels.hashCode();
+        }
     }
 
     public boolean isEmpty() {

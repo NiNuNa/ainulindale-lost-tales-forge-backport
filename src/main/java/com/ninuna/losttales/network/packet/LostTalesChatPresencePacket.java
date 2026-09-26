@@ -2,6 +2,7 @@ package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
+import com.ninuna.losttales.chat.ChatRoleplayStatus;
 import com.ninuna.losttales.chat.ChatStatusLine;
 import com.ninuna.losttales.chat.server.ChatPresenceService;
 import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
@@ -25,10 +26,13 @@ import net.minecraft.entity.player.EntityPlayerMP;
  * one ({@link ChatStatusLine}). An identity left out is Online, and has
  * no line. One byte of flags, one byte of count, then per identity its
  * kind, the character's id for a character, and the status's code; then
- * one byte of count and per identity its kind, id and line. Offline is
- * never chosen, a line is never empty, an identity named twice in either
- * list or past {@link #MAX_CHOICES} is malformed, and a malformed payload
- * is discarded whole.
+ * one byte of count and per identity its kind, id and line; then one byte
+ * of count and per identity its kind, id and role-play status's code, for
+ * the identities whose status is not their own default
+ * ({@link ChatRoleplayStatus#defaultFor}). Offline is never chosen, a line
+ * is never empty, an identity named twice in one list or past
+ * {@link #MAX_CHOICES} is malformed, and a malformed payload is discarded
+ * whole.
  */
 public final class LostTalesChatPresencePacket implements IMessage {
     /** Choices one payload may carry: the account, nine characters and lore ones besides. */
@@ -36,22 +40,40 @@ public final class LostTalesChatPresencePacket implements IMessage {
     static final int KIND_ACCOUNT = 0;
     static final int KIND_CHARACTER = 1;
     private static final int FLAG_IDLE = 1;
-    private static final int MAX_PACKET_BYTES = 3 + MAX_CHOICES * 18
-            + MAX_CHOICES * (17 + 2 + ChatStatusLine.MAX_BYTES);
+    private static final int MAX_PACKET_BYTES = 4 + MAX_CHOICES * 18
+            + MAX_CHOICES * (17 + 2 + ChatStatusLine.MAX_BYTES)
+            + MAX_CHOICES * 18;
 
     private boolean idle;
     private Map<ChatPresenceIdentity, ChatPresence> choices =
             Collections.emptyMap();
     private Map<ChatPresenceIdentity, String> lines = Collections.emptyMap();
+    private Map<ChatPresenceIdentity, ChatRoleplayStatus> roleplay =
+            Collections.emptyMap();
     private boolean malformed;
 
     public LostTalesChatPresencePacket() {}
 
     public LostTalesChatPresencePacket(boolean idle,
                                        Map<ChatPresenceIdentity, ChatPresence> choices,
-                                       Map<ChatPresenceIdentity, String> lines) {
+                                       Map<ChatPresenceIdentity, String> lines,
+                                       Map<ChatPresenceIdentity, ChatRoleplayStatus> roleplay) {
         this.idle = idle;
         this.lines = cleanLines(lines);
+        Map<ChatPresenceIdentity, ChatRoleplayStatus> keptRoleplay =
+                new LinkedHashMap<ChatPresenceIdentity, ChatRoleplayStatus>();
+        if (roleplay != null) {
+            for (Map.Entry<ChatPresenceIdentity, ChatRoleplayStatus> entry
+                    : roleplay.entrySet()) {
+                if (entry.getKey() != null && entry.getValue() != null
+                        && entry.getValue() != ChatRoleplayStatus.defaultFor(
+                                entry.getKey())
+                        && keptRoleplay.size() < MAX_CHOICES) {
+                    keptRoleplay.put(entry.getKey(), entry.getValue());
+                }
+            }
+        }
+        this.roleplay = Collections.unmodifiableMap(keptRoleplay);
         Map<ChatPresenceIdentity, ChatPresence> kept =
                 new LinkedHashMap<ChatPresenceIdentity, ChatPresence>();
         if (choices != null) {
@@ -133,15 +155,34 @@ public final class LostTalesChatPresencePacket implements IMessage {
                 }
                 readLines.put(identity, line);
             }
+            int roleplayCount = buffer.readUnsignedByte();
+            if (roleplayCount > MAX_CHOICES) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "too many role-play statuses");
+            }
+            Map<ChatPresenceIdentity, ChatRoleplayStatus> readRoleplay =
+                    new LinkedHashMap<ChatPresenceIdentity, ChatRoleplayStatus>();
+            for (int index = 0; index < roleplayCount; index++) {
+                ChatPresenceIdentity identity = readIdentity(buffer);
+                ChatRoleplayStatus status = ChatRoleplayStatus.fromCode(
+                        buffer.readUnsignedByte());
+                if (status == null || readRoleplay.containsKey(identity)) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "invalid role-play status");
+                }
+                readRoleplay.put(identity, status);
+            }
             LostTalesPacketCodec.requireFinished(buffer);
             this.idle = (flags & FLAG_IDLE) != 0;
             this.choices = Collections.unmodifiableMap(read);
             this.lines = Collections.unmodifiableMap(readLines);
+            this.roleplay = Collections.unmodifiableMap(readRoleplay);
         } catch (RuntimeException failure) {
             this.malformed = true;
             this.idle = false;
             this.choices = Collections.emptyMap();
             this.lines = Collections.emptyMap();
+            this.roleplay = Collections.emptyMap();
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -161,6 +202,12 @@ public final class LostTalesChatPresencePacket implements IMessage {
             writeIdentity(buffer, entry.getKey());
             LostTalesPacketCodec.writeUtf8String(buffer, entry.getValue(),
                     ChatStatusLine.MAX_BYTES);
+        }
+        buffer.writeByte(this.roleplay.size());
+        for (Map.Entry<ChatPresenceIdentity, ChatRoleplayStatus> entry
+                : this.roleplay.entrySet()) {
+            writeIdentity(buffer, entry.getKey());
+            buffer.writeByte(entry.getValue().code());
         }
     }
 
@@ -204,6 +251,11 @@ public final class LostTalesChatPresencePacket implements IMessage {
         return this.lines;
     }
 
+    /** The role-play statuses chosen, by identity; an identity left out keeps its default. */
+    public Map<ChatPresenceIdentity, ChatRoleplayStatus> getRoleplay() {
+        return this.roleplay;
+    }
+
     public boolean isMalformed() {
         return this.malformed;
     }
@@ -225,7 +277,7 @@ public final class LostTalesChatPresencePacket implements IMessage {
                         public void run(EntityPlayerMP sender) {
                             ChatPresenceService.state(sender,
                                     message.getChoices(), message.getLines(),
-                                    message.isIdle());
+                                    message.getRoleplay(), message.isIdle());
                         }
                     });
             return null;

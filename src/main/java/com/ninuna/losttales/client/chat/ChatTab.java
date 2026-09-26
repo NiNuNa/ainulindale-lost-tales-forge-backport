@@ -2,12 +2,16 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatTabIds;
+import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.TabMark;
 import com.ninuna.losttales.client.window.ToolStrip;
 import com.ninuna.losttales.client.window.Window;
+import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowTab;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
@@ -37,6 +41,12 @@ import net.minecraft.util.StatCollector;
  * filed under, and the selection points at.</p>
  */
 public final class ChatTab extends WindowTab {
+    /** The rows of a conversation's menu behind the tool strip's cog. */
+    private static final String MENU_MARK_READ = "mark_read";
+    private static final String MENU_JUMP_UNREAD = "jump_unread";
+    private static final String MENU_MUTE = "mute";
+    private static final String MENU_PINGS = "pings";
+    private static final String MENU_HIDE = "hide";
     /** The timestamp area's button: the person, for the heads the area holds. */
     private static final ToolStrip.Panel AREA_PANEL = new ToolStrip.Panel(
             LostTalesUiSheet.AREA, LostTalesUiSheet.AREA_HOVER,
@@ -463,6 +473,73 @@ public final class ChatTab extends WindowTab {
     public void toggleMemberList(Window window) {
         ChatLayout.setMembersHidden(window.getId(),
                 !ChatLayout.isMembersHidden(window));
+    }
+
+    /**
+     * A messenger's channel menu. While the tab holds anything unread:
+     * Mark as Read, the counters and the divider gone at once, and Jump to
+     * First Unread, the tab brought forward and its history taken to where
+     * the unread run begins. Then Mute Channel (out of the feed), Mute
+     * Mentions (cue silent) and Hide Channel (stays closed when messaged).
+     */
+    @Override
+    public List<MenuWindow.Entry> menuRows() {
+        List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>(5);
+        boolean divided = ClientChatChannelViews.unreadDividerLine(this) != null;
+        if (ClientChatChannelViews.hasUnread(this) || divided) {
+            rows.add(menuRow(MENU_MARK_READ, "gui.losttales.chat.tab.mark_read"));
+        }
+        if (divided) {
+            rows.add(menuRow(MENU_JUMP_UNREAD,
+                    "gui.losttales.chat.tab.jump_unread"));
+        }
+        rows.add(menuRow(MENU_MUTE, ChatLayout.isMuted(this)
+                ? "gui.losttales.chat.tab.unmute"
+                : "gui.losttales.chat.tab.mute"));
+        rows.add(menuRow(MENU_PINGS, ChatLayout.isPingsMuted(this)
+                ? "gui.losttales.chat.tab.unmute_mentions"
+                : "gui.losttales.chat.tab.mute_mentions"));
+        rows.add(menuRow(MENU_HIDE, ChatLayout.isHidden(this)
+                ? "gui.losttales.chat.tab.unhide"
+                : "gui.losttales.chat.tab.hide"));
+        return rows;
+    }
+
+    private static MenuWindow.Entry menuRow(String id, String labelKey) {
+        return new MenuWindow.Entry(id, StatCollector.translateToLocal(labelKey));
+    }
+
+    /** The switches stay; reading and jumping are done with the menu. */
+    @Override
+    public boolean takeMenuRow(String id) {
+        if (MENU_MUTE.equals(id)) {
+            ChatLayout.setMuted(this, !ChatLayout.isMuted(this));
+            return true;
+        }
+        if (MENU_PINGS.equals(id)) {
+            ChatLayout.setPingsMuted(this, !ChatLayout.isPingsMuted(this));
+            return true;
+        }
+        if (MENU_HIDE.equals(id)) {
+            ChatLayout.setHidden(this, !ChatLayout.isHidden(this));
+            return true;
+        }
+        if (MENU_MARK_READ.equals(id)) {
+            ClientChatChannelViews.markViewed(this);
+            ClientChatChannelViews.dismissDivider(this);
+        } else if (MENU_JUMP_UNREAD.equals(id)) {
+            Integer first = ClientChatChannelViews.unreadDividerLine(this);
+            WindowScreen screen = WindowScreen.current();
+            if (screen != null) {
+                screen.jumpToTab(this);
+            }
+            if (first != null) {
+                // The rows exist once the tab has been drawn; the next
+                // draw lands on the run's first line.
+                LostTalesChatPresentation.requestJump(first.intValue());
+            }
+        }
+        return false;
     }
 
     @Override

@@ -37,7 +37,7 @@ public final class LoreCharacterSyncPacket implements IMessage {
             for (int index = 0; index < count; index++) {
                 String id = string(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 String name = string(buffer, CharacterPacketCodec.MAX_NAME_BYTES);
-                String description = string(buffer, CharacterPacketCodec.MAX_DESCRIPTION_BYTES);
+                String description = string(buffer, CharacterPacketCodec.MAX_SECTION_BYTES);
                 String race = string(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 String gender = string(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 String model = string(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
@@ -76,7 +76,7 @@ public final class LoreCharacterSyncPacket implements IMessage {
         for (LoreCharacterSummary summary : summaries) {
             write(buffer, summary.getId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             write(buffer, summary.getName(), CharacterPacketCodec.MAX_NAME_BYTES);
-            write(buffer, summary.getDescription(), CharacterPacketCodec.MAX_DESCRIPTION_BYTES);
+            write(buffer, summary.getDescription(), CharacterPacketCodec.MAX_SECTION_BYTES);
             write(buffer, summary.getRaceId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             write(buffer, summary.getGenderId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             write(buffer, summary.getModelId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);

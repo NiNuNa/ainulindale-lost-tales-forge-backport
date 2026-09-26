@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.WindowKeys;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,10 +32,10 @@ public final class ChatShortcutsTest {
 
     @Test
     public void aKeyIsFoundByTheNameItsIconWrites() {
-        assertEquals("f", ChatShortcuts.keyName(Keyboard.KEY_F));
-        assertEquals("backspace", ChatShortcuts.keyName(Keyboard.KEY_BACK));
-        assertEquals("pgup", ChatShortcuts.keyName(Keyboard.KEY_PRIOR));
-        assertEquals("pgdn", ChatShortcuts.keyName(Keyboard.KEY_NEXT));
+        assertEquals("f", WindowKeys.keyName(Keyboard.KEY_F));
+        assertEquals("backspace", WindowKeys.keyName(Keyboard.KEY_BACK));
+        assertEquals("pgup", WindowKeys.keyName(Keyboard.KEY_PRIOR));
+        assertEquals("pgdn", WindowKeys.keyName(Keyboard.KEY_NEXT));
     }
 
     @Test

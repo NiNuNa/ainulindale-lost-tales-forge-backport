@@ -3,6 +3,7 @@ package com.ninuna.losttales.network.packet;
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
+import com.ninuna.losttales.chat.ChatRoleplayStatus;
 import com.ninuna.losttales.chat.ChatStatusLine;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
@@ -23,7 +24,9 @@ import java.util.UUID;
  * account shown to a player who has just joined, {@link #MAX_ACCOUNTS}
  * to a payload, which keeps a full one inside what a payload may carry.
  * Only Online, Away and Do Not Disturb travel: Invisible is never told to
- * anyone, and Offline is what is not said. A payload naming an account or
+ * anyone, and Offline is what is not said. Every identity shown travels
+ * with its role-play status, its default where none was chosen. A
+ * payload naming an account or
  * an identity twice, another status, or more than the bounds allow is
  * refused whole.
  */
@@ -32,27 +35,34 @@ public final class LostTalesChatPresenceSyncPacket implements IMessage {
     /** Identities one account may show at once: the account, the played character and the chat character, with room. */
     public static final int MAX_SHOWN = 8;
     private static final int MAX_PACKET_BYTES = 2 + MAX_ACCOUNTS
-            * (17 + MAX_SHOWN * (18 + 2 + ChatStatusLine.MAX_BYTES));
+            * (17 + MAX_SHOWN * (18 + 2 + ChatStatusLine.MAX_BYTES + 1));
 
     private Map<UUID, Map<ChatPresenceIdentity, ChatPresence>> accounts =
             Collections.emptyMap();
     private Map<UUID, Map<ChatPresenceIdentity, String>> lines =
+            Collections.emptyMap();
+    private Map<UUID, Map<ChatPresenceIdentity, ChatRoleplayStatus>> roleplay =
             Collections.emptyMap();
     private boolean malformed;
 
     public LostTalesChatPresenceSyncPacket() {}
 
     /**
-     * What each account's identities show, and the lines of those that
-     * have one; a line of an identity not shown is not told.
+     * What each account's identities show, the lines of those that have
+     * one, and each one's role-play status, its default where
+     * {@code roleplay} names none; nothing of an identity not shown is
+     * told.
      */
     public LostTalesChatPresenceSyncPacket(
             Map<UUID, Map<ChatPresenceIdentity, ChatPresence>> accounts,
-            Map<UUID, Map<ChatPresenceIdentity, String>> lines) {
+            Map<UUID, Map<ChatPresenceIdentity, String>> lines,
+            Map<UUID, Map<ChatPresenceIdentity, ChatRoleplayStatus>> roleplay) {
         Map<UUID, Map<ChatPresenceIdentity, ChatPresence>> kept =
                 new LinkedHashMap<UUID, Map<ChatPresenceIdentity, ChatPresence>>();
         Map<UUID, Map<ChatPresenceIdentity, String>> keptLines =
                 new LinkedHashMap<UUID, Map<ChatPresenceIdentity, String>>();
+        Map<UUID, Map<ChatPresenceIdentity, ChatRoleplayStatus>> keptRoleplay =
+                new LinkedHashMap<UUID, Map<ChatPresenceIdentity, ChatRoleplayStatus>>();
         if (accounts != null) {
             for (Map.Entry<UUID, Map<ChatPresenceIdentity, ChatPresence>> account
                     : accounts.entrySet()) {
@@ -64,10 +74,28 @@ public final class LostTalesChatPresenceSyncPacket implements IMessage {
                 kept.put(account.getKey(), shown);
                 keptLines.put(account.getKey(), linesOf(shown,
                         lines == null ? null : lines.get(account.getKey())));
+                keptRoleplay.put(account.getKey(), roleplayOf(shown,
+                        roleplay == null ? null : roleplay.get(account.getKey())));
             }
         }
         this.accounts = Collections.unmodifiableMap(kept);
         this.lines = Collections.unmodifiableMap(keptLines);
+        this.roleplay = Collections.unmodifiableMap(keptRoleplay);
+    }
+
+    /** Each identity shown with its role-play status: the one given, else its default. */
+    private static Map<ChatPresenceIdentity, ChatRoleplayStatus> roleplayOf(
+            Map<ChatPresenceIdentity, ChatPresence> shown,
+            Map<ChatPresenceIdentity, ChatRoleplayStatus> roleplay) {
+        Map<ChatPresenceIdentity, ChatRoleplayStatus> kept =
+                new LinkedHashMap<ChatPresenceIdentity, ChatRoleplayStatus>();
+        for (ChatPresenceIdentity identity : shown.keySet()) {
+            ChatRoleplayStatus status = roleplay == null ? null
+                    : roleplay.get(identity);
+            kept.put(identity, status == null
+                    ? ChatRoleplayStatus.defaultFor(identity) : status);
+        }
+        return Collections.unmodifiableMap(kept);
     }
 
     /** The lines of the identities shown, cleaned, the empty ones gone. */
@@ -126,6 +154,8 @@ public final class LostTalesChatPresenceSyncPacket implements IMessage {
                     new LinkedHashMap<UUID, Map<ChatPresenceIdentity, ChatPresence>>();
             Map<UUID, Map<ChatPresenceIdentity, String>> readLines =
                     new LinkedHashMap<UUID, Map<ChatPresenceIdentity, String>>();
+            Map<UUID, Map<ChatPresenceIdentity, ChatRoleplayStatus>> readRoleplay =
+                    new LinkedHashMap<UUID, Map<ChatPresenceIdentity, ChatRoleplayStatus>>();
             for (int index = 0; index < count; index++) {
                 UUID account = new UUID(buffer.readLong(), buffer.readLong());
                 int shownCount = buffer.readUnsignedByte();
@@ -137,6 +167,8 @@ public final class LostTalesChatPresenceSyncPacket implements IMessage {
                         new LinkedHashMap<ChatPresenceIdentity, ChatPresence>();
                 Map<ChatPresenceIdentity, String> accountLines =
                         new LinkedHashMap<ChatPresenceIdentity, String>();
+                Map<ChatPresenceIdentity, ChatRoleplayStatus> accountRoleplay =
+                        new LinkedHashMap<ChatPresenceIdentity, ChatRoleplayStatus>();
                 for (int at = 0; at < shownCount; at++) {
                     ChatPresenceIdentity identity =
                             LostTalesChatPresencePacket.readIdentity(buffer);
@@ -152,18 +184,29 @@ public final class LostTalesChatPresenceSyncPacket implements IMessage {
                     if (line.length() > 0) {
                         accountLines.put(identity, line);
                     }
+                    ChatRoleplayStatus status = ChatRoleplayStatus.fromCode(
+                            buffer.readUnsignedByte());
+                    if (status == null) {
+                        throw new LostTalesPacketCodec.DecodeException(
+                                "invalid role-play status");
+                    }
+                    accountRoleplay.put(identity, status);
                 }
                 read.put(account, Collections.unmodifiableMap(shown));
                 readLines.put(account,
                         Collections.unmodifiableMap(accountLines));
+                readRoleplay.put(account,
+                        Collections.unmodifiableMap(accountRoleplay));
             }
             LostTalesPacketCodec.requireFinished(buffer);
             this.accounts = Collections.unmodifiableMap(read);
             this.lines = Collections.unmodifiableMap(readLines);
+            this.roleplay = Collections.unmodifiableMap(readRoleplay);
         } catch (RuntimeException failure) {
             this.malformed = true;
             this.accounts = Collections.emptyMap();
             this.lines = Collections.emptyMap();
+            this.roleplay = Collections.emptyMap();
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -178,6 +221,8 @@ public final class LostTalesChatPresenceSyncPacket implements IMessage {
             buffer.writeByte(account.getValue().size());
             Map<ChatPresenceIdentity, String> accountLines =
                     this.lines.get(account.getKey());
+            Map<ChatPresenceIdentity, ChatRoleplayStatus> accountRoleplay =
+                    this.roleplay.get(account.getKey());
             for (Map.Entry<ChatPresenceIdentity, ChatPresence> entry
                     : account.getValue().entrySet()) {
                 LostTalesChatPresencePacket.writeIdentity(buffer, entry.getKey());
@@ -186,6 +231,10 @@ public final class LostTalesChatPresenceSyncPacket implements IMessage {
                         : accountLines.get(entry.getKey());
                 LostTalesPacketCodec.writeUtf8String(buffer,
                         line == null ? "" : line, ChatStatusLine.MAX_BYTES);
+                ChatRoleplayStatus status = accountRoleplay == null ? null
+                        : accountRoleplay.get(entry.getKey());
+                buffer.writeByte((status == null ? ChatRoleplayStatus
+                        .defaultFor(entry.getKey()) : status).code());
             }
         }
     }
@@ -201,6 +250,11 @@ public final class LostTalesChatPresenceSyncPacket implements IMessage {
      */
     public Map<UUID, Map<ChatPresenceIdentity, String>> getLines() {
         return this.lines;
+    }
+
+    /** Each shown identity's role-play status, by account; every account stated has its map. */
+    public Map<UUID, Map<ChatPresenceIdentity, ChatRoleplayStatus>> getRoleplay() {
+        return this.roleplay;
     }
 
     public boolean isMalformed() {

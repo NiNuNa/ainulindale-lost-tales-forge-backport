@@ -1,63 +1,93 @@
 package com.ninuna.losttales.client.window;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import net.minecraft.util.StatCollector;
 
 /**
- * The kinds of sub-window the chat opens: one of each at most, but a
- * card for each person. The id is what the layout file remembers a kind's
- * place by.
+ * A kind of sub-window: one of each is open at most, but a card for each
+ * person and a question for each page. The window system's own kinds are
+ * here; every system registers its own ({@link #register}) before the
+ * layout file is read, since the file remembers each kind's place by its
+ * id.
  */
-public enum SubWindowKind {
-    EMOJI("emoji"),
-    REACTIONS("reactions"),
-    ITEMS("items"),
-    MARKERS("markers"),
-    QUESTS("quests"),
-    CARD("card"),
-    /** A message's actions. */
-    MESSAGE("message"),
-    /** A person's: message them, ignore them. */
-    PERSON("person"),
-    /** A tab's settings, behind the channel's cog on the tool strip. */
-    TAB("tab"),
+public final class SubWindowKind {
+    private static final Map<String, SubWindowKind> KINDS =
+            new LinkedHashMap<String, SubWindowKind>();
+
+    /** A tab's menu, behind the cog on the tool strip. */
+    public static final SubWindowKind TAB = register("tab",
+            "gui.losttales.window.sub.tab");
     /** A window's own menu, behind the three dots at the end of its row. */
-    WINDOW("window"),
-    /** The palette a colour row of the window menu opens. */
-    PALETTE("palette"),
-    /** The closed channels and the conversations to open, behind the {@code +}. */
-    OPEN("open"),
+    public static final SubWindowKind WINDOW = register("window",
+            "gui.losttales.window.sub.window");
+    /** The palette a colour setting opens. */
+    public static final SubWindowKind PALETTE = register("palette",
+            "gui.losttales.window.sub.palette");
+    /** The closed tabs to open, behind the {@code +}. */
+    public static final SubWindowKind OPEN = register("open",
+            "gui.losttales.window.sub.open");
     /** The tab search. */
-    TAB_SEARCH("tab_search"),
-    /** The identities and the statuses, behind the head button. */
-    CHARACTERS("characters"),
-    /** The status line's field. */
-    STATUS_LINE("status_line"),
-    /** A message's report: a note and a reason. */
-    REPORT("report"),
-    /** Every chat setting, the channels' switches, the ignored and the shortcuts. */
-    SETTINGS("settings");
+    public static final SubWindowKind TAB_SEARCH = register("tab_search",
+            "gui.losttales.window.sub.tab_search");
+    /** The quick switcher: every tab, and what the pages find. */
+    public static final SubWindowKind SWITCHER = register("switcher",
+            "gui.losttales.window.sub.switcher");
+    /** Every setting, in sections. */
+    public static final SubWindowKind SETTINGS = register("settings",
+            "gui.losttales.window.sub.settings");
+    /** A question before an action that cannot be undone ({@link QuestionWindow}). */
+    public static final SubWindowKind QUESTION = register("question",
+            "gui.losttales.window.sub.question");
 
-    final String id;
+    /** What the layout file remembers the kind's place by. */
+    public final String id;
+    private final String titleKey;
 
-    SubWindowKind(String id) {
+    private SubWindowKind(String id, String titleKey) {
         this.id = id;
+        this.titleKey = titleKey;
+    }
+
+    /**
+     * The kind with this id, made the first time it is asked for; its
+     * strip reads {@code titleKey} where its content names nothing.
+     */
+    public static synchronized SubWindowKind register(String id,
+                                                      String titleKey) {
+        String key = normalise(id);
+        SubWindowKind kind = KINDS.get(key);
+        if (kind == null) {
+            kind = new SubWindowKind(key, titleKey);
+            KINDS.put(key, kind);
+        }
+        return kind;
     }
 
     /** The name on the window's strip. */
     public String title() {
-        return StatCollector.translateToLocal(
-                "gui.losttales.chat.small_window." + this.id);
+        return StatCollector.translateToLocal(this.titleKey);
     }
 
-    /** The kind the layout file names, or null for a word it does not know. */
-    static SubWindowKind fromId(String id) {
-        String wanted = id == null ? "" : id.trim().toLowerCase(Locale.ROOT);
-        for (SubWindowKind kind : values()) {
-            if (kind.id.equals(wanted)) {
-                return kind;
-            }
-        }
-        return null;
+    /** The kind the layout file names, or null for a word no system registered. */
+    static synchronized SubWindowKind fromId(String id) {
+        return KINDS.get(normalise(id));
+    }
+
+    /** Every kind, in the order they were registered. */
+    static synchronized List<SubWindowKind> all() {
+        return new ArrayList<SubWindowKind>(KINDS.values());
+    }
+
+    private static String normalise(String id) {
+        return id == null ? "" : id.trim().toLowerCase(Locale.ROOT);
+    }
+
+    @Override
+    public String toString() {
+        return this.id;
     }
 }
