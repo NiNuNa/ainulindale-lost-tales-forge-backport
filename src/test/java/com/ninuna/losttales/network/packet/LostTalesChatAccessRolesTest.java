@@ -37,14 +37,11 @@ public final class LostTalesChatAccessRolesTest {
     private static LostTalesChatAccessPacket statement(int played,
             int account, Map<UUID, Integer> own,
             LostTalesChatAccessPacket.RoleHolder holder, int radius) {
-        return new LostTalesChatAccessPacket(false, played,
-                holder == null
+        return ChatPacketFixtures.access(false, played)
+                .holders(holder == null
                         ? Collections.<LostTalesChatAccessPacket.RoleHolder>emptyList()
-                        : Collections.singletonList(holder),
-                Collections.<UUID>emptyList(), ChatRoleCatalog.current().roles(),
-                LostTalesChatAccessPacket.allChannelIds(),
-                LostTalesChatAccessPacket.allChannelIds(), false, false,
-                Collections.<String>emptyList(), account, own, radius);
+                        : Collections.singletonList(holder))
+                .accountRoles(account, own).proximity(radius).build();
     }
 
     private static LostTalesChatAccessPacket roundTrip(

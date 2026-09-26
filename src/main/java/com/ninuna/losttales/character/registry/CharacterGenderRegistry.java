@@ -1,10 +1,10 @@
 package com.ninuna.losttales.character.registry;
 
+import com.ninuna.losttales.util.LostTalesIdentifiers;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
-import java.util.Locale;
 import java.util.Set;
 
 /** Stable roleplay-gender identifiers accepted by character creation. */
@@ -24,7 +24,7 @@ public final class CharacterGenderRegistry {
     private CharacterGenderRegistry() {}
 
     public static boolean contains(String id) {
-        return IDENTIFIERS.contains(normalizeIdentifier(id));
+        return IDENTIFIERS.contains(LostTalesIdentifiers.normalize(id));
     }
 
     public static Collection<String> getAll() {
@@ -37,10 +37,6 @@ public final class CharacterGenderRegistry {
      * storing and displaying the roleplay value as non-binary.
      */
     public static String appearanceGender(String id) {
-        return FEMALE.equals(normalizeIdentifier(id)) ? FEMALE : MALE;
-    }
-
-    public static String normalizeIdentifier(String id) {
-        return id == null ? "" : id.trim().toLowerCase(Locale.ROOT);
+        return FEMALE.equals(LostTalesIdentifiers.normalize(id)) ? FEMALE : MALE;
     }
 }

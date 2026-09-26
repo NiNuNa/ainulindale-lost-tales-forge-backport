@@ -81,31 +81,10 @@ public final class ChatConsoleEvent {
     /** What was reported, for a {@link Kind#REPORT} entry; null for every other. */
     private final Report report;
 
-    public ChatConsoleEvent(long id, long timestampMillis, Kind kind,
-                            Severity severity, String actor, String text) {
-        this(id, timestampMillis, kind, severity, actor, text, "");
-    }
-
-    public ChatConsoleEvent(long id, long timestampMillis, Kind kind,
-                            Severity severity, String actor, String text,
-                            String context) {
-        this(id, timestampMillis, kind, severity, actor, text, context, null);
-    }
-
     /**
-     * As above with the actor's account as the server knew it; an
-     * identity naming another account than {@code actor} is dropped.
-     */
-    public ChatConsoleEvent(long id, long timestampMillis, Kind kind,
-                            Severity severity, String actor, String text,
-                            String context, ChatNamedPlayer actorIdentity) {
-        this(id, timestampMillis, kind, severity, actor, text, context,
-                actorIdentity, null);
-    }
-
-    /**
-     * As above with what a player reported: a {@link Kind#REPORT} entry
-     * carries its report, and no other entry carries one.
+     * An identity naming another account than {@code actor} is dropped. A
+     * {@link Kind#REPORT} entry carries its report, and no other entry
+     * carries one.
      */
     public ChatConsoleEvent(long id, long timestampMillis, Kind kind,
                             Severity severity, String actor, String text,

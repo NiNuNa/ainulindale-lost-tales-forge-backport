@@ -125,10 +125,6 @@ public final class ChatLineBands {
         return this.left[band];
     }
 
-    float rightOf(int band) {
-        return this.right[band];
-    }
-
     float topOf(int band) {
         return this.top[band];
     }

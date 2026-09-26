@@ -182,81 +182,6 @@ public final class LostTalesChatAccessPacket implements IMessage {
 
     public LostTalesChatAccessPacket() {}
 
-    public LostTalesChatAccessPacket(boolean operatorAccess) {
-        this(operatorAccess, 0);
-    }
-
-    public LostTalesChatAccessPacket(boolean operatorAccess, int roleMask) {
-        this(operatorAccess, roleMask, Collections.<RoleHolder>emptyList());
-    }
-
-    public LostTalesChatAccessPacket(boolean operatorAccess, int roleMask,
-                                     List<RoleHolder> roleHolders) {
-        this(operatorAccess, roleMask, roleHolders, Collections.<UUID>emptyList());
-    }
-
-    public LostTalesChatAccessPacket(boolean operatorAccess, int roleMask,
-                                     List<RoleHolder> roleHolders,
-                                     List<UUID> mutedSenders) {
-        this(operatorAccess, roleMask, roleHolders, mutedSenders,
-                ChatRoleCatalog.current().roles(), allChannelIds(), allChannelIds());
-    }
-
-    public LostTalesChatAccessPacket(boolean operatorAccess, int roleMask,
-                                     List<RoleHolder> roleHolders,
-                                     List<UUID> mutedSenders,
-                                     List<ChatAccountRole> catalog,
-                                     List<String> readableChannels,
-                                     List<String> sendableChannels) {
-        this(operatorAccess, roleMask, roleHolders, mutedSenders, catalog,
-                readableChannels, sendableChannels, false, false);
-    }
-
-    public LostTalesChatAccessPacket(boolean operatorAccess, int roleMask,
-                                     List<RoleHolder> roleHolders,
-                                     List<UUID> mutedSenders,
-                                     List<ChatAccountRole> catalog,
-                                     List<String> readableChannels,
-                                     List<String> sendableChannels,
-                                     boolean canModerate, boolean canEditServerConfig) {
-        this(operatorAccess, roleMask, roleHolders, mutedSenders, catalog,
-                readableChannels, sendableChannels, canModerate, canEditServerConfig,
-                Collections.<String>emptyList());
-    }
-
-    public LostTalesChatAccessPacket(boolean operatorAccess, int roleMask,
-                                     List<RoleHolder> roleHolders,
-                                     List<UUID> mutedSenders,
-                                     List<ChatAccountRole> catalog,
-                                     List<String> readableChannels,
-                                     List<String> sendableChannels,
-                                     boolean canModerate, boolean canEditServerConfig,
-                                     List<String> capabilities) {
-        this(operatorAccess, roleMask, roleHolders, mutedSenders, catalog,
-                readableChannels, sendableChannels, canModerate,
-                canEditServerConfig, capabilities, roleMask,
-                Collections.<UUID, Integer>emptyMap(), 0);
-    }
-
-    public LostTalesChatAccessPacket(boolean operatorAccess, int roleMask,
-                                     List<RoleHolder> roleHolders,
-                                     List<UUID> mutedSenders,
-                                     List<ChatAccountRole> catalog,
-                                     List<String> readableChannels,
-                                     List<String> sendableChannels,
-                                     boolean canModerate, boolean canEditServerConfig,
-                                     List<String> capabilities,
-                                     int accountRoleMask,
-                                     Map<UUID, Integer> characterRoleMasks,
-                                     int proximityRadius) {
-        this(operatorAccess, roleMask, roleHolders, mutedSenders, catalog,
-                readableChannels, sendableChannels, canModerate,
-                canEditServerConfig, capabilities, accountRoleMask,
-                characterRoleMasks, proximityRadius,
-                Collections.<String, ChatChannelIconSpec>emptyMap(),
-                ChatProfanityWords.NONE);
-    }
-
     /** The whole statement, see the class comment. */
     public LostTalesChatAccessPacket(boolean operatorAccess, int roleMask,
                                      List<RoleHolder> roleHolders,
@@ -889,10 +814,6 @@ public final class LostTalesChatAccessPacket implements IMessage {
         private final int mask;
         private final int accountMask;
         private final UUID characterId;
-
-        public RoleHolder(String name, int mask) {
-            this(name, mask, mask, null);
-        }
 
         public RoleHolder(String name, int mask, int accountMask,
                           UUID characterId) {

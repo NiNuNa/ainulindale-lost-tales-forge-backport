@@ -79,7 +79,7 @@ public final class CameraInterpolatorTest {
 
     @Test(expected = IllegalArgumentException.class)
     public void smoothingRejectsNegativeRates() {
-        new CameraSmoothing(-1.0D, 1.0D, 1.0D, 1.0D, 1.0D, 1.0D);
+        new CameraSmoothing(-1.0D, -1.0D, 1.0D, 1.0D, 1.0D, 1.0D, 1.0D);
     }
 
     private static CameraPose simulate(int framesPerSecond, double seconds) {
@@ -90,7 +90,7 @@ public final class CameraInterpolatorTest {
                 12.0D, 68.0D, -8.0D, -150.0D, 25.0D,
                 2.8D, 0.8D, 0.3D, -2.0D);
         CameraSmoothing smoothing = new CameraSmoothing(
-                8.0D, 15.0D, 10.0D, 12.0D, 9.0D, 6.0D);
+                8.0D, 8.0D, 15.0D, 10.0D, 12.0D, 9.0D, 6.0D);
         int frames = (int)Math.round(framesPerSecond * seconds);
         double delta = seconds / frames;
         for (int frame = 0; frame < frames; frame++) {
@@ -107,7 +107,7 @@ public final class CameraInterpolatorTest {
     }
 
     private static CameraSmoothing allRates(double rate) {
-        return new CameraSmoothing(rate, rate, rate, rate, rate, rate);
+        return new CameraSmoothing(rate, rate, rate, rate, rate, rate, rate);
     }
 
     private static void assertPoseEquals(

@@ -1,6 +1,7 @@
 package com.ninuna.losttales.network.packet.character;
 
 import com.ninuna.losttales.character.server.CharacterTemplateAdoption;
+import cpw.mods.fml.common.network.ByteBufUtils;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import org.junit.Test;
@@ -69,7 +70,7 @@ public final class CharacterTemplateAdoptRequestPacketTest {
             buffer.writeLong(-1L);
             buffer.writeBoolean(true);
             for (int field = 0; field < 7; field++) {
-                buffer.writeShort(0);
+                ByteBufUtils.writeVarInt(buffer, 0, 2);
             }
             buffer.writeInt(20);
             CharacterTemplateAdoptRequestPacket packet =

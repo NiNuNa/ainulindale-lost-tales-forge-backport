@@ -4,6 +4,7 @@ import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.server.CharacterNetworkRequestHandler;
 import com.ninuna.losttales.character.server.CharacterServerPacketDispatcher;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
+import com.ninuna.losttales.network.packet.LostTalesPacketCodec;
 import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
@@ -40,9 +41,9 @@ public final class LoreCharacterClaimRequestPacket implements IMessage {
             this.expectedRosterRevision = buffer.readLong();
             this.expectedOwnershipRevision = buffer.readLong();
             this.slotIndex = buffer.readByte();
-            this.loreCharacterId = CharacterPacketCodec.readString(
+            this.loreCharacterId = LostTalesPacketCodec.readUtf8String(
                     buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-            CharacterPacketCodec.requireFinished(buffer);
+            LostTalesPacketCodec.requireFinished(buffer);
             if (this.expectedRosterRevision < 0L
                     || this.expectedOwnershipRevision < 0L
                     || this.loreCharacterId.length() == 0
@@ -57,7 +58,7 @@ public final class LoreCharacterClaimRequestPacket implements IMessage {
         buffer.writeLong(this.expectedRosterRevision);
         buffer.writeLong(this.expectedOwnershipRevision);
         buffer.writeByte(this.slotIndex);
-        CharacterPacketCodec.writeString(buffer, this.loreCharacterId,
+        LostTalesPacketCodec.writeUtf8String(buffer, this.loreCharacterId,
                 CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
     }
 

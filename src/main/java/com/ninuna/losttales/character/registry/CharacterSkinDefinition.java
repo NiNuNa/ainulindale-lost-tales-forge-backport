@@ -1,5 +1,7 @@
 package com.ninuna.losttales.character.registry;
 
+import com.ninuna.losttales.util.LostTalesIdentifiers;
+
 /**
  * One server-valid character skin.
  *
@@ -96,7 +98,7 @@ public final class CharacterSkinDefinition {
     }
 
     public boolean isCompatibleWith(String raceId, String genderId) {
-        if (!this.raceId.equals(CharacterRaceRegistry.normalizeIdentifier(raceId))) {
+        if (!this.raceId.equals(LostTalesIdentifiers.normalize(raceId))) {
             return false;
         }
         return this.genderId.length() == 0

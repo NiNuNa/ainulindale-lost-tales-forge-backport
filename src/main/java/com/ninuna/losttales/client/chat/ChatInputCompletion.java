@@ -527,17 +527,10 @@ final class ChatInputCompletion implements ChatInputField.MentionSource {
                     this.font, x, y, anchor, inputX));
         }
         if (this.commandSuggestions.contains(this.font, x, y, anchor, inputX)) {
-            return new Slot(Slot.COMMAND, this.commandSuggestions.candidateAt(
+            return new Slot(Slot.COMMAND, this.commandSuggestions.rowAt(
                     this.font, x, y, anchor, inputX));
         }
         return null;
-    }
-
-    /** The mention candidate a slot names, for its hover card, or null. */
-    ChatMentionCandidate mentionAt(Slot slot) {
-        return slot != null && slot.box == Slot.NAME
-                && LostTalesConfig.enableChatPings
-                ? this.nameSuggestions.at(slot.row) : null;
     }
 
     /**

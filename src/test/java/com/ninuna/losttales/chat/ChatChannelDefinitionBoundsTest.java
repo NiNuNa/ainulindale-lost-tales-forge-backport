@@ -126,7 +126,7 @@ public final class ChatChannelDefinitionBoundsTest {
                 new ChatChannelDescriptor("global", "Stolen",
                         ChatPresentationMode.IN_CHARACTER,
                         ChatRecipientRule.EVERYONE, ChatChannelAccess.NONE,
-                        0xFFFFFF, false)), this.channelWarnings());
+                        0xFFFFFF, false, ChatChannelScope.NONE)), this.channelWarnings());
 
         assertEquals(builtIn, ChatChannel.fromId("global"));
         assertFalse(this.warnings.isEmpty());

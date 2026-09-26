@@ -25,23 +25,15 @@ final class LostTalesChatMotion {
         float slide = Motions.param(id, "slide", 14.0F);
         float followThrough = Motions.param(id, "follow_through", 6.0F);
         float fadeLead = Math.max(0.05F, Motions.param(id, "fade_lead", 0.58F));
-        float p = clamp(progress);
-        float settled = smoothStep(p);
+        float p = LostTalesGuiEasing.clamp(progress);
+        float settled = LostTalesGuiEasing.smoothStep(p);
         float slideIn = -slide * (1.0F - settled) * (1.0F - settled);
         float swing = followThrough * (1.0F - p)
-                * (float)Math.sin(clamp((p - 0.35F) / 0.65F) * Math.PI);
+                * (float)Math.sin(LostTalesGuiEasing.clamp((p - 0.35F) / 0.65F) * Math.PI);
         return new MessageSample(
                 rise * (1.0F - settled),
-                smoothStep(clamp(p / fadeLead)),
+                LostTalesGuiEasing.smoothStep(LostTalesGuiEasing.clamp(p / fadeLead)),
                 slideIn + swing);
-    }
-
-    static float smoothStep(float value) {
-        return LostTalesGuiEasing.smoothStep(value);
-    }
-
-    private static float clamp(float value) {
-        return LostTalesGuiEasing.clamp(value);
     }
 
     static final class MessageSample {

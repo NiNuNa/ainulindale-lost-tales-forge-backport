@@ -38,7 +38,6 @@ public final class ChatForeignEmoji {
     public static final int MAX_UNICODE_CODE_POINTS = 16;
 
     private static final Charset UTF_8 = Charset.forName("UTF-8");
-    private static final int VARIATION_SELECTOR = 0xFE0F;
     private static final int ZERO_WIDTH_JOINER = 0x200D;
     private static final int KEYCAP = 0x20E3;
 
@@ -152,7 +151,7 @@ public final class ChatForeignEmoji {
         }
         int end = match.length;
         while (end < unicode.length()
-                && unicode.charAt(end) == VARIATION_SELECTOR) {
+                && unicode.charAt(end) == ChatEmoji.VARIATION_SELECTOR) {
             end++;
         }
         return end == unicode.length() ? match.emoji : null;
@@ -275,7 +274,7 @@ public final class ChatForeignEmoji {
     /** What joins, styles or tags a pictograph within one emoji. */
     private static boolean isJoining(int codePoint) {
         return codePoint == ZERO_WIDTH_JOINER
-                || codePoint == VARIATION_SELECTOR
+                || codePoint == ChatEmoji.VARIATION_SELECTOR
                 || codePoint == KEYCAP
                 || (codePoint >= 0xE0020 && codePoint <= 0xE007F);
     }

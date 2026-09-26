@@ -489,10 +489,6 @@ public final class WindowGestures {
             this.fromLeft = fromLeft;
             this.fromTop = fromTop;
         }
-
-        boolean isCorner() {
-            return this.horizontal && this.vertical;
-        }
     }
 
     /** A window and the edge of it the pointer is on. */

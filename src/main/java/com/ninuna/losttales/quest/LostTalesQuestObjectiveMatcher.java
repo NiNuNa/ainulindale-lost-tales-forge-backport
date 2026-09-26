@@ -29,8 +29,8 @@ public final class LostTalesQuestObjectiveMatcher {
         }
         Map<String, String> params = objective.getParams();
         return matchesItemOrTag(stack,
-                firstNonEmpty(params.get("item"), params.get("itemId"), params.get("items")),
-                firstNonEmpty(params.get("tag"), params.get("ore"), params.get("oreDict"), params.get("oredict")));
+                LostTalesQuestParams.value(params, "item"),
+                LostTalesQuestParams.value(params, "ore"));
     }
 
     public static boolean matchesItemOrTag(ItemStack stack, String itemSpec, String tagSpec) {
@@ -77,8 +77,8 @@ public final class LostTalesQuestObjectiveMatcher {
         }
         Map<String, String> params = objective.getParams();
         return matchesEntity(entity,
-                firstNonEmpty(params.get("entity"), params.get("entityId"), params.get("type")),
-                firstNonEmpty(params.get("tag"), params.get("group")));
+                LostTalesQuestParams.value(params, "entity"),
+                LostTalesQuestParams.value(params, "group"));
     }
 
     public static boolean matchesEntity(Entity entity, String entitySpec, String tagSpec) {
@@ -275,7 +275,11 @@ public final class LostTalesQuestObjectiveMatcher {
         return stripped;
     }
 
-    private static String normalizeResourceId(String value) {
+    /**
+     * A registry name as selectors compare it: trimmed, lower-cased, and
+     * in the {@code minecraft} namespace when it names none.
+     */
+    static String normalizeResourceId(String value) {
         if (value == null) {
             return "";
         }
@@ -315,18 +319,6 @@ public final class LostTalesQuestObjectiveMatcher {
             }
         }
         return builder.toString();
-    }
-
-    private static String firstNonEmpty(String... values) {
-        if (values == null) {
-            return "";
-        }
-        for (String value : values) {
-            if (value != null && value.trim().length() > 0) {
-                return value.trim();
-            }
-        }
-        return "";
     }
 
     private static final class ParsedItemSelector {

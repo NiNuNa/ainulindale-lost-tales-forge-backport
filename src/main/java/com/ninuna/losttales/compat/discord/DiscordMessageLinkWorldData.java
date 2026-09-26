@@ -1,10 +1,9 @@
 package com.ninuna.losttales.compat.discord;
 
+import com.ninuna.losttales.storage.NbtTags;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
-import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.WorldSavedData;
 
@@ -82,7 +81,7 @@ public final class DiscordMessageLinkWorldData extends WorldSavedData {
     public synchronized void writeToNBT(NBTTagCompound compound) {
         if (this.readOnlyForNewerVersion) {
             if (this.preservedNewerData != null) {
-                copyTagContents(this.preservedNewerData, compound);
+                NbtTags.copyContents(this.preservedNewerData, compound);
             }
             return;
         }
@@ -167,20 +166,5 @@ public final class DiscordMessageLinkWorldData extends WorldSavedData {
 
     public synchronized int getQuarantinedEntryCount() {
         return this.quarantinedEntries.size();
-    }
-
-    private static void copyTagContents(NBTTagCompound source,
-                                        NBTTagCompound destination) {
-        Set<?> keySet = source.func_150296_c();
-        for (Object keyObject : keySet) {
-            if (!(keyObject instanceof String)) {
-                continue;
-            }
-            String key = (String) keyObject;
-            NBTBase value = source.getTag(key);
-            if (value != null) {
-                destination.setTag(key, value.copy());
-            }
-        }
     }
 }

@@ -438,7 +438,7 @@ public final class ChatMemberList {
         state.scrollNanos = now;
         float most = Math.max(0.0F, state.contentHeight - room);
         state.scrollTarget = Math.max(0.0F, Math.min(most, state.scrollTarget));
-        state.scroll = (float)Motions.followTravel(MotionIds.CHAT_SCROLL,
+        state.scroll = (float)Motions.followTravel(MotionIds.WINDOW_SCROLL,
                 state.scroll, state.scrollTarget, elapsed);
         if (Math.abs(state.scroll - state.scrollTarget) < 0.05F) {
             state.scroll = state.scrollTarget;

@@ -1,7 +1,6 @@
 package com.ninuna.losttales.chat.emoji;
 
-import com.ninuna.losttales.LostTalesMetaData;
-import cpw.mods.fml.common.FMLLog;
+import com.ninuna.losttales.util.LostTalesLog;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -41,7 +40,6 @@ public final class ChatEmojiShortcodes {
     /** Characters in one name. */
     static final int MAX_NAME_LENGTH = 64;
 
-    private static final int VARIATION_SELECTOR = 0xFE0F;
     private static final char KEYCAP = '\u20E3';
     private static final int MIN_HEX_DIGITS = 4;
     private static final int MAX_HEX_DIGITS = 6;
@@ -66,7 +64,7 @@ public final class ChatEmojiShortcodes {
         for (int index = 0; index < unicode.length(); ) {
             int codePoint = unicode.codePointAt(index);
             index += Character.charCount(codePoint);
-            if (codePoint == VARIATION_SELECTOR) {
+            if (codePoint == ChatEmoji.VARIATION_SELECTOR) {
                 continue;
             }
             if (hexcode.length() > 0) {
@@ -111,7 +109,7 @@ public final class ChatEmojiShortcodes {
             return true;
         }
         int next = index + 1;
-        return next < text.length() && (text.charAt(next) == VARIATION_SELECTOR
+        return next < text.length() && (text.charAt(next) == ChatEmoji.VARIATION_SELECTOR
                 || text.charAt(next) == KEYCAP);
     }
 
@@ -142,16 +140,19 @@ public final class ChatEmojiShortcodes {
             input = ChatEmojiShortcodes.class.getClassLoader()
                     .getResourceAsStream(resource);
             if (input == null) {
-                warn("Emoji name list %s is missing; emoji the game lacks are named by their code points",
+                LostTalesLog.warning("Emoji name list %s is missing; emoji the game lacks "
+                                + "are named by their code points",
                         resource);
                 return Collections.emptyMap();
             }
             return Collections.unmodifiableMap(read(input));
         } catch (IOException e) {
-            warn("Emoji name list %s could not be read; emoji the game lacks are named by their code points: %s",
+            LostTalesLog.warning("Emoji name list %s could not be read; emoji the game "
+                            + "lacks are named by their code points: %s",
                     resource, e);
         } catch (RuntimeException e) {
-            warn("Emoji name list %s could not be read; emoji the game lacks are named by their code points: %s",
+            LostTalesLog.warning("Emoji name list %s could not be read; emoji the game "
+                            + "lacks are named by their code points: %s",
                     resource, e);
         } finally {
             closeAfterReading(input);
@@ -289,17 +290,6 @@ public final class ChatEmojiShortcodes {
             input.close();
         } catch (IOException ignored) {
             // The list is read by then; a failed close loses nothing.
-        }
-    }
-
-    private static void warn(String format, Object... args) {
-        Object[] values = new Object[args.length + 1];
-        values[0] = LostTalesMetaData.MOD_ID;
-        System.arraycopy(args, 0, values, 1, args.length);
-        try {
-            FMLLog.warning("[%s] " + format, values);
-        } catch (RuntimeException ignored) {
-            // FML's logger is not set up in runtime-free unit tests.
         }
     }
 

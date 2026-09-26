@@ -32,8 +32,7 @@ public final class LostTalesChatPacketTest {
     @Test
     public void sendRequestRoundTripsAndRejectsTrailingData() {
         LostTalesChatSendPacket original =
-                new LostTalesChatSendPacket(
-                        ChatChannel.PARTY, "Meet at the western gate.");
+                ChatPacketFixtures.send(ChatChannel.PARTY, "Meet at the western gate.").build();
         ByteBuf buffer = Unpooled.buffer();
         original.toBytes(buffer);
         LostTalesChatSendPacket decoded =
@@ -57,12 +56,11 @@ public final class LostTalesChatPacketTest {
     @Test
     public void sendRequestCarriesTheAskedForIdentity() {
         assertEquals(LostTalesChatSendPacket.IDENTITY_DEFAULT,
-                new LostTalesChatSendPacket(ChatChannel.GLOBAL, "hello")
+                ChatPacketFixtures.send(ChatChannel.GLOBAL, "hello").build()
                         .getIdentityKind());
         java.util.UUID characterId = java.util.UUID.randomUUID();
-        LostTalesChatSendPacket original = new LostTalesChatSendPacket(
-                ChatChannel.OOC, "hello", null, "",
-                LostTalesChatSendPacket.IDENTITY_CHARACTER, characterId);
+        LostTalesChatSendPacket original = ChatPacketFixtures.send(ChatChannel.OOC, "hello")
+                .as(LostTalesChatSendPacket.IDENTITY_CHARACTER, characterId).build();
         ByteBuf buffer = Unpooled.buffer();
         original.toBytes(buffer);
         LostTalesChatSendPacket decoded = new LostTalesChatSendPacket();
@@ -72,9 +70,8 @@ public final class LostTalesChatPacketTest {
                 decoded.getIdentityKind());
         assertEquals(characterId, decoded.getIdentityCharacterId());
 
-        LostTalesChatSendPacket account = new LostTalesChatSendPacket(
-                ChatChannel.GLOBAL, "hello", null, "",
-                LostTalesChatSendPacket.IDENTITY_ACCOUNT, null);
+        LostTalesChatSendPacket account = ChatPacketFixtures.send(ChatChannel.GLOBAL, "hello")
+                .as(LostTalesChatSendPacket.IDENTITY_ACCOUNT, null).build();
         ByteBuf accountBuffer = Unpooled.buffer();
         account.toBytes(accountBuffer);
         LostTalesChatSendPacket decodedAccount =
@@ -94,8 +91,8 @@ public final class LostTalesChatPacketTest {
         ByteBuf badKind = Unpooled.buffer();
         account.toBytes(badKind);
         ByteBuf defaultKind = Unpooled.buffer();
-        new LostTalesChatSendPacket(ChatChannel.GLOBAL, "hello", null, "",
-                LostTalesChatSendPacket.IDENTITY_DEFAULT, null)
+        ChatPacketFixtures.send(ChatChannel.GLOBAL, "hello")
+                .as(LostTalesChatSendPacket.IDENTITY_DEFAULT, null).build()
                 .toBytes(defaultKind);
         badKind.setByte(onlyDifference(badKind, defaultKind), 9);
         LostTalesChatSendPacket rejected = new LostTalesChatSendPacket();
@@ -124,11 +121,12 @@ public final class LostTalesChatPacketTest {
 
     @Test
     public void sendRequestCarriesBoundedShareReferences() {
-        LostTalesChatSendPacket original = new LostTalesChatSendPacket(
-                ChatChannel.GLOBAL, "see [i:Sword] [m:Bree] [q:Road Work]",
-                Arrays.asList(ChatShareReference.item(4),
+        LostTalesChatSendPacket original = ChatPacketFixtures.send(
+                ChatChannel.GLOBAL, "see [i:Sword] [m:Bree] [q:Road Work]")
+                .sharing(Arrays.asList(ChatShareReference.item(4),
                         ChatShareReference.marker("losttales:bree"),
-                        ChatShareReference.quest("losttales:road_work")));
+                        ChatShareReference.quest("losttales:road_work")))
+                .build();
         ByteBuf buffer = Unpooled.buffer();
         original.toBytes(buffer);
         LostTalesChatSendPacket decoded = new LostTalesChatSendPacket();
@@ -155,7 +153,7 @@ public final class LostTalesChatPacketTest {
 
         // A hand-built payload with an out-of-range slot is discarded.
         ByteBuf forged = Unpooled.buffer();
-        new LostTalesChatSendPacket(ChatChannel.GLOBAL, "[i:Sword]")
+        ChatPacketFixtures.send(ChatChannel.GLOBAL, "[i:Sword]").build()
                 .toBytes(forged);
         forged.writerIndex(forged.writerIndex() - 1);
         forged.writeByte(1);
@@ -170,19 +168,18 @@ public final class LostTalesChatPacketTest {
     @Test
     public void presentationCarriesValidatedShowcasesAndRejectsBadOnes() {
         byte[] data = new byte[] {31, -117, 8, 0, 1, 2, 3, 4};
-        LostTalesChatMessagePacket original =
-                new LostTalesChatMessagePacket(
-                        ChatChannel.OOC, UUID.randomUUID(), "Steve",
-                        "Steve", "", 0xFFFFFF, 0xFFFFFF,
-                        "look [i:Sword] near [m:Bree] [q:Road Work]", 5L, "",
-                        Arrays.asList(ChatShowcase.item(0, data),
-                                ChatShowcase.marker(1, "losttales:bree",
-                                        "Bree", "town", "orange", 100,
-                                        512.5D, -384.0D),
-                                ChatShowcase.quest(2, "losttales:road_work",
-                                        "Road Work", "Regional",
-                                        "Defeat 4 orcs", "Experience: 20",
-                                        true)));
+        LostTalesChatMessagePacket original = ChatPacketFixtures.line(
+                ChatChannel.OOC, "Steve", "Steve",
+                "look [i:Sword] near [m:Bree] [q:Road Work]").at(5L)
+                .showcases(Arrays.asList(ChatShowcase.item(0, data),
+                        ChatShowcase.marker(1, "losttales:bree",
+                                "Bree", "town", "orange", 100,
+                                512.5D, -384.0D),
+                        ChatShowcase.quest(2, "losttales:road_work",
+                                "Road Work", "Regional",
+                                "Defeat 4 orcs", "Experience: 20",
+                                true)))
+                .build();
         ByteBuf buffer = Unpooled.buffer();
         original.toBytes(buffer);
         LostTalesChatMessagePacket decoded =
@@ -223,11 +220,8 @@ public final class LostTalesChatPacketTest {
         // A showcase whose kind does not match its token is refused.
         boolean rejectedKind = false;
         try {
-            new LostTalesChatMessagePacket(
-                    ChatChannel.OOC, UUID.randomUUID(), "Steve",
-                    "Steve", "", 0xFFFFFF, 0xFFFFFF,
-                    "only [m:Bree]", 5L, "",
-                    Arrays.asList(ChatShowcase.item(0, data)));
+            ChatPacketFixtures.line(ChatChannel.OOC, "Steve", "Steve", "only [m:Bree]").at(5L)
+                    .showcases(Arrays.asList(ChatShowcase.item(0, data))).build();
         } catch (IllegalArgumentException expected) {
             rejectedKind = true;
         }
@@ -235,11 +229,8 @@ public final class LostTalesChatPacketTest {
 
         boolean rejectedIndex = false;
         try {
-            new LostTalesChatMessagePacket(
-                    ChatChannel.OOC, UUID.randomUUID(), "Steve",
-                    "Steve", "", 0xFFFFFF, 0xFFFFFF,
-                    "only [i:Sword]", 5L, "",
-                    Arrays.asList(ChatShowcase.item(1, data)));
+            ChatPacketFixtures.line(ChatChannel.OOC, "Steve", "Steve", "only [i:Sword]").at(5L)
+                    .showcases(Arrays.asList(ChatShowcase.item(1, data))).build();
         } catch (IllegalArgumentException expected) {
             rejectedIndex = true;
         }
@@ -265,8 +256,8 @@ public final class LostTalesChatPacketTest {
 
     @Test
     public void whisperPacketsCarryTheirTargetAndPartner() {
-        LostTalesChatSendPacket send = new LostTalesChatSendPacket(
-                ChatChannel.WHISPER, "psst", null, " Steve ");
+        LostTalesChatSendPacket send = ChatPacketFixtures.send(ChatChannel.WHISPER, "psst")
+                .to(" Steve ").build();
         ByteBuf buffer = Unpooled.buffer();
         send.toBytes(buffer);
         LostTalesChatSendPacket decodedSend = new LostTalesChatSendPacket();
@@ -277,26 +268,24 @@ public final class LostTalesChatPacketTest {
         // A whisper without a target is refused; other channels need none.
         boolean rejected = false;
         try {
-            new LostTalesChatSendPacket(ChatChannel.WHISPER, "psst", null, "");
+            ChatPacketFixtures.send(ChatChannel.WHISPER, "psst").to("").build();
         } catch (IllegalArgumentException expected) {
             rejected = true;
         }
         assertTrue(rejected);
-        assertEquals("", new LostTalesChatSendPacket(ChatChannel.OOC, "hi")
+        assertEquals("", ChatPacketFixtures.send(ChatChannel.OOC, "hi").build()
                 .getTarget());
 
-        LostTalesChatMessagePacket message = new LostTalesChatMessagePacket(
-                ChatChannel.WHISPER, UUID.randomUUID(), "Alex", "Alex", "",
-                0xFFFFFF, 0xFFFFFF, "psst", 5L, "", null, "", "Steve");
+        LostTalesChatMessagePacket message = ChatPacketFixtures.line(
+                ChatChannel.WHISPER, "Alex", "Alex", "psst").at(5L).partner("Steve").build();
         buffer = Unpooled.buffer();
         message.toBytes(buffer);
         LostTalesChatMessagePacket decoded = new LostTalesChatMessagePacket();
         decoded.fromBytes(buffer);
         assertFalse(decoded.isMalformed());
         assertEquals("Steve", decoded.getPartner());
-        assertEquals("", new LostTalesChatMessagePacket(
-                ChatChannel.OOC, UUID.randomUUID(), "Alex", "Alex", "",
-                0xFFFFFF, 0xFFFFFF, "hi", 5L, "").getPartner());
+        assertEquals("", ChatPacketFixtures.line(ChatChannel.OOC, "Alex", "Alex", "hi").at(5L)
+                .build().getPartner());
     }
 
 
@@ -315,9 +304,8 @@ public final class LostTalesChatPacketTest {
         assertTrue(withToken.length() > ChatMessageValidator.MAX_CHARACTERS);
         assertEquals(5, ChatMessageValidator.visibleLength("ab[i:Sword]cd"));
 
-        LostTalesChatSendPacket packet = new LostTalesChatSendPacket(
-                ChatChannel.OOC, withToken,
-                Arrays.asList(ChatShareReference.marker("losttales:x")));
+        LostTalesChatSendPacket packet = ChatPacketFixtures.send(ChatChannel.OOC, withToken)
+                .sharing(Arrays.asList(ChatShareReference.marker("losttales:x"))).build();
         ByteBuf buffer = Unpooled.buffer();
         packet.toBytes(buffer);
         LostTalesChatSendPacket decoded = new LostTalesChatSendPacket();
@@ -365,10 +353,8 @@ public final class LostTalesChatPacketTest {
                                 index, -index));
             }
             LostTalesChatMessagePacket original =
-                    new LostTalesChatMessagePacket(ChatChannel.GLOBAL,
-                            UUID.randomUUID(), "Aldric", "Steve", "",
-                            0xFFFFFF, 0xFFFFFF, message, 1L, "",
-                            showcases);
+                    ChatPacketFixtures.line(ChatChannel.GLOBAL, "Aldric", "Steve", message)
+                            .showcases(showcases).build();
             ByteBuf buffer = Unpooled.buffer();
             original.toBytes(buffer);
             LostTalesChatMessagePacket decoded =
@@ -410,10 +396,9 @@ public final class LostTalesChatPacketTest {
         while (ChatMessageValidator.isValid(message.toString() + "x")) {
             message.append('x');
         }
-        LostTalesChatSendPacket packet = new LostTalesChatSendPacket(
-                ChatChannel.OOC, message.toString(), references,
-                "", LostTalesChatSendPacket.IDENTITY_CHARACTER,
-                UUID.randomUUID());
+        LostTalesChatSendPacket packet = ChatPacketFixtures.send(
+                ChatChannel.OOC, message.toString()).sharing(references)
+                .as(LostTalesChatSendPacket.IDENTITY_CHARACTER, UUID.randomUUID()).build();
         ByteBuf buffer = Unpooled.buffer();
         packet.toBytes(buffer);
         assertTrue("request of " + buffer.readableBytes()
@@ -448,9 +433,8 @@ public final class LostTalesChatPacketTest {
         }
         assertTrue(withinBudget.size() > 1);
         String message = tokensFor(ChatShareTokenParser.MAX_TOKENS);
-        LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
-                ChatChannel.GLOBAL, UUID.randomUUID(), "Aldric", "Steve", "",
-                0xFFFFFF, 0xFFFFFF, message, 1L, "", withinBudget);
+        LostTalesChatMessagePacket packet = ChatPacketFixtures.line(
+                ChatChannel.GLOBAL, "Aldric", "Steve", message).showcases(withinBudget).build();
         ByteBuf buffer = Unpooled.buffer();
         packet.toBytes(buffer);
         assertTrue("delivered line of " + buffer.readableBytes()
@@ -467,9 +451,8 @@ public final class LostTalesChatPacketTest {
                 new ArrayList<ChatShowcase>(withinBudget);
         overBudget.add(ChatShowcase.item(index, stack));
         try {
-            new LostTalesChatMessagePacket(ChatChannel.GLOBAL,
-                    UUID.randomUUID(), "Aldric", "Steve", "", 0xFFFFFF,
-                    0xFFFFFF, message, 1L, "", overBudget);
+            ChatPacketFixtures.line(ChatChannel.GLOBAL, "Aldric", "Steve", message)
+                    .showcases(overBudget).build();
             fail("a line over the showcase budget was accepted");
         } catch (IllegalArgumentException expected) {
             assertNotNull(expected);
@@ -485,10 +468,9 @@ public final class LostTalesChatPacketTest {
     @Test
     public void theMessageIdRoundTripsAndIsSharedByBothWhisperCopies() {
         long id = ChatMessageIdAllocator.next();
-        LostTalesChatMessagePacket original = new LostTalesChatMessagePacket(
-                ChatChannel.WHISPER, UUID.randomUUID(), "Steve", "Steve", "",
-                0xFFFFFF, 0xFFFFFF, "hello", 1L, "", null, "", "Alex", 0,
-                true, id);
+        LostTalesChatMessagePacket original = ChatPacketFixtures.line(
+                ChatChannel.WHISPER, "Steve", "Steve", "hello").partner("Alex").accountLine(true)
+                .messageId(id).build();
         ByteBuf buffer = Unpooled.buffer();
         original.toBytes(buffer);
         LostTalesChatMessagePacket decoded =
@@ -506,16 +488,15 @@ public final class LostTalesChatPacketTest {
                 decoded.getTimestampMillis(), decoded.getSkinId(),
                 decoded.getShowcases(), decoded.getFactionName(), "Steve",
                 decoded.getRoles(), decoded.isAccountLine(),
-                decoded.getMessageId());
+                decoded.getMessageId(), decoded.getReply());
         assertEquals(id, other.getMessageId());
     }
 
     /** A line the server never named carries no id, and still travels. */
     @Test
     public void anUnnamedLineTravelsWithoutAnId() {
-        LostTalesChatMessagePacket original = new LostTalesChatMessagePacket(
-                ChatChannel.GLOBAL, UUID.randomUUID(), "Aldric", "Steve", "",
-                0xFFFFFF, 0xFFFFFF, "hello", 1L, "");
+        LostTalesChatMessagePacket original = ChatPacketFixtures.line(
+                ChatChannel.GLOBAL, "Aldric", "Steve", "hello").build();
         ByteBuf buffer = Unpooled.buffer();
         original.toBytes(buffer);
         LostTalesChatMessagePacket decoded =
@@ -531,10 +512,9 @@ public final class LostTalesChatPacketTest {
      */
     @Test
     public void aNegativeIdOffTheWireIsMalformed() {
-        LostTalesChatMessagePacket original = new LostTalesChatMessagePacket(
-                ChatChannel.GLOBAL, UUID.randomUUID(), "Aldric", "Steve", "",
-                0xFFFFFF, 0xFFFFFF, "hello", 1L, "", null, "", "", 0, false,
-                -7L);
+        LostTalesChatMessagePacket original = ChatPacketFixtures.line(
+                ChatChannel.GLOBAL, "Aldric", "Steve", "hello").accountLine(false).messageId(-7L)
+                .build();
         ByteBuf buffer = Unpooled.buffer();
         original.toBytes(buffer);
         LostTalesChatMessagePacket decoded =
@@ -699,9 +679,8 @@ public final class LostTalesChatPacketTest {
         assertEquals(2, decoded.withScope("").getNamedPlayers().size());
 
         // A player's line keeps no component, whatever it is handed.
-        LostTalesChatMessagePacket player = new LostTalesChatMessagePacket(
-                ChatChannel.GLOBAL, UUID.randomUUID(), "Beren", "Steve", "",
-                0xFFFFFF, 0xFFFFFF, "hello", 1L, "").withServerBody(json, named);
+        LostTalesChatMessagePacket player = ChatPacketFixtures.line(
+                ChatChannel.GLOBAL, "Beren", "Steve", "hello").build().withServerBody(json, named);
         assertEquals("", player.getBodyJson());
         assertEquals(2, player.getNamedPlayers().size());
         ByteBuf playerBuffer = Unpooled.buffer();
@@ -729,9 +708,8 @@ public final class LostTalesChatPacketTest {
      */
     @Test
     public void aLineEndingBeforeItsLastPartsIsMalformed() {
-        LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
-                ChatChannel.GLOBAL, UUID.randomUUID(), "Beren", "Steve", "",
-                0xFFFFFF, 0xFFFFFF, "hello", 1L, "");
+        LostTalesChatMessagePacket packet = ChatPacketFixtures.line(
+                ChatChannel.GLOBAL, "Beren", "Steve", "hello").build();
         ByteBuf buffer = Unpooled.buffer();
         packet.toBytes(buffer);
         // The quote block is nothing for a line that quotes nothing. An
@@ -906,9 +884,8 @@ public final class LostTalesChatPacketTest {
     /** An ordinary line replies to nothing and pays nothing for it. */
     @Test
     public void anOrdinaryLineCarriesNoQuote() {
-        LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
-                ChatChannel.GLOBAL, UUID.randomUUID(), "Beren", "Steve", "",
-                0xFFFFFF, 0xFFFFFF, "hello", 1L, "");
+        LostTalesChatMessagePacket packet = ChatPacketFixtures.line(
+                ChatChannel.GLOBAL, "Beren", "Steve", "hello").build();
         ByteBuf buffer = Unpooled.buffer();
         packet.toBytes(buffer);
         int size = buffer.readableBytes();
@@ -938,11 +915,9 @@ public final class LostTalesChatPacketTest {
      */
     @Test
     public void anUnnamedLineIsQuotedByItsWordsOverTheWire() {
-        LostTalesChatSendPacket request = new LostTalesChatSendPacket(
-                ChatChannel.GLOBAL, "well done", null, "",
-                LostTalesChatSendPacket.IDENTITY_DEFAULT, null,
-                ChatMessageIds.NONE, "", 0L, null, "System",
-                "Bilbo has just earned the achievement [Taking Inventory]");
+        LostTalesChatSendPacket request = ChatPacketFixtures.send(ChatChannel.GLOBAL, "well done")
+                .quoting("System", "Bilbo has just earned the achievement [Taking Inventory]")
+                .build();
         ByteBuf buffer = Unpooled.buffer();
         request.toBytes(buffer);
         LostTalesChatSendPacket decodedRequest = new LostTalesChatSendPacket();
@@ -954,25 +929,21 @@ public final class LostTalesChatPacketTest {
                 decodedRequest.getQuoteExcerpt());
         // A request without a quote reads back without one.
         ByteBuf plain = Unpooled.buffer();
-        new LostTalesChatSendPacket(ChatChannel.GLOBAL, "hello").toBytes(plain);
+        ChatPacketFixtures.send(ChatChannel.GLOBAL, "hello").build().toBytes(plain);
         LostTalesChatSendPacket decodedPlain = new LostTalesChatSendPacket();
         decodedPlain.fromBytes(plain);
         assertFalse(decodedPlain.isMalformed());
         assertEquals("", decodedPlain.getQuoteAuthor());
         assertEquals("", decodedPlain.getQuoteExcerpt());
         try {
-            new LostTalesChatSendPacket(ChatChannel.GLOBAL, "hello", null, "",
-                    LostTalesChatSendPacket.IDENTITY_DEFAULT, null,
-                    ChatMessageIdAllocator.next(), "", 0L, null, "System",
-                    "x");
+            ChatPacketFixtures.send(ChatChannel.GLOBAL, "hello")
+                    .replyingTo(ChatMessageIdAllocator.next()).quoting("System", "x").build();
             fail("a quote and an id were both accepted");
         } catch (IllegalArgumentException expected) {
             assertNotNull(expected);
         }
         try {
-            new LostTalesChatSendPacket(ChatChannel.GLOBAL, "hello", null, "",
-                    LostTalesChatSendPacket.IDENTITY_DEFAULT, null,
-                    ChatMessageIds.NONE, "", 0L, null, "", "x");
+            ChatPacketFixtures.send(ChatChannel.GLOBAL, "hello").quoting("", "x").build();
             fail("words without an author were accepted");
         } catch (IllegalArgumentException expected) {
             assertNotNull(expected);
@@ -1007,8 +978,7 @@ public final class LostTalesChatPacketTest {
     @Test
     public void aRequestCannotNameALocalId() {
         try {
-            new LostTalesChatSendPacket(ChatChannel.GLOBAL, "hello", null, "",
-                    LostTalesChatSendPacket.IDENTITY_DEFAULT, null, -7L);
+            ChatPacketFixtures.send(ChatChannel.GLOBAL, "hello").replyingTo(-7L).build();
             fail("a client-local id was accepted as a reply target");
         } catch (IllegalArgumentException expected) {
             assertNotNull(expected);
@@ -1019,9 +989,8 @@ public final class LostTalesChatPacketTest {
     @Test
     public void aReplyRequestRoundTrips() {
         long target = ChatMessageIdAllocator.next();
-        LostTalesChatSendPacket original = new LostTalesChatSendPacket(
-                ChatChannel.GLOBAL, "on my way", null, "",
-                LostTalesChatSendPacket.IDENTITY_DEFAULT, null, target);
+        LostTalesChatSendPacket original = ChatPacketFixtures.send(ChatChannel.GLOBAL, "on my way")
+                .replyingTo(target).build();
         ByteBuf buffer = Unpooled.buffer();
         original.toBytes(buffer);
         LostTalesChatSendPacket decoded = new LostTalesChatSendPacket();
@@ -1029,8 +998,7 @@ public final class LostTalesChatPacketTest {
         assertFalse(decoded.isMalformed());
         assertEquals(target, decoded.getReplyToMessageId());
 
-        LostTalesChatSendPacket plain = new LostTalesChatSendPacket(
-                ChatChannel.GLOBAL, "hello");
+        LostTalesChatSendPacket plain = ChatPacketFixtures.send(ChatChannel.GLOBAL, "hello").build();
         ByteBuf plainBuffer = Unpooled.buffer();
         plain.toBytes(plainBuffer);
         LostTalesChatSendPacket plainDecoded = new LostTalesChatSendPacket();
@@ -1120,10 +1088,9 @@ public final class LostTalesChatPacketTest {
         assertNull(shortened.getOwnCharacterId());
         assertNull(shortened.getPartnerCharacterId());
         // A plain line never carries them, whatever it is built with.
-        LostTalesChatMessagePacket plain = new LostTalesChatMessagePacket(
-                ChatChannel.GLOBAL, UUID.randomUUID(), "Aragorn", "Steve", "",
-                0xFFFFFF, 0xFFFFFF, "hello", 1L, "skin", null, "", "", 0,
-                false, ChatMessageIds.NONE, null, "", 0L, own, own, partner);
+        LostTalesChatMessagePacket plain = ChatPacketFixtures.line(
+                ChatChannel.GLOBAL, "Aragorn", "Steve", "hello").skin("skin").accountLine(false)
+                .character(own).build().withConversation(own, partner);
         assertNull(plain.getOwnCharacterId());
         assertNull(plain.getPartnerCharacterId());
         buffer = Unpooled.buffer();
@@ -1190,10 +1157,8 @@ public final class LostTalesChatPacketTest {
     @Test
     public void whisperRequestsAddressTheCharacterById() {
         UUID target = UUID.randomUUID();
-        LostTalesChatSendPacket send = new LostTalesChatSendPacket(
-                ChatChannel.WHISPER, "psst", null, "Steve",
-                LostTalesChatSendPacket.IDENTITY_DEFAULT, null,
-                ChatMessageIds.NONE, "Aldric", 3L, target);
+        LostTalesChatSendPacket send = ChatPacketFixtures.send(ChatChannel.WHISPER, "psst")
+                .to("Steve").toCharacter("Aldric", target).echoNonce(3L).build();
         assertEquals(target, send.getTargetCharacterId());
         ByteBuf buffer = Unpooled.buffer();
         send.toBytes(buffer);
@@ -1214,7 +1179,7 @@ public final class LostTalesChatPacketTest {
         shortened.fromBytes(buffer.slice(0, buffer.readableBytes() - (1 + 16)));
         assertTrue(shortened.isMalformed());
         assertNull(shortened.getTargetCharacterId());
-        assertNull(new LostTalesChatSendPacket(ChatChannel.OOC, "hi")
+        assertNull(ChatPacketFixtures.send(ChatChannel.OOC, "hi").build()
                 .getTargetCharacterId());
     }
 

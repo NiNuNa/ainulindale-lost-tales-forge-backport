@@ -2,7 +2,7 @@ package com.ninuna.losttales.party.storage;
 
 import com.ninuna.losttales.party.model.Party;
 import com.ninuna.losttales.party.model.PartyMember;
-import net.minecraft.nbt.NBTBase;
+import com.ninuna.losttales.storage.NbtTags;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.WorldSavedData;
 
@@ -13,7 +13,6 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 /** Persistent server-authoritative party collection and character membership index. */
@@ -65,7 +64,7 @@ public final class PartyWorldData extends WorldSavedData {
     @Override
     public synchronized void writeToNBT(NBTTagCompound compound) {
         if (this.readOnlyForNewerVersion && this.preservedNewerData != null) {
-            copyTagContents(this.preservedNewerData, compound);
+            NbtTags.copyContents(this.preservedNewerData, compound);
             return;
         }
         PartyNbtCodec.write(compound, this.parties.values(), this.quarantinedEntries);
@@ -87,10 +86,6 @@ public final class PartyWorldData extends WorldSavedData {
         UUID partyId = characterId == null
                 ? null : this.partyIdByCharacterId.get(characterId);
         return partyId == null ? null : this.parties.get(partyId);
-    }
-
-    public synchronized UUID getPartyIdForCharacter(UUID characterId) {
-        return characterId == null ? null : this.partyIdByCharacterId.get(characterId);
     }
 
     public synchronized boolean containsParty(UUID partyId) {
@@ -167,10 +162,6 @@ public final class PartyWorldData extends WorldSavedData {
         this.characterReferencesValidated = true;
     }
 
-    public synchronized void markCharacterReferencesUnchecked() {
-        this.characterReferencesValidated = false;
-    }
-
     private boolean rebuildMembershipIndexAndRepair() {
         boolean repaired = false;
         ArrayList<UUID> emptyPartyIds = new ArrayList<UUID>();
@@ -239,21 +230,6 @@ public final class PartyWorldData extends WorldSavedData {
             throw new IllegalStateException(
                     "Party data is read-only because it uses unsupported version "
                             + this.unsupportedDataVersion);
-        }
-    }
-
-    private static void copyTagContents(NBTTagCompound source,
-                                        NBTTagCompound destination) {
-        Set<?> keySet = source.func_150296_c();
-        for (Object keyObject : keySet) {
-            if (!(keyObject instanceof String)) {
-                continue;
-            }
-            String key = (String) keyObject;
-            NBTBase value = source.getTag(key);
-            if (value != null) {
-                destination.setTag(key, value.copy());
-            }
         }
     }
 }

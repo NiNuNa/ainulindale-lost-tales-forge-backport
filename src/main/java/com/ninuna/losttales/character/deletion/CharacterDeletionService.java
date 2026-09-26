@@ -19,6 +19,7 @@ import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.party.server.PartyErrorId;
 import com.ninuna.losttales.party.server.PartyOperationResult;
 import com.ninuna.losttales.party.server.PartyService;
+import com.ninuna.losttales.util.LostTalesMath;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.world.World;
@@ -148,7 +149,7 @@ public final class CharacterDeletionService {
 
         long deletedAt = Math.max(
                 tombstone.getPreparedAt(), System.currentTimeMillis());
-        long purgeAfter = saturatingAdd(deletedAt,
+        long purgeAfter = LostTalesMath.saturatingAdd(deletedAt,
                 (long) Math.max(1, LostTalesConfig.characterDeletionRetentionDays)
                         * MILLIS_PER_DAY);
         tombstone.commit(deletedAt, purgeAfter);
@@ -421,13 +422,6 @@ public final class CharacterDeletionService {
             return CharacterErrorId.PARTY_INVITATION_STORAGE_READ_ONLY;
         }
         return CharacterErrorId.PARTY_CLEANUP_FAILED;
-    }
-
-    private static long saturatingAdd(long left, long right) {
-        if (right > 0L && left > Long.MAX_VALUE - right) {
-            return Long.MAX_VALUE;
-        }
-        return left + right;
     }
 
     private static void flushCommitted(

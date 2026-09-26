@@ -1,6 +1,6 @@
 package com.ninuna.losttales.client.quest;
 
-import com.ninuna.losttales.mapmarker.LostTalesMapMarkerIdentity;
+import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import com.ninuna.losttales.quest.progress.LostTalesQuestHistoryEntry;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import java.util.ArrayList;
@@ -129,11 +129,6 @@ public final class LostTalesClientQuestProgressStore {
         return entry != null && entry.isFailed();
     }
 
-    public static synchronized boolean isQuestAbandoned(String questId) {
-        LostTalesQuestHistoryEntry entry = getQuestHistoryEntry(questId);
-        return entry != null && entry.isAbandoned();
-    }
-
     public static synchronized boolean isMarkerDiscovered(String markerId) {
         return findDiscoveredMarkerId(markerId) != null;
     }
@@ -173,10 +168,6 @@ public final class LostTalesClientQuestProgressStore {
         return Collections.unmodifiableCollection(copy);
     }
 
-    public static synchronized boolean hasPinnedQuest() {
-        return !getPinnedQuestIds().isEmpty();
-    }
-
     public static synchronized String getPinnedMapMarkerId() {
         return pinnedMapMarkerId == null ? "" : pinnedMapMarkerId;
     }
@@ -195,7 +186,7 @@ public final class LostTalesClientQuestProgressStore {
 
     private static void addDiscoveredMarkerId(String markerId) {
         String normalized = markerId == null ? "" : markerId.trim();
-        String key = markerCanonicalKey(normalized);
+        String key = LostTalesQuestMarkerHelper.markerCanonicalKey(normalized);
         if (key.length() == 0
                 || DISCOVERED_MARKER_IDS_BY_CANONICAL_KEY
                         .containsKey(key)) {
@@ -206,26 +197,15 @@ public final class LostTalesClientQuestProgressStore {
     }
 
     private static String findDiscoveredMarkerId(String markerId) {
-        String key = markerCanonicalKey(markerId);
+        String key = LostTalesQuestMarkerHelper.markerCanonicalKey(markerId);
         return key.length() == 0 ? null
                 : DISCOVERED_MARKER_IDS_BY_CANONICAL_KEY.get(key);
     }
 
     private static boolean sameMarkerIdentity(
             String first, String second) {
-        String firstKey = markerCanonicalKey(first);
+        String firstKey = LostTalesQuestMarkerHelper.markerCanonicalKey(first);
         return firstKey.length() > 0
-                && firstKey.equals(markerCanonicalKey(second));
-    }
-
-    private static String markerCanonicalKey(String markerId) {
-        String normalized = markerId == null ? "" : markerId.trim();
-        if (normalized.length() == 0) {
-            return "";
-        }
-        return LostTalesMapMarkerIdentity.create(
-                normalized,
-                LostTalesMapMarkerIdentity.Authority.QUEST_PLAYER)
-                .getCanonicalKey();
+                && firstKey.equals(LostTalesQuestMarkerHelper.markerCanonicalKey(second));
     }
 }

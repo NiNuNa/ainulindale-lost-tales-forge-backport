@@ -2,6 +2,7 @@ package com.ninuna.losttales.network.packet.character;
 
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.character.model.CharacterProfile;
+import com.ninuna.losttales.network.packet.LostTalesPacketCodec;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
@@ -48,12 +49,12 @@ public final class CharacterProfilePacket implements IMessage {
     @Override
     public void fromBytes(ByteBuf buffer) {
         try {
-            this.characterId = CharacterPacketCodec.readUuid(buffer);
+            this.characterId = LostTalesPacketCodec.readUuid(buffer);
             this.available = buffer.readBoolean();
             this.profile = this.available
                     ? CharacterPacketCodec.readProfile(buffer)
                     : CharacterProfile.EMPTY;
-            CharacterPacketCodec.requireFinished(buffer);
+            LostTalesPacketCodec.requireFinished(buffer);
         } catch (RuntimeException exception) {
             this.malformed = true;
             this.available = false;
@@ -63,7 +64,7 @@ public final class CharacterProfilePacket implements IMessage {
 
     @Override
     public void toBytes(ByteBuf buffer) {
-        CharacterPacketCodec.writeUuid(buffer, this.characterId);
+        LostTalesPacketCodec.writeUuid(buffer, this.characterId);
         buffer.writeBoolean(this.available);
         if (this.available) {
             CharacterPacketCodec.writeProfile(buffer, this.profile);

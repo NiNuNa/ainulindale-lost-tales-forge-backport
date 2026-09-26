@@ -136,7 +136,7 @@ final class ChatWindowFields implements WindowFields.Kit {
 
         /** The list's bottom a clear pixel above the field's row. */
         private static int anchor(int fieldTop) {
-            return ChatEmojiSuggestionBox.anchorEndingAt(fieldTop - 1);
+            return ChatSuggestionBox.anchorEndingAt(fieldTop - 1);
         }
     }
 }

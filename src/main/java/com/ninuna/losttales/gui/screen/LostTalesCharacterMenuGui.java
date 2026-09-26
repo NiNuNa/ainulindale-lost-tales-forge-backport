@@ -1,6 +1,7 @@
 package com.ninuna.losttales.gui.screen;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.client.chat.ClientChatChannelState;
 import com.ninuna.losttales.client.gui.LostTalesGuiPointerTargets;
 import com.ninuna.losttales.client.gui.LostTalesPointerInteractable;
 import com.ninuna.losttales.client.gui.animation.LostTalesControlBarAnimation;
@@ -9,8 +10,8 @@ import com.ninuna.losttales.client.gui.controlbar.LostTalesControlBar.Hint;
 import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.window.WindowScreen;
-import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.config.client.LostTalesSettingsHubGui;
+import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.screen.character.CharactersPage;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
@@ -282,7 +283,14 @@ public class LostTalesCharacterMenuGui extends GuiScreen
     @Override
     protected void actionPerformed(GuiButton button) {
         if (button != null && button.id == BUTTON_SETTINGS && this.mc != null) {
-            this.mc.displayGuiScreen(new LostTalesSettingsHubGui(this));
+            // Settings on the window screen, back to this menu as it
+            // closes; a player who may change the server's options first
+            // picks between the two.
+            if (ClientChatChannelState.canEditServerConfig()) {
+                this.mc.displayGuiScreen(new LostTalesSettingsHubGui(this));
+            } else {
+                WindowScreen.openSettings(this);
+            }
         }
     }
 

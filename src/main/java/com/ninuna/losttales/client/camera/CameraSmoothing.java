@@ -11,13 +11,6 @@ public final class CameraSmoothing {
     private final double fovRate;
 
     public CameraSmoothing(
-            double positionRate, double rotationRate, double zoomRate,
-            double shoulderRate, double verticalRate, double fovRate) {
-        this(positionRate, positionRate, rotationRate, zoomRate,
-                shoulderRate, verticalRate, fovRate);
-    }
-
-    public CameraSmoothing(
             double positionRate, double verticalPositionRate,
             double rotationRate, double zoomRate,
             double shoulderRate, double verticalRate, double fovRate) {

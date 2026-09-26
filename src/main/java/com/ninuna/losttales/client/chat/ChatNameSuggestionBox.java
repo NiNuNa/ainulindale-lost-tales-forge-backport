@@ -1,9 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.client.window.PointerRegions;
-import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiCornerMark;
-import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.chat.ChatMentionCandidate;
 import com.ninuna.losttales.chat.ChatNameSuggester;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
@@ -33,11 +31,7 @@ import net.minecraft.client.gui.FontRenderer;
  * its own colour instead; roles come first in the candidate list, so
  * they stand above the players.</p>
  */
-final class ChatNameSuggestionBox {
-    static final int MAX_ROWS = 8;
-    private static final int ROW_HEIGHT = 11;
-    /** The rows stand two pixels inside the frame's ink, as a framed button's content does. */
-    private static final int PADDING = WindowStyle.POPUP_INSET;
+final class ChatNameSuggestionBox extends ChatSuggestionBox {
     /** The face's box and the gap after it, shared by every row. */
     private static final int ICON_SIZE = 8;
     /**
@@ -47,11 +41,6 @@ final class ChatNameSuggestionBox {
     private static final int ICON_WIDTH =
             ICON_SIZE + LostTalesUiCornerMark.OVERHANG_X;
     private static final int ICON_GAP = 3;
-    /**
-     * How far above the input anchor ({@link ChatInputBar#inputAnchor})
-     * the box ends: one pixel clear of the bar's top.
-     */
-    private static final int BOTTOM_MARGIN = 15;
 
     private List<ChatMentionCandidate> matches = Collections.emptyList();
     private ChatNameSuggester.Query query;
@@ -92,6 +81,7 @@ final class ChatNameSuggestionBox {
         }
     }
 
+    @Override
     boolean isActive() {
         return this.query != null && !this.matches.isEmpty()
                 && this.query.atIndex != this.dismissedAtIndex;
@@ -122,29 +112,14 @@ final class ChatNameSuggestionBox {
         }
     }
 
-    boolean contains(FontRenderer font, double mouseX, double mouseY,
-                     int screenHeight, int inputX) {
-        if (!isActive()) {
-            return false;
-        }
-        int top = boxTop(screenHeight);
-        return LostTalesUiHitBox.contains(mouseX, mouseY, inputX, top,
-                boxWidth(font), screenHeight - BOTTOM_MARGIN - top);
+    @Override
+    int shownRows() {
+        return this.matches.size();
     }
 
-    /**
-     * The row under the point, or -1: the one test the row's highlight,
-     * a press and the pointer all ask.
-     */
-    int rowAt(FontRenderer font, double mouseX, double mouseY,
-              int screenHeight, int inputX) {
-        if (!contains(font, mouseX, mouseY, screenHeight, inputX)
-                || mouseY < boxTop(screenHeight) + PADDING) {
-            return -1;
-        }
-        int row = (int)Math.floor((mouseY - boxTop(screenHeight) - PADDING)
-                / (double)ROW_HEIGHT);
-        return row >= 0 && row < this.matches.size() ? row : -1;
+    @Override
+    int rowHeight() {
+        return ROW_HEIGHT;
     }
 
     /** The suggestion on a row, or null. */
@@ -159,16 +134,11 @@ final class ChatNameSuggestionBox {
         if (!isActive()) {
             return;
         }
-        int width = boxWidth(font);
-        int top = boxTop(screenHeight);
-        int bottom = screenHeight - BOTTOM_MARGIN;
         int hoveredRow = rowAt(font, mouseX, mouseY, screenHeight, inputX);
         if (hoveredRow >= 0) {
             this.selectedIndex = hoveredRow;
         }
-        regions.add(inputX, top, inputX + width, bottom);
-        WindowStyle.drawPopupList(inputX, top, inputX + width,
-                bottom, top + PADDING, ROW_HEIGHT,
+        int top = drawFrame(font, regions, screenHeight, inputX,
                 this.selectedIndex < this.matches.size()
                         ? this.selectedIndex : -1);
         for (int row = 0; row < this.matches.size(); row++) {
@@ -264,17 +234,13 @@ final class ChatNameSuggestionBox {
         }
     }
 
-    private int boxWidth(FontRenderer font) {
+    @Override
+    int boxWidth(FontRenderer font) {
         int width = 0;
         for (int index = 0; index < this.matches.size(); index++) {
             width = Math.max(width, font.getStringWidth(
                     "@" + this.matches.get(index).getDisplayName()));
         }
         return width + PADDING * 2 + ICON_WIDTH + ICON_GAP;
-    }
-
-    private int boxTop(int screenHeight) {
-        return screenHeight - BOTTOM_MARGIN
-                - this.matches.size() * ROW_HEIGHT - PADDING * 2;
     }
 }

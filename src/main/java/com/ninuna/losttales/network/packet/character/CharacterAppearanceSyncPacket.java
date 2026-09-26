@@ -4,6 +4,7 @@ import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.character.sync.CharacterAppearanceKind;
+import com.ninuna.losttales.network.packet.LostTalesPacketCodec;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
@@ -59,26 +60,26 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                     new ArrayList<CharacterAppearance>(count);
             Set<UUID> playerIds = new HashSet<UUID>();
             for (int index = 0; index < count; index++) {
-                UUID playerId = CharacterPacketCodec.readUuid(buffer);
-                String characterName = CharacterPacketCodec.readString(
+                UUID playerId = LostTalesPacketCodec.readUuid(buffer);
+                String characterName = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_NAME_BYTES);
-                String raceId = CharacterPacketCodec.readString(
+                String raceId = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-                String genderId = CharacterPacketCodec.readString(
+                String genderId = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-                String skinId = CharacterPacketCodec.readString(
+                String skinId = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 boolean showMinecraftCape = buffer.readBoolean();
                 int cosmeticCapeId = buffer.readUnsignedShort();
-                String accountName = CharacterPacketCodec.readString(
+                String accountName = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_NAME_BYTES);
-                String startingFactionId = CharacterPacketCodec.readString(
+                String startingFactionId = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 int roleplayLevel = buffer.readInt();
                 int age = buffer.readInt();
-                String bodyTypeId = CharacterPacketCodec.readString(
+                String bodyTypeId = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-                String chestTypeId = CharacterPacketCodec.readString(
+                String chestTypeId = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 int kindCode = buffer.readUnsignedByte();
                 CharacterAppearanceKind kind = CharacterAppearanceKind.fromCode(kindCode);
@@ -99,7 +100,7 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                             "invalid appearance details");
                 }
                 UUID characterId = buffer.readBoolean()
-                        ? CharacterPacketCodec.readUuid(buffer) : null;
+                        ? LostTalesPacketCodec.readUuid(buffer) : null;
                 if (characterId != null && kind != CharacterAppearanceKind.CHARACTER) {
                     throw new CharacterPacketCodec.DecodeException(
                             "a character id on an appearance that is not a character");
@@ -109,7 +110,7 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                         genderId, skinId, showMinecraftCape, cosmeticCapeId,
                         startingFactionId, roleplayLevel, age, bodyTypeId, chestTypeId));
             }
-            CharacterPacketCodec.requireFinished(buffer);
+            LostTalesPacketCodec.requireFinished(buffer);
             this.appearances = Collections.unmodifiableList(decoded);
         } catch (RuntimeException exception) {
             this.appearances = Collections.emptyList();
@@ -125,39 +126,39 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
         buffer.writeBoolean(this.replaceAll);
         buffer.writeShort(this.appearances.size());
         for (CharacterAppearance appearance : this.appearances) {
-            CharacterPacketCodec.writeUuid(buffer, appearance.getPlayerId());
-            CharacterPacketCodec.writeString(
+            LostTalesPacketCodec.writeUuid(buffer, appearance.getPlayerId());
+            LostTalesPacketCodec.writeUtf8String(
                     buffer, appearance.getCharacterName(),
                     CharacterPacketCodec.MAX_NAME_BYTES);
-            CharacterPacketCodec.writeString(
+            LostTalesPacketCodec.writeUtf8String(
                     buffer, appearance.getRaceId(),
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-            CharacterPacketCodec.writeString(
+            LostTalesPacketCodec.writeUtf8String(
                     buffer, appearance.getGenderId(),
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-            CharacterPacketCodec.writeString(
+            LostTalesPacketCodec.writeUtf8String(
                     buffer, appearance.getSkinId(),
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             buffer.writeBoolean(appearance.isMinecraftCapeVisible());
             buffer.writeShort(appearance.getCosmeticCapeId());
             // The account name pairs the tab list with characters for
             // mention completion.
-            CharacterPacketCodec.writeString(
+            LostTalesPacketCodec.writeUtf8String(
                     buffer, appearance.getAccountName(),
                     CharacterPacketCodec.MAX_NAME_BYTES);
             // For the chat player card: starting faction, level and age
             // are public character identity.
-            CharacterPacketCodec.writeString(
+            LostTalesPacketCodec.writeUtf8String(
                     buffer, appearance.getStartingFactionId(),
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             buffer.writeInt(appearance.getRoleplayLevel());
             buffer.writeInt(appearance.getAge());
             // The arm width, which other clients need to pick the body the
             // character is drawn with, and the chest type.
-            CharacterPacketCodec.writeString(
+            LostTalesPacketCodec.writeUtf8String(
                     buffer, appearance.getBodyTypeId(),
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-            CharacterPacketCodec.writeString(
+            LostTalesPacketCodec.writeUtf8String(
                     buffer, appearance.getChestTypeId(),
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             // Which identity this is, so the account can be drawn from its
@@ -167,7 +168,7 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
             // mentions by it rather than by a name.
             buffer.writeBoolean(appearance.getCharacterId() != null);
             if (appearance.getCharacterId() != null) {
-                CharacterPacketCodec.writeUuid(buffer, appearance.getCharacterId());
+                LostTalesPacketCodec.writeUuid(buffer, appearance.getCharacterId());
             }
         }
     }

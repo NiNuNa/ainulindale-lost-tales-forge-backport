@@ -1036,27 +1036,6 @@ public final class ChatHistory {
             this.readableChannels = Collections.unmodifiableSet(ids);
         }
 
-        /**
-         * An account with one character, in that faction, made then; a
-         * faction id of nothing is an account with no character in any.
-         * The shape most callers and every test have to describe.
-         */
-        public Requester(UUID accountId, String factionId, long characterCreatedAt,
-                         UUID partyId, Collection<ChatChannel> readable) {
-            this(accountId, oneFaction(factionId, characterCreatedAt), partyId,
-                    readable);
-        }
-
-        private static Map<String, Long> oneFaction(String factionId,
-                                                    long characterCreatedAt) {
-            if (factionId == null || factionId.length() == 0) {
-                return Collections.emptyMap();
-            }
-            Map<String, Long> owned = new HashMap<String, Long>();
-            owned.put(factionId, Long.valueOf(characterCreatedAt));
-            return owned;
-        }
-
         /** When the earliest character in that faction was made; null for none. */
         Long earliestCharacterIn(String factionId) {
             return factionId == null ? null : this.ownedFactions.get(factionId);

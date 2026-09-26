@@ -27,28 +27,28 @@ public final class LostTalesQuestPrerequisiteHelper {
             return null;
         }
 
-        String completed = firstNonEmpty(prerequisites.get("completed"), prerequisites.get("completedQuests"), prerequisites.get("requiresCompleted"));
+        String completed = LostTalesQuestParams.value(prerequisites, "completed");
         if (!hasAllCompleted(data, completed)) {
             return new ChatComponentTranslation("chat.losttales.quest.requires.completed");
         }
 
-        String active = firstNonEmpty(prerequisites.get("active"), prerequisites.get("activeQuests"), prerequisites.get("requiresActive"));
+        String active = LostTalesQuestParams.value(prerequisites, "active");
         if (!hasAllActive(data, active)) {
             return new ChatComponentTranslation("chat.losttales.quest.requires.active");
         }
 
-        String notCompleted = firstNonEmpty(prerequisites.get("notCompleted"), prerequisites.get("not_completed"), prerequisites.get("forbidCompleted"));
+        String notCompleted = LostTalesQuestParams.value(prerequisites, "notCompleted");
         if (hasAnyCompleted(data, notCompleted)) {
             return new ChatComponentTranslation("chat.losttales.quest.requires.not_completed");
         }
 
-        String notActive = firstNonEmpty(prerequisites.get("notActive"), prerequisites.get("not_active"), prerequisites.get("forbidActive"));
+        String notActive = LostTalesQuestParams.value(prerequisites, "notActive");
         if (hasAnyActive(data, notActive)) {
             return new ChatComponentTranslation("chat.losttales.quest.requires.not_active");
         }
 
-        String levelValue = firstNonEmpty(prerequisites.get("minLevel"), prerequisites.get("minExperienceLevel"), prerequisites.get("level"));
-        int requiredLevel = parseInt(levelValue, -1);
+        String levelValue = LostTalesQuestParams.value(prerequisites, "minLevel");
+        int requiredLevel = LostTalesQuestParams.parseInt(levelValue, -1);
         if (requiredLevel >= 0 && player != null && player.experienceLevel < requiredLevel) {
             return new ChatComponentTranslation("chat.losttales.quest.requires.level",
                     Integer.valueOf(requiredLevel));
@@ -105,20 +105,5 @@ public final class LostTalesQuestPrerequisiteHelper {
             }
         }
         return cleaned.toArray(new String[cleaned.size()]);
-    }
-
-    private static String firstNonEmpty(String a, String b, String c) {
-        if (a != null && a.trim().length() > 0) return a;
-        if (b != null && b.trim().length() > 0) return b;
-        if (c != null && c.trim().length() > 0) return c;
-        return "";
-    }
-
-    private static int parseInt(String value, int fallback) {
-        try {
-            return Integer.parseInt(value);
-        } catch (Exception ignored) {
-            return fallback;
-        }
     }
 }

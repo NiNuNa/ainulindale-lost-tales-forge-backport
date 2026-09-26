@@ -61,7 +61,7 @@ public class LostTalesBlockPlushie extends LostTalesBlockStatueBase {
 
     @Override
     public void onBlockPlacedBy(World world, int x, int y, int z, EntityLivingBase entity, ItemStack itemStack) {
-        int metadata = LostTalesBlockRotationHelper.getLegacyPlushieMetadata(entity);
+        int metadata = LostTalesBlockRotationHelper.getPlushieMetadata(entity);
         world.setBlockMetadataWithNotify(x, y, z, metadata, 2);
 
         TileEntity tileEntity = world.getTileEntity(x, y, z);

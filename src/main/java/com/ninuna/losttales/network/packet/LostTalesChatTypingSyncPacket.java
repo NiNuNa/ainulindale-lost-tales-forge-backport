@@ -32,12 +32,6 @@ public final class LostTalesChatTypingSyncPacket implements IMessage {
     public LostTalesChatTypingSyncPacket() {}
 
     public LostTalesChatTypingSyncPacket(ChatChannel channel, String partner,
-                                         String identityName,
-                                         boolean typing) {
-        this(channel, partner, identityName, typing, "", "");
-    }
-
-    public LostTalesChatTypingSyncPacket(ChatChannel channel, String partner,
                                          String identityName, boolean typing,
                                          String scopeValue, String recipientIdentity) {
         this.scopeValue = scopeValue == null ? "" : scopeValue;

@@ -60,11 +60,6 @@ public final class CharacterRaceGameplayProfile {
         return this.height;
     }
 
-    /** Kept for existing GUI callers; this is the standing value. */
-    public float getEyeHeight() {
-        return this.standingEyeHeight;
-    }
-
     public float getStandingEyeHeight() {
         return this.standingEyeHeight;
     }

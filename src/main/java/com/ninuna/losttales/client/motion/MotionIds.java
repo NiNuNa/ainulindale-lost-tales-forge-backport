@@ -24,52 +24,57 @@ public final class MotionIds {
     public static final String CHAT_LINE_HOVER = "chat.line.hover";
     /** The newest message rising into the stack and sliding in. */
     public static final String CHAT_LINE_APPEAR = "chat.line.appear";
-    /** The input bars coming up from below as the chat opens. */
-    public static final String CHAT_BAR_APPEAR = "chat.bar.appear";
-    /** A small window opening where it stands, and fading out there as it closes. */
-    public static final String CHAT_SMALL_WINDOW_OPEN = "chat.small_window.open";
-    /** A tab gliding to its place and width in the row. */
-    public static final String CHAT_TAB_MOVE = "chat.tab.move";
-    /** A tab's own controls going and coming as the row narrows. */
-    public static final String CHAT_TAB_CONTROLS = "chat.tab.controls";
     /** A row of the stack gliding to its place in a new layout. */
     public static final String CHAT_ROW_MOVE = "chat.row.move";
     /** A row new to the layout fading in where it lands. */
     public static final String CHAT_ROW_APPEAR = "chat.row.appear";
-    /** The snap assist's panes. */
-    public static final String CHAT_SNAP_ASSIST = "chat.snap.assist";
-    /** The snap layouts' flyout, and the snap bar's fade and its way down. */
-    public static final String CHAT_SNAP_LAYOUTS = "chat.snap.layouts";
-    /** The frosted preview of where a window will snap. */
-    public static final String CHAT_SNAP_PREVIEW = "chat.snap.preview";
-    /** The search well's magnifier becoming its cross. */
-    public static final String CHAT_SEARCH_CLEAR = "chat.search.clear";
-    /** A window gliding to the part of the screen it fills. */
-    public static final String CHAT_WINDOW_FILL = "chat.window.fill";
     /** A window's timestamp area driven out or in. */
     public static final String CHAT_WINDOW_AREA = "chat.window.area";
     /** A window's member list coming out or going in. */
     public static final String CHAT_WINDOW_MEMBERS = "chat.window.members";
-    /** A new window fading in. */
-    public static final String CHAT_WINDOW_APPEAR = "chat.window.appear";
     /** The jump-to-present button flying in and out. */
     public static final String CHAT_JUMP_SHOW = "chat.jump.show";
     /** A message's toolbar coming up once the history rests under the pointer. */
     public static final String CHAT_TOOLBAR_SHOW = "chat.toolbar.show";
-    /** A chevron control playing its run of frames. */
-    public static final String CHAT_ICON_FLIP = "chat.icon.flip";
     /** The closed feed's lines rising for its typing row. */
     public static final String CHAT_FEED_TYPING = "chat.feed.typing";
-    /** A history, list or panel gliding to where it was scrolled. */
-    public static final String CHAT_SCROLL = "chat.scroll";
-    /** A row or control crossing to its lit shade. */
-    public static final String CHAT_HOVER_FADE = "chat.hover.fade";
     /** The scrollbar coming and going. */
     public static final String CHAT_SCROLLBAR_FADE = "chat.scrollbar.fade";
-    /** A name cut short gliding home once the pointer leaves it. */
-    public static final String CHAT_MARQUEE_RETURN = "chat.marquee.return";
+
+    /* ---- window: the window system every tab stands in ---- */
+
+    /** The input bars coming up from below as the window screen opens. */
+    public static final String WINDOW_BAR_APPEAR = "window.bar.appear";
+    /** A sub-window opening where it stands, and fading out there as it closes. */
+    public static final String WINDOW_SUB_OPEN = "window.sub.open";
+    /** A tab gliding to its place and width in the row. */
+    public static final String WINDOW_TAB_MOVE = "window.tab.move";
+    /** A tab's own controls going and coming as the row narrows. */
+    public static final String WINDOW_TAB_CONTROLS = "window.tab.controls";
+    /** The snap assist's panes. */
+    public static final String WINDOW_SNAP_ASSIST = "window.snap.assist";
+    /** The snap layouts' flyout, and the snap bar's fade and its way down. */
+    public static final String WINDOW_SNAP_LAYOUTS = "window.snap.layouts";
+    /** The frosted preview of where a window will snap. */
+    public static final String WINDOW_SNAP_PREVIEW = "window.snap.preview";
     /** The snap bar peeking further down as the pointer comes nearer it. */
-    public static final String CHAT_SNAP_BAR_PEEK = "chat.snap.bar.peek";
+    public static final String WINDOW_SNAP_BAR_PEEK = "window.snap.bar.peek";
+    /** The search well's magnifier becoming its cross. */
+    public static final String WINDOW_SEARCH_CLEAR = "window.search.clear";
+    /** A window gliding to the part of the screen it fills. */
+    public static final String WINDOW_FILL = "window.fill";
+    /** A new window fading in. */
+    public static final String WINDOW_APPEAR = "window.appear";
+    /** A chevron control playing its run of frames. */
+    public static final String WINDOW_ICON_FLIP = "window.icon.flip";
+    /** A history, list or panel gliding to where it was scrolled. */
+    public static final String WINDOW_SCROLL = "window.scroll";
+    /** A row or control crossing to its lit shade. */
+    public static final String WINDOW_HOVER_FADE = "window.hover.fade";
+    /** A name cut short gliding home once the pointer leaves it. */
+    public static final String WINDOW_MARQUEE_RETURN = "window.marquee.return";
+    /** A short notice over a window's bar coming up, standing a moment and fading. */
+    public static final String WINDOW_NOTICE = "window.notice";
 
     /* ---- hud ---- */
 

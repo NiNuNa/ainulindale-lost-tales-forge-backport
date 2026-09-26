@@ -32,9 +32,9 @@ import net.minecraft.util.IChatComponent;
  * silence it would stand headless under nothing, so it opens a run with
  * its name.</p>
  *
- * <p>A message with no entry here — a system line, an adopted stray, a
- * line printed straight into vanilla's chat — has no identity to
- * continue, so it ends whatever run it lands in, in every view alike.
+ * <p>A message with no entry here — a line printed straight into
+ * vanilla's chat — has no identity to continue, so it ends whatever run
+ * it lands in, in every view alike.
  * Entries are bounded like the tab index and go with the rest of the
  * client's chat state.</p>
  */

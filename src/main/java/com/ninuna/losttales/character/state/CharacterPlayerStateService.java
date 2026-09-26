@@ -32,7 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Captures, validates, migrates, persists, applies, and synchronizes character state. */
+/** Captures, validates, persists, applies, and synchronizes character state. */
 public final class CharacterPlayerStateService {
 
     private static final CharacterPlayerStateService INSTANCE =
@@ -40,12 +40,6 @@ public final class CharacterPlayerStateService {
 
     private final List<CharacterStateComponent> components;
     private final Map<String, CharacterStateComponent> componentsById;
-    /**
-     * The account bootstrap version each component first appeared in.
-     * A retained generation of an account bootstrapped before that
-     * version lacks the component, and the migration fills it in.
-     */
-    private final Map<String, Integer> introducedAt;
     private final VanillaStatisticsStateComponent statisticsComponent;
     private final VanillaLocationStateComponent locationComponent;
     private final CharacterLocationTransitionService locationTransitionService;
@@ -55,35 +49,29 @@ public final class CharacterPlayerStateService {
     private CharacterPlayerStateService() {
         ArrayList<CharacterStateComponent> registered =
                 new ArrayList<CharacterStateComponent>();
-        LinkedHashMap<String, Integer> introduced =
-                new LinkedHashMap<String, Integer>();
         this.statisticsComponent = new VanillaStatisticsStateComponent();
         this.locationComponent = new VanillaLocationStateComponent();
         this.locationTransitionService =
                 new CharacterLocationTransitionService(this.locationComponent);
         this.lotrCustomWaypointComponent = new LotrCustomWaypointStateComponent();
         this.lotrProgressionComponent = new LotrProgressionStateComponent();
-        // Registration order is apply order within a phase. The version
-        // is the account bootstrap version the component arrived with;
-        // a new component takes the next one and bumps
-        // CharacterPlayerStateAccount.CURRENT_BOOTSTRAP_VERSION.
-        register(registered, introduced, new VanillaInventoryStateComponent(), 1);
-        register(registered, introduced, new AccessoryStateComponent(), 12);
-        register(registered, introduced, new VanillaEnderChestStateComponent(), 9);
-        register(registered, introduced, this.locationComponent, 10);
-        register(registered, introduced, new VanillaSpawnStateComponent(), 11);
-        register(registered, introduced, new VanillaPotionStateComponent(), 1);
-        register(registered, introduced, this.statisticsComponent, 2);
-        register(registered, introduced, new LostTalesQuestStateComponent(), 3);
-        register(registered, introduced, new LotrFastTravelRegionStateComponent(), 6);
-        register(registered, introduced, new LotrWaypointUseStateComponent(), 7);
-        register(registered, introduced, this.lotrCustomWaypointComponent, 7);
-        register(registered, introduced, this.lotrProgressionComponent, 4);
-        register(registered, introduced, new LotrCharacterDetailsStateComponent(), 8);
-        register(registered, introduced, new LotrQuestStateComponent(), 5);
-        register(registered, introduced, new VanillaVitalsStateComponent(), 1);
+        // Registration order is apply order within a phase.
+        registered.add(new VanillaInventoryStateComponent());
+        registered.add(new AccessoryStateComponent());
+        registered.add(new VanillaEnderChestStateComponent());
+        registered.add(this.locationComponent);
+        registered.add(new VanillaSpawnStateComponent());
+        registered.add(new VanillaPotionStateComponent());
+        registered.add(this.statisticsComponent);
+        registered.add(new LostTalesQuestStateComponent());
+        registered.add(new LotrFastTravelRegionStateComponent());
+        registered.add(new LotrWaypointUseStateComponent());
+        registered.add(this.lotrCustomWaypointComponent);
+        registered.add(this.lotrProgressionComponent);
+        registered.add(new LotrCharacterDetailsStateComponent());
+        registered.add(new LotrQuestStateComponent());
+        registered.add(new VanillaVitalsStateComponent());
         this.components = Collections.unmodifiableList(registered);
-        this.introducedAt = Collections.unmodifiableMap(introduced);
 
         LinkedHashMap<String, CharacterStateComponent> byId =
                 new LinkedHashMap<String, CharacterStateComponent>();
@@ -97,27 +85,13 @@ public final class CharacterPlayerStateService {
         this.componentsById = Collections.unmodifiableMap(byId);
     }
 
-    private static void register(List<CharacterStateComponent> registered,
-                                 Map<String, Integer> introduced,
-                                 CharacterStateComponent component,
-                                 int bootstrapVersion) {
-        if (bootstrapVersion < 1 || bootstrapVersion
-                > CharacterPlayerStateAccount.CURRENT_BOOTSTRAP_VERSION) {
-            throw new IllegalStateException(
-                    "Character state component " + component.getId()
-                            + " names a bootstrap version outside the known range");
-        }
-        registered.add(component);
-        introduced.put(component.getId(), Integer.valueOf(bootstrapVersion));
-    }
-
     public static CharacterPlayerStateService getInstance() {
         return INSTANCE;
     }
 
     /**
-     * Bootstrap and schema migration for one account's saved identities. A
-     * roster seen for the first time gets a record for every character: the
+     * Bootstrap for one account's saved identities. A roster seen for the
+     * first time gets a record for every character: the
      * active character's is the live state the account file holds, every
      * other character's is clean defaults. With no active character the live
      * state is the account's own and stays where it is. Characters created
@@ -146,16 +120,12 @@ public final class CharacterPlayerStateService {
 
         boolean changed = false;
         long now = System.currentTimeMillis();
-        // The live state is imported into the active character's record; on
-        // the account it is imported nowhere, since it is already the
-        // account's and is captured when the account is first left.
-        UUID importTarget = null;
-        if (account.getBootstrapVersion()
-                < CharacterPlayerStateAccount.CURRENT_BOOTSTRAP_VERSION) {
-            importTarget = roster.getActiveCharacterId();
-        }
-
         if (account.getBootstrapVersion() == 0) {
+            // The live state is imported into the active character's
+            // record; on the account it is imported nowhere, since it is
+            // already the account's and is captured when the account is
+            // first left.
+            UUID importTarget = roster.getActiveCharacterId();
             Map<String, NBTTagCompound> liveState = importTarget == null
                     ? null : captureComponents(player);
             ArrayList<CharacterPlayerStateRecord> initialized =
@@ -175,11 +145,6 @@ public final class CharacterPlayerStateService {
             for (CharacterPlayerStateRecord record : initialized) {
                 account.putRecord(record);
             }
-            account.markBootstrapped(now);
-            changed = true;
-        } else if (account.getBootstrapVersion()
-                < CharacterPlayerStateAccount.CURRENT_BOOTSTRAP_VERSION) {
-            migrateLegacySnapshots(player, roster, account, importTarget);
             account.markBootstrapped(now);
             changed = true;
         }
@@ -443,115 +408,6 @@ public final class CharacterPlayerStateService {
                     "Character snapshot exceeds the configured size limit: "
                             + size + " > " + maximum);
         }
-    }
-
-    /**
-     * Upgrades retained generations without changing transaction
-     * references: every component the account was bootstrapped before
-     * is filled in on each generation — with the live player's own
-     * state for the character the live state is imported into, and
-     * with the character's defaults for every other record — and every
-     * generation is re-versioned to the current snapshot version. The
-     * account is left untouched until every generation has passed
-     * component and size validation, since older world-data roots are
-     * already dirty and could otherwise persist a half migration.
-     */
-    private void migrateLegacySnapshots(EntityPlayerMP player,
-                                        CharacterRoster roster,
-                                        CharacterPlayerStateAccount account,
-                                        UUID importTarget)
-            throws CharacterStateValidationException {
-        List<CharacterStateComponent> missing =
-                componentsIntroducedAfter(account.getBootstrapVersion());
-        Map<String, NBTTagCompound> imported = null;
-        if (importTarget != null && !missing.isEmpty()) {
-            imported = new LinkedHashMap<String, NBTTagCompound>();
-            for (CharacterStateComponent component : missing) {
-                NBTTagCompound state = component.capture(player);
-                component.validate(state);
-                imported.put(component.getId(), state);
-            }
-        }
-        ArrayList<CharacterPlayerStateRecord> existing =
-                new ArrayList<CharacterPlayerStateRecord>(account.getRecords());
-        ArrayList<CharacterPlayerStateRecord> migrated =
-                new ArrayList<CharacterPlayerStateRecord>(existing.size());
-        for (CharacterPlayerStateRecord record : existing) {
-            Map<String, NBTTagCompound> fill;
-            if (record.getCharacterId().equals(importTarget)) {
-                fill = imported;
-            } else if (missing.isEmpty()) {
-                fill = Collections.emptyMap();
-            } else {
-                fill = createDefaultComponents(
-                        roster.getCharacter(record.getCharacterId()));
-            }
-            CharacterPlayerStateSnapshot current = migrateLegacySnapshot(
-                    record.getCurrent(), missing, fill);
-            CharacterPlayerStateSnapshot previous = record.getPrevious() == null
-                    ? null : migrateLegacySnapshot(
-                            record.getPrevious(), missing, fill);
-            migrated.add(new CharacterPlayerStateRecord(
-                    record.getCharacterId(), current, previous));
-        }
-        for (CharacterPlayerStateRecord record : migrated) {
-            account.putRecord(record);
-        }
-    }
-
-    /** The components an account bootstrapped at {@code version} has never held. */
-    private List<CharacterStateComponent> componentsIntroducedAfter(int version) {
-        ArrayList<CharacterStateComponent> missing =
-                new ArrayList<CharacterStateComponent>();
-        for (CharacterStateComponent component : this.components) {
-            if (this.introducedAt.get(component.getId()).intValue() > version) {
-                missing.add(component);
-            }
-        }
-        return missing;
-    }
-
-    /**
-     * One generation brought to the current version: each component it
-     * lacks is filled from {@code fill} when the account had never held
-     * it, and is a fault otherwise; each it holds is validated. The
-     * whole is validated as a snapshot before it is returned.
-     */
-    private CharacterPlayerStateSnapshot migrateLegacySnapshot(
-            CharacterPlayerStateSnapshot snapshot,
-            List<CharacterStateComponent> missing,
-            Map<String, NBTTagCompound> fill)
-            throws CharacterStateValidationException {
-        if (snapshot == null || snapshot.getDataVersion() <= 0
-                || snapshot.getDataVersion()
-                > CharacterPlayerStateSnapshot.CURRENT_DATA_VERSION) {
-            throw new CharacterStateValidationException(
-                    "Unsupported legacy character snapshot version");
-        }
-        Map<String, NBTTagCompound> migrated = snapshot.copyComponents();
-        for (CharacterStateComponent component : this.components) {
-            NBTTagCompound stored = migrated.get(component.getId());
-            if (stored != null) {
-                component.validate(stored);
-                continue;
-            }
-            NBTTagCompound value = missing.contains(component) && fill != null
-                    ? fill.get(component.getId()) : null;
-            if (value == null) {
-                throw new CharacterStateValidationException(
-                        "Legacy migration state for " + component.getId()
-                                + " is unavailable");
-            }
-            migrated.put(component.getId(), (NBTTagCompound)value.copy());
-        }
-        CharacterPlayerStateSnapshot upgraded = new CharacterPlayerStateSnapshot(
-                snapshot.getCharacterId(),
-                snapshot.getGeneration(),
-                snapshot.getCapturedAt(),
-                CharacterPlayerStateSnapshot.CURRENT_DATA_VERSION,
-                migrated);
-        validateSnapshot(upgraded);
-        return upgraded;
     }
 
     private void applyPhase(EntityPlayerMP player,

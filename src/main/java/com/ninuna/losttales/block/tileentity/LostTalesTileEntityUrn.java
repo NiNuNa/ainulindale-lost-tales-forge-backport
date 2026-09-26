@@ -146,7 +146,7 @@ public class LostTalesTileEntityUrn extends TileEntity implements IInventory, IA
     }
 
     public float getRenderRotation(int metadata) {
-        return this.hasStoredRotation ? this.rotation : LostTalesBlockRotationHelper.getLegacyDirectionalRenderRotation(metadata);
+        return this.hasStoredRotation ? this.rotation : LostTalesBlockRotationHelper.getDirectionalMetadataRotation(metadata);
     }
 
     public boolean hasStoredRotation() {

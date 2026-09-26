@@ -1,6 +1,7 @@
 package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.chat.ChatConsoleEvent;
+import com.ninuna.losttales.chat.ChatConsoleFixtures;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatReportReason;
 import io.netty.buffer.ByteBuf;
@@ -22,11 +23,10 @@ public final class LostTalesChatConsoleSyncPacketTest {
 
     @Test
     public void aBatchRoundTripsInOrder() {
-        ChatConsoleEvent command = new ChatConsoleEvent(10L, 5000L,
-                ChatConsoleEvent.Kind.COMMAND, ChatConsoleEvent.Severity.INFO, "Steve",
-                "/gamemode 1", "faction|scope:gondor");
-        ChatConsoleEvent warning = new ChatConsoleEvent(11L, 6000L,
-                ChatConsoleEvent.Kind.WARNING, ChatConsoleEvent.Severity.WARNING, "",
+        ChatConsoleEvent command = ChatConsoleFixtures.command(
+                10L, 5000L, "Steve", "/gamemode 1", "faction|scope:gondor");
+        ChatConsoleEvent warning = ChatConsoleFixtures.entry(
+                11L, 6000L, ChatConsoleEvent.Kind.WARNING, ChatConsoleEvent.Severity.WARNING, "",
                 "the mute list could not be read");
         LostTalesChatConsoleSyncPacket packet = new LostTalesChatConsoleSyncPacket(
                 Arrays.asList(command, warning));
@@ -77,10 +77,8 @@ public final class LostTalesChatConsoleSyncPacketTest {
     @Test
     public void theActorsAccountCrossesWithTheEntry() {
         UUID steve = UUID.randomUUID();
-        ChatConsoleEvent command = new ChatConsoleEvent(10L, 5000L,
-                ChatConsoleEvent.Kind.COMMAND, ChatConsoleEvent.Severity.INFO,
-                "Steve", "/gamemode 1", "",
-                ChatNamedPlayer.account(steve, "Steve"));
+        ChatConsoleEvent command = ChatConsoleFixtures.command(
+                10L, 5000L, "Steve", "/gamemode 1", "", ChatNamedPlayer.account(steve, "Steve"));
         assertEquals(steve, command.getActorIdentity().getPlayerId());
         ByteBuf buffer = Unpooled.buffer();
         new LostTalesChatConsoleSyncPacket(Arrays.asList(command))
@@ -91,10 +89,8 @@ public final class LostTalesChatConsoleSyncPacketTest {
         ChatNamedPlayer actor = decoded.getEvents().get(0).getActorIdentity();
         assertEquals(steve, actor.getPlayerId());
         assertEquals("Steve", actor.getAccount());
-        assertNull(new ChatConsoleEvent(11L, 5000L,
-                ChatConsoleEvent.Kind.COMMAND, ChatConsoleEvent.Severity.INFO,
-                "Alex", "/gamemode 1", "",
-                ChatNamedPlayer.account(steve, "Steve"))
+        assertNull(ChatConsoleFixtures.command(
+                11L, 5000L, "Alex", "/gamemode 1", "", ChatNamedPlayer.account(steve, "Steve"))
                 .getActorIdentity());
     }
 
@@ -135,8 +131,9 @@ public final class LostTalesChatConsoleSyncPacketTest {
         } catch (IllegalArgumentException expected) {
         }
         try {
-            new ChatConsoleEvent(14L, 6000L, ChatConsoleEvent.Kind.REPORT,
-                    ChatConsoleEvent.Severity.NOTICE, "Steve", "odd", "");
+            ChatConsoleFixtures.entry(
+                    14L, 6000L, ChatConsoleEvent.Kind.REPORT, ChatConsoleEvent.Severity.NOTICE,
+                    "Steve", "odd");
             fail("a report entry carries its report");
         } catch (IllegalArgumentException expected) {
         }
@@ -146,8 +143,9 @@ public final class LostTalesChatConsoleSyncPacketTest {
     public void theCapIsKeptAndBadPayloadsAreRefused() {
         List<ChatConsoleEvent> many = new ArrayList<ChatConsoleEvent>();
         for (int index = 0; index < LostTalesChatConsoleSyncPacket.MAX_EVENTS + 3; index++) {
-            many.add(new ChatConsoleEvent(100L + index, 1L, ChatConsoleEvent.Kind.SERVER,
-                    ChatConsoleEvent.Severity.INFO, "", "entry " + index));
+            many.add(ChatConsoleFixtures.entry(
+                    100L + index, 1L, ChatConsoleEvent.Kind.SERVER, ChatConsoleEvent.Severity.INFO,
+                    "", "entry " + index));
         }
         assertEquals(LostTalesChatConsoleSyncPacket.MAX_EVENTS,
                 new LostTalesChatConsoleSyncPacket(many).getEvents().size());
@@ -197,12 +195,12 @@ public final class LostTalesChatConsoleSyncPacketTest {
      */
     @Test
     public void aReplaySaysWhereItsReaderArrived() {
-        ChatConsoleEvent started = new ChatConsoleEvent(20L, 1000L,
-                ChatConsoleEvent.Kind.SERVER, ChatConsoleEvent.Severity.INFO,
-                "Server", "Server started");
-        ChatConsoleEvent later = new ChatConsoleEvent(22L, 900L,
-                ChatConsoleEvent.Kind.SERVER, ChatConsoleEvent.Severity.INFO,
-                "", "a new entry");
+        ChatConsoleEvent started = ChatConsoleFixtures.entry(
+                20L, 1000L, ChatConsoleEvent.Kind.SERVER, ChatConsoleEvent.Severity.INFO, "Server",
+                "Server started");
+        ChatConsoleEvent later = ChatConsoleFixtures.entry(
+                22L, 900L, ChatConsoleEvent.Kind.SERVER, ChatConsoleEvent.Severity.INFO, "",
+                "a new entry");
         LostTalesChatConsoleSyncPacket live = new LostTalesChatConsoleSyncPacket(
                 Arrays.asList(started));
         assertFalse(live.isReplay());

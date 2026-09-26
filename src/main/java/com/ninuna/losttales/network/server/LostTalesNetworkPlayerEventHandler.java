@@ -3,6 +3,7 @@ package com.ninuna.losttales.network.server;
 import com.ninuna.losttales.party.server.PartyMemberStatusSyncManager;
 import com.ninuna.losttales.party.server.PartySyncManager;
 import com.ninuna.losttales.party.server.PartyTrackingSyncManager;
+import com.ninuna.losttales.quest.missive.MissiveBoardWatches;
 
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerLoggedOutEvent;
@@ -22,5 +23,6 @@ public final class LostTalesNetworkPlayerEventHandler {
         PartySyncManager.clearPlayer(event.player.getUniqueID());
         PartyMemberStatusSyncManager.clearPlayer(event.player.getUniqueID());
         PartyTrackingSyncManager.clearPlayer(event.player.getUniqueID());
+        MissiveBoardWatches.forget(event.player.getUniqueID());
     }
 }

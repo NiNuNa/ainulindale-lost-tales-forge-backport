@@ -389,8 +389,12 @@ public final class LostTalesServerBroadcastHook {
         message.appendSibling(mark);
     }
 
-    /** The name the server's lines are recorded under; the client shows its own word for it. */
-    static final String SERVER_NAME = "Server";
+    /**
+     * The name the server's lines are recorded under, and the actor of
+     * what the server itself does in the Server Console; the client shows
+     * its own word for it.
+     */
+    public static final String SERVER_NAME = "Server";
 
     /**
      * The id of the line that announced {@code account}'s arrival, no

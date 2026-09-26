@@ -5,6 +5,7 @@ import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerStorage;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibility;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerWorldData;
+import com.ninuna.losttales.storage.NbtTags;
 import java.util.UUID;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.nbt.NBTTagCompound;
@@ -12,7 +13,6 @@ import net.minecraft.network.NetworkManager;
 import net.minecraft.network.Packet;
 import net.minecraft.network.play.server.S35PacketUpdateTileEntity;
 import net.minecraft.tileentity.TileEntity;
-import net.minecraftforge.common.util.Constants;
 import software.bernie.geckolib3.core.IAnimatable;
 import software.bernie.geckolib3.core.manager.AnimationData;
 import software.bernie.geckolib3.core.manager.AnimationFactory;
@@ -21,6 +21,12 @@ import software.bernie.geckolib3.core.manager.AnimationFactory;
 public final class LostTalesTileEntityWaystone
         extends TileEntity implements IAnimatable {
     public static final int CURRENT_DATA_VERSION = 1;
+    /**
+     * How near a player stands to use the waystone, squared, measured to
+     * the block's middle: eight blocks. The waystone's page closes once
+     * its player is further than this.
+     */
+    public static final double REACH_SQ = 64.0D;
     private final AnimationFactory factory = new AnimationFactory(this);
 
     private String markerId = "";
@@ -114,7 +120,7 @@ public final class LostTalesTileEntityWaystone
                 && player.getDistanceSq(
                         this.xCoord + 0.5D,
                         this.yCoord + 0.5D,
-                        this.zCoord + 0.5D) <= 64.0D;
+                        this.zCoord + 0.5D) <= REACH_SQ;
     }
 
     @Override
@@ -122,8 +128,8 @@ public final class LostTalesTileEntityWaystone
         super.writeToNBT(tag);
         tag.setInteger("DataVersion", CURRENT_DATA_VERSION);
         tag.setString("MarkerId", this.markerId);
-        writeUuid(tag, "LinkToken", this.linkToken);
-        writeUuid(tag, "Owner", this.ownerPlayerId);
+        NbtTags.writeUuid(tag, "LinkToken", this.linkToken);
+        NbtTags.writeUuid(tag, "Owner", this.ownerPlayerId);
         tag.setString("DisplayName", this.displayName);
         tag.setString("Visibility",
                 this.visibility.getSerializedName());
@@ -135,8 +141,8 @@ public final class LostTalesTileEntityWaystone
     public void readFromNBT(NBTTagCompound tag) {
         super.readFromNBT(tag);
         this.markerId = bounded(tag.getString("MarkerId"), 256, "");
-        this.linkToken = readUuid(tag, "LinkToken");
-        this.ownerPlayerId = readUuid(tag, "Owner");
+        this.linkToken = NbtTags.readUuid(tag, "LinkToken");
+        this.ownerPlayerId = NbtTags.readUuid(tag, "Owner");
         this.displayName = bounded(
                 tag.getString("DisplayName"), 256, "Waystone");
         this.visibility =
@@ -197,23 +203,6 @@ public final class LostTalesTileEntityWaystone
             this.worldObj.markBlockForUpdate(
                     this.xCoord, this.yCoord, this.zCoord);
         }
-    }
-
-    private static void writeUuid(
-            NBTTagCompound tag, String key, UUID value) {
-        if (value != null) {
-            tag.setLong(key + "Most", value.getMostSignificantBits());
-            tag.setLong(key + "Least", value.getLeastSignificantBits());
-        }
-    }
-
-    private static UUID readUuid(NBTTagCompound tag, String key) {
-        if (!tag.hasKey(key + "Most", Constants.NBT.TAG_LONG)
-                || !tag.hasKey(key + "Least", Constants.NBT.TAG_LONG)) {
-            return null;
-        }
-        return new UUID(
-                tag.getLong(key + "Most"), tag.getLong(key + "Least"));
     }
 
     private static String bounded(

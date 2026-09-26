@@ -70,7 +70,7 @@ public class LostTalesBlockUrnBase extends LostTalesBlockDirectionalContainerBas
 
     @Override
     public void onBlockPlacedBy(World world, int i, int j, int k, EntityLivingBase entity, ItemStack itemStack) {
-        world.setBlockMetadataWithNotify(i, j, k, LostTalesBlockRotationHelper.getLegacyDirectionalMetadata(entity), 2);
+        world.setBlockMetadataWithNotify(i, j, k, LostTalesBlockRotationHelper.getDirectionalMetadata(entity), 2);
         this.configurePlacedTileEntity(world, i, j, k, entity);
     }
 

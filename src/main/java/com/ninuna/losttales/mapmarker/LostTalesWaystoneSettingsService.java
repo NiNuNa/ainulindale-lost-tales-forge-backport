@@ -22,12 +22,35 @@ import net.minecraft.world.World;
 
 /**
  * Main-thread server authority for waystone settings. The block link and
- * repository revision are revalidated for every request.
+ * repository revision are revalidated for every request, and every
+ * answer goes back to the player as the waystone's state, saying why.
  */
 public final class LostTalesWaystoneSettingsService {
     private static final double MIN_DISCOVERY_RADIUS = 1.0D;
 
     private LostTalesWaystoneSettingsService() {}
+
+    /**
+     * The player used a waystone. It passes the checks every request
+     * passes — it stands where its record links it, within the player's
+     * reach, holding the record's link token — and its state goes to the
+     * player as an opening, which opens the waystone's page. A waystone
+     * that fails them opens nothing.
+     */
+    public static boolean open(
+            EntityPlayerMP player, LostTalesTileEntityWaystone tile) {
+        if (player == null || tile == null) {
+            return false;
+        }
+        Context context = resolve(player, tile.xCoord, tile.yCoord,
+                tile.zCoord, tile.getMarkerId());
+        if (context == null || context.tile != tile) {
+            return false;
+        }
+        sendState(player, context.tile, context.record,
+                LostTalesWaystoneStateReason.OPENED);
+        return true;
+    }
 
     public static void apply(
             EntityPlayerMP player,
@@ -35,78 +58,81 @@ public final class LostTalesWaystoneSettingsService {
         if (player == null || request == null || request.isMalformed()) {
             return;
         }
-        Context context = resolve(player, request);
+        Context context = resolve(player, request.getX(), request.getY(),
+                request.getZ(), request.getMarkerId());
         if (context == null) {
             deny(player, "chat.losttales.waystone.invalid");
             return;
         }
         if (context.record.getRevision() != request.getExpectedRevision()) {
-            deny(player, "chat.losttales.waystone.stale");
-            sendState(player, context.tile, context.record);
+            refuse(player, context, LostTalesWaystoneStateReason.STALE);
             return;
         }
         if (!LostTalesWaystonePermissionPolicy.canBreakOrEdit(
                 player, context.record, context.world,
                 request.getX(), request.getY(), request.getZ(), true)) {
-            deny(player, "chat.losttales.waystone.denied");
-            sendState(player, context.tile, context.record);
+            refuse(player, context, LostTalesWaystoneStateReason.DENIED);
             return;
         }
 
-        LostTalesMapMarkerRecord updated;
+        Outcome outcome;
         switch (request.getOperation()) {
             case SAVE:
-                updated = applySettings(
+                outcome = applySettings(
                         player, context.record, request);
                 break;
             case SHARE_PLAYER:
-                updated = applyPlayerSharing(
-                        player, context.record,
+                outcome = applyPlayerSharing(
+                        context.record,
                         request.getTargetPlayerName(), false);
                 break;
             case UNSHARE_PLAYER:
-                updated = applyPlayerSharing(
-                        player, context.record,
+                outcome = applyPlayerSharing(
+                        context.record,
                         request.getTargetPlayerName(), true);
                 break;
             case SHARE_FELLOWSHIP:
-                updated = applyFellowshipSharing(
+                outcome = applyFellowshipSharing(
                         player, context.record,
                         request.getTargetPlayerName(), false);
                 break;
             case UNSHARE_FELLOWSHIP:
-                updated = applyFellowshipSharing(
+                outcome = applyFellowshipSharing(
                         player, context.record,
                         request.getTargetPlayerName(), true);
                 break;
             default:
-                updated = null;
+                outcome = Outcome.refused(
+                        LostTalesWaystoneStateReason.INVALID_SETTINGS);
         }
-        if (updated == null) {
-            sendState(player, context.tile, context.record);
+        if (outcome.refusal != null) {
+            refuse(player, context, outcome.refusal);
             return;
         }
 
+        LostTalesMapMarkerRecord updated = outcome.updated;
         try {
             context.data.saveRecord(updated);
             context.tile.linkTo(updated);
         } catch (RuntimeException exception) {
-            deny(player, "chat.losttales.waystone.save_failed");
-            sendState(player, context.tile, context.record);
+            refuse(player, context,
+                    LostTalesWaystoneStateReason.SAVE_FAILED);
             return;
         }
         LostTalesMapMarkerSyncManager.syncAll();
-        sendState(player, context.tile, updated);
+        sendState(player, context.tile, updated,
+                LostTalesWaystoneStateReason.SAVED);
         player.addChatMessage(new ChatComponentTranslation(
-                "chat.losttales.waystone.saved"));
+                LostTalesWaystoneStateReason.SAVED.getMessageKey()));
     }
 
     public static void sendState(
             EntityPlayerMP player,
             LostTalesTileEntityWaystone tile,
-            LostTalesMapMarkerRecord record) {
+            LostTalesMapMarkerRecord record,
+            LostTalesWaystoneStateReason reason) {
         if (player == null || tile == null || record == null
-                || player.worldObj == null
+                || reason == null || player.worldObj == null
                 || !tile.isUseableByPlayer(player)) {
             return;
         }
@@ -120,20 +146,41 @@ public final class LostTalesWaystoneSettingsService {
                 new LostTalesWaystoneStatePacket(
                         player.dimension,
                         tile.xCoord, tile.yCoord, tile.zCoord,
-                        record, canEdit, operator),
+                        record, canEdit, operator, reason),
                 player);
     }
 
+    /**
+     * A request turned down: the chat says why, and the state as it
+     * stands goes back to the page saying the same.
+     */
+    private static void refuse(
+            EntityPlayerMP player, Context context,
+            LostTalesWaystoneStateReason reason) {
+        deny(player, reason.getMessageKey());
+        sendState(player, context.tile, context.record, reason);
+    }
+
+    /**
+     * The waystone at a place in the player's own world, linked to the
+     * marker named and within the player's reach, its record linked back
+     * to that very block by the same token; null where any of it fails.
+     */
     private static Context resolve(
-            EntityPlayerMP player,
-            LostTalesWaystoneSettingsRequestPacket request) {
+            EntityPlayerMP player, int x, int y, int z, String markerId) {
         World world = player.worldObj;
-        if (world == null || world.isRemote
+        if (world == null || world.isRemote || markerId == null
+                || markerId.length() == 0
                 || player.dimension != world.provider.dimensionId) {
             return null;
         }
-        TileEntity raw = world.getTileEntity(
-                request.getX(), request.getY(), request.getZ());
+        // Reach first: the position comes from the client, and reading a
+        // tile entity there could load a chunk far from the player.
+        if (player.getDistanceSq(x + 0.5D, y + 0.5D, z + 0.5D)
+                > LostTalesTileEntityWaystone.REACH_SQ) {
+            return null;
+        }
+        TileEntity raw = world.getTileEntity(x, y, z);
         if (!(raw instanceof LostTalesTileEntityWaystone)) {
             return null;
         }
@@ -141,19 +188,18 @@ public final class LostTalesWaystoneSettingsService {
                 (LostTalesTileEntityWaystone)raw;
         if (!tile.isUseableByPlayer(player)
                 || !tile.isLinked()
-                || !request.getMarkerId().equals(tile.getMarkerId())) {
+                || !markerId.equals(tile.getMarkerId())) {
             return null;
         }
         LostTalesMapMarkerWorldData data =
                 LostTalesMapMarkerStorage.get(world);
-        LostTalesMapMarkerRecord record =
-                data.getRecord(request.getMarkerId());
+        LostTalesMapMarkerRecord record = data.getRecord(markerId);
         if (record == null || !record.isLinked()
                 || record.getLinkedDimensionId()
                         != world.provider.dimensionId
-                || record.getLinkedX() != request.getX()
-                || record.getLinkedY() != request.getY()
-                || record.getLinkedZ() != request.getZ()
+                || record.getLinkedX() != x
+                || record.getLinkedY() != y
+                || record.getLinkedZ() != z
                 || record.getLinkToken() == null
                 || !record.getLinkToken().equals(tile.getLinkToken())) {
             return null;
@@ -161,15 +207,15 @@ public final class LostTalesWaystoneSettingsService {
         return new Context(world, tile, data, record);
     }
 
-    private static LostTalesMapMarkerRecord applySettings(
+    private static Outcome applySettings(
             EntityPlayerMP player,
             LostTalesMapMarkerRecord record,
             LostTalesWaystoneSettingsRequestPacket request) {
         LostTalesMapMarkerEditableSettings requested =
                 request.getSettings();
         if (requested == null) {
-            deny(player, "chat.losttales.waystone.invalid_settings");
-            return null;
+            return Outcome.refused(
+                    LostTalesWaystoneStateReason.INVALID_SETTINGS);
         }
         String name = trim(requested.getName());
         String icon = trim(requested.getIconName());
@@ -207,18 +253,18 @@ public final class LostTalesWaystoneSettingsService {
                 || requested.getPriority()
                         > LostTalesMapMarkerDefinition.MAX_PRIORITY
                 || visibility == null) {
-            deny(player, "chat.losttales.waystone.invalid_settings");
-            return null;
+            return Outcome.refused(
+                    LostTalesWaystoneStateReason.INVALID_SETTINGS);
         }
         if (visibility == LostTalesMapMarkerVisibility.PUBLIC
                 && !LostTalesWaystonePermissionPolicy.canMakePublic(
                         player)) {
-            deny(player, "chat.losttales.waystone.public_denied");
-            return null;
+            return Outcome.refused(
+                    LostTalesWaystoneStateReason.PUBLIC_DENIED);
         }
         if (changesPhysicalFields(record, requested)) {
-            deny(player, "chat.losttales.waystone.invalid_settings");
-            return null;
+            return Outcome.refused(
+                    LostTalesWaystoneStateReason.INVALID_SETTINGS);
         }
         LostTalesMapMarkerEditableSettings normalized =
                 new LostTalesMapMarkerEditableSettings(
@@ -234,10 +280,10 @@ public final class LostTalesWaystoneSettingsService {
                         requested.getPriority(),
                         visibility);
         try {
-            return record.withEditableSettings(normalized);
+            return Outcome.of(record.withEditableSettings(normalized));
         } catch (IllegalArgumentException exception) {
-            deny(player, "chat.losttales.waystone.invalid_settings");
-            return null;
+            return Outcome.refused(
+                    LostTalesWaystoneStateReason.INVALID_SETTINGS);
         }
     }
 
@@ -283,18 +329,17 @@ public final class LostTalesWaystoneSettingsService {
         return value == null ? "" : value.trim();
     }
 
-    private static LostTalesMapMarkerRecord applyPlayerSharing(
-            EntityPlayerMP player,
+    private static Outcome applyPlayerSharing(
             LostTalesMapMarkerRecord record,
             String playerName, boolean remove) {
         UUID targetId = findPlayerId(playerName);
         if (targetId == null) {
-            deny(player, "chat.losttales.waystone.player_not_found");
-            return null;
+            return Outcome.refused(
+                    LostTalesWaystoneStateReason.PLAYER_NOT_FOUND);
         }
         if (targetId.equals(record.getOwnerPlayerId())) {
-            deny(player, "chat.losttales.waystone.invalid_share");
-            return null;
+            return Outcome.refused(
+                    LostTalesWaystoneStateReason.INVALID_SHARE);
         }
         Set<UUID> shared =
                 new LinkedHashSet<UUID>(record.getSharedPlayerIds());
@@ -303,8 +348,8 @@ public final class LostTalesWaystoneSettingsService {
         } else {
             if (shared.size()
                     >= LostTalesMapMarkerRecord.MAX_SHARED_PLAYERS) {
-                deny(player, "chat.losttales.waystone.share_limit");
-                return null;
+                return Outcome.refused(
+                        LostTalesWaystoneStateReason.SHARE_LIMIT);
             }
             shared.add(targetId);
         }
@@ -314,11 +359,10 @@ public final class LostTalesWaystoneSettingsService {
                 && visibility == LostTalesMapMarkerVisibility.PRIVATE) {
             visibility = LostTalesMapMarkerVisibility.SHARED;
         }
-        return record.withSharedPlayers(shared, visibility);
+        return Outcome.of(record.withSharedPlayers(shared, visibility));
     }
 
-    private static LostTalesMapMarkerRecord
-    applyFellowshipSharing(
+    private static Outcome applyFellowshipSharing(
             EntityPlayerMP player,
             LostTalesMapMarkerRecord record,
             String fellowshipName, boolean remove) {
@@ -327,9 +371,8 @@ public final class LostTalesWaystoneSettingsService {
         if (fellowship == null
                 || fellowship.getFellowshipID() == null
                 || !remove && fellowship.isDisbanded()) {
-            deny(player,
-                    "chat.losttales.waystone.fellowship_not_found");
-            return null;
+            return Outcome.refused(
+                    LostTalesWaystoneStateReason.FELLOWSHIP_NOT_FOUND);
         }
         Set<UUID> shared = new LinkedHashSet<UUID>(
                 record.getSharedFellowshipIds());
@@ -340,9 +383,8 @@ public final class LostTalesWaystoneSettingsService {
             if (shared.size()
                     >= LostTalesMapMarkerRecord
                             .MAX_SHARED_FELLOWSHIPS) {
-                deny(player,
-                        "chat.losttales.waystone.share_limit");
-                return null;
+                return Outcome.refused(
+                        LostTalesWaystoneStateReason.SHARE_LIMIT);
             }
             shared.add(fellowshipId);
         }
@@ -353,8 +395,8 @@ public final class LostTalesWaystoneSettingsService {
                         == LostTalesMapMarkerVisibility.PRIVATE) {
             visibility = LostTalesMapMarkerVisibility.SHARED;
         }
-        return record.withSharedFellowships(
-                shared, visibility);
+        return Outcome.of(record.withSharedFellowships(
+                shared, visibility));
     }
 
     private static LOTRFellowship resolveFellowship(
@@ -433,6 +475,28 @@ public final class LostTalesWaystoneSettingsService {
     private static void deny(EntityPlayerMP player, String key) {
         if (player != null) {
             player.addChatMessage(new ChatComponentTranslation(key));
+        }
+    }
+
+    /** What a request comes to: the record it makes, or why it was turned down. */
+    private static final class Outcome {
+        private final LostTalesMapMarkerRecord updated;
+        private final LostTalesWaystoneStateReason refusal;
+
+        private Outcome(LostTalesMapMarkerRecord updated,
+                        LostTalesWaystoneStateReason refusal) {
+            this.updated = updated;
+            this.refusal = refusal;
+        }
+
+        static Outcome of(LostTalesMapMarkerRecord updated) {
+            return updated == null ? refused(
+                    LostTalesWaystoneStateReason.INVALID_SETTINGS)
+                    : new Outcome(updated, null);
+        }
+
+        static Outcome refused(LostTalesWaystoneStateReason reason) {
+            return new Outcome(null, reason);
         }
     }
 

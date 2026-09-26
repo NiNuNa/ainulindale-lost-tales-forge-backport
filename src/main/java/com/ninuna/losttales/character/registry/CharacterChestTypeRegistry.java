@@ -1,9 +1,9 @@
 package com.ninuna.losttales.character.registry;
 
+import com.ninuna.losttales.util.LostTalesIdentifiers;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -53,11 +53,11 @@ public final class CharacterChestTypeRegistry {
     private CharacterChestTypeRegistry() {}
 
     public static CharacterChestTypeDefinition get(String id) {
-        return DEFINITIONS.get(normalizeIdentifier(id));
+        return DEFINITIONS.get(LostTalesIdentifiers.normalize(id));
     }
 
     public static boolean contains(String id) {
-        return DEFINITIONS.containsKey(normalizeIdentifier(id));
+        return DEFINITIONS.containsKey(LostTalesIdentifiers.normalize(id));
     }
 
     public static Collection<CharacterChestTypeDefinition> getAll() {
@@ -67,17 +67,13 @@ public final class CharacterChestTypeRegistry {
     /** The chest a creator pre-selects for a sex: rounded medium for female, none otherwise. */
     public static String defaultFor(String genderId) {
         return CharacterGenderRegistry.FEMALE.equals(
-                CharacterGenderRegistry.normalizeIdentifier(genderId)) ? ROUNDED_MEDIUM : NONE;
+                LostTalesIdentifiers.normalize(genderId)) ? ROUNDED_MEDIUM : NONE;
     }
 
     /** A registered identifier, or none for anything unknown. */
     public static String normalizeOrNone(String id) {
-        String normalized = normalizeIdentifier(id);
+        String normalized = LostTalesIdentifiers.normalize(id);
         return DEFINITIONS.containsKey(normalized) ? normalized : NONE;
-    }
-
-    public static String normalizeIdentifier(String id) {
-        return id == null ? "" : id.trim().toLowerCase(Locale.ROOT);
     }
 
     private static void register(Map<String, CharacterChestTypeDefinition> definitions,

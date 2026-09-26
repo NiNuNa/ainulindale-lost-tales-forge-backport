@@ -21,8 +21,8 @@ import java.util.regex.Pattern;
  *
  * <pre>
  * {
- *   "chat.small_window.open": { "about": "...", "duration": 140, "curve": "settle" },
- *   "chat.scroll":      { "about": "...", "follow": 0.06 },
+ *   "window.sub.open": { "about": "...", "duration": 140, "curve": "settle" },
+ *   "window.scroll":   { "about": "...", "follow": 0.06 },
  *   "chat.line.hover":  { "about": "...", "parts": { "chevron": { "poses": ..., "beats": ... } } }
  * }
  * </pre>

@@ -35,10 +35,6 @@ final class LostTalesMapFastTravelPrompt {
      */
     private final boolean hasAlternatives;
 
-    LostTalesMapFastTravelPrompt(String destinationName) {
-        this(destinationName, null, false);
-    }
-
     LostTalesMapFastTravelPrompt(
             String destinationName, String blockedReasonKey,
             boolean hasAlternatives) {

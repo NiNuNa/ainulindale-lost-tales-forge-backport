@@ -4,7 +4,8 @@ import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.state.CharacterPlayerStateRecord;
 import com.ninuna.losttales.character.state.CharacterPlayerStateWorldData;
 import com.ninuna.losttales.character.storage.CharacterNbtCodec;
-import net.minecraft.nbt.NBTBase;
+import com.ninuna.losttales.storage.NbtTags;
+import com.ninuna.losttales.util.LostTalesIdentifiers;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.world.WorldSavedData;
@@ -17,7 +18,6 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 /** Fail-closed state vault and in-flight transfer journal for lore characters. */
@@ -102,7 +102,7 @@ public final class LoreCharacterTransferWorldData extends WorldSavedData {
     @Override
     public synchronized void writeToNBT(NBTTagCompound compound) {
         if (this.readOnly && this.preservedData != null) {
-            copy(this.preservedData, compound);
+            NbtTags.copyContents(this.preservedData, compound);
             return;
         }
         compound.setInteger("DataVersion", CURRENT_DATA_VERSION);
@@ -124,11 +124,11 @@ public final class LoreCharacterTransferWorldData extends WorldSavedData {
     }
     public synchronized String getReadOnlyReason() { return this.readOnlyReason; }
     public synchronized LoreCharacterVaultEntry getVaultEntry(String loreId) {
-        return this.vault.get(normalize(loreId));
+        return this.vault.get(LostTalesIdentifiers.normalize(loreId));
     }
     public synchronized int getVaultEntryCount() { return this.vault.size(); }
     public synchronized LoreCharacterTransferRecord getTransaction(String loreId) {
-        return this.transactions.get(normalize(loreId));
+        return this.transactions.get(LostTalesIdentifiers.normalize(loreId));
     }
     public synchronized Collection<LoreCharacterTransferRecord> getTransactions() {
         return Collections.unmodifiableList(
@@ -227,7 +227,7 @@ public final class LoreCharacterTransferWorldData extends WorldSavedData {
     private static NBTTagCompound writeVault(LoreCharacterVaultEntry entry) {
         NBTTagCompound tag = new NBTTagCompound();
         tag.setString("LoreCharacterId", entry.getLoreCharacterId());
-        writeUuid(tag, "CapturedOwnerUUID", entry.getCapturedOwnerId());
+        NbtTags.writeUuid(tag, "CapturedOwnerUUID", entry.getCapturedOwnerId());
         tag.setTag("Character", CharacterNbtCodec.writeCharacterRecord(
                 entry.getCharacterCopy()));
         tag.setTag("PlayerState", CharacterPlayerStateWorldData.writeRecordCopy(
@@ -237,7 +237,7 @@ public final class LoreCharacterTransferWorldData extends WorldSavedData {
     }
 
     private static LoreCharacterVaultEntry readVault(NBTTagCompound tag) {
-        UUID ownerId = readUuid(tag, "CapturedOwnerUUID");
+        UUID ownerId = NbtTags.readUuid(tag, "CapturedOwnerUUID");
         if (ownerId == null
                 || !tag.hasKey("LoreCharacterId", Constants.NBT.TAG_STRING)
                 || !tag.hasKey("Character", Constants.NBT.TAG_COMPOUND)
@@ -259,12 +259,12 @@ public final class LoreCharacterTransferWorldData extends WorldSavedData {
         NBTTagCompound tag = new NBTTagCompound();
         tag.setInteger("DataVersion",
                 LoreCharacterTransferRecord.CURRENT_DATA_VERSION);
-        writeUuid(tag, "TransactionUUID", transaction.getTransactionId());
+        NbtTags.writeUuid(tag, "TransactionUUID", transaction.getTransactionId());
         tag.setString("Type", transaction.getType().name());
         tag.setString("LoreCharacterId", transaction.getLoreCharacterId());
-        writeUuid(tag, "CharacterUUID", transaction.getCharacterId());
-        writeUuid(tag, "SourceOwnerUUID", transaction.getSourceOwnerId());
-        writeUuid(tag, "TargetOwnerUUID", transaction.getTargetOwnerId());
+        NbtTags.writeUuid(tag, "CharacterUUID", transaction.getCharacterId());
+        NbtTags.writeUuid(tag, "SourceOwnerUUID", transaction.getSourceOwnerId());
+        NbtTags.writeUuid(tag, "TargetOwnerUUID", transaction.getTargetOwnerId());
         tag.setInteger("TargetSlot", transaction.getTargetSlot());
         tag.setLong("ExpectedOwnershipRevision",
                 transaction.getExpectedOwnershipRevision());
@@ -280,12 +280,12 @@ public final class LoreCharacterTransferWorldData extends WorldSavedData {
             throw new IllegalArgumentException("unsupported transaction version");
         }
         return new LoreCharacterTransferRecord(
-                readUuid(tag, "TransactionUUID"),
+                NbtTags.readUuid(tag, "TransactionUUID"),
                 LoreCharacterTransferRecord.Type.valueOf(tag.getString("Type")),
                 tag.getString("LoreCharacterId"),
-                readUuid(tag, "CharacterUUID"),
-                readUuid(tag, "SourceOwnerUUID"),
-                readUuid(tag, "TargetOwnerUUID"),
+                NbtTags.readUuid(tag, "CharacterUUID"),
+                NbtTags.readUuid(tag, "SourceOwnerUUID"),
+                NbtTags.readUuid(tag, "TargetOwnerUUID"),
                 tag.getInteger("TargetSlot"),
                 tag.getLong("ExpectedOwnershipRevision"),
                 tag.getInteger("Step"),
@@ -310,31 +310,6 @@ public final class LoreCharacterTransferWorldData extends WorldSavedData {
             throw new IllegalStateException(
                     "Lore-character transfer storage is read-only: "
                             + this.readOnlyReason);
-        }
-    }
-
-    private static String normalize(String value) {
-        return value == null ? "" : value.trim().toLowerCase(java.util.Locale.ROOT);
-    }
-    private static void writeUuid(NBTTagCompound tag, String key, UUID value) {
-        if (value != null) {
-            tag.setLong(key + "Most", value.getMostSignificantBits());
-            tag.setLong(key + "Least", value.getLeastSignificantBits());
-        }
-    }
-    private static UUID readUuid(NBTTagCompound tag, String key) {
-        return tag.hasKey(key + "Most", Constants.NBT.TAG_LONG)
-                && tag.hasKey(key + "Least", Constants.NBT.TAG_LONG)
-                ? new UUID(tag.getLong(key + "Most"),
-                tag.getLong(key + "Least")) : null;
-    }
-    private static void copy(NBTTagCompound source, NBTTagCompound target) {
-        Set<?> keys = source.func_150296_c();
-        for (Object value : keys) {
-            if (value instanceof String) {
-                NBTBase tag = source.getTag((String)value);
-                if (tag != null) target.setTag((String)value, tag.copy());
-            }
         }
     }
 }

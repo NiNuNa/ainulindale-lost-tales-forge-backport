@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatColorMarkers;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.chat.ChatNarrator;
@@ -44,8 +45,8 @@ final class ChatHeadMarker {
                         : characterId.toString())
                 + ':' + encodeText(skinId)
                 + ':' + encodeText(copyText)
-                + ':' + colorHex(titleColor)
-                + ':' + colorHex(nameColor);
+                + ':' + ChatColorMarkers.hex(titleColor)
+                + ':' + ChatColorMarkers.hex(nameColor);
     }
 
     /** NPC variant: the skin field carries the entity's texture path. */
@@ -54,8 +55,8 @@ final class ChatHeadMarker {
                             int nameColor) {
         return PREFIX + npcId + ":N::" + encodeText(texturePath)
                 + ':' + encodeText(copyText)
-                + ':' + colorHex(titleColor)
-                + ':' + colorHex(nameColor);
+                + ':' + ChatColorMarkers.hex(titleColor)
+                + ':' + ChatColorMarkers.hex(nameColor);
     }
 
     static Data decode(IChatComponent component) {
@@ -156,15 +157,6 @@ final class ChatHeadMarker {
 
     private static String decodeText(String value) {
         return new String(Base64.getUrlDecoder().decode(value), UTF_8);
-    }
-
-    private static String colorHex(int color) {
-        String hex = Integer.toHexString(color & 0xFFFFFF);
-        StringBuilder padded = new StringBuilder(6);
-        for (int index = hex.length(); index < 6; index++) {
-            padded.append('0');
-        }
-        return padded.append(hex).toString();
     }
 
     private static int parseColor(String value) {

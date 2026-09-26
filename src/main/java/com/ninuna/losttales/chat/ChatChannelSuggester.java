@@ -29,7 +29,7 @@ public final class ChatChannelSuggester {
         }
         int clamped = Math.max(0, Math.min(text.length(), cursor));
         int index = clamped - 1;
-        while (index >= 0 && isNameCharacter(text.charAt(index))) {
+        while (index >= 0 && ChatMentions.isNameCharacter(text.charAt(index))) {
             index--;
         }
         if (index < 0 || text.charAt(index) != '#'
@@ -173,15 +173,10 @@ public final class ChatChannelSuggester {
      */
     public static int wordEnd(String text, int start) {
         int end = start;
-        while (end < text.length() && isNameCharacter(text.charAt(end))) {
+        while (end < text.length() && ChatMentions.isNameCharacter(text.charAt(end))) {
             end++;
         }
         return end;
-    }
-
-    /** The characters a channel word is made of. */
-    public static boolean isNameCharacter(char character) {
-        return Character.isLetterOrDigit(character) || character == '_';
     }
 
     /** The scope a channel's code name needs: the faction for the Faction channel alone. */

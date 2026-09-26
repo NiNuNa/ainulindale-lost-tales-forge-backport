@@ -142,14 +142,6 @@ public class LostTalesMobAggroSyncPacket implements IMessage {
                 new ArrayList<Entry>(this.entries));
     }
 
-    public List<Integer> getEntityIds() {
-        List<Integer> ids = new ArrayList<Integer>(this.entries.size());
-        for (Entry entry : this.entries) {
-            ids.add(Integer.valueOf(entry.getEntityId()));
-        }
-        return Collections.unmodifiableList(ids);
-    }
-
     private void markMalformed(ByteBuf buffer) {
         this.malformed = true;
         this.entries.clear();
@@ -161,10 +153,6 @@ public class LostTalesMobAggroSyncPacket implements IMessage {
     private static int clampRadius(int radius) {
         return Math.max(MIN_TRACKING_RADIUS,
                 Math.min(MAX_TRACKING_RADIUS, radius));
-    }
-
-    private static boolean isFinite(double value) {
-        return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 
     public static final class Entry {
@@ -221,7 +209,7 @@ public class LostTalesMobAggroSyncPacket implements IMessage {
         private boolean isValid() {
             return this.entityId >= 0
                     && this.engagement != LostTalesCombatEngagement.NONE
-                    && isFinite(this.x) && isFinite(this.y) && isFinite(this.z)
+                    && Double.isFinite(this.x) && Double.isFinite(this.y) && Double.isFinite(this.z)
                     && Math.abs(this.x) <= MAX_WORLD_COORDINATE
                     && Math.abs(this.z) <= MAX_WORLD_COORDINATE
                     && Math.abs(this.y) <= MAX_VERTICAL_COORDINATE

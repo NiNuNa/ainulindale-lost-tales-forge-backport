@@ -87,6 +87,6 @@ public final class LostTalesMapMarkerReseedServiceTest {
                 128.0D, 8.0D,
                 false, false, true,
                 LostTalesMapMarkerSource.LOTR_ADAPTER,
-                true, "losttales:glowstone_house");
+                true, "losttales:glowstone_house", 0);
     }
 }

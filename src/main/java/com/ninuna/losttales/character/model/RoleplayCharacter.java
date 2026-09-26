@@ -4,6 +4,7 @@ import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
 
+import com.ninuna.losttales.util.LostTalesIdentifiers;
 import java.util.UUID;
 
 /** Persistent server-authoritative record for one roleplaying character. */
@@ -88,10 +89,10 @@ public class RoleplayCharacter {
         this.genderId = builder.genderId;
         this.skinId = builder.skinId;
         this.bodyTypeId = CharacterBodyTypeRegistry.contains(builder.bodyTypeId)
-                ? CharacterBodyTypeRegistry.normalizeIdentifier(builder.bodyTypeId)
+                ? LostTalesIdentifiers.normalize(builder.bodyTypeId)
                 : CharacterBodyTypeRegistry.defaultFor(builder.genderId);
         this.chestTypeId = CharacterChestTypeRegistry.contains(builder.chestTypeId)
-                ? CharacterChestTypeRegistry.normalizeIdentifier(builder.chestTypeId)
+                ? LostTalesIdentifiers.normalize(builder.chestTypeId)
                 : CharacterChestTypeRegistry.defaultFor(builder.genderId);
         this.profile = builder.profile;
         this.age = builder.age;

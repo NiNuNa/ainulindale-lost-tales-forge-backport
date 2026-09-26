@@ -23,16 +23,6 @@ public final class ChatChannelDescriptor {
                                  ChatRecipientRule recipientRule,
                                  ChatChannelAccess access,
                                  int displayColor,
-                                 boolean bridgeable) {
-        this(id, displayName, presentation, recipientRule, access, displayColor,
-                bridgeable, ChatChannelScope.NONE);
-    }
-
-    public ChatChannelDescriptor(String id, String displayName,
-                                 ChatPresentationMode presentation,
-                                 ChatRecipientRule recipientRule,
-                                 ChatChannelAccess access,
-                                 int displayColor,
                                  boolean bridgeable,
                                  ChatChannelScope scope) {
         if (id == null || id.trim().length() == 0) {

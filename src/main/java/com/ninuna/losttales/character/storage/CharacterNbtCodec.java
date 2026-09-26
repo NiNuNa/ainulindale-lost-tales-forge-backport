@@ -1,6 +1,5 @@
 package com.ninuna.losttales.character.storage;
 
-import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.model.CharacterProgression;
@@ -9,12 +8,14 @@ import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 import com.ninuna.losttales.character.validation.CharacterValidator;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
-import cpw.mods.fml.common.FMLLog;
+import com.ninuna.losttales.storage.NbtQuarantine;
+import com.ninuna.losttales.storage.NbtTags;
+import com.ninuna.losttales.util.LostTalesIdentifiers;
+import com.ninuna.losttales.util.LostTalesLog;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
@@ -34,12 +35,9 @@ import java.util.UUID;
 public final class CharacterNbtCodec {
 
     public static final int CURRENT_ROOT_DATA_VERSION = 2;
-    public static final int CURRENT_QUARANTINE_DATA_VERSION = 1;
 
     private static final String TAG_DATA_VERSION = "DataVersion";
     private static final String TAG_ROSTERS = "Rosters";
-    private static final String TAG_QUARANTINE = "Quarantine";
-    private static final String TAG_QUARANTINE_ENTRIES = "Entries";
     private static final String TAG_ENTRY_TYPE = "EntryType";
     private static final String TAG_REASON = "Reason";
     private static final String TAG_ROSTER_INDEX = "RosterIndex";
@@ -159,7 +157,7 @@ public final class CharacterNbtCodec {
             }
         }
         output.setTag(TAG_ROSTERS, rosterList);
-        output.setTag(TAG_QUARANTINE, writeQuarantine(quarantinedEntries));
+        NbtQuarantine.write(output, quarantinedEntries);
     }
 
     /**
@@ -174,31 +172,32 @@ public final class CharacterNbtCodec {
 
     public static ReadResult read(NBTTagCompound source) {
         if (source == null) {
-            warn("Character data root is malformed; data will remain read-only to avoid overwriting it");
+            LostTalesLog.warning("Character data root is malformed; data will remain "
+                    + "read-only to avoid overwriting it");
             return ReadResult.unsupported(source, -1);
         }
         int rootVersion = versionOf(source);
         if (rootVersion != CURRENT_ROOT_DATA_VERSION) {
-            warn("Character data root uses unsupported version %d; data will remain read-only",
+            LostTalesLog.warning("Character data root uses unsupported version %d; data will remain read-only",
                     Integer.valueOf(rootVersion));
             return ReadResult.unsupported(source, rootVersion);
         }
 
         NBTTagCompound root = (NBTTagCompound) source.copy();
-        QuarantineReadResult quarantineResult = readQuarantine(root);
-        if (!quarantineResult.supported) {
-            warn("Character quarantine data is malformed or uses unsupported version %d; "
+        NbtQuarantine.Read quarantineResult = NbtQuarantine.readCurrentVersionOnly(root);
+        if (!quarantineResult.isSupported()) {
+            LostTalesLog.warning("Character quarantine data is malformed or uses unsupported version %d; "
                             + "the whole store will remain read-only",
-                    Integer.valueOf(quarantineResult.unsupportedVersion));
-            return ReadResult.unsupported(source, quarantineResult.unsupportedVersion);
+                    Integer.valueOf(quarantineResult.getUnsupportedVersion()));
+            return ReadResult.unsupported(source, quarantineResult.getUnsupportedVersion());
         }
 
-        boolean repaired = quarantineResult.repaired;
+        boolean repaired = quarantineResult.isRepaired();
         ArrayList<NBTTagCompound> quarantinedEntries =
-                new ArrayList<NBTTagCompound>(quarantineResult.entries);
+                new ArrayList<NBTTagCompound>(quarantineResult.getEntries());
         if (!root.hasKey(TAG_ROSTERS, Constants.NBT.TAG_LIST)) {
             repaired = true;
-            warn("Character data root is missing the roster list; repairing it as empty");
+            LostTalesLog.warning("Character data root is missing the roster list; repairing it as empty");
         }
         LinkedHashMap<UUID, CharacterRoster> rosters = new LinkedHashMap<UUID, CharacterRoster>();
         NBTTagList rosterList = root.getTagList(TAG_ROSTERS, Constants.NBT.TAG_COMPOUND);
@@ -207,7 +206,8 @@ public final class CharacterNbtCodec {
             NBTTagCompound rawRoster = rosterList.getCompoundTagAt(i);
             RosterReadResult rosterResult = readRoster(rawRoster, i);
             if (rosterResult.unsupportedVersion >= 0) {
-                warn("Character data contains nested unsupported version %d; the whole store will remain read-only",
+                LostTalesLog.warning("Character data contains nested unsupported version %d; "
+                                + "the whole store will remain read-only",
                         Integer.valueOf(rosterResult.unsupportedVersion));
                 return ReadResult.unsupported(source, rosterResult.unsupportedVersion);
             }
@@ -225,83 +225,28 @@ public final class CharacterNbtCodec {
                 quarantinedEntries.add(createQuarantineEntry(
                         "roster", "duplicate_roster_owner", i, -1,
                         roster.getOwnerId(), null, rawRoster));
-                warn("Quarantining duplicate roster for owner %s at index %d",
+                LostTalesLog.warning("Quarantining duplicate roster for owner %s at index %d",
                         roster.getOwnerId(), Integer.valueOf(i));
                 continue;
             }
             rosters.put(roster.getOwnerId(), roster);
         }
 
-        if (quarantinedEntries.size() > quarantineResult.entries.size()) {
-            warn("Preserved %d newly rejected character record(s) in the character-data quarantine",
-                    Integer.valueOf(quarantinedEntries.size() - quarantineResult.entries.size()));
+        if (quarantinedEntries.size() > quarantineResult.getEntries().size()) {
+            LostTalesLog.warning("Preserved %d newly rejected character record(s) in the character-data quarantine",
+                    Integer.valueOf(quarantinedEntries.size() - quarantineResult.getEntries().size()));
         }
         return ReadResult.success(rosters, repaired, quarantinedEntries);
-    }
-
-    private static NBTTagCompound writeQuarantine(Collection<NBTTagCompound> entries) {
-        NBTTagCompound quarantine = new NBTTagCompound();
-        quarantine.setInteger(TAG_DATA_VERSION, CURRENT_QUARANTINE_DATA_VERSION);
-        NBTTagList entryList = new NBTTagList();
-        if (entries != null) {
-            for (NBTTagCompound entry : entries) {
-                if (entry != null) {
-                    entryList.appendTag(entry.copy());
-                }
-            }
-        }
-        quarantine.setTag(TAG_QUARANTINE_ENTRIES, entryList);
-        return quarantine;
-    }
-
-    private static QuarantineReadResult readQuarantine(NBTTagCompound root) {
-        if (!root.hasKey(TAG_QUARANTINE)) {
-            return QuarantineReadResult.success(Collections.<NBTTagCompound>emptyList(), false);
-        }
-        if (!root.hasKey(TAG_QUARANTINE, Constants.NBT.TAG_COMPOUND)) {
-            return QuarantineReadResult.unsupported(-1);
-        }
-
-        NBTTagCompound source = root.getCompoundTag(TAG_QUARANTINE);
-        NBTTagCompound quarantine = (NBTTagCompound) source.copy();
-        int version = quarantine.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
-                ? quarantine.getInteger(TAG_DATA_VERSION)
-                : 0;
-        if (version < 0 || version > CURRENT_QUARANTINE_DATA_VERSION) {
-            return QuarantineReadResult.unsupported(version);
-        }
-
-        boolean repaired = false;
-        if (version == 0) {
-            version = 1;
-            quarantine.setInteger(TAG_DATA_VERSION, version);
-            repaired = true;
-        }
-        if (version != CURRENT_QUARANTINE_DATA_VERSION) {
-            return QuarantineReadResult.unsupported(version);
-        }
-        if (quarantine.hasKey(TAG_QUARANTINE_ENTRIES)
-                && !quarantine.hasKey(TAG_QUARANTINE_ENTRIES, Constants.NBT.TAG_LIST)) {
-            return QuarantineReadResult.unsupported(-1);
-        }
-
-        ArrayList<NBTTagCompound> entries = new ArrayList<NBTTagCompound>();
-        NBTTagList entryList = quarantine.getTagList(
-                TAG_QUARANTINE_ENTRIES, Constants.NBT.TAG_COMPOUND);
-        for (int i = 0; i < entryList.tagCount(); i++) {
-            entries.add((NBTTagCompound) entryList.getCompoundTagAt(i).copy());
-        }
-        return QuarantineReadResult.success(entries, repaired);
     }
 
     private static NBTTagCompound writeRoster(CharacterRoster roster) {
         NBTTagCompound tag = new NBTTagCompound();
         tag.setInteger(TAG_DATA_VERSION, CharacterRoster.CURRENT_DATA_VERSION);
-        writeUuid(tag, TAG_OWNER_UUID, roster.getOwnerId());
+        NbtTags.writeUuid(tag, TAG_OWNER_UUID, roster.getOwnerId());
         tag.setInteger(TAG_UNLOCKED_SLOT_COUNT, roster.getUnlockedSlotCount());
         tag.setLong(TAG_REVISION, roster.getRevision());
         if (roster.getActiveCharacterId() != null) {
-            writeUuid(tag, TAG_ACTIVE_CHARACTER_UUID, roster.getActiveCharacterId());
+            NbtTags.writeUuid(tag, TAG_ACTIVE_CHARACTER_UUID, roster.getActiveCharacterId());
         }
         tag.setBoolean(TAG_ACCOUNT_SHOW_MINECRAFT_CAPE, roster.isAccountMinecraftCapeVisible());
         tag.setInteger(TAG_ACCOUNT_COSMETIC_CAPE_ID, roster.getAccountCosmeticCapeId());
@@ -318,8 +263,8 @@ public final class CharacterNbtCodec {
     private static NBTTagCompound writeCharacter(RoleplayCharacter character) {
         NBTTagCompound tag = new NBTTagCompound();
         tag.setInteger(TAG_DATA_VERSION, RoleplayCharacter.CURRENT_DATA_VERSION);
-        writeUuid(tag, TAG_CHARACTER_UUID, character.getCharacterId());
-        writeUuid(tag, TAG_OWNER_UUID, character.getOwnerId());
+        NbtTags.writeUuid(tag, TAG_CHARACTER_UUID, character.getCharacterId());
+        NbtTags.writeUuid(tag, TAG_OWNER_UUID, character.getOwnerId());
         tag.setString(TAG_KIND, character.getKind().getId());
         tag.setInteger(TAG_SLOT_INDEX, character.getSlotIndex());
         tag.setString(TAG_NAME, character.getName());
@@ -415,7 +360,7 @@ public final class CharacterNbtCodec {
                                                  UUID characterId,
                                                  UUID ownerId) {
         if (!tag.hasKey(TAG_PROFILE, Constants.NBT.TAG_COMPOUND)) {
-            warn("Assigning an empty profile to character %s owned by %s",
+            LostTalesLog.warning("Assigning an empty profile to character %s owned by %s",
                     characterId, ownerId);
             return new ProfileReadResult(CharacterProfile.EMPTY, true);
         }
@@ -484,7 +429,7 @@ public final class CharacterNbtCodec {
             glances.add(glance);
         }
         if (repaired) {
-            warn("Repairing the profile of character %s owned by %s",
+            LostTalesLog.warning("Repairing the profile of character %s owned by %s",
                     characterId, ownerId);
         }
         return new ProfileReadResult(profile.withGlances(glances), repaired);
@@ -514,21 +459,21 @@ public final class CharacterNbtCodec {
 
     private static RosterReadResult readRoster(NBTTagCompound source, int rosterIndex) {
         if (source == null) {
-            warn("Skipping malformed roster at index %d", Integer.valueOf(rosterIndex));
+            LostTalesLog.warning("Skipping malformed roster at index %d", Integer.valueOf(rosterIndex));
             return RosterReadResult.failed(true, "malformed_roster");
         }
         int version = versionOf(source);
         if (version != CharacterRoster.CURRENT_DATA_VERSION) {
-            warn("Roster at index %d uses unsupported version %d",
+            LostTalesLog.warning("Roster at index %d uses unsupported version %d",
                     Integer.valueOf(rosterIndex), Integer.valueOf(version));
             return RosterReadResult.unsupported(version);
         }
 
         NBTTagCompound tag = (NBTTagCompound) source.copy();
         boolean repaired = false;
-        UUID ownerId = readUuid(tag, TAG_OWNER_UUID);
+        UUID ownerId = NbtTags.readUuid(tag, TAG_OWNER_UUID);
         if (ownerId == null) {
-            warn("Skipping roster at index %d because its owner UUID is missing or invalid",
+            LostTalesLog.warning("Skipping roster at index %d because its owner UUID is missing or invalid",
                     Integer.valueOf(rosterIndex));
             return RosterReadResult.failed(true, "missing_or_invalid_owner_uuid");
         }
@@ -539,12 +484,12 @@ public final class CharacterNbtCodec {
                 : CharacterRoster.INITIAL_UNLOCKED_SLOTS;
         if (!hasUnlockedSlotCount) {
             repaired = true;
-            warn("Repairing missing unlocked slot count for owner %s", ownerId);
+            LostTalesLog.warning("Repairing missing unlocked slot count for owner %s", ownerId);
         }
         if (unlockedSlotCount < CharacterRoster.INITIAL_UNLOCKED_SLOTS
                 || unlockedSlotCount > CharacterRoster.MAX_SLOTS) {
             repaired = true;
-            warn("Repairing unlocked slot count %d for owner %s",
+            LostTalesLog.warning("Repairing unlocked slot count %d for owner %s",
                     Integer.valueOf(unlockedSlotCount), ownerId);
         }
 
@@ -552,15 +497,15 @@ public final class CharacterNbtCodec {
         long revision = hasRevision ? tag.getLong(TAG_REVISION) : 0L;
         if (!hasRevision) {
             repaired = true;
-            warn("Repairing missing roster revision for owner %s", ownerId);
+            LostTalesLog.warning("Repairing missing roster revision for owner %s", ownerId);
         }
         if (revision < 0L) {
             revision = 0L;
             repaired = true;
-            warn("Repairing negative roster revision for owner %s", ownerId);
+            LostTalesLog.warning("Repairing negative roster revision for owner %s", ownerId);
         }
 
-        UUID activeCharacterId = readUuid(tag, TAG_ACTIVE_CHARACTER_UUID);
+        UUID activeCharacterId = NbtTags.readUuid(tag, TAG_ACTIVE_CHARACTER_UUID);
         CharacterRoster roster = new CharacterRoster(
                 ownerId,
                 unlockedSlotCount,
@@ -578,7 +523,7 @@ public final class CharacterNbtCodec {
                 ? tag.getInteger(TAG_ACCOUNT_COSMETIC_CAPE_ID)
                 : RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID;
         if (!CharacterCapeCatalog.isValidSelection(accountCapeId)) {
-            warn("Repairing unknown account cape %d for owner %s",
+            LostTalesLog.warning("Repairing unknown account cape %d for owner %s",
                     Integer.valueOf(accountCapeId), ownerId);
             accountCapeId = RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID;
             repaired = true;
@@ -613,7 +558,8 @@ public final class CharacterNbtCodec {
                 quarantinedEntries.add(createQuarantineEntry(
                         "character", "duplicate_character_uuid_or_occupied_slot",
                         rosterIndex, i, ownerId, character.getCharacterId(), rawCharacter));
-                warn("Quarantining duplicate character UUID or occupied slot for owner %s, character %s, slot %d",
+                LostTalesLog.warning("Quarantining duplicate character UUID or occupied slot "
+                                + "for owner %s, character %s, slot %d",
                         ownerId, character.getCharacterId(), Integer.valueOf(character.getSlotIndex()));
             }
         }
@@ -623,12 +569,12 @@ public final class CharacterNbtCodec {
         if (roster.getUnlockedSlotCount() != beforeNormalizedUnlockedCount
                 || roster.getUnlockedSlotCount() != clampUnlockedSlotCount(unlockedSlotCount)) {
             repaired = true;
-            warn("Expanded unlocked slots for owner %s to preserve occupied slots", ownerId);
+            LostTalesLog.warning("Expanded unlocked slots for owner %s to preserve occupied slots", ownerId);
         }
 
         if (roster.getActiveCharacterId() != null && roster.getActiveCharacter() == null) {
             repaired = true;
-            warn("Clearing invalid active character %s for owner %s",
+            LostTalesLog.warning("Clearing invalid active character %s for owner %s",
                     roster.getActiveCharacterId(), ownerId);
             roster.clearInvalidActiveCharacter();
         }
@@ -639,13 +585,13 @@ public final class CharacterNbtCodec {
     private static CharacterReadResult readCharacter(NBTTagCompound source, UUID rosterOwnerId,
                                                        int rosterIndex, int characterIndex) {
         if (source == null) {
-            warn("Skipping malformed character at index %d for owner %s",
+            LostTalesLog.warning("Skipping malformed character at index %d for owner %s",
                     Integer.valueOf(characterIndex), rosterOwnerId);
             return CharacterReadResult.failed(true, "malformed_character");
         }
         int version = versionOf(source);
         if (version != RoleplayCharacter.CURRENT_DATA_VERSION) {
-            warn("Character at index %d for owner %s uses unsupported version %d",
+            LostTalesLog.warning("Character at index %d for owner %s uses unsupported version %d",
                     Integer.valueOf(characterIndex), rosterOwnerId,
                     Integer.valueOf(version));
             return CharacterReadResult.unsupported(version);
@@ -654,47 +600,47 @@ public final class CharacterNbtCodec {
         NBTTagCompound tag = (NBTTagCompound) source.copy();
         boolean repaired = false;
         ArrayList<NBTTagCompound> quarantinedEntries = new ArrayList<NBTTagCompound>();
-        UUID characterId = readUuid(tag, TAG_CHARACTER_UUID);
+        UUID characterId = NbtTags.readUuid(tag, TAG_CHARACTER_UUID);
         if (characterId == null) {
-            warn("Skipping character at index %d for owner %s because its UUID is missing or invalid",
+            LostTalesLog.warning("Skipping character at index %d for owner %s because its UUID is missing or invalid",
                     Integer.valueOf(characterIndex), rosterOwnerId);
             return CharacterReadResult.failed(true, "missing_or_invalid_character_uuid");
         }
 
-        UUID characterOwnerId = readUuid(tag, TAG_OWNER_UUID);
+        UUID characterOwnerId = NbtTags.readUuid(tag, TAG_OWNER_UUID);
         if (characterOwnerId == null) {
             characterOwnerId = rosterOwnerId;
             repaired = true;
-            warn("Repairing missing owner UUID for character %s using roster owner %s",
+            LostTalesLog.warning("Repairing missing owner UUID for character %s using roster owner %s",
                     characterId, rosterOwnerId);
         } else if (!rosterOwnerId.equals(characterOwnerId)) {
-            warn("Skipping character %s because owner %s does not match roster owner %s",
+            LostTalesLog.warning("Skipping character %s because owner %s does not match roster owner %s",
                     characterId, characterOwnerId, rosterOwnerId);
             return CharacterReadResult.failed(true, "owner_uuid_mismatch");
         }
 
         if (!tag.hasKey(TAG_SLOT_INDEX, Constants.NBT.TAG_INT)) {
-            warn("Skipping character %s for owner %s because its slot index is missing",
+            LostTalesLog.warning("Skipping character %s for owner %s because its slot index is missing",
                     characterId, rosterOwnerId);
             return CharacterReadResult.failed(true, "missing_slot_index");
         }
         int slotIndex = tag.getInteger(TAG_SLOT_INDEX);
         if (!CharacterRoster.isValidSlotIndex(slotIndex)) {
-            warn("Skipping character %s for owner %s because slot %d is invalid",
+            LostTalesLog.warning("Skipping character %s for owner %s because slot %d is invalid",
                     characterId, rosterOwnerId, Integer.valueOf(slotIndex));
             return CharacterReadResult.failed(true, "invalid_slot_index");
         }
 
         String name = tag.getString(TAG_NAME);
         String storedRaceId = tag.getString(TAG_RACE_ID);
-        String raceId = CharacterRaceRegistry.normalizeIdentifier(storedRaceId);
+        String raceId = LostTalesIdentifiers.normalize(storedRaceId);
         if (CharacterRaceRegistry.get(raceId) == null) {
             raceId = CharacterRaceRegistry.HUMAN;
             repaired = true;
-            warn("Repairing unknown race %s to safe fallback %s for character %s owned by %s",
+            LostTalesLog.warning("Repairing unknown race %s to safe fallback %s for character %s owned by %s",
                     storedRaceId, raceId, characterId, rosterOwnerId);
         }
-        String storedGenderId = CharacterGenderRegistry.normalizeIdentifier(
+        String storedGenderId = LostTalesIdentifiers.normalize(
                 tag.getString(TAG_GENDER_ID));
         String genderId = CharacterRaceRegistry.normalizeGenderForRace(
                 raceId, storedGenderId);
@@ -709,25 +655,26 @@ public final class CharacterNbtCodec {
             // A record where they disagree would be the account's own
             // identity to one reader and a deletable character to
             // another, so it is quarantined rather than guessed at.
-            warn("Skipping character %s for owner %s because slot %d and kind %s disagree",
+            LostTalesLog.warning("Skipping character %s for owner %s because slot %d and kind %s disagree",
                     characterId, rosterOwnerId, Integer.valueOf(slotIndex),
                     kind.getId());
             return CharacterReadResult.failed(true, "slot_kind_mismatch");
         }
         if (isBlank(name) || isBlank(raceId) || isBlank(genderId)
                 || isBlank(startingFactionId)) {
-            warn("Skipping character %s for owner %s because a required text field is empty or unsupported",
+            LostTalesLog.warning("Skipping character %s for owner %s because a required "
+                            + "text field is empty or unsupported",
                     characterId, rosterOwnerId);
             return CharacterReadResult.failed(true, "missing_required_text_field");
         }
         if (!raceId.equals(storedRaceId)) {
             repaired = true;
-            warn("Repairing race id %s to %s for character %s owned by %s",
+            LostTalesLog.warning("Repairing race id %s to %s for character %s owned by %s",
                     storedRaceId, raceId, characterId, rosterOwnerId);
         }
         if (!genderId.equals(storedGenderId)) {
             repaired = true;
-            warn("Repairing gender %s to %s for race %s on character %s owned by %s",
+            LostTalesLog.warning("Repairing gender %s to %s for race %s on character %s owned by %s",
                     storedGenderId, genderId, raceId, characterId, rosterOwnerId);
         }
 
@@ -743,7 +690,7 @@ public final class CharacterNbtCodec {
                 > MAX_STABLE_IDENTIFIER_LENGTH)) {
             startingWaypointId = "";
             repaired = true;
-            warn("Clearing malformed starting waypoint for character %s owned by %s",
+            LostTalesLog.warning("Clearing malformed starting waypoint for character %s owned by %s",
                     characterId, rosterOwnerId);
         } else {
             startingWaypointId = normalizedStartingWaypointId;
@@ -759,12 +706,12 @@ public final class CharacterNbtCodec {
             repaired = true;
         }
 
-        String skinId = CharacterSkinRegistry.normalizeIdentifier(
+        String skinId = LostTalesIdentifiers.normalize(
                 tag.getString(TAG_SKIN_ID));
         if (!CharacterSkinRegistry.isCompatible(skinId, raceId, genderId)) {
             skinId = CharacterSkinRegistry.getDefaultSkinId(raceId, genderId, characterId);
             repaired = true;
-            warn("Assigning a compatible LOTR skin to character %s owned by %s",
+            LostTalesLog.warning("Assigning a compatible LOTR skin to character %s owned by %s",
                     characterId, rosterOwnerId);
         }
 
@@ -772,7 +719,7 @@ public final class CharacterNbtCodec {
         // creator would have pre-selected.
         boolean hasBodyType = tag.hasKey(TAG_BODY_TYPE_ID, Constants.NBT.TAG_STRING);
         String storedBodyTypeId = hasBodyType
-                ? CharacterBodyTypeRegistry.normalizeIdentifier(tag.getString(TAG_BODY_TYPE_ID))
+                ? LostTalesIdentifiers.normalize(tag.getString(TAG_BODY_TYPE_ID))
                 : "";
         String bodyTypeId = CharacterBodyTypeRegistry.contains(storedBodyTypeId)
                 ? storedBodyTypeId
@@ -780,7 +727,7 @@ public final class CharacterNbtCodec {
         if (!bodyTypeId.equals(storedBodyTypeId)) {
             repaired = true;
             if (hasBodyType) {
-                warn("Repairing unknown body type %s to %s for character %s owned by %s",
+                LostTalesLog.warning("Repairing unknown body type %s to %s for character %s owned by %s",
                         storedBodyTypeId, bodyTypeId, characterId, rosterOwnerId);
             }
         }
@@ -789,7 +736,7 @@ public final class CharacterNbtCodec {
         // would have.
         boolean hasChestType = tag.hasKey(TAG_CHEST_TYPE_ID, Constants.NBT.TAG_STRING);
         String storedChestTypeId = hasChestType
-                ? CharacterChestTypeRegistry.normalizeIdentifier(tag.getString(TAG_CHEST_TYPE_ID))
+                ? LostTalesIdentifiers.normalize(tag.getString(TAG_CHEST_TYPE_ID))
                 : "";
         String chestTypeId = CharacterChestTypeRegistry.contains(storedChestTypeId)
                 ? storedChestTypeId
@@ -797,7 +744,7 @@ public final class CharacterNbtCodec {
         if (!chestTypeId.equals(storedChestTypeId)) {
             repaired = true;
             if (hasChestType) {
-                warn("Repairing unknown chest type %s to %s for character %s owned by %s",
+                LostTalesLog.warning("Repairing unknown chest type %s to %s for character %s owned by %s",
                         storedChestTypeId, chestTypeId, characterId, rosterOwnerId);
             }
         }
@@ -815,7 +762,7 @@ public final class CharacterNbtCodec {
                 : RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE;
         if (!hasShowMinecraftCape) {
             repaired = true;
-            warn("Assigning the default normal-cape visibility to character %s owned by %s",
+            LostTalesLog.warning("Assigning the default normal-cape visibility to character %s owned by %s",
                     characterId, rosterOwnerId);
         }
 
@@ -828,10 +775,10 @@ public final class CharacterNbtCodec {
         if (!hasCosmeticCapeId || cosmeticCapeId != storedCosmeticCapeId) {
             repaired = true;
             if (hasCosmeticCapeId) {
-                warn("Clearing invalid cosmetic cape ID %d for character %s owned by %s",
+                LostTalesLog.warning("Clearing invalid cosmetic cape ID %d for character %s owned by %s",
                         Integer.valueOf(storedCosmeticCapeId), characterId, rosterOwnerId);
             } else {
-                warn("Assigning no cosmetic cape to character %s owned by %s",
+                LostTalesLog.warning("Assigning no cosmetic cape to character %s owned by %s",
                         characterId, rosterOwnerId);
             }
         }
@@ -840,15 +787,15 @@ public final class CharacterNbtCodec {
         int age = hasAge ? tag.getInteger(TAG_AGE) : 1;
         if (!hasAge) {
             repaired = true;
-            warn("Repairing missing age for character %s owned by %s", characterId, rosterOwnerId);
+            LostTalesLog.warning("Repairing missing age for character %s owned by %s", characterId, rosterOwnerId);
         } else if (age < 1) {
             age = 1;
             repaired = true;
-            warn("Repairing non-positive age for character %s owned by %s", characterId, rosterOwnerId);
+            LostTalesLog.warning("Repairing non-positive age for character %s owned by %s", characterId, rosterOwnerId);
         } else if (age > MAX_REASONABLE_AGE) {
             age = MAX_REASONABLE_AGE;
             repaired = true;
-            warn("Clamping unreasonable age for character %s owned by %s", characterId, rosterOwnerId);
+            LostTalesLog.warning("Clamping unreasonable age for character %s owned by %s", characterId, rosterOwnerId);
         }
 
         boolean hasRoleplayLevel = tag.hasKey(TAG_ROLEPLAY_LEVEL, Constants.NBT.TAG_INT);
@@ -857,12 +804,12 @@ public final class CharacterNbtCodec {
                 : RoleplayCharacter.INITIAL_ROLEPLAY_LEVEL;
         if (!hasRoleplayLevel) {
             repaired = true;
-            warn("Repairing missing roleplay level for character %s owned by %s",
+            LostTalesLog.warning("Repairing missing roleplay level for character %s owned by %s",
                     characterId, rosterOwnerId);
         } else if (roleplayLevel < RoleplayCharacter.INITIAL_ROLEPLAY_LEVEL) {
             roleplayLevel = RoleplayCharacter.INITIAL_ROLEPLAY_LEVEL;
             repaired = true;
-            warn("Repairing invalid roleplay level for character %s owned by %s",
+            LostTalesLog.warning("Repairing invalid roleplay level for character %s owned by %s",
                     characterId, rosterOwnerId);
         }
 
@@ -870,13 +817,13 @@ public final class CharacterNbtCodec {
         long creationTimestamp = hasCreationTimestamp ? tag.getLong(TAG_CREATION_TIMESTAMP) : 0L;
         if (!hasCreationTimestamp) {
             repaired = true;
-            warn("Repairing missing creation timestamp for character %s owned by %s",
+            LostTalesLog.warning("Repairing missing creation timestamp for character %s owned by %s",
                     characterId, rosterOwnerId);
         }
         if (creationTimestamp < 0L) {
             creationTimestamp = 0L;
             repaired = true;
-            warn("Repairing negative creation timestamp for character %s owned by %s",
+            LostTalesLog.warning("Repairing negative creation timestamp for character %s owned by %s",
                     characterId, rosterOwnerId);
         }
 
@@ -919,14 +866,14 @@ public final class CharacterNbtCodec {
     private static ProgressionReadResult readProgression(NBTTagCompound source, UUID characterId,
                                                           UUID ownerId, boolean wasPresent) {
         if (!wasPresent) {
-            warn("Creating missing progression container for character %s owned by %s",
+            LostTalesLog.warning("Creating missing progression container for character %s owned by %s",
                     characterId, ownerId);
             return ProgressionReadResult.success(new CharacterProgression(), true, false);
         }
 
         int version = versionOf(source);
         if (version != CharacterProgression.CURRENT_DATA_VERSION) {
-            warn("Progression data for character %s owned by %s uses unsupported version %d",
+            LostTalesLog.warning("Progression data for character %s owned by %s uses unsupported version %d",
                     characterId, ownerId, Integer.valueOf(version));
             return ProgressionReadResult.unsupported(version);
         }
@@ -939,7 +886,7 @@ public final class CharacterNbtCodec {
         if (experiencePoints < 0L) {
             experiencePoints = 0L;
             repaired = true;
-            warn("Repairing negative experience for character %s owned by %s", characterId, ownerId);
+            LostTalesLog.warning("Repairing negative experience for character %s owned by %s", characterId, ownerId);
         }
 
         boolean extensionTagPresent = tag.hasKey(TAG_EXTENSION_DATA);
@@ -950,7 +897,8 @@ public final class CharacterNbtCodec {
                 : new NBTTagCompound();
         if (!hasExtensionData) {
             repaired = true;
-            warn("Repairing missing or malformed progression extension data for character %s owned by %s",
+            LostTalesLog.warning("Repairing missing or malformed progression extension "
+                            + "data for character %s owned by %s",
                     characterId, ownerId);
         }
         CharacterProgression progression = new CharacterProgression(
@@ -975,30 +923,15 @@ public final class CharacterNbtCodec {
             entry.setInteger(TAG_CHARACTER_INDEX, characterIndex);
         }
         if (ownerId != null) {
-            writeUuid(entry, TAG_OWNER_UUID, ownerId);
+            NbtTags.writeUuid(entry, TAG_OWNER_UUID, ownerId);
         }
         if (characterId != null) {
-            writeUuid(entry, TAG_CHARACTER_UUID, characterId);
+            NbtTags.writeUuid(entry, TAG_CHARACTER_UUID, characterId);
         }
         entry.setTag(TAG_ORIGINAL_DATA, originalData == null
                 ? new NBTTagCompound()
                 : originalData.copy());
         return entry;
-    }
-
-    private static void writeUuid(NBTTagCompound tag, String key, UUID uuid) {
-        tag.setLong(key + "Most", uuid.getMostSignificantBits());
-        tag.setLong(key + "Least", uuid.getLeastSignificantBits());
-    }
-
-    private static UUID readUuid(NBTTagCompound tag, String key) {
-        String mostKey = key + "Most";
-        String leastKey = key + "Least";
-        if (!tag.hasKey(mostKey, Constants.NBT.TAG_LONG)
-                || !tag.hasKey(leastKey, Constants.NBT.TAG_LONG)) {
-            return null;
-        }
-        return new UUID(tag.getLong(mostKey), tag.getLong(leastKey));
     }
 
     private static boolean isBlank(String value) {
@@ -1023,19 +956,6 @@ public final class CharacterNbtCodec {
             }
         }
         return copies;
-    }
-
-    private static void warn(String message, Object... arguments) {
-        Object[] allArguments = new Object[arguments.length + 1];
-        allArguments[0] = LostTalesMetaData.MOD_ID;
-        System.arraycopy(arguments, 0, allArguments, 1, arguments.length);
-        try {
-            FMLLog.warning("[%s] " + message, allArguments);
-        } catch (Throwable ignored) {
-            // Persistence validation must never fail merely because Forge's
-            // logger has not yet been bootstrapped (for example in standalone
-            // recovery tools and the dependency-free validation harness).
-        }
     }
 
     public static final class ReadResult {
@@ -1104,31 +1024,6 @@ public final class CharacterNbtCodec {
 
         public List<NBTTagCompound> getQuarantinedEntriesCopy() {
             return copyQuarantineEntries(this.quarantinedEntries);
-        }
-    }
-
-    private static final class QuarantineReadResult {
-        private final List<NBTTagCompound> entries;
-        private final boolean repaired;
-        private final boolean supported;
-        private final int unsupportedVersion;
-
-        private QuarantineReadResult(Collection<NBTTagCompound> entries, boolean repaired,
-                                     boolean supported, int unsupportedVersion) {
-            this.entries = copyQuarantineEntries(entries);
-            this.repaired = repaired;
-            this.supported = supported;
-            this.unsupportedVersion = unsupportedVersion;
-        }
-
-        private static QuarantineReadResult success(Collection<NBTTagCompound> entries,
-                                                    boolean repaired) {
-            return new QuarantineReadResult(entries, repaired, true, -1);
-        }
-
-        private static QuarantineReadResult unsupported(int version) {
-            return new QuarantineReadResult(Collections.<NBTTagCompound>emptyList(),
-                    false, false, version);
         }
     }
 

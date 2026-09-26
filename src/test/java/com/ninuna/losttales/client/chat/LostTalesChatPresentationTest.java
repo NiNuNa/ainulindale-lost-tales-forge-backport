@@ -4,10 +4,12 @@ import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatRoleFixtures;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
+import com.ninuna.losttales.chat.ChatConsoleFixtures;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatEpithet;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.network.packet.ChatPacketFixtures;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.chat.ChatNarrator;
 import java.util.UUID;
@@ -44,10 +46,9 @@ public final class LostTalesChatPresentationTest {
      */
     @Test
     public void aNarratorLineWearsItsMarkAndItalicWords() {
-        LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
-                ChatChannel.GLOBAL, UUID.randomUUID(), ChatNarrator.NAME,
-                "Steve", "", 0, ChatNarrator.color(), "the gate falls",
-                123456789L, ChatNarrator.SKIN_ID);
+        LostTalesChatMessagePacket packet = ChatPacketFixtures.line(
+                ChatChannel.GLOBAL, ChatNarrator.NAME, "Steve", "the gate falls")
+                .colors(0, ChatNarrator.color()).at(123456789L).skin(ChatNarrator.SKIN_ID).build();
         assertTrue(packet.isNarrator());
         IChatComponent message = LostTalesChatPresentation.build(packet);
         boolean marked = false;
@@ -91,10 +92,8 @@ public final class LostTalesChatPresentationTest {
     @Test
     public void theNameIsTheFirstPartToAnswerAfterTheHead() {
         IChatComponent message = LostTalesChatPresentation.build(
-                new LostTalesChatMessagePacket(
-                        ChatChannel.GLOBAL, UUID.randomUUID(), "Arathorn",
-                        "RangerOfTheNorth", "", 0x55AA55, 0x336633,
-                        "hello", 123456789L, ""));
+                ChatPacketFixtures.line(ChatChannel.GLOBAL, "Arathorn", "RangerOfTheNorth", "hello")
+                        .colors(0x55AA55, 0x336633).at(123456789L).build());
         boolean afterHead = false;
         String firstBefore = null;
         String firstAfter = null;
@@ -121,12 +120,10 @@ public final class LostTalesChatPresentationTest {
     @Test
     public void identityUsesBracketsSpacingAndVanillaReplyAction() {
         LostTalesChatMessagePacket packet =
-                new LostTalesChatMessagePacket(
-                        ChatChannel.GLOBAL, UUID.randomUUID(), "Arathorn",
-                        "RangerOfTheNorth", "Ranger",
-                        0x55AA55, 0x336633,
-                        "The road is clear.", 123456789L,
-                        "losttales:human_ranger_male_2");
+                ChatPacketFixtures.line(
+                        ChatChannel.GLOBAL, "Arathorn", "RangerOfTheNorth", "The road is clear.")
+                        .title("Ranger").colors(0x55AA55, 0x336633).at(123456789L)
+                        .skin("losttales:human_ranger_male_2").build();
         IChatComponent message = LostTalesChatPresentation.build(packet);
 
         StringBuilder plainText = new StringBuilder();
@@ -144,7 +141,7 @@ public final class LostTalesChatPresentationTest {
             if (decoded != null) {
                 headMarker = decoded;
             }
-            if ("Global".equals(part.getUnformattedTextForChat())) {
+            if ("Global Chat".equals(part.getUnformattedTextForChat())) {
                 assertFalse(part.getChatStyle().getBold());
             }
             if ("Arathorn".equals(part.getUnformattedTextForChat())) {
@@ -161,7 +158,7 @@ public final class LostTalesChatPresentationTest {
             }
         }
 
-        assertEquals("Global: <  Arathorn, the Ranger> The road is clear.",
+        assertEquals("Global Chat: <  Arathorn, the Ranger> The road is clear.",
                 plainText.toString());
         assertNotNull(reply);
         assertEquals(ClickEvent.Action.SUGGEST_COMMAND,
@@ -199,10 +196,9 @@ public final class LostTalesChatPresentationTest {
     @Test
     public void titledNamesFollowLotrNpcNamingAndUntitledNamesAreBare() {
         LostTalesChatMessagePacket titled =
-                new LostTalesChatMessagePacket(
-                        ChatChannel.GLOBAL, UUID.randomUUID(), "Aldric",
-                        "Aldric123", "Farmer", 0x55AA55, 0x336633,
-                        "Good harvest.", 123456789L, "", null, "Gondor");
+                ChatPacketFixtures.line(ChatChannel.GLOBAL, "Aldric", "Aldric123", "Good harvest.")
+                        .title("Farmer").colors(0x55AA55, 0x336633).at(123456789L).faction("Gondor")
+                        .build();
         ChatTitleMarker.Data marker = null;
         StringBuilder plainText = new StringBuilder();
         for (Object value : LostTalesChatPresentation.build(titled)) {
@@ -213,24 +209,22 @@ public final class LostTalesChatPresentationTest {
                 marker = decoded;
             }
         }
-        assertEquals("Global: <  Aldric, the Gondor Farmer> Good harvest.",
+        assertEquals("Global Chat: <  Aldric, the Gondor Farmer> Good harvest.",
                 plainText.toString());
         assertNotNull(marker);
         assertEquals("Gondor Farmer", marker.epithet);
         assertEquals(0x55AA55, marker.color);
 
         LostTalesChatMessagePacket untitled =
-                new LostTalesChatMessagePacket(
-                        ChatChannel.GLOBAL, UUID.randomUUID(), "Aldric",
-                        "Aldric123", "", 0x55AA55, 0x336633,
-                        "Good harvest.", 123456789L, "", null, "Gondor");
+                ChatPacketFixtures.line(ChatChannel.GLOBAL, "Aldric", "Aldric123", "Good harvest.")
+                        .colors(0x55AA55, 0x336633).at(123456789L).faction("Gondor").build();
         plainText.setLength(0);
         for (Object value : LostTalesChatPresentation.build(untitled)) {
             IChatComponent part = (IChatComponent)value;
             plainText.append(part.getUnformattedTextForChat());
             assertFalse(ChatTitleMarker.isMarker(part));
         }
-        assertEquals("Global: <  Aldric> Good harvest.",
+        assertEquals("Global Chat: <  Aldric> Good harvest.",
                 plainText.toString());
         assertEquals("Farmer", ChatEpithet.epithet("", "Farmer"));
         assertEquals("Gondor Farmer",
@@ -291,12 +285,10 @@ public final class LostTalesChatPresentationTest {
     @Test
     public void theSenderFollowsTheChannelPrefix() {
         LostTalesChatMessagePacket packet =
-                new LostTalesChatMessagePacket(
-                        ChatChannel.PROXIMITY, UUID.randomUUID(),
-                        "Arathorn", "RangerOfTheNorth", "",
-                        0x55AA55, 0x336633, "Halt.",
-                        123456789L,
-                        "losttales:human_ranger_male_2");
+                ChatPacketFixtures.line(
+                        ChatChannel.PROXIMITY, "Arathorn", "RangerOfTheNorth", "Halt.")
+                        .colors(0x55AA55, 0x336633).at(123456789L)
+                        .skin("losttales:human_ranger_male_2").build();
         StringBuilder plainText = new StringBuilder();
         for (Object value : LostTalesChatPresentation.build(packet)) {
             plainText.append(((IChatComponent)value)
@@ -304,7 +296,7 @@ public final class LostTalesChatPresentationTest {
         }
 
         String rendered = plainText.toString();
-        assertTrue(rendered, rendered.startsWith("Proximity: <"));
+        assertTrue(rendered, rendered.startsWith("Proximity Chat: <"));
         assertFalse(rendered.contains(" | "));
         assertTrue(rendered.endsWith(
                 "Arathorn> Halt."));
@@ -319,11 +311,9 @@ public final class LostTalesChatPresentationTest {
         String prefix = ClientChatChannelState.displayName(ChatChannel.FACTION);
         assertNotEquals(ChatChannel.FACTION.getDisplayName(), prefix);
         IChatComponent message = LostTalesChatPresentation.build(
-                new LostTalesChatMessagePacket(
-                        ChatChannel.FACTION, UUID.randomUUID(),
-                        "Amdir", "Player", "",
-                        0x778899, 0x245A32, "Mae govannen.",
-                        123456789L, "losttales:elf_high_male_0"));
+                ChatPacketFixtures.line(ChatChannel.FACTION, "Amdir", "Player", "Mae govannen.")
+                        .colors(0x778899, 0x245A32).at(123456789L).skin("losttales:elf_high_male_0")
+                        .build());
         for (Object value : message) {
             IChatComponent part = (IChatComponent)value;
             if (prefix.equals(part.getUnformattedTextForChat())) {
@@ -390,11 +380,10 @@ public final class LostTalesChatPresentationTest {
     @Test
     public void ampersandCodesStayLiteral() {
         LostTalesChatMessagePacket packet =
-                new LostTalesChatMessagePacket(
-                        ChatChannel.GLOBAL, UUID.randomUUID(), "Arathorn",
-                        "RangerOfTheNorth", "", 0x55AA55, 0x336633,
-                        "&6gold words", 123456789L,
-                        "losttales:human_ranger_male_2");
+                ChatPacketFixtures.line(
+                        ChatChannel.GLOBAL, "Arathorn", "RangerOfTheNorth", "&6gold words")
+                        .colors(0x55AA55, 0x336633).at(123456789L)
+                        .skin("losttales:human_ranger_male_2").build();
         IChatComponent message = LostTalesChatPresentation.build(packet);
         StringBuilder plainText = new StringBuilder();
         ChatHeadMarker.Data marker = null;
@@ -437,12 +426,11 @@ public final class LostTalesChatPresentationTest {
      */
     @Test
     public void accountLinesWearTheirRolesColourAndNoTag() {
-        LostTalesChatMessagePacket tagged = new LostTalesChatMessagePacket(
-                ChatChannel.OOC, UUID.randomUUID(), "Steve", "Steve", "",
-                0xFCECD1, ChatAccountRole.TEAM.getColor(), "hello",
-                123456789L, "", null, "", "",
-                ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR,
-                        ChatAccountRole.TEAM));
+        LostTalesChatMessagePacket tagged = ChatPacketFixtures.line(
+                ChatChannel.OOC, "Steve", "Steve", "hello")
+                .colors(0xFCECD1, ChatAccountRole.TEAM.getColor()).at(123456789L)
+                .roles(ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR, ChatAccountRole.TEAM))
+                .build();
         // Without a loaded language a built-in's name reads as its key.
         String operatorTag = "[" + ChatRoleFixtures.OPERATOR.getDisplayName() + "]";
         String developerTag = "[" + ChatAccountRole.TEAM.getDisplayName() + "]";
@@ -476,11 +464,9 @@ public final class LostTalesChatPresentationTest {
     public void directMessagesFollowTheCommonIdentityRules() {
         int roles = ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR);
         LostTalesChatMessagePacket whisper =
-                new LostTalesChatMessagePacket(
-                        ChatChannel.WHISPER, UUID.randomUUID(), "Steve",
-                        "Steve", "", 0xFCECD1,
-                        ChatAccountRole.nameColor(roles), "hello",
-                        123456789L, "", null, "", "Alex", roles, true);
+                ChatPacketFixtures.line(ChatChannel.WHISPER, "Steve", "Steve", "hello")
+                        .colors(0xFCECD1, ChatAccountRole.nameColor(roles)).at(123456789L)
+                        .partner("Alex").roles(roles).accountLine(true).build();
         String operatorTag = "[" + ChatRoleFixtures.OPERATOR.getDisplayName() + "]";
         StringBuilder plain = new StringBuilder();
         for (Object value : LostTalesChatPresentation.build(whisper)) {
@@ -495,11 +481,9 @@ public final class LostTalesChatPresentationTest {
         // own colour, and the character's name alone, no account
         // behind it.
         LostTalesChatMessagePacket asCharacter =
-                new LostTalesChatMessagePacket(
-                        ChatChannel.WHISPER, UUID.randomUUID(),
-                        "Aldric", "Steve", "", 0xFCECD1, 0x55AA55,
-                        "hello", 123456789L, "skin", null, "", "Alex",
-                        0, false);
+                ChatPacketFixtures.line(ChatChannel.WHISPER, "Aldric", "Steve", "hello")
+                        .colors(0xFCECD1, 0x55AA55).at(123456789L).skin("skin").partner("Alex")
+                        .accountLine(false).build();
         StringBuilder character = new StringBuilder();
         for (Object value
                 : LostTalesChatPresentation.build(asCharacter)) {
@@ -521,10 +505,9 @@ public final class LostTalesChatPresentationTest {
     @Test
     public void markupStylesTheBodyAndDropsItsMarkers() {
         IChatComponent message = LostTalesChatPresentation.build(
-                new LostTalesChatMessagePacket(
-                        ChatChannel.GLOBAL, UUID.randomUUID(), "Aldric",
-                        "Steve", "", 0x55AA55, 0x336633,
-                        "a **bold** and `code` word", 123456789L, ""));
+                ChatPacketFixtures.line(
+                        ChatChannel.GLOBAL, "Aldric", "Steve", "a **bold** and `code` word")
+                        .colors(0x55AA55, 0x336633).at(123456789L).build());
         StringBuilder body = new StringBuilder();
         boolean sawBold = false;
         boolean sawCode = false;
@@ -573,11 +556,10 @@ public final class LostTalesChatPresentationTest {
         try {
             String command = "/losttales hud **bold** :smile: @Arathorn";
             LostTalesChatMessagePacket packet =
-                    new LostTalesChatMessagePacket(
-                            ChatChannel.GLOBAL, UUID.randomUUID(), "Arathorn",
-                            "RangerOfTheNorth", "", 0x55AA55, 0x336633,
-                            command, 123456789L,
-                            "losttales:human_ranger_male_2");
+                    ChatPacketFixtures.line(
+                            ChatChannel.GLOBAL, "Arathorn", "RangerOfTheNorth", command)
+                            .colors(0x55AA55, 0x336633).at(123456789L)
+                            .skin("losttales:human_ranger_male_2").build();
             IChatComponent said = LostTalesChatPresentation.build(packet,
                     ChatTab.of(ChatChannel.GLOBAL), new int[0], false,
                     ChatBodyKind.MESSAGE);
@@ -586,10 +568,7 @@ public final class LostTalesChatPresentationTest {
                     ChatBodyKind.COMMAND);
 
             assertEquals(headerOf(said), headerOf(used));
-            assertEquals("Global: <  Arathorn> ", headerOf(used));
-            // Both bodies open behind the chevron.
-            assertNull(labelOf(said));
-            assertNull(labelOf(used));
+            assertEquals("Global Chat: <  Arathorn> ", headerOf(used));
 
             java.util.List<IChatComponent> body = bodyOf(used);
             // One run, slash and all, behind the chevron: the command as
@@ -606,7 +585,6 @@ public final class LostTalesChatPresentationTest {
                     packet, ChatTab.of(ChatChannel.GLOBAL), new int[0], true,
                     ChatBodyKind.COMMAND);
             assertEquals("", headerOf(grouped));
-            assertNull(labelOf(grouped));
             assertEquals(1, bodyOf(grouped).size());
             assertEquals(command,
                     bodyOf(grouped).get(0).getUnformattedTextForChat());
@@ -622,10 +600,10 @@ public final class LostTalesChatPresentationTest {
      */
     @Test
     public void aQuotedCommandIsInlineCode() {
-        LostTalesChatMessagePacket answer = new LostTalesChatMessagePacket(
-                ChatChannel.GLOBAL, UUID.randomUUID(), "Arathorn",
-                "RangerOfTheNorth", "", 0x55AA55, 0x336633, "Done.",
-                123456789L, "losttales:human_ranger_male_2");
+        LostTalesChatMessagePacket answer = ChatPacketFixtures.line(
+                ChatChannel.GLOBAL, "Arathorn", "RangerOfTheNorth", "Done.")
+                .colors(0x55AA55, 0x336633).at(123456789L).skin("losttales:human_ranger_male_2")
+                .build();
         IChatComponent command = quoteWordsOf(answer.withReply(
                 com.ninuna.losttales.chat.ChatReplyReference.unanchored(
                         "Player125", "/clear", 0xAA5555)));
@@ -707,8 +685,7 @@ public final class LostTalesChatPresentationTest {
 
     private static ChatConsoleEvent consoleEntry(ChatConsoleEvent.Kind kind,
                                                  ChatConsoleEvent.Severity severity) {
-        return new ChatConsoleEvent(1L, 0L, kind, severity, "Server",
-                "Server started");
+        return ChatConsoleFixtures.entry(1L, 0L, kind, severity, "Server", "Server started");
     }
 
     /**
@@ -831,11 +808,10 @@ public final class LostTalesChatPresentationTest {
         try {
             UUID player = UUID.randomUUID();
             UUID character = UUID.randomUUID();
-            LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
-                    ChatChannel.GLOBAL, UUID.randomUUID(), "Arathorn",
-                    "RangerOfTheNorth", "", 0x55AA55, 0x336633,
-                    "hi @Aragorn and @Nobody", 123456789L,
-                    "losttales:human_ranger_male_2").withNamedPlayers(
+            LostTalesChatMessagePacket packet = ChatPacketFixtures.line(
+                    ChatChannel.GLOBAL, "Arathorn", "RangerOfTheNorth", "hi @Aragorn and @Nobody")
+                    .colors(0x55AA55, 0x336633).at(123456789L).skin("losttales:human_ranger_male_2")
+                    .build().withNamedPlayers(
                             java.util.Collections.singletonList(
                                     new com.ninuna.losttales.chat
                                             .ChatNamedPlayer(player,
@@ -890,17 +866,6 @@ public final class LostTalesChatPresentationTest {
             header.append(part.getUnformattedTextForChat());
         }
         return header.toString();
-    }
-
-    /** The label the line's body break carries, or null for the chevron. */
-    private static String labelOf(IChatComponent message) {
-        for (Object value : message) {
-            IChatComponent part = (IChatComponent)value;
-            if (ChatLayoutMarker.isBodyBreak(part)) {
-                return ChatLayoutMarker.bodyLabel(part);
-            }
-        }
-        return null;
     }
 
     /** The parts after the line's body break. */

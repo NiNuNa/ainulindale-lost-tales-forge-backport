@@ -1,10 +1,10 @@
 package com.ninuna.losttales.character.registry;
 
+import com.ninuna.losttales.util.LostTalesIdentifiers;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
-import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -25,7 +25,7 @@ public final class CharacterBodyTypeRegistry {
     private CharacterBodyTypeRegistry() {}
 
     public static boolean contains(String id) {
-        return IDENTIFIERS.contains(normalizeIdentifier(id));
+        return IDENTIFIERS.contains(LostTalesIdentifiers.normalize(id));
     }
 
     public static Collection<String> getAll() {
@@ -35,16 +35,12 @@ public final class CharacterBodyTypeRegistry {
     /** The body type a creator pre-selects for a sex: slim for female, wide otherwise. */
     public static String defaultFor(String genderId) {
         return CharacterGenderRegistry.FEMALE.equals(
-                CharacterGenderRegistry.normalizeIdentifier(genderId)) ? SLIM : WIDE;
+                LostTalesIdentifiers.normalize(genderId)) ? SLIM : WIDE;
     }
 
     /** A registered identifier, or wide for anything unknown. */
     public static String normalizeOrWide(String id) {
-        String normalized = normalizeIdentifier(id);
+        String normalized = LostTalesIdentifiers.normalize(id);
         return IDENTIFIERS.contains(normalized) ? normalized : WIDE;
-    }
-
-    public static String normalizeIdentifier(String id) {
-        return id == null ? "" : id.trim().toLowerCase(Locale.ROOT);
     }
 }

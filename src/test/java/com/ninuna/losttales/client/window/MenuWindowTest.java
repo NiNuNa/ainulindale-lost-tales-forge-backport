@@ -32,7 +32,7 @@ public final class MenuWindowTest {
     private static final MenuWindow.Owner NOBODY = new MenuWindow.Owner() {
         @Override
         public void take(MenuWindow menu, MenuWindow.Entry entry,
-                         boolean back) {}
+                         String part, boolean back) {}
 
         @Override
         public void keyTyped(MenuWindow menu, LostTalesKeyPress press) {}

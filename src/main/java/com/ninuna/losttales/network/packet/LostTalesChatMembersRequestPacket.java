@@ -94,8 +94,8 @@ public final class LostTalesChatMembersRequestPacket implements IMessage {
                     MAX_ACCOUNT_BYTES);
             this.partnerIdentity = LostTalesPacketCodec.readUtf8String(buffer,
                     MAX_IDENTITY_BYTES);
-            this.partnerCharacterId = readOptionalUuid(buffer);
-            this.heldCharacterId = readOptionalUuid(buffer);
+            this.partnerCharacterId = LostTalesPacketCodec.readNullableUuid(buffer);
+            this.heldCharacterId = LostTalesPacketCodec.readNullableUuid(buffer);
             this.heldFingerprint = buffer.readLong();
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
@@ -123,22 +123,9 @@ public final class LostTalesChatMembersRequestPacket implements IMessage {
                 MAX_ACCOUNT_BYTES);
         LostTalesPacketCodec.writeUtf8String(buffer, this.partnerIdentity,
                 MAX_IDENTITY_BYTES);
-        writeOptionalUuid(buffer, this.partnerCharacterId);
-        writeOptionalUuid(buffer, this.heldCharacterId);
+        LostTalesPacketCodec.writeNullableUuid(buffer, this.partnerCharacterId);
+        LostTalesPacketCodec.writeNullableUuid(buffer, this.heldCharacterId);
         buffer.writeLong(this.heldFingerprint);
-    }
-
-    private static UUID readOptionalUuid(ByteBuf buffer) {
-        return buffer.readBoolean()
-                ? new UUID(buffer.readLong(), buffer.readLong()) : null;
-    }
-
-    private static void writeOptionalUuid(ByteBuf buffer, UUID id) {
-        buffer.writeBoolean(id != null);
-        if (id != null) {
-            buffer.writeLong(id.getMostSignificantBits());
-            buffer.writeLong(id.getLeastSignificantBits());
-        }
     }
 
     /**

@@ -127,18 +127,14 @@ public final class ChatNamedPlayer {
             }
             int end = at + needle.length();
             boolean startsClean = at == 0
-                    || !isNameCharacter(haystack.charAt(at - 1));
+                    || !ChatMentions.isNameCharacter(haystack.charAt(at - 1));
             boolean endsClean = end >= haystack.length()
-                    || !isNameCharacter(haystack.charAt(end));
+                    || !ChatMentions.isNameCharacter(haystack.charAt(end));
             if (startsClean && endsClean) {
                 return true;
             }
             from = at + 1;
         }
-    }
-
-    private static boolean isNameCharacter(char character) {
-        return Character.isLetterOrDigit(character) || character == '_';
     }
 
     @Override

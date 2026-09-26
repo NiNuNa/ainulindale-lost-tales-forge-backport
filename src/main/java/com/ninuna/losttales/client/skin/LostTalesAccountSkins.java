@@ -6,6 +6,7 @@ import com.ninuna.losttales.config.LostTalesConfig;
 import com.mojang.authlib.GameProfile;
 import com.ninuna.losttales.character.skin.AccountSkinProfile;
 import com.ninuna.losttales.character.skin.ProfileTexturesDecoder;
+import com.ninuna.losttales.util.LostTalesIdentifiers;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.AbstractClientPlayer;
@@ -173,7 +174,7 @@ public final class LostTalesAccountSkins {
                 || minecraft == null || minecraft.thePlayer != player) {
             return null;
         }
-        String configured = CharacterBodyTypeRegistry.normalizeIdentifier(
+        String configured = LostTalesIdentifiers.normalize(
                 LostTalesConfig.devSkinOverrideBodyType);
         if (configured.indexOf(':') < 0) {
             configured = LostTalesMetaData.MOD_ID + ":" + configured;

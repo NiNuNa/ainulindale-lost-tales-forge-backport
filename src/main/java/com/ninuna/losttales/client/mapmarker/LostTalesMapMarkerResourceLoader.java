@@ -118,7 +118,7 @@ final class LostTalesMapMarkerResourceLoader {
                 ? object.get("y").getAsDouble()
                 : LostTalesMapMarkerDefinition.AUTOMATIC_Y;
         double z = object.get("z").getAsDouble();
-        if (!isFinite(x) || !isFinite(y) || !isFinite(z)) {
+        if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) {
             return null;
         }
         double compassFadeInRadius = getDouble(object, "compassFadeInRadius", 128.0D);
@@ -186,9 +186,4 @@ final class LostTalesMapMarkerResourceLoader {
     private static int parseDimensionId(String dimensionName) {
         return LostTalesDimensionHelper.parseDimensionId(dimensionName, LOTRDimension.MIDDLE_EARTH.dimensionID);
     }
-
-    private static boolean isFinite(double value) {
-        return !Double.isNaN(value) && !Double.isInfinite(value);
-    }
-
 }

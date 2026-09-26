@@ -1,6 +1,7 @@
 package com.ninuna.losttales.network.packet.party;
 
 import com.ninuna.losttales.LostTalesMod;
+import com.ninuna.losttales.network.packet.LostTalesPacketCodec;
 import com.ninuna.losttales.party.server.PartyErrorId;
 import com.ninuna.losttales.party.server.PartyInvitationOperationResult;
 import com.ninuna.losttales.party.server.PartyOperationResult;
@@ -88,11 +89,11 @@ public final class PartyOperationResultPacket implements IMessage {
             this.successful = buffer.readBoolean();
             this.changed = buffer.readBoolean();
             this.partyDisbanded = buffer.readBoolean();
-            this.errorId = PartyErrorId.fromId(PartyPacketCodec.readString(
+            this.errorId = PartyErrorId.fromId(LostTalesPacketCodec.readUtf8String(
                     buffer, PartyPacketCodec.MAX_ERROR_ID_BYTES));
             this.partyRevision = buffer.readLong();
             this.stateFollows = buffer.readBoolean();
-            PartyPacketCodec.requireFinished(buffer);
+            LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
             this.operationType = PartyOperationType.UNKNOWN;
@@ -113,7 +114,7 @@ public final class PartyOperationResultPacket implements IMessage {
         buffer.writeBoolean(this.successful);
         buffer.writeBoolean(this.changed);
         buffer.writeBoolean(this.partyDisbanded);
-        PartyPacketCodec.writeString(
+        LostTalesPacketCodec.writeUtf8String(
                 buffer, this.errorId.getId(), PartyPacketCodec.MAX_ERROR_ID_BYTES);
         buffer.writeLong(this.partyRevision);
         buffer.writeBoolean(this.stateFollows);

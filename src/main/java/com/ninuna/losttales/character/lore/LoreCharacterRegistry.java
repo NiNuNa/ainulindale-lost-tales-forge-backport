@@ -1,6 +1,8 @@
 package com.ninuna.losttales.character.lore;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.util.LostTalesCloseables;
+import com.ninuna.losttales.util.LostTalesIdentifiers;
 import cpw.mods.fml.common.FMLLog;
 
 import java.io.File;
@@ -91,7 +93,7 @@ public final class LoreCharacterRegistry {
 
     public static synchronized LoreCharacterDefinition get(String id) {
         ensureLoaded();
-        return DEFINITIONS_BY_ID.get(normalizeIdentifier(id));
+        return DEFINITIONS_BY_ID.get(LostTalesIdentifiers.normalize(id));
     }
 
     public static synchronized LoreCharacterDefinition getByName(String name) {
@@ -136,7 +138,7 @@ public final class LoreCharacterRegistry {
             errors.add("bundled index: " + safeMessage(e));
             return 0;
         } finally {
-            closeQuietly(indexReader);
+            LostTalesCloseables.closeQuietly(indexReader);
         }
 
         int registered = 0;
@@ -161,7 +163,7 @@ public final class LoreCharacterRegistry {
             } catch (RuntimeException e) {
                 errors.add(source + ": " + safeMessage(e));
             } finally {
-                closeQuietly(reader);
+                LostTalesCloseables.closeQuietly(reader);
             }
         }
         return registered;
@@ -238,7 +240,7 @@ public final class LoreCharacterRegistry {
             } catch (FileNotFoundException e) {
                 errors.add(source + ": " + safeMessage(e));
             } finally {
-                closeQuietly(reader);
+                LostTalesCloseables.closeQuietly(reader);
             }
         }
         return registered;
@@ -328,22 +330,10 @@ public final class LoreCharacterRegistry {
         sortedDefinitions = Collections.unmodifiableList(values);
     }
 
-    private static String normalizeIdentifier(String id) {
-        return id == null ? "" : id.trim().toLowerCase(Locale.ROOT);
-    }
-
     private static String safeMessage(Throwable throwable) {
         String message = throwable == null ? null : throwable.getMessage();
         return message == null || message.length() == 0
                 ? throwable.getClass().getSimpleName() : message;
-    }
-
-    private static void closeQuietly(Reader reader) {
-        if (reader != null) {
-            try {
-                reader.close();
-            } catch (IOException ignored) {}
-        }
     }
 
     private static void logInfo(String format, Object... arguments) {

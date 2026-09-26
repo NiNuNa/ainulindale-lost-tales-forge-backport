@@ -22,6 +22,7 @@ import com.ninuna.losttales.chat.server.ChatIdentitySelection;
 import com.ninuna.losttales.chat.server.ChatMemberWatches;
 import com.ninuna.losttales.chat.server.ChatReactions;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
+import com.ninuna.losttales.chat.server.LostTalesServerBroadcastHook;
 import com.ninuna.losttales.compat.discord.gateway.DiscordGatewayClient;
 import com.ninuna.losttales.compat.discord.gateway.DiscordGatewayProtocol;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
@@ -1314,7 +1315,8 @@ public final class LostTalesDiscordBridge {
         }
         LostTalesChatService.console(ChatConsoleEvent.Kind.CONFIG,
                 ChatConsoleEvent.Severity.NOTICE,
-                result.link.issuerName.length() > 0 ? result.link.issuerName : "Server",
+                result.link.issuerName.length() > 0 ? result.link.issuerName
+                        : LostTalesServerBroadcastHook.SERVER_NAME,
                 "linked Discord channel " + where + " to " + gameName);
     }
 
@@ -1354,7 +1356,8 @@ public final class LostTalesDiscordBridge {
         answerLater(interaction, DiscordSlashCommands.unlinked(gameChannelName(owner)));
         retireWebhooks(webhooks);
         LostTalesChatService.console(ChatConsoleEvent.Kind.CONFIG,
-                ChatConsoleEvent.Severity.NOTICE, "Server", "Discord channel " + where
+                ChatConsoleEvent.Severity.NOTICE,
+                LostTalesServerBroadcastHook.SERVER_NAME, "Discord channel " + where
                         + " was unlinked from " + gameChannelName(owner) + " by "
                         + DiscordMessageSanitizer.inboundName(interaction.userName)
                         + " on Discord");
@@ -1497,8 +1500,8 @@ public final class LostTalesDiscordBridge {
 
     /**
      * The name a link's game channel reads by: the channel's own
-     * ({@code OOC}, {@code Global}), or a faction's for a
-     * faction's chat ({@code Gondor}).
+     * ({@code OOC Chat}, {@code Global Chat}), or a faction's chat by its
+     * faction ({@code Gondor Chat}).
      */
     public static String gameChannelName(String key) {
         String value = key == null ? "" : key.trim();
@@ -1511,7 +1514,8 @@ public final class LostTalesDiscordBridge {
         }
         String faction = LotrCharacterAdapter.getInstance()
                 .getFactionDisplayName(named.scope);
-        return faction == null || faction.length() == 0 ? value : faction;
+        return faction == null || faction.length() == 0 ? value
+                : ChatChannel.factionChatName(faction);
     }
 
     /**
@@ -2137,18 +2141,8 @@ public final class LostTalesDiscordBridge {
                  DiscordNotice notice, String bindingKey, ChatChannel channel,
                  String factionScope) {
             this(kind, username, avatarUrl, message, messageId, reply, notice,
-                    bindingKey, channel, factionScope, null, 0L);
-        }
-
-        Outbound(Kind kind, String username, String avatarUrl,
-                 String message, long messageId,
-                 ChatReplyReference reply, DiscordNotice notice,
-                 String bindingKey, ChatChannel channel,
-                 String factionScope, UUID senderId,
-                 long queuedAtMillis) {
-            this(kind, username, avatarUrl, message, messageId, reply, notice,
-                    bindingKey, channel, factionScope, senderId, queuedAtMillis, "",
-                    Collections.<ChatNamedPlayer>emptyList());
+                    bindingKey, channel, factionScope, null, 0L, "",
+                    Collections.<ChatNamedPlayer>emptyList(), null, null);
         }
 
         Outbound(Kind kind, String username, String avatarUrl,

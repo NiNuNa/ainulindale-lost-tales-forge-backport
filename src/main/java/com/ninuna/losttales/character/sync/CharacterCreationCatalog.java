@@ -4,6 +4,7 @@ import com.ninuna.losttales.character.registry.CharacterFactionDefinition;
 import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
+import com.ninuna.losttales.util.LostTalesIdentifiers;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,22 +26,6 @@ public final class CharacterCreationCatalog {
 
     public CharacterCreationCatalog(boolean lotrAvailable,
                                     String unavailableReason,
-                                    Map<String, List<String>> factionIdsByRace) {
-        this(lotrAvailable, unavailableReason, factionIdsByRace,
-                Collections.<String, List<String>>emptyMap(),
-                Collections.<String>emptyList());
-    }
-
-    public CharacterCreationCatalog(boolean lotrAvailable,
-                                    String unavailableReason,
-                                    Map<String, List<String>> factionIdsByRace,
-                                    Map<String, List<String>> waypointIdsByFaction) {
-        this(lotrAvailable, unavailableReason, factionIdsByRace,
-                waypointIdsByFaction, null);
-    }
-
-    public CharacterCreationCatalog(boolean lotrAvailable,
-                                    String unavailableReason,
                                     Map<String, List<String>> factionIdsByRace,
                                     Map<String, List<String>> waypointIdsByFaction,
                                     List<String> allWaypointIds) {
@@ -50,7 +35,7 @@ public final class CharacterCreationCatalog {
                 new LinkedHashMap<String, List<String>>();
         if (factionIdsByRace != null) {
             for (Map.Entry<String, List<String>> entry : factionIdsByRace.entrySet()) {
-                String raceId = CharacterRaceRegistry.normalizeIdentifier(entry.getKey());
+                String raceId = LostTalesIdentifiers.normalize(entry.getKey());
                 if (CharacterRaceRegistry.get(raceId) == null || copy.containsKey(raceId)) {
                     continue;
                 }
@@ -165,7 +150,7 @@ public final class CharacterCreationCatalog {
 
     public List<String> getFactionIds(String raceId) {
         List<String> ids = this.factionIdsByRace.get(
-                CharacterRaceRegistry.normalizeIdentifier(raceId));
+                LostTalesIdentifiers.normalize(raceId));
         return ids == null ? Collections.<String>emptyList() : ids;
     }
 

@@ -188,7 +188,11 @@ public final class ChatMentions {
         return false;
     }
 
-    private static boolean isNameCharacter(char character) {
+    /**
+     * Whether a character may be part of a name written after an
+     * {@code @} or a {@code #}: a letter, a digit or an underscore.
+     */
+    public static boolean isNameCharacter(char character) {
         return Character.isLetterOrDigit(character) || character == '_';
     }
 }

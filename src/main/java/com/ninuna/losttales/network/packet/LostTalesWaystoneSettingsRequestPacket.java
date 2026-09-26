@@ -233,9 +233,11 @@ public final class LostTalesWaystoneSettingsRequestPacket
                         "invalid waystone settings");
             }
         } else if (this.targetPlayerName == null
-                || this.targetPlayerName.trim().length() == 0) {
+                || this.targetPlayerName.trim().length() == 0
+                || !LostTalesPacketCodec.isUtf8WithinLimit(
+                        this.targetPlayerName, MAX_PLAYER_NAME_BYTES)) {
             throw new IllegalArgumentException(
-                    "missing shared player name");
+                    "missing or overlong shared name");
         }
     }
 
@@ -255,10 +257,6 @@ public final class LostTalesWaystoneSettingsRequestPacket
     }
     public boolean isMalformed() { return this.malformed; }
 
-    private static boolean isFinite(double value) {
-        return !Double.isNaN(value) && !Double.isInfinite(value);
-    }
-
     private static boolean isValidSettings(
             LostTalesMapMarkerEditableSettings value) {
         return value != null
@@ -277,11 +275,11 @@ public final class LostTalesWaystoneSettingsRequestPacket
                 && LostTalesPacketCodec.isUtf8WithinLimit(
                         value.getWaystoneStructureType(),
                         MAX_STRUCTURE_ID_BYTES)
-                && isFinite(value.getX())
-                && isFinite(value.getY())
-                && isFinite(value.getZ())
-                && isFinite(value.getCompassFadeInRadius())
-                && isFinite(value.getDiscoveryRadius())
+                && Double.isFinite(value.getX())
+                && Double.isFinite(value.getY())
+                && Double.isFinite(value.getZ())
+                && Double.isFinite(value.getCompassFadeInRadius())
+                && Double.isFinite(value.getDiscoveryRadius())
                 && value.getPriority()
                         >= com.ninuna.losttales.mapmarker
                                 .LostTalesMapMarkerDefinition.MIN_PRIORITY

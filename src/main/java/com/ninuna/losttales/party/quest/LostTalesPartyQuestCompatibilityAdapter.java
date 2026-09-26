@@ -8,11 +8,6 @@ import net.minecraft.entity.player.EntityPlayerMP;
 public final class LostTalesPartyQuestCompatibilityAdapter implements PartyQuestCompatibilityAdapter {
 
     @Override
-    public String getId() {
-        return "losttales";
-    }
-
-    @Override
     public boolean isAvailable() {
         return true;
     }

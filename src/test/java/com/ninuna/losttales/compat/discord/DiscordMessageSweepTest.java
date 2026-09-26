@@ -20,7 +20,7 @@ public final class DiscordMessageSweepTest {
                                                String editedTimestamp) {
         return new DiscordJson.Message(id, "1", "User", false, content,
                 Collections.<String, String>emptyMap(), "",
-                editedTimestamp);
+                editedTimestamp, "", "");
     }
 
     @Test

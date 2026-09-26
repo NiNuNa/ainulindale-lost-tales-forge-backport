@@ -7,7 +7,10 @@ import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiButton;
+import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiCaret;
+import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
@@ -21,6 +24,7 @@ import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.util.StatCollector;
+import org.lwjgl.input.Mouse;
 
 /**
  * A menu in a sub-window of its own: the rows a control or the pointer
@@ -37,9 +41,16 @@ import net.minecraft.util.StatCollector;
  *
  * <p>A menu may hold a field above its rows, which takes what is typed
  * while its window is in front and until a row is taken: a search that
- * narrows the rows, or a note or a line to be kept. The menu holds the
- * text and draws the field ({@link WindowFields}); which rows a filter
- * leaves is its owner's business.</p>
+ * narrows the rows, or a note, a line or a number to be kept. The menu
+ * holds the text and draws the field ({@link WindowFields}); which rows a
+ * filter leaves, and what the field may hold, is its owner's business.</p>
+ *
+ * <p>A number's row is a stepper: its value between two chevrons, each
+ * of which a press answers on its own, as it does on the value
+ * ({@link #PART_LESS}, {@link #PART_VALUE}, {@link #PART_MORE}).</p>
+ *
+ * <p>The same rows stand in a page as well ({@link PageRows}): a menu of
+ * no kind, drawn in the page's box on the page's surface.</p>
  */
 public final class MenuWindow extends SubWindowContent {
     public static final int ROW_HEIGHT = 11;
@@ -72,6 +83,21 @@ public final class MenuWindow extends SubWindowContent {
             LostTalesColors.rgb(LostTalesColors.HONEY);
     /** The hairline under a section's name: nearly opaque, a firmer line than the field's. */
     private static final int HEADER_RULE_ALPHA = 0xE0;
+    /** A stepper's parts, as a press on a number's row names them. */
+    public static final String PART_LESS = "less";
+    public static final String PART_VALUE = "value";
+    public static final String PART_MORE = "more";
+    /**
+     * The cell a stepper's chevron answers in: its three pixels of ink
+     * with three clear on either side, the clear space between the
+     * chevron and the number included.
+     */
+    static final int STEPPER_CELL = 9;
+    private static final LostTalesUiSheet LESS = LostTalesUiSheet.TOGGLE_5;
+    private static final LostTalesUiSheet LESS_LIT = LostTalesUiSheet.TOGGLE_5_HOVER;
+    private static final LostTalesUiSheet MORE = LostTalesUiSheet.TOGGLE_1;
+    private static final LostTalesUiSheet MORE_LIT = LostTalesUiSheet.TOGGLE_1_HOVER;
+    private static final String[] NO_WORDS = new String[0];
 
     /**
      * A picture standing in a row's icon column: a person's head. It is
@@ -80,6 +106,11 @@ public final class MenuWindow extends SubWindowContent {
     public interface Picture {
         void draw(Minecraft minecraft, float iconX, float labelTop,
                   int alpha);
+    }
+
+    /** What a menu's field may hold: a number's field takes only the characters a number can. */
+    public interface FieldFilter {
+        boolean accepts(String text);
     }
 
     /** How a row's label is measured and drawn where it is not plain words: emoji shortcodes as their sprites. */
@@ -92,8 +123,12 @@ public final class MenuWindow extends SubWindowContent {
 
     /** Who takes a menu's rows and its keys: its {@link WindowMenus}. */
     public interface Owner {
-        /** A row taken; with {@code back}, pressed with the right button. */
-        void take(MenuWindow menu, Entry entry, boolean back);
+        /**
+         * A row taken; with {@code back}, pressed with the right button.
+         * On a stepper, {@code part} names the part pressed; null for the
+         * row as a whole.
+         */
+        void take(MenuWindow menu, Entry entry, String part, boolean back);
 
         /** A key for the menu's field while it holds the keys. */
         void keyTyped(MenuWindow menu, LostTalesKeyPress press);
@@ -150,6 +185,10 @@ public final class MenuWindow extends SubWindowContent {
         public String value = "";
         /** A colour chip before the value, a colour setting's; -1 for none. */
         int valueChip = -1;
+        /** A picture before the value, a marker's icon; null for none. */
+        Picture valuePicture;
+        /** The room the value's picture takes across. */
+        int valuePictureWidth;
         /**
          * A shortcut's keys at the row's right end: a key code for each
          * key, drawn in the mod's key icons, and words between and after
@@ -162,6 +201,18 @@ public final class MenuWindow extends SubWindowContent {
          * padding as a header is; never taken.
          */
         public boolean group;
+        /** Whether the row is a number's: its value between two chevrons. */
+        boolean stepper;
+        /** Whether each chevron still moves the number; one at its bound is muted. */
+        boolean canLess;
+        boolean canMore;
+        /** What the number's value says under the pointer. */
+        String stepperTip = "";
+        /**
+         * The widest values the number can read, measured so its chevrons
+         * stand still as it changes.
+         */
+        String[] stepperWidest = NO_WORDS;
 
         public Entry(String id, String label) {
             this(id, label, false, false, false, -1, null);
@@ -179,6 +230,18 @@ public final class MenuWindow extends SubWindowContent {
             return this;
         }
 
+        /**
+         * The same entry with a picture before its value, {@code width}
+         * across, as a colour's chip stands: a marker icon's row shows the
+         * icon it names. It is drawn from the value's left and the label's
+         * capitals' top.
+         */
+        public Entry withValuePicture(Picture picture, int width) {
+            this.valuePicture = picture;
+            this.valuePictureWidth = picture == null ? 0 : Math.max(0, width);
+            return this;
+        }
+
         /** The same entry showing a shortcut's keys; see {@link #keys}. */
         public Entry withKeys(Object... keys) {
             this.keys = keys == null ? NO_PARTS : keys;
@@ -188,6 +251,22 @@ public final class MenuWindow extends SubWindowContent {
         /** The same entry, muted and closed for {@code reason}. */
         public Entry unavailable(String reason) {
             this.unavailable = reason == null ? "" : reason;
+            return this;
+        }
+
+        /**
+         * The same entry as a number's stepper: its value between two
+         * chevrons, each of which moves it while it can; the value says
+         * {@code tip} under the pointer, and is given room for the widest
+         * of {@code widest}.
+         */
+        public Entry withStepper(boolean less, boolean more, String tip,
+                                 String... widest) {
+            this.stepper = true;
+            this.canLess = less;
+            this.canMore = more;
+            this.stepperTip = tip == null ? "" : tip;
+            this.stepperWidest = widest == null ? NO_WORDS : widest;
             return this;
         }
 
@@ -280,8 +359,15 @@ public final class MenuWindow extends SubWindowContent {
             copy.unavailable = this.unavailable;
             copy.value = this.value;
             copy.valueChip = this.valueChip;
+            copy.valuePicture = this.valuePicture;
+            copy.valuePictureWidth = this.valuePictureWidth;
             copy.keys = this.keys;
             copy.group = this.group;
+            copy.stepper = this.stepper;
+            copy.canLess = this.canLess;
+            copy.canMore = this.canMore;
+            copy.stepperTip = this.stepperTip;
+            copy.stepperWidest = this.stepperWidest;
             return copy;
         }
 
@@ -320,6 +406,7 @@ public final class MenuWindow extends SubWindowContent {
         }
     }
 
+    /** The kind of window it stands in; null for a menu standing in a page. */
     public final SubWindowKind kind;
     /** The menus of the screen it stands on; a menu that comes back with a new screen takes that screen's. */
     private Owner owner;
@@ -363,6 +450,8 @@ public final class MenuWindow extends SubWindowContent {
     private int[] filterHint = NO_KEYS;
     /** The list the field opens as it is typed in — a status line's emoji list — or null. */
     private WindowFields.FieldList fieldList;
+    /** What the field may hold; null for anything. */
+    private FieldFilter fieldFilter;
     /** Where the field's row stood as it was last drawn: its list hangs above it. */
     private int fieldRowLeft;
     private int fieldRowTop;
@@ -375,10 +464,18 @@ public final class MenuWindow extends SubWindowContent {
     private final Map<String, Float> spriteFades = new HashMap<String, Float>();
     private final Map<String, Float> labelFades = new HashMap<String, Float>();
     private long spriteNanos;
+    /** Each stepper chevron's glyph motion, by its row's id and its side. */
+    private final Map<String, LostTalesUiButtonMotion> chevrons =
+            new HashMap<String, LostTalesUiButtonMotion>();
 
     MenuWindow(SubWindowKind kind, Owner owner) {
         this.kind = kind;
         this.owner = owner;
+    }
+
+    /** A menu standing in a page rather than in a window of its own ({@link PageRows}): it has no kind. */
+    MenuWindow(Owner owner) {
+        this(null, owner);
     }
 
     /* ---- What its owner hands it ---- */
@@ -446,6 +543,7 @@ public final class MenuWindow extends SubWindowContent {
         this.renderedScrollRows = 0.0D;
         this.spriteFades.clear();
         this.labelFades.clear();
+        this.chevrons.clear();
         this.spriteNanos = 0L;
     }
 
@@ -465,6 +563,7 @@ public final class MenuWindow extends SubWindowContent {
                 Math.max(1, limit), showsEmoji);
         this.field.setFocused(false);
         this.fieldList = WindowFields.listFor(this.field, showsEmoji);
+        this.fieldFilter = null;
         this.filterPrompt = prompt == null ? "" : prompt;
         this.filterHint = hint == null ? NO_KEYS : hint;
         this.fieldIcon = icon == null ? LostTalesUiSheet.SEARCH : icon;
@@ -474,6 +573,7 @@ public final class MenuWindow extends SubWindowContent {
     public void closeField() {
         this.field = null;
         this.fieldList = null;
+        this.fieldFilter = null;
         this.filterPrompt = "";
         this.filterHint = NO_KEYS;
     }
@@ -499,17 +599,39 @@ public final class MenuWindow extends SubWindowContent {
         this.field.setCursorPositionEnd();
     }
 
+    /** What the field may hold from now on; null for anything. */
+    public void setFieldFilter(FieldFilter filter) {
+        this.fieldFilter = filter;
+    }
+
+    /** Chooses all the field holds, so what is typed next replaces it. */
+    public void selectField() {
+        if (this.field != null) {
+            this.field.setCursorPositionEnd();
+            this.field.setSelectionPos(0);
+        }
+    }
+
     /**
      * Offers a press to the field, as the input bar's field takes one —
      * typing, the caret's keys, selecting, the clipboard — and answers
-     * whether it changed what the field holds.
+     * whether it changed what the field holds. A press that would leave
+     * the field holding what it may not is undone, caret and all.
      */
     boolean edit(LostTalesKeyPress press) {
         if (this.field == null) {
             return false;
         }
         String before = this.field.getText();
+        int caret = this.field.getCursorPosition();
+        int selection = this.field.getSelectionEnd();
         this.field.textboxKeyTyped(press.character, press.key);
+        if (this.fieldFilter != null
+                && !this.fieldFilter.accepts(this.field.getText())) {
+            this.field.setText(before);
+            this.field.setCursorPosition(caret);
+            this.field.setSelectionPos(selection);
+        }
         refreshList();
         return !before.equals(this.field.getText());
     }
@@ -601,7 +723,8 @@ public final class MenuWindow extends SubWindowContent {
         }
         if (hover.menuEntry != null) {
             if (button == 0 || button == 1) {
-                this.owner.take(this, hover.menuEntry, button == 1);
+                this.owner.take(this, hover.menuEntry, hover.part,
+                        button == 1);
             }
             return true;
         }
@@ -653,8 +776,11 @@ public final class MenuWindow extends SubWindowContent {
                     + SWATCH_GAP + hintWidth(minecraft) + PADDING_X);
         }
         String name = stripTitle();
-        return Math.max(widest, TabRow.loneTabWidth(font,
-                name != null ? name : this.kind.title(), this.icon != null));
+        if (name == null && this.kind != null) {
+            name = this.kind.title();
+        }
+        return Math.max(widest, SubWindowStrip.widthFor(font,
+                name != null ? name : "", this.icon != null));
     }
 
     /** The width a row takes whole: from the window's edge to its value's end. */
@@ -826,6 +952,19 @@ public final class MenuWindow extends SubWindowContent {
         hover.menuEntry = takes ? row : null;
         hover.acts = takes;
         hover.tip = row == null ? "" : row.unavailable;
+        if (takes && row.stepper) {
+            // A stepper's parts answer where they are drawn, measured as
+            // the draw measures them.
+            int firstRow = (int)Math.floor(this.renderedScrollRows);
+            hover.part = stepperPartAt(x, y, at.left + at.width - PADDING_X,
+                    firstRowY(at, firstRow)
+                            + (index - firstRow) * this.rowHeight,
+                    this.rowHeight, stepperTextWidth(
+                            Minecraft.getMinecraft().fontRenderer, row));
+            if (PART_VALUE.equals(hover.part)) {
+                hover.tip = row.stepperTip;
+            }
+        }
         return hover;
     }
 
@@ -917,7 +1056,8 @@ public final class MenuWindow extends SubWindowContent {
             int rowY = firstY;
             for (int index = Math.max(0, firstRow); index < last; index++) {
                 drawRow(minecraft, font, at, this.entries.get(index), rowY,
-                        index == hoveredIndex, elapsed, alpha);
+                        index == hoveredIndex, pointerX, pointerY, elapsed,
+                        alpha);
                 rowY += this.rowHeight;
             }
         } finally {
@@ -944,7 +1084,8 @@ public final class MenuWindow extends SubWindowContent {
      */
     private void drawRow(Minecraft minecraft, FontRenderer font, Layout at,
                          Entry entry, int rowY, boolean hovered,
-                         double elapsed, int alpha) {
+                         double pointerX, double pointerY, double elapsed,
+                         int alpha) {
         int labelTop = rowY + LostTalesUiInk.centredStart(this.rowHeight,
                 LostTalesUiInk.CAP_HEIGHT);
         if (entry.header) {
@@ -988,7 +1129,13 @@ public final class MenuWindow extends SubWindowContent {
         int labelLeft = at.left + this.labelX;
         int right = at.left + at.width - PADDING_X;
         int value = valueWidth(minecraft, font, entry);
-        if (value > 0) {
+        if (entry.stepper) {
+            drawStepper(font, entry, right, labelTop, hovered
+                    ? stepperPartAt(pointerX, pointerY, right, rowY,
+                            this.rowHeight, stepperTextWidth(font, entry))
+                    : null, alpha);
+            right -= value + VALUE_GAP;
+        } else if (value > 0) {
             drawValue(minecraft, font, entry, right - value, rowY, labelTop,
                     alpha);
             right -= value + VALUE_GAP;
@@ -1026,10 +1173,20 @@ public final class MenuWindow extends SubWindowContent {
                         : LostTalesColors.rgb(LostTalesColors.SAND), alpha);
     }
 
-    /** How wide a row's value is: its chip, its words and its keys. */
+    /**
+     * How wide a row's value is: its chip, its words and its keys; a
+     * stepper's, its chevrons and the room its number takes.
+     */
     private static int valueWidth(Minecraft minecraft, FontRenderer font,
                                   Entry entry) {
+        if (entry.stepper) {
+            return STEPPER_CELL * 2 + stepperTextWidth(font, entry);
+        }
         int width = 0;
+        if (entry.valuePicture != null) {
+            width += entry.valuePictureWidth
+                    + (entry.value.length() > 0 ? SWATCH_GAP : 0);
+        }
         if (entry.valueChip >= 0) {
             width += CHIP_WIDTH + (entry.value.length() > 0 ? SWATCH_GAP : 0);
         }
@@ -1046,15 +1203,20 @@ public final class MenuWindow extends SubWindowContent {
     }
 
     /**
-     * A row's value from {@code x}: a colour's chip, a square on the
-     * words' capitals, then the words in the aside tone, then a
-     * shortcut's keys in the mod's own key icons on the row's middle,
-     * words between them a seam's width clear.
+     * A row's value from {@code x}: its picture, a colour's chip, a
+     * square on the words' capitals, then the words in the aside tone,
+     * then a shortcut's keys in the mod's own key icons on the row's
+     * middle, words between them a seam's width clear.
      */
     private void drawValue(Minecraft minecraft, FontRenderer font,
                            Entry entry, int x, int rowY, int labelTop,
                            int alpha) {
         int aside = WindowStyle.asideRgb();
+        if (entry.valuePicture != null) {
+            entry.valuePicture.draw(minecraft, x, labelTop, alpha);
+            x += entry.valuePictureWidth
+                    + (entry.value.length() > 0 ? SWATCH_GAP : 0);
+        }
         if (entry.valueChip >= 0) {
             Gui.drawRect(x, labelTop, x + CHIP_WIDTH,
                     labelTop + LostTalesUiInk.CAP_HEIGHT,
@@ -1083,6 +1245,112 @@ public final class MenuWindow extends SubWindowContent {
                 x += font.getStringWidth(word) + KEY_GAP;
             }
         }
+    }
+
+    /** The room a stepper's number takes: its widest value, whatever it reads now. */
+    private static int stepperTextWidth(FontRenderer font, Entry entry) {
+        int width = font.getStringWidth(entry.value);
+        for (String widest : entry.stepperWidest) {
+            width = Math.max(width, font.getStringWidth(widest));
+        }
+        return width;
+    }
+
+    /**
+     * Which part of a stepper whose value ends at {@code right}, in a row
+     * {@code rowHeight} tall from {@code rowTop}, lies under a point: the
+     * chevron down, the number, the chevron up, or null for none. Each
+     * answers across the row's height, the number across the room its
+     * widest value takes.
+     */
+    static String stepperPartAt(double x, double y, int right, int rowTop,
+                                int rowHeight, int textWidth) {
+        int moreLeft = right - STEPPER_CELL;
+        int textLeft = moreLeft - textWidth;
+        int lessLeft = textLeft - STEPPER_CELL;
+        if (LostTalesUiHitBox.contains(x, y, moreLeft, rowTop, STEPPER_CELL,
+                rowHeight)) {
+            return PART_MORE;
+        }
+        if (LostTalesUiHitBox.contains(x, y, textLeft, rowTop, textWidth,
+                rowHeight)) {
+            return PART_VALUE;
+        }
+        if (LostTalesUiHitBox.contains(x, y, lessLeft, rowTop, STEPPER_CELL,
+                rowHeight)) {
+            return PART_LESS;
+        }
+        return null;
+    }
+
+    /**
+     * A number's value between its chevrons, the whole ending at
+     * {@code right}: the number centred in the room its widest value
+     * takes, in the aside tone and in ivory under the pointer; each
+     * chevron a glyph button, and at the bound it cannot pass a flat
+     * shape in the aside tone that nothing moves.
+     */
+    private void drawStepper(FontRenderer font, Entry entry, int right,
+                             int labelTop, String pointed, int alpha) {
+        int textWidth = stepperTextWidth(font, entry);
+        int moreLeft = right - STEPPER_CELL;
+        int textLeft = moreLeft - textWidth;
+        int lessLeft = textLeft - STEPPER_CELL;
+        int chevronY = labelTop + Math.floorDiv(
+                LostTalesUiInk.CAP_HEIGHT - LESS.getHeight(), 2);
+        drawChevron(entry, LESS, LESS_LIT, entry.canLess,
+                PART_LESS.equals(pointed), lessLeft, chevronY, alpha);
+        drawChevron(entry, MORE, MORE_LIT, entry.canMore,
+                PART_MORE.equals(pointed), moreLeft, chevronY, alpha);
+        LostTalesUiInk.drawText(font, entry.value,
+                textLeft + LostTalesUiInk.centredStart(textWidth,
+                        font.getStringWidth(entry.value)),
+                labelTop, PART_VALUE.equals(pointed) ? LostTalesUiInk.IVORY
+                        : WindowStyle.asideRgb(), alpha);
+    }
+
+    /**
+     * One of a stepper's chevrons, centred in its cell, rising and
+     * lighting under the pointer and dropping as it is pressed, as every
+     * glyph button does.
+     */
+    private void drawChevron(Entry entry, final LostTalesUiSheet sprite,
+                             LostTalesUiSheet lit, boolean moves,
+                             boolean pointed, int cellLeft, final int top,
+                             final int alpha) {
+        final int x = cellLeft + LostTalesUiInk.centredStart(STEPPER_CELL,
+                sprite.getWidth());
+        LostTalesUiInk.beginContent();
+        if (moves) {
+            String key = entry.id + ":" + sprite.name();
+            LostTalesUiButtonMotion motion = this.chevrons.get(key);
+            if (motion == null) {
+                motion = new LostTalesUiButtonMotion(
+                        LostTalesUiButtonMotion.Character.LIFT);
+                this.chevrons.put(key, motion);
+            }
+            motion.advance(System.nanoTime(), pointed, pointed, pointed
+                    && (Mouse.isButtonDown(0) || Mouse.isButtonDown(1)));
+            LostTalesUiButton.drawGlyph(sprite, lit, motion, x, top, alpha);
+            return;
+        }
+        // At its bound the chevron stands as a flat shape in the aside
+        // tone, as a row that cannot be taken is worded, over its shadow.
+        LostTalesUiFlatLayers.draw(alpha, x, top,
+                x + sprite.getWidth() + LostTalesUiInk.SHADOW_OFFSET,
+                top + sprite.getHeight() + LostTalesUiInk.SHADOW_OFFSET,
+                new LostTalesUiFlatLayers.Layers() {
+                    @Override
+                    public void draw() {
+                        sprite.drawSilhouette(LostTalesUiInk.SHADOW,
+                                x + LostTalesUiInk.SHADOW_OFFSET,
+                                top + LostTalesUiInk.SHADOW_OFFSET,
+                                LostTalesUiInk.shadowAlpha(alpha));
+                        LostTalesUiFlatLayers.nextLayer();
+                        sprite.drawSilhouette(WindowStyle.asideRgb(), x, top,
+                                alpha);
+                    }
+                });
     }
 
     /**
@@ -1265,7 +1533,7 @@ public final class MenuWindow extends SubWindowContent {
             this.renderedScrollRows = this.scrollRows;
             return;
         }
-        this.renderedScrollRows = Motions.followTravel(MotionIds.CHAT_SCROLL,
+        this.renderedScrollRows = Motions.followTravel(MotionIds.WINDOW_SCROLL,
                 this.renderedScrollRows, this.scrollRows, elapsed);
     }
 
@@ -1278,6 +1546,24 @@ public final class MenuWindow extends SubWindowContent {
     private int firstRowY(Layout at, int firstRow) {
         return at.rowsTop - (int)Math.round(
                 (this.renderedScrollRows - firstRow) * this.rowHeight);
+    }
+
+    /**
+     * Where the row under a point is drawn in a content box, the box's
+     * whole width across: what a window opened from the row hangs from.
+     * Null off every row.
+     */
+    LostTalesUiHitBox rowBoxAt(LostTalesUiHitBox box, double x, double y) {
+        Layout at = layOut(box);
+        clampScroll(at);
+        int index = rowIndexAt(at, x, y);
+        if (index < 0) {
+            return null;
+        }
+        int firstRow = (int)Math.floor(this.renderedScrollRows);
+        return new LostTalesUiHitBox(at.left, firstRowY(at, firstRow)
+                + (index - firstRow) * this.rowHeight, at.width,
+                this.rowHeight);
     }
 
     /**
@@ -1319,11 +1605,17 @@ public final class MenuWindow extends SubWindowContent {
     /** One step of a row's crossfade in {@code fades}, a new row starting where it is headed. */
     private static float stepFade(Map<String, Float> fades, Entry entry,
                                   boolean lit, double elapsed) {
-        Float kept = fades.get(entry.id);
+        return stepFade(fades, entry.id, lit, elapsed);
+    }
+
+    /** As above, for the crossfade kept under {@code id}: a row's, or a part of one. */
+    private static float stepFade(Map<String, Float> fades, String id,
+                                  boolean lit, double elapsed) {
+        Float kept = fades.get(id);
         float fade = kept == null ? (lit ? 1.0F : 0.0F)
                 : WindowStyle.hoverFade(kept.floatValue(), lit,
                         elapsed);
-        fades.put(entry.id, Float.valueOf(fade));
+        fades.put(id, Float.valueOf(fade));
         return fade;
     }
 }

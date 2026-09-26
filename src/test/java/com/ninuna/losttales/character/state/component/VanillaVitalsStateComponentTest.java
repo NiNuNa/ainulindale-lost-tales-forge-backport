@@ -7,9 +7,9 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
 /**
- * Version 2 carries the breath, the fire and the portal cooldown; a
- * version 1 snapshot lacks them and still validates as full breath, no
- * fire and no cooldown, while out-of-range conditions are refused.
+ * The snapshot carries the breath, the fire and the portal cooldown; one
+ * without them, one at another version and out-of-range conditions are
+ * refused.
  */
 public final class VanillaVitalsStateComponentTest {
 
@@ -27,14 +27,19 @@ public final class VanillaVitalsStateComponentTest {
         assertEquals(0, state.getInteger("PortalCooldown"));
     }
 
-    @Test
-    public void aVersionOneSnapshotWithoutTheConditionsStillValidates()
+    @Test(expected = CharacterStateValidationException.class)
+    public void anOlderVersionIsRefused()
             throws CharacterStateValidationException {
         NBTTagCompound state = this.component.createDefault();
         state.setInteger("Version", 1);
-        state.removeTag("Air");
+        this.component.validate(state);
+    }
+
+    @Test(expected = CharacterStateValidationException.class)
+    public void aSnapshotWithoutItsConditionsIsRefused()
+            throws CharacterStateValidationException {
+        NBTTagCompound state = this.component.createDefault();
         state.removeTag("Fire");
-        state.removeTag("PortalCooldown");
         this.component.validate(state);
     }
 

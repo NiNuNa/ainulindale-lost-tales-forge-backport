@@ -353,10 +353,10 @@ public final class LostTalesChatMembersPacket implements IMessage {
     }
 
     private static Member readMember(ByteBuf buffer) {
-        UUID playerId = readUuid(buffer);
+        UUID playerId = LostTalesPacketCodec.readUuid(buffer);
         String account = LostTalesPacketCodec.readUtf8String(buffer,
                 MAX_ACCOUNT_BYTES);
-        UUID characterId = buffer.readBoolean() ? readUuid(buffer) : null;
+        UUID characterId = LostTalesPacketCodec.readNullableUuid(buffer);
         String name = LostTalesPacketCodec.readUtf8String(buffer,
                 MAX_NAME_BYTES);
         int nameColor = buffer.readInt();
@@ -394,13 +394,10 @@ public final class LostTalesChatMembersPacket implements IMessage {
         buffer.writeInt(this.unlisted);
         buffer.writeShort(this.members.size());
         for (Member member : this.members) {
-            writeUuid(buffer, member.playerId);
+            LostTalesPacketCodec.writeUuid(buffer, member.playerId);
             LostTalesPacketCodec.writeUtf8String(buffer, member.account,
                     MAX_ACCOUNT_BYTES);
-            buffer.writeBoolean(member.characterId != null);
-            if (member.characterId != null) {
-                writeUuid(buffer, member.characterId);
-            }
+            LostTalesPacketCodec.writeNullableUuid(buffer, member.characterId);
             LostTalesPacketCodec.writeUtf8String(buffer, member.name,
                     MAX_NAME_BYTES);
             buffer.writeInt(member.nameColor);
@@ -416,15 +413,6 @@ public final class LostTalesChatMembersPacket implements IMessage {
             buffer.writeShort(member.groupOrder);
             buffer.writeBoolean(member.online);
         }
-    }
-
-    private static UUID readUuid(ByteBuf buffer) {
-        return new UUID(buffer.readLong(), buffer.readLong());
-    }
-
-    private static void writeUuid(ByteBuf buffer, UUID id) {
-        buffer.writeLong(id.getMostSignificantBits());
-        buffer.writeLong(id.getLeastSignificantBits());
     }
 
     /** The channel whose conversation the members are of. */

@@ -40,7 +40,7 @@ public final class LostTalesQuestProgressNbtTest {
     @Test
     public void objectiveProgressCannotOverflow() {
         LostTalesQuestProgress progress = new LostTalesQuestProgress(
-                "losttales:test", 0, "stage", null);
+                "losttales:test", 0, "stage", null, 0L, 0L);
         progress.setObjectiveProgress("objective", Integer.MAX_VALUE);
 
         assertEquals(Integer.MAX_VALUE,

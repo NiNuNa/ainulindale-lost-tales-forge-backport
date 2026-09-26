@@ -7,6 +7,8 @@ import com.ninuna.losttales.network.packet.LostTalesMapMarkerDiscoveryPacket;
 import com.ninuna.losttales.network.packet.LostTalesMapMarkerSnapshotPacket;
 import com.ninuna.losttales.network.packet.LostTalesChargeTierSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesMissiveAcceptPacket;
+import com.ninuna.losttales.network.packet.LostTalesMissiveBoardRequestPacket;
+import com.ninuna.losttales.network.packet.LostTalesMissiveBoardStatePacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestActionPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
@@ -158,5 +160,7 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(LostTalesChatReportPacket.Handler.class, LostTalesChatReportPacket.class, 65, Side.SERVER);
         CHANNEL.registerMessage(CharacterProfileRequestPacket.Handler.class, CharacterProfileRequestPacket.class, 66, Side.SERVER);
         CHANNEL.registerMessage(CharacterProfilePacket.Handler.class, CharacterProfilePacket.class, 67, Side.CLIENT);
+        CHANNEL.registerMessage(LostTalesMissiveBoardStatePacket.Handler.class, LostTalesMissiveBoardStatePacket.class, 68, Side.CLIENT);
+        CHANNEL.registerMessage(LostTalesMissiveBoardRequestPacket.Handler.class, LostTalesMissiveBoardRequestPacket.class, 69, Side.SERVER);
     }
 }

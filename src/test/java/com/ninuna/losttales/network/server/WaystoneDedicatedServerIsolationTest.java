@@ -7,6 +7,7 @@ import com.ninuna.losttales.block.tileentity.LostTalesTileEntityWaystone;
 import com.ninuna.losttales.compat.lotr.LostTalesLotrWaystoneTravelAdapter;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerHeightResolver;
 import com.ninuna.losttales.mapmarker.LostTalesWaystoneSettingsService;
+import com.ninuna.losttales.mapmarker.LostTalesWaystoneStateReason;
 import com.ninuna.losttales.network.packet.LostTalesWaystoneSettingsRequestPacket;
 import com.ninuna.losttales.network.packet.LostTalesWaystoneStatePacket;
 import com.ninuna.losttales.network.packet.LostTalesWaystoneTravelRequestPacket;
@@ -27,6 +28,7 @@ public final class WaystoneDedicatedServerIsolationTest {
                 LostTalesGlowstoneHouseWaystonePlacer.class,
                 LostTalesWaystoneGenerationHandler.class,
                 LostTalesWaystoneSettingsService.class,
+                LostTalesWaystoneStateReason.class,
                 LostTalesLotrWaystoneTravelAdapter.class,
                 LostTalesWaystoneSettingsRequestPacket.class,
                 LostTalesWaystoneStatePacket.class,

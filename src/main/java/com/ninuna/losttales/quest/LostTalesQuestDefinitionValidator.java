@@ -71,20 +71,20 @@ public final class LostTalesQuestDefinitionValidator {
         switch (LostTalesQuestObjectiveType.of(type)) {
             case GATHER:
             case CRAFT:
-                if (!hasAny(params, "item", "itemId", "items", "tag", "ore", "oreDict", "oredict")) {
-                    warn(out, quest, stage, objective, "missing 'item' or OreDictionary-style 'tag' parameter for type '%s'", type);
+                if (!hasAny(params, "item", "ore")) {
+                    warn(out, quest, stage, objective, "missing 'item' or OreDictionary 'ore' parameter for type '%s'", type);
                 }
                 validateInteger(out, quest, stage, objective, params.get("count"), "count");
                 return;
             case KILL:
-                if (!hasAny(params, "entity", "entityId", "type", "tag", "group")) {
+                if (!hasAny(params, "entity", "group")) {
                     warn(out, quest, stage, objective, "has no entity selector; it will count any killed entity");
                 }
                 validateInteger(out, quest, stage, objective, params.get("count"), "count");
                 validateNumber(out, quest, stage, objective, params.get("radius"), "radius");
                 return;
             case GOTO:
-                boolean hasMarker = hasAny(params, "marker", "markerId", "mapMarker");
+                boolean hasMarker = hasAny(params, "marker");
                 boolean hasAnyCoordinate = hasAny(params, "x", "y", "z");
                 if (!hasMarker && !hasAnyCoordinate) {
                     warn(out, quest, stage, objective, "missing marker or x/y/z coordinates for type 'goto'");
@@ -97,17 +97,17 @@ public final class LostTalesQuestDefinitionValidator {
                 validateNumber(out, quest, stage, objective, params.get("radius"), "radius");
                 return;
             case TALK:
-                if (!hasAny(params, "entity", "entityId", "npc", "target")) {
+                if (!hasAny(params, "entity")) {
                     warn(out, quest, stage, objective, "missing 'entity' parameter for type 'talk'; nobody can be spoken to");
                 }
                 validateNumber(out, quest, stage, objective, params.get("radius"), "radius");
                 return;
             case DELIVER:
-                if (!hasAny(params, "entity", "entityId", "npc", "target")) {
+                if (!hasAny(params, "entity")) {
                     warn(out, quest, stage, objective, "missing 'entity' parameter for type 'deliver'; nobody can be handed anything");
                 }
-                if (!hasAny(params, "item", "itemId", "items", "tag", "ore", "oreDict", "oredict")) {
-                    warn(out, quest, stage, objective, "missing 'item' or OreDictionary-style 'tag' parameter for type 'deliver'; nothing would change hands");
+                if (!hasAny(params, "item", "ore")) {
+                    warn(out, quest, stage, objective, "missing 'item' or OreDictionary 'ore' parameter for type 'deliver'; nothing would change hands");
                 }
                 validateInteger(out, quest, stage, objective, params.get("count"), "count");
                 validateNumber(out, quest, stage, objective, params.get("radius"), "radius");
@@ -145,8 +145,7 @@ public final class LostTalesQuestDefinitionValidator {
         }
         LostTalesQuestDialogue spoken = LostTalesQuestDialogue.of(quest);
         if (spoken.isOffered()
-                && !hasAny(quest.getInteraction(), "entity", "entityId",
-                        "npc", "target")) {
+                && !hasAny(quest.getInteraction(), "entity")) {
             out.warn("quest=" + quest.getId() + " is offered in conversation "
                     + "but its interaction names nobody to have it with");
         }

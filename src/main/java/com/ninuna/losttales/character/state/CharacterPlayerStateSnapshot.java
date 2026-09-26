@@ -29,7 +29,7 @@ public final class CharacterPlayerStateSnapshot {
         if (generation <= 0L) {
             throw new IllegalArgumentException("generation must be positive");
         }
-        if (dataVersion < 0 || dataVersion > CURRENT_DATA_VERSION) {
+        if (dataVersion != CURRENT_DATA_VERSION) {
             throw new IllegalArgumentException("unsupported snapshot version " + dataVersion);
         }
         this.characterId = characterId;

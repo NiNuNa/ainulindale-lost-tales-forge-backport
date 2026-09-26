@@ -2,6 +2,7 @@ package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
+import com.ninuna.losttales.chat.ChatConsoleFixtures;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatReportReason;
 import com.ninuna.losttales.chat.ChatReplyReference;
@@ -26,7 +27,8 @@ import static org.junit.Assert.assertTrue;
 /**
  * The kept history round-trips through the save exactly, its audiences
  * included; a line the save cannot vouch for is quarantined rather than
- * shown, and data from a newer build is left alone.
+ * shown, and data at another version than this build writes is left
+ * alone.
  */
 public final class ChatHistoryNbtCodecTest {
     private static final UUID ALICE = UUID.fromString("00000000-0000-0000-0000-00000000000a");
@@ -84,14 +86,12 @@ public final class ChatHistoryNbtCodecTest {
                 line(line, ChatChannel.GLOBAL, ALICE, "hail", ""),
                 Arrays.asList(ALICE), ChatHistory.Audience.everyone());
         long command = ChatMessageIdAllocator.next();
-        ChatConsoleStream.record(new ChatConsoleEvent(command, 5L,
-                ChatConsoleEvent.Kind.COMMAND, ChatConsoleEvent.Severity.INFO,
-                "Steve", "/tp Alex", "global",
-                ChatNamedPlayer.account(BOB, "Steve")));
+        ChatConsoleStream.record(ChatConsoleFixtures.command(
+                command, 5L, "Steve", "/tp Alex", "global", ChatNamedPlayer.account(BOB, "Steve")));
         long warning = ChatMessageIdAllocator.next();
-        ChatConsoleStream.record(new ChatConsoleEvent(warning, 6L,
-                ChatConsoleEvent.Kind.WARNING, ChatConsoleEvent.Severity.WARNING,
-                "", "the bridge is down"));
+        ChatConsoleStream.record(ChatConsoleFixtures.entry(
+                warning, 6L, ChatConsoleEvent.Kind.WARNING, ChatConsoleEvent.Severity.WARNING, "",
+                "the bridge is down"));
 
         // A reaction on an entry is kept with it, as one on a message is.
         assertTrue(ChatConsoleStream.react(warning, BOB, "Steve", "grinning", true));
@@ -135,13 +135,13 @@ public final class ChatHistoryNbtCodecTest {
         assertTrue(ChatMessageIdAllocator.next() > warning);
     }
 
-    /** An event the save cannot vouch for is quarantined; an older save without the list reads as an empty console. */
+    /** An event the save cannot vouch for is quarantined; a save without the list reads as an empty console. */
     @Test
     public void anEventTheSaveCannotVouchForIsQuarantined() {
         long id = ChatMessageIdAllocator.next();
-        ChatConsoleStream.record(new ChatConsoleEvent(id, 5L,
-                ChatConsoleEvent.Kind.SERVER, ChatConsoleEvent.Severity.INFO,
-                "Server", "Server started"));
+        ChatConsoleStream.record(ChatConsoleFixtures.entry(
+                id, 5L, ChatConsoleEvent.Kind.SERVER, ChatConsoleEvent.Severity.INFO, "Server",
+                "Server started"));
         NBTTagCompound written = new NBTTagCompound();
         ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
                 ChatConsoleStream.snapshot(),
@@ -183,8 +183,8 @@ public final class ChatHistoryNbtCodecTest {
         assertEquals("duplicate_event",
                 result.getQuarantineEntriesCopy().get(3).getString("Reason"));
 
-        // A save written before the console was kept: read whole, as an
-        // empty console, and marked for writing in the newer shape.
+        // A save without the console's list reads whole, as an empty
+        // console, and is marked to be written again.
         written.removeTag("ConsoleEvents");
         ChatHistoryNbtCodec.ReadResult older = ChatHistoryNbtCodec.read(written);
         assertFalse(older.isReadOnly());
@@ -241,7 +241,7 @@ public final class ChatHistoryNbtCodecTest {
         assertTrue(ChatMessageIdAllocator.next() > faction);
 
         List<LostTalesChatMessagePacket> bobSees = ChatHistory.replayFor(
-                new ChatHistory.Requester(BOB, "", 0L, PARTY, EVERY_CHANNEL), 0L);
+                ChatHistoryRequesters.oneFaction(BOB, "", 0L, PARTY, EVERY_CHANNEL), 0L);
         assertEquals(3, bobSees.size());
         assertEquals("hail", bobSees.get(0).getMessage());
         // Bob is handed the partner's copy of the whisper, not Alice's own.
@@ -251,13 +251,13 @@ public final class ChatHistoryNbtCodecTest {
         // Alice, out of the party and its faction line's gate, is handed her
         // own copies: the faction line is hers by a character made in time.
         List<LostTalesChatMessagePacket> aliceSees = ChatHistory.replayFor(
-                new ChatHistory.Requester(ALICE, "gondor", 0L, null, EVERY_CHANNEL), 0L);
+                ChatHistoryRequesters.oneFaction(ALICE, "gondor", 0L, null, EVERY_CHANNEL), 0L);
         assertEquals(3, aliceSees.size());
         // Alice's own copy of the whisper, the one naming Bob as its partner.
         assertEquals("bob", aliceSees.get(1).getPartner());
         assertEquals("the gate holds", aliceSees.get(2).getMessage());
         // A stranger with nothing: the open line alone.
-        assertEquals(1, ChatHistory.replayFor(new ChatHistory.Requester(
+        assertEquals(1, ChatHistory.replayFor(ChatHistoryRequesters.oneFaction(
                 UUID.randomUUID(), "", 0L, null, EVERY_CHANNEL), 0L).size());
         // The whisper still quotes back into its own conversation only.
         assertTrue(ChatHistory.quoteFor(whisper, BOB, ChatChannel.WHISPER, "").exists());
@@ -389,7 +389,7 @@ public final class ChatHistoryNbtCodecTest {
     }
 
     @Test
-    public void reactionsRoundTripAndOnlyAReactedLineWearsTheNewerLayout() {
+    public void reactionsRoundTripAndEveryLineWearsTheOneLayout() {
         long plain = ChatMessageIdAllocator.next();
         ChatHistory.record(plain, ALICE, "Aldric", null,
                 line(plain, ChatChannel.GLOBAL, ALICE, "hail", ""),
@@ -398,7 +398,7 @@ public final class ChatHistoryNbtCodecTest {
         ChatHistory.record(reacted, ALICE, "Aldric", null,
                 line(reacted, ChatChannel.GLOBAL, ALICE, "well met", ""),
                 Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
-        ChatHistory.Requester bob = new ChatHistory.Requester(BOB, "", 0L,
+        ChatHistory.Requester bob = ChatHistoryRequesters.oneFaction(BOB, "", 0L,
                 null, EVERY_CHANNEL);
         ChatHistory.react(reacted, bob, BOB, "Beren", "smile", true);
         ChatHistory.react(reacted, null,
@@ -411,9 +411,9 @@ public final class ChatHistoryNbtCodecTest {
                 ChatConsoleStream.reactionsSnapshot(), Collections.<NBTTagCompound>emptyList());
         NBTTagList entries = written.getTagList("Entries",
                 Constants.NBT.TAG_COMPOUND);
-        assertEquals(1, entries.getCompoundTagAt(0).getInteger("DataVersion"));
-        assertEquals("the registry's emoji alone keep the second layout",
-                ChatHistoryNbtCodec.REACTED_ENTRY_DATA_VERSION,
+        assertEquals(ChatHistoryNbtCodec.CURRENT_ENTRY_DATA_VERSION,
+                entries.getCompoundTagAt(0).getInteger("DataVersion"));
+        assertEquals(ChatHistoryNbtCodec.CURRENT_ENTRY_DATA_VERSION,
                 entries.getCompoundTagAt(1).getInteger("DataVersion"));
 
         ChatHistoryNbtCodec.ReadResult result = ChatHistoryNbtCodec.read(written);
@@ -433,7 +433,7 @@ public final class ChatHistoryNbtCodecTest {
         ChatHistory.record(reacted, ALICE, "Aldric", null,
                 line(reacted, ChatChannel.GLOBAL, ALICE, "well met", ""),
                 Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
-        ChatHistory.react(reacted, new ChatHistory.Requester(BOB, "", 0L,
+        ChatHistory.react(reacted, ChatHistoryRequesters.oneFaction(BOB, "", 0L,
                 null, EVERY_CHANNEL), BOB, "Beren", "smile", true);
         NBTTagCompound written = new NBTTagCompound();
         ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
@@ -462,7 +462,7 @@ public final class ChatHistoryNbtCodecTest {
         ChatHistory.reactFromDiscord(reacted,
                 LostTalesChatMessagePacket.discordSenderId("42"), "Nils", "joy",
                 "", "900000000000000001", true);
-        ChatHistory.react(reacted, new ChatHistory.Requester(BOB, "", 0L,
+        ChatHistory.react(reacted, ChatHistoryRequesters.oneFaction(BOB, "", 0L,
                 null, EVERY_CHANNEL), BOB, "Beren", "joy", true);
         NBTTagCompound written = new NBTTagCompound();
         ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
@@ -489,7 +489,7 @@ public final class ChatHistoryNbtCodecTest {
     }
 
     @Test
-    public void aForeignEmojiRoundTripsUnderTheNewestLayout() {
+    public void aForeignEmojiRoundTrips() {
         long reacted = ChatMessageIdAllocator.next();
         ChatHistory.record(reacted, ALICE, "Aldric", null,
                 line(reacted, ChatChannel.OOC, ALICE, "well met", ""),
@@ -498,7 +498,7 @@ public final class ChatHistoryNbtCodecTest {
         String unicorn = "🦄";
         UUID member = LostTalesChatMessagePacket.discordSenderId("42");
         ChatHistory.react(reacted, null, member, "Nils", parrot, true);
-        ChatHistory.react(reacted, new ChatHistory.Requester(BOB, "", 0L,
+        ChatHistory.react(reacted, ChatHistoryRequesters.oneFaction(BOB, "", 0L,
                 null, EVERY_CHANNEL), BOB, "Beren", parrot, true);
         ChatHistory.react(reacted, null, member, "Nils", unicorn, true);
         // The member takes their parrot back: Bob holds it alone.
@@ -508,12 +508,9 @@ public final class ChatHistoryNbtCodecTest {
         ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
                 ChatConsoleStream.snapshot(),
                 ChatConsoleStream.reactionsSnapshot(), Collections.<NBTTagCompound>emptyList());
-        assertEquals(ChatHistoryNbtCodec.FOREIGN_ENTRY_DATA_VERSION,
+        assertEquals(ChatHistoryNbtCodec.CURRENT_ENTRY_DATA_VERSION,
                 written.getTagList("Entries", Constants.NBT.TAG_COMPOUND)
                         .getCompoundTagAt(0).getInteger("DataVersion"));
-        assertTrue("a build that knew only the second layout reads it as newer",
-                ChatHistoryNbtCodec.FOREIGN_ENTRY_DATA_VERSION
-                        > ChatHistoryNbtCodec.REACTED_ENTRY_DATA_VERSION);
 
         ChatHistoryNbtCodec.ReadResult result = ChatHistoryNbtCodec.read(written);
         assertFalse(result.isReadOnly());
@@ -530,7 +527,7 @@ public final class ChatHistoryNbtCodecTest {
      * A foreign key the registry has come to carry since the entry was
      * saved is read back under the registry's name, merged with the
      * reactions already there, and the read marks the save to be written
-     * again, in the layout its reactions need now.
+     * again.
      */
     @Test
     public void aSavedForeignEmojiTheRegistryNowCarriesIsReadUnderItsName() {
@@ -541,7 +538,7 @@ public final class ChatHistoryNbtCodecTest {
         UUID member = LostTalesChatMessagePacket.discordSenderId("42");
         ChatHistory.react(reacted, null, member, "Nils", "partyparrot:556",
                 true);
-        ChatHistory.react(reacted, new ChatHistory.Requester(BOB, "", 0L,
+        ChatHistory.react(reacted, ChatHistoryRequesters.oneFaction(BOB, "", 0L,
                 null, EVERY_CHANNEL), BOB, "Beren", "grinning", true);
         NBTTagCompound written = new NBTTagCompound();
         ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
@@ -549,7 +546,7 @@ public final class ChatHistoryNbtCodecTest {
                 ChatConsoleStream.reactionsSnapshot(), Collections.<NBTTagCompound>emptyList());
         NBTTagCompound entry = written.getTagList("Entries",
                 Constants.NBT.TAG_COMPOUND).getCompoundTagAt(0);
-        assertEquals(ChatHistoryNbtCodec.FOREIGN_ENTRY_DATA_VERSION,
+        assertEquals(ChatHistoryNbtCodec.CURRENT_ENTRY_DATA_VERSION,
                 entry.getInteger("DataVersion"));
         // As a build whose registry lacked the grin would have written the
         // member's reaction: by its Unicode.
@@ -574,34 +571,35 @@ public final class ChatHistoryNbtCodecTest {
         ChatHistoryNbtCodec.write(again, ChatHistory.snapshot(),
                 ChatConsoleStream.snapshot(),
                 ChatConsoleStream.reactionsSnapshot(), Collections.<NBTTagCompound>emptyList());
-        assertEquals("the registry's emoji alone keep the second layout",
-                ChatHistoryNbtCodec.REACTED_ENTRY_DATA_VERSION,
-                again.getTagList("Entries", Constants.NBT.TAG_COMPOUND)
-                        .getCompoundTagAt(0).getInteger("DataVersion"));
+        assertEquals("grinning", again.getTagList("Entries",
+                Constants.NBT.TAG_COMPOUND).getCompoundTagAt(0)
+                .getTagList("Reactions", Constants.NBT.TAG_COMPOUND)
+                .getCompoundTagAt(0).getString("Emoji"));
     }
 
+    /** An entry in any other layout than this build writes holds the whole store read-only. */
     @Test
-    public void aForeignEmojiInAnOlderLayoutIsQuarantined() {
+    public void anEntryInAnOlderLayoutHoldsTheWholeStoreReadOnly() {
         long reacted = ChatMessageIdAllocator.next();
         ChatHistory.record(reacted, ALICE, "Aldric", null,
                 line(reacted, ChatChannel.GLOBAL, ALICE, "well met", ""),
                 Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
-        ChatHistory.react(reacted, new ChatHistory.Requester(BOB, "", 0L,
+        ChatHistory.react(reacted, ChatHistoryRequesters.oneFaction(BOB, "", 0L,
                 null, EVERY_CHANNEL), BOB, "Beren", "smile", true);
         NBTTagCompound written = new NBTTagCompound();
         ChatHistoryNbtCodec.write(written, ChatHistory.snapshot(),
                 ChatConsoleStream.snapshot(),
                 ChatConsoleStream.reactionsSnapshot(), Collections.<NBTTagCompound>emptyList());
-        NBTTagCompound entry = written.getTagList("Entries",
-                Constants.NBT.TAG_COMPOUND).getCompoundTagAt(0);
-        assertEquals(ChatHistoryNbtCodec.REACTED_ENTRY_DATA_VERSION,
-                entry.getInteger("DataVersion"));
-        entry.getTagList("Reactions", Constants.NBT.TAG_COMPOUND)
-                .getCompoundTagAt(0).setString("Emoji", "partyparrot:556");
+        written.getTagList("Entries", Constants.NBT.TAG_COMPOUND)
+                .getCompoundTagAt(0).setInteger("DataVersion",
+                        ChatHistoryNbtCodec.CURRENT_ENTRY_DATA_VERSION - 1);
+
         ChatHistoryNbtCodec.ReadResult result = ChatHistoryNbtCodec.read(written);
+        assertTrue(result.isReadOnly());
+        assertEquals(ChatHistoryNbtCodec.CURRENT_ENTRY_DATA_VERSION - 1,
+                result.getUnsupportedVersion());
         assertTrue(result.getEntries().isEmpty());
-        assertEquals("invalid_reactions",
-                result.getQuarantineEntriesCopy().get(0).getString("Reason"));
+        assertEquals(written, result.getOriginalDataCopy());
     }
 
     private static LostTalesChatMessagePacket line(long id, ChatChannel channel,

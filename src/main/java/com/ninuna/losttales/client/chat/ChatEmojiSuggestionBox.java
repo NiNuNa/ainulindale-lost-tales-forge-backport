@@ -1,8 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.client.window.PointerRegions;
-import com.ninuna.losttales.client.window.WindowStyle;
-import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.emoji.ChatEmojiSuggester;
 import java.util.Collections;
@@ -15,18 +13,9 @@ import net.minecraft.client.gui.FontRenderer;
  * unclosed {@code :prefix} sits at the cursor. Selection state lives here;
  * applying a completion to the input field is the chat screen's job.
  */
-final class ChatEmojiSuggestionBox {
-    static final int MAX_ROWS = 8;
-    private static final int ROW_HEIGHT = 12;
-    /** The rows stand two pixels inside the frame's ink, as a framed button's content does. */
-    private static final int PADDING = WindowStyle.POPUP_INSET;
+final class ChatEmojiSuggestionBox extends ChatSuggestionBox {
     /** Between the emoji's slot and its shortcode. */
     private static final int ICON_GAP = 4;
-    /**
-     * How far above the input anchor ({@link ChatInputBar#inputAnchor})
-     * the box ends: one pixel clear of the bar's top.
-     */
-    private static final int BOTTOM_MARGIN = 15;
 
     private List<ChatEmoji> matches = Collections.emptyList();
     private ChatEmojiSuggester.Query query;
@@ -57,6 +46,7 @@ final class ChatEmojiSuggestionBox {
         }
     }
 
+    @Override
     boolean isActive() {
         return this.query != null && !this.matches.isEmpty()
                 && this.query.colonIndex != this.dismissedColonIndex;
@@ -87,30 +77,14 @@ final class ChatEmojiSuggestionBox {
         }
     }
 
-    /** True while the mouse is over the visible popup, including padding. */
-    boolean contains(FontRenderer font, double mouseX, double mouseY,
-                     int screenHeight, int inputX) {
-        if (!isActive()) {
-            return false;
-        }
-        int top = boxTop(screenHeight);
-        return LostTalesUiHitBox.contains(mouseX, mouseY, inputX, top,
-                boxWidth(font), screenHeight - BOTTOM_MARGIN - top);
+    @Override
+    int shownRows() {
+        return this.matches.size();
     }
 
-    /**
-     * The row under the point, or -1: the one test the row's highlight,
-     * a press and the pointer all ask.
-     */
-    int rowAt(FontRenderer font, double mouseX, double mouseY,
-              int screenHeight, int inputX) {
-        if (!contains(font, mouseX, mouseY, screenHeight, inputX)
-                || mouseY < boxTop(screenHeight) + PADDING) {
-            return -1;
-        }
-        int row = (int)Math.floor((mouseY - boxTop(screenHeight) - PADDING)
-                / (double)ROW_HEIGHT);
-        return row >= 0 && row < this.matches.size() ? row : -1;
+    @Override
+    int rowHeight() {
+        return GLYPH_ROW_HEIGHT;
     }
 
     /** The suggestion on a row, or null. */
@@ -125,21 +99,16 @@ final class ChatEmojiSuggestionBox {
         if (!isActive()) {
             return;
         }
-        int width = boxWidth(font);
-        int top = boxTop(screenHeight);
-        int bottom = screenHeight - BOTTOM_MARGIN;
         int hoveredRow = rowAt(font, mouseX, mouseY, screenHeight, inputX);
         if (hoveredRow >= 0) {
             this.selectedIndex = hoveredRow;
         }
-        regions.add(inputX, top, inputX + width, bottom);
-        WindowStyle.drawPopupList(inputX, top, inputX + width,
-                bottom, top + PADDING, ROW_HEIGHT,
+        int top = drawFrame(font, regions, screenHeight, inputX,
                 this.selectedIndex < this.matches.size()
                         ? this.selectedIndex : -1);
         for (int row = 0; row < this.matches.size(); row++) {
             ChatEmoji emoji = this.matches.get(row);
-            int rowTop = top + PADDING + row * ROW_HEIGHT;
+            int rowTop = top + PADDING + row * GLYPH_ROW_HEIGHT;
             ChatInlineIcons.drawEmoji(minecraft, emoji,
                     ChatInlineIcons.boxLeft(inputX + PADDING,
                             ChatInlineIcons.SLOT_WIDTH),
@@ -153,7 +122,8 @@ final class ChatEmojiSuggestionBox {
         }
     }
 
-    private int boxWidth(FontRenderer font) {
+    @Override
+    int boxWidth(FontRenderer font) {
         int width = 0;
         for (ChatEmoji emoji : this.matches) {
             width = Math.max(width,
@@ -161,15 +131,5 @@ final class ChatEmojiSuggestionBox {
         }
         return PADDING + ChatInlineIcons.SLOT_WIDTH + ICON_GAP + width
                 + PADDING;
-    }
-
-    /** The anchor at which the box ends at {@code bottom}: for a list over a field that is not the bar. */
-    static int anchorEndingAt(int bottom) {
-        return bottom + BOTTOM_MARGIN;
-    }
-
-    private int boxTop(int screenHeight) {
-        return screenHeight - BOTTOM_MARGIN
-                - this.matches.size() * ROW_HEIGHT - PADDING * 2;
     }
 }

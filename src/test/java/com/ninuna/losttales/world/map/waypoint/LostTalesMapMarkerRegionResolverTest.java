@@ -6,6 +6,7 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import lotr.common.LOTRDimension;
 import lotr.common.world.map.LOTRWaypoint;
 import org.junit.Test;
@@ -71,6 +72,7 @@ public final class LostTalesMapMarkerRegionResolverTest {
                 12.0D,
                 hiddenUntilDiscovered,
                 discoverable,
-                requiresRegionUnlock);
+                requiresRegionUnlock,
+                LostTalesMapMarkerSource.QUEST_DYNAMIC, false, "", 0);
     }
 }

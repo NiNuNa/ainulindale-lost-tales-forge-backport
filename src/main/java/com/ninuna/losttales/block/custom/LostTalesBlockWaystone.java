@@ -1,17 +1,16 @@
 package com.ninuna.losttales.block.custom;
 
-import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.block.ELostTalesBlock;
 import com.ninuna.losttales.block.LostTalesWaystoneLifecycleService;
 import com.ninuna.losttales.block.base.LostTalesBlockDirectionalContainerBase;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityWaystone;
 import com.ninuna.losttales.compat.lotr.LostTalesWaystonePermissionPolicy;
 import com.ninuna.losttales.user.ELostTalesUser;
-import com.ninuna.losttales.gui.LostTalesGuiIds;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRepository;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerStorage;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSyncManager;
+import com.ninuna.losttales.mapmarker.LostTalesWaystoneSettingsService;
 import java.util.Random;
 import java.util.UUID;
 import net.minecraft.block.Block;
@@ -97,18 +96,23 @@ public final class LostTalesBlockWaystone
         }
     }
 
+    /**
+     * Using either half opens the waystone's page: the server checks the
+     * waystone as it checks every request and sends its state as an
+     * opening. No container is opened.
+     */
     @Override
     public boolean onBlockActivated(
             World world, int x, int y, int z, EntityPlayer player,
             int side, float hitX, float hitY, float hitZ) {
         int baseY = world.getBlockMetadata(x, y, z) == UPPER_METADATA
                 ? y - 1 : y;
-        if (!world.isRemote) {
+        if (!world.isRemote && player instanceof EntityPlayerMP) {
             TileEntity tile = world.getTileEntity(x, baseY, z);
             if (tile instanceof LostTalesTileEntityWaystone) {
-                player.openGui(LostTalesMod.instance,
-                        LostTalesGuiIds.WAYSTONE,
-                        world, x, baseY, z);
+                LostTalesWaystoneSettingsService.open(
+                        (EntityPlayerMP)player,
+                        (LostTalesTileEntityWaystone)tile);
             }
         }
         return true;

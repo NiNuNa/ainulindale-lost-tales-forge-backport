@@ -73,7 +73,7 @@ public class WindowFrame {
      * stands whole from the start.
      */
     private final MotionTransition appearMotion =
-            new MotionTransition(MotionIds.CHAT_WINDOW_APPEAR);
+            new MotionTransition(MotionIds.WINDOW_APPEAR);
     private boolean appearing;
     /** How much of its opacity the window showed when last drawn. */
     private float shown = 1.0F;
@@ -86,7 +86,7 @@ public class WindowFrame {
      * ({@link #fillLegTo}, none for the window's own box).
      */
     private final MotionTransition fillMotion =
-            new MotionTransition(MotionIds.CHAT_WINDOW_FILL, true);
+            new MotionTransition(MotionIds.WINDOW_FILL, true);
     /** Whether {@link #fillMotion} has been advanced at all yet. */
     private boolean fillSeen;
     private WindowPlacement.Box fillLegFrom;

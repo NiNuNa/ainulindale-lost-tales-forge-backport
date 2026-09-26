@@ -76,11 +76,6 @@ final class ChatWindowDrags {
                 ChatLayout.getMembersWidth(window)));
     }
 
-    /** Whether a member list's edge is being dragged. */
-    static boolean isResizingMembers(WindowGestures gestures) {
-        return gestures.contentDrag() instanceof MembersResize;
-    }
-
     /** A scrollbar being dragged: which window, and where it was grabbed. */
     private static final class ScrollbarDrag
             implements WindowGestures.ContentDrag {

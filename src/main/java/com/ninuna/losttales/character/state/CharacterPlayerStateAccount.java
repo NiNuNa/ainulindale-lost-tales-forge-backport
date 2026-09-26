@@ -10,6 +10,11 @@ import java.util.UUID;
 public final class CharacterPlayerStateAccount {
 
     public static final int CURRENT_DATA_VERSION = 13;
+    /**
+     * The bootstrap version of an account whose identities all have
+     * records. An account not yet bootstrapped has version 0; no other
+     * version is read.
+     */
     public static final int CURRENT_BOOTSTRAP_VERSION = 12;
 
     private final UUID ownerId;
@@ -29,8 +34,8 @@ public final class CharacterPlayerStateAccount {
         if (ownerId == null) {
             throw new IllegalArgumentException("ownerId must not be null");
         }
-        if (bootstrapVersion < 0
-                || bootstrapVersion > CURRENT_BOOTSTRAP_VERSION) {
+        if (bootstrapVersion != 0
+                && bootstrapVersion != CURRENT_BOOTSTRAP_VERSION) {
             throw new IllegalArgumentException(
                     "unsupported bootstrap version " + bootstrapVersion);
         }
@@ -57,10 +62,6 @@ public final class CharacterPlayerStateAccount {
 
     public long getBootstrappedAt() {
         return this.bootstrappedAt;
-    }
-
-    public boolean isBootstrapped() {
-        return this.bootstrapVersion >= CURRENT_BOOTSTRAP_VERSION;
     }
 
     public void markBootstrapped(long timestamp) {

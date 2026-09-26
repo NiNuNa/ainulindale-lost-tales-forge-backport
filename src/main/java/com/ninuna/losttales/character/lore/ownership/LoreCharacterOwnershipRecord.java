@@ -1,6 +1,6 @@
 package com.ninuna.losttales.character.lore.ownership;
 
-import java.util.Locale;
+import com.ninuna.losttales.util.LostTalesIdentifiers;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -29,7 +29,7 @@ public final class LoreCharacterOwnershipRecord {
             long createdAt,
             long lastClaimedAt,
             long lastReleasedAt) {
-        String normalizedLoreId = normalizeIdentifier(loreCharacterId);
+        String normalizedLoreId = LostTalesIdentifiers.normalize(loreCharacterId);
         if (!isValidIdentifier(normalizedLoreId)) {
             throw new IllegalArgumentException(
                     "loreCharacterId must be a valid namespaced identifier");
@@ -132,11 +132,6 @@ public final class LoreCharacterOwnershipRecord {
         return new LoreCharacterOwnershipRecord(
                 this.loreCharacterId, this.characterId, null,
                 nextRevision, this.createdAt, this.lastClaimedAt, releasedAt);
-    }
-
-    public static String normalizeIdentifier(String value) {
-        return value == null ? ""
-                : value.trim().toLowerCase(Locale.ROOT);
     }
 
     public static boolean isValidIdentifier(String value) {

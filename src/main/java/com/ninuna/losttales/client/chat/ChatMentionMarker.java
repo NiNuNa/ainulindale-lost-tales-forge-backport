@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatAccountRole;
+import com.ninuna.losttales.chat.ChatColorMarkers;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
 import java.nio.charset.Charset;
 import java.util.Base64;
@@ -41,7 +42,7 @@ final class ChatMentionMarker {
             component.setChatStyle(component.getChatStyle()
                     .setChatClickEvent(new ClickEvent(
                             ClickEvent.Action.SUGGEST_COMMAND,
-                            PREFIX + colorHex(color) + ":" + PLAYER + ":"
+                            PREFIX + ChatColorMarkers.hex(color) + ":" + PLAYER + ":"
                                     + encode(account) + recordOf(recorded))));
         }
         return component;
@@ -54,7 +55,7 @@ final class ChatMentionMarker {
             component.setChatStyle(component.getChatStyle()
                     .setChatClickEvent(new ClickEvent(
                             ClickEvent.Action.SUGGEST_COMMAND,
-                            PREFIX + colorHex(color) + ":" + ROLE + ":"
+                            PREFIX + ChatColorMarkers.hex(color) + ":" + ROLE + ":"
                                     + encode(role.getId()))));
         }
         return component;
@@ -108,15 +109,6 @@ final class ChatMentionMarker {
     static Integer colorOf(IChatComponent component) {
         Data data = decode(component);
         return data == null ? null : Integer.valueOf(data.color);
-    }
-
-    private static String colorHex(int color) {
-        String hex = Integer.toHexString(color & 0xFFFFFF);
-        StringBuilder result = new StringBuilder(6);
-        for (int index = hex.length(); index < 6; index++) {
-            result.append('0');
-        }
-        return result.append(hex).toString();
     }
 
     /**

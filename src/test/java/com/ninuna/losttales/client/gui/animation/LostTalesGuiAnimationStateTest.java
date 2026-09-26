@@ -88,7 +88,7 @@ public final class LostTalesGuiAnimationStateTest {
     public void inverseMouseMatchesDisplayedTransform() {
         LostTalesGuiAnimationSample sample =
                 new LostTalesGuiAnimationSample(
-                        0.5F, 0.5F, 0.5F, 8.0F, 0.5F, 0.25F);
+                        0.5F, 0.5F, 0.5F, 0.0F, 8.0F, 0.5F, 0.25F);
         assertEquals(120, sample.inverseMouseX(110, 200));
         assertEquals(188, sample.inverseMouseY(100, 120));
     }

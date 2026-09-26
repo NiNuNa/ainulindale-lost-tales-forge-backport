@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatColorMarkers;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.util.ChatComponentText;
@@ -51,7 +52,7 @@ final class ChatShowcaseMarker {
     private static String encode(ChatShareKind kind, int showcaseId,
                                  boolean icon, int rgb) {
         return PREFIX + kind.getCode() + ':' + showcaseId + ':'
-                + (icon ? 'i' : 't') + ':' + colorHex(rgb);
+                + (icon ? 'i' : 't') + ':' + ChatColorMarkers.hex(rgb);
     }
 
     static Data decode(IChatComponent component) {
@@ -82,15 +83,6 @@ final class ChatShowcaseMarker {
         } catch (NumberFormatException ignored) {
             return null;
         }
-    }
-
-    private static String colorHex(int color) {
-        String hex = Integer.toHexString(color & 0xFFFFFF);
-        StringBuilder padded = new StringBuilder(6);
-        for (int index = hex.length(); index < 6; index++) {
-            padded.append('0');
-        }
-        return padded.append(hex).toString();
     }
 
     static final class Data {

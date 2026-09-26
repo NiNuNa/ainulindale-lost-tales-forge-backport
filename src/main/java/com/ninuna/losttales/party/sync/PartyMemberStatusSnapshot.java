@@ -45,7 +45,7 @@ public final class PartyMemberStatusSnapshot {
             this.heldItem = null;
             return;
         }
-        if (!isFinite(health) || !isFinite(maximumHealth)
+        if (!Float.isFinite(health) || !Float.isFinite(maximumHealth)
                 || maximumHealth <= 0.0F
                 || maximumHealth > MAX_SYNCHRONIZED_HEALTH) {
             throw new IllegalArgumentException("invalid synchronized health");
@@ -163,10 +163,6 @@ public final class PartyMemberStatusSnapshot {
         return copy(this.heldItem);
     }
 
-    public boolean isOnlineActive() {
-        return this.availability.hasLiveEntityData();
-    }
-
     public boolean isDead() {
         return this.availability == PartyMemberAvailability.DEAD;
     }
@@ -218,9 +214,5 @@ public final class PartyMemberStatusSnapshot {
         result = 31 * result + (stack.hasTagCompound()
                 ? stack.getTagCompound().hashCode() : 0);
         return result;
-    }
-
-    private static boolean isFinite(float value) {
-        return !Float.isNaN(value) && !Float.isInfinite(value);
     }
 }

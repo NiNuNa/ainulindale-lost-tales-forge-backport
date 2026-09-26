@@ -97,12 +97,8 @@ public final class LostTalesThirdPersonBlockActionPacket
         return (int)(clamped * (float)OFFSET_UNITS);
     }
 
-    private static boolean isFinite(float value) {
-        return !Float.isNaN(value) && !Float.isInfinite(value);
-    }
-
     private static boolean isUnitOffset(float value) {
-        return isFinite(value) && value >= 0.0F && value <= 1.0F;
+        return Float.isFinite(value) && value >= 0.0F && value <= 1.0F;
     }
 
     private static boolean isValidSide(int side) {

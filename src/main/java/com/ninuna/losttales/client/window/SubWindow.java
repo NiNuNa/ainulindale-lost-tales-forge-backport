@@ -7,9 +7,10 @@ import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 
 /**
  * One sub-window: a kind, what it holds, the window it belongs to,
- * and where it stands in that window. Its box takes its title strip — one
- * tab, as a window's row with a single tab in it — and under that its
- * content; the frame runs just outside the box, as a window's does.
+ * and where it stands in that window. Its box takes its strip — a
+ * window's tool strip holding its icon, its name and its cross
+ * ({@link SubWindowStrip}) — and under that its content; the frame runs
+ * just outside the box, as a window's does.
  *
  * <p>A sub-window lives inside its window as a window lives on a
  * screen: its room is the window's box, a frame and two clear pixels
@@ -24,8 +25,8 @@ import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
  * drawn in.</p>
  */
 public final class SubWindow {
-    /** The title strip: a window's tab row, without the tool strip. */
-    public static final int STRIP_HEIGHT = TabRow.ROW_HEIGHT;
+    /** The strip across its top: a window's tool strip. */
+    public static final int STRIP_HEIGHT = SubWindowStrip.HEIGHT;
     /** How far a window rises into place as it opens, in pixels. */
     static final float RISE = 5.0F;
 
@@ -50,7 +51,7 @@ public final class SubWindow {
     int height;
     private boolean open = true;
     private final MotionTransition openness =
-            new MotionTransition(MotionIds.CHAT_SMALL_WINDOW_OPEN);
+            new MotionTransition(MotionIds.WINDOW_SUB_OPEN);
     final LostTalesUiButtonMotion closeMotion = new LostTalesUiButtonMotion(
             LostTalesUiButtonMotion.Character.SNAP);
     /** Where the box was drawn this frame, laid on the display's grid. */
@@ -59,8 +60,8 @@ public final class SubWindow {
     /** How far it was drawn from the whole pixels its content is laid out on. */
     public float fractionX;
     public float fractionY;
-    /** The strip's one tab as it was drawn this frame; null before the first draw. */
-    TabRow.LoneTab tab;
+    /** The strip as it was drawn this frame; null before the first draw. */
+    SubWindowStrip strip;
     /** How far it had opened as it was drawn this frame. */
     float shownShare;
     /**
@@ -176,7 +177,7 @@ public final class SubWindow {
 
     /** Whether the point is on the strip's cross, as drawn. */
     boolean closeContains(double x, double y) {
-        return this.open && this.tab != null && this.tab.closeBox.contains(
+        return this.open && this.strip != null && this.strip.closeBox.contains(
                 x - this.fractionX, y - this.fractionY) && inRoom(x, y);
     }
 
@@ -238,7 +239,7 @@ public final class SubWindow {
         return title != null ? title : this.kind.title();
     }
 
-    /** The narrowest the window may be: its content's, and room for its tab. */
+    /** The narrowest the window may be: its content's, and room for its strip. */
     int minWidth() {
         return Math.max(this.content.minWidth(), MIN_STRIP_WIDTH);
     }
@@ -248,6 +249,6 @@ public final class SubWindow {
         return STRIP_HEIGHT + this.content.minHeight();
     }
 
-    /** Room for the tab's icon and cross with a few letters of its name between. */
+    /** Room for the strip's icon and cross with a few letters of its name between. */
     private static final int MIN_STRIP_WIDTH = 64;
 }

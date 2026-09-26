@@ -46,6 +46,31 @@ public final class LostTalesConfigDefinitions {
         }
     }
 
+    /**
+     * An option's bounds as {@code definitions} holds them, {min, max};
+     * null for an option it does not hold, or whose bounds it cannot
+     * read as numbers.
+     */
+    public static double[] bounds(Configuration definitions, String category,
+                                  String key) {
+        if (definitions == null || category == null || key == null
+                || !definitions.hasCategory(category)) {
+            return null;
+        }
+        Property property = definitions.getCategory(category).get(key);
+        if (property == null || property.getMinValue() == null
+                || property.getMaxValue() == null) {
+            return null;
+        }
+        try {
+            double min = Double.parseDouble(property.getMinValue());
+            double max = Double.parseDouble(property.getMaxValue());
+            return min <= max ? new double[] {min, max} : null;
+        } catch (NumberFormatException unstated) {
+            return null;
+        }
+    }
+
     private static void dress(Property property, Property definition) {
         if (property.getType() != definition.getType()
                 || property.isList() != definition.isList()) {

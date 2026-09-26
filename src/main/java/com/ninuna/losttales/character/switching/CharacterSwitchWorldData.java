@@ -1,8 +1,7 @@
 package com.ninuna.losttales.character.switching;
 
-import com.ninuna.losttales.LostTalesMetaData;
-import cpw.mods.fml.common.FMLLog;
-import net.minecraft.nbt.NBTBase;
+import com.ninuna.losttales.storage.NbtTags;
+import com.ninuna.losttales.util.LostTalesLog;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.world.WorldSavedData;
@@ -86,14 +85,16 @@ public final class CharacterSwitchWorldData extends WorldSavedData {
         }
         int version = compound.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
                 ? compound.getInteger(TAG_DATA_VERSION) : 0;
-        if (version < 0 || version > CURRENT_DATA_VERSION) {
+        // Only this build's version is read; any other is kept as it is
+        // and the store goes read-only.
+        if (version != CURRENT_DATA_VERSION) {
             this.readOnlyForNewerVersion = true;
             this.unsupportedDataVersion = version;
             this.preservedNewerData = (NBTTagCompound) compound.copy();
             return;
         }
 
-        boolean repaired = version == 0;
+        boolean repaired = false;
         if (compound.hasKey(TAG_QUARANTINE, Constants.NBT.TAG_LIST)) {
             NBTTagList quarantine = compound.getTagList(
                     TAG_QUARANTINE, Constants.NBT.TAG_COMPOUND);
@@ -101,7 +102,7 @@ public final class CharacterSwitchWorldData extends WorldSavedData {
                 NBTTagCompound entry = (NBTTagCompound)
                         quarantine.getCompoundTagAt(index).copy();
                 this.quarantinedEntries.add(entry);
-                UUID blockedOwner = readUuid(entry, "BlockedOwnerUUID");
+                UUID blockedOwner = NbtTags.readUuid(entry, "BlockedOwnerUUID");
                 if (blockedOwner != null) {
                     this.blockedOwners.add(blockedOwner);
                 }
@@ -127,7 +128,7 @@ public final class CharacterSwitchWorldData extends WorldSavedData {
             try {
                 CharacterSwitchAccountState state = readAccount(raw);
                 if (state == null) {
-                    quarantine(raw, "invalid_account", readUuid(raw, TAG_OWNER_UUID));
+                    quarantine(raw, "invalid_account", NbtTags.readUuid(raw, TAG_OWNER_UUID));
                     repaired = true;
                     continue;
                 }
@@ -155,7 +156,7 @@ public final class CharacterSwitchWorldData extends WorldSavedData {
                 this.blockedOwners.clear();
                 return;
             } catch (RuntimeException exception) {
-                UUID blockedOwner = readUuid(raw, TAG_OWNER_UUID);
+                UUID blockedOwner = NbtTags.readUuid(raw, TAG_OWNER_UUID);
                 if (blockedOwner != null) {
                     CharacterSwitchAccountState existing =
                             this.accounts.remove(blockedOwner);
@@ -166,7 +167,7 @@ public final class CharacterSwitchWorldData extends WorldSavedData {
                 }
                 quarantine(raw, "malformed_account", blockedOwner);
                 repaired = true;
-                warn("Quarantined malformed character switch account at index %d: %s",
+                LostTalesLog.warning("Quarantined malformed character switch account at index %d: %s",
                         Integer.valueOf(index), exception.toString());
             }
         }
@@ -178,7 +179,7 @@ public final class CharacterSwitchWorldData extends WorldSavedData {
     @Override
     public void writeToNBT(NBTTagCompound compound) {
         if (this.readOnlyForNewerVersion && this.preservedNewerData != null) {
-            copyTagContents(this.preservedNewerData, compound);
+            NbtTags.copyContents(this.preservedNewerData, compound);
             return;
         }
         compound.setInteger(TAG_DATA_VERSION, CURRENT_DATA_VERSION);
@@ -264,7 +265,7 @@ public final class CharacterSwitchWorldData extends WorldSavedData {
     private static NBTTagCompound writeAccount(CharacterSwitchAccountState state) {
         NBTTagCompound tag = new NBTTagCompound();
         tag.setInteger(TAG_DATA_VERSION, CharacterSwitchAccountState.CURRENT_DATA_VERSION);
-        writeUuid(tag, TAG_OWNER_UUID, state.getOwnerId());
+        NbtTags.writeUuid(tag, TAG_OWNER_UUID, state.getOwnerId());
         tag.setInteger(TAG_COOLDOWN_STAGE, state.getCooldownStage());
         tag.setLong(TAG_NEXT_ALLOWED_AT, state.getNextAllowedAt());
         tag.setLong(TAG_LAST_SWITCH_AT, state.getLastSuccessfulSwitchAt());
@@ -282,10 +283,10 @@ public final class CharacterSwitchWorldData extends WorldSavedData {
     private static CharacterSwitchAccountState readAccount(NBTTagCompound tag) {
         int version = tag.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
                 ? tag.getInteger(TAG_DATA_VERSION) : 0;
-        if (version < 0 || version > CharacterSwitchAccountState.CURRENT_DATA_VERSION) {
+        if (version != CharacterSwitchAccountState.CURRENT_DATA_VERSION) {
             throw new UnsupportedVersionException(version);
         }
-        UUID ownerId = readUuid(tag, TAG_OWNER_UUID);
+        UUID ownerId = NbtTags.readUuid(tag, TAG_OWNER_UUID);
         if (ownerId == null) {
             return null;
         }
@@ -309,12 +310,12 @@ public final class CharacterSwitchWorldData extends WorldSavedData {
     private static NBTTagCompound writeTransaction(CharacterSwitchTransaction transaction) {
         NBTTagCompound tag = new NBTTagCompound();
         tag.setInteger(TAG_DATA_VERSION, CharacterSwitchTransaction.CURRENT_DATA_VERSION);
-        writeUuid(tag, TAG_TRANSACTION_UUID, transaction.getTransactionId());
+        NbtTags.writeUuid(tag, TAG_TRANSACTION_UUID, transaction.getTransactionId());
         if (transaction.getSourceCharacterId() != null) {
-            writeUuid(tag, TAG_SOURCE_CHARACTER_UUID, transaction.getSourceCharacterId());
+            NbtTags.writeUuid(tag, TAG_SOURCE_CHARACTER_UUID, transaction.getSourceCharacterId());
         }
         if (transaction.getTargetCharacterId() != null) {
-            writeUuid(tag, TAG_TARGET_CHARACTER_UUID, transaction.getTargetCharacterId());
+            NbtTags.writeUuid(tag, TAG_TARGET_CHARACTER_UUID, transaction.getTargetCharacterId());
         }
         tag.setLong(TAG_SOURCE_REVISION, transaction.getSourceRosterRevision());
         tag.setLong(TAG_TARGET_REVISION, transaction.getTargetRosterRevision());
@@ -345,15 +346,14 @@ public final class CharacterSwitchWorldData extends WorldSavedData {
     private static CharacterSwitchTransaction readTransaction(NBTTagCompound tag) {
         int version = tag.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
                 ? tag.getInteger(TAG_DATA_VERSION) : 0;
-        if (version < 0 || version > CharacterSwitchTransaction.CURRENT_DATA_VERSION) {
+        if (version != CharacterSwitchTransaction.CURRENT_DATA_VERSION) {
             throw new UnsupportedVersionException(version);
         }
-        UUID transactionId = readUuid(tag, TAG_TRANSACTION_UUID);
-        UUID sourceId = readUuid(tag, TAG_SOURCE_CHARACTER_UUID);
-        UUID targetId = readUuid(tag, TAG_TARGET_CHARACTER_UUID);
-        // A version-3 journal leaves the target out when the target is the
-        // account; older journals always named a character.
-        if (transactionId == null || version < 3 && targetId == null) {
+        UUID transactionId = NbtTags.readUuid(tag, TAG_TRANSACTION_UUID);
+        // A side left out is the account.
+        UUID sourceId = NbtTags.readUuid(tag, TAG_SOURCE_CHARACTER_UUID);
+        UUID targetId = NbtTags.readUuid(tag, TAG_TARGET_CHARACTER_UUID);
+        if (transactionId == null) {
             throw new IllegalArgumentException("transaction identifiers are missing");
         }
         NBTTagCompound previous = tag.hasKey(TAG_PREVIOUS, Constants.NBT.TAG_COMPOUND)
@@ -379,8 +379,8 @@ public final class CharacterSwitchWorldData extends WorldSavedData {
                 committed.getLong(TAG_LAST_SWITCH_AT),
                 committed.getLong(TAG_DECAY_ANCHOR_AT),
                 committed.getLong(TAG_LAST_OBSERVED_CLOCK),
-                version >= 2 ? tag.getLong(TAG_SOURCE_STATE_GENERATION) : -1L,
-                version >= 2 ? tag.getLong(TAG_TARGET_STATE_GENERATION) : -1L,
+                tag.getLong(TAG_SOURCE_STATE_GENERATION),
+                tag.getLong(TAG_TARGET_STATE_GENERATION),
                 CharacterSwitchTransactionStatus.fromId(tag.getString(TAG_STATUS)),
                 tag.getLong(TAG_COMPLETED_AT));
     }
@@ -401,7 +401,7 @@ public final class CharacterSwitchWorldData extends WorldSavedData {
         NBTTagCompound entry = new NBTTagCompound();
         entry.setString("Reason", reason == null ? "unknown" : reason);
         if (blockedOwner != null) {
-            writeUuid(entry, "BlockedOwnerUUID", blockedOwner);
+            NbtTags.writeUuid(entry, "BlockedOwnerUUID", blockedOwner);
             this.blockedOwners.add(blockedOwner);
         }
         entry.setTag("OriginalData", original == null
@@ -414,53 +414,6 @@ public final class CharacterSwitchWorldData extends WorldSavedData {
             throw new IllegalStateException(
                     "Character switch data is read-only because it uses unsupported version "
                             + this.unsupportedDataVersion);
-        }
-    }
-
-    private static void warn(String message, Object... arguments) {
-        Object[] allArguments = new Object[arguments.length + 1];
-        allArguments[0] = LostTalesMetaData.MOD_ID;
-        System.arraycopy(arguments, 0, allArguments, 1, arguments.length);
-        try {
-            FMLLog.warning("[%s] " + message, allArguments);
-        } catch (Throwable ignored) {
-            // Journal quarantine must remain available to standalone repair
-            // and validation tooling before the Forge logger is initialized.
-        }
-    }
-
-    private static void writeUuid(NBTTagCompound tag, String key, UUID uuid) {
-        if (tag == null || uuid == null) {
-            return;
-        }
-        tag.setLong(key + "Most", uuid.getMostSignificantBits());
-        tag.setLong(key + "Least", uuid.getLeastSignificantBits());
-    }
-
-    private static UUID readUuid(NBTTagCompound tag, String key) {
-        if (tag == null || key == null) {
-            return null;
-        }
-        String most = key + "Most";
-        String least = key + "Least";
-        if (!tag.hasKey(most, Constants.NBT.TAG_LONG)
-                || !tag.hasKey(least, Constants.NBT.TAG_LONG)) {
-            return null;
-        }
-        return new UUID(tag.getLong(most), tag.getLong(least));
-    }
-
-    private static void copyTagContents(NBTTagCompound source, NBTTagCompound destination) {
-        Set<?> keys = source.func_150296_c();
-        for (Object keyObject : keys) {
-            if (!(keyObject instanceof String)) {
-                continue;
-            }
-            String key = (String) keyObject;
-            NBTBase value = source.getTag(key);
-            if (value != null) {
-                destination.setTag(key, value.copy());
-            }
         }
     }
 

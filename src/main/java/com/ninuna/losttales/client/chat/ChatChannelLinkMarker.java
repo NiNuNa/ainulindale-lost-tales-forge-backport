@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatColorMarkers;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import java.nio.charset.Charset;
 import java.util.Base64;
@@ -58,7 +59,7 @@ final class ChatChannelLinkMarker {
                                            int color, String tabId,
                                            int chatLineId, long messageId) {
         if (component != null && tabId != null && tabId.length() > 0) {
-            String payload = PREFIX + colorHex(color) + ':' + chatLineId + ':'
+            String payload = PREFIX + ChatColorMarkers.hex(color) + ':' + chatLineId + ':'
                     + Base64.getUrlEncoder().withoutPadding()
                             .encodeToString(tabId.getBytes(UTF_8));
             if (ChatMessageIds.isServerId(messageId)) {
@@ -157,15 +158,6 @@ final class ChatChannelLinkMarker {
             return null;
         }
         return value.substring(PREFIX.length());
-    }
-
-    private static String colorHex(int color) {
-        String hex = Integer.toHexString(color & 0xFFFFFF);
-        StringBuilder padded = new StringBuilder(6);
-        for (int index = hex.length(); index < 6; index++) {
-            padded.append('0');
-        }
-        return padded.append(hex).toString();
     }
 
     static final class Data {

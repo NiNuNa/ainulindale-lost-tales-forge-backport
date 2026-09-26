@@ -20,6 +20,7 @@ import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.character.validation.CharacterValidationResult;
 import com.ninuna.losttales.character.validation.CharacterValidator;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.util.LostTalesServerPlayers;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
@@ -62,7 +63,7 @@ public final class CharacterSwitchCoordinator {
                                                       int requestId,
                                                       long expectedRosterRevision,
                                                       UUID targetCharacterId) {
-        if (!isServerPlayer(player)) {
+        if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return CharacterOperationResult.failure(CharacterErrorId.INVALID_PLAYER, null);
         }
         if (targetCharacterId == null) {
@@ -80,7 +81,7 @@ public final class CharacterSwitchCoordinator {
                                                    int requestId,
                                                    long expectedRosterRevision,
                                                    PlayableIdentity target) {
-        if (!isServerPlayer(player)) {
+        if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return CharacterOperationResult.failure(CharacterErrorId.INVALID_PLAYER, null);
         }
         UUID ownerId = player.getUniqueID();
@@ -103,7 +104,7 @@ public final class CharacterSwitchCoordinator {
 
     /** Login/admin recovery: reconcile journals and restore an interrupted switch. */
     public CharacterErrorId recover(EntityPlayerMP player) {
-        if (!isServerPlayer(player)) {
+        if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return CharacterErrorId.INVALID_PLAYER;
         }
         synchronized (getAccountLock(player.getUniqueID())) {
@@ -158,7 +159,7 @@ public final class CharacterSwitchCoordinator {
 
     /** Respawn finalization stores the post-death vanilla state; it never restores pre-death data. */
     public CharacterErrorId handleRespawn(EntityPlayerMP player) {
-        if (!isServerPlayer(player)) {
+        if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return CharacterErrorId.INVALID_PLAYER;
         }
         synchronized (getAccountLock(player.getUniqueID())) {
@@ -211,7 +212,7 @@ public final class CharacterSwitchCoordinator {
 
     /** Dimension replacement reconciles metadata but keeps the live entity state. */
     public CharacterErrorId handleDimensionChange(EntityPlayerMP player) {
-        if (!isServerPlayer(player)) {
+        if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return CharacterErrorId.INVALID_PLAYER;
         }
         synchronized (getAccountLock(player.getUniqueID())) {
@@ -247,7 +248,7 @@ public final class CharacterSwitchCoordinator {
 
     /** Durable death marker prevents a reconnect from restoring pre-drop state. */
     public void markDeathPending(EntityPlayerMP player) {
-        if (!isServerPlayer(player)) {
+        if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return;
         }
         synchronized (getAccountLock(player.getUniqueID())) {
@@ -270,7 +271,7 @@ public final class CharacterSwitchCoordinator {
 
     /** Captures the identity being played on clean logout, except during unresolved death. */
     public void saveActiveStateOnLogout(EntityPlayerMP player) {
-        if (!isServerPlayer(player)) {
+        if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return;
         }
         synchronized (getAccountLock(player.getUniqueID())) {
@@ -299,7 +300,7 @@ public final class CharacterSwitchCoordinator {
 
     /** Periodic durability checkpoint. Transitioning players are retried next cycle. */
     public boolean checkpointActiveState(EntityPlayerMP player) {
-        if (!isServerPlayer(player)) {
+        if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return true;
         }
         CharacterLifecycleStateTracker.Snapshot lifecycle =
@@ -367,17 +368,6 @@ public final class CharacterSwitchCoordinator {
             }
         }
         return saved;
-    }
-
-    public CharacterSwitchAccountState getAccountState(World world, UUID ownerId) {
-        if (world == null || world.isRemote || ownerId == null) {
-            return null;
-        }
-        synchronized (getAccountLock(ownerId)) {
-            CharacterSwitchWorldData data = CharacterSwitchStorage.get(world);
-            return data.isReadOnlyForNewerVersion() || data.isOwnerBlocked(ownerId)
-                    ? null : data.getOrCreateAccount(ownerId);
-        }
     }
 
     public boolean resetCooldown(World world, UUID ownerId) {
@@ -906,70 +896,57 @@ public final class CharacterSwitchCoordinator {
             return CharacterErrorId.SWITCH_RECOVERY_REQUIRED;
         }
 
-        CharacterPlayerStateAccount playerStateAccount = null;
-        if (transaction.hasPlayerStateGenerations()) {
-            // Migrate older snapshot schemas before resolving a generation that
-            // may be referenced by an interrupted player-state journal. Generation
-            // identifiers are preserved by the migration.
-            playerStateAccount = this.playerStateService.ensureBootstrapped(
-                    player, roster, stores.playerStates);
-        }
+        // The generation the journal names is resolved against a
+        // bootstrapped player-state account.
+        CharacterPlayerStateAccount playerStateAccount =
+                this.playerStateService.ensureBootstrapped(
+                        player, roster, stores.playerStates);
 
         // Only a journal whose own status says the switch was still in
         // flight names a generation to put back on. One that was already
         // rolled back names the state the player is on, and re-applying
         // it would rewind them to the moment the attempt failed.
-        if (transaction.hasPlayerStateGenerations()
-                && CharacterSwitchRecoveryReconciler
+        if (CharacterSwitchRecoveryReconciler
                         .requiresLiveReconciliation(transaction)
                 && player.isEntityAlive() && !player.isDead
                 && player.getHealth() > 0.0F) {
             UUID activeId = roster.getActiveCharacterId();
             try {
-                // A version-2 journal of a first-character import carries no
-                // source generation: the live account file is the source.
-                // If its PREPARED record survived and the roster is still on
-                // the account, that file is authoritative as it stands. A
-                // newer journal whose source is the account names the
-                // account's own generation and restores it like any source.
-                boolean legacyFirstImport =
-                        transaction.getSourceCharacterId() == null
-                        && transaction.getSourceStateGeneration() <= 0L;
-                if (!(activeId == null && legacyFirstImport)) {
-                    long generation;
-                    if (equalsUuid(activeId,
-                            transaction.getTargetCharacterId())) {
-                        generation = transaction.getTargetStateGeneration();
-                    } else if (equalsUuid(activeId,
-                            transaction.getSourceCharacterId())) {
-                        generation = transaction.getSourceStateGeneration();
-                    } else {
-                        return requireManualRecoveryLocked(
-                                player.worldObj, account, stores.switches,
-                                transaction);
-                    }
-                    PlayableIdentity identity = PlayableIdentity.of(
-                            player.getUniqueID(), activeId);
-                    RoleplayCharacter activeCharacter =
-                            roster.getCharacter(activeId);
-                    CharacterPlayerStateSnapshot snapshot =
-                            this.playerStateService.findGeneration(
-                                    playerStateAccount, identity.getGameplayId(),
-                                    generation);
-                    this.playerStateService.apply(
-                            player, identity, activeCharacter, snapshot);
-                    this.playerStateService.transitionLocation(
-                            player, snapshot);
-                    if (!CharacterRaceGameplayHandler
-                            .prepareEquipmentForCharacterSwitch(
-                                    player, activeCharacter)) {
-                        throw new CharacterStateValidationException(
-                                "Recovered equipment cannot be normalized safely");
-                    }
-                    CharacterRaceGameplayHandler.apply(
-                            player, activeCharacter);
-                    this.playerStateService.synchronize(player);
+                // Whichever side the roster is on, the account included,
+                // is restored from the generation the journal names for it.
+                long generation;
+                if (equalsUuid(activeId,
+                        transaction.getTargetCharacterId())) {
+                    generation = transaction.getTargetStateGeneration();
+                } else if (equalsUuid(activeId,
+                        transaction.getSourceCharacterId())) {
+                    generation = transaction.getSourceStateGeneration();
+                } else {
+                    return requireManualRecoveryLocked(
+                            player.worldObj, account, stores.switches,
+                            transaction);
                 }
+                PlayableIdentity identity = PlayableIdentity.of(
+                        player.getUniqueID(), activeId);
+                RoleplayCharacter activeCharacter =
+                        roster.getCharacter(activeId);
+                CharacterPlayerStateSnapshot snapshot =
+                        this.playerStateService.findGeneration(
+                                playerStateAccount, identity.getGameplayId(),
+                                generation);
+                this.playerStateService.apply(
+                        player, identity, activeCharacter, snapshot);
+                this.playerStateService.transitionLocation(
+                        player, snapshot);
+                if (!CharacterRaceGameplayHandler
+                        .prepareEquipmentForCharacterSwitch(
+                                player, activeCharacter)) {
+                    throw new CharacterStateValidationException(
+                            "Recovered equipment cannot be normalized safely");
+                }
+                CharacterRaceGameplayHandler.apply(
+                        player, activeCharacter);
+                this.playerStateService.synchronize(player);
                 CharacterLiveStatePersistence.save(player);
             } catch (Throwable failure) {
                 // Never allow play to continue after a partial interrupted-switch
@@ -990,10 +967,9 @@ public final class CharacterSwitchCoordinator {
             }
         } else if (player.isEntityAlive() && !player.isDead
                 && player.getHealth() > 0.0F) {
-            // Nothing to put back: a version-1 journal names no generation,
-            // and a rolled-back one names the state the player is already
-            // on. Either way the live state is made durable so the journal
-            // can be cleared below.
+            // Nothing to put back: a rolled-back journal names the state
+            // the player is already on. The live state is made durable so
+            // the journal can be cleared below.
             CharacterLiveStatePersistence.save(player);
         }
 
@@ -1102,11 +1078,6 @@ public final class CharacterSwitchCoordinator {
 
     private static boolean equalsUuid(UUID left, UUID right) {
         return left == null ? right == null : left.equals(right);
-    }
-
-    private static boolean isServerPlayer(EntityPlayerMP player) {
-        return player != null && player.getUniqueID() != null
-                && player.worldObj != null && !player.worldObj.isRemote;
     }
 
     private static void logFailure(EntityPlayerMP player, String phase,

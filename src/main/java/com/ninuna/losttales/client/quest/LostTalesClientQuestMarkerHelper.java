@@ -1,17 +1,16 @@
 package com.ninuna.losttales.client.quest;
 
-import com.ninuna.losttales.mapmarker.LostTalesMapMarkerIdentity;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveSelection;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveType;
+import com.ninuna.losttales.quest.LostTalesQuestParams;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import net.minecraft.client.Minecraft;
@@ -91,7 +90,7 @@ public final class LostTalesClientQuestMarkerHelper {
 
     public static String getActiveQuestMarkerLabel(
             Map<String, String> labels, String markerId) {
-        String key = markerCanonicalKey(markerId);
+        String key = LostTalesQuestMarkerHelper.markerCanonicalKey(markerId);
         return labels == null || key.length() == 0
                 ? null : labels.get(key);
     }
@@ -118,7 +117,7 @@ public final class LostTalesClientQuestMarkerHelper {
                     .isComplete(progress, objective)) {
                 continue;
             }
-            String markerId = firstParam(objective, "marker", "mapMarker", "map_marker", "targetMarker", "target_marker");
+            String markerId = LostTalesQuestParams.value(objective.getParams(), "marker");
             if (markerId != null && markerId.length() > 0) {
                 String[] split = markerId.split(",");
                 for (String part : split) {
@@ -129,95 +128,34 @@ public final class LostTalesClientQuestMarkerHelper {
     }
 
     private static void putMarkerLabel(Map<String, String> labels, String markerId, String label) {
-        String key = markerCanonicalKey(markerId);
+        String key = LostTalesQuestMarkerHelper.markerCanonicalKey(markerId);
         if (key.length() > 0 && !labels.containsKey(key)) {
             labels.put(key, label);
         }
     }
 
-    private static String markerCanonicalKey(String markerId) {
-        String normalized =
-                LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
-        if (normalized.length() == 0) {
-            return "";
-        }
-        return LostTalesMapMarkerIdentity.create(
-                normalized,
-                LostTalesMapMarkerIdentity.Authority.QUEST_PLAYER)
-                .getCanonicalKey();
-    }
-
     private static ActiveCoordinateMarker coordinateMarkerFromObjective(LostTalesQuestDefinition quest, LostTalesQuestObjectiveDefinition objective, String label) {
-        String xValue = firstParam(objective, "x", "posX", "targetX");
-        String yValue = firstParam(objective, "y", "posY", "targetY");
-        String zValue = firstParam(objective, "z", "posZ", "targetZ");
-        if (xValue == null || zValue == null) {
+        LostTalesQuestParams.Location location =
+                LostTalesQuestParams.location(objective.getParams(),
+                        currentDimension());
+        if (location == null) {
             return null;
         }
-
-        Double x = parseDouble(xValue);
-        Double z = parseDouble(zValue);
-        Double y = parseDouble(yValue == null || yValue.length() == 0 ? "64" : yValue);
-        if (x == null || y == null || z == null) {
-            return null;
-        }
-
-        int dimensionId = parseDimensionId(firstParam(objective, "dimension", "dim", "world"));
         String id = "objective:" + (quest == null ? "unknown" : quest.getId()) + ":" + objective.getId();
-        return new ActiveCoordinateMarker(id, label, dimensionId, x.doubleValue(), y.doubleValue(), z.doubleValue());
+        return new ActiveCoordinateMarker(id, label, location.getDimensionId(),
+                location.getX(), location.getY(), location.getZ());
     }
 
     private static boolean isGotoObjective(LostTalesQuestObjectiveDefinition objective) {
         return LostTalesQuestObjectiveType.GOTO.is(objective);
     }
 
-    private static String firstParam(LostTalesQuestObjectiveDefinition objective, String... keys) {
-        if (objective == null || keys == null) {
-            return "";
-        }
-        Map<String, String> params = objective.getParams();
-        for (String key : keys) {
-            if (key == null) {
-                continue;
-            }
-            String value = params.get(key);
-            if (value != null && value.trim().length() > 0) {
-                return value.trim();
-            }
-        }
-        return "";
-    }
-
-    private static Double parseDouble(String value) {
-        if (value == null) {
-            return null;
-        }
-        try {
-            return Double.valueOf(value.trim());
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
-    }
-
-    private static int parseDimensionId(String value) {
-        if (value == null || value.trim().length() == 0) {
-            return 0;
-        }
-        String normalized = value.trim().toLowerCase(Locale.ROOT);
-        if ("minecraft:overworld".equals(normalized) || "overworld".equals(normalized) || "world".equals(normalized)) {
-            return 0;
-        }
-        if ("minecraft:the_nether".equals(normalized) || "minecraft:nether".equals(normalized) || "the_nether".equals(normalized) || "nether".equals(normalized)) {
-            return -1;
-        }
-        if ("minecraft:the_end".equals(normalized) || "minecraft:end".equals(normalized) || "the_end".equals(normalized) || "end".equals(normalized)) {
-            return 1;
-        }
-        try {
-            return Integer.parseInt(normalized);
-        } catch (NumberFormatException ignored) {
-            return 0;
-        }
+    /** The dimension this player stands in; the overworld before a world is joined. */
+    private static int currentDimension() {
+        net.minecraft.client.Minecraft minecraft =
+                net.minecraft.client.Minecraft.getMinecraft();
+        return minecraft == null || minecraft.thePlayer == null
+                ? 0 : minecraft.thePlayer.dimension;
     }
 
     private static String createQuestLabel(LostTalesQuestDefinition quest) {

@@ -5,7 +5,6 @@ import com.ninuna.losttales.client.window.PageTab;
 import com.ninuna.losttales.client.window.TabSelection;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowLayout;
-import com.ninuna.losttales.client.window.WindowPlacement;
 import com.ninuna.losttales.client.window.WindowTab;
 import java.util.List;
 import net.minecraft.client.Minecraft;
@@ -18,13 +17,10 @@ import net.minecraft.util.StatCollector;
  * keeps the screen consistent afterwards — the window being typed in
  * comes to the front, drafts change hands with the tab, a completion
  * walked in the tab just left is over, a reply aimed at it is put down
- * — and the verbs that open a whisper, close a tab or a window, detach a
- * tab into a window of its own, or bring an open tab forward.
+ * — and the verbs that open a whisper, close a tab or a window, or
+ * bring an open tab forward.
  */
 public final class ChatTabActions {
-    /** Where a detached window's row lands: a little below its old one. */
-    private static final int DETACH_DROP = 40;
-
     private final ChatInputBar bar;
     private final ChatInputCompletion completion;
     private final ChatComposer composer;
@@ -292,34 +288,6 @@ public final class ChatTabActions {
         if (closed) {
             TabSelection.clear();
             syncSelection();
-        }
-    }
-
-    /**
-     * The tab menu's way of giving a channel a window of its own: the
-     * new window lands a little below its old row, kept on screen, and
-     * the channel stays selected there.
-     */
-    void detachChannel(WindowTab channel, int screenWidth, int screenHeight) {
-        Window window = WindowLayout.windowOf(channel);
-        if (window == null) {
-            return;
-        }
-        TabSelection.clear();
-        ChatFrame frame = ChatFrame.of(window);
-        WindowPlacement.Anchor anchor = WindowPlacement.constrainWindow(
-                null, this.mc, frame.boxLeft,
-                frame.tabRowBottom() + DETACH_DROP
-                        + WindowPlacement.lineHeight(this.mc),
-                screenWidth, screenHeight);
-        Window detached = WindowLayout.detach(channel,
-                WindowPlacement.windowPercentX(anchor.x, this.mc,
-                        screenWidth),
-                WindowPlacement.windowPercentY(null, anchor.baseline,
-                        this.mc, screenHeight));
-        if (detached != null) {
-            ChatFrame.of(detached).beginAppearing();
-            selectChannel(channel);
         }
     }
 

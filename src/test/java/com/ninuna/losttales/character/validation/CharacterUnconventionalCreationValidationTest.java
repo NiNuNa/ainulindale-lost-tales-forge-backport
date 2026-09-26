@@ -127,7 +127,11 @@ public final class CharacterUnconventionalCreationValidationTest {
                 ORC_FACTION,
                 waypointId,
                 unconventional,
-                description);
+                description,
+                "",
+                "",
+                true,
+                0);
     }
 
     private static String humanSkin() {

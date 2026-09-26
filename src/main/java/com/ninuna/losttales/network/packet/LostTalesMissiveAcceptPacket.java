@@ -1,37 +1,37 @@
 package com.ninuna.losttales.network.packet;
 
-import com.ninuna.losttales.block.tileentity.LostTalesTileEntityMissiveBoard;
-import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
 import com.ninuna.losttales.network.server.LostTalesServerPacketDispatcher;
 import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
-import com.ninuna.losttales.quest.LostTalesQuestDefinition;
-import com.ninuna.losttales.quest.LostTalesQuestManager;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveData;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveNbt;
-import com.ninuna.losttales.quest.missive.LostTalesMissiveQuestFactory;
+import com.ninuna.losttales.quest.missive.MissiveAcceptance;
+import com.ninuna.losttales.quest.missive.MissiveBoardService;
+import com.ninuna.losttales.quest.missive.MissiveBoardStateReason;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
-import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.ChatComponentTranslation;
 
 /**
- * Client-to-server request to accept a missive.
- *
- * Requests may point either to a board slot or to a player inventory slot. In
- * both cases the logical server re-reads the authoritative stack, validates its
- * NBT and quest ID, starts the generated quest, and only then consumes/removes
- * the letter.
+ * A page's request to accept a missive: a notice on a board, named by
+ * the board's world, place and slot (the board's page), or a letter in
+ * the player's own inventory, named by its slot (the letter's page),
+ * with the quest id the page read there. The server reads the stack
+ * standing there now, checks it is that letter, starts its quest, and
+ * only then takes the letter away; a board's answer is its notices
+ * ({@link MissiveBoardService#accept}).
  */
 public class LostTalesMissiveAcceptPacket implements IMessage {
     public static final int SOURCE_BOARD = 0;
     public static final int SOURCE_PLAYER_INVENTORY = 1;
+    public static final int MAX_PACKET_BYTES = 1024;
 
-    private int sourceType = SOURCE_BOARD;
+    private int sourceType = -1;
+    private int dimensionId;
     private int x;
     private int y;
     private int z;
@@ -41,184 +41,143 @@ public class LostTalesMissiveAcceptPacket implements IMessage {
 
     public LostTalesMissiveAcceptPacket() {}
 
-    public LostTalesMissiveAcceptPacket(int x, int y, int z, int slot, String expectedQuestId) {
-        this.sourceType = SOURCE_BOARD;
+    private LostTalesMissiveAcceptPacket(int sourceType, int dimensionId,
+                                         int x, int y, int z, int slot,
+                                         String expectedQuestId) {
+        this.sourceType = sourceType;
+        this.dimensionId = dimensionId;
         this.x = x;
         this.y = y;
         this.z = z;
         this.slot = slot;
         this.expectedQuestId = expectedQuestId == null ? "" : expectedQuestId;
+        validate();
     }
 
-    public static LostTalesMissiveAcceptPacket fromPlayerInventory(int slot, String expectedQuestId) {
-        LostTalesMissiveAcceptPacket packet = new LostTalesMissiveAcceptPacket();
-        packet.sourceType = SOURCE_PLAYER_INVENTORY;
-        packet.slot = slot;
-        packet.expectedQuestId = expectedQuestId == null ? "" : expectedQuestId;
-        return packet;
+    /** Accepts the notice in the board's {@code slot}, the letter of {@code expectedQuestId}. */
+    public static LostTalesMissiveAcceptPacket fromBoard(int dimensionId,
+                                                         int x, int y, int z,
+                                                         int slot,
+                                                         String expectedQuestId) {
+        return new LostTalesMissiveAcceptPacket(SOURCE_BOARD, dimensionId,
+                x, y, z, slot, expectedQuestId);
+    }
+
+    /** Accepts the letter in the inventory's {@code slot}, the letter of {@code expectedQuestId}. */
+    public static LostTalesMissiveAcceptPacket fromPlayerInventory(
+            int slot, String expectedQuestId) {
+        return new LostTalesMissiveAcceptPacket(SOURCE_PLAYER_INVENTORY, 0,
+                0, 0, 0, slot, expectedQuestId);
     }
 
     @Override
     public void fromBytes(ByteBuf buffer) {
+        this.malformed = false;
         try {
+            if (buffer == null || buffer.readableBytes() > MAX_PACKET_BYTES
+                    || buffer.readableBytes() < 6 * 4) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "invalid missive acceptance size");
+            }
             this.sourceType = buffer.readInt();
+            this.dimensionId = buffer.readInt();
             this.x = buffer.readInt();
             this.y = buffer.readInt();
             this.z = buffer.readInt();
             this.slot = buffer.readInt();
             this.expectedQuestId = LostTalesPacketCodec.readUtf8String(
-                    buffer, LostTalesPacketCodec.MAX_IDENTIFIER_BYTES).trim();
+                    buffer, LostTalesMissiveCodec.MAX_QUEST_ID_BYTES);
             LostTalesPacketCodec.requireFinished(buffer);
-
-            if ((this.sourceType != SOURCE_BOARD && this.sourceType != SOURCE_PLAYER_INVENTORY)
-                    || !LostTalesPacketCodec.isReasonableInventorySlot(this.slot)
-                    || this.expectedQuestId.length() == 0
-                    || (this.sourceType == SOURCE_BOARD
-                    && !LostTalesPacketCodec.isValidBlockPosition(this.x, this.y, this.z))) {
-                throw new LostTalesPacketCodec.DecodeException("invalid missive acceptance request");
-            }
+            validate();
         } catch (RuntimeException exception) {
             this.malformed = true;
+            LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
 
     @Override
     public void toBytes(ByteBuf buffer) {
+        validate();
         buffer.writeInt(this.sourceType);
+        buffer.writeInt(this.dimensionId);
         buffer.writeInt(this.x);
         buffer.writeInt(this.y);
         buffer.writeInt(this.z);
         buffer.writeInt(this.slot);
-        LostTalesPacketCodec.writeUtf8String(
-                buffer, this.expectedQuestId == null ? "" : this.expectedQuestId,
-                LostTalesPacketCodec.MAX_IDENTIFIER_BYTES);
+        LostTalesPacketCodec.writeUtf8String(buffer, this.expectedQuestId,
+                LostTalesMissiveCodec.MAX_QUEST_ID_BYTES);
     }
 
-    private static void execute(
-            EntityPlayerMP player, int sourceType, int expectedDimension,
-            int x, int y, int z, int slot, String expectedQuestId) {
-        if (sourceType == SOURCE_PLAYER_INVENTORY) {
-            handlePlayerInventoryAcceptance(player, slot, expectedQuestId);
-        } else if (sourceType == SOURCE_BOARD
-                && player.worldObj.provider != null
-                && player.worldObj.provider.dimensionId == expectedDimension) {
-            handleBoardAcceptance(player, x, y, z, slot, expectedQuestId);
-        }
-    }
-
-    private static void handleBoardAcceptance(
-            EntityPlayerMP player, int x, int y, int z, int slot, String expectedQuestId) {
-        TileEntity tileEntity = player.worldObj.getTileEntity(x, y, z);
-        if (!(tileEntity instanceof LostTalesTileEntityMissiveBoard)) {
-            send(player, "chat.losttales.missive.board_gone");
-            return;
-        }
-
-        LostTalesTileEntityMissiveBoard board = (LostTalesTileEntityMissiveBoard) tileEntity;
-        if (!board.isUseableByPlayer(player)) {
-            send(player, "chat.losttales.missive.too_far");
-            return;
-        }
-        if (slot < 0 || slot >= board.getSizeInventory()) {
-            send(player, "chat.losttales.missive.gone");
-            return;
-        }
-
-        ItemStack stack = board.getStackInSlot(slot);
-        LostTalesMissiveData missive = readValidMissive(player, stack, expectedQuestId);
-        if (missive == null) {
-            return;
-        }
-
-        LostTalesQuestManager.StartResult result = startMissive(player, missive);
-        if (result == LostTalesQuestManager.StartResult.STARTED) {
-            if (missive.isFirstComeFirstServed()) {
-                board.setInventorySlotContents(slot, null);
-            } else {
-                board.markDirty();
-                player.worldObj.markBlockForUpdate(x, y, z);
-            }
-            player.worldObj.playSoundEffect(
-                    (double) x + 0.5D,
-                    (double) y + 0.5D,
-                    (double) z + 0.5D,
-                    "random.pop", 0.45F, 1.25F);
-        } else {
-            sendStartFailure(player, result);
+    /**
+     * A source, a quest id as a letter holds one, and for a board a place
+     * where a block may stand and one of its slots; for the inventory a
+     * reasonable slot, and the board's fields left at zero.
+     */
+    private void validate() {
+        boolean board = this.sourceType == SOURCE_BOARD;
+        if (!board && this.sourceType != SOURCE_PLAYER_INVENTORY
+                || this.expectedQuestId == null
+                || this.expectedQuestId.length() == 0
+                || !this.expectedQuestId.equals(this.expectedQuestId.trim())
+                || !LostTalesPacketCodec.isUtf8WithinLimit(
+                        this.expectedQuestId,
+                        LostTalesMissiveCodec.MAX_QUEST_ID_BYTES)
+                || (board ? !LostTalesPacketCodec.isValidBlockPosition(
+                        this.x, this.y, this.z) || this.slot < 0
+                        || this.slot >= LostTalesMissiveBoardStatePacket.MAX_NOTICES
+                        : this.dimensionId != 0 || this.x != 0 || this.y != 0
+                        || this.z != 0
+                        || !LostTalesPacketCodec.isReasonableInventorySlot(
+                                this.slot))) {
+            throw new IllegalArgumentException(
+                    "invalid missive acceptance request");
         }
     }
 
-    private static void handlePlayerInventoryAcceptance(
-            EntityPlayerMP player, int slot, String expectedQuestId) {
+    public int getSourceType() { return this.sourceType; }
+    public int getDimensionId() { return this.dimensionId; }
+    public int getX() { return this.x; }
+    public int getY() { return this.y; }
+    public int getZ() { return this.z; }
+    public int getSlot() { return this.slot; }
+    public String getExpectedQuestId() { return this.expectedQuestId; }
+    public boolean isMalformed() { return this.malformed; }
+
+    /**
+     * The letter in the player's own inventory: still that letter in that
+     * slot, its quest started, and only then the letter used up. A
+     * refusal is said in the chat; the letter's page stays open on it.
+     */
+    private static void acceptFromInventory(EntityPlayerMP player, int slot,
+                                            String expectedQuestId) {
         if (slot < 0 || slot >= player.inventory.getSizeInventory()) {
-            send(player, "chat.losttales.missive.letter_gone");
+            say(player, "chat.losttales.missive.letter_gone");
             return;
         }
-
         ItemStack stack = player.inventory.getStackInSlot(slot);
-        LostTalesMissiveData missive = readValidMissive(player, stack, expectedQuestId);
-        if (missive == null) {
+        MissiveBoardStateReason refusal =
+                MissiveAcceptance.check(stack, expectedQuestId);
+        if (refusal != null) {
+            say(player, refusal == MissiveBoardStateReason.GONE
+                    ? "chat.losttales.missive.letter_gone"
+                    : refusal.getMessageKey());
             return;
         }
-
-        LostTalesQuestManager.StartResult result = startMissive(player, missive);
-        if (result == LostTalesQuestManager.StartResult.STARTED) {
+        LostTalesMissiveData missive = LostTalesMissiveNbt.readFromItemStack(stack);
+        MissiveBoardStateReason outcome =
+                MissiveAcceptance.start(player, missive);
+        if (outcome == MissiveBoardStateReason.ACCEPTED) {
             player.inventory.setInventorySlotContents(slot, null);
             player.inventory.markDirty();
-            player.worldObj.playSoundAtEntity(player, "random.pop", 0.45F, 1.25F);
-        } else {
-            sendStartFailure(player, result);
+            player.worldObj.playSoundAtEntity(player, "random.pop", 0.45F,
+                    1.25F);
+        } else if (outcome.isSaidInChat()) {
+            say(player, outcome.getMessageKey());
         }
     }
 
-    private static LostTalesMissiveData readValidMissive(
-            EntityPlayerMP player, ItemStack stack, String expectedQuestId) {
-        if (stack == null || stack.stackSize <= 0
-                || stack.getItem() != ELostTalesItem.MISSIVE_LETTER.getItem()) {
-            send(player, "chat.losttales.missive.gone");
-            return null;
-        }
-
-        LostTalesMissiveData missive = LostTalesMissiveNbt.readFromItemStack(stack);
-        if (missive == null || !missive.isValid()) {
-            send(player, "chat.losttales.missive.damaged");
-            return null;
-        }
-
-        String expected = expectedQuestId == null ? "" : expectedQuestId.trim();
-        if (expected.length() == 0 || !expected.equals(missive.getQuestId())) {
-            send(player, "chat.losttales.missive.changed");
-            return null;
-        }
-        return missive;
-    }
-
-    private static LostTalesQuestManager.StartResult startMissive(
-            EntityPlayerMP player, LostTalesMissiveData missive) {
-        LostTalesQuestDefinition quest = LostTalesMissiveQuestFactory.createQuestDefinition(missive);
-        if (quest == null) {
-            send(player, "chat.losttales.missive.refused");
-            return LostTalesQuestManager.StartResult.UNKNOWN_QUEST;
-        }
-        return LostTalesQuestManager.startGeneratedQuest(
-                player, quest, missive.getTimeLimitTicks());
-    }
-
-    private static void sendStartFailure(
-            EntityPlayerMP player, LostTalesQuestManager.StartResult result) {
-        if (result == LostTalesQuestManager.StartResult.ALREADY_ACTIVE) {
-            send(player, "chat.losttales.missive.already_active");
-        } else if (result == LostTalesQuestManager.StartResult.ALREADY_COMPLETED) {
-            send(player, "chat.losttales.missive.already_completed");
-        } else if (result == LostTalesQuestManager.StartResult.REQUIREMENTS_NOT_MET) {
-            // startGeneratedQuest already sends the specific prerequisite failure.
-        } else {
-            send(player, "chat.losttales.missive.not_now");
-        }
-    }
-
-    /** A missive board's word to the player, said by the Server. */
-    private static void send(EntityPlayerMP player, String key) {
+    /** A missive's word to the player, said by the Server. */
+    private static void say(EntityPlayerMP player, String key) {
         if (player != null) {
             player.addChatMessage(new ChatComponentTranslation(key));
         }
@@ -228,28 +187,28 @@ public class LostTalesMissiveAcceptPacket implements IMessage {
         @Override
         public IMessage onMessage(final LostTalesMissiveAcceptPacket message, MessageContext context) {
             EntityPlayerMP player = LostTalesServerPacketDispatcher.getPlayer(context);
-            if (player == null || player.worldObj == null
-                    || player.worldObj.provider == null || message == null) {
+            if (player == null || message == null) {
                 return null;
             }
-
-            final int sourceType = message.sourceType;
-            final int expectedDimension = player.worldObj.provider.dimensionId;
-            final int x = message.x;
-            final int y = message.y;
-            final int z = message.z;
-            final int slot = message.slot;
-            final String expectedQuestId = message.expectedQuestId;
             LostTalesServerPacketDispatcher.submit(
                     player,
                     LostTalesRequestRateLimiter.RequestType.MISSIVE_ACCEPT,
-                    message.malformed,
+                    message.isMalformed(),
                     "LostTalesMissiveAcceptPacket",
                     new LostTalesServerTaskQueue.PlayerTask() {
                         @Override
                         public void run(EntityPlayerMP livePlayer) {
-                            execute(livePlayer, sourceType, expectedDimension,
-                                    x, y, z, slot, expectedQuestId);
+                            if (message.getSourceType() == SOURCE_BOARD) {
+                                MissiveBoardService.accept(livePlayer,
+                                        message.getDimensionId(),
+                                        message.getX(), message.getY(),
+                                        message.getZ(), message.getSlot(),
+                                        message.getExpectedQuestId());
+                            } else {
+                                acceptFromInventory(livePlayer,
+                                        message.getSlot(),
+                                        message.getExpectedQuestId());
+                            }
                         }
                     }
             );

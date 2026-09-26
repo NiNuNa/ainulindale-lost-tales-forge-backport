@@ -55,7 +55,6 @@ import com.ninuna.losttales.client.gui.LostTalesHudHidingScreen;
 import com.ninuna.losttales.client.gui.LostTalesPlayerListOverlay;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
-import com.ninuna.losttales.client.mapmarker.LostTalesClientWaystoneStateStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientWaystoneTravelContext;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
@@ -165,6 +164,9 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     }
 
     private static void clearSessionState() {
+        // A page that stands for a thing in this world (a waystone) goes
+        // before every page lets its content go.
+        WindowPages.closeWorldPages();
         WindowPages.forgetContents();
         LostTalesClientQuestProgressStore.clear();
         LostTalesClientQuestNotificationStore.clear();
@@ -180,7 +182,6 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         LostTalesMapTerrainCache.clear();
         LostTalesMapTerrainRenderer.clear();
         LostTalesMapViewMemory.clear();
-        LostTalesClientWaystoneStateStore.clear();
         LostTalesClientWaystoneTravelContext.clear();
         LostTalesClientMobAggroCache.clear();
         LostTalesClientQuickLootCache.clear();

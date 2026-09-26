@@ -16,13 +16,6 @@ public final class LostTalesGuiAnimationSample {
     private final float scaleY;
 
     LostTalesGuiAnimationSample(float progress, float easedProgress,
-                                float opacity, float translationY,
-                                float scaleX, float scaleY) {
-        this(progress, easedProgress, opacity,
-                0.0F, translationY, scaleX, scaleY);
-    }
-
-    LostTalesGuiAnimationSample(float progress, float easedProgress,
                                 float opacity, float translationX,
                                 float translationY,
                                 float scaleX, float scaleY) {

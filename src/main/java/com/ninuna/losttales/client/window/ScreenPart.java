@@ -8,9 +8,10 @@ import java.util.List;
  * A system with work of its own on the window screen besides what its
  * tabs show: the chat, with its input bar, its menus, its completion
  * lists and its conversations. The screen makes one of each registered
- * part when it opens ({@link WindowScreen#addPart}), and the part adds its
- * kinds of menu and its sections of Settings to the screen's as it is
- * made ({@link WindowScreen#menus}, {@link WindowScreen#settings}). The
+ * part when it opens in a world ({@link WindowScreen#addPart}), and the
+ * part adds its kinds of menu to the screen's as it is made
+ * ({@link WindowScreen#menus}); a system's sections of Settings are given
+ * to every Settings, a part or none ({@link Settings#addSections}). The
  * screen asks it at fixed points of every key, press, turn of the wheel
  * and frame, in the order the screen handles them; each method says
  * where. Everything is optional: a part leaves alone what it has no part
@@ -18,7 +19,11 @@ import java.util.List;
  * for that.
  */
 public abstract class ScreenPart {
-    /** Makes a screen's part; each screen that opens gets its own. */
+    /**
+     * Makes a screen's part; each screen that opens gets its own. A part
+     * that needs a world is not made for a screen that stands without one
+     * ({@link WindowScreen#isWorldless}): its maker answers null.
+     */
     public interface Maker {
         ScreenPart make(WindowScreen screen);
     }

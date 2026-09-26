@@ -1,11 +1,10 @@
 package com.ninuna.losttales.world.waystone;
 
-import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerStorage;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerWorldData;
 import com.ninuna.losttales.mapmarker.LostTalesWaystoneGenerationState;
-import cpw.mods.fml.common.FMLLog;
+import com.ninuna.losttales.util.LostTalesLog;
 import net.minecraft.world.WorldServer;
 
 /** Resolves registered placers and persists durable failure state. */
@@ -40,7 +39,7 @@ public final class LostTalesWaystonePlacementService {
                             LostTalesWaystoneGenerationState.FAILED_OR_BLOCKED,
                             "unknown_structure_type");
             data.saveRecord(failed);
-            warn("Marker %s references unknown waystone structure %s",
+            LostTalesLog.warning("Marker %s references unknown waystone structure %s",
                     record.getId(), record.getWaystoneStructureType());
             return LostTalesWaystonePlacementResult.blocked(
                     "unknown_structure_type");
@@ -57,21 +56,9 @@ public final class LostTalesWaystonePlacementService {
                         LostTalesWaystoneGenerationState.FAILED_OR_BLOCKED,
                         result.getReason()));
             }
-            warn("Waystone generation blocked for marker %s: %s",
+            LostTalesLog.warning("Waystone generation blocked for marker %s: %s",
                     record.getId(), result.getReason());
         }
         return result;
-    }
-
-    private static void warn(String format, Object... args) {
-        Object[] values = new Object[
-                (args == null ? 0 : args.length) + 1];
-        values[0] = LostTalesMetaData.MOD_ID;
-        if (args != null) {
-            System.arraycopy(args, 0, values, 1, args.length);
-        }
-        try {
-            FMLLog.warning("[%s] " + format, values);
-        } catch (RuntimeException ignored) {}
     }
 }

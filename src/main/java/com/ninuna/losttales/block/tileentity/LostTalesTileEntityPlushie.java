@@ -71,7 +71,7 @@ public class LostTalesTileEntityPlushie extends TileEntity implements IAnimatabl
     }
 
     public float getRenderRotation(int metadata) {
-        return this.hasStoredRotation ? this.rotation : LostTalesBlockRotationHelper.getLegacyPlushieRenderRotation(metadata);
+        return this.hasStoredRotation ? this.rotation : LostTalesBlockRotationHelper.getPlushieMetadataRotation(metadata);
     }
 
     public boolean hasStoredRotation() {

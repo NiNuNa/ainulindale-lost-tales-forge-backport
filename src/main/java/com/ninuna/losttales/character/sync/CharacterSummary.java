@@ -7,6 +7,7 @@ import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
 
+import com.ninuna.losttales.util.LostTalesIdentifiers;
 import java.util.UUID;
 
 /** Immutable client-safe projection of one private roleplaying character. */
@@ -47,10 +48,10 @@ public final class CharacterSummary {
         this.genderId = genderId == null ? "" : genderId;
         this.skinId = skinId == null ? "" : skinId;
         this.bodyTypeId = CharacterBodyTypeRegistry.contains(bodyTypeId)
-                ? CharacterBodyTypeRegistry.normalizeIdentifier(bodyTypeId)
+                ? LostTalesIdentifiers.normalize(bodyTypeId)
                 : CharacterBodyTypeRegistry.defaultFor(genderId);
         this.chestTypeId = CharacterChestTypeRegistry.contains(chestTypeId)
-                ? CharacterChestTypeRegistry.normalizeIdentifier(chestTypeId)
+                ? LostTalesIdentifiers.normalize(chestTypeId)
                 : CharacterChestTypeRegistry.defaultFor(genderId);
         this.showMinecraftCape = showMinecraftCape;
         this.cosmeticCapeId = CharacterCapeCatalog.normalizeSelection(cosmeticCapeId);

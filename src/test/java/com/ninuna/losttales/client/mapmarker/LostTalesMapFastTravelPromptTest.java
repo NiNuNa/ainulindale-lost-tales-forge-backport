@@ -22,7 +22,7 @@ public final class LostTalesMapFastTravelPromptTest {
     @Test
     public void disabledPlaceMarkerDoesNotProduceAnAction() {
         LostTalesMapFastTravelPrompt prompt =
-                new LostTalesMapFastTravelPrompt("Bree");
+                new LostTalesMapFastTravelPrompt("Bree", null, false);
         LostTalesMapChoicePrompt.Layout layout =
                 LostTalesMapChoicePrompt.calculateLayout(320, 180);
         int x = layout.third.x + layout.third.width / 2;

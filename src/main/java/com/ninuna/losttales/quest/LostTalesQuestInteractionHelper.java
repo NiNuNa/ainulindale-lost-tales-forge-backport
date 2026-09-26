@@ -2,11 +2,9 @@ package com.ninuna.losttales.quest;
 
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.util.LostTalesDimensionHelper;
-import java.util.Locale;
 import java.util.Map;
 import net.minecraft.block.Block;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityList;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.nbt.NBTTagCompound;
 /**
@@ -58,7 +56,9 @@ public final class LostTalesQuestInteractionHelper {
             if (LostTalesQuestDialogue.of(quest).isOffered()) {
                 continue;
             }
-            if (matchesDimension(player, quest.getInteraction()) && matchesEntity(target, firstValue(quest.getInteraction(), "entity", "entityId", "npc", "target"))) {
+            String giver = LostTalesQuestParams.value(quest.getInteraction(), "entity");
+            if (matchesDimension(player, quest.getInteraction()) && giver.length() > 0
+                    && LostTalesQuestObjectiveMatcher.matchesEntity(target, giver, "")) {
                 boolean markerChanged = LostTalesQuestManager.revealQuestGiverMarker(player, quest, target, false);
                 LostTalesQuestManager.StartResult result = LostTalesQuestManager.startQuest(player, quest.getId(), LostTalesQuestStartSource.INTERACTION);
                 if (result == LostTalesQuestManager.StartResult.STARTED || result == LostTalesQuestManager.StartResult.ALREADY_ACTIVE || result == LostTalesQuestManager.StartResult.ALREADY_COMPLETED) {
@@ -85,7 +85,7 @@ public final class LostTalesQuestInteractionHelper {
                 continue;
             }
             Map<String, String> interaction = quest.getInteraction();
-            String blockSpec = firstValue(interaction, "block", "blockId", "target");
+            String blockSpec = LostTalesQuestParams.first(interaction, "block", "blockId", "target");
             if (blockSpec.length() == 0) {
                 continue;
             }
@@ -125,7 +125,7 @@ public final class LostTalesQuestInteractionHelper {
     }
 
     private static boolean matchesDimension(EntityPlayerMP player, Map<String, String> interaction) {
-        String dimension = firstValue(interaction, "dimension", "dim");
+        String dimension = LostTalesQuestParams.first(interaction, "dimension", "dim");
         if (dimension.length() == 0) {
             return true;
         }
@@ -133,34 +133,14 @@ public final class LostTalesQuestInteractionHelper {
         return targetDimension == player.worldObj.provider.dimensionId;
     }
 
-    private static boolean matchesEntity(Entity entity, String entitySpec) {
-        if (entitySpec == null || entitySpec.trim().length() == 0) {
-            return false;
-        }
-
-        String legacyName = normalizeLoose(EntityList.getEntityString(entity));
-        String className = normalizeLoose(entity.getClass().getSimpleName().replace("Entity", ""));
-        String[] entries = entitySpec.split(",");
-        for (String entry : entries) {
-            String normalized = normalizeLoose(entry);
-            String pathOnly = normalizeLoose(stripNamespace(entry));
-            if (normalized.length() == 0 || normalized.startsWith("#")) {
-                continue;
-            }
-            if (normalized.equals(legacyName) || pathOnly.equals(legacyName) || normalized.equals(className) || pathOnly.equals(className)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private static boolean matchesBlock(Block block, String blockSpec) {
         String[] entries = blockSpec.split(",");
         Object blockNameObject = Block.blockRegistry.getNameForObject(block);
-        String blockName = blockNameObject == null ? "" : normalizeResourceId(blockNameObject.toString());
+        String blockName = blockNameObject == null ? ""
+                : LostTalesQuestObjectiveMatcher.normalizeResourceId(blockNameObject.toString());
         for (String entry : entries) {
-            String normalized = normalizeResourceId(entry);
-            if (normalized.length() == 0 || normalized.startsWith("#")) {
+            String normalized = LostTalesQuestObjectiveMatcher.normalizeResourceId(entry);
+            if (normalized.length() == 0 || entry.trim().startsWith("#")) {
                 continue;
             }
             Object registered = Block.blockRegistry.getObject(normalized);
@@ -172,13 +152,13 @@ public final class LostTalesQuestInteractionHelper {
     }
 
     private static boolean matchesMetadata(int metadata, Map<String, String> interaction) {
-        String metaText = firstValue(interaction, "metadata", "meta", "damage");
+        String metaText = LostTalesQuestParams.first(interaction, "metadata", "meta", "damage");
         if (metaText.length() == 0 || "*".equals(metaText)) {
             return true;
         }
         String[] entries = metaText.split(",");
         for (String entry : entries) {
-            if (metadata == parseInt(entry.trim(), -9999)) {
+            if (metadata == LostTalesQuestParams.parseInt(entry, -9999)) {
                 return true;
             }
         }
@@ -193,77 +173,14 @@ public final class LostTalesQuestInteractionHelper {
             return true;
         }
 
-        double targetX = parseDouble(xText, blockX) + 0.5D;
-        double targetY = parseDouble(yText, blockY) + 0.5D;
-        double targetZ = parseDouble(zText, blockZ) + 0.5D;
-        double radius = Math.max(0.5D, parseDouble(firstValue(interaction, "radius", "range"), 1.5D));
+        double targetX = LostTalesQuestParams.parseDouble(xText, blockX) + 0.5D;
+        double targetY = LostTalesQuestParams.parseDouble(yText, blockY) + 0.5D;
+        double targetZ = LostTalesQuestParams.parseDouble(zText, blockZ) + 0.5D;
+        double radius = Math.max(0.5D, LostTalesQuestParams.parseDouble(
+                LostTalesQuestParams.first(interaction, "radius", "range"), 1.5D));
         double dx = player.posX - targetX;
         double dy = player.posY - targetY;
         double dz = player.posZ - targetZ;
         return dx * dx + dy * dy + dz * dz <= radius * radius;
-    }
-
-    private static String firstValue(Map<String, String> map, String... keys) {
-        if (map == null || keys == null) {
-            return "";
-        }
-        for (String key : keys) {
-            String value = map.get(key);
-            if (value != null && value.trim().length() > 0) {
-                return value.trim();
-            }
-        }
-        return "";
-    }
-
-    private static String normalizeResourceId(String value) {
-        if (value == null) {
-            return "";
-        }
-        String normalized = value.trim().toLowerCase(Locale.ROOT);
-        if (normalized.indexOf(':') < 0 && normalized.length() > 0 && !normalized.startsWith("#")) {
-            normalized = "minecraft:" + normalized;
-        }
-        return normalized;
-    }
-
-    private static String stripNamespace(String value) {
-        if (value == null) {
-            return "";
-        }
-        String trimmed = value.trim();
-        int colon = trimmed.indexOf(':');
-        return colon >= 0 && colon + 1 < trimmed.length() ? trimmed.substring(colon + 1) : trimmed;
-    }
-
-    private static String normalizeLoose(String value) {
-        if (value == null) {
-            return "";
-        }
-        String stripped = stripNamespace(value).toLowerCase(Locale.ROOT);
-        StringBuilder builder = new StringBuilder();
-        for (int i = 0; i < stripped.length(); i++) {
-            char c = stripped.charAt(i);
-            if (c >= 'a' && c <= 'z' || c >= '0' && c <= '9') {
-                builder.append(c);
-            }
-        }
-        return builder.toString();
-    }
-
-    private static int parseInt(String value, int fallback) {
-        try {
-            return Integer.parseInt(value);
-        } catch (Exception ignored) {
-            return fallback;
-        }
-    }
-
-    private static double parseDouble(String value, double fallback) {
-        try {
-            return Double.parseDouble(value);
-        } catch (Exception ignored) {
-            return fallback;
-        }
     }
 }

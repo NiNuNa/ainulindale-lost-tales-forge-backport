@@ -198,21 +198,21 @@ public final class AccessoryPlayerData implements IExtendedEntityProperties {
             return;
         }
         NBTTagCompound data = playerTag.getCompoundTag(PROPERTY_ID);
-        int version = data.hasKey(TAG_VERSION, Constants.NBT.TAG_INT)
-                ? data.getInteger(TAG_VERSION) : 0;
-        if (version == 1
-                && data.hasKey(TAG_REJECTED, Constants.NBT.TAG_COMPOUND)) {
-            addRejectedEntry(data.getCompoundTag(TAG_REJECTED));
-        } else if (data.hasKey(TAG_REJECTED, Constants.NBT.TAG_LIST)) {
+        if (!data.hasKey(TAG_VERSION, Constants.NBT.TAG_INT)
+                || data.getInteger(TAG_VERSION) != DATA_VERSION) {
+            // Only this layout is read. Data at any other version is kept
+            // whole as one rejected entry, which recovery cannot decode
+            // and so leaves as it is.
+            addRejectedEntry(data);
+            return;
+        }
+        if (data.hasKey(TAG_REJECTED, Constants.NBT.TAG_LIST)) {
             net.minecraft.nbt.NBTTagList rejected = data.getTagList(
                     TAG_REJECTED, Constants.NBT.TAG_COMPOUND);
             for (int index = 0; index < rejected.tagCount()
                     && index < MAX_REJECTED_ENTRIES; index++) {
                 addRejectedEntry(rejected.getCompoundTagAt(index));
             }
-        } else if (data.hasKey(TAG_REJECTED, Constants.NBT.TAG_COMPOUND)) {
-            // Preserve a legacy/future singleton even when the version is unknown.
-            addRejectedEntry(data.getCompoundTag(TAG_REJECTED));
         }
         if (!data.hasKey(TAG_EQUIPPED, Constants.NBT.TAG_COMPOUND)) {
             return;

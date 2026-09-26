@@ -16,6 +16,7 @@ import com.ninuna.losttales.character.server.CharacterCreationRequest;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
 import com.ninuna.losttales.chat.profanity.ChatProfanityFilter;
+import com.ninuna.losttales.util.LostTalesIdentifiers;
 import net.minecraft.entity.player.EntityPlayerMP;
 
 import java.text.Normalizer;
@@ -140,7 +141,7 @@ public final class CharacterValidator {
             }
         }
 
-        String raceId = CharacterRaceRegistry.normalizeIdentifier(requestedRaceId);
+        String raceId = LostTalesIdentifiers.normalize(requestedRaceId);
         if (!isValidIdentifierLength(raceId)) {
             return CharacterAppearanceValidationResult.failure(
                     CharacterErrorId.INVALID_RACE);
@@ -153,12 +154,12 @@ public final class CharacterValidator {
         // A race nobody may newly choose may still be kept by a character
         // who already is one; what is refused is taking it.
         if (!race.isSelectable() && !raceId.equals(
-                CharacterRaceRegistry.normalizeIdentifier(keptRaceId))) {
+                LostTalesIdentifiers.normalize(keptRaceId))) {
             return CharacterAppearanceValidationResult.failure(
                     CharacterErrorId.INVALID_RACE);
         }
 
-        String genderId = CharacterGenderRegistry.normalizeIdentifier(requestedGenderId);
+        String genderId = LostTalesIdentifiers.normalize(requestedGenderId);
         if (!isValidIdentifierLength(genderId)
                 || !CharacterGenderRegistry.contains(genderId)
                 || !race.isGenderAllowed(genderId)) {
@@ -166,7 +167,7 @@ public final class CharacterValidator {
                     CharacterErrorId.INVALID_GENDER);
         }
 
-        String skinId = CharacterSkinRegistry.normalizeIdentifier(requestedSkinId);
+        String skinId = LostTalesIdentifiers.normalize(requestedSkinId);
         if (!isValidIdentifierLength(skinId)
                 || !CharacterSkinRegistry.isCompatible(skinId, race.getId(), genderId)) {
             return CharacterAppearanceValidationResult.failure(
@@ -175,7 +176,7 @@ public final class CharacterValidator {
 
         // Body type is a choice of its own; an empty request takes the
         // default for the sex, anything unknown is refused.
-        String bodyTypeId = CharacterBodyTypeRegistry.normalizeIdentifier(
+        String bodyTypeId = LostTalesIdentifiers.normalize(
                 requestedBodyTypeId);
         if (bodyTypeId.length() == 0) {
             bodyTypeId = CharacterBodyTypeRegistry.defaultFor(genderId);
@@ -184,7 +185,7 @@ public final class CharacterValidator {
             return CharacterAppearanceValidationResult.failure(
                     CharacterErrorId.INVALID_BODY_TYPE);
         }
-        String chestTypeId = CharacterChestTypeRegistry.normalizeIdentifier(
+        String chestTypeId = LostTalesIdentifiers.normalize(
                 requestedChestTypeId);
         if (chestTypeId.length() == 0) {
             chestTypeId = CharacterChestTypeRegistry.defaultFor(genderId);

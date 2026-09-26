@@ -32,18 +32,29 @@ public final class WindowPages {
         private final Window.ScreenFill firstFill;
         private final KeyBinding key;
         private final Factory factory;
+        private final boolean fromWorld;
         private final PageTab tab;
         private PageContent content;
 
         Page(String id, String titleKey, ItemStack icon,
-             Window.ScreenFill firstFill, KeyBinding key, Factory factory) {
+             Window.ScreenFill firstFill, KeyBinding key, Factory factory,
+             boolean fromWorld) {
             this.id = id;
             this.titleKey = titleKey;
             this.icon = icon;
             this.firstFill = firstFill;
             this.key = key;
             this.factory = factory;
+            this.fromWorld = fromWorld;
             this.tab = new PageTab(this);
+        }
+
+        /**
+         * Whether the page stands for a thing in the world — a waystone —
+         * and opens only from it ({@link #registerWorldPage}).
+         */
+        public boolean opensFromWorld() {
+            return this.fromWorld;
         }
 
         /** Whether the page's key is bound to the keyboard's {@code keyCode}. */
@@ -124,22 +135,75 @@ public final class WindowPages {
                                              Window.ScreenFill firstFill,
                                              KeyBinding key,
                                              Factory factory) {
-        if (id == null || !id.matches("[a-z0-9_]{1,24}") || titleKey == null
-                || icon == null || firstFill == null || factory == null
-                || PAGES.containsKey(id)) {
-            throw new IllegalArgumentException("Not a page, or one twice: " + id);
-        }
-        PAGES.put(id, new Page(id, titleKey, icon, firstFill, key, factory));
+        add(new Page(id, titleKey, icon, firstFill, key, factory, false));
     }
 
-    /** Whether a page no window holds can be opened again. */
+    /**
+     * Registers a page that stands for a thing in the world — a
+     * waystone — and opens only from it, never by a key: the {@code +}
+     * never offers it, the layout file leaves its tab out, and its tab
+     * closes as the player leaves the world, since the thing may be gone
+     * by the next visit.
+     */
+    public static synchronized void registerWorldPage(String id,
+                                                      String titleKey,
+                                                      ItemStack icon,
+                                                      Factory factory) {
+        add(new Page(id, titleKey, icon, Window.ScreenFill.NONE, null,
+                factory, true));
+    }
+
+    private static void add(Page page) {
+        if (page.id == null || !page.id.matches("[a-z0-9_]{1,24}")
+                || page.titleKey == null || page.icon == null
+                || page.firstFill == null || page.factory == null
+                || PAGES.containsKey(page.id)) {
+            throw new IllegalArgumentException("Not a page, or one twice: "
+                    + page.id);
+        }
+        PAGES.put(page.id, page);
+    }
+
+    /**
+     * Whether a page no window holds can be opened again: one the player
+     * opens, not one that opens from a thing in the world.
+     */
     public static boolean hasClosed() {
         for (Page page : all()) {
-            if (!WindowLayout.isOpen(page.tab()) && page.tab().isAvailable()) {
+            if (isOffered(page)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /** Whether the {@code +} offers the page: opened by the player, closed, and shown now. */
+    static boolean isOffered(Page page) {
+        return !page.opensFromWorld() && !WindowLayout.isOpen(page.tab())
+                && page.tab().isAvailable();
+    }
+
+    /**
+     * Leaving the world closes every page that stands for a thing in it,
+     * locked window or not; a window left empty goes. Not written: such a
+     * tab is never in the layout file.
+     */
+    public static void closeWorldPages() {
+        final List<PageTab> bound = new ArrayList<PageTab>();
+        for (Page page : all()) {
+            if (page.opensFromWorld() && WindowLayout.isOpen(page.tab())) {
+                bound.add(page.tab());
+            }
+        }
+        if (bound.isEmpty()) {
+            return;
+        }
+        WindowLayout.removeTabs(new WindowLayout.TabFilter() {
+            @Override
+            public boolean matches(WindowTab tab) {
+                return bound.contains(tab);
+            }
+        });
     }
 
     /** The page registered under {@code id}; null for none. */

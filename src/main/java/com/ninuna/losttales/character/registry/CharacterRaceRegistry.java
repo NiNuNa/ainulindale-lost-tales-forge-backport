@@ -1,5 +1,6 @@
 package com.ninuna.losttales.character.registry;
 
+import com.ninuna.losttales.util.LostTalesIdentifiers;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -8,7 +9,6 @@ import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -111,7 +111,7 @@ public final class CharacterRaceRegistry {
     private CharacterRaceRegistry() {}
 
     public static CharacterRaceDefinition get(String id) {
-        return DEFINITIONS.get(normalizeIdentifier(id));
+        return DEFINITIONS.get(LostTalesIdentifiers.normalize(id));
     }
 
     public static Collection<CharacterRaceDefinition> getAll() {
@@ -127,17 +127,13 @@ public final class CharacterRaceRegistry {
         if (definition == null) {
             return "";
         }
-        String normalizedGender = CharacterGenderRegistry.normalizeIdentifier(genderId);
+        String normalizedGender = LostTalesIdentifiers.normalize(genderId);
         if (definition.isGenderAllowed(normalizedGender)) {
             return normalizedGender;
         }
         return definition.hasGenderedModels()
                 ? CharacterGenderRegistry.MALE
                 : CharacterGenderRegistry.NON_BINARY;
-    }
-
-    public static String normalizeIdentifier(String id) {
-        return id == null ? "" : id.trim().toLowerCase(Locale.ROOT);
     }
 
     private static CharacterRaceDefinition definition(
@@ -228,7 +224,7 @@ public final class CharacterRaceRegistry {
 
     private static void register(Map<String, CharacterRaceDefinition> definitions,
                                  CharacterRaceDefinition definition) {
-        String id = normalizeIdentifier(definition.getId());
+        String id = LostTalesIdentifiers.normalize(definition.getId());
         if (!id.equals(definition.getId())) {
             throw new IllegalArgumentException("Race ID is not canonical: " + definition.getId());
         }

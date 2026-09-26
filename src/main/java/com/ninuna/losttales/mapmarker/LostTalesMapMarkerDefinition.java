@@ -39,64 +39,10 @@ public final class LostTalesMapMarkerDefinition {
     private final int priority;
 
     public LostTalesMapMarkerDefinition(String id, String name, String iconName, String colorName, int dimensionId, double x, double y, double z, boolean hiddenUntilDiscovered) {
-        this(id, name, iconName, colorName, CATEGORY_DEFAULT, false, dimensionId, x, y, z, 128.0D, 8.0D, hiddenUntilDiscovered, hiddenUntilDiscovered);
-    }
-
-    public LostTalesMapMarkerDefinition(String id, String name, String iconName, String colorName, String categoryName, boolean hasFastTravel, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered) {
-        this(id, name, iconName, colorName, categoryName, hasFastTravel, dimensionId, x, y, z, compassFadeInRadius, discoveryRadius, hiddenUntilDiscovered, hiddenUntilDiscovered);
-    }
-
-    public LostTalesMapMarkerDefinition(String id, String name, String iconName, String colorName, String categoryName, boolean hasFastTravel, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable) {
-        this(id, name, iconName, colorName, categoryName, "",
-                hasFastTravel, dimensionId, x, y, z,
-                compassFadeInRadius, discoveryRadius,
-                hiddenUntilDiscovered, discoverable);
-    }
-
-    public LostTalesMapMarkerDefinition(String id, String name, String iconName, String colorName, String categoryName, boolean hasFastTravel, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable, boolean requiresRegionUnlock) {
-        this(id, name, iconName, colorName, categoryName, "",
-                hasFastTravel, dimensionId, x, y, z,
-                compassFadeInRadius, discoveryRadius,
-                hiddenUntilDiscovered, discoverable,
-                requiresRegionUnlock);
-    }
-
-    public LostTalesMapMarkerDefinition(String id, String name, String iconName, String colorName, String categoryName, String description, boolean hasFastTravel, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable) {
-        this(id, name, iconName, colorName, categoryName, description,
-                hasFastTravel, dimensionId,
-                x, y, z, compassFadeInRadius, discoveryRadius,
-                hiddenUntilDiscovered, discoverable, false);
-    }
-
-    public LostTalesMapMarkerDefinition(String id, String name, String iconName, String colorName, String categoryName, String description, boolean hasFastTravel, int dimensionId, double x, double y, double z, double compassFadeInRadius, double discoveryRadius, boolean hiddenUntilDiscovered, boolean discoverable, boolean requiresRegionUnlock) {
-        this(id, name, iconName, colorName, categoryName, description,
-                hasFastTravel, dimensionId,
-                x, y, z, compassFadeInRadius, discoveryRadius,
-                hiddenUntilDiscovered, discoverable, requiresRegionUnlock,
-                LostTalesMapMarkerSource.QUEST_DYNAMIC, false, "");
-    }
-
-    public LostTalesMapMarkerDefinition(String id, String name,
-                                        String iconName, String colorName,
-                                        String categoryName,
-                                        String description,
-                                        boolean hasFastTravel,
-                                        int dimensionId,
-                                        double x, double y, double z,
-                                        double compassFadeInRadius,
-                                        double discoveryRadius,
-                                        boolean hiddenUntilDiscovered,
-                                        boolean discoverable,
-                                        boolean requiresRegionUnlock,
-                                        LostTalesMapMarkerSource source,
-                                        boolean hasWaystone,
-                                        String waystoneStructureType) {
-        this(id, name, iconName, colorName, categoryName, description,
-                hasFastTravel, dimensionId, x, y, z,
-                compassFadeInRadius, discoveryRadius,
-                hiddenUntilDiscovered, discoverable,
-                requiresRegionUnlock, source, hasWaystone,
-                waystoneStructureType, 0);
+        this(id, name, iconName, colorName, CATEGORY_DEFAULT, "", false,
+                dimensionId, x, y, z, 128.0D, 8.0D,
+                hiddenUntilDiscovered, hiddenUntilDiscovered, false,
+                LostTalesMapMarkerSource.QUEST_DYNAMIC, false, "", 0);
     }
 
     public LostTalesMapMarkerDefinition(String id, String name,

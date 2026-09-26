@@ -1,7 +1,7 @@
 package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.chat.ChatChannel;
-import com.ninuna.losttales.client.chat.ChatLayout;
+import com.ninuna.losttales.client.chat.TwoWindowLayout;
 import com.ninuna.losttales.client.chat.ChatTab;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -22,7 +22,7 @@ public final class TabSelectionTest {
 
     @Before
     public void setUp() {
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
         TabSelection.clear();
         this.window = WindowLayout.window("w2");
         // A snapshot: the window's own list is live, and these tests
@@ -33,7 +33,7 @@ public final class TabSelectionTest {
     @After
     public void tearDown() {
         TabSelection.clear();
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
     }
 
     @Test

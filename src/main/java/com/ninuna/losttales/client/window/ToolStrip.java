@@ -163,7 +163,7 @@ public final class ToolStrip {
                 new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
         /** The magnifier crossing over to the cross as a search stands in the well. */
         final MotionTransition clearing =
-                new MotionTransition(MotionIds.CHAT_SEARCH_CLEAR);
+                new MotionTransition(MotionIds.WINDOW_SEARCH_CLEAR);
     }
 
     private GuiTextField field;

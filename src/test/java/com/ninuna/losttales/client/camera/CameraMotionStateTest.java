@@ -213,8 +213,9 @@ public final class CameraMotionStateTest {
     private static CameraMotionProfile idleOnlyProfile() {
         return new CameraMotionProfile(
                 0.5D, 0.25D,
-                0.0D, 0.0D, 0.0D, 0.0D,
-                0.8D, 10.0D,
+                0.0D, 0.0D, 0.0D,
+                0.0D, 0.0D, 0.0D,
+                10.0D, 240.0D, 0.8D, 10.0D,
                 0.035D, 0.022D, 0.014D, 0.11D);
     }
 

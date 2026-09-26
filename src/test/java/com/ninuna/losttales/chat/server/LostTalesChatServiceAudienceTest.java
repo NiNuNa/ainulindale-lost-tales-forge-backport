@@ -141,7 +141,7 @@ public final class LostTalesChatServiceAudienceTest {
     private static List<LostTalesChatMessagePacket> replay(
             UUID account, String factionId, long createdAt, UUID partyId,
             List<ChatChannel> readable) {
-        return ChatHistory.replayFor(new ChatHistory.Requester(account, factionId,
+        return ChatHistory.replayFor(ChatHistoryRequesters.oneFaction(account, factionId,
                 createdAt, partyId, readable), ChatMessageIds.NONE);
     }
 }

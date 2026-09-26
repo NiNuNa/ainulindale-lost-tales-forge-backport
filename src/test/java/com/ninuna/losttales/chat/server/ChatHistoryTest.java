@@ -7,6 +7,7 @@ import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatTabIds;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.network.packet.ChatPacketFixtures;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.Arrays;
 import java.util.Collections;
@@ -397,9 +398,9 @@ public final class ChatHistoryTest {
     public void anOpenChannelReplaysToAnyoneAndTheSenderGetsTheirOwnCopy() {
         long id = ChatMessageIdAllocator.next();
         LostTalesChatMessagePacket shared = line(id, ChatChannel.GLOBAL, ALICE, "hail");
-        LostTalesChatMessagePacket own = new LostTalesChatMessagePacket(ChatChannel.GLOBAL,
-                ALICE, "Aldric", "alice", "", 0, 0, "hail", SENT_AT, "", null, "", "", 0,
-                false, id, ChatReplyReference.NONE, "", 77L);
+        LostTalesChatMessagePacket own = ChatPacketFixtures.line(
+                ChatChannel.GLOBAL, "Aldric", "alice", "hail").sender(ALICE).colors(0, 0)
+                .at(SENT_AT).accountLine(false).messageId(id).echoNonce(77L).build();
         ChatHistory.record(id, ALICE, "Aldric", own, shared,
                 Collections.singletonList(ALICE), ChatHistory.Audience.everyone());
         assertEquals(77L, ChatHistory.replayFor(requester(ALICE), ChatMessageIds.NONE)
@@ -424,15 +425,15 @@ public final class ChatHistoryTest {
         record(ChatChannel.PARTY, ALICE, "form up", Arrays.asList(ALICE, BOB),
                 ChatHistory.Audience.party(PARTY, Arrays.asList(ALICE, BOB)));
         assertEquals(1, ChatHistory.replayFor(
-                new ChatHistory.Requester(BOB, "", 0L, PARTY, EVERY_CHANNEL),
+                ChatHistoryRequesters.oneFaction(BOB, "", 0L, PARTY, EVERY_CHANNEL),
                 ChatMessageIds.NONE).size());
         // Bob has since left the party.
         assertTrue(ChatHistory.replayFor(
-                new ChatHistory.Requester(BOB, "", 0L, null, EVERY_CHANNEL),
+                ChatHistoryRequesters.oneFaction(BOB, "", 0L, null, EVERY_CHANNEL),
                 ChatMessageIds.NONE).isEmpty());
         // Carol joined it afterwards.
         assertTrue(ChatHistory.replayFor(
-                new ChatHistory.Requester(CAROL, "", 0L, PARTY, EVERY_CHANNEL),
+                ChatHistoryRequesters.oneFaction(CAROL, "", 0L, PARTY, EVERY_CHANNEL),
                 ChatMessageIds.NONE).isEmpty());
     }
 
@@ -443,18 +444,18 @@ public final class ChatHistoryTest {
                 ChatHistory.Audience.faction(GONDOR, false));
         // A Gondor character made before the line: shown it, online then or not.
         assertEquals(1, ChatHistory.replayFor(
-                new ChatHistory.Requester(CAROL, GONDOR, SENT_AT - 1L, null, EVERY_CHANNEL),
+                ChatHistoryRequesters.oneFaction(CAROL, GONDOR, SENT_AT - 1L, null, EVERY_CHANNEL),
                 ChatMessageIds.NONE).size());
         // A Gondor character made after it: not in the faction when it was said.
         assertTrue(ChatHistory.replayFor(
-                new ChatHistory.Requester(CAROL, GONDOR, SENT_AT + 1L, null, EVERY_CHANNEL),
+                ChatHistoryRequesters.oneFaction(CAROL, GONDOR, SENT_AT + 1L, null, EVERY_CHANNEL),
                 ChatMessageIds.NONE).isEmpty());
         // Another faction, or the account with none.
         assertTrue(ChatHistory.replayFor(
-                new ChatHistory.Requester(CAROL, "MORDOR", 0L, null, EVERY_CHANNEL),
+                ChatHistoryRequesters.oneFaction(CAROL, "MORDOR", 0L, null, EVERY_CHANNEL),
                 ChatMessageIds.NONE).isEmpty());
         assertTrue(ChatHistory.replayFor(
-                new ChatHistory.Requester(CAROL, "", 0L, null, EVERY_CHANNEL),
+                ChatHistoryRequesters.oneFaction(CAROL, "", 0L, null, EVERY_CHANNEL),
                 ChatMessageIds.NONE).isEmpty());
     }
 
@@ -466,7 +467,7 @@ public final class ChatHistoryTest {
         assertEquals(1, ChatHistory.replayFor(requester(BOB), ChatMessageIds.NONE).size());
         // Bob was an operator then but is not any more.
         assertTrue(ChatHistory.replayFor(
-                new ChatHistory.Requester(BOB, "", 0L, null,
+                ChatHistoryRequesters.oneFaction(BOB, "", 0L, null,
                         Collections.singletonList(ChatChannel.GLOBAL)),
                 ChatMessageIds.NONE).isEmpty());
         // Carol was not sent it but is an operator now: the channel's past is hers.
@@ -612,7 +613,7 @@ public final class ChatHistoryTest {
     /* ---- helpers ---- */
 
     private static ChatHistory.Requester requester(UUID account) {
-        return new ChatHistory.Requester(account, "", 0L, null, EVERY_CHANNEL);
+        return ChatHistoryRequesters.oneFaction(account, "", 0L, null, EVERY_CHANNEL);
     }
 
     /** As below, with the conversation of a scoped channel stamped on the line. */
@@ -630,7 +631,7 @@ public final class ChatHistoryTest {
     /* ---- reactions ---- */
 
     private static ChatHistory.Requester reader(UUID account) {
-        return new ChatHistory.Requester(account, "", 0L, null, EVERY_CHANNEL);
+        return ChatHistoryRequesters.oneFaction(account, "", 0L, null, EVERY_CHANNEL);
     }
 
     @Test

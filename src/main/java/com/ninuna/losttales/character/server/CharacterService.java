@@ -44,10 +44,6 @@ public final class CharacterService {
     private final CharacterFactionResolver factionResolver;
     private final CharacterCapeEligibilityPolicy capeEligibilityPolicy;
 
-    public CharacterService(CharacterFactionResolver factionResolver) {
-        this(factionResolver, new AllowlistedCharacterCapeEligibilityPolicy());
-    }
-
     public CharacterService(CharacterFactionResolver factionResolver,
                             CharacterCapeEligibilityPolicy capeEligibilityPolicy) {
         if (factionResolver == null) {

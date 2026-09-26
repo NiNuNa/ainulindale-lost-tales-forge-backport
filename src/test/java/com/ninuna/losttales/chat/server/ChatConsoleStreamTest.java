@@ -1,6 +1,7 @@
 package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.chat.ChatConsoleEvent;
+import com.ninuna.losttales.chat.ChatConsoleFixtures;
 import java.util.List;
 import org.junit.After;
 import org.junit.Before;
@@ -51,14 +52,15 @@ public final class ChatConsoleStreamTest {
     @Test
     public void anEventHasAKindASeverityAndSomethingToSay() {
         try {
-            new ChatConsoleEvent(1L, 1L, null, ChatConsoleEvent.Severity.INFO, "a", "b");
+            ChatConsoleFixtures.entry(1L, 1L, null, ChatConsoleEvent.Severity.INFO, "a", "b");
             assertTrue(false);
         } catch (IllegalArgumentException expected) {
             // no kind
         }
         try {
-            new ChatConsoleEvent(1L, 1L, ChatConsoleEvent.Kind.COMMAND,
-                    ChatConsoleEvent.Severity.INFO, "a", "   ");
+            ChatConsoleFixtures.entry(
+                    1L, 1L, ChatConsoleEvent.Kind.COMMAND, ChatConsoleEvent.Severity.INFO, "a",
+                    "   ");
             assertTrue(false);
         } catch (IllegalArgumentException expected) {
             // nothing said
@@ -67,19 +69,18 @@ public final class ChatConsoleStreamTest {
         for (int index = 0; index < ChatConsoleEvent.MAX_TEXT_LENGTH + 50; index++) {
             long_.append('x');
         }
-        ChatConsoleEvent clipped = new ChatConsoleEvent(1L, 1L, ChatConsoleEvent.Kind.COMMAND,
-                ChatConsoleEvent.Severity.INFO, null, long_.toString());
+        ChatConsoleEvent clipped = ChatConsoleFixtures.entry(
+                1L, 1L, ChatConsoleEvent.Kind.COMMAND, ChatConsoleEvent.Severity.INFO, null,
+                long_.toString());
         assertEquals(ChatConsoleEvent.MAX_TEXT_LENGTH, clipped.getText().length());
         assertEquals("", clipped.getActor());
         // Only a command has a context, and only a printable one.
-        assertEquals("global", new ChatConsoleEvent(1L, 1L, ChatConsoleEvent.Kind.COMMAND,
-                ChatConsoleEvent.Severity.INFO, "a", "/x", " global ").getContext());
-        assertEquals("", new ChatConsoleEvent(1L, 1L, ChatConsoleEvent.Kind.SERVER,
-                ChatConsoleEvent.Severity.INFO, "a", "started", "global").getContext());
-        assertEquals("", new ChatConsoleEvent(1L, 1L, ChatConsoleEvent.Kind.COMMAND,
-                ChatConsoleEvent.Severity.INFO, "a", "/x", "global\nooc").getContext());
-        assertEquals("", new ChatConsoleEvent(1L, 1L, ChatConsoleEvent.Kind.COMMAND,
-                ChatConsoleEvent.Severity.INFO, "a", "/x", null).getContext());
+        assertEquals("global", ChatConsoleFixtures.command(1L, 1L, "a", "/x", " global ").getContext());
+        assertEquals("", new ChatConsoleEvent(
+                1L, 1L, ChatConsoleEvent.Kind.SERVER, ChatConsoleEvent.Severity.INFO, "a",
+                "started", "global", null, null).getContext());
+        assertEquals("", ChatConsoleFixtures.command(1L, 1L, "a", "/x", "global\nooc").getContext());
+        assertEquals("", ChatConsoleFixtures.command(1L, 1L, "a", "/x", null).getContext());
         assertEquals(ChatConsoleEvent.Kind.WARNING, ChatConsoleEvent.Kind.fromOrdinal(5));
         assertEquals(null, ChatConsoleEvent.Kind.fromOrdinal(99));
         assertEquals(null, ChatConsoleEvent.Severity.fromOrdinal(-1));
@@ -127,14 +128,18 @@ public final class ChatConsoleStreamTest {
     @Test
     public void restoredEventsComeBackOnceEachAndMoveTheAllocatorOn() {
         List<ChatConsoleEvent> kept = new java.util.ArrayList<ChatConsoleEvent>();
-        kept.add(new ChatConsoleEvent(30L, 30L, ChatConsoleEvent.Kind.SERVER,
-                ChatConsoleEvent.Severity.INFO, "Server", "third"));
-        kept.add(new ChatConsoleEvent(10L, 10L, ChatConsoleEvent.Kind.SERVER,
-                ChatConsoleEvent.Severity.INFO, "Server", "first"));
-        kept.add(new ChatConsoleEvent(20L, 20L, ChatConsoleEvent.Kind.SERVER,
-                ChatConsoleEvent.Severity.INFO, "Server", "second"));
-        kept.add(new ChatConsoleEvent(20L, 21L, ChatConsoleEvent.Kind.SERVER,
-                ChatConsoleEvent.Severity.INFO, "Server", "second again"));
+        kept.add(ChatConsoleFixtures.entry(
+                30L, 30L, ChatConsoleEvent.Kind.SERVER, ChatConsoleEvent.Severity.INFO, "Server",
+                "third"));
+        kept.add(ChatConsoleFixtures.entry(
+                10L, 10L, ChatConsoleEvent.Kind.SERVER, ChatConsoleEvent.Severity.INFO, "Server",
+                "first"));
+        kept.add(ChatConsoleFixtures.entry(
+                20L, 20L, ChatConsoleEvent.Kind.SERVER, ChatConsoleEvent.Severity.INFO, "Server",
+                "second"));
+        kept.add(ChatConsoleFixtures.entry(
+                20L, 21L, ChatConsoleEvent.Kind.SERVER, ChatConsoleEvent.Severity.INFO, "Server",
+                "second again"));
         kept.add(null);
         assertEquals(3, ChatConsoleStream.restore(kept,
                 java.util.Collections.<Long, ChatReactions>emptyMap()));
@@ -152,8 +157,9 @@ public final class ChatConsoleStreamTest {
 
     private static long record(String text) {
         long id = ChatMessageIdAllocator.next();
-        ChatConsoleStream.record(new ChatConsoleEvent(id, id, ChatConsoleEvent.Kind.COMMAND,
-                ChatConsoleEvent.Severity.INFO, "Steve", text));
+        ChatConsoleStream.record(ChatConsoleFixtures.entry(
+                id, id, ChatConsoleEvent.Kind.COMMAND, ChatConsoleEvent.Severity.INFO, "Steve",
+                text));
         return id;
     }
 
@@ -164,18 +170,18 @@ public final class ChatConsoleStreamTest {
     @Test
     public void anEntryTakesReactionsAndLosesThemWithItself() {
         java.util.UUID reader = java.util.UUID.randomUUID();
-        ChatConsoleStream.record(new ChatConsoleEvent(5L, 5L,
-                ChatConsoleEvent.Kind.SERVER, ChatConsoleEvent.Severity.INFO,
-                "Server", "Server started"));
+        ChatConsoleStream.record(ChatConsoleFixtures.entry(
+                5L, 5L, ChatConsoleEvent.Kind.SERVER, ChatConsoleEvent.Severity.INFO, "Server",
+                "Server started"));
         assertTrue(ChatConsoleStream.react(5L, reader, "Nils", "grinning", true));
         assertFalse(ChatConsoleStream.react(5L, reader, "Nils", "grinning", true));
         assertFalse(ChatConsoleStream.react(6L, reader, "Nils", "grinning", true));
         assertEquals(1, ChatConsoleStream.reactionsFor(5L, reader)
                 .getReactions().size());
         for (long id = 10L; id < 10L + ChatConsoleStream.MAX_EVENTS; id++) {
-            ChatConsoleStream.record(new ChatConsoleEvent(id, id,
-                    ChatConsoleEvent.Kind.SERVER, ChatConsoleEvent.Severity.INFO,
-                    "Server", "tick"));
+            ChatConsoleStream.record(ChatConsoleFixtures.entry(
+                    id, id, ChatConsoleEvent.Kind.SERVER, ChatConsoleEvent.Severity.INFO, "Server",
+                    "tick"));
         }
         assertNull(ChatConsoleStream.find(5L));
         assertTrue(ChatConsoleStream.reactionsFor(5L, reader).isEmpty());

@@ -26,10 +26,6 @@ public final class CharacterStateNbtUtil {
         return output.size();
     }
 
-    public static boolean isFinite(float value) {
-        return !Float.isNaN(value) && !Float.isInfinite(value);
-    }
-
     public static float clamp(float value, float minimum, float maximum) {
         return Math.max(minimum, Math.min(maximum, value));
     }

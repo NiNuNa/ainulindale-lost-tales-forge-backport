@@ -1,7 +1,6 @@
 package com.ninuna.losttales.world.waystone;
 
-import com.ninuna.losttales.LostTalesMetaData;
-import cpw.mods.fml.common.FMLLog;
+import com.ninuna.losttales.util.LostTalesLog;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -22,7 +21,7 @@ public final class LostTalesWaystoneStructureRegistry {
         try {
             register(new LostTalesGlowstoneHouseWaystonePlacer());
         } catch (RuntimeException exception) {
-            warn("Failed to register glowstone-house waystone structure: %s",
+            LostTalesLog.warning("Failed to register glowstone-house waystone structure: %s",
                     exception.getMessage());
         }
     }
@@ -54,17 +53,5 @@ public final class LostTalesWaystoneStructureRegistry {
         return Collections.unmodifiableMap(
                 new LinkedHashMap<String, LostTalesWaystoneStructurePlacer>(
                         PLACERS));
-    }
-
-    private static void warn(String format, Object... args) {
-        Object[] values = new Object[
-                (args == null ? 0 : args.length) + 1];
-        values[0] = LostTalesMetaData.MOD_ID;
-        if (args != null) {
-            System.arraycopy(args, 0, values, 1, args.length);
-        }
-        try {
-            FMLLog.warning("[%s] " + format, values);
-        } catch (RuntimeException ignored) {}
     }
 }

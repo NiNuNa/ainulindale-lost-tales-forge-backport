@@ -1,5 +1,6 @@
 package com.ninuna.losttales.compat.discord.gateway;
 
+import com.ninuna.losttales.util.LostTalesCloseables;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -84,10 +85,10 @@ public final class DiscordWebSocket {
             readHandshakeReply(in, DiscordWebSocketFrames.handshakeAccept(key));
             return new DiscordWebSocket(socket, in, out);
         } catch (IOException failure) {
-            closeQuietly(socket);
+            LostTalesCloseables.closeQuietly(socket);
             throw failure;
         } catch (RuntimeException failure) {
-            closeQuietly(socket);
+            LostTalesCloseables.closeQuietly(socket);
             throw new IOException("websocket handshake failed: " + failure, failure);
         }
     }
@@ -204,14 +205,6 @@ public final class DiscordWebSocket {
 
     public void close() {
         this.closed = true;
-        closeQuietly(this.socket);
-    }
-
-    private static void closeQuietly(Socket socket) {
-        try {
-            socket.close();
-        } catch (IOException ignored) {
-            // Nothing left to do with it.
-        }
+        LostTalesCloseables.closeQuietly(this.socket);
     }
 }

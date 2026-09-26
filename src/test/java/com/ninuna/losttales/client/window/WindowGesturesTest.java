@@ -1,7 +1,7 @@
 package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.chat.ChatChannel;
-import com.ninuna.losttales.client.chat.ChatLayout;
+import com.ninuna.losttales.client.chat.TwoWindowLayout;
 import com.ninuna.losttales.client.chat.ChatTab;
 import com.ninuna.losttales.client.chat.ClientChatChannelState;
 import java.util.Arrays;
@@ -21,7 +21,7 @@ public final class WindowGesturesTest {
 
     @Before
     public void setUp() {
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
         ClientChatChannelState.clear();
         this.frame = WindowFrame.of(WindowLayout.windows().get(0));
         this.frame.drawn = true;
@@ -33,7 +33,7 @@ public final class WindowGesturesTest {
 
     @After
     public void tearDown() {
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
         ClientChatChannelState.clear();
     }
 

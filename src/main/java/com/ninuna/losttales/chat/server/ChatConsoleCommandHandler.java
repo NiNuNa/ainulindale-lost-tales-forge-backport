@@ -43,7 +43,7 @@ public final class ChatConsoleCommandHandler {
                     ((EntityPlayerMP)sender).getUniqueID(),
                     System.currentTimeMillis());
         } else if (sender instanceof MinecraftServer) {
-            actor = "Server";
+            actor = LostTalesServerBroadcastHook.SERVER_NAME;
         } else {
             return;
         }

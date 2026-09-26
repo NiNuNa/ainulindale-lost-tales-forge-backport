@@ -7,17 +7,14 @@ import io.netty.buffer.ByteBuf;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * The bounds the character packet family holds its fields to, and the
- * primitives it reads and writes them with.
+ * profile its packets carry within them.
  *
- * <p>The limits are this family's own; the reading and writing is every
- * family's, and lives in {@link LostTalesPacketCodec}. Nothing here does
- * any work of its own, so a decode primitive can only be hardened in one
- * place — the two families kept a copy each until they drifted over
- * whether a null buffer was a truncated packet.</p>
+ * <p>The limits are this family's own; the reading and writing of every
+ * field is every family's, and lives in {@link LostTalesPacketCodec}, so a
+ * decode primitive is hardened in one place.</p>
  */
 final class CharacterPacketCodec {
 
@@ -36,34 +33,6 @@ final class CharacterPacketCodec {
 
     private CharacterPacketCodec() {}
 
-    static String readString(ByteBuf buffer, int maximumBytes) {
-        return LostTalesPacketCodec.readShortFramedString(buffer, maximumBytes);
-    }
-
-    static void writeString(ByteBuf buffer, String value, int maximumBytes) {
-        LostTalesPacketCodec.writeShortFramedString(buffer, value, maximumBytes);
-    }
-
-    static UUID readUuid(ByteBuf buffer) {
-        return LostTalesPacketCodec.readUuid(buffer);
-    }
-
-    static UUID readNullableUuid(ByteBuf buffer) {
-        return LostTalesPacketCodec.readNullableUuid(buffer);
-    }
-
-    static void writeUuid(ByteBuf buffer, UUID value) {
-        LostTalesPacketCodec.writeUuid(buffer, value);
-    }
-
-    static void writeNullableUuid(ByteBuf buffer, UUID value) {
-        LostTalesPacketCodec.writeNullableUuid(buffer, value);
-    }
-
-    static void requireFinished(ByteBuf buffer) {
-        LostTalesPacketCodec.requireFinished(buffer);
-    }
-
     /**
      * A profile on the wire: the About texts in order, the facts in
      * order, a count of glances and each one's emoji, title and line. The
@@ -72,16 +41,16 @@ final class CharacterPacketCodec {
      */
     static void writeProfile(ByteBuf buffer, CharacterProfile profile) {
         for (CharacterProfile.Section section : CharacterProfile.Section.values()) {
-            writeString(buffer, profile.section(section), MAX_SECTION_BYTES);
+            LostTalesPacketCodec.writeUtf8String(buffer, profile.section(section), MAX_SECTION_BYTES);
         }
         for (CharacterProfile.Fact fact : CharacterProfile.Fact.values()) {
-            writeString(buffer, profile.fact(fact), MAX_FACT_BYTES);
+            LostTalesPacketCodec.writeUtf8String(buffer, profile.fact(fact), MAX_FACT_BYTES);
         }
         buffer.writeByte(profile.glances().size());
         for (CharacterProfile.Glance glance : profile.glances()) {
-            writeString(buffer, glance.getEmoji(), MAX_GLANCE_EMOJI_BYTES);
-            writeString(buffer, glance.getTitle(), MAX_GLANCE_TITLE_BYTES);
-            writeString(buffer, glance.getLine(), MAX_GLANCE_LINE_BYTES);
+            LostTalesPacketCodec.writeUtf8String(buffer, glance.getEmoji(), MAX_GLANCE_EMOJI_BYTES);
+            LostTalesPacketCodec.writeUtf8String(buffer, glance.getTitle(), MAX_GLANCE_TITLE_BYTES);
+            LostTalesPacketCodec.writeUtf8String(buffer, glance.getLine(), MAX_GLANCE_LINE_BYTES);
         }
     }
 
@@ -89,10 +58,10 @@ final class CharacterPacketCodec {
         CharacterProfile profile = CharacterProfile.EMPTY;
         for (CharacterProfile.Section section : CharacterProfile.Section.values()) {
             profile = profile.withSection(section,
-                    readString(buffer, MAX_SECTION_BYTES));
+                    LostTalesPacketCodec.readUtf8String(buffer, MAX_SECTION_BYTES));
         }
         for (CharacterProfile.Fact fact : CharacterProfile.Fact.values()) {
-            profile = profile.withFact(fact, readString(buffer, MAX_FACT_BYTES));
+            profile = profile.withFact(fact, LostTalesPacketCodec.readUtf8String(buffer, MAX_FACT_BYTES));
         }
         int count = buffer.readUnsignedByte();
         if (count > CharacterProfile.MAX_GLANCES) {
@@ -102,9 +71,9 @@ final class CharacterPacketCodec {
                 new ArrayList<CharacterProfile.Glance>(count);
         for (int index = 0; index < count; index++) {
             glances.add(new CharacterProfile.Glance(
-                    readString(buffer, MAX_GLANCE_EMOJI_BYTES),
-                    readString(buffer, MAX_GLANCE_TITLE_BYTES),
-                    readString(buffer, MAX_GLANCE_LINE_BYTES)));
+                    LostTalesPacketCodec.readUtf8String(buffer, MAX_GLANCE_EMOJI_BYTES),
+                    LostTalesPacketCodec.readUtf8String(buffer, MAX_GLANCE_TITLE_BYTES),
+                    LostTalesPacketCodec.readUtf8String(buffer, MAX_GLANCE_LINE_BYTES)));
         }
         return profile.withGlances(glances);
     }

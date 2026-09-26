@@ -50,12 +50,6 @@ public final class LostTalesThirdPersonEntityActionPacket
 
     public LostTalesThirdPersonEntityActionPacket(
             Action action, int entityId,
-            double hitX, double hitY, double hitZ) {
-        this(action, entityId, hitX, hitY, hitZ, false);
-    }
-
-    public LostTalesThirdPersonEntityActionPacket(
-            Action action, int entityId,
             double hitX, double hitY, double hitZ,
             boolean useItemIfInteractionDeclines) {
         this.action = action;
@@ -78,9 +72,9 @@ public final class LostTalesThirdPersonEntityActionPacket
             this.useItemIfInteractionDeclines = buffer.readBoolean();
             LostTalesPacketCodec.requireFinished(buffer);
             if (this.action == null || this.entityId < 0
-                    || !isFinite(this.hitX)
-                    || !isFinite(this.hitY)
-                    || !isFinite(this.hitZ)) {
+                    || !Double.isFinite(this.hitX)
+                    || !Double.isFinite(this.hitY)
+                    || !Double.isFinite(this.hitZ)) {
                 throw new LostTalesPacketCodec.DecodeException(
                         "invalid third-person entity action");
             }
@@ -100,10 +94,6 @@ public final class LostTalesThirdPersonEntityActionPacket
         buffer.writeDouble(this.hitY);
         buffer.writeDouble(this.hitZ);
         buffer.writeBoolean(this.useItemIfInteractionDeclines);
-    }
-
-    private static boolean isFinite(double value) {
-        return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 
     Action getActionForTest() {

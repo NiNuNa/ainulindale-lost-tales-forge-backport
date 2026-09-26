@@ -397,16 +397,6 @@ public final class ChatReactions {
         return this.byEmoji.isEmpty();
     }
 
-    /** Whether any emoji reacted with is a foreign one. */
-    public boolean hasForeign() {
-        for (String emoji : this.byEmoji.keySet()) {
-            if (ChatForeignEmoji.isForeign(emoji)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     /** Reactions in all, every emoji together. */
     public int total() {
         int total = 0;

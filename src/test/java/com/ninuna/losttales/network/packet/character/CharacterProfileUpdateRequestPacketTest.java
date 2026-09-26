@@ -3,6 +3,7 @@ package com.ninuna.losttales.network.packet.character;
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
+import cpw.mods.fml.common.network.ByteBufUtils;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import org.junit.Test;
@@ -183,14 +184,14 @@ public final class CharacterProfileUpdateRequestPacketTest {
         buffer.writeLong(revision);
         buffer.writeLong(characterId.getMostSignificantBits());
         buffer.writeLong(characterId.getLeastSignificantBits());
-        buffer.writeShort(appearanceBytes);
+        ByteBufUtils.writeVarInt(buffer, appearanceBytes, 2);
         for (int i = 0; i < appearanceBytes; i++) {
             buffer.writeByte('a');
         }
         int emptyStrings = CharacterProfile.Section.values().length - 1
                 + CharacterProfile.Fact.values().length;
         for (int i = 0; i < emptyStrings; i++) {
-            buffer.writeShort(0);
+            ByteBufUtils.writeVarInt(buffer, 0, 2);
         }
         buffer.writeByte(glances);
         buffer.writeInt(20);

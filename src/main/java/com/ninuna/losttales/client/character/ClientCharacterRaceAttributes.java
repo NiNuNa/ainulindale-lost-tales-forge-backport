@@ -25,7 +25,7 @@ public final class ClientCharacterRaceAttributes {
     }
 
     public static String formatEyeHeight(CharacterRaceGameplayProfile profile) {
-        return format(safe(profile).getEyeHeight(), 2);
+        return format(safe(profile).getStandingEyeHeight(), 2);
     }
 
     public static String formatHealth(CharacterRaceGameplayProfile profile) {

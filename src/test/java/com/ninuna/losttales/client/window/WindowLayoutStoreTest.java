@@ -4,8 +4,10 @@ import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatRecipientRule;
 import com.ninuna.losttales.chat.ChatPresentationMode;
 import com.ninuna.losttales.chat.ChatChannelDescriptor;
+import com.ninuna.losttales.chat.ChatChannelScope;
 import com.ninuna.losttales.chat.ChatChannelAccess;
 import com.ninuna.losttales.client.chat.ChatLayout;
+import com.ninuna.losttales.client.chat.TwoWindowLayout;
 import com.ninuna.losttales.client.chat.ChatTab;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -32,22 +34,16 @@ public final class WindowLayoutStoreTest {
 
     @Before
     public void reset() {
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
     }
 
     @After
     public void cleanUp() {
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
         WindowLayout.setChangeListener(null);
         ChatChannel.resetToBuiltIn();
     }
 
-    /**
-     * A window filling a part of the screen names it in its line and
-     * keeps its own place and size beside it, which is what it goes
-     * back to; a window without the word is at its own size, and a part
-     * the build does not know reads as none.
-     */
     /**
      * A place's whisper tabs, open or closed by hand, are lines of their
      * own that survive the round trip and come back for that place only.
@@ -73,6 +69,12 @@ public final class WindowLayoutStoreTest {
         assertEquals(described, WindowLayoutStore.describe());
     }
 
+    /**
+     * A window filling a part of the screen names it in its line and
+     * keeps its own place and size beside it, which is what it goes
+     * back to; a window without the word is at its own size, and a part
+     * the build does not know reads as none.
+     */
     @Test
     public void aWindowFillingTheScreenRoundTrips() {
         WindowLayoutStore.load(Arrays.asList(
@@ -130,10 +132,7 @@ public final class WindowLayoutStoreTest {
         WindowLayoutStore.load(lines);
 
         ChatChannel.installDefined(Collections.singletonList(
-                new ChatChannelDescriptor("trade", "Trade",
-                        ChatPresentationMode.IN_CHARACTER,
-                        ChatRecipientRule.EVERYONE, ChatChannelAccess.NONE,
-                        0xC9A227, false)), null);
+                tradeChannel()), null);
         ChatChannel trade = ChatChannel.fromId("trade");
         assertNotNull(trade);
         assertFalse("the window was dropped when the file was read,"
@@ -177,6 +176,34 @@ public final class WindowLayoutStoreTest {
     }
 
     /**
+     * An account with no file yet starts with the first window, and its
+     * first change writes the file under the account's name.
+     */
+    @Test
+    public void aNewAccountsFirstChangeWritesItsFile() throws IOException {
+        UUID alex = UUID.fromString("d6000000-0000-0000-0000-00000000006d");
+        File folder = File.createTempFile("losttales-layout", "");
+        assertTrue(folder.delete());
+        assertTrue(folder.mkdirs());
+        try {
+            WindowLayoutStore.initialize(folder, alex);
+            Window window = WindowLayout.firstWindow();
+            assertNotNull("a new account has the first window", window);
+            assertTrue(WindowLayout.setPosition(window.getId(), 10.0D, 20.0D,
+                    true));
+            File own = WindowLayoutStore.fileFor(folder, alex);
+            assertTrue("the change is written", own.isFile());
+            List<String> written = Files.readAllLines(own.toPath(),
+                    Charset.forName("UTF-8"));
+            assertTrue(written.toString(), written.get(1).startsWith(
+                    "window " + window.getId() + " locked=false x=10.00 y=20.00"));
+        } finally {
+            WindowLayoutStore.initialize(null);
+            deleteTree(folder);
+        }
+    }
+
+    /**
      * Moving the feed before a server's channels are in force rewrites
      * only the file's feed line: a window on one of that server's
      * channels, which the layout could not place yet, stays in the file
@@ -208,10 +235,7 @@ public final class WindowLayoutStoreTest {
             assertFalse(written.toString(), written.contains("feed x=0.00 y=100.00"));
 
             ChatChannel.installDefined(Collections.singletonList(
-                    new ChatChannelDescriptor("trade", "Trade",
-                            ChatPresentationMode.IN_CHARACTER,
-                            ChatRecipientRule.EVERYONE, ChatChannelAccess.NONE,
-                            0xC9A227, false)), null);
+                    tradeChannel()), null);
             WindowLayoutStore.reload();
             assertTrue("the window is back with its channel",
                     holdsTrade(ChatChannel.fromId("trade")));
@@ -272,10 +296,7 @@ public final class WindowLayoutStoreTest {
         ChatLayout.close(ChatChannel.GLOBAL);
 
         ChatChannel.installDefined(Collections.singletonList(
-                new ChatChannelDescriptor("trade", "Trade",
-                        ChatPresentationMode.IN_CHARACTER,
-                        ChatRecipientRule.EVERYONE, ChatChannelAccess.NONE,
-                        0xC9A227, false)), null);
+                tradeChannel()), null);
         WindowLayoutStore.reload();
 
         assertFalse("the closed channel stays closed",
@@ -298,7 +319,7 @@ public final class WindowLayoutStoreTest {
         for (String line : described) {
             assertFalse(line.startsWith("window "));
         }
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
         assertFalse(WindowLayout.isEmpty());
         WindowLayoutStore.load(described);
         assertTrue(WindowLayout.isEmpty());
@@ -335,7 +356,7 @@ public final class WindowLayoutStoreTest {
         assertTrue(lines.contains("noping party"));
         assertTrue(lines.contains("hidden operator"));
 
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
         WindowLayoutStore.load(lines);
         assertEquals(3, WindowLayout.windows().size());
         assertEquals(12.25D, ChatLayout.feedOffsetX(), 0.0001D);
@@ -477,5 +498,13 @@ public final class WindowLayoutStoreTest {
                 ChatLayout.setAreaHidden("w2", true));
         assertTrue(ChatLayout.setMembersHidden("w1", false));
         assertFalse(ChatLayout.isMembersHidden(WindowLayout.window("w1")));
+    }
+
+    /** The server-defined Trade channel the reload tests install. */
+    private static ChatChannelDescriptor tradeChannel() {
+        return new ChatChannelDescriptor("trade", "Trade",
+                ChatPresentationMode.IN_CHARACTER,
+                ChatRecipientRule.EVERYONE, ChatChannelAccess.NONE,
+                0xC9A227, false, ChatChannelScope.NONE);
     }
 }

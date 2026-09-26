@@ -81,11 +81,6 @@ final class DiscordMessageLinks {
         final String bindingId;
 
         Copy(String discordId, String destination, String webhookUrl,
-             String header) {
-            this(discordId, destination, webhookUrl, header, "");
-        }
-
-        Copy(String discordId, String destination, String webhookUrl,
              String header, String bindingId) {
             this.discordId = discordId;
             this.destination = destination == null ? "" : destination;

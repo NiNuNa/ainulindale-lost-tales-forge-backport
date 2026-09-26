@@ -2,6 +2,7 @@ package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
+import com.ninuna.losttales.chat.ChatConsoleFixtures;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.network.packet.LostTalesChatConsoleSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatHistorySyncPacket;
@@ -116,7 +117,8 @@ public final class ChatLoginReplayTest {
     }
 
     private static ChatConsoleEvent entry(long id) {
-        return new ChatConsoleEvent(id, 5000L, ChatConsoleEvent.Kind.SERVER,
-                ChatConsoleEvent.Severity.INFO, "", "entry " + id);
+        return ChatConsoleFixtures.entry(
+                id, 5000L, ChatConsoleEvent.Kind.SERVER, ChatConsoleEvent.Severity.INFO, "",
+                "entry " + id);
     }
 }

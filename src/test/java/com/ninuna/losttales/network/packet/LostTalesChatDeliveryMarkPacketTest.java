@@ -9,6 +9,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -42,9 +43,6 @@ public final class LostTalesChatDeliveryMarkPacketTest {
     public void everyMarkRoundTripsInTenBytes() {
         for (ChatDeliveryMark.State state : ChatDeliveryMark.State.values()) {
             for (ChatDeliveryMark.Reason reason : ChatDeliveryMark.Reason.values()) {
-                if (reason == ChatDeliveryMark.Reason.UNKNOWN) {
-                    continue;
-                }
                 ByteBuf buffer = Unpooled.buffer();
                 new LostTalesChatDeliveryMarkPacket(1234L, state, reason)
                         .toBytes(buffer);
@@ -79,6 +77,8 @@ public final class LostTalesChatDeliveryMarkPacketTest {
             assertEquals(code, inOrder[code].code());
             assertEquals(inOrder[code], ChatDeliveryMark.Reason.fromCode(code));
         }
+        assertEquals(inOrder.length, ChatDeliveryMark.Reason.values().length);
+        assertNull(ChatDeliveryMark.Reason.fromCode(inOrder.length));
         assertEquals("", ChatDeliveryMark.State.NONE.langKey());
         assertEquals("", ChatDeliveryMark.Reason.NONE.langKey());
     }
@@ -104,13 +104,14 @@ public final class LostTalesChatDeliveryMarkPacketTest {
     }
 
     @Test
-    public void anUnknownStateIsMalformedAndAnUnknownReasonReadsAsUnknown() {
+    public void anUnknownStateOrReasonIsMalformed() {
         assertTrue(decode(raw(1234L, 3, 4)).isMalformed());
         assertTrue(decode(raw(1234L, -1, 4)).isMalformed());
-        LostTalesChatDeliveryMarkPacket newer = decode(raw(1234L, 2, 200));
-        assertFalse(newer.isMalformed());
-        assertEquals(ChatDeliveryMark.State.FAILED, newer.getState());
-        assertEquals(ChatDeliveryMark.Reason.UNKNOWN, newer.getReason());
+        LostTalesChatDeliveryMarkPacket unknownReason = decode(raw(1234L, 2, 200));
+        assertTrue(unknownReason.isMalformed());
+        assertEquals(ChatDeliveryMark.State.NONE, unknownReason.getState());
+        assertEquals(ChatDeliveryMark.Reason.NONE, unknownReason.getReason());
+        assertTrue(decode(raw(1234L, 2, 9)).isMalformed());
     }
 
     @Test
@@ -119,7 +120,6 @@ public final class LostTalesChatDeliveryMarkPacketTest {
         refuse(-1L, ChatDeliveryMark.State.RETRYING, ChatDeliveryMark.Reason.WAITING);
         refuse(1L, null, ChatDeliveryMark.Reason.WAITING);
         refuse(1L, ChatDeliveryMark.State.FAILED, null);
-        refuse(1L, ChatDeliveryMark.State.FAILED, ChatDeliveryMark.Reason.UNKNOWN);
     }
 
     private static void refuse(long messageId, ChatDeliveryMark.State state,

@@ -96,7 +96,7 @@ public final class CharacterUnselectableRaceValidationTest {
                 0L, 0, "Bogdal", CharacterRaceRegistry.HALF_TROLL,
                 CharacterGenderRegistry.NON_BINARY,
                 skinFor(CharacterRaceRegistry.HALF_TROLL), 25, FACTION, WAYPOINT,
-                false, "", CharacterBodyTypeRegistry.WIDE);
+                false, "", CharacterBodyTypeRegistry.WIDE, "", true, 0);
     }
 
     private static final class TestFactionResolver

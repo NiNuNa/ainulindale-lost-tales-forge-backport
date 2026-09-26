@@ -5,6 +5,7 @@ import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.compat.minecraft.PlayerItemUseAccess;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.event.LostTalesMobAggroEventHandler;
+import com.ninuna.losttales.util.LostTalesMath;
 import net.minecraft.entity.player.EntityPlayerMP;
 
 /** Conservative default policy; individual checks can later become providers. */
@@ -88,7 +89,7 @@ public final class DefaultCharacterSwitchPolicy implements CharacterSwitchPolicy
                 && safeNow - lifecycle.getLastCombatAt() < combatGrace)
                 || LostTalesMobAggroEventHandler.hasTrackedCombat(player)) {
             long retryAt = lifecycle.getLastCombatAt() <= 0L
-                    ? -1L : safeAdd(lifecycle.getLastCombatAt(), combatGrace);
+                    ? -1L : LostTalesMath.saturatingAdd(lifecycle.getLastCombatAt(), combatGrace);
             return CharacterSwitchPolicyResult.denied(
                     CharacterErrorId.SWITCH_IN_COMBAT, retryAt);
         }
@@ -174,11 +175,6 @@ public final class DefaultCharacterSwitchPolicy implements CharacterSwitchPolicy
                     accountState.getNextAllowedAt());
         }
         return null;
-    }
-
-    private static long safeAdd(long left, long right) {
-        return right > 0L && left > Long.MAX_VALUE - right
-                ? Long.MAX_VALUE : left + right;
     }
 
     static boolean isCooldownExempt(EntityPlayerMP player) {

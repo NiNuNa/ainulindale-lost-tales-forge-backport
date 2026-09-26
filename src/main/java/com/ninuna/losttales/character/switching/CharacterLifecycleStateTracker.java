@@ -2,6 +2,8 @@ package com.ninuna.losttales.character.switching;
 
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.event.LostTalesMobAggroEventHandler;
+import com.ninuna.losttales.util.LostTalesMath;
+import com.ninuna.losttales.util.LostTalesServerPlayers;
 import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerChangedDimensionEvent;
@@ -115,7 +117,7 @@ public final class CharacterLifecycleStateTracker {
     }
 
     public static void beginSession(EntityPlayerMP player) {
-        if (!isServerPlayer(player)) {
+        if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return;
         }
         long now = System.currentTimeMillis();
@@ -306,7 +308,7 @@ public final class CharacterLifecycleStateTracker {
     }
 
     private static void beginTransition(EntityPlayerMP player, boolean respawning) {
-        if (!isServerPlayer(player)) {
+        if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return;
         }
         SessionState state = getState(player);
@@ -324,7 +326,7 @@ public final class CharacterLifecycleStateTracker {
             state.switching = false;
             state.ownedDimensionTransition = false;
             state.stableGroundTicks = 0;
-            state.transitionUntil = safeAdd(now,
+            state.transitionUntil = LostTalesMath.saturatingAdd(now,
                     Math.max(0L, LostTalesConfig.characterSwitchTeleportGraceMillis));
             state.dimensionId = player.dimension;
             state.lastX = player.posX;
@@ -352,7 +354,7 @@ public final class CharacterLifecycleStateTracker {
                 if (player.dimension != state.dimensionId
                         || distanceSq > threshold * threshold) {
                     state.transitionUntil = Math.max(state.transitionUntil,
-                            safeAdd(now, Math.max(0L,
+                            LostTalesMath.saturatingAdd(now, Math.max(0L,
                                     LostTalesConfig.characterSwitchTeleportGraceMillis)));
                     state.stableGroundTicks = 0;
                 }
@@ -431,15 +433,10 @@ public final class CharacterLifecycleStateTracker {
     }
 
     private static SessionState getState(EntityPlayerMP player) {
-        if (!isServerPlayer(player)) {
+        if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return null;
         }
         return STATES.get(player.getUniqueID());
-    }
-
-    private static boolean isServerPlayer(EntityPlayerMP player) {
-        return player != null && player.getUniqueID() != null
-                && player.worldObj != null && !player.worldObj.isRemote;
     }
 
     private static long nextEpoch() {
@@ -449,11 +446,6 @@ public final class CharacterLifecycleStateTracker {
             return NEXT_EPOCH.getAndIncrement();
         }
         return value;
-    }
-
-    private static long safeAdd(long left, long right) {
-        return right > 0L && left > Long.MAX_VALUE - right
-                ? Long.MAX_VALUE : left + right;
     }
 
     private static final class SessionState {

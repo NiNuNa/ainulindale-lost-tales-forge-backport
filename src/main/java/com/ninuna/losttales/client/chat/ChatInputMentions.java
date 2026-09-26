@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatMentionCandidate;
+import com.ninuna.losttales.chat.ChatMentions;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -47,7 +48,7 @@ final class ChatInputMentions {
 
     /** The mention whose {@code @} stands at {@code at}, or null. */
     static Found at(String text, int at, List<ChatMentionCandidate> candidates) {
-        if (at > 0 && isNameCharacter(text.charAt(at - 1))) {
+        if (at > 0 && ChatMentions.isNameCharacter(text.charAt(at - 1))) {
             return null;
         }
         ChatMentionCandidate best = null;
@@ -81,11 +82,7 @@ final class ChatInputMentions {
             return 0;
         }
         int end = from + wanted.length();
-        return end < text.length() && isNameCharacter(text.charAt(end))
+        return end < text.length() && ChatMentions.isNameCharacter(text.charAt(end))
                 ? 0 : wanted.length();
-    }
-
-    private static boolean isNameCharacter(char character) {
-        return Character.isLetterOrDigit(character) || character == '_';
     }
 }

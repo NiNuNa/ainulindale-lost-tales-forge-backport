@@ -3,6 +3,8 @@ package com.ninuna.losttales.client.character;
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.config.LostTalesConfigFiles;
 
+import com.ninuna.losttales.util.LostTalesCloseables;
+import com.ninuna.losttales.util.LostTalesTextFiles;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -182,7 +184,7 @@ public final class CharacterTemplateStore {
         } catch (IOException unreadable) {
             return new LinkedHashMap<String, String>();
         } finally {
-            closeQuietly(reader);
+            LostTalesCloseables.closeQuietly(reader);
         }
         return values;
     }
@@ -190,10 +192,13 @@ public final class CharacterTemplateStore {
     /**
      * Writes beside the file and moves it into place, so a template is
      * never half-written: an interrupted save leaves the previous one.
+     * A failure is logged, and not again until a write succeeds
+     * ({@link LostTalesTextFiles#writeFailed}).
      */
     private static boolean write(File file, List<String> lines) {
         File parent = file.getParentFile();
         if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
+            LostTalesTextFiles.writeFailed(file, "its folder could not be made");
             return false;
         }
         File temporary = new File(parent, "." + file.getName() + ".tmp");
@@ -207,11 +212,12 @@ public final class CharacterTemplateStore {
             }
             writer.flush();
         } catch (IOException unwritable) {
-            closeQuietly(writer);
+            LostTalesCloseables.closeQuietly(writer);
             temporary.delete();
+            LostTalesTextFiles.writeFailed(file, unwritable.toString());
             return false;
         } finally {
-            closeQuietly(writer);
+            LostTalesCloseables.closeQuietly(writer);
         }
         // Moved over the old file in one step, so a move that fails leaves
         // the previous template where it was.
@@ -226,8 +232,10 @@ public final class CharacterTemplateStore {
             }
         } catch (IOException unmovable) {
             temporary.delete();
+            LostTalesTextFiles.writeFailed(file, unmovable.toString());
             return false;
         }
+        LostTalesTextFiles.writeSucceeded(file);
         return true;
     }
 
@@ -248,16 +256,6 @@ public final class CharacterTemplateStore {
             return Math.max(0, Integer.parseInt(value.trim()));
         } catch (NumberFormatException notANumber) {
             return 0;
-        }
-    }
-
-    private static void closeQuietly(java.io.Closeable closeable) {
-        if (closeable != null) {
-            try {
-                closeable.close();
-            } catch (IOException ignored) {
-                // Losing a template write must never break the client.
-            }
         }
     }
 }

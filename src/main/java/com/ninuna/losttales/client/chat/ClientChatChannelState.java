@@ -758,22 +758,23 @@ public final class ClientChatChannelState {
 
     /**
      * The name of one conversation: for a faction's chat that faction's
-     * name ("Gondor"), whichever faction is read now; the channel's name
-     * ({@link #displayName(ChatChannel)}) for every other.
+     * chat ("Gondor Chat"), whichever faction is read now; the channel's
+     * name ({@link #displayName(ChatChannel)}) for every other.
      */
     public static synchronized String displayName(ChatChannel channel,
                                                   String scope) {
         return isFaction(channel, scope)
-                ? factionName(scope, channel.getDisplayName())
+                ? factionChatName(scope, channel.getDisplayName())
                 : displayName(channel);
     }
 
     /**
-     * Visible label for a channel. Faction shows the LOTR faction name
-     * ("Gondor") of the identity its tab speaks as, so the tab, indicator
-     * and message prefix all agree and follow the chat identity. Party
-     * shows its leader's name ("Aldric's Party") while the chat identity
-     * is in one, since a party has no name of its own.
+     * Visible label for a channel. Faction shows the chat of the LOTR
+     * faction ("Gondor Chat") the identity its tab speaks as belongs to,
+     * so the tab, indicator and message prefix all agree and follow the
+     * chat identity. Party shows its leader's name ("Aldric's Party
+     * Chat") while the chat identity is in one, since a party has no name
+     * of its own.
      */
     public static synchronized String displayName(ChatChannel channel) {
         if (channel == null) {
@@ -788,7 +789,18 @@ public final class ClientChatChannelState {
         if (channel != ChatChannel.FACTION) {
             return channel.getDisplayName();
         }
-        return factionName(wornFactionId(channel), channel.getDisplayName());
+        return factionChatName(wornFactionId(channel),
+                channel.getDisplayName());
+    }
+
+    /**
+     * A faction's chat by its faction ("Gondor Chat"), or {@code fallback}
+     * while LOTR cannot name the faction.
+     */
+    private static String factionChatName(String factionId, String fallback) {
+        String faction = factionName(factionId, "");
+        return faction.length() == 0 ? fallback
+                : ChatChannel.factionChatName(faction);
     }
 
     /**
@@ -1087,19 +1099,13 @@ public final class ClientChatChannelState {
         return canModerate;
     }
 
-    /**
-     * States which capabilities the player holds. A server that named
-     * none — an older one, whose payload carried the two flags alone —
-     * leaves the flags to speak for themselves.
-     */
+    /** States which capabilities the player holds, as the access payload lists them. */
     public static synchronized void setCapabilities(
             java.util.Collection<String> held) {
         java.util.Set<String> ids = new java.util.HashSet<String>();
-        if (held != null) {
-            for (String id : held) {
-                if (id != null && id.trim().length() > 0) {
-                    ids.add(id.trim().toLowerCase(java.util.Locale.ROOT));
-                }
+        for (String id : held) {
+            if (id != null && id.trim().length() > 0) {
+                ids.add(id.trim().toLowerCase(java.util.Locale.ROOT));
             }
         }
         capabilities = java.util.Collections.unmodifiableSet(ids);

@@ -3,6 +3,7 @@ package com.ninuna.losttales.character.physics;
 import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
 import com.ninuna.losttales.character.registry.CharacterRaceGameplayProfile;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
+import com.ninuna.losttales.util.LostTalesIdentifiers;
 
 /**
  * Immutable common-side measurements for one active player race.
@@ -33,7 +34,7 @@ public final class CharacterRaceDimensions {
             float sneakingEyeHeight,
             float modelScale,
             boolean lotrDerived) {
-        this.raceId = CharacterRaceRegistry.normalizeIdentifier(raceId);
+        this.raceId = LostTalesIdentifiers.normalize(raceId);
         this.width = width;
         this.height = height;
         this.standingEyeHeight = standingEyeHeight;
@@ -53,7 +54,7 @@ public final class CharacterRaceDimensions {
             throw new IllegalArgumentException("profile must not be null");
         }
 
-        String canonicalRaceId = CharacterRaceRegistry.normalizeIdentifier(raceId);
+        String canonicalRaceId = LostTalesIdentifiers.normalize(raceId);
         CharacterRaceDefinition definition =
                 CharacterRaceRegistry.get(canonicalRaceId);
         float width = positiveOr(definition == null
@@ -102,7 +103,7 @@ public final class CharacterRaceDimensions {
             throw new IllegalArgumentException("fallback must not be null");
         }
 
-        String canonicalRaceId = CharacterRaceRegistry.normalizeIdentifier(raceId);
+        String canonicalRaceId = LostTalesIdentifiers.normalize(raceId);
         float safeWidth = positiveOr(width, fallback.getWidth());
         float safeHeight = positiveOr(height, fallback.getHeight());
         float safeStandingEyeHeight = clampEyeHeight(
@@ -174,10 +175,6 @@ public final class CharacterRaceDimensions {
     /** Common renderer scale metadata; no client-only class is referenced. */
     public float getModelScale() {
         return this.modelScale;
-    }
-
-    public float getSneakingEyeDrop() {
-        return this.standingEyeHeight - this.sneakingEyeHeight;
     }
 
     public boolean isLotrDerived() {

@@ -442,8 +442,7 @@ public final class WindowBar {
                                     List<Placed> placed, int top, int left,
                                     int right, float share) {
         float opacity = share * WindowStyle.opacity(minecraft);
-        int surface = LostTalesUiInk.argb(LostTalesUiInk.SURFACE_HIGHLIGHT_RGB,
-                Math.round(WindowStyle.INSET_ALPHA * opacity));
+        int surface = WindowStyle.stripArgb(opacity);
         int bottom = top + WindowPlacement.BAR_STRIP_HEIGHT;
         List<int[]> holes = new ArrayList<int[]>();
         for (Placed each : placed) {

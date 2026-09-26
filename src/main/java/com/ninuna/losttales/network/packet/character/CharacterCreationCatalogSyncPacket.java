@@ -2,6 +2,7 @@ package com.ninuna.losttales.network.packet.character;
 
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.character.sync.CharacterCreationCatalog;
+import com.ninuna.losttales.network.packet.LostTalesPacketCodec;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
@@ -37,7 +38,7 @@ public final class CharacterCreationCatalogSyncPacket implements IMessage {
     public void fromBytes(ByteBuf buffer) {
         try {
             boolean available = buffer.readBoolean();
-            String reason = CharacterPacketCodec.readString(
+            String reason = LostTalesPacketCodec.readUtf8String(
                     buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             int raceCount = buffer.readUnsignedByte();
             if (raceCount > MAX_RACES) {
@@ -46,7 +47,7 @@ public final class CharacterCreationCatalogSyncPacket implements IMessage {
             LinkedHashMap<String, List<String>> factionsByRace =
                     new LinkedHashMap<String, List<String>>();
             for (int raceIndex = 0; raceIndex < raceCount; raceIndex++) {
-                String raceId = CharacterPacketCodec.readString(
+                String raceId = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 if (factionsByRace.containsKey(raceId)) {
                     throw new CharacterPacketCodec.DecodeException("duplicate race entry");
@@ -57,7 +58,7 @@ public final class CharacterCreationCatalogSyncPacket implements IMessage {
                 }
                 ArrayList<String> factions = new ArrayList<String>(factionCount);
                 for (int factionIndex = 0; factionIndex < factionCount; factionIndex++) {
-                    String factionId = CharacterPacketCodec.readString(
+                    String factionId = LostTalesPacketCodec.readUtf8String(
                             buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                     if (factions.contains(factionId)) {
                         throw new CharacterPacketCodec.DecodeException(
@@ -76,7 +77,7 @@ public final class CharacterCreationCatalogSyncPacket implements IMessage {
                     new LinkedHashMap<String, List<String>>();
             for (int factionIndex = 0;
                  factionIndex < waypointFactionCount; factionIndex++) {
-                String factionId = CharacterPacketCodec.readString(
+                String factionId = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 if (waypointsByFaction.containsKey(factionId)) {
                     throw new CharacterPacketCodec.DecodeException(
@@ -90,7 +91,7 @@ public final class CharacterCreationCatalogSyncPacket implements IMessage {
                 ArrayList<String> waypoints = new ArrayList<String>(waypointCount);
                 for (int waypointIndex = 0;
                      waypointIndex < waypointCount; waypointIndex++) {
-                    String waypointId = CharacterPacketCodec.readString(
+                    String waypointId = LostTalesPacketCodec.readUtf8String(
                             buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                     if (waypoints.contains(waypointId)) {
                         throw new CharacterPacketCodec.DecodeException(
@@ -109,7 +110,7 @@ public final class CharacterCreationCatalogSyncPacket implements IMessage {
                     new ArrayList<String>(allWaypointCount);
             for (int waypointIndex = 0;
                  waypointIndex < allWaypointCount; waypointIndex++) {
-                String waypointId = CharacterPacketCodec.readString(
+                String waypointId = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 if (allWaypoints.contains(waypointId)) {
                     throw new CharacterPacketCodec.DecodeException(
@@ -117,7 +118,7 @@ public final class CharacterCreationCatalogSyncPacket implements IMessage {
                 }
                 allWaypoints.add(waypointId);
             }
-            CharacterPacketCodec.requireFinished(buffer);
+            LostTalesPacketCodec.requireFinished(buffer);
             this.catalog = new CharacterCreationCatalog(
                     available, reason, factionsByRace,
                     waypointsByFaction, allWaypoints);
@@ -137,11 +138,11 @@ public final class CharacterCreationCatalogSyncPacket implements IMessage {
             throw new IllegalStateException("too many race entries");
         }
         buffer.writeBoolean(this.catalog.isLotrAvailable());
-        CharacterPacketCodec.writeString(buffer, this.catalog.getUnavailableReason(),
+        LostTalesPacketCodec.writeUtf8String(buffer, this.catalog.getUnavailableReason(),
                 CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
         buffer.writeByte(entries.size());
         for (Map.Entry<String, List<String>> entry : entries.entrySet()) {
-            CharacterPacketCodec.writeString(buffer, entry.getKey(),
+            LostTalesPacketCodec.writeUtf8String(buffer, entry.getKey(),
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             List<String> factions = entry.getValue();
             if (factions.size() > MAX_FACTIONS_PER_RACE) {
@@ -149,7 +150,7 @@ public final class CharacterCreationCatalogSyncPacket implements IMessage {
             }
             buffer.writeShort(factions.size());
             for (String factionId : factions) {
-                CharacterPacketCodec.writeString(buffer, factionId,
+                LostTalesPacketCodec.writeUtf8String(buffer, factionId,
                         CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             }
         }
@@ -160,7 +161,7 @@ public final class CharacterCreationCatalogSyncPacket implements IMessage {
         }
         buffer.writeShort(waypointEntries.size());
         for (Map.Entry<String, List<String>> entry : waypointEntries.entrySet()) {
-            CharacterPacketCodec.writeString(buffer, entry.getKey(),
+            LostTalesPacketCodec.writeUtf8String(buffer, entry.getKey(),
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             List<String> waypoints = entry.getValue();
             if (waypoints.size() > MAX_WAYPOINTS_PER_FACTION) {
@@ -168,7 +169,7 @@ public final class CharacterCreationCatalogSyncPacket implements IMessage {
             }
             buffer.writeShort(waypoints.size());
             for (String waypointId : waypoints) {
-                CharacterPacketCodec.writeString(buffer, waypointId,
+                LostTalesPacketCodec.writeUtf8String(buffer, waypointId,
                         CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             }
         }
@@ -178,7 +179,7 @@ public final class CharacterCreationCatalogSyncPacket implements IMessage {
         }
         buffer.writeShort(allWaypoints.size());
         for (String waypointId : allWaypoints) {
-            CharacterPacketCodec.writeString(buffer, waypointId,
+            LostTalesPacketCodec.writeUtf8String(buffer, waypointId,
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
         }
     }

@@ -2,7 +2,7 @@ package com.ninuna.losttales.character.lore.transfer;
 
 import com.ninuna.losttales.character.model.CharacterRoster;
 
-import java.util.Locale;
+import com.ninuna.losttales.util.LostTalesIdentifiers;
 import java.util.UUID;
 
 /** Immutable crash-recovery marker for one claim or release operation. */
@@ -37,7 +37,7 @@ public final class LoreCharacterTransferRecord {
             long expectedOwnershipRevision,
             int step,
             long createdAt) {
-        String normalized = normalize(loreCharacterId);
+        String normalized = LostTalesIdentifiers.normalize(loreCharacterId);
         if (transactionId == null || type == null || normalized.length() == 0
                 || characterId == null || expectedOwnershipRevision < 0L
                 || step < 0 || step > 3
@@ -82,13 +82,4 @@ public final class LoreCharacterTransferRecord {
     }
     public int getStep() { return this.step; }
     public long getCreatedAt() { return this.createdAt; }
-
-    public boolean involves(UUID ownerId) {
-        return ownerId != null && (ownerId.equals(this.sourceOwnerId)
-                || ownerId.equals(this.targetOwnerId));
-    }
-
-    private static String normalize(String value) {
-        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
-    }
 }

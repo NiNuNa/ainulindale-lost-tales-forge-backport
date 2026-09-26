@@ -15,6 +15,7 @@ import com.ninuna.losttales.party.storage.PartyWorldData;
 import com.ninuna.losttales.party.sync.PartyGoHereMarkerSnapshot;
 import com.ninuna.losttales.party.sync.PartyTrackedMemberSnapshot;
 import com.ninuna.losttales.party.sync.PartyTrackingSnapshot;
+import com.ninuna.losttales.util.LostTalesServerPlayers;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
@@ -52,7 +53,7 @@ public final class PartyTrackingSyncManager {
     }
 
     public static synchronized boolean sendNow(EntityPlayerMP recipient) {
-        if (!isServerPlayer(recipient)) {
+        if (!LostTalesServerPlayers.isServerPlayer(recipient)) {
             return false;
         }
         ServerView view = collectServerView();
@@ -279,7 +280,7 @@ public final class PartyTrackingSyncManager {
                     continue;
                 }
                 EntityPlayerMP player = (EntityPlayerMP) value;
-                if (!isServerPlayer(player)) {
+                if (!LostTalesServerPlayers.isServerPlayer(player)) {
                     continue;
                 }
                 PartyService.ActiveCharacterContext active =
@@ -293,11 +294,6 @@ public final class PartyTrackingSyncManager {
             }
         }
         return new ServerView(partyData, markerData, onlineByOwner);
-    }
-
-    private static boolean isServerPlayer(EntityPlayerMP player) {
-        return player != null && player.getUniqueID() != null
-                && player.worldObj != null && !player.worldObj.isRemote;
     }
 
     private static final class ServerView {

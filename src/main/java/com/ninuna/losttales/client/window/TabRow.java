@@ -26,7 +26,6 @@ import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 
 /**
  * The tabs of one window, laid out the way a browser lays out
@@ -486,7 +485,7 @@ public final class TabRow {
     private double sharedTo = DEFAULT_TAB_WIDTH;
     private double sharedDrawn = DEFAULT_TAB_WIDTH;
     private final MotionTransition sharedLeg =
-            new MotionTransition(MotionIds.CHAT_TAB_MOVE, true);
+            new MotionTransition(MotionIds.WINDOW_TAB_MOVE, true);
     /**
      * How far every tab shows each of the buttons it gives up by width,
      * each going or coming as the row's width crosses its share: its ink
@@ -495,9 +494,9 @@ public final class TabRow {
      * it has gone ({@link #roomPhase}, {@link #inkPhase}).
      */
     private final MotionTransition draftShown =
-            new MotionTransition(MotionIds.CHAT_TAB_CONTROLS);
+            new MotionTransition(MotionIds.WINDOW_TAB_CONTROLS);
     private final MotionTransition closeShown =
-            new MotionTransition(MotionIds.CHAT_TAB_CONTROLS);
+            new MotionTransition(MotionIds.WINDOW_TAB_CONTROLS);
     /**
      * The width the row's tabs keep after one was closed by its cross,
      * while the pointer stays on the row; NaN while none is held.
@@ -2016,141 +2015,6 @@ public final class TabRow {
         GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
-    /* ---- A sub-window's title strip: one tab ---- */
-
-    /**
-     * Clear space between a sub-window's frame edge and its one tab, as
-     * between a window's frame edge and its search button.
-     */
-    static final int LONE_TAB_MARGIN = SEARCH_MARGIN;
-
-    /**
-     * Where the one tab of a sub-window's title strip stands and what
-     * it shows: the name cut to the room the strip leaves it, and its
-     * cross, which closes the window.
-     */
-    static final class LoneTab {
-        final float left;
-        final float right;
-        final int top;
-        final String label;
-        final int labelWidth;
-        final boolean icon;
-        final LostTalesUiHitBox closeBox;
-
-        LoneTab(float left, float right, int top, String label,
-                int labelWidth, boolean icon, LostTalesUiHitBox closeBox) {
-            this.left = left;
-            this.right = right;
-            this.top = top;
-            this.label = label;
-            this.labelWidth = labelWidth;
-            this.icon = icon;
-            this.closeBox = closeBox;
-        }
-
-        /**
-         * The bottom of the tab's surface: the selected tab's pieces reach
-         * the strip's rule row. Its top row is a pixel narrower each side,
-         * as every tab's is.
-         */
-        int bottom() {
-            return this.top + LostTalesUiSheet.TAB_SELECTED_LEFT.getHeight();
-        }
-    }
-
-    /**
-     * Lays out a sub-window's one tab in the strip from {@code stripLeft}
-     * to {@code stripRight} ending on {@code rowBottom}: the tab in front
-     * of a window's row, holding an icon when {@code icon}, the
-     * name and its cross, as wide as they need and no wider than the
-     * strip leaves it.
-     */
-    static LoneTab layOutLoneTab(FontRenderer font, float stripLeft,
-                                 float stripRight, int rowBottom,
-                                 String label, boolean icon) {
-        int iconWidth = icon ? TabIcons.SLOT + TabIcons.GAP
-                : 0;
-        int controls = CONTROL_GAP + CONTROL_SIZE;
-        float left = stripLeft + LONE_TAB_MARGIN;
-        float room = Math.max(0.0F, stripRight - LONE_TAB_MARGIN - left
-                - PADDING_X * 2 - iconWidth - controls);
-        String shown = font.getStringWidth(label) <= room ? label
-                : LostTalesSkyrimUiStyle.trimToWidth(font, label,
-                        (int)Math.floor(room));
-        int labelWidth = font.getStringWidth(shown);
-        float right = left + PADDING_X * 2 + iconWidth + labelWidth + controls;
-        int top = tabTop(rowBottom, true);
-        double closeLeft = snappedLeft(right - PADDING_X - CONTROL_SIZE,
-                displayStep());
-        return new LoneTab(left, right, top, shown, labelWidth, icon,
-                tabControlBox(closeLeft, top));
-    }
-
-    /**
-     * The strip a sub-window's one tab needs to show {@code label}
-     * whole beside its cross, and its icon when {@code icon}: what a
-     * window opening at its content's own size is at least as wide as.
-     */
-    public static int loneTabWidth(FontRenderer font, String label, boolean icon) {
-        int iconWidth = icon ? TabIcons.SLOT + TabIcons.GAP
-                : 0;
-        return LONE_TAB_MARGIN * 2 + PADDING_X * 2 + iconWidth
-                + font.getStringWidth(label) + CONTROL_GAP + CONTROL_SIZE;
-    }
-
-    /**
-     * Draws a sub-window's one tab, laid out by {@link #layOutLoneTab},
-     * and the strip's rule under it: the selected tab's shape, the
-     * accent in {@code accentRgb} across its face, the {@code icon}
-     * glyph centred in the icon's slot, the name in the accent's colour
-     * and the cross, stepped by {@code closeMotion}. The rule runs the
-     * strip's width, hanging from the tab's feet as a window's does.
-     */
-    static void drawLoneTab(FontRenderer font, LoneTab tab, float stripLeft,
-                            float stripRight, int rowBottom,
-                            LostTalesUiSheet icon, int accentRgb,
-                            LostTalesUiButtonMotion closeMotion, int alpha) {
-        if (alpha < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
-            return;
-        }
-        LostTalesUiRules.drawRuleAround(stripLeft, stripRight,
-                rowBottom - 1, rowBottom, alpha, tab.left - SELECTED_FOOT,
-                tab.right + SELECTED_FOOT);
-        drawTabShape(tab.left, tab.right, tab.top, 0.0F, true, 1.0F, 0.0F,
-                accentRgb, 0.0F, alpha,
-                Math.round(TAB_SURFACE_ALPHA * alpha / 255.0F));
-        drawAccent(tab.left + BORDER_WIDTH, tab.right - BORDER_WIDTH,
-                tab.top + ACCENT_ROW, accentRgb, alpha);
-        int wholeLeft = (int)Math.floor(tab.left);
-        float fraction = tab.left - wholeLeft;
-        int interiorTop = tab.top + INTERIOR_TOP;
-        int textX = wholeLeft + PADDING_X;
-        LostTalesUiInk.beginContent();
-        if (tab.icon && icon != null) {
-            GL11.glPushMatrix();
-            GL11.glTranslatef(fraction, 0.0F, 0.0F);
-            try {
-                icon.drawWithShadow(textX + LostTalesUiInk.centredStart(
-                                TabIcons.SIZE, icon.getWidth()),
-                        centredInInterior(interiorTop, icon.getHeight()),
-                        alpha);
-            } finally {
-                GL11.glPopMatrix();
-            }
-            textX += TabIcons.SLOT + TabIcons.GAP;
-        }
-        drawWords(font, tab.label, textX, fraction,
-                centredInInterior(interiorTop, CAP_HEIGHT), accentRgb, alpha);
-        LostTalesUiButton.drawGlyph(LostTalesUiSheet.CLOSE,
-                LostTalesUiSheet.CLOSE_HOVER, closeMotion,
-                (float)tab.closeBox.left
-                        + (CONTROL_SIZE - LostTalesUiSheet.CLOSE.getWidth()) / 2,
-                (int)tab.closeBox.top
-                        + (CONTROL_SIZE - LostTalesUiSheet.CLOSE.getHeight()) / 2,
-                alpha);
-    }
-
     /**
      * Where a tab is drawn: under the pointer while it is one of those
      * the hand carries, and otherwise where its glide has brought it on
@@ -2515,7 +2379,7 @@ public final class TabRow {
 
     /** One step toward {@code target}, arriving rather than creeping. */
     public static float eased(float current, float target, double elapsed) {
-        float value = (float)Motions.followTravel(MotionIds.CHAT_MARQUEE_RETURN,
+        float value = (float)Motions.followTravel(MotionIds.WINDOW_MARQUEE_RETURN,
                 current, target, elapsed);
         // Inside one display pixel there is nothing left to draw, and
         // an exponential tail spends longer and longer covering it — the
@@ -3723,7 +3587,7 @@ public final class TabRow {
          * 0 where it set out and 1 arrived; set going afresh only when
          * the row gives it another place or width.
          */
-        MotionTransition leg = new MotionTransition(MotionIds.CHAT_TAB_MOVE,
+        MotionTransition leg = new MotionTransition(MotionIds.WINDOW_TAB_MOVE,
                 true);
         /** Whether the tab is still growing in from nothing after it opened. */
         boolean joining;

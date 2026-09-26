@@ -1,17 +1,19 @@
 package com.ninuna.losttales.config.client;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.resources.I18n;
 
 /**
- * The one door to the mod's settings, opened from the Mods list and the
- * character menu: the client's own settings, and — where the player can
- * change them — the server's. In a world the server button shows only
- * once the server has said the player is an operator; in the main menu
- * it edits the local file, the server this game hosts.
+ * The door to the mod's settings from the Mods list: the client's own
+ * settings, which are Settings on the window screen — over this screen in
+ * the main menu, and back here as it closes — and, where the player can
+ * change them, the server's. In a world the server button shows only once
+ * the server has said the player is an operator; in the main menu it
+ * edits the local file, the server this game hosts.
  */
 public final class LostTalesSettingsHubGui extends GuiScreen {
 
@@ -49,7 +51,7 @@ public final class LostTalesSettingsHubGui extends GuiScreen {
             return;
         }
         if (button.id == BUTTON_CLIENT) {
-            this.mc.displayGuiScreen(new LostTalesConfigGui(this));
+            WindowScreen.openSettings(this);
         } else if (button.id == BUTTON_SERVER) {
             this.mc.displayGuiScreen(LostTalesServerConfigLoadingGui.open(this.mc, this));
         } else if (button.id == BUTTON_BACK) {

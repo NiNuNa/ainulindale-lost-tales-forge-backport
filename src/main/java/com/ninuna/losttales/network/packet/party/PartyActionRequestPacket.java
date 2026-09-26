@@ -1,5 +1,6 @@
 package com.ninuna.losttales.network.packet.party;
 
+import com.ninuna.losttales.network.packet.LostTalesPacketCodec;
 import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
 import com.ninuna.losttales.party.model.PartyColor;
 import com.ninuna.losttales.party.server.PartyNetworkRequestHandler;
@@ -66,10 +67,10 @@ public final class PartyActionRequestPacket implements IMessage {
             this.operationType = PartyOperationType.fromNetworkId(
                     buffer.readUnsignedByte());
             this.expectedActiveCharacterId =
-                    PartyPacketCodec.readNullableUuid(buffer);
-            this.expectedPartyId = PartyPacketCodec.readNullableUuid(buffer);
+                    LostTalesPacketCodec.readNullableUuid(buffer);
+            this.expectedPartyId = LostTalesPacketCodec.readNullableUuid(buffer);
             this.expectedPartyRevision = buffer.readLong();
-            this.targetId = PartyPacketCodec.readNullableUuid(buffer);
+            this.targetId = LostTalesPacketCodec.readNullableUuid(buffer);
             int colorId = buffer.readByte();
             if (colorId == -1) {
                 this.color = null;
@@ -90,7 +91,7 @@ public final class PartyActionRequestPacket implements IMessage {
                 this.markerX = 0.0D;
                 this.markerZ = 0.0D;
             }
-            PartyPacketCodec.requireFinished(buffer);
+            LostTalesPacketCodec.requireFinished(buffer);
             validateShape();
         } catch (RuntimeException exception) {
             this.operationType = this.operationType == null
@@ -104,11 +105,11 @@ public final class PartyActionRequestPacket implements IMessage {
         validateShape();
         buffer.writeInt(this.requestId);
         buffer.writeByte(this.operationType.getNetworkId());
-        PartyPacketCodec.writeNullableUuid(
+        LostTalesPacketCodec.writeNullableUuid(
                 buffer, this.expectedActiveCharacterId);
-        PartyPacketCodec.writeNullableUuid(buffer, this.expectedPartyId);
+        LostTalesPacketCodec.writeNullableUuid(buffer, this.expectedPartyId);
         buffer.writeLong(this.expectedPartyRevision);
-        PartyPacketCodec.writeNullableUuid(buffer, this.targetId);
+        LostTalesPacketCodec.writeNullableUuid(buffer, this.targetId);
         buffer.writeByte(this.color == null ? -1 : this.color.getNetworkId());
         buffer.writeBoolean(this.hasMarkerPosition);
         if (this.hasMarkerPosition) {
@@ -116,54 +117,6 @@ public final class PartyActionRequestPacket implements IMessage {
             buffer.writeDouble(this.markerX);
             buffer.writeDouble(this.markerZ);
         }
-    }
-
-    public int getRequestId() {
-        return this.requestId;
-    }
-
-    public PartyOperationType getOperationType() {
-        return this.operationType;
-    }
-
-    public UUID getExpectedActiveCharacterId() {
-        return this.expectedActiveCharacterId;
-    }
-
-    public UUID getExpectedPartyId() {
-        return this.expectedPartyId;
-    }
-
-    public long getExpectedPartyRevision() {
-        return this.expectedPartyRevision;
-    }
-
-    public UUID getTargetId() {
-        return this.targetId;
-    }
-
-    public PartyColor getColor() {
-        return this.color;
-    }
-
-    public boolean hasMarkerPosition() {
-        return this.hasMarkerPosition;
-    }
-
-    public int getMarkerDimensionId() {
-        return this.markerDimensionId;
-    }
-
-    public double getMarkerX() {
-        return this.markerX;
-    }
-
-    public double getMarkerZ() {
-        return this.markerZ;
-    }
-
-    public boolean isMalformed() {
-        return this.malformed;
     }
 
     private void validateShape() {
@@ -205,16 +158,12 @@ public final class PartyActionRequestPacket implements IMessage {
                     "invalid map marker position payload");
         }
         if (this.hasMarkerPosition
-                && (!isFinite(this.markerX) || !isFinite(this.markerZ)
+                && (!Double.isFinite(this.markerX) || !Double.isFinite(this.markerZ)
                 || Math.abs(this.markerX) > 30000000.0D
                 || Math.abs(this.markerZ) > 30000000.0D)) {
             throw new PartyPacketCodec.DecodeException(
                     "invalid map marker coordinates");
         }
-    }
-
-    private static boolean isFinite(double value) {
-        return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 
     public static final class Handler implements IMessageHandler<PartyActionRequestPacket, IMessage> {

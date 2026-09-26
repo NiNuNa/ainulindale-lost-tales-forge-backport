@@ -45,18 +45,6 @@ public final class LostTalesChatTypingPacket implements IMessage {
     public LostTalesChatTypingPacket() {}
 
     public LostTalesChatTypingPacket(ChatChannel channel, String target,
-                                     boolean typing) {
-        this(channel, target, typing,
-                LostTalesChatSendPacket.IDENTITY_DEFAULT, null);
-    }
-
-    public LostTalesChatTypingPacket(ChatChannel channel, String target,
-                                     boolean typing, int identityKind,
-                                     UUID identityCharacterId) {
-        this(channel, target, typing, identityKind, identityCharacterId, "", null);
-    }
-
-    public LostTalesChatTypingPacket(ChatChannel channel, String target,
                                      boolean typing, int identityKind,
                                      UUID identityCharacterId, String targetIdentity,
                                      UUID targetCharacterId) {

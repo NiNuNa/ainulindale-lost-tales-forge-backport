@@ -97,7 +97,7 @@ public final class ChatChannelRegistryTest {
             ChatChannel.register(new ChatChannelDescriptor(
                     ChatChannel.GLOBAL.getId(), "Impostor",
                     ChatPresentationMode.OUT_OF_CHARACTER,
-                    ChatRecipientRule.EVERYONE, ChatChannelAccess.NONE, 0, false));
+                    ChatRecipientRule.EVERYONE, ChatChannelAccess.NONE, 0, false, ChatChannelScope.NONE));
             fail("a built-in id was taken over");
         } catch (IllegalStateException expected) {
             assertTrue(expected.getMessage().contains(ChatChannel.GLOBAL.getId()));
@@ -140,6 +140,6 @@ public final class ChatChannelRegistryTest {
         return ChatChannel.register(new ChatChannelDescriptor(
                 CUSTOM_ID, "Test", ChatPresentationMode.OUT_OF_CHARACTER,
                 ChatRecipientRule.EVERYONE, ChatChannelAccess.NONE,
-                LostTalesColors.rgb(LostTalesColors.HONEY), false));
+                LostTalesColors.rgb(LostTalesColors.HONEY), false, ChatChannelScope.NONE));
     }
 }

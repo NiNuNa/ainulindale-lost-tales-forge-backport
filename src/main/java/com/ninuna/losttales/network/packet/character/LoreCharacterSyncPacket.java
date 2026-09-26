@@ -3,6 +3,7 @@ package com.ninuna.losttales.network.packet.character;
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.character.lore.sync.LoreCharacterSnapshot;
 import com.ninuna.losttales.character.lore.sync.LoreCharacterSummary;
+import com.ninuna.losttales.network.packet.LostTalesPacketCodec;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
@@ -48,7 +49,7 @@ public final class LoreCharacterSyncPacket implements IMessage {
                 boolean transferring = buffer.readBoolean();
                 String owner = string(buffer, CharacterPacketCodec.MAX_NAME_BYTES);
                 java.util.UUID ownedCharacterId =
-                        CharacterPacketCodec.readNullableUuid(buffer);
+                        LostTalesPacketCodec.readNullableUuid(buffer);
                 long revision = buffer.readLong();
                 if (revision < 0L) throw new CharacterPacketCodec.DecodeException("negative revision");
                 summaries.add(new LoreCharacterSummary(
@@ -56,7 +57,7 @@ public final class LoreCharacterSyncPacket implements IMessage {
                         configured, claimed, owned, transferring,
                         owner, ownedCharacterId, revision));
             }
-            CharacterPacketCodec.requireFinished(buffer);
+            LostTalesPacketCodec.requireFinished(buffer);
             this.snapshot = new LoreCharacterSnapshot(
                     summaries, ownershipReadOnly, transferReadOnly);
         } catch (RuntimeException exception) {
@@ -86,7 +87,7 @@ public final class LoreCharacterSyncPacket implements IMessage {
             buffer.writeBoolean(summary.isOwnedByViewer());
             buffer.writeBoolean(summary.isTransferInProgress());
             write(buffer, summary.getOwnerName(), CharacterPacketCodec.MAX_NAME_BYTES);
-            CharacterPacketCodec.writeNullableUuid(
+            LostTalesPacketCodec.writeNullableUuid(
                     buffer, summary.getOwnedCharacterId());
             buffer.writeLong(summary.getOwnershipRevision());
         }
@@ -95,10 +96,10 @@ public final class LoreCharacterSyncPacket implements IMessage {
     public LoreCharacterSnapshot getSnapshot() { return this.snapshot; }
     public boolean isMalformed() { return this.malformed; }
     private static String string(ByteBuf buffer, int max) {
-        return CharacterPacketCodec.readString(buffer, max);
+        return LostTalesPacketCodec.readUtf8String(buffer, max);
     }
     private static void write(ByteBuf buffer, String value, int max) {
-        CharacterPacketCodec.writeString(buffer, value, max);
+        LostTalesPacketCodec.writeUtf8String(buffer, value, max);
     }
     public static final class Handler implements IMessageHandler<
             LoreCharacterSyncPacket, IMessage> {

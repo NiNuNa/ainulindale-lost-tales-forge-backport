@@ -35,24 +35,6 @@ public final class LostTalesMapMarkerEditableSettings {
             double compassFadeInRadius, double discoveryRadius,
             boolean hiddenUntilDiscovered, boolean discoverable,
             boolean requiresRegionUnlock, boolean hasWaystone,
-            String waystoneStructureType,
-            LostTalesMapMarkerVisibility visibility) {
-        this(name, iconName, colorName, categoryName, description,
-                hasFastTravel, dimensionId, x, y, z,
-                compassFadeInRadius, discoveryRadius,
-                hiddenUntilDiscovered, discoverable,
-                requiresRegionUnlock, hasWaystone,
-                waystoneStructureType, 0, visibility);
-    }
-
-    public LostTalesMapMarkerEditableSettings(
-            String name, String iconName, String colorName,
-            String categoryName, String description,
-            boolean hasFastTravel,
-            int dimensionId, double x, double y, double z,
-            double compassFadeInRadius, double discoveryRadius,
-            boolean hiddenUntilDiscovered, boolean discoverable,
-            boolean requiresRegionUnlock, boolean hasWaystone,
             String waystoneStructureType, int priority,
             LostTalesMapMarkerVisibility visibility) {
         if (priority < LostTalesMapMarkerDefinition.MIN_PRIORITY

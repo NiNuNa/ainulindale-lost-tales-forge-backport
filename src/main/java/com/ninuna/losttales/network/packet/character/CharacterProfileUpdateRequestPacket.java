@@ -4,6 +4,7 @@ import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.server.CharacterNetworkRequestHandler;
 import com.ninuna.losttales.character.server.CharacterServerPacketDispatcher;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
+import com.ninuna.losttales.network.packet.LostTalesPacketCodec;
 import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
@@ -54,10 +55,10 @@ public final class CharacterProfileUpdateRequestPacket implements IMessage {
         try {
             this.requestId = buffer.readInt();
             this.expectedRosterRevision = buffer.readLong();
-            this.characterId = CharacterPacketCodec.readUuid(buffer);
+            this.characterId = LostTalesPacketCodec.readUuid(buffer);
             this.profile = CharacterPacketCodec.readProfile(buffer);
             this.age = buffer.readInt();
-            CharacterPacketCodec.requireFinished(buffer);
+            LostTalesPacketCodec.requireFinished(buffer);
             if (this.expectedRosterRevision < 0L) {
                 throw new CharacterPacketCodec.DecodeException(
                         "missing roster revision");
@@ -75,7 +76,7 @@ public final class CharacterProfileUpdateRequestPacket implements IMessage {
     public void toBytes(ByteBuf buffer) {
         buffer.writeInt(this.requestId);
         buffer.writeLong(this.expectedRosterRevision);
-        CharacterPacketCodec.writeUuid(buffer, this.characterId);
+        LostTalesPacketCodec.writeUuid(buffer, this.characterId);
         CharacterPacketCodec.writeProfile(buffer, this.profile);
         buffer.writeInt(this.age);
     }

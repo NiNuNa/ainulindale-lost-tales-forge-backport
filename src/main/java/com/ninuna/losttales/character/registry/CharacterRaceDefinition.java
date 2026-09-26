@@ -1,5 +1,6 @@
 package com.ninuna.losttales.character.registry;
 
+import com.ninuna.losttales.util.LostTalesIdentifiers;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.LinkedHashSet;
@@ -31,31 +32,6 @@ public final class CharacterRaceDefinition {
     private final float guiPreviewScale;
     private final int guiPreviewVerticalOffset;
     private final boolean selectable;
-
-    public CharacterRaceDefinition(
-            String id,
-            String lotrRaceAssociation,
-            Set<CharacterFactionCategory> allowedFactionCategories,
-            Set<String> allowedFactionIds,
-            Set<String> deniedFactionIds,
-            Set<String> allowedGenderIds,
-            float width,
-            float height,
-            float standingEyeHeight,
-            float sneakingEyeHeight,
-            double maxHealth,
-            double movementSpeedMultiplier,
-            double attackDamage,
-            float rendererScale,
-            float guiPreviewScale,
-            int guiPreviewVerticalOffset) {
-        this(id, lotrRaceAssociation, allowedFactionCategories,
-                allowedFactionIds, deniedFactionIds, allowedGenderIds,
-                width, height, standingEyeHeight, sneakingEyeHeight,
-                maxHealth, movementSpeedMultiplier, attackDamage,
-                rendererScale, guiPreviewScale, guiPreviewVerticalOffset,
-                true);
-    }
 
     public CharacterRaceDefinition(
             String id,
@@ -131,17 +107,13 @@ public final class CharacterRaceDefinition {
         return this.id;
     }
 
-    public String getLotrRaceAssociation() {
-        return this.lotrRaceAssociation;
-    }
-
     public Set<String> getAllowedGenderIds() {
         return this.allowedGenderIds;
     }
 
     public boolean isGenderAllowed(String genderId) {
         return this.allowedGenderIds.contains(
-                CharacterGenderRegistry.normalizeIdentifier(genderId));
+                LostTalesIdentifiers.normalize(genderId));
     }
 
     public boolean hasGenderedModels() {

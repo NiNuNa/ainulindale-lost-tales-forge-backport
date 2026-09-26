@@ -1,23 +1,22 @@
 package com.ninuna.losttales.block.custom;
 
-import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityMissiveBoard;
-import com.ninuna.losttales.gui.LostTalesGuiIds;
+import com.ninuna.losttales.quest.missive.MissiveBoardService;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockContainer;
 import net.minecraft.block.material.Material;
 import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
 
 /**
- * Simple server-safe missive board block foundation.
- *
- * The board currently owns a persistent tile-entity inventory. GUI opening,
- * dynamic generation, and server-validated quest acceptance are intentionally
- * added in later stages.
+ * A missive board: its notices live in its tile entity, and breaking it
+ * drops them. Using it opens the board's page: the server checks the
+ * board and the player's reach and sends its notices as an opening. No
+ * container is opened.
  */
 public class LostTalesBlockMissiveBoard extends BlockContainer {
 
@@ -30,10 +29,11 @@ public class LostTalesBlockMissiveBoard extends BlockContainer {
 
     @Override
     public boolean onBlockActivated(World world, int x, int y, int z, EntityPlayer player, int side, float hitX, float hitY, float hitZ) {
-        if (!world.isRemote) {
+        if (!world.isRemote && player instanceof EntityPlayerMP) {
             TileEntity tileEntity = world.getTileEntity(x, y, z);
             if (tileEntity instanceof LostTalesTileEntityMissiveBoard) {
-                player.openGui(LostTalesMod.instance, LostTalesGuiIds.MISSIVE_BOARD, world, x, y, z);
+                MissiveBoardService.open((EntityPlayerMP) player,
+                        (LostTalesTileEntityMissiveBoard) tileEntity);
             }
         }
         return true;

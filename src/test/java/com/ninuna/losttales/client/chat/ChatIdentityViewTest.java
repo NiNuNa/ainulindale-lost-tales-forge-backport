@@ -12,6 +12,7 @@ import java.util.UUID;
 import org.junit.After;
 import com.ninuna.losttales.network.packet.LostTalesChatIdentitySyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
+import com.ninuna.losttales.network.packet.ChatPacketFixtures;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import org.junit.Test;
 
@@ -44,7 +45,7 @@ public final class ChatIdentityViewTest {
         ClientChatChannelState.clear();
         ClientChatTypingState.clear();
         ChatSpeechBubbles.clear();
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
     }
 
     @Test
@@ -191,9 +192,8 @@ public final class ChatIdentityViewTest {
         roster();
         UUID speaker = new UUID(10L, 20L);
         LostTalesChatMessagePacket packet =
-                new LostTalesChatMessagePacket(
-                        ChatChannel.FACTION, speaker, "Friend", "Steve", "", 0, 0,
-                        "Hello", 1L, "").withScope(ROHAN);
+                ChatPacketFixtures.line(ChatChannel.FACTION, "Friend", "Steve", "Hello")
+                        .sender(speaker).colors(0, 0).build().withScope(ROHAN);
         ChatSpeechBubbles.receive(packet);
         assertTrue(ChatSpeechBubbles.isEmpty());
         ClientChatIdentities.select(identityOf(BEREN));
@@ -202,8 +202,8 @@ public final class ChatIdentityViewTest {
         ChatSpeechBubbles.clear();
         for (ChatChannel channel : new ChatChannel[] {ChatChannel.OOC, ChatChannel.OPERATOR,
                 ChatChannel.CLIENT_CONSOLE}) {
-            ChatSpeechBubbles.receive(new LostTalesChatMessagePacket(
-                    channel, speaker, "Steve", "Steve", "", 0, 0, "Hello", 1L, ""));
+            ChatSpeechBubbles.receive(ChatPacketFixtures.line(channel, "Steve", "Steve", "Hello")
+                    .sender(speaker).colors(0, 0).build());
         }
         assertTrue(ChatSpeechBubbles.isEmpty());
     }
@@ -216,9 +216,9 @@ public final class ChatIdentityViewTest {
         for (ChatChannel channel : new ChatChannel[] {ChatChannel.GLOBAL, ChatChannel.PROXIMITY,
                 ChatChannel.FACTION, ChatChannel.PARTY, ChatChannel.WHISPER}) {
             ChatSpeechBubbles.clear();
-            LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
-                    channel, new UUID(10L, 20L), "Friend", "Steve", "", 0, 0,
-                    "Hello", 1L, "", null, "", channel == ChatChannel.WHISPER ? "Steve" : "")
+            LostTalesChatMessagePacket packet = ChatPacketFixtures.line(
+                    channel, "Friend", "Steve", "Hello").sender(new UUID(10L, 20L)).colors(0, 0)
+                    .partner(channel == ChatChannel.WHISPER ? "Steve" : "").build()
                     .withScope(channel == ChatChannel.FACTION ? GONDOR
                             : channel == ChatChannel.PARTY ? party.toString() : "")
                     .withConversation(ALDRIC, null);

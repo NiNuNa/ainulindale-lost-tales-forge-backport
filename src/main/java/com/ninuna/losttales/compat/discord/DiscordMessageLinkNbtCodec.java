@@ -1,8 +1,8 @@
 package com.ninuna.losttales.compat.discord;
 
-import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatMessageIds;
-import cpw.mods.fml.common.FMLLog;
+import com.ninuna.losttales.storage.NbtQuarantine;
+import com.ninuna.losttales.util.LostTalesLog;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -36,7 +36,6 @@ final class DiscordMessageLinkNbtCodec {
 
     static final int CURRENT_ROOT_DATA_VERSION = 1;
     static final int CURRENT_ENTRY_DATA_VERSION = 1;
-    static final int CURRENT_QUARANTINE_DATA_VERSION = 1;
     /** Safety bound on messages read back; entries past it are quarantined. */
     static final int MAX_ENTRIES = DiscordMessageLinks.MAX_LINKS;
     /** The most copies one message may name: it has one per binding of its channel. */
@@ -55,11 +54,7 @@ final class DiscordMessageLinkNbtCodec {
 
     private static final String TAG_DATA_VERSION = "DataVersion";
     private static final String TAG_MESSAGES = "Messages";
-    private static final String TAG_QUARANTINE = "Quarantine";
-    private static final String TAG_QUARANTINE_ENTRIES = "Entries";
-    private static final String TAG_REASON = "Reason";
     private static final String TAG_ENTRY_INDEX = "EntryIndex";
-    private static final String TAG_ORIGINAL_DATA = "OriginalData";
 
     private static final String TAG_MESSAGE_ID = "MessageId";
     private static final String TAG_COPIES = "Copies";
@@ -85,7 +80,7 @@ final class DiscordMessageLinkNbtCodec {
             }
         }
         output.setTag(TAG_MESSAGES, list);
-        output.setTag(TAG_QUARANTINE, writeQuarantine(quarantinedEntries));
+        NbtQuarantine.write(output, quarantinedEntries);
     }
 
     /**
@@ -145,7 +140,7 @@ final class DiscordMessageLinkNbtCodec {
         int version = safeSource.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
                 ? safeSource.getInteger(TAG_DATA_VERSION) : 0;
         if (version > CURRENT_ROOT_DATA_VERSION || version < 0) {
-            warn("Discord message link data uses unsupported version %d; data will remain read-only",
+            LostTalesLog.warning("Discord message link data uses unsupported version %d; data will remain read-only",
                     Integer.valueOf(version));
             return ReadResult.unsupported(safeSource, version);
         }
@@ -155,13 +150,13 @@ final class DiscordMessageLinkNbtCodec {
         }
         boolean repaired = version != CURRENT_ROOT_DATA_VERSION
                 || !safeSource.hasKey(TAG_MESSAGES, Constants.NBT.TAG_LIST);
-        QuarantineReadResult quarantine = readQuarantine(safeSource);
-        if (!quarantine.supported) {
-            return ReadResult.unsupported(safeSource, quarantine.unsupportedVersion);
+        NbtQuarantine.Read quarantine = NbtQuarantine.read(safeSource);
+        if (!quarantine.isSupported()) {
+            return ReadResult.unsupported(safeSource, quarantine.getUnsupportedVersion());
         }
-        repaired |= quarantine.repaired;
+        repaired |= quarantine.isRepaired();
         List<NBTTagCompound> quarantinedEntries =
-                new ArrayList<NBTTagCompound>(quarantine.entries);
+                new ArrayList<NBTTagCompound>(quarantine.getEntries());
         List<DiscordMessageLinks.SavedLink> links =
                 new ArrayList<DiscordMessageLinks.SavedLink>();
         Set<Long> seenMessages = new HashSet<Long>();
@@ -186,7 +181,7 @@ final class DiscordMessageLinkNbtCodec {
                 }
             }
             if (reason != null) {
-                quarantinedEntries.add(createQuarantineEntry(reason, index, raw));
+                quarantinedEntries.add(NbtQuarantine.entry(reason, TAG_ENTRY_INDEX, index, raw));
                 repaired = true;
                 continue;
             }
@@ -351,86 +346,6 @@ final class DiscordMessageLinkNbtCodec {
                 || tag.getTagList(key, Constants.NBT.TAG_COMPOUND).tagCount() == count;
     }
 
-    private static NBTTagCompound writeQuarantine(
-            Collection<NBTTagCompound> quarantinedEntries) {
-        NBTTagCompound root = new NBTTagCompound();
-        root.setInteger(TAG_DATA_VERSION, CURRENT_QUARANTINE_DATA_VERSION);
-        NBTTagList list = new NBTTagList();
-        if (quarantinedEntries != null) {
-            for (NBTTagCompound entry : quarantinedEntries) {
-                if (entry != null) {
-                    list.appendTag(entry.copy());
-                }
-            }
-        }
-        root.setTag(TAG_QUARANTINE_ENTRIES, list);
-        return root;
-    }
-
-    private static QuarantineReadResult readQuarantine(NBTTagCompound source) {
-        if (!source.hasKey(TAG_QUARANTINE)) {
-            return new QuarantineReadResult(true, -1,
-                    Collections.<NBTTagCompound>emptyList(), false);
-        }
-        if (!source.hasKey(TAG_QUARANTINE, Constants.NBT.TAG_COMPOUND)) {
-            return new QuarantineReadResult(false, -1,
-                    Collections.<NBTTagCompound>emptyList(), false);
-        }
-        NBTTagCompound root = source.getCompoundTag(TAG_QUARANTINE);
-        int version = root.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
-                ? root.getInteger(TAG_DATA_VERSION) : 0;
-        if (version > CURRENT_QUARANTINE_DATA_VERSION || version < 0) {
-            return new QuarantineReadResult(false, version,
-                    Collections.<NBTTagCompound>emptyList(), false);
-        }
-        if (root.hasKey(TAG_QUARANTINE_ENTRIES)
-                && !holdsCompoundsOnly(root, TAG_QUARANTINE_ENTRIES)) {
-            return new QuarantineReadResult(false, -1,
-                    Collections.<NBTTagCompound>emptyList(), false);
-        }
-        List<NBTTagCompound> entries = new ArrayList<NBTTagCompound>();
-        if (root.hasKey(TAG_QUARANTINE_ENTRIES, Constants.NBT.TAG_LIST)) {
-            NBTTagList list = root.getTagList(TAG_QUARANTINE_ENTRIES,
-                    Constants.NBT.TAG_COMPOUND);
-            for (int index = 0; index < list.tagCount(); index++) {
-                entries.add((NBTTagCompound) list.getCompoundTagAt(index).copy());
-            }
-        }
-        return new QuarantineReadResult(true, -1, entries,
-                version != CURRENT_QUARANTINE_DATA_VERSION
-                        || !root.hasKey(TAG_QUARANTINE_ENTRIES,
-                                Constants.NBT.TAG_LIST));
-    }
-
-    private static NBTTagCompound createQuarantineEntry(String reason,
-                                                        int entryIndex,
-                                                        NBTTagCompound original) {
-        NBTTagCompound entry = new NBTTagCompound();
-        entry.setString(TAG_REASON, reason == null ? "unknown" : reason);
-        entry.setInteger(TAG_ENTRY_INDEX, entryIndex);
-        if (original != null) {
-            entry.setTag(TAG_ORIGINAL_DATA, original.copy());
-        }
-        return entry;
-    }
-
-    private static void warn(String format, Object... args) {
-        try {
-            FMLLog.warning("[%s] " + format, prependModId(args));
-        } catch (RuntimeException ignored) {
-            // FML's logger is not bootstrapped in isolated codec unit tests.
-        }
-    }
-
-    private static Object[] prependModId(Object[] args) {
-        Object[] values = new Object[(args == null ? 0 : args.length) + 1];
-        values[0] = LostTalesMetaData.MOD_ID;
-        if (args != null) {
-            System.arraycopy(args, 0, values, 1, args.length);
-        }
-        return values;
-    }
-
     private static final class EntryReadResult {
         final DiscordMessageLinks.SavedLink link;
         final String failureReason;
@@ -453,21 +368,6 @@ final class DiscordMessageLinkNbtCodec {
 
         static EntryReadResult unsupported(int version) {
             return new EntryReadResult(null, null, version);
-        }
-    }
-
-    private static final class QuarantineReadResult {
-        final boolean supported;
-        final int unsupportedVersion;
-        final List<NBTTagCompound> entries;
-        final boolean repaired;
-
-        QuarantineReadResult(boolean supported, int unsupportedVersion,
-                             List<NBTTagCompound> entries, boolean repaired) {
-            this.supported = supported;
-            this.unsupportedVersion = unsupportedVersion;
-            this.entries = entries;
-            this.repaired = repaired;
         }
     }
 

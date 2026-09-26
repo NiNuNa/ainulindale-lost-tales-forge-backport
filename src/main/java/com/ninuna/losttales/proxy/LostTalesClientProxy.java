@@ -2,6 +2,7 @@ package com.ninuna.losttales.proxy;
 
 import com.ninuna.losttales.client.chat.ChatLayout;
 import com.ninuna.losttales.client.chat.ChatScreenPart;
+import com.ninuna.losttales.client.settings.ClientSettingsSections;
 import com.ninuna.losttales.client.chat.ClientChatIdentitySelection;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapPage;
 import com.ninuna.losttales.client.window.Window;
@@ -9,7 +10,6 @@ import com.ninuna.losttales.network.packet.LostTalesChatIdentitySyncPacket;
 import com.ninuna.losttales.config.LostTalesConfigFiles;
 import java.io.File;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityLamp;
-import com.ninuna.losttales.block.tileentity.LostTalesTileEntityMissiveBoard;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityPlushie;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityStatue;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityWaystone;
@@ -30,11 +30,15 @@ import com.ninuna.losttales.client.chat.ChatEmojiUsageStore;
 import com.ninuna.losttales.client.chat.ChatSpeechBubbles;
 import com.ninuna.losttales.client.window.PageContent;
 import com.ninuna.losttales.client.window.WindowPages;
+import com.ninuna.losttales.client.window.WorldPageWatch;
 import com.ninuna.losttales.client.window.WindowLayoutStore;
 import com.ninuna.losttales.gui.screen.character.CharacterSubWindows;
 import com.ninuna.losttales.gui.screen.character.CharactersPage;
 import com.ninuna.losttales.gui.screen.party.PartyPage;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
+import com.ninuna.losttales.gui.screen.missive.MissiveBoardPage;
+import com.ninuna.losttales.gui.screen.missive.MissiveLetterPage;
+import com.ninuna.losttales.gui.screen.waystone.WaystonePage;
 import net.minecraft.init.Items;
 import com.ninuna.losttales.client.chat.LostTalesChatClientHandler;
 import com.ninuna.losttales.client.chat.ClientChatChannelViews;
@@ -53,7 +57,6 @@ import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificationStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerUsageStore;
-import com.ninuna.losttales.client.mapmarker.LostTalesClientWaystoneStateStore;
 import com.ninuna.losttales.client.party.ClientPartyMemberStatusCache;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.client.party.ClientPartyTrackingCache;
@@ -72,18 +75,14 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.compat.minecraft.ModDisableabilityAccess;
 import com.ninuna.losttales.config.client.ClientServerConfigCache;
-import com.ninuna.losttales.config.client.LostTalesConfigGuiEventHandler;
 import com.ninuna.losttales.config.client.LostTalesThirdPersonConfig;
 import com.ninuna.losttales.entity.npc.LostTalesEntityOdaneGuard;
 import com.ninuna.losttales.entity.npc.LostTalesEntityOdaneMan;
 import com.ninuna.losttales.gui.ELostTalesMapLabels;
-import com.ninuna.losttales.gui.LostTalesGuiIds;
-import com.ninuna.losttales.gui.screen.LostTalesMissiveBoardGui;
-import com.ninuna.losttales.gui.screen.LostTalesMissiveLetterReaderGui;
-import com.ninuna.losttales.gui.screen.LostTalesWaystoneGui;
 import com.ninuna.losttales.item.armor.LostTalesItemArmor3D;
 import com.ninuna.losttales.network.packet.LostTalesMapMarkerDiscoveryPacket;
 import com.ninuna.losttales.network.packet.LostTalesMapMarkerSnapshotPacket;
+import com.ninuna.losttales.network.packet.LostTalesMissiveBoardStatePacket;
 import com.ninuna.losttales.network.packet.LostTalesWaystoneStatePacket;
 import com.ninuna.losttales.network.packet.LostTalesChargeTierSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
@@ -128,6 +127,7 @@ import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatPresenceSyncPacket;
 import com.ninuna.losttales.client.chat.ClientChatMembers;
 import com.ninuna.losttales.client.chat.ClientChatPresence;
+import com.ninuna.losttales.client.motion.MotionLabPage;
 import com.ninuna.losttales.client.motion.Motions;
 import cpw.mods.fml.client.registry.ClientRegistry;
 import cpw.mods.fml.client.registry.RenderingRegistry;
@@ -138,8 +138,6 @@ import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
-import net.minecraft.tileentity.TileEntity;
-import net.minecraft.world.World;
 import net.minecraft.client.resources.IReloadableResourceManager;
 import lotr.client.render.entity.LOTRRenderBreeMan;
 import net.minecraftforge.common.MinecraftForge;
@@ -168,6 +166,8 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         registerPages();
         ChatLayout.install();
         ChatScreenPart.install();
+        // Every client option's section of Settings, after the chat's.
+        ClientSettingsSections.install();
         WindowLayoutStore.initialize(clientFolder);
         ClientChatReadMarks.initialize(clientFolder);
         ClientChatPresenceChoices.initialize(clientFolder);
@@ -193,7 +193,6 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         FMLCommonHandler.instance().bus().register(clientEventHandler);
         FMLCommonHandler.instance().bus().register(characterClientTaskQueue);
         FMLCommonHandler.instance().bus().register(guiAnimationHandler);
-        FMLCommonHandler.instance().bus().register(new LostTalesConfigGuiEventHandler());
         MinecraftForge.EVENT_BUS.register(new LostTalesMainMenuHandler());
         ELostTalesMapLabels.initAndRegisterMapLabels();
 
@@ -205,7 +204,10 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     /**
      * The quest journal, the party, the map and the characters, each a
      * page a window can hold, with the key that opens it from another page
-     * (N1 a); and the Characters tab's own kinds of sub-window.
+     * (N1 a); the Characters tab's own kinds of sub-window; the Motion
+     * Lab, a page with no key, which needs no world (Q5 a, Q6 a); and the
+     * pages that open only from a thing in the world: a waystone's (Q10 a),
+     * a missive board's (Q7 a) and a missive letter's (Q9 a).
      */
     private static void registerPages() {
         WindowPages.register(QuestJournalPage.PAGE_ID, "gui.losttales.page.journal",
@@ -248,6 +250,46 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                     }
                 });
         CharacterSubWindows.install();
+        WindowPages.register(MotionLabPage.PAGE_ID,
+                "gui.losttales.page.motion_lab", MotionLabPage.ICON,
+                Window.ScreenFill.NONE, null,
+                new WindowPages.Factory() {
+                    @Override
+                    public PageContent create() {
+                        return new MotionLabPage();
+                    }
+                });
+        MotionLabPage.install();
+        // A waystone's page opens only from the waystone: no key, never
+        // offered under the +, and gone as the player leaves the world.
+        WindowPages.registerWorldPage(WaystonePage.PAGE_ID,
+                "gui.losttales.page.waystone", WaystonePage.ICON,
+                new WindowPages.Factory() {
+                    @Override
+                    public PageContent create() {
+                        return new WaystonePage();
+                    }
+                });
+        WindowPages.registerWorldPage(MissiveBoardPage.PAGE_ID,
+                "gui.losttales.page.missive_board", MissiveBoardPage.ICON,
+                new WindowPages.Factory() {
+                    @Override
+                    public PageContent create() {
+                        return new MissiveBoardPage();
+                    }
+                });
+        WindowPages.registerWorldPage(MissiveLetterPage.PAGE_ID,
+                "gui.losttales.page.missive_letter", MissiveLetterPage.ICON,
+                new WindowPages.Factory() {
+                    @Override
+                    public PageContent create() {
+                        return new MissiveLetterPage();
+                    }
+                });
+        MissiveBoardPage.install();
+        // A world page closes by itself once its thing is out of reach,
+        // behind another tab as well as in front.
+        WorldPageWatch.install();
     }
 
     @Override
@@ -323,29 +365,8 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     }
 
     @Override
-    public Object getClientGuiElement(int id, EntityPlayer player, World world, int x, int y, int z) {
-        if (id == LostTalesGuiIds.MISSIVE_BOARD) {
-            TileEntity tileEntity = world.getTileEntity(x, y, z);
-            if (tileEntity instanceof LostTalesTileEntityMissiveBoard) {
-                return new LostTalesMissiveBoardGui(player.inventory, (LostTalesTileEntityMissiveBoard) tileEntity);
-            }
-        }
-        if (id == LostTalesGuiIds.WAYSTONE) {
-            TileEntity tileEntity = world.getTileEntity(x, y, z);
-            if (tileEntity instanceof LostTalesTileEntityWaystone) {
-                return new LostTalesWaystoneGui(
-                        (LostTalesTileEntityWaystone)tileEntity);
-            }
-        }
-        return null;
-    }
-
-
-    @Override
-    public void openMissiveLetterGui(EntityPlayer player, ItemStack stack, int inventorySlot) {
-        if (stack != null) {
-            Minecraft.getMinecraft().displayGuiScreen(new LostTalesMissiveLetterReaderGui(stack, inventorySlot));
-        }
+    public void openMissiveLetterPage(int inventorySlot) {
+        MissiveLetterPage.open(inventorySlot);
     }
 
     @Override
@@ -385,7 +406,13 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     @Override
     public void handleWaystoneState(
             LostTalesWaystoneStatePacket packet) {
-        LostTalesClientWaystoneStateStore.accept(packet);
+        WaystonePage.accept(packet);
+    }
+
+    @Override
+    public void handleMissiveBoardState(
+            LostTalesMissiveBoardStatePacket packet) {
+        MissiveBoardPage.accept(packet);
     }
 
     @Override

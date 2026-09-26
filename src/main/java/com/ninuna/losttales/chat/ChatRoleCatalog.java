@@ -5,7 +5,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -227,14 +226,5 @@ public final class ChatRoleCatalog {
             }
         });
         return custom;
-    }
-
-    /** A copy of the account assignments, for editing. */
-    public Map<String, Set<UUID>> membersCopy() {
-        Map<String, Set<UUID>> copy = new LinkedHashMap<String, Set<UUID>>();
-        for (Map.Entry<String, Set<UUID>> entry : this.members.entrySet()) {
-            copy.put(entry.getKey(), new HashSet<UUID>(entry.getValue()));
-        }
-        return copy;
     }
 }

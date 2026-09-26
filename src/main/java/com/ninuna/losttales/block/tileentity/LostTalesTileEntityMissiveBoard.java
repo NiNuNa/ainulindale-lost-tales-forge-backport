@@ -1,10 +1,12 @@
 package com.ninuna.losttales.block.tileentity;
 
+import com.ninuna.losttales.block.ELostTalesBlock;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveData;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveGenerator;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveNbt;
+import com.ninuna.losttales.quest.missive.MissiveBoardWatches;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.item.ItemStack;
@@ -16,14 +18,20 @@ import net.minecraft.network.play.server.S35PacketUpdateTileEntity;
 import net.minecraft.tileentity.TileEntity;
 
 /**
- * Server-authoritative inventory and generation foundation for dynamic missive boards.
- *
- * The board stores generated missive letter stacks and slowly refills itself on
- * the server. Quest acceptance is intentionally still deferred to a later
- * server-validated stage.
+ * A missive board's notices: up to nine missive letters, which the board
+ * refills and takes down by itself on the server. Its page reads them
+ * through {@link com.ninuna.losttales.quest.missive.MissiveBoardService},
+ * which accepts, takes and pins for a player standing within
+ * {@link #REACH_SQ}; every change here tells the players watching it.
  */
 public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInventory {
     public static final int INVENTORY_SIZE = 9;
+    /**
+     * How near a player stands to use the board, squared, measured to the
+     * block's middle: eight blocks. The board's page closes once its
+     * player is further than this.
+     */
+    public static final double REACH_SQ = 64.0D;
     public static final int DEFAULT_MIN_AVAILABLE_MISSIVES = 5;
     public static final int DEFAULT_MAX_AVAILABLE_MISSIVES = 9;
     public static final long DEFAULT_GENERATION_INTERVAL_TICKS = 36000L;
@@ -256,6 +264,9 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInve
         this.markDirty();
         if (this.worldObj != null) {
             this.worldObj.markBlockForUpdate(this.xCoord, this.yCoord, this.zCoord);
+            if (!this.worldObj.isRemote) {
+                MissiveBoardWatches.markChanged();
+            }
         }
     }
 
@@ -323,11 +334,20 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInve
         return 1;
     }
 
+    /** The board still stands here, and the player is within {@link #REACH_SQ} of it. */
     @Override
     public boolean isUseableByPlayer(EntityPlayer player) {
-        return this.worldObj != null
+        return player != null && this.worldObj != null
                 && this.worldObj.getTileEntity(this.xCoord, this.yCoord, this.zCoord) == this
-                && player.getDistanceSq((double) this.xCoord + 0.5D, (double) this.yCoord + 0.5D, (double) this.zCoord + 0.5D) <= 64.0D;
+                && this.worldObj.getBlock(this.xCoord, this.yCoord, this.zCoord)
+                        == ELostTalesBlock.MISSIVE_BOARD.getBlock()
+                && isWithinReach(player, this.xCoord, this.yCoord, this.zCoord);
+    }
+
+    /** Whether the player is within {@link #REACH_SQ} of the middle of the block at {@code x}/{@code y}/{@code z}. */
+    public static boolean isWithinReach(EntityPlayer player, int x, int y, int z) {
+        return player != null && player.getDistanceSq(
+                x + 0.5D, y + 0.5D, z + 0.5D) <= REACH_SQ;
     }
 
     @Override

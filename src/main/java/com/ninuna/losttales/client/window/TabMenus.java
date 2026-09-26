@@ -165,7 +165,7 @@ final class TabMenus {
         List<MenuWindow.Entry> pages = new ArrayList<MenuWindow.Entry>();
         for (WindowPages.Page page : WindowPages.all()) {
             PageTab tab = page.tab();
-            if (!WindowLayout.isOpen(tab) && tab.isAvailable()
+            if (WindowPages.isOffered(page)
                     && WindowMenus.matchesFilter(page.title(), filter)) {
                 pages.add(new MenuWindow.Entry(tab.id(), page.title(), false,
                         -1, tab));

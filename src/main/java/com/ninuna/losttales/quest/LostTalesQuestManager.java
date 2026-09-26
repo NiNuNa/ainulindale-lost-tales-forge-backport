@@ -15,7 +15,6 @@ import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import com.ninuna.losttales.quest.progress.LostTalesQuestHistoryEntry;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
-import com.ninuna.losttales.util.LostTalesDimensionHelper;
 import com.ninuna.losttales.world.map.waypoint.LostTalesMapMarkerWaypointUnlockHelper;
 import java.util.Collection;
 import java.util.Collections;
@@ -265,8 +264,7 @@ public final class LostTalesQuestManager {
                 || !LostTalesQuestDialogue.of(quest).isOffered()) {
             return false;
         }
-        String giverSelector = firstNonEmptyParam(quest.getInteraction(),
-                "entity", "entityId", "npc", "target");
+        String giverSelector = LostTalesQuestParams.value(quest.getInteraction(), "entity");
         Entity giver = giverSelector.length() == 0 ? null
                 : nearbyEntity(player, Collections.singleton(giverSelector));
         boolean marked = giver != null
@@ -323,8 +321,7 @@ public final class LostTalesQuestManager {
      */
     private static Entity nearbyQuestGiver(EntityPlayerMP player,
                                            LostTalesQuestDefinition quest) {
-        String giver = firstNonEmptyParam(quest.getInteraction(),
-                "entity", "entityId", "npc", "target");
+        String giver = LostTalesQuestParams.value(quest.getInteraction(), "entity");
         Set<String> selectors = new LinkedHashSet<String>();
         if (giver.length() > 0) {
             selectors.add(giver);
@@ -335,8 +332,7 @@ public final class LostTalesQuestManager {
                 if (!LostTalesQuestObjectiveType.of(objective).isNpcVisit()) {
                     continue;
                 }
-                String named = firstNonEmptyParam(objective.getParams(),
-                        "entity", "entityId", "npc", "target");
+                String named = LostTalesQuestParams.value(objective.getParams(), "entity");
                 if (named.length() > 0) {
                     selectors.add(named);
                 }
@@ -781,7 +777,7 @@ public final class LostTalesQuestManager {
                             objective, 1);
                     continue;
                 }
-                int wanted = getObjectiveTargetCount(objective);
+                int wanted = LostTalesQuestObjectiveTextHelper.getObjectiveTargetCount(objective);
                 if (countMatchingInventoryItems(player, objective) < wanted) {
                     sendQuestChat(player, "chat.losttales.quest.missing_items",
                             quest.getTitle());
@@ -806,25 +802,10 @@ public final class LostTalesQuestManager {
     private static boolean matchesVisitedEntity(Entity target,
             LostTalesQuestObjectiveDefinition objective) {
         Map<String, String> params = objective.getParams();
-        String selector = firstNonEmptyParam(params,
-                "entity", "entityId", "npc", "target");
+        String selector = LostTalesQuestParams.value(params, "entity");
         return selector.length() > 0
                 && LostTalesQuestObjectiveMatcher.matchesEntity(target,
-                        selector, firstNonEmptyParam(params, "tag", "group"));
-    }
-
-    private static String firstNonEmptyParam(Map<String, String> params,
-            String... keys) {
-        if (params == null || keys == null) {
-            return "";
-        }
-        for (String key : keys) {
-            String value = params.get(key);
-            if (value != null && value.trim().length() > 0) {
-                return value.trim();
-            }
-        }
-        return "";
+                        selector, LostTalesQuestParams.first(params, "tag", "group"));
     }
 
     /**
@@ -1082,17 +1063,15 @@ public final class LostTalesQuestManager {
             return false;
         }
 
-        int target = getObjectiveTargetCount(objective);
+        int target = LostTalesQuestObjectiveTextHelper.getObjectiveTargetCount(objective);
         int before = data.getObjectiveProgress(quest.getId(), objective.getId());
-        if (target > 0 && before >= target) {
+        if (before >= target) {
             return false;
         }
 
         int now = data.addObjectiveProgress(quest.getId(), objective.getId(), Math.max(1, amount), target);
         boolean changed = now != before;
         if (changed) {
-            if (before < target && now >= target) {
-            }
             evaluateStageProgress(player, quest.getId());
         }
         return changed;
@@ -1105,15 +1084,13 @@ public final class LostTalesQuestManager {
         }
 
         int before = data.getObjectiveProgress(quest.getId(), objective.getId());
-        int target = getObjectiveTargetCount(objective);
-        int clamped = target > 0 ? Math.min(value, target) : value;
+        int target = LostTalesQuestObjectiveTextHelper.getObjectiveTargetCount(objective);
+        int clamped = Math.min(value, target);
         if (before == clamped) {
             return false;
         }
 
         data.setObjectiveProgress(quest.getId(), objective.getId(), clamped);
-        if (before < target && clamped >= target) {
-        }
         evaluateStageProgress(player, quest.getId());
         return true;
     }
@@ -1132,7 +1109,7 @@ public final class LostTalesQuestManager {
             if (objective.isOptional()) {
                 continue;
             }
-            int target = getObjectiveTargetCount(objective);
+            int target = LostTalesQuestObjectiveTextHelper.getObjectiveTargetCount(objective);
             int current = progress.getObjectiveProgress(objective.getId());
             if (current < target) {
                 return false;
@@ -1286,13 +1263,12 @@ public final class LostTalesQuestManager {
                     : stage.getObjectives()) {
                 if (!objective.isOptional()
                         || progress.getObjectiveProgress(objective.getId())
-                        < getObjectiveTargetCount(objective)) {
+                        < LostTalesQuestObjectiveTextHelper.getObjectiveTargetCount(objective)) {
                     continue;
                 }
-                String detail = firstNonEmpty(
-                        objective.getParam("outcome", ""),
-                        objective.getParam("outcomeText", ""),
-                        objective.getParam("outcome_text", ""));
+                String detail = LostTalesQuestParams.first(
+                        objective.getParams(),
+                        "outcome", "outcomeText", "outcome_text");
                 if (detail.length() == 0) {
                     String description = objective.getDescription();
                     detail = "Optional objective completed: "
@@ -1321,7 +1297,7 @@ public final class LostTalesQuestManager {
                     : stage.getObjectives()) {
                 if (objective.isOptional()
                         && progress.getObjectiveProgress(objective.getId())
-                        >= getObjectiveTargetCount(objective)) {
+                        >= LostTalesQuestObjectiveTextHelper.getObjectiveTargetCount(objective)) {
                     completed.add(objective.getId());
                 }
             }
@@ -1359,14 +1335,12 @@ public final class LostTalesQuestManager {
                 continue;
             }
 
-            int target = getObjectiveTargetCount(objective);
+            int target = LostTalesQuestObjectiveTextHelper.getObjectiveTargetCount(objective);
             int inventoryCount = Math.min(target, countMatchingInventoryItems(player, objective));
             int before = data.getObjectiveProgress(quest.getId(), objective.getId());
             if (inventoryCount > before) {
                 data.setObjectiveProgress(quest.getId(), objective.getId(), inventoryCount);
                 changed = true;
-                if (before < target && inventoryCount >= target) {
-                }
             }
         }
         return changed;
@@ -1391,16 +1365,6 @@ public final class LostTalesQuestManager {
         return LostTalesQuestObjectiveType.GATHER.is(objective);
     }
 
-    private static int getObjectiveTargetCount(LostTalesQuestObjectiveDefinition objective) {
-        if (objective == null) {
-            return 1;
-        }
-        if (LostTalesQuestObjectiveType.of(objective).countsToOne()) {
-            return 1;
-        }
-        return parseInt(objective.getParam("count", "1"), 1);
-    }
-
     private static boolean isGotoObjective(LostTalesQuestObjectiveDefinition objective) {
         return LostTalesQuestObjectiveType.GOTO.is(objective);
     }
@@ -1412,17 +1376,17 @@ public final class LostTalesQuestManager {
         }
         Map<String, String> params = objective.getParams();
         LostTalesMapMarkerDefinition marker = getObjectiveLocationMarker(player, objective);
-        boolean hasExplicitCoordinates = params.containsKey("x") || params.containsKey("y") || params.containsKey("z");
-
-        if (marker == null && !hasExplicitCoordinates) {
+        LostTalesQuestParams.Location location = marker != null ? null
+                : LostTalesQuestParams.location(params, source.worldObj.provider.dimensionId);
+        if (marker == null && location == null) {
             return false;
         }
 
-        double x = marker != null ? marker.getX() : parseDouble(params.get("x"), 0.0D);
-        double y = marker != null ? marker.getY() : parseDouble(params.get("y"), 0.0D);
-        double z = marker != null ? marker.getZ() : parseDouble(params.get("z"), 0.0D);
-        double radius = Math.max(0.5D, parseDouble(params.get("radius"), 3.0D));
-        int targetDimension = marker != null ? marker.getDimensionId() : LostTalesDimensionHelper.parseDimensionId(params.get("dimension"), source.worldObj.provider.dimensionId);
+        double x = marker != null ? marker.getX() : location.getX();
+        double y = marker != null ? marker.getY() : location.getY();
+        double z = marker != null ? marker.getZ() : location.getZ();
+        double radius = Math.max(0.5D, LostTalesQuestParams.parseDouble(params.get("radius"), 3.0D));
+        int targetDimension = marker != null ? marker.getDimensionId() : location.getDimensionId();
         if (source.worldObj.provider.dimensionId != targetDimension) {
             return false;
         }
@@ -1438,10 +1402,8 @@ public final class LostTalesQuestManager {
         if (objective == null) {
             return false;
         }
-        String value = firstNonEmpty(
-                objective.getParam("partyShared", ""),
-                objective.getParam("party_shared", ""),
-                objective.getParam("shareWithParty", ""));
+        String value = LostTalesQuestParams.first(objective.getParams(),
+                "partyShared", "party_shared", "shareWithParty");
         return value.length() == 0 || Boolean.parseBoolean(value);
     }
 
@@ -1449,14 +1411,8 @@ public final class LostTalesQuestManager {
         if (player == null || objective == null) {
             return null;
         }
-        String markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(firstNonEmpty(
-                objective.getParam("marker", ""),
-                objective.getParam("markerId", ""),
-                objective.getParam("mapMarker", ""),
-                objective.getParam("map_marker", ""),
-                objective.getParam("targetMarker", ""),
-                objective.getParam("target_marker", "")
-        ));
+        String markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(
+                objective.getParam("marker", ""));
         if (markerId.length() == 0) {
             return null;
         }
@@ -1470,7 +1426,7 @@ public final class LostTalesQuestManager {
     }
 
     private static boolean isWithinObjectiveRadius(EntityPlayerMP player, Entity victim, LostTalesQuestObjectiveDefinition objective) {
-        double radius = parseDouble(objective.getParam("radius", "0"), 0.0D);
+        double radius = LostTalesQuestParams.parseDouble(objective.getParam("radius", "0"), 0.0D);
         if (radius <= 0.0D || player == null || victim == null) {
             return true;
         }
@@ -1515,34 +1471,6 @@ public final class LostTalesQuestManager {
             return;
         }
         player.addChatMessage(new ChatComponentTranslation(key, args));
-    }
-
-    private static int parseInt(String value, int fallback) {
-        try {
-            return Integer.parseInt(value);
-        } catch (Exception ignored) {
-            return fallback;
-        }
-    }
-
-    private static double parseDouble(String value, double fallback) {
-        try {
-            return Double.parseDouble(value);
-        } catch (Exception ignored) {
-            return fallback;
-        }
-    }
-
-    private static String firstNonEmpty(String... values) {
-        if (values == null) {
-            return "";
-        }
-        for (String value : values) {
-            if (value != null && value.trim().length() > 0) {
-                return value.trim();
-            }
-        }
-        return "";
     }
 
     public enum StartResult {

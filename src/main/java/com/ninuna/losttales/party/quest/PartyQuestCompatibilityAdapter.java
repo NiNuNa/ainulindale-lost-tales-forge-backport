@@ -10,8 +10,6 @@ import net.minecraft.entity.player.EntityPlayerMP;
  */
 public interface PartyQuestCompatibilityAdapter {
 
-    String getId();
-
     boolean isAvailable();
 
     void applyKillProgress(EntityPlayerMP participant, Entity victim,

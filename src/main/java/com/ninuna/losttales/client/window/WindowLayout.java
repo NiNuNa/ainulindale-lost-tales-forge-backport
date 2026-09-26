@@ -77,8 +77,7 @@ public final class WindowLayout {
     /**
      * Back to the layout a player starts with: no window at all, then the
      * windows the systems lay out for a new player ({@link #setDefaults}:
-     * the chat's console window and conversation window). Remembered
-     * places go too.
+     * the chat's one window of Global and OOC). Remembered places go too.
      */
     public static synchronized void reset() {
         PLACES.clear();
@@ -762,13 +761,6 @@ public final class WindowLayout {
         final int width;
         /** The part of the screen the window fills; none in its own box. */
         final Window.ScreenFill fill;
-
-        public WindowSpec(String id, List<? extends WindowTab> tabs,
-                          WindowTab activeTab, boolean locked,
-                          double offsetX, double offsetY) {
-            this(id, tabs, activeTab, locked, offsetX, offsetY, null,
-                    Window.LinkSide.BELOW, 0.0D, 0, Window.ScreenFill.NONE);
-        }
 
         public WindowSpec(String id, List<? extends WindowTab> tabs,
                           WindowTab activeTab, boolean locked,

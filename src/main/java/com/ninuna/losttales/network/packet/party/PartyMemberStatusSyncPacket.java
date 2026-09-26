@@ -1,6 +1,7 @@
 package com.ninuna.losttales.network.packet.party;
 
 import com.ninuna.losttales.LostTalesMod;
+import com.ninuna.losttales.network.packet.LostTalesPacketCodec;
 import com.ninuna.losttales.party.model.Party;
 import com.ninuna.losttales.party.sync.PartyMemberAvailability;
 import com.ninuna.losttales.party.sync.PartyMemberStatusSnapshot;
@@ -36,9 +37,9 @@ public final class PartyMemberStatusSyncPacket implements IMessage {
     @Override
     public void fromBytes(ByteBuf buffer) {
         try {
-            UUID ownerId = PartyPacketCodec.readUuid(buffer);
+            UUID ownerId = LostTalesPacketCodec.readUuid(buffer);
             long sequence = buffer.readLong();
-            UUID activeCharacterId = PartyPacketCodec.readUuid(buffer);
+            UUID activeCharacterId = LostTalesPacketCodec.readUuid(buffer);
             if (sequence <= 0L) {
                 throw new PartyPacketCodec.DecodeException(
                         "invalid party status sequence");
@@ -46,13 +47,13 @@ public final class PartyMemberStatusSyncPacket implements IMessage {
 
             boolean hasParty = buffer.readBoolean();
             if (!hasParty) {
-                PartyPacketCodec.requireFinished(buffer);
+                LostTalesPacketCodec.requireFinished(buffer);
                 this.snapshot = PartyStatusSnapshot.noParty(
                         ownerId, sequence, activeCharacterId);
                 return;
             }
 
-            UUID partyId = PartyPacketCodec.readUuid(buffer);
+            UUID partyId = LostTalesPacketCodec.readUuid(buffer);
             long partyRevision = buffer.readLong();
             int count = buffer.readUnsignedByte();
             if (partyRevision < 0L || count <= 0
@@ -65,7 +66,7 @@ public final class PartyMemberStatusSyncPacket implements IMessage {
                     new ArrayList<PartyMemberStatusSnapshot>(count);
             Set<UUID> characterIds = new HashSet<UUID>();
             for (int index = 0; index < count; index++) {
-                UUID characterId = PartyPacketCodec.readUuid(buffer);
+                UUID characterId = LostTalesPacketCodec.readUuid(buffer);
                 PartyMemberAvailability availability =
                         PartyMemberAvailability.fromNetworkId(
                                 buffer.readUnsignedByte());
@@ -89,7 +90,7 @@ public final class PartyMemberStatusSyncPacket implements IMessage {
                         characterId, availability, dimensionId,
                         health, maximumHealth, helmet, heldItem));
             }
-            PartyPacketCodec.requireFinished(buffer);
+            LostTalesPacketCodec.requireFinished(buffer);
             PartyStatusSnapshot decoded = new PartyStatusSnapshot(
                     ownerId, sequence, activeCharacterId,
                     partyId, partyRevision, statuses);
@@ -109,21 +110,21 @@ public final class PartyMemberStatusSyncPacket implements IMessage {
         if (this.snapshot == null) {
             throw new IllegalStateException("snapshot must not be null");
         }
-        PartyPacketCodec.writeUuid(buffer, this.snapshot.getOwnerId());
+        LostTalesPacketCodec.writeUuid(buffer, this.snapshot.getOwnerId());
         buffer.writeLong(this.snapshot.getSynchronizationSequence());
-        PartyPacketCodec.writeUuid(
+        LostTalesPacketCodec.writeUuid(
                 buffer, this.snapshot.getActiveCharacterId());
         buffer.writeBoolean(this.snapshot.hasParty());
         if (!this.snapshot.hasParty()) {
             return;
         }
 
-        PartyPacketCodec.writeUuid(buffer, this.snapshot.getPartyId());
+        LostTalesPacketCodec.writeUuid(buffer, this.snapshot.getPartyId());
         buffer.writeLong(this.snapshot.getPartyRevision());
         buffer.writeByte(this.snapshot.getMemberStatuses().size());
         for (PartyMemberStatusSnapshot status
                 : this.snapshot.getMemberStatuses()) {
-            PartyPacketCodec.writeUuid(buffer, status.getCharacterId());
+            LostTalesPacketCodec.writeUuid(buffer, status.getCharacterId());
             buffer.writeByte(status.getAvailability().getNetworkId());
             if (status.getAvailability().hasLiveEntityData()) {
                 buffer.writeInt(status.getDimensionId());

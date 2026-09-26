@@ -5,10 +5,16 @@ import com.ninuna.losttales.client.camera.CameraPresetFileStore;
 import com.ninuna.losttales.config.LostTalesConfigDefinitions;
 import com.ninuna.losttales.config.LostTalesConfigFiles;
 import java.io.File;
+import java.util.Set;
+import java.util.TreeSet;
 import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.common.config.Property;
 
-/** Client-only options for the optional third-person camera overhaul. */
+/**
+ * Client-only options for the optional third-person camera overhaul, in
+ * their own file: set in Settings, Camera, and saved the moment one
+ * changes ({@link #save}).
+ */
 public final class LostTalesThirdPersonConfig {
     public static final String CATEGORY_CAMERA = "third_person_camera";
     private static final double ORIGINAL_HEAD_TRACKING_ANGLE = 35.0D;
@@ -20,7 +26,6 @@ public final class LostTalesThirdPersonConfig {
     private static final double MAXIMUM_HEAD_TRACKING_ANGLE = 120.0D;
 
     private static File loadedConfigFile;
-    private static Configuration pendingGuiConfiguration;
     /**
      * Every camera option as the mod ships it
      * ({@link LostTalesConfigDefinitions}): read on the first load against
@@ -111,18 +116,61 @@ public final class LostTalesThirdPersonConfig {
         }
     }
 
-    public static synchronized Configuration createConfiguration() {
-        pendingGuiConfiguration = loadedConfigFile == null
-                ? null : new Configuration(loadedConfigFile);
-        return pendingGuiConfiguration;
+    /**
+     * Writes every camera option as its field holds it now to the file,
+     * each in its shipped definition; nothing before the first load.
+     */
+    public static synchronized void save() {
+        if (loadedConfigFile == null) {
+            return;
+        }
+        Configuration config = new Configuration(loadedConfigFile);
+        try {
+            config.load();
+            writeCurrentValues(config);
+            applyGuiMetadata(config);
+            applyShippedDefinitions(config);
+        } finally {
+            if (config.hasChanged()) {
+                config.save();
+            }
+        }
     }
 
-    /** Saves the exact Configuration whose properties the Forge GUI edited. */
-    public static synchronized void savePendingGuiConfiguration() {
-        Configuration pending = pendingGuiConfiguration;
-        if (pending != null) {
-            pending.save();
+    /**
+     * A camera option as the mod ships it, as the file writes it; null
+     * before the first load, or for a key the file does not hold. What
+     * Settings' Default and Restore Defaults put back.
+     */
+    public static String shippedValue(String key) {
+        Configuration definitions = shipped;
+        if (definitions == null || !definitions.hasCategory(CATEGORY_CAMERA)) {
+            return null;
         }
+        Property property = definitions.getCategory(CATEGORY_CAMERA).get(key);
+        return property == null ? null : property.getString();
+    }
+
+    /**
+     * A number camera option's bounds as it is defined, {min, max}; null
+     * before the first load, or for an option with none.
+     */
+    public static double[] shippedBounds(String key) {
+        return LostTalesConfigDefinitions.bounds(shipped, CATEGORY_CAMERA, key);
+    }
+
+    /**
+     * The key of every camera option, as the options are defined: from
+     * the first load, or, before it, read against no file.
+     */
+    public static Set<String> optionKeys() {
+        Configuration definitions = shipped;
+        if (definitions == null) {
+            definitions = new Configuration();
+            readOptions(definitions, false);
+        }
+        return new TreeSet<String>(
+                definitions.getCategory(CATEGORY_CAMERA).keySet());
     }
 
     public static void applyGuiMetadata(Configuration config) {
@@ -417,6 +465,135 @@ public final class LostTalesThirdPersonConfig {
                 config.save();
             }
         }
+    }
+
+    /**
+     * Sets every camera option to what its field holds now, in
+     * {@code config}; {@link #save} writes nothing else.
+     */
+    static void writeCurrentValues(Configuration config) {
+        config.get(CATEGORY_CAMERA, "enabled", enabled).set(enabled);
+        config.get(CATEGORY_CAMERA, "cameraPreset", cameraPreset)
+                .set(cameraPreset);
+        config.get(CATEGORY_CAMERA, "enableFovEffects", enableFovEffects)
+                .set(enableFovEffects);
+        config.get(CATEGORY_CAMERA, "enableTargetCrosshair",
+                enableTargetCrosshair).set(enableTargetCrosshair);
+        config.get(CATEGORY_CAMERA, "enableCameraIntentTargeting",
+                enableCameraIntentTargeting).set(enableCameraIntentTargeting);
+        config.get(CATEGORY_CAMERA, "enableTargetLock", enableTargetLock)
+                .set(enableTargetLock);
+        config.get(CATEGORY_CAMERA, "enableTargetLockIndicator",
+                enableTargetLockIndicator).set(enableTargetLockIndicator);
+        config.get(CATEGORY_CAMERA, "targetLockSelectionRange",
+                targetLockSelectionRange).set(targetLockSelectionRange);
+        config.get(CATEGORY_CAMERA, "targetLockReleaseRange",
+                targetLockReleaseRange).set(targetLockReleaseRange);
+        config.get(CATEGORY_CAMERA, "targetLockSelectionAngle",
+                targetLockSelectionAngle).set(targetLockSelectionAngle);
+        config.get(CATEGORY_CAMERA, "targetLockYawSpeed", targetLockYawSpeed)
+                .set(targetLockYawSpeed);
+        config.get(CATEGORY_CAMERA, "targetLockPitchSpeed",
+                targetLockPitchSpeed).set(targetLockPitchSpeed);
+        config.get(CATEGORY_CAMERA, "targetLockHeightFactor",
+                targetLockHeightFactor).set(targetLockHeightFactor);
+        config.get(CATEGORY_CAMERA, "targetLockLineOfSightGraceSeconds",
+                targetLockLineOfSightGraceSeconds)
+                .set(targetLockLineOfSightGraceSeconds);
+        config.get(CATEGORY_CAMERA, "enableProjectileAimCorrection",
+                enableProjectileAimCorrection)
+                .set(enableProjectileAimCorrection);
+        config.get(CATEGORY_CAMERA, "enableProjectilePrediction",
+                enableProjectilePrediction).set(enableProjectilePrediction);
+        config.get(CATEGORY_CAMERA, "projectileAimDistance",
+                projectileAimDistance).set(projectileAimDistance);
+        config.get(CATEGORY_CAMERA, "projectileTrajectorySamplesPerTick",
+                projectileTrajectorySamplesPerTick)
+                .set(projectileTrajectorySamplesPerTick);
+        config.get(CATEGORY_CAMERA, "projectileTrajectorySmoothing",
+                projectileTrajectorySmoothing)
+                .set(projectileTrajectorySmoothing);
+        config.get(CATEGORY_CAMERA, "projectileTrajectoryOriginBlendDistance",
+                projectileTrajectoryOriginBlendDistance)
+                .set(projectileTrajectoryOriginBlendDistance);
+        config.get(CATEGORY_CAMERA, "projectileTrajectoryLineWidth",
+                projectileTrajectoryLineWidth)
+                .set(projectileTrajectoryLineWidth);
+        config.get(CATEGORY_CAMERA, "projectileTrajectoryOpacity",
+                projectileTrajectoryOpacity).set(projectileTrajectoryOpacity);
+        config.get(CATEGORY_CAMERA, "enableChargeTierFeedback",
+                enableChargeTierFeedback).set(enableChargeTierFeedback);
+        config.get(CATEGORY_CAMERA, "enableChargeTierParticles",
+                enableChargeTierParticles).set(enableChargeTierParticles);
+        config.get(CATEGORY_CAMERA, "enableChargeTierSounds",
+                enableChargeTierSounds).set(enableChargeTierSounds);
+        config.get(CATEGORY_CAMERA, "enableCameraMotion", enableCameraMotion)
+                .set(enableCameraMotion);
+        config.get(CATEGORY_CAMERA, "cameraMotionMultiplier",
+                cameraMotionMultiplier).set(cameraMotionMultiplier);
+        config.get(CATEGORY_CAMERA, "airborneMotionMultiplier",
+                airborneMotionMultiplier).set(airborneMotionMultiplier);
+        config.get(CATEGORY_CAMERA, "landingMotionMultiplier",
+                landingMotionMultiplier).set(landingMotionMultiplier);
+        config.get(CATEGORY_CAMERA, "ridingMotionMultiplier",
+                ridingMotionMultiplier).set(ridingMotionMultiplier);
+        config.get(CATEGORY_CAMERA, "swimmingMotionMultiplier",
+                swimmingMotionMultiplier).set(swimmingMotionMultiplier);
+        config.get(CATEGORY_CAMERA, "attackMotionMultiplier",
+                attackMotionMultiplier).set(attackMotionMultiplier);
+        config.get(CATEGORY_CAMERA, "damageMotionMultiplier",
+                damageMotionMultiplier).set(damageMotionMultiplier);
+        config.get(CATEGORY_CAMERA, "explosionMotionMultiplier",
+                explosionMotionMultiplier).set(explosionMotionMultiplier);
+        config.get(CATEGORY_CAMERA, "explosionMotionRadius",
+                explosionMotionRadius).set(explosionMotionRadius);
+        config.get(CATEGORY_CAMERA, "distanceMultiplier", distanceMultiplier)
+                .set(distanceMultiplier);
+        config.get(CATEGORY_CAMERA, "minimumZoomDistance",
+                minimumZoomDistance).set(minimumZoomDistance);
+        config.get(CATEGORY_CAMERA, "maximumZoomDistance",
+                maximumZoomDistance).set(maximumZoomDistance);
+        config.get(CATEGORY_CAMERA, "zoomStep", zoomStep).set(zoomStep);
+        config.get(CATEGORY_CAMERA, "shoulderOffsetMultiplier",
+                shoulderOffsetMultiplier).set(shoulderOffsetMultiplier);
+        config.get(CATEGORY_CAMERA, "verticalOffsetMultiplier",
+                verticalOffsetMultiplier).set(verticalOffsetMultiplier);
+        config.get(CATEGORY_CAMERA, "transitionSpeedMultiplier",
+                transitionSpeedMultiplier).set(transitionSpeedMultiplier);
+        config.get(CATEGORY_CAMERA, "collisionPadding", collisionPadding)
+                .set(collisionPadding);
+        config.get(CATEGORY_CAMERA, "collisionReleaseRate",
+                collisionReleaseRate).set(collisionReleaseRate);
+        config.get(CATEGORY_CAMERA, "defaultRightShoulder",
+                defaultRightShoulder).set(defaultRightShoulder);
+        config.get(CATEGORY_CAMERA, "enableDirectionalMovement",
+                enableDirectionalMovement).set(enableDirectionalMovement);
+        config.get(CATEGORY_CAMERA, "bodyRotationSpeed", bodyRotationSpeed)
+                .set(bodyRotationSpeed);
+        config.get(CATEGORY_CAMERA, "sprintBodyRotationSpeed",
+                sprintBodyRotationSpeed).set(sprintBodyRotationSpeed);
+        config.get(CATEGORY_CAMERA, "headTrackingAngle", headTrackingAngle)
+                .set(headTrackingAngle);
+        config.get(CATEGORY_CAMERA, "headTrackingSpeed", headTrackingSpeed)
+                .set(headTrackingSpeed);
+        config.get(CATEGORY_CAMERA, "headTrackingHysteresisAngle",
+                headTrackingHysteresisAngle).set(headTrackingHysteresisAngle);
+        config.get(CATEGORY_CAMERA, "headTrackingTransitionSeconds",
+                headTrackingTransitionSeconds)
+                .set(headTrackingTransitionSeconds);
+        config.get(CATEGORY_CAMERA, "combatProfileWithWeaponHeld",
+                combatProfileWithWeaponHeld).set(combatProfileWithWeaponHeld);
+        config.get(CATEGORY_CAMERA, "combatProfileHoldSeconds",
+                combatProfileHoldSeconds).set(combatProfileHoldSeconds);
+        config.get(CATEGORY_CAMERA, "attackCommitmentSeconds",
+                attackCommitmentSeconds).set(attackCommitmentSeconds);
+        config.get(CATEGORY_CAMERA, "aimingBodyRotationSpeed",
+                aimingBodyRotationSpeed).set(aimingBodyRotationSpeed);
+        config.get(CATEGORY_CAMERA, "attackBodyRotationSpeed",
+                attackBodyRotationSpeed).set(attackBodyRotationSpeed);
+        config.get(CATEGORY_CAMERA, "enableSwimmingDirectionalMovement",
+                enableSwimmingDirectionalMovement)
+                .set(enableSwimmingDirectionalMovement);
     }
 
     private static double getClampedDouble(

@@ -93,8 +93,6 @@ public final class ChatMemberDirectory {
     static final long ABSENT_REFRESH_MILLIS = 15000L;
 
     private static final Map<String, Absentees> ABSENT = new HashMap<String, Absentees>();
-    /** The server's name as its member row sorts. */
-    private static final String SERVER_NAME = "Server";
     /** A Discord server's heading while its name is not known. */
     private static final String DISCORD_NAME = "Discord";
 
@@ -650,8 +648,10 @@ public final class ChatMemberDirectory {
         int color = LostTalesColors.rgb(LostTalesColors.ROSE_GRAY);
         String group = inCharacter ? ChatChannelPolicy.factionOf(null) : "";
         return new LostTalesChatMembersPacket.Member(
-                LostTalesChatMessagePacket.SERVER_SENDER_ID, SERVER_NAME, null,
-                SERVER_NAME, color, "", "", color, group,
+                LostTalesChatMessagePacket.SERVER_SENDER_ID,
+                LostTalesServerBroadcastHook.SERVER_NAME, null,
+                LostTalesServerBroadcastHook.SERVER_NAME, color, "", "", color,
+                group,
                 inCharacter ? factionName(group) : "", 0, true);
     }
 

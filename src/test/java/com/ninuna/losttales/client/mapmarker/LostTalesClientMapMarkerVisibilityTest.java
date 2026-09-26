@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.mapmarker;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import org.junit.Test;
 
 /** Regression coverage for the intentionally different map/compass policy. */
@@ -40,6 +41,7 @@ public final class LostTalesClientMapMarkerVisibilityTest {
                 "fort",
                 "white",
                 LostTalesMapMarkerData.CATEGORY_POINT_OF_INTEREST,
+                "",
                 false,
                 100,
                 0.0D,
@@ -49,6 +51,9 @@ public final class LostTalesClientMapMarkerVisibilityTest {
                 8.0D,
                 hiddenUntilDiscovered,
                 discoverable,
-                requiresRegionUnlock);
+                requiresRegionUnlock,
+                false,
+                0,
+                LostTalesMapMarkerSource.CUSTOM_PRESET);
     }
 }

@@ -253,6 +253,12 @@ public final class LostTalesLotrWaystoneTravelAdapter {
             return null;
         }
         World world = player.worldObj;
+        // Reach first: the position comes from the client, and reading a
+        // tile entity there could load a chunk far from the player.
+        if (player.getDistanceSq(sourceX + 0.5D, sourceY + 0.5D,
+                sourceZ + 0.5D) > LostTalesTileEntityWaystone.REACH_SQ) {
+            return null;
+        }
         TileEntity raw = world.getTileEntity(
                 sourceX, sourceY, sourceZ);
         if (!(raw instanceof LostTalesTileEntityWaystone)) {

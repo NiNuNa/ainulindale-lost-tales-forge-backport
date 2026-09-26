@@ -38,9 +38,7 @@ import net.minecraft.util.IChatComponent;
  * grouping, hover, scrolling and removal all still see a single
  * message. A grouped continuation carries no sender at all and so has
  * no header row; its body starts on the row it is already on, behind
- * the same chevron, and the run stays aligned. A line may name its own
- * separator instead of the chevron, and is laid out the same way behind
- * it. The separator is
+ * the same chevron, and the run stays aligned. The chevron is
  * the chat's own punctuation rather than the sender's words: it is added
  * here, so the stored message never holds it and copying a line copies
  * what was said.</p>
@@ -277,10 +275,8 @@ final class ChatLineWrapper {
                     builder.appendStamp(stamp, metrics.width(" "));
                 }
                 int senderColor = ChatLayoutMarker.bodyColor(part);
-                String label = ChatLayoutMarker.bodyLabel(part);
                 builder.beginBody(senderColor < 0 ? nameColor
-                        : senderColor,
-                        label == null ? BODY_SEPARATOR : label);
+                        : senderColor);
             } else if (isAtomic(part)) {
                 builder.appendAtomic(part);
             } else {
@@ -546,18 +542,17 @@ final class ChatLineWrapper {
 
         /**
          * Ends the header and opens the message body at the left edge,
-         * behind {@code separator} — the chat's chevron, or the label a
-         * line names — drawn in the sender's colour. A header that drew
+         * behind the chat's chevron drawn in the sender's colour. A header that drew
          * nothing — a grouped continuation, whose runs are all hidden in
          * this state — keeps the row it is on, so the body of a run
          * always begins in the same place. From here on every
-         * continuation line is inset by the separator's width, up to
+         * continuation line is inset by the chevron's width, up to
          * the same ceiling a long header's indent has, and has the whole
          * width: only the header is drawn at the large size.
          */
-        void beginBody(int senderColor, String separator) {
+        void beginBody(int senderColor) {
             this.width = this.bodyWidth;
-            int separatorWidth = this.metrics.width(separator);
+            int separatorWidth = this.metrics.width(BODY_SEPARATOR);
             int inset = Math.min(separatorWidth, this.maxIndent);
             this.closedIndent = inset;
             this.openIndent = inset;
@@ -578,7 +573,7 @@ final class ChatLineWrapper {
             }
             this.bodyFirstRow = this.lines.size();
             this.used = 0;
-            place(ChatBodyMarker.separator(separator, senderColor),
+            place(ChatBodyMarker.separator(BODY_SEPARATOR, senderColor),
                     separatorWidth);
             this.lineStart = separatorWidth;
         }

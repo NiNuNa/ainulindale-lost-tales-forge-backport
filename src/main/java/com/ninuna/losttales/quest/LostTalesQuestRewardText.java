@@ -29,25 +29,26 @@ public final class LostTalesQuestRewardText {
             if (value.length() == 0) {
                 continue;
             }
-            if (isOneOf(key, "experience", "xp", "experiencePoints")) {
+            if (isOneOf(key, "experience")) {
                 result.add(StatCollector.translateToLocalFormatted(
                         "gui.losttales.quest.reward.experience", value));
-            } else if (isOneOf(key, "levels", "experienceLevels", "xpLevels")) {
+            } else if (isOneOf(key, "levels")) {
                 result.add(StatCollector.translateToLocalFormatted("1".equals(value)
                         ? "gui.losttales.quest.reward.level"
                         : "gui.losttales.quest.reward.levels", value));
-            } else if (isOneOf(key, "items", "stacks", "itemStacks")) {
-                for (String part : value.replace(';', ',').split(",")) {
-                    String item = itemPhrase(part);
-                    if (item.length() > 0) {
-                        result.add(item);
-                    }
+            } else if ("items".equals(key)) {
+                // Named as the server reads them to grant them.
+                for (LostTalesQuestItemSpec item
+                        : LostTalesQuestItemSpec.rewardItems(rewards)) {
+                    addPhrase(result, itemPhrase(item));
                 }
-            } else if (isOneOf(key, "item", "itemId", "stack")) {
-                String item = itemPhrase(value);
-                if (item.length() > 0) {
-                    result.add(item);
-                }
+            } else if ("item".equals(key)) {
+                addPhrase(result, itemPhrase(
+                        LostTalesQuestItemSpec.rewardItem(rewards)));
+            } else if (("count".equals(key) || "meta".equals(key))
+                    && LostTalesQuestParams.value(rewards, "item").length() > 0) {
+                // Parts of the item, which its own phrase says.
+                continue;
             } else {
                 result.add(prettify(key) + ": " + value);
             }
@@ -73,51 +74,48 @@ public final class LostTalesQuestRewardText {
      * an item this game does not have.
      */
     static String itemPhrase(String written) {
-        String spec = written == null ? "" : written.trim();
-        if (spec.length() == 0) {
-            return "";
-        }
-        int count = 1;
-        int meta = 0;
-        int star = spec.lastIndexOf('*');
-        if (star >= 0 && star + 1 < spec.length()) {
-            count = Math.max(1, parseInt(spec.substring(star + 1), 1));
-            spec = spec.substring(0, star);
-        }
-        int at = spec.lastIndexOf('@');
-        if (at >= 0 && at + 1 < spec.length()) {
-            meta = Math.max(0, parseInt(spec.substring(at + 1), 0));
-            spec = spec.substring(0, at);
-        }
-        if (spec.indexOf(':') < 0) {
-            spec = "minecraft:" + spec;
-        }
-        return (count > 1 ? count + "x " : "") + itemName(spec, meta);
+        return itemPhrase(LostTalesQuestItemSpec.parse(written, 1, 0));
     }
 
-    private static String itemName(String id, int meta) {
+    /** One item as {@code 2x Bread}; empty for none. */
+    static String itemPhrase(LostTalesQuestItemSpec item) {
+        if (item == null || item.isEmpty()) {
+            return "";
+        }
+        return (item.getCount() > 1 ? item.getCount() + "x " : "")
+                + itemName(item);
+    }
+
+    private static String itemName(LostTalesQuestItemSpec spec) {
+        String id = spec.getItemId();
         String readable = prettify(id.substring(id.indexOf(':') + 1));
-        Object item;
+        Item item;
         try {
-            item = Item.itemRegistry.getObject(id);
+            item = spec.item();
         } catch (RuntimeException unreadable) {
             return readable;
         }
-        if (!(item instanceof Item)) {
+        if (item == null) {
             return readable;
         }
         try {
             // Another mod may name its item with code only a client has.
-            String name = new ItemStack((Item)item, 1, meta).getDisplayName();
+            String name = new ItemStack(item, 1, spec.getMeta()).getDisplayName();
             return name == null || name.trim().length() == 0 ? readable : name;
         } catch (RuntimeException unnamed) {
             return readable;
         }
     }
 
+    private static void addPhrase(List<String> phrases, String phrase) {
+        if (phrase.length() > 0) {
+            phrases.add(phrase);
+        }
+    }
+
     private static boolean isOneOf(String key, String... names) {
         for (String name : names) {
-            if (name.equalsIgnoreCase(key)) {
+            if (name.equals(key)) {
                 return true;
             }
         }
@@ -129,13 +127,5 @@ public final class LostTalesQuestRewardText {
         String text = value == null ? "" : value.replace('_', ' ').trim();
         return text.length() == 0 ? ""
                 : Character.toUpperCase(text.charAt(0)) + text.substring(1);
-    }
-
-    private static int parseInt(String value, int fallback) {
-        try {
-            return Integer.parseInt(value.trim());
-        } catch (NumberFormatException notANumber) {
-            return fallback;
-        }
     }
 }

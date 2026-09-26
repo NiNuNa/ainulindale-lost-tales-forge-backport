@@ -1,14 +1,13 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.config.LostTalesConfigFiles;
+import com.ninuna.losttales.util.LostTalesCloseables;
+import com.ninuna.losttales.util.LostTalesTextFiles;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -264,7 +263,7 @@ public final class ClientChatIgnores {
         } catch (IOException ignored) {
             // Preferences are best-effort; starting empty is safe.
         } finally {
-            closeQuietly(reader);
+            LostTalesCloseables.closeQuietly(reader);
         }
         rebuildKnownNames();
     }
@@ -302,41 +301,18 @@ public final class ClientChatIgnores {
         if (file == null) {
             return;
         }
-        File parent = file.getParentFile();
-        if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
-            return;
+        List<String> lines = new ArrayList<String>(
+                ignoredAccounts.size() + ignoredIdentities.size());
+        for (Map.Entry<UUID, String> entry : ignoredAccounts.entrySet()) {
+            lines.add("ignore " + entry.getKey()
+                    + (entry.getValue().length() > 0
+                            ? " " + entry.getValue() : ""));
         }
-        Writer writer = null;
-        try {
-            writer = new OutputStreamWriter(new FileOutputStream(file), UTF_8);
-            for (Map.Entry<UUID, String> entry : ignoredAccounts.entrySet()) {
-                writer.write("ignore " + entry.getKey()
-                        + (entry.getValue().length() > 0
-                                ? " " + entry.getValue() : "") + "\n");
-            }
-            for (Map.Entry<String, String> entry : ignoredIdentities.entrySet()) {
-                writer.write("ignore-identity "
-                        + entry.getKey().substring(0, entry.getKey().indexOf('|'))
-                        + " " + entry.getValue() + "\n");
-            }
-            for (Map.Entry<String, String> entry : ignoredIdentities.entrySet()) {
-                writer.write("ignore-identity "
-                        + entry.getKey().substring(0, entry.getKey().indexOf('|'))
-                        + " " + entry.getValue() + "\n");
-            }
-        } catch (IOException ignored) {
-            // Losing a preference write must never break chat.
-        } finally {
-            closeQuietly(writer);
+        for (Map.Entry<String, String> entry : ignoredIdentities.entrySet()) {
+            lines.add("ignore-identity "
+                    + entry.getKey().substring(0, entry.getKey().indexOf('|'))
+                    + " " + entry.getValue());
         }
-    }
-
-    private static void closeQuietly(java.io.Closeable closeable) {
-        if (closeable != null) {
-            try {
-                closeable.close();
-            } catch (IOException ignored) {
-            }
-        }
+        LostTalesTextFiles.writeLines(file, lines);
     }
 }

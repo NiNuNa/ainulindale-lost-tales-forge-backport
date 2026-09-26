@@ -306,7 +306,7 @@ final class LockAnimation {
     private Pose turnPose(long elapsedNanos) {
         float lean = this.direction;
         if (elapsedNanos < TURN_ANTICIPATE_NANOS) {
-            float progress = easeOutCubic(
+            float progress = LostTalesGuiEasing.easeOutCubic(
                     (float)elapsedNanos / (float)TURN_ANTICIPATE_NANOS);
             this.swing = this.turnFrom;
             // Against the travel, and rising off the strip as it winds.
@@ -316,7 +316,7 @@ final class LockAnimation {
         }
         long afterWindUp = elapsedNanos - TURN_ANTICIPATE_NANOS;
         if (afterWindUp < TURN_ACTION_NANOS) {
-            float progress = easeOutCubic(
+            float progress = LostTalesGuiEasing.easeOutCubic(
                     (float)afterWindUp / (float)TURN_ACTION_NANOS);
             this.swing = this.turnFrom
                     + (this.turnTo - this.turnFrom) * progress;
@@ -346,10 +346,10 @@ final class LockAnimation {
      */
     private Pose hoverPose(long elapsedNanos, long nowNanos,
                            boolean locked) {
-        float entry = clamp01((float)elapsedNanos / (float)TELL_NANOS);
+        float entry = LostTalesGuiEasing.clamp((float)elapsedNanos / (float)TELL_NANOS);
         float hump = (float)Math.sin(entry * Math.PI)
                 * (float)Math.exp(-1.4F * entry);
-        float settled = smoothStep(entry);
+        float settled = LostTalesGuiEasing.smoothStep(entry);
         return locked
                 ? pressurePose(nowNanos, settled, hump)
                 : easePose(nowNanos, settled, hump);
@@ -404,10 +404,6 @@ final class LockAnimation {
                 / (double)periodNanos * TWO_PI;
     }
 
-    private static float smoothStep(float value) {
-        return LostTalesGuiEasing.smoothStep(value);
-    }
-
     /** A pose, with the shadow's own trailing offset worked out from it. */
     private static Pose pose(float offsetX, float offsetY,
                              float rotationDegrees, float scaleX,
@@ -419,16 +415,8 @@ final class LockAnimation {
                         - offsetY * SHADOW_LAG);
     }
 
-    private static float easeOutCubic(float value) {
-        return LostTalesGuiEasing.easeOutCubic(value);
-    }
-
     private static float lerp(float from, float to, float progress) {
         return from + (to - from) * progress;
-    }
-
-    private static float clamp01(float value) {
-        return LostTalesGuiEasing.clamp(value);
     }
 
     /** Where the padlock stands this instant, and where its shadow does. */

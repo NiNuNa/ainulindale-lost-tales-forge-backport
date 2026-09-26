@@ -5,6 +5,7 @@ import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
 import com.ninuna.losttales.character.registry.CharacterRaceGameplayProfile;
 import com.ninuna.losttales.character.registry.CharacterRaceGameplayRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
+import com.ninuna.losttales.util.LostTalesIdentifiers;
 import cpw.mods.fml.common.FMLLog;
 import lotr.common.entity.npc.LOTREntityBreeMan;
 import lotr.common.entity.npc.LOTREntityDwarf;
@@ -51,7 +52,7 @@ public final class LotrRaceProfileAdapter {
 
     public synchronized CharacterRaceGameplayProfile resolve(
             World world, String raceId) {
-        String canonicalRaceId = CharacterRaceRegistry.normalizeIdentifier(raceId);
+        String canonicalRaceId = LostTalesIdentifiers.normalize(raceId);
         if (canonicalRaceId.length() == 0) {
             return CharacterRaceGameplayRegistry.DEFAULT;
         }
@@ -121,7 +122,7 @@ public final class LotrRaceProfileAdapter {
                         profile.getRepresentativeEntityClassName(),
                         profile.getWidth(),
                         profile.getHeight(),
-                        profile.getEyeHeight(),
+                        profile.getStandingEyeHeight(),
                         profile.getMaxHealth(),
                         profile.getMovementSpeedMultiplier(),
                         profile.getAttackDamage());

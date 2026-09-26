@@ -25,8 +25,8 @@ public final class LostTalesThirdPersonAimPacket implements IMessage {
     public LostTalesThirdPersonAimPacket(
             boolean active, float directionX,
             float directionY, float directionZ) {
-        if (active && (!isFinite(directionX)
-                || !isFinite(directionY) || !isFinite(directionZ))) {
+        if (active && (!Float.isFinite(directionX)
+                || !Float.isFinite(directionY) || !Float.isFinite(directionZ))) {
             throw new IllegalArgumentException("aim direction must be finite");
         }
         this.active = active;
@@ -45,9 +45,9 @@ public final class LostTalesThirdPersonAimPacket implements IMessage {
             this.directionZ = buffer.readFloat();
             LostTalesPacketCodec.requireFinished(buffer);
             if (activeValue > 1 || this.active
-                    && (!isFinite(this.directionX)
-                    || !isFinite(this.directionY)
-                    || !isFinite(this.directionZ))) {
+                    && (!Float.isFinite(this.directionX)
+                    || !Float.isFinite(this.directionY)
+                    || !Float.isFinite(this.directionZ))) {
                 throw new LostTalesPacketCodec.DecodeException(
                         "invalid third-person aim packet");
             }
@@ -62,10 +62,6 @@ public final class LostTalesThirdPersonAimPacket implements IMessage {
         buffer.writeFloat(this.directionX);
         buffer.writeFloat(this.directionY);
         buffer.writeFloat(this.directionZ);
-    }
-
-    private static boolean isFinite(float value) {
-        return !Float.isNaN(value) && !Float.isInfinite(value);
     }
 
     boolean isActiveForTest() {

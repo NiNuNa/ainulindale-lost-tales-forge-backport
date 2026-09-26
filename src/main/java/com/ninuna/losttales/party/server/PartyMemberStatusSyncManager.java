@@ -14,6 +14,7 @@ import com.ninuna.losttales.party.storage.PartyStorage;
 import com.ninuna.losttales.party.storage.PartyWorldData;
 import com.ninuna.losttales.party.sync.PartyMemberStatusSnapshot;
 import com.ninuna.losttales.party.sync.PartyStatusSnapshot;
+import com.ninuna.losttales.util.LostTalesServerPlayers;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
@@ -51,7 +52,7 @@ public final class PartyMemberStatusSyncManager {
 
     /** Sends a fresh snapshot after login, character, or party-state changes. */
     public static synchronized boolean sendNow(EntityPlayerMP recipient) {
-        if (!isServerPlayer(recipient)) {
+        if (!LostTalesServerPlayers.isServerPlayer(recipient)) {
             return false;
         }
         ServerView view = collectServerView();
@@ -170,7 +171,7 @@ public final class PartyMemberStatusSyncManager {
         } catch (RuntimeException exception) {
             return PartyMemberStatusSnapshot.unavailable(characterId);
         }
-        if (!isFinite(maximumHealth) || !isFinite(health)
+        if (!Float.isFinite(maximumHealth) || !Float.isFinite(health)
                 || maximumHealth <= 0.0F) {
             return PartyMemberStatusSnapshot.unavailable(characterId);
         }
@@ -240,7 +241,7 @@ public final class PartyMemberStatusSyncManager {
                     continue;
                 }
                 EntityPlayerMP player = (EntityPlayerMP) value;
-                if (!isServerPlayer(player)) {
+                if (!LostTalesServerPlayers.isServerPlayer(player)) {
                     continue;
                 }
                 UUID ownerId = player.getUniqueID();
@@ -267,15 +268,6 @@ public final class PartyMemberStatusSyncManager {
                 ? null : roster.getActiveCharacter();
         return active != null && ownerId.equals(active.getOwnerId())
                 ? active.getCharacterId() : ownerId;
-    }
-
-    private static boolean isServerPlayer(EntityPlayerMP player) {
-        return player != null && player.getUniqueID() != null
-                && player.worldObj != null && !player.worldObj.isRemote;
-    }
-
-    private static boolean isFinite(float value) {
-        return !Float.isNaN(value) && !Float.isInfinite(value);
     }
 
     private static final class ServerView {

@@ -45,14 +45,13 @@ public final class ChatReactionsTest {
         assertTrue("on a message that carries it, a player may add theirs",
                 reactions.set(PARROT, ALICE, "Aldric", true));
         assertTrue(reactions.standOf(PARROT).players());
-        assertTrue(reactions.hasForeign());
 
         assertTrue(reactions.set(PARROT, DISCORD_MEMBER, "", false));
         assertEquals("the player's stays when the member's goes",
                 1, reactions.summaryFor(ALICE).find(PARROT).count);
         assertTrue(reactions.set(PARROT, ALICE, "", false));
         assertNull(reactions.summaryFor(ALICE).find(PARROT));
-        assertFalse(reactions.hasForeign());
+        assertTrue(reactions.isEmpty());
         assertFalse("gone from the message, a player cannot bring it back",
                 reactions.set(PARROT, ALICE, "Aldric", true));
     }
@@ -99,7 +98,7 @@ public final class ChatReactionsTest {
         assertEquals(1, reactions.snapshot().size());
         assertEquals(2, reactions.summaryFor(ALICE).find("grinning").count);
         assertTrue(reactions.summaryFor(ALICE).find("grinning").mine);
-        assertFalse(reactions.hasForeign());
+        assertTrue(reactions.snapshot().containsKey("grinning"));
         // A kind the save wrote under its own name still takes a reactor once.
         assertTrue(reactions.restore("smile", BOB, "Beren", ""));
         assertFalse(reactions.restore("smile", BOB, "Beren", ""));

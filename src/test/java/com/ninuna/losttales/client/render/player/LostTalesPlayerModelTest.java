@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.render.player;
 
+import com.ninuna.losttales.character.registry.CharacterSkinLayout;
 import net.minecraft.client.model.ModelBox;
 import net.minecraft.client.model.ModelRenderer;
 import org.junit.Test;
@@ -18,7 +19,7 @@ public final class LostTalesPlayerModelTest {
 
     @Test
     public void wideBodyKeepsVanillaArms() {
-        LostTalesPlayerModel model = new LostTalesPlayerModel(0.0F, false);
+        LostTalesPlayerModel model = plainBody(false);
         assertFalse(model.isSlim());
         assertEquals(64.0F, model.textureWidth, 0.0F);
         assertEquals(64.0F, model.textureHeight, 0.0F);
@@ -33,7 +34,7 @@ public final class LostTalesPlayerModelTest {
     /** Java Edition keeps slim arms level with wide ones (MC-275473). */
     @Test
     public void slimBodyNarrowsBothArmsAndKeepsTheirHeight() {
-        LostTalesPlayerModel model = new LostTalesPlayerModel(0.0F, true);
+        LostTalesPlayerModel model = plainBody(true);
         assertTrue(model.isSlim());
         assertEquals(3.0F, width(model.bipedRightArm), 0.0F);
         assertEquals(3.0F, width(model.bipedLeftArm), 0.0F);
@@ -46,7 +47,7 @@ public final class LostTalesPlayerModelTest {
 
     @Test
     public void leftLimbsHaveTheirOwnUnmirroredParts() {
-        LostTalesPlayerModel model = new LostTalesPlayerModel(0.0F, false);
+        LostTalesPlayerModel model = plainBody(false);
         assertFalse(model.bipedLeftArm.mirror);
         assertFalse(model.bipedLeftLeg.mirror);
         assertEquals(1.9F, model.bipedLeftLeg.rotationPointX, 0.0F);
@@ -63,7 +64,7 @@ public final class LostTalesPlayerModelTest {
      */
     @Test
     public void everyLimbCarriesOneOverlayChildOfItsOwnSize() {
-        LostTalesPlayerModel model = new LostTalesPlayerModel(0.0F, true);
+        LostTalesPlayerModel model = plainBody(true);
         ModelRenderer[] limbs = {
                 model.bipedBody, model.bipedRightArm, model.bipedLeftArm,
                 model.bipedRightLeg, model.bipedLeftLeg};
@@ -84,6 +85,12 @@ public final class LostTalesPlayerModelTest {
         for (ModelRenderer limb : limbs) {
             assertFalse(((ModelRenderer)limb.childModels.get(0)).showModel);
         }
+    }
+
+    /** The plain player body in Minecraft's layout, without a chest. */
+    private static LostTalesPlayerModel plainBody(boolean slim) {
+        return new LostTalesPlayerModel(0.0F, slim, PlayerBodyShape.PLAYER,
+                CharacterSkinLayout.MINECRAFT_64X64, null, false);
     }
 
     private static float width(ModelRenderer part) {

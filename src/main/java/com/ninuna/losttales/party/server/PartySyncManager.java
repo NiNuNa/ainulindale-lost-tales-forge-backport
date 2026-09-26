@@ -43,7 +43,7 @@ public final class PartySyncManager {
     private PartySyncManager() {}
 
     public static boolean sendState(EntityPlayerMP player, int requestId) {
-        if (!isServerPlayer(player)) {
+        if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return false;
         }
         UUID ownerId = player.getUniqueID();
@@ -74,7 +74,7 @@ public final class PartySyncManager {
                                           int requestId,
                                           PartyOperationType operationType,
                                           PartyOperationResult result) {
-        if (!isServerPlayer(player) || result == null || operationType == null) {
+        if (!LostTalesServerPlayers.isServerPlayer(player) || result == null || operationType == null) {
             return;
         }
         LostTalesNetworkHandler.CHANNEL.sendTo(
@@ -88,7 +88,7 @@ public final class PartySyncManager {
                                           int requestId,
                                           PartyOperationType operationType,
                                           PartyInvitationOperationResult result) {
-        if (!isServerPlayer(player) || result == null || operationType == null) {
+        if (!LostTalesServerPlayers.isServerPlayer(player) || result == null || operationType == null) {
             return;
         }
         LostTalesNetworkHandler.CHANNEL.sendTo(
@@ -104,7 +104,7 @@ public final class PartySyncManager {
                                    PartyErrorId errorId,
                                    long partyRevision,
                                    boolean stateFollows) {
-        if (!isServerPlayer(player)) {
+        if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return;
         }
         LostTalesNetworkHandler.CHANNEL.sendTo(
@@ -122,7 +122,7 @@ public final class PartySyncManager {
 
     public static AudienceSnapshot captureActivePartyAudience(
             EntityPlayerMP player) {
-        if (!isServerPlayer(player)) {
+        if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return AudienceSnapshot.empty();
         }
         Party party;
@@ -309,7 +309,7 @@ public final class PartySyncManager {
 
     private static InviteTargetCollection collectInviteTargets(
             EntityPlayerMP receiver, PartyInvitationState state) {
-        if (!isServerPlayer(receiver) || state == null
+        if (!LostTalesServerPlayers.isServerPlayer(receiver) || state == null
                 || !state.isSuccessful() || state.getParty() == null
                 || state.getActiveCharacterId() == null
                 || !state.getActiveCharacterId().equals(
@@ -349,7 +349,7 @@ public final class PartySyncManager {
             }
             EntityPlayerMP targetPlayer = (EntityPlayerMP) value;
             UUID targetOwnerId = targetPlayer.getUniqueID();
-            if (!isServerPlayer(targetPlayer)
+            if (!LostTalesServerPlayers.isServerPlayer(targetPlayer)
                     || receiver.getUniqueID().equals(targetOwnerId)) {
                 continue;
             }
@@ -397,11 +397,6 @@ public final class PartySyncManager {
                     candidates.subList(0, PartyStateSnapshot.MAX_INVITE_TARGETS));
         }
         return new InviteTargetCollection(candidates, truncated);
-    }
-
-    private static boolean isServerPlayer(EntityPlayerMP player) {
-        return player != null && player.getUniqueID() != null
-                && player.worldObj != null && !player.worldObj.isRemote;
     }
 
     private static final class InviteTargetCollection {

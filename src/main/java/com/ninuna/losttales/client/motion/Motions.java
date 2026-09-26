@@ -3,7 +3,8 @@ package com.ninuna.losttales.client.motion;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiEasing;
 import com.ninuna.losttales.config.LostTalesConfig;
-import cpw.mods.fml.common.FMLLog;
+import com.ninuna.losttales.util.LostTalesLog;
+import com.ninuna.losttales.util.LostTalesTextFiles;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -46,7 +47,8 @@ import net.minecraft.util.ResourceLocation;
 public final class Motions {
     /** The families, one motion file each. */
     public static final List<String> FAMILIES = Collections.unmodifiableList(
-            Arrays.asList("chat", "ui", "screen", "hud", "inventory", "map"));
+            Arrays.asList("ui", "window", "chat", "screen", "hud", "inventory",
+                    "map"));
     /** The slowest and fastest {@code animationSpeed} plays at. */
     public static final double MIN_SPEED = 0.25D;
     public static final double MAX_SPEED = 4.0D;
@@ -62,6 +64,8 @@ public final class Motions {
     /** Motions played in place of their files' while the Motion Lab tunes them. */
     private static volatile Map<String, Motion> previews =
             Collections.emptyMap();
+    /** The ids the Motion Lab's own files hold. */
+    private static volatile Set<String> savedIds = Collections.emptySet();
     private static File overrideFolder;
 
     /** Reads every motion again whenever the resources are, F3+T included. */
@@ -177,6 +181,23 @@ public final class Motions {
         previews = Collections.emptyMap();
     }
 
+    /** Whether the motion of {@code id} plays a preview the Motion Lab has not saved. */
+    public static boolean isPreviewed(String id) {
+        return id != null && previews.containsKey(id);
+    }
+
+    /** The ids of every motion playing an unsaved preview, in the order they were first tuned. */
+    public static List<String> previewed() {
+        return Collections.unmodifiableList(
+                new java.util.ArrayList<String>(previews.keySet()));
+    }
+
+    /** Whether the Motion Lab's own file holds the motion of {@code id}, so its saved version plays. */
+    public static boolean isSaved(String id) {
+        motions();
+        return id != null && savedIds.contains(id);
+    }
+
     /** Plays the motion of {@code id} as its files say again. */
     public static synchronized void clearPreview(String id) {
         if (!previews.containsKey(id)) {
@@ -238,13 +259,15 @@ public final class Motions {
         try {
             if (saved.isEmpty()) {
                 if (file.isFile() && !file.delete()) {
-                    log(file.getPath() + " could not be removed");
+                    LostTalesTextFiles.writeFailed(file,
+                            "it could not be removed");
                     return false;
                 }
             } else {
                 File folder = file.getParentFile();
                 if (!folder.isDirectory() && !folder.mkdirs()) {
-                    log(folder.getPath() + " could not be made");
+                    LostTalesTextFiles.writeFailed(file,
+                            "its folder could not be made");
                     return false;
                 }
                 File written = new File(folder, file.getName() + ".tmp");
@@ -257,18 +280,21 @@ public final class Motions {
                     writer.close();
                 }
                 if (file.isFile() && !file.delete()) {
-                    log(file.getPath() + " could not be replaced");
+                    LostTalesTextFiles.writeFailed(file,
+                            "the old file could not be replaced");
                     return false;
                 }
                 if (!written.renameTo(file)) {
-                    log(written.getPath() + " could not be moved into place");
+                    LostTalesTextFiles.writeFailed(file, written.getName()
+                            + " could not be moved into place");
                     return false;
                 }
             }
         } catch (IOException unwritable) {
-            log(file.getPath() + " could not be written: " + unwritable);
+            LostTalesTextFiles.writeFailed(file, unwritable.toString());
             return false;
         }
+        LostTalesTextFiles.writeSucceeded(file);
         reload(manager);
         return true;
     }
@@ -399,6 +425,7 @@ public final class Motions {
         Map<String, Motion> motions = new LinkedHashMap<String, Motion>();
         Map<String, String> families = new LinkedHashMap<String, String>();
         Map<String, Motion> own = new LinkedHashMap<String, Motion>();
+        Set<String> saved = new HashSet<String>();
         for (String family : FAMILIES) {
             String name = family + ".json";
             MotionCodec.Result base = read(classpathText(family), "the mod's "
@@ -412,12 +439,15 @@ public final class Motions {
                             read(packed, "the resource packs' " + name));
                 }
             }
-            String saved = savedText(family);
-            if (saved != null) {
-                merge(motions, families, family,
-                        read(saved, "the Motion Lab's " + name));
+            String savedText = savedText(family);
+            if (savedText != null) {
+                MotionCodec.Result tuned = read(savedText,
+                        "the Motion Lab's " + name);
+                merge(motions, families, family, tuned);
+                saved.addAll(tuned.motions().keySet());
             }
         }
+        savedIds = Collections.unmodifiableSet(saved);
         bundled = Collections.unmodifiableMap(own);
         familyOf = Collections.unmodifiableMap(families);
         current = Collections.unmodifiableMap(motions);
@@ -516,10 +546,6 @@ public final class Motions {
     }
 
     private static void log(String message) {
-        try {
-            FMLLog.warning("[losttales] %s", message);
-        } catch (Throwable ignored) {
-            // Early bootstrap and unit tests may not have an FML logger.
-        }
+        LostTalesLog.warning("%s", message);
     }
 }

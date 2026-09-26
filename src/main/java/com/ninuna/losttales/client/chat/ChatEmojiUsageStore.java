@@ -2,14 +2,13 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.config.LostTalesConfigFiles;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
+import com.ninuna.losttales.util.LostTalesCloseables;
+import com.ninuna.losttales.util.LostTalesTextFiles;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.BufferedReader;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -126,7 +125,7 @@ public final class ChatEmojiUsageStore {
         } catch (IOException ignored) {
             // Preferences are best-effort; starting empty is safe.
         } finally {
-            closeQuietly(reader);
+            LostTalesCloseables.closeQuietly(reader);
         }
     }
 
@@ -156,39 +155,18 @@ public final class ChatEmojiUsageStore {
         if (file == null) {
             return;
         }
-        File parent = file.getParentFile();
-        if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
-            return;
-        }
-        Writer writer = null;
-        try {
-            writer = new OutputStreamWriter(
-                    new FileOutputStream(file), UTF_8);
-            for (ChatEmoji emoji : ChatEmoji.values()) {
-                if (favoriteNames.contains(emoji.getName())) {
-                    writer.write("favorite " + emoji.getName() + "\n");
-                }
-            }
-            for (ChatEmoji emoji : ChatEmoji.values()) {
-                Integer count = useCounts.get(emoji.getName());
-                if (count != null && count.intValue() > 0) {
-                    writer.write("count " + emoji.getName()
-                            + " " + count + "\n");
-                }
-            }
-        } catch (IOException ignored) {
-            // Losing a preference write must never break chat.
-        } finally {
-            closeQuietly(writer);
-        }
-    }
-
-    private static void closeQuietly(java.io.Closeable closeable) {
-        if (closeable != null) {
-            try {
-                closeable.close();
-            } catch (IOException ignored) {
+        List<String> lines = new ArrayList<String>();
+        for (ChatEmoji emoji : ChatEmoji.values()) {
+            if (favoriteNames.contains(emoji.getName())) {
+                lines.add("favorite " + emoji.getName());
             }
         }
+        for (ChatEmoji emoji : ChatEmoji.values()) {
+            Integer count = useCounts.get(emoji.getName());
+            if (count != null && count.intValue() > 0) {
+                lines.add("count " + emoji.getName() + " " + count);
+            }
+        }
+        LostTalesTextFiles.writeLines(file, lines);
     }
 }

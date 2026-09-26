@@ -663,10 +663,10 @@ public final class SnapLayouts {
 
         /** The bar fading in as it comes out, and out as it goes. */
         private final MotionTransition shown =
-                new MotionTransition(MotionIds.CHAT_SNAP_LAYOUTS);
+                new MotionTransition(MotionIds.WINDOW_SNAP_LAYOUTS);
         /** The bar travelling from its peek all the way down, and back. */
         private final MotionTransition reveal =
-                new MotionTransition(MotionIds.CHAT_SNAP_LAYOUTS, true);
+                new MotionTransition(MotionIds.WINDOW_SNAP_LAYOUTS, true);
         private Stage stage = Stage.HIDDEN;
         /** How far down the screen the peeking bar's bottom edge stands. */
         private double peek;
@@ -856,7 +856,7 @@ public final class SnapLayouts {
             double elapsed = this.peekNanos == 0L ? 0.0D
                     : (now - this.peekNanos) / 1.0E9D;
             this.peekNanos = now;
-            this.peek = Motions.followTravel(MotionIds.CHAT_SNAP_BAR_PEEK,
+            this.peek = Motions.followTravel(MotionIds.WINDOW_SNAP_BAR_PEEK,
                     this.peek, out ? this.peekTarget : 0.0D, elapsed);
             double bottom = this.peek + down * (resting.bottom() - this.peek);
             return new LostTalesUiHitBox(resting.left,
@@ -893,7 +893,7 @@ public final class SnapLayouts {
         static final int COLUMNS = 3;
 
         private final MotionTransition shown =
-                new MotionTransition(MotionIds.CHAT_SNAP_LAYOUTS);
+                new MotionTransition(MotionIds.WINDOW_SNAP_LAYOUTS);
         /** The window the panel belongs to while it is open or going. */
         private String windowId;
         private boolean open;

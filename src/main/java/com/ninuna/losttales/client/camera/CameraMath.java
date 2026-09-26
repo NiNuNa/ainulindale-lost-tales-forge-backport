@@ -12,7 +12,7 @@ public final class CameraMath {
     private CameraMath() {}
 
     public static double sanitizeDeltaSeconds(double deltaSeconds) {
-        if (!isFinite(deltaSeconds) || deltaSeconds <= 0.0D) {
+        if (!Double.isFinite(deltaSeconds) || deltaSeconds <= 0.0D) {
             return 0.0D;
         }
         return Math.min(deltaSeconds, MAX_FRAME_DELTA_SECONDS);
@@ -62,7 +62,7 @@ public final class CameraMath {
     }
 
     static void requireFinite(String name, double value) {
-        if (!isFinite(value)) {
+        if (!Double.isFinite(value)) {
             throw new IllegalArgumentException(name + " must be finite");
         }
     }
@@ -73,9 +73,5 @@ public final class CameraMath {
             throw new IllegalArgumentException(
                     name + " must be greater than or equal to zero");
         }
-    }
-
-    private static boolean isFinite(double value) {
-        return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 }

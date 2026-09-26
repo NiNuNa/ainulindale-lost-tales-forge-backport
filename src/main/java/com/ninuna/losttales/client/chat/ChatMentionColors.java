@@ -41,11 +41,6 @@ final class ChatMentionColors {
 
     private ChatMentionColors() {}
 
-    /** Whether a character may be part of the name after an {@code @}. */
-    static boolean isMentionCharacter(char character) {
-        return Character.isLetterOrDigit(character) || character == '_';
-    }
-
     /**
      * The colour the named mention is drawn in, or -1 when the name
      * reaches nobody and the text stays as it was typed: a role's own

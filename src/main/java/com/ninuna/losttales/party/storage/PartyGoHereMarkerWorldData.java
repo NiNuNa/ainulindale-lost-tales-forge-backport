@@ -1,7 +1,7 @@
 package com.ninuna.losttales.party.storage;
 
 import com.ninuna.losttales.party.model.PartyGoHereMarker;
-import net.minecraft.nbt.NBTBase;
+import com.ninuna.losttales.storage.NbtTags;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.WorldSavedData;
 
@@ -11,7 +11,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 /** Persistent one-marker-per-character party marker store. */
@@ -63,7 +62,7 @@ public final class PartyGoHereMarkerWorldData extends WorldSavedData {
     public synchronized void writeToNBT(NBTTagCompound compound) {
         if (this.readOnlyForNewerVersion
                 && this.preservedNewerData != null) {
-            copyTagContents(this.preservedNewerData, compound);
+            NbtTags.copyContents(this.preservedNewerData, compound);
             return;
         }
         PartyGoHereMarkerNbtCodec.write(
@@ -91,21 +90,6 @@ public final class PartyGoHereMarkerWorldData extends WorldSavedData {
                         this.markersByOwnerCharacter.values()));
     }
 
-    public synchronized List<PartyGoHereMarker> getMarkersForParty(
-            UUID partyId) {
-        ArrayList<PartyGoHereMarker> markers =
-                new ArrayList<PartyGoHereMarker>();
-        if (partyId != null) {
-            for (PartyGoHereMarker marker
-                    : this.markersByOwnerCharacter.values()) {
-                if (partyId.equals(marker.getPartyId())) {
-                    markers.add(marker);
-                }
-            }
-        }
-        return Collections.unmodifiableList(markers);
-    }
-
     public synchronized boolean saveMarker(PartyGoHereMarker marker) {
         ensureWritable();
         if (marker == null) {
@@ -126,30 +110,6 @@ public final class PartyGoHereMarkerWorldData extends WorldSavedData {
         PartyGoHereMarker removed = ownerCharacterId == null ? null
                 : this.markersByOwnerCharacter.remove(ownerCharacterId);
         if (removed != null) {
-            markDirty();
-        }
-        return removed;
-    }
-
-    public synchronized int removeMarkersForParty(UUID partyId) {
-        ensureWritable();
-        if (partyId == null) {
-            return 0;
-        }
-        ArrayList<UUID> owners = new ArrayList<UUID>();
-        for (PartyGoHereMarker marker
-                : this.markersByOwnerCharacter.values()) {
-            if (partyId.equals(marker.getPartyId())) {
-                owners.add(marker.getOwnerCharacterId());
-            }
-        }
-        int removed = 0;
-        for (UUID owner : owners) {
-            if (this.markersByOwnerCharacter.remove(owner) != null) {
-                removed++;
-            }
-        }
-        if (removed > 0) {
             markDirty();
         }
         return removed;
@@ -199,20 +159,5 @@ public final class PartyGoHereMarkerWorldData extends WorldSavedData {
 
     private static boolean equalNullable(Object left, Object right) {
         return left == null ? right == null : left.equals(right);
-    }
-
-    private static void copyTagContents(NBTTagCompound source,
-                                        NBTTagCompound destination) {
-        Set<?> keySet = source.func_150296_c();
-        for (Object keyObject : keySet) {
-            if (!(keyObject instanceof String)) {
-                continue;
-            }
-            String key = (String) keyObject;
-            NBTBase value = source.getTag(key);
-            if (value != null) {
-                destination.setTag(key, value.copy());
-            }
-        }
     }
 }

@@ -1,6 +1,7 @@
 package com.ninuna.losttales.network.packet.party;
 
 import com.ninuna.losttales.LostTalesMod;
+import com.ninuna.losttales.network.packet.LostTalesPacketCodec;
 import com.ninuna.losttales.party.model.Party;
 import com.ninuna.losttales.party.model.PartyColor;
 import com.ninuna.losttales.party.server.PartyErrorId;
@@ -42,10 +43,10 @@ public final class PartyStateSyncPacket implements IMessage {
     public void fromBytes(ByteBuf buffer) {
         try {
             this.requestId = buffer.readInt();
-            UUID ownerId = PartyPacketCodec.readUuid(buffer);
+            UUID ownerId = LostTalesPacketCodec.readUuid(buffer);
             long synchronizationSequence = buffer.readLong();
             PartyErrorId stateErrorId = PartyErrorId.fromId(
-                    PartyPacketCodec.readString(
+                    LostTalesPacketCodec.readUtf8String(
                             buffer, PartyPacketCodec.MAX_ERROR_ID_BYTES));
 
             if (synchronizationSequence <= 0L) {
@@ -53,13 +54,13 @@ public final class PartyStateSyncPacket implements IMessage {
                         "invalid synchronization sequence");
             }
             if (stateErrorId != PartyErrorId.NONE) {
-                PartyPacketCodec.requireFinished(buffer);
+                LostTalesPacketCodec.requireFinished(buffer);
                 this.snapshot = PartyStateSnapshot.failure(
                         ownerId, synchronizationSequence, stateErrorId);
                 return;
             }
 
-            UUID activeCharacterId = PartyPacketCodec.readUuid(buffer);
+            UUID activeCharacterId = LostTalesPacketCodec.readUuid(buffer);
             PartySnapshot party = readParty(buffer);
             boolean incomingTruncated = buffer.readBoolean();
             int incomingCount = buffer.readUnsignedShort();
@@ -85,7 +86,7 @@ public final class PartyStateSyncPacket implements IMessage {
             }
             List<PartyInviteTargetSnapshot> inviteTargets =
                     readInviteTargets(buffer, inviteTargetCount);
-            PartyPacketCodec.requireFinished(buffer);
+            LostTalesPacketCodec.requireFinished(buffer);
 
             PartyStateSnapshot decoded = new PartyStateSnapshot(
                     ownerId,
@@ -118,9 +119,9 @@ public final class PartyStateSyncPacket implements IMessage {
             throw new IllegalStateException("snapshot must not be null");
         }
         buffer.writeInt(this.requestId);
-        PartyPacketCodec.writeUuid(buffer, this.snapshot.getOwnerId());
+        LostTalesPacketCodec.writeUuid(buffer, this.snapshot.getOwnerId());
         buffer.writeLong(this.snapshot.getSynchronizationSequence());
-        PartyPacketCodec.writeString(
+        LostTalesPacketCodec.writeUtf8String(
                 buffer,
                 this.snapshot.getStateErrorId().getId(),
                 PartyPacketCodec.MAX_ERROR_ID_BYTES);
@@ -128,7 +129,7 @@ public final class PartyStateSyncPacket implements IMessage {
             return;
         }
 
-        PartyPacketCodec.writeUuid(buffer, this.snapshot.getActiveCharacterId());
+        LostTalesPacketCodec.writeUuid(buffer, this.snapshot.getActiveCharacterId());
         writeParty(buffer, this.snapshot.getParty());
         buffer.writeBoolean(this.snapshot.isIncomingTruncated());
         buffer.writeShort(this.snapshot.getIncomingInvitations().size());
@@ -167,8 +168,8 @@ public final class PartyStateSyncPacket implements IMessage {
         if (!present) {
             return null;
         }
-        UUID partyId = PartyPacketCodec.readUuid(buffer);
-        UUID leaderCharacterId = PartyPacketCodec.readUuid(buffer);
+        UUID partyId = LostTalesPacketCodec.readUuid(buffer);
+        UUID leaderCharacterId = LostTalesPacketCodec.readUuid(buffer);
         long createdAt = buffer.readLong();
         long revision = buffer.readLong();
         int dataVersion = buffer.readInt();
@@ -183,9 +184,9 @@ public final class PartyStateSyncPacket implements IMessage {
         Set<UUID> characterIds = new HashSet<UUID>();
         Set<PartyColor> colors = EnumSet.noneOf(PartyColor.class);
         for (int index = 0; index < memberCount; index++) {
-            UUID characterId = PartyPacketCodec.readUuid(buffer);
-            UUID ownerId = PartyPacketCodec.readUuid(buffer);
-            String characterName = PartyPacketCodec.readString(
+            UUID characterId = LostTalesPacketCodec.readUuid(buffer);
+            UUID ownerId = LostTalesPacketCodec.readUuid(buffer);
+            String characterName = LostTalesPacketCodec.readUtf8String(
                     buffer, PartyPacketCodec.MAX_NAME_BYTES);
             long joinedAt = buffer.readLong();
             PartyColor color = PartyColor.fromNetworkId(
@@ -216,16 +217,16 @@ public final class PartyStateSyncPacket implements IMessage {
         if (party == null) {
             return;
         }
-        PartyPacketCodec.writeUuid(buffer, party.getPartyId());
-        PartyPacketCodec.writeUuid(buffer, party.getLeaderCharacterId());
+        LostTalesPacketCodec.writeUuid(buffer, party.getPartyId());
+        LostTalesPacketCodec.writeUuid(buffer, party.getLeaderCharacterId());
         buffer.writeLong(party.getCreatedAt());
         buffer.writeLong(party.getRevision());
         buffer.writeInt(party.getDataVersion());
         buffer.writeByte(party.getMemberCount());
         for (PartyMemberSnapshot member : party.getMembers()) {
-            PartyPacketCodec.writeUuid(buffer, member.getCharacterId());
-            PartyPacketCodec.writeUuid(buffer, member.getOwnerId());
-            PartyPacketCodec.writeString(
+            LostTalesPacketCodec.writeUuid(buffer, member.getCharacterId());
+            LostTalesPacketCodec.writeUuid(buffer, member.getOwnerId());
+            LostTalesPacketCodec.writeUtf8String(
                     buffer,
                     member.getCharacterName(),
                     PartyPacketCodec.MAX_NAME_BYTES);
@@ -240,15 +241,15 @@ public final class PartyStateSyncPacket implements IMessage {
                 new ArrayList<PartyInvitationSnapshot>(count);
         Set<UUID> invitationIds = new HashSet<UUID>();
         for (int index = 0; index < count; index++) {
-            UUID invitationId = PartyPacketCodec.readUuid(buffer);
-            UUID partyId = PartyPacketCodec.readUuid(buffer);
-            UUID invitingCharacterId = PartyPacketCodec.readUuid(buffer);
-            UUID invitingOwnerId = PartyPacketCodec.readUuid(buffer);
-            String invitingCharacterName = PartyPacketCodec.readString(
+            UUID invitationId = LostTalesPacketCodec.readUuid(buffer);
+            UUID partyId = LostTalesPacketCodec.readUuid(buffer);
+            UUID invitingCharacterId = LostTalesPacketCodec.readUuid(buffer);
+            UUID invitingOwnerId = LostTalesPacketCodec.readUuid(buffer);
+            String invitingCharacterName = LostTalesPacketCodec.readUtf8String(
                     buffer, PartyPacketCodec.MAX_NAME_BYTES);
-            UUID targetCharacterId = PartyPacketCodec.readUuid(buffer);
-            UUID targetOwnerId = PartyPacketCodec.readUuid(buffer);
-            String targetCharacterName = PartyPacketCodec.readString(
+            UUID targetCharacterId = LostTalesPacketCodec.readUuid(buffer);
+            UUID targetOwnerId = LostTalesPacketCodec.readUuid(buffer);
+            String targetCharacterName = LostTalesPacketCodec.readUtf8String(
                     buffer, PartyPacketCodec.MAX_NAME_BYTES);
             long createdAt = buffer.readLong();
             long expiresAt = buffer.readLong();
@@ -274,17 +275,17 @@ public final class PartyStateSyncPacket implements IMessage {
 
     private static void writeInvitation(ByteBuf buffer,
                                         PartyInvitationSnapshot invitation) {
-        PartyPacketCodec.writeUuid(buffer, invitation.getInvitationId());
-        PartyPacketCodec.writeUuid(buffer, invitation.getPartyId());
-        PartyPacketCodec.writeUuid(buffer, invitation.getInvitingCharacterId());
-        PartyPacketCodec.writeUuid(buffer, invitation.getInvitingOwnerId());
-        PartyPacketCodec.writeString(
+        LostTalesPacketCodec.writeUuid(buffer, invitation.getInvitationId());
+        LostTalesPacketCodec.writeUuid(buffer, invitation.getPartyId());
+        LostTalesPacketCodec.writeUuid(buffer, invitation.getInvitingCharacterId());
+        LostTalesPacketCodec.writeUuid(buffer, invitation.getInvitingOwnerId());
+        LostTalesPacketCodec.writeUtf8String(
                 buffer,
                 invitation.getInvitingCharacterName(),
                 PartyPacketCodec.MAX_NAME_BYTES);
-        PartyPacketCodec.writeUuid(buffer, invitation.getTargetCharacterId());
-        PartyPacketCodec.writeUuid(buffer, invitation.getTargetOwnerId());
-        PartyPacketCodec.writeString(
+        LostTalesPacketCodec.writeUuid(buffer, invitation.getTargetCharacterId());
+        LostTalesPacketCodec.writeUuid(buffer, invitation.getTargetOwnerId());
+        LostTalesPacketCodec.writeUtf8String(
                 buffer,
                 invitation.getTargetCharacterName(),
                 PartyPacketCodec.MAX_NAME_BYTES);
@@ -299,11 +300,11 @@ public final class PartyStateSyncPacket implements IMessage {
         Set<UUID> ownerIds = new HashSet<UUID>();
         Set<UUID> characterIds = new HashSet<UUID>();
         for (int index = 0; index < count; index++) {
-            UUID ownerId = PartyPacketCodec.readUuid(buffer);
-            UUID characterId = PartyPacketCodec.readUuid(buffer);
-            String playerName = PartyPacketCodec.readString(
+            UUID ownerId = LostTalesPacketCodec.readUuid(buffer);
+            UUID characterId = LostTalesPacketCodec.readUuid(buffer);
+            String playerName = LostTalesPacketCodec.readUtf8String(
                     buffer, PartyPacketCodec.MAX_NAME_BYTES);
-            String characterName = PartyPacketCodec.readString(
+            String characterName = LostTalesPacketCodec.readUtf8String(
                     buffer, PartyPacketCodec.MAX_NAME_BYTES);
             if (!ownerIds.add(ownerId) || !characterIds.add(characterId)) {
                 throw new PartyPacketCodec.DecodeException(
@@ -317,12 +318,12 @@ public final class PartyStateSyncPacket implements IMessage {
 
     private static void writeInviteTarget(
             ByteBuf buffer, PartyInviteTargetSnapshot target) {
-        PartyPacketCodec.writeUuid(buffer, target.getOwnerId());
-        PartyPacketCodec.writeUuid(buffer, target.getCharacterId());
-        PartyPacketCodec.writeString(
+        LostTalesPacketCodec.writeUuid(buffer, target.getOwnerId());
+        LostTalesPacketCodec.writeUuid(buffer, target.getCharacterId());
+        LostTalesPacketCodec.writeUtf8String(
                 buffer, target.getPlayerName(),
                 PartyPacketCodec.MAX_NAME_BYTES);
-        PartyPacketCodec.writeString(
+        LostTalesPacketCodec.writeUtf8String(
                 buffer, target.getCharacterName(),
                 PartyPacketCodec.MAX_NAME_BYTES);
     }

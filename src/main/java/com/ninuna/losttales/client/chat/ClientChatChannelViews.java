@@ -817,7 +817,7 @@ public final class ClientChatChannelViews {
         if (Math.abs(target - ease.value) <= SCROLL_SNAP_LINES) {
             ease.value = target;
         } else {
-            ease.value = Motions.followTravel(MotionIds.CHAT_SCROLL, ease.value,
+            ease.value = Motions.followTravel(MotionIds.WINDOW_SCROLL, ease.value,
                     target, elapsed);
         }
         while (RENDERED.size() > MAX_EASED_VIEWS) {

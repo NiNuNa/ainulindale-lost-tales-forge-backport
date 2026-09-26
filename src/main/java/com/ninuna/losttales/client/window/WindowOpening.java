@@ -35,10 +35,10 @@ public final class WindowOpening {
 
     /**
      * How far below its place every window's input bar stands now: up
-     * from below with a brief overshoot ({@link MotionIds#CHAT_BAR_APPEAR}).
+     * from below with a brief overshoot ({@link MotionIds#WINDOW_BAR_APPEAR}).
      */
     public static synchronized float barOffset() {
-        long duration = Motions.travelNanos(MotionIds.CHAT_BAR_APPEAR);
+        long duration = Motions.travelNanos(MotionIds.WINDOW_BAR_APPEAR);
         if (duration <= 0L || openedNanos <= 0L) {
             return 0.0F;
         }
@@ -48,7 +48,7 @@ public final class WindowOpening {
 
     /** Where the bars stand {@code progress} of the way through their entrance. */
     static float barOffsetAt(float progress) {
-        String id = MotionIds.CHAT_BAR_APPEAR;
+        String id = MotionIds.WINDOW_BAR_APPEAR;
         float distance = Motions.param(id, "distance", 13.0F);
         float swing = Motions.param(id, "swing", 1.25F);
         float swings = Motions.param(id, "swings", 2.5F);

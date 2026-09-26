@@ -18,12 +18,11 @@ import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveSelection;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveType;
+import com.ninuna.losttales.quest.LostTalesQuestParams;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
@@ -350,7 +349,7 @@ public final class LostTalesQuestHudRenderer {
     }
 
     private static void addMarkerTargets(List<HudQuestTarget> targets, LostTalesQuestObjectiveDefinition objective, int dimension) {
-        String markerId = firstParam(objective, "marker", "mapMarker", "map_marker", "targetMarker", "target_marker");
+        String markerId = LostTalesQuestParams.value(objective.getParams(), "marker");
         if (markerId == null || markerId.length() == 0) {
             return;
         }
@@ -381,76 +380,16 @@ public final class LostTalesQuestHudRenderer {
         if (!isGotoObjective(objective)) {
             return null;
         }
-        String xValue = firstParam(objective, "x", "posX", "targetX");
-        String yValue = firstParam(objective, "y", "posY", "targetY");
-        String zValue = firstParam(objective, "z", "posZ", "targetZ");
-        if (xValue == null || zValue == null || xValue.length() == 0 || zValue.length() == 0) {
+        LostTalesQuestParams.Location location =
+                LostTalesQuestParams.location(objective.getParams(), currentDimension);
+        if (location == null || location.getDimensionId() != currentDimension) {
             return null;
         }
-        int dimension = parseDimensionId(firstParam(objective, "dimension", "dim", "world"));
-        if (dimension != currentDimension) {
-            return null;
-        }
-        Double x = parseDouble(xValue);
-        Double y = parseDouble(yValue == null || yValue.length() == 0 ? "64" : yValue);
-        Double z = parseDouble(zValue);
-        if (x == null || y == null || z == null) {
-            return null;
-        }
-        return new HudQuestTarget(x.doubleValue(), y.doubleValue(), z.doubleValue());
+        return new HudQuestTarget(location.getX(), location.getY(), location.getZ());
     }
 
     private static boolean isGotoObjective(LostTalesQuestObjectiveDefinition objective) {
         return LostTalesQuestObjectiveType.GOTO.is(objective);
-    }
-
-    private static String firstParam(LostTalesQuestObjectiveDefinition objective, String... keys) {
-        if (objective == null || keys == null) {
-            return "";
-        }
-        Map<String, String> params = objective.getParams();
-        for (String key : keys) {
-            if (key == null) {
-                continue;
-            }
-            String value = params.get(key);
-            if (value != null && value.trim().length() > 0) {
-                return value.trim();
-            }
-        }
-        return "";
-    }
-
-    private static Double parseDouble(String value) {
-        if (value == null) {
-            return null;
-        }
-        try {
-            return Double.valueOf(value.trim());
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
-    }
-
-    private static int parseDimensionId(String value) {
-        if (value == null || value.trim().length() == 0) {
-            return 0;
-        }
-        String normalized = value.trim().toLowerCase(Locale.ROOT);
-        if ("minecraft:overworld".equals(normalized) || "overworld".equals(normalized) || "world".equals(normalized)) {
-            return 0;
-        }
-        if ("minecraft:the_nether".equals(normalized) || "minecraft:nether".equals(normalized) || "the_nether".equals(normalized) || "nether".equals(normalized)) {
-            return -1;
-        }
-        if ("minecraft:the_end".equals(normalized) || "minecraft:end".equals(normalized) || "the_end".equals(normalized) || "end".equals(normalized)) {
-            return 1;
-        }
-        try {
-            return Integer.parseInt(normalized);
-        } catch (NumberFormatException ignored) {
-            return 0;
-        }
     }
 
     private static void renderNotifications(Minecraft minecraft, ScaledResolution resolution) {

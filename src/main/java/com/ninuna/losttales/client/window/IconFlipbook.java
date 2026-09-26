@@ -21,7 +21,7 @@ public final class IconFlipbook {
     private final LostTalesUiSheet[] frames;
     private final LostTalesUiSheet[] hoverFrames;
     private final MotionTransition flip =
-            new MotionTransition(MotionIds.CHAT_ICON_FLIP);
+            new MotionTransition(MotionIds.WINDOW_ICON_FLIP);
     private float hoverFade;
     private long hoverNanos;
 

@@ -67,31 +67,26 @@ public final class LostTalesConfig {
     public static final Set<String> CLIENT_CATEGORIES = Collections.unmodifiableSet(
             new HashSet<String>(Arrays.asList(CATEGORY_CLIENT)));
     /**
-     * The client options the Settings window sets
-     * and saves the moment they are chosen: every chat option but the
-     * history's length, a safety bound (Nils, 2026-09-24, S2 a). The
-     * Config Screen leaves them to the chat: they stay in the client
-     * file, and are shown nowhere else.
+     * The client options Settings does not show, kept in the client file
+     * alone: each is state another screen writes as it is used, not a
+     * choice made in a list. Every other client option, and every option
+     * of the camera's file, is set in Settings and saved the moment it
+     * changes (Nils, 2026-09-26, Q2 a); a test fails for an option that is
+     * in neither.
      */
-    public static final Set<String> CHAT_SETTINGS_KEYS = Collections.unmodifiableSet(
-            new HashSet<String>(Arrays.asList("chatBackgroundColor",
-                    "chatSelectedLineColor", "chatMentionLineColor",
-                    "chatSelectedMentionColor", "chatReplyHighlightColor",
-                    "enableChatEmojis", "convertChatEmoticons",
-                    "chatProfanityFilter", "enableChatMessageGrouping",
-                    "enableChatBackgroundBlur", "enableChatPings",
-                    "chatPingSound", "chatFeedAlignment", "chatSpeakerSize",
-                    "chatFeedSpeakerSize", "chatFeedMessageSize",
-                    "chatQuoteSize", "chatFeedQuoteSize",
-                    "hideHudWhileChatting", "sendChatTypingStatus",
-                    "showChatTypingIndicators", "enableNpcChatStyling",
-                    "showChatSpeechBubbles")));
+    public static final Set<String> FILE_ONLY_CLIENT_KEYS = Collections.unmodifiableSet(
+            new HashSet<String>(Arrays.asList(
+                    // The map's legend writes the categories it hides.
+                    "hiddenMapLegendCategories",
+                    // The map's waypoint editor writes a custom
+                    // waypoint's colour and its note.
+                    "customWaypointColors",
+                    "customWaypointNotes")));
 
     private static File loadedClientFile;
     private static File loadedServerFile;
     private static File loadedRolesFile;
     private static File loadedChannelsFile;
-    private static Configuration pendingGuiConfiguration;
     /**
      * Every option as the mod ships it ({@link LostTalesConfigDefinitions}):
      * read on the first load against no file, while each field still
@@ -199,6 +194,7 @@ public final class LostTalesConfig {
     public static final String DEFAULT_CHAT_SELECTED_LINE_COLOR = "PLUM_GRAY";
     public static final String DEFAULT_CHAT_MENTION_LINE_COLOR = "CORAL";
     public static final String DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR = "APRICOT";
+    public static final String DEFAULT_CHAT_SERVER_TEXT_COLOR = "HONEY";
     /**
      * A colour option's value that follows another colour instead of
      * naming a palette entry: the selected mention's, which is by
@@ -212,6 +208,8 @@ public final class LostTalesConfig {
     public static String chatSelectedMentionColor = CHAT_COLOR_AUTOMATIC;
     /** The line a reply's quote jumps to, lit while the eye finds it. */
     public static String chatReplyHighlightColor = DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR;
+    /** What the Server and the Client say, their words' own colour. */
+    public static String chatServerTextColor = DEFAULT_CHAT_SERVER_TEXT_COLOR;
     /** The edges the closed-chat feed's lines may stand against. */
     static final String[] CHAT_FEED_ALIGNMENTS = {"LEFT", "CENTRE", "RIGHT"};
     /** Where the feed's lines stand until chosen: the middle. */
@@ -263,7 +261,7 @@ public final class LostTalesConfig {
      */
     public static String devSkinOverridePath = "";
     /** The override skin's arm widths, as the option names them. */
-    static final String[] DEV_SKIN_BODY_TYPES = {"wide", "slim"};
+    public static final String[] DEV_SKIN_BODY_TYPES = {"wide", "slim"};
     public static String devSkinOverrideBodyType = DEV_SKIN_BODY_TYPES[0];
     /** Draw the jacket, sleeve, and trouser overlays of 64x64 skins. */
     public static boolean showSkinOverlays = true;
@@ -638,7 +636,7 @@ public final class LostTalesConfig {
                     CATEGORY_CLIENT,
                     "hudPlacementPreset",
                     hudPlacementPreset,
-                    "HUD placement preset used by the Mod List config GUI. Use custom to keep individual offsets exactly as configured. Valid values: custom, default, lotr-safe, compact, minimal."
+                    "Where the HUD's panels stand: custom keeps each panel where it was placed; default, lotr-safe, compact and minimal put every panel in that layout's place. Set in Settings, HUD."
             );
             hudPresetProperty.setValidValues(HUD_PRESET_VALUES);
             hudPlacementPreset = normalizeHudPreset(hudPresetProperty.getString());
@@ -1224,37 +1222,44 @@ public final class LostTalesConfig {
                     "chatBackgroundColor",
                     CATEGORY_CLIENT,
                     chatBackgroundColor,
-                    "Palette colour of the open chat's history panel and the rows framing it. Set in the chat's Chat Settings.",
+                    "Palette colour of the open chat's history panel and the rows framing it. Set in Settings.",
                     LostTalesColors.paletteNames()
             ), DEFAULT_CHAT_BACKGROUND_COLOR);
             chatSelectedLineColor = paletteName(config.getString(
                     "chatSelectedLineColor",
                     CATEGORY_CLIENT,
                     chatSelectedLineColor,
-                    "Palette colour of the chat line under the pointer. Set in the chat's Chat Settings.",
+                    "Palette colour of the chat line under the pointer. Set in Settings.",
                     LostTalesColors.paletteNames()
             ), DEFAULT_CHAT_SELECTED_LINE_COLOR);
             chatMentionLineColor = paletteName(config.getString(
                     "chatMentionLineColor",
                     CATEGORY_CLIENT,
                     chatMentionLineColor,
-                    "Palette colour of a chat line that @-mentions you. Set in the chat's Chat Settings.",
+                    "Palette colour of a chat line that @-mentions you. Set in Settings.",
                     LostTalesColors.paletteNames()
             ), DEFAULT_CHAT_MENTION_LINE_COLOR);
             chatSelectedMentionColor = automaticOrPaletteName(config.getString(
                     "chatSelectedMentionColor",
                     CATEGORY_CLIENT,
                     chatSelectedMentionColor,
-                    "Palette colour of a chat line that @-mentions you while it is under the pointer. AUTO, the default, is the mention colour one shade lighter on its own ramp of the palette, or the selected-line colour where the mention colour is already its ramp's lightest. Set in the chat's Chat Settings.",
+                    "Palette colour of a chat line that @-mentions you while it is under the pointer. AUTO, the default, is the mention colour one shade lighter on its own ramp of the palette, or the selected-line colour where the mention colour is already its ramp's lightest. Set in Settings.",
                     automaticOrPaletteNames()
             ));
             chatReplyHighlightColor = paletteName(config.getString(
                     "chatReplyHighlightColor",
                     CATEGORY_CLIENT,
                     chatReplyHighlightColor,
-                    "Palette colour a chat line is lit in when a reply's quote jumps to it. Set in the chat's Chat Settings.",
+                    "Palette colour a chat line is lit in when a reply's quote jumps to it. Set in Settings.",
                     LostTalesColors.paletteNames()
             ), DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR);
+            chatServerTextColor = paletteName(config.getString(
+                    "chatServerTextColor",
+                    CATEGORY_CLIENT,
+                    chatServerTextColor,
+                    "Palette colour of what the Server and the Client say in the chat: joins, command answers, notices, the consoles' lines. Names, links and warnings keep their own colours. Set in Settings.",
+                    LostTalesColors.paletteNames()
+            ), DEFAULT_CHAT_SERVER_TEXT_COLOR);
             Property feedAlignmentProperty = config.get(
                     CATEGORY_CLIENT, "chatFeedAlignment", chatFeedAlignment,
                     "Which edge the closed chat feed's lines stand against: LEFT, CENTRE (the default), or RIGHT. Each line's background thins out away from that edge, from the middle to both sides for CENTRE.");
@@ -1699,24 +1704,6 @@ public final class LostTalesConfig {
         return server != null && server.isServerRunning();
     }
 
-    /**
-     * The client's options as the Forge screen edits them; null on a
-     * dedicated server, which has no client options and no screen.
-     */
-    public static synchronized Configuration createConfiguration() {
-        pendingGuiConfiguration = loadedClientFile == null
-                ? null : new Configuration(loadedClientFile);
-        return pendingGuiConfiguration;
-    }
-
-    /** Saves the exact Configuration whose properties the Forge GUI edited. */
-    public static synchronized void savePendingGuiConfiguration() {
-        Configuration pending = pendingGuiConfiguration;
-        if (pending != null) {
-            pending.save();
-        }
-    }
-
     public static void reload() {
         if (loadedServerFile != null) {
             load(loadedClientFile, loadedServerFile, loadedRolesFile, loadedChannelsFile);
@@ -2072,7 +2059,7 @@ public final class LostTalesConfig {
     /**
      * A client option as the mod ships it, as the file writes it; null
      * before the first load, or for an option the client category does
-     * not hold. What the chat's Restore Defaults puts back.
+     * not hold. What Settings' Default and Restore Defaults put back.
      */
     public static String shippedClientValue(String key) {
         Configuration definitions = shipped;
@@ -2083,7 +2070,34 @@ public final class LostTalesConfig {
         return property == null ? null : property.getString();
     }
 
-    private static void writeCurrentValues(Configuration config) {
+    /**
+     * A number client option's bounds as it is defined, {min, max}; null
+     * before the first load, or for an option with none. What a number's
+     * row in Settings keeps within.
+     */
+    public static double[] shippedClientBounds(String key) {
+        return LostTalesConfigDefinitions.bounds(shipped, CATEGORY_CLIENT, key);
+    }
+
+    /**
+     * The key of every client option, as the options are defined: from
+     * the first load, or, before it, read against no file.
+     */
+    public static Set<String> clientOptionKeys() {
+        Configuration definitions = shipped;
+        if (definitions == null) {
+            definitions = new Configuration();
+            defineOptions(definitions);
+        }
+        return new java.util.TreeSet<String>(
+                definitions.getCategory(CATEGORY_CLIENT).keySet());
+    }
+
+    /**
+     * Sets every option that is saved to what its field holds now, in
+     * {@code config}; {@link #save} writes nothing else.
+     */
+    static void writeCurrentValues(Configuration config) {
         if (config == null) {
             return;
         }
@@ -2135,6 +2149,8 @@ public final class LostTalesConfig {
                 chatSelectedMentionColor).set(chatSelectedMentionColor);
         config.get(CATEGORY_CLIENT, "chatReplyHighlightColor",
                 chatReplyHighlightColor).set(chatReplyHighlightColor);
+        config.get(CATEGORY_CLIENT, "chatServerTextColor",
+                chatServerTextColor).set(chatServerTextColor);
         Property feedAlignmentProperty = config.get(
                 CATEGORY_CLIENT, "chatFeedAlignment", chatFeedAlignment);
         feedAlignmentProperty.set(chatFeedAlignment);
@@ -2294,6 +2310,21 @@ public final class LostTalesConfig {
         config.get(CATEGORY_CLIENT, "worldQuestMarkerMaxDistance", worldQuestMarkerMaxDistance).set(worldQuestMarkerMaxDistance);
         config.get(CATEGORY_CLIENT, "showQuestChatFeedback", showQuestChatFeedback).set(showQuestChatFeedback);
         config.get(CATEGORY_CLIENT, "playQuestSounds", playQuestSounds).set(playQuestSounds);
+        config.get(CATEGORY_CLIENT, "enableQuestDialogue", enableQuestDialogue).set(enableQuestDialogue);
+        config.get(CATEGORY_CLIENT, "partyCompassMarkerFadeRadius",
+                partyCompassMarkerFadeRadius).set(partyCompassMarkerFadeRadius);
+        config.get(CATEGORY_CLIENT, "chatHistoryLines", chatHistoryLines).set(chatHistoryLines);
+        config.get(CATEGORY_CLIENT, "showSkinOverlays", showSkinOverlays).set(showSkinOverlays);
+        config.get(CATEGORY_CLIENT, "chestPhysics", chestPhysics).set(chestPhysics);
+        // A float is kept as its own words, as the float's read defines it.
+        config.get(CATEGORY_CLIENT, "chestBounce", Float.toString(chestBounce))
+                .set(Float.toString(chestBounce));
+        config.get(CATEGORY_CLIENT, "devSkinOverridePath", devSkinOverridePath)
+                .set(devSkinOverridePath);
+        Property bodyTypeProperty = config.get(CATEGORY_CLIENT,
+                "devSkinOverrideBodyType", devSkinOverrideBodyType);
+        bodyTypeProperty.set(devSkinOverrideBodyType);
+        bodyTypeProperty.setValidValues(DEV_SKIN_BODY_TYPES);
         config.get(CATEGORY_QUESTS, "enableQuestPrerequisites", enableQuestPrerequisites).set(enableQuestPrerequisites);
         config.get(CATEGORY_QUESTS, "enableQuestRewards", enableQuestRewards).set(enableQuestRewards);
         config.get(CATEGORY_QUESTS, "allowQuestItemStarts", allowQuestItemStarts).set(allowQuestItemStarts);
@@ -2467,8 +2498,8 @@ public final class LostTalesConfig {
             Property existing = config.getCategory(CATEGORY_CLIENT).get(key);
             if (existing != null
                     && existing.getType() != Property.Type.DOUBLE) {
-                // Old releases declared HUD offsets as integers. Recreate the
-                // property so Forge's config GUI accepts precise drag values.
+                // An offset written as a whole number is made again as a
+                // double, so it holds the fraction a drag leaves it at.
                 defaultValue = existing.getDouble(defaultValue);
                 config.getCategory(CATEGORY_CLIENT).remove(key);
             }

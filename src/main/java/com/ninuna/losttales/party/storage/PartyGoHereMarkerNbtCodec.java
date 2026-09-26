@@ -1,8 +1,9 @@
 package com.ninuna.losttales.party.storage;
 
-import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.party.model.PartyGoHereMarker;
-import cpw.mods.fml.common.FMLLog;
+import com.ninuna.losttales.storage.NbtQuarantine;
+import com.ninuna.losttales.storage.NbtTags;
+import com.ninuna.losttales.util.LostTalesLog;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
@@ -20,15 +21,11 @@ import java.util.UUID;
 public final class PartyGoHereMarkerNbtCodec {
 
     public static final int CURRENT_ROOT_DATA_VERSION = 1;
-    public static final int CURRENT_QUARANTINE_DATA_VERSION = 1;
 
     private static final String TAG_DATA_VERSION = "DataVersion";
     private static final String TAG_MARKERS = "Markers";
-    private static final String TAG_QUARANTINE = "Quarantine";
-    private static final String TAG_ENTRIES = "Entries";
     private static final String TAG_REASON = "Reason";
     private static final String TAG_MARKER_INDEX = "MarkerIndex";
-    private static final String TAG_ORIGINAL_DATA = "OriginalData";
     private static final String TAG_PARTY_UUID = "PartyUUID";
     private static final String TAG_OWNER_CHARACTER_UUID = "OwnerCharacterUUID";
     private static final String TAG_DIMENSION_ID = "DimensionId";
@@ -55,7 +52,7 @@ public final class PartyGoHereMarkerNbtCodec {
             }
         }
         output.setTag(TAG_MARKERS, list);
-        output.setTag(TAG_QUARANTINE, writeQuarantine(quarantinedEntries));
+        NbtQuarantine.write(output, quarantinedEntries);
     }
 
     public static ReadResult read(NBTTagCompound source) {
@@ -63,7 +60,7 @@ public final class PartyGoHereMarkerNbtCodec {
         int version = safeSource.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
                 ? safeSource.getInteger(TAG_DATA_VERSION) : 0;
         if (version > CURRENT_ROOT_DATA_VERSION || version < 0) {
-            warn("Party marker data uses unsupported version %d; data will remain read-only",
+            LostTalesLog.warning("Party marker data uses unsupported version %d; data will remain read-only",
                     Integer.valueOf(version));
             return ReadResult.unsupported(safeSource, version);
         }
@@ -74,13 +71,13 @@ public final class PartyGoHereMarkerNbtCodec {
 
         boolean repaired = version != CURRENT_ROOT_DATA_VERSION
                 || !safeSource.hasKey(TAG_MARKERS, Constants.NBT.TAG_LIST);
-        QuarantineReadResult quarantine = readQuarantine(safeSource);
-        if (!quarantine.supported) {
-            return ReadResult.unsupported(safeSource, quarantine.unsupportedVersion);
+        NbtQuarantine.Read quarantine = NbtQuarantine.read(safeSource);
+        if (!quarantine.isSupported()) {
+            return ReadResult.unsupported(safeSource, quarantine.getUnsupportedVersion());
         }
-        repaired |= quarantine.repaired;
+        repaired |= quarantine.isRepaired();
         ArrayList<NBTTagCompound> quarantinedEntries =
-                new ArrayList<NBTTagCompound>(quarantine.entries);
+                new ArrayList<NBTTagCompound>(quarantine.getEntries());
         LinkedHashMap<UUID, PartyGoHereMarker> markers =
                 new LinkedHashMap<UUID, PartyGoHereMarker>();
         NBTTagList list = safeSource.getTagList(
@@ -93,8 +90,8 @@ public final class PartyGoHereMarkerNbtCodec {
                         safeSource, markerResult.unsupportedVersion);
             }
             if (markerResult.marker == null) {
-                quarantinedEntries.add(createQuarantineEntry(
-                        markerResult.failureReason, index, raw));
+                quarantinedEntries.add(NbtQuarantine.entry(
+                        markerResult.failureReason, TAG_MARKER_INDEX, index, raw));
                 repaired = true;
                 continue;
             }
@@ -107,8 +104,8 @@ public final class PartyGoHereMarkerNbtCodec {
                 PartyGoHereMarker discarded = retained == previous
                         ? markerResult.marker : previous;
                 markers.put(ownerCharacterId, retained);
-                quarantinedEntries.add(createQuarantineEntry(
-                        "duplicate_owner_marker", index,
+                quarantinedEntries.add(NbtQuarantine.entry(
+                        "duplicate_owner_marker", TAG_MARKER_INDEX, index,
                         writeMarker(discarded)));
                 repaired = true;
             } else {
@@ -125,9 +122,9 @@ public final class PartyGoHereMarkerNbtCodec {
         entry.setString(TAG_REASON, reason == null ? "unknown" : reason);
         if (marker != null) {
             if (marker.getPartyId() != null) {
-                writeUuid(entry, TAG_PARTY_UUID, marker.getPartyId());
+                NbtTags.writeUuid(entry, TAG_PARTY_UUID, marker.getPartyId());
             }
-            writeUuid(entry, TAG_OWNER_CHARACTER_UUID,
+            NbtTags.writeUuid(entry, TAG_OWNER_CHARACTER_UUID,
                     marker.getOwnerCharacterId());
             entry.setInteger(TAG_DIMENSION_ID, marker.getDimensionId());
         }
@@ -138,9 +135,9 @@ public final class PartyGoHereMarkerNbtCodec {
         NBTTagCompound tag = new NBTTagCompound();
         tag.setInteger(TAG_DATA_VERSION, PartyGoHereMarker.CURRENT_DATA_VERSION);
         if (marker.getPartyId() != null) {
-            writeUuid(tag, TAG_PARTY_UUID, marker.getPartyId());
+            NbtTags.writeUuid(tag, TAG_PARTY_UUID, marker.getPartyId());
         }
-        writeUuid(tag, TAG_OWNER_CHARACTER_UUID, marker.getOwnerCharacterId());
+        NbtTags.writeUuid(tag, TAG_OWNER_CHARACTER_UUID, marker.getOwnerCharacterId());
         tag.setInteger(TAG_DIMENSION_ID, marker.getDimensionId());
         tag.setDouble(TAG_X, marker.getX());
         tag.setDouble(TAG_Y, marker.getY());
@@ -155,13 +152,13 @@ public final class PartyGoHereMarkerNbtCodec {
         }
         int version = source.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
                 ? source.getInteger(TAG_DATA_VERSION) : 0;
-        if (version > PartyGoHereMarker.CURRENT_DATA_VERSION || version < 0) {
+        if (version != PartyGoHereMarker.CURRENT_DATA_VERSION) {
             return MarkerReadResult.unsupported(version);
         }
-        UUID partyId = readUuid(source, TAG_PARTY_UUID);
-        UUID ownerCharacterId = readUuid(source, TAG_OWNER_CHARACTER_UUID);
-        if (ownerCharacterId == null
-                || (version < 2 && partyId == null)) {
+        // A marker without a party is its character's own.
+        UUID partyId = NbtTags.readUuid(source, TAG_PARTY_UUID);
+        UUID ownerCharacterId = NbtTags.readUuid(source, TAG_OWNER_CHARACTER_UUID);
+        if (ownerCharacterId == null) {
             return MarkerReadResult.failed("missing_required_identity");
         }
         if (!source.hasKey(TAG_DIMENSION_ID, Constants.NBT.TAG_INT)
@@ -181,98 +178,10 @@ public final class PartyGoHereMarkerNbtCodec {
                     source.getDouble(TAG_Y),
                     source.getDouble(TAG_Z),
                     updatedAt),
-                    version != PartyGoHereMarker.CURRENT_DATA_VERSION
-                            || !source.hasKey(TAG_UPDATED_AT,
-                            Constants.NBT.TAG_LONG));
+                    !source.hasKey(TAG_UPDATED_AT, Constants.NBT.TAG_LONG));
         } catch (IllegalArgumentException exception) {
             return MarkerReadResult.failed("invalid_marker_data");
         }
-    }
-
-    private static NBTTagCompound writeQuarantine(
-            Collection<NBTTagCompound> entries) {
-        NBTTagCompound root = new NBTTagCompound();
-        root.setInteger(TAG_DATA_VERSION, CURRENT_QUARANTINE_DATA_VERSION);
-        NBTTagList list = new NBTTagList();
-        if (entries != null) {
-            for (NBTTagCompound entry : entries) {
-                if (entry != null) {
-                    list.appendTag(entry.copy());
-                }
-            }
-        }
-        root.setTag(TAG_ENTRIES, list);
-        return root;
-    }
-
-    private static QuarantineReadResult readQuarantine(NBTTagCompound source) {
-        if (!source.hasKey(TAG_QUARANTINE)) {
-            return QuarantineReadResult.success(
-                    Collections.<NBTTagCompound>emptyList(), true);
-        }
-        if (!source.hasKey(TAG_QUARANTINE, Constants.NBT.TAG_COMPOUND)) {
-            return QuarantineReadResult.unsupported(-1);
-        }
-        NBTTagCompound root = source.getCompoundTag(TAG_QUARANTINE);
-        int version = root.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
-                ? root.getInteger(TAG_DATA_VERSION) : 0;
-        if (version > CURRENT_QUARANTINE_DATA_VERSION || version < 0) {
-            return QuarantineReadResult.unsupported(version);
-        }
-        if (root.hasKey(TAG_ENTRIES)
-                && !root.hasKey(TAG_ENTRIES, Constants.NBT.TAG_LIST)) {
-            return QuarantineReadResult.unsupported(-1);
-        }
-        ArrayList<NBTTagCompound> entries = new ArrayList<NBTTagCompound>();
-        NBTTagList list = root.getTagList(
-                TAG_ENTRIES, Constants.NBT.TAG_COMPOUND);
-        for (int index = 0; index < list.tagCount(); index++) {
-            entries.add((NBTTagCompound) list.getCompoundTagAt(index).copy());
-        }
-        return QuarantineReadResult.success(entries,
-                version != CURRENT_QUARANTINE_DATA_VERSION
-                        || !root.hasKey(TAG_ENTRIES,
-                        Constants.NBT.TAG_LIST));
-    }
-
-    private static NBTTagCompound createQuarantineEntry(String reason,
-                                                         int markerIndex,
-                                                         NBTTagCompound original) {
-        NBTTagCompound entry = new NBTTagCompound();
-        entry.setString(TAG_REASON, reason == null ? "unknown" : reason);
-        entry.setInteger(TAG_MARKER_INDEX, markerIndex);
-        if (original != null) {
-            entry.setTag(TAG_ORIGINAL_DATA, original.copy());
-        }
-        return entry;
-    }
-
-    private static void writeUuid(NBTTagCompound tag, String key, UUID value) {
-        tag.setLong(key + "Most", value.getMostSignificantBits());
-        tag.setLong(key + "Least", value.getLeastSignificantBits());
-    }
-
-    private static UUID readUuid(NBTTagCompound tag, String key) {
-        String most = key + "Most";
-        String least = key + "Least";
-        if (!tag.hasKey(most, Constants.NBT.TAG_LONG)
-                || !tag.hasKey(least, Constants.NBT.TAG_LONG)) {
-            return null;
-        }
-        return new UUID(tag.getLong(most), tag.getLong(least));
-    }
-
-    private static void warn(String format, Object... args) {
-        FMLLog.warning("[%s] " + format, prependModId(args));
-    }
-
-    private static Object[] prependModId(Object[] args) {
-        Object[] values = new Object[(args == null ? 0 : args.length) + 1];
-        values[0] = LostTalesMetaData.MOD_ID;
-        if (args != null) {
-            System.arraycopy(args, 0, values, 1, args.length);
-        }
-        return values;
     }
 
     private static final Comparator<PartyGoHereMarker> MARKER_ORDER =
@@ -388,34 +297,6 @@ public final class PartyGoHereMarkerNbtCodec {
 
         private static MarkerReadResult unsupported(int version) {
             return new MarkerReadResult(null, false, null, version);
-        }
-    }
-
-    private static final class QuarantineReadResult {
-        private final List<NBTTagCompound> entries;
-        private final boolean repaired;
-        private final boolean supported;
-        private final int unsupportedVersion;
-
-        private QuarantineReadResult(List<NBTTagCompound> entries,
-                                     boolean repaired,
-                                     boolean supported,
-                                     int unsupportedVersion) {
-            this.entries = entries;
-            this.repaired = repaired;
-            this.supported = supported;
-            this.unsupportedVersion = unsupportedVersion;
-        }
-
-        private static QuarantineReadResult success(
-                List<NBTTagCompound> entries, boolean repaired) {
-            return new QuarantineReadResult(entries, repaired, true, -1);
-        }
-
-        private static QuarantineReadResult unsupported(int version) {
-            return new QuarantineReadResult(
-                    Collections.<NBTTagCompound>emptyList(),
-                    false, false, version);
         }
     }
 }

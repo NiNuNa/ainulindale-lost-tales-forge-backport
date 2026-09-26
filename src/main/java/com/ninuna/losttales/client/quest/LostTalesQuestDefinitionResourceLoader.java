@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.quest;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestDefinitionJsonParser;
+import com.ninuna.losttales.util.LostTalesCloseables;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
@@ -64,7 +65,7 @@ final class LostTalesQuestDefinitionResourceLoader {
         } catch (RuntimeException ignored) {
             // Broken index files should not make the journal unusable.
         } finally {
-            closeQuietly(reader);
+            LostTalesCloseables.closeQuietly(reader);
         }
 
         if (files.isEmpty()) {
@@ -84,7 +85,7 @@ final class LostTalesQuestDefinitionResourceLoader {
         } catch (RuntimeException ignored) {
             return null;
         } finally {
-            closeQuietly(reader);
+            LostTalesCloseables.closeQuietly(reader);
         }
     }
 
@@ -97,13 +98,5 @@ final class LostTalesQuestDefinitionResourceLoader {
             return new ResourceLocation(domain, path);
         }
         return new ResourceLocation(LostTalesMetaData.MOD_ID, normalized);
-    }
-
-    private static void closeQuietly(Reader reader) {
-        if (reader != null) {
-            try {
-                reader.close();
-            } catch (IOException ignored) {}
-        }
     }
 }

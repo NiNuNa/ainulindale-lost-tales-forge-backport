@@ -74,9 +74,9 @@ public final class LostTalesMapMarkerSnapshotPacket implements IMessage {
                 boolean hasWaystone = buffer.readBoolean();
                 String structureType = readId(buffer);
                 int priority = buffer.readInt();
-                if (!isFinite(x) || !isFinite(y) || !isFinite(z)
-                        || !isFinite(compassRadius)
-                        || !isFinite(discoveryRadius)
+                if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)
+                        || !Double.isFinite(compassRadius)
+                        || !Double.isFinite(discoveryRadius)
                         || compassRadius < 0.0D
                         || discoveryRadius < 0.0D) {
                     throw new LostTalesPacketCodec.DecodeException(
@@ -149,10 +149,10 @@ public final class LostTalesMapMarkerSnapshotPacket implements IMessage {
             if (marker == null || marker.getId().length() == 0
                     || !LostTalesPacketCodec.isUtf8WithinLimit(
                             marker.getId(), MAX_ID_BYTES)
-                    || !isFinite(marker.getX())
-                    || !isFinite(marker.getY())
-                    || !isFinite(marker.getZ())
-                    || !isFinite(marker.getDiscoveryRadius())
+                    || !Double.isFinite(marker.getX())
+                    || !Double.isFinite(marker.getY())
+                    || !Double.isFinite(marker.getZ())
+                    || !Double.isFinite(marker.getDiscoveryRadius())
                     || marker.getDiscoveryRadius() < 0.0D) {
                 throw new IllegalArgumentException(
                         "invalid map marker snapshot entry");
@@ -188,10 +188,6 @@ public final class LostTalesMapMarkerSnapshotPacket implements IMessage {
     private static void writeText(ByteBuf buffer, String value) {
         LostTalesPacketCodec.writeUtf8String(
                 buffer, value == null ? "" : value, MAX_TEXT_BYTES);
-    }
-
-    private static boolean isFinite(double value) {
-        return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 
     public static final class Handler

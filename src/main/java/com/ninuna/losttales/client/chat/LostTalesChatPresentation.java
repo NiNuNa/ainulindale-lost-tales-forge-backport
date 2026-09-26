@@ -20,6 +20,7 @@ import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
+import com.ninuna.losttales.chat.server.LostTalesServerBroadcastHook;
 import com.ninuna.losttales.chat.share.ChatShowcase;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowLayout;
@@ -489,6 +490,17 @@ public final class LostTalesChatPresentation {
                     "gui.losttales.chat.message.not_forwardable");
         }
         return "";
+    }
+
+    /**
+     * Whether a printed line is the Server's or the Client's own, by the
+     * sender it was remembered with.
+     */
+    static boolean isSystemLine(int chatLineId) {
+        ChatGroupRuns.Entry entry = chatLineId == 0 ? null
+                : ChatGroupRuns.of(chatLineId);
+        return entry != null
+                && LostTalesChatMessagePacket.isSystemSender(entry.senderId);
     }
 
     /** Why a line cannot be answered, or empty where it can: a tab this player cannot talk in. */
@@ -1850,8 +1862,8 @@ public final class LostTalesChatPresentation {
 
     /**
      * The body row of a line, the same for its full and its grouped
-     * form: the body break carrying the sender's colour and the words
-     * the kind opens the body with, then the body itself — read for
+     * form: the body break carrying the sender's colour, then the body
+     * itself — read for
      * everything a message may carry, or shown exactly as it is — and
      * the spoiler marks, numbered over the body alone so the two forms
      * of one message agree on which spoiler is which, and so a spoiler
@@ -1861,8 +1873,7 @@ public final class LostTalesChatPresentation {
                                    LostTalesChatMessagePacket packet,
                                    int[] showcaseIds, ChatChannel channel,
                                    ChatBodyKind kind, IChatComponent body) {
-        root.appendSibling(ChatLayoutMarker.bodyBreak(packet.getNameColor(),
-                bodyLabel(kind)));
+        root.appendSibling(ChatLayoutMarker.bodyBreak(packet.getNameColor()));
         int bodyStart = root.getSiblings().size();
         if (kind.parsesBody()) {
             // The players the server recorded the message as naming place
@@ -1903,20 +1914,6 @@ public final class LostTalesChatPresentation {
             IChatComponent part = parts.get(index);
             part.setChatStyle(part.getChatStyle().setItalic(Boolean.TRUE));
         }
-    }
-
-    /**
-     * The words a kind opens the body with, and the one space that
-     * stands between them and the body — the same space the chevron
-     * carries; empty for the chevron. The space is added here rather
-     * than kept in the lang file, where a trailing space is easily
-     * lost.
-     */
-    private static String bodyLabel(ChatBodyKind kind) {
-        if (kind.getLabelKey().length() == 0) {
-            return "";
-        }
-        return ChatEpithet.translate(kind.getLabelKey(), "").trim() + " ";
     }
 
     /**
@@ -2005,10 +2002,14 @@ public final class LostTalesChatPresentation {
                     LostTalesChatVisualStyle.asideRgb(), id));
             return;
         }
+        // The Server's words are quoted in the colour they were said in.
+        int words = senderId != null
+                && LostTalesChatMessagePacket.isSystemSender(senderId)
+                ? LostTalesChatVisualStyle.serverTextRgb() : ivory;
         root.appendSibling(ChatReplyMarker.apply(
                 text(ClientChatProfanity.filterMessage(reply.getExcerpt()),
-                        nearestFormatting(ivory), false),
-                ivory, id));
+                        nearestFormatting(words), false),
+                words, id));
     }
 
     /**
@@ -2260,7 +2261,13 @@ public final class LostTalesChatPresentation {
         boolean adminNotice = ChatSystemLineClassifier.isAdminNotice(message);
         ChatTab asked = channel == ChatChannel.CLIENT_CONSOLE && !adminNotice
                 ? commandOutputTab() : null;
-        if (asked == null && !ChatLayout.isOpen(tab)
+        // A line addressed to this player, a party invitation, stands in
+        // the conversation they are looking at, where it is read and
+        // answered, rather than in a console that may be closed.
+        ChatTab addressed = asked == null
+                && PartyInvitationNotice.isNotice(message)
+                ? ClientChatChannelState.getSelected() : null;
+        if (asked == null && addressed == null && !ChatLayout.isOpen(tab)
                 && !ChatLayout.isHidden(tab)) {
             ChatLayout.openTab(tab, windowIdOfSelection());
         }
@@ -2291,7 +2298,9 @@ public final class LostTalesChatPresentation {
         // way a bot's reply on Discord names the command; the answers
         // behind it join its run.
         ChatReplyReference reply = ChatReplyReference.NONE;
-        if (asked != null) {
+        if (addressed != null) {
+            tab = addressed;
+        } else if (asked != null) {
             tab = asked;
             reply = commandEchoQuote();
             // The answer quotes this player's command: a reply to them,
@@ -2455,8 +2464,9 @@ public final class LostTalesChatPresentation {
      */
     private static boolean isServerActor(String actor) {
         String name = actor == null ? "" : actor.trim();
-        return "Server".equalsIgnoreCase(name) || name.equalsIgnoreCase(
-                StatCollector.translateToLocal("chat.losttales.server.name"));
+        return LostTalesServerBroadcastHook.SERVER_NAME.equalsIgnoreCase(name)
+                || name.equalsIgnoreCase(StatCollector.translateToLocal(
+                        "chat.losttales.server.name"));
     }
 
     /**
@@ -3807,15 +3817,15 @@ public final class LostTalesChatPresentation {
             if (hit != null) {
                 end = hit.end;
             } else {
-                while (end < text.length() && ChatMentionColors
-                        .isMentionCharacter(text.charAt(end))) {
+                while (end < text.length() && ChatMentions
+                        .isNameCharacter(text.charAt(end))) {
                     end++;
                 }
             }
             // The at-sign must open a word, so an address never becomes
             // a mention of whoever is named after it.
-            boolean opensWord = at == 0 || !ChatMentionColors
-                    .isMentionCharacter(text.charAt(at - 1));
+            boolean opensWord = at == 0 || !ChatMentions
+                    .isNameCharacter(text.charAt(at - 1));
             String name = text.substring(at + 1, end);
             ChatNamedPlayer recorded = hit == null ? null : hit.player;
             int color = opensWord && end > at + 1

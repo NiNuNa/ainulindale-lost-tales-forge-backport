@@ -5,6 +5,7 @@ import com.ninuna.losttales.character.server.CharacterOperationResult;
 import com.ninuna.losttales.character.sync.CharacterOperationFeedback;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
+import com.ninuna.losttales.network.packet.LostTalesPacketCodec;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
@@ -67,12 +68,12 @@ public final class CharacterOperationResultPacket implements IMessage {
             this.operationType = CharacterOperationType.fromNetworkId(buffer.readUnsignedByte());
             this.successful = buffer.readBoolean();
             this.changed = buffer.readBoolean();
-            this.errorId = CharacterErrorId.fromId(CharacterPacketCodec.readString(
+            this.errorId = CharacterErrorId.fromId(LostTalesPacketCodec.readUtf8String(
                     buffer, CharacterPacketCodec.MAX_ERROR_ID_BYTES));
             this.rosterRevision = buffer.readLong();
             this.retryAfterMillis = buffer.readLong();
             this.rosterFollows = buffer.readBoolean();
-            CharacterPacketCodec.requireFinished(buffer);
+            LostTalesPacketCodec.requireFinished(buffer);
 
             if (this.operationType == CharacterOperationType.UNKNOWN
                     || (this.successful && this.errorId != CharacterErrorId.NONE)
@@ -100,7 +101,7 @@ public final class CharacterOperationResultPacket implements IMessage {
         buffer.writeByte(this.operationType.getNetworkId());
         buffer.writeBoolean(this.successful);
         buffer.writeBoolean(this.changed);
-        CharacterPacketCodec.writeString(buffer, this.errorId.getId(), CharacterPacketCodec.MAX_ERROR_ID_BYTES);
+        LostTalesPacketCodec.writeUtf8String(buffer, this.errorId.getId(), CharacterPacketCodec.MAX_ERROR_ID_BYTES);
         buffer.writeLong(this.rosterRevision);
         buffer.writeLong(this.retryAfterMillis);
         buffer.writeBoolean(this.rosterFollows);

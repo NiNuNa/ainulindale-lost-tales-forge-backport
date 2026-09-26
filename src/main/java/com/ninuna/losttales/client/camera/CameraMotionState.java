@@ -75,8 +75,8 @@ public final class CameraMotionState {
                     "target and motion profile are required");
         }
         CameraMath.requireNonNegativeFinite("multiplier", multiplier);
-        boolean hasStridePhase = isFinite(stridePhase);
-        boolean hasStrideIntensity = isFinite(strideIntensity);
+        boolean hasStridePhase = Double.isFinite(stridePhase);
+        boolean hasStrideIntensity = Double.isFinite(strideIntensity);
         if (hasStridePhase != hasStrideIntensity
                 || (hasStrideIntensity && strideIntensity < 0.0D)) {
             throw new IllegalArgumentException(
@@ -248,9 +248,5 @@ public final class CameraMotionState {
     private static double clamp(
             double value, double minimum, double maximum) {
         return Math.max(minimum, Math.min(maximum, value));
-    }
-
-    private static boolean isFinite(double value) {
-        return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 }

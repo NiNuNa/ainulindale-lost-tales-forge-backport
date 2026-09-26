@@ -1,10 +1,9 @@
 package com.ninuna.losttales.character.deletion;
 
-import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.storage.CharacterNbtCodec;
-import cpw.mods.fml.common.FMLLog;
-import net.minecraft.nbt.NBTBase;
+import com.ninuna.losttales.storage.NbtTags;
+import com.ninuna.losttales.util.LostTalesLog;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.world.WorldSavedData;
@@ -150,7 +149,7 @@ public final class CharacterDeletionWorldData extends WorldSavedData {
             } catch (RuntimeException exception) {
                 quarantine(raw, "malformed_tombstone");
                 repaired = true;
-                warn("Quarantined malformed character deletion tombstone at index %d: %s",
+                LostTalesLog.warning("Quarantined malformed character deletion tombstone at index %d: %s",
                         Integer.valueOf(index), exception.toString());
             }
         }
@@ -162,7 +161,7 @@ public final class CharacterDeletionWorldData extends WorldSavedData {
     @Override
     public void writeToNBT(NBTTagCompound compound) {
         if (this.readOnlyForNewerVersion && this.preservedNewerData != null) {
-            copyTagContents(this.preservedNewerData, compound);
+            NbtTags.copyContents(this.preservedNewerData, compound);
             return;
         }
         compound.setInteger(TAG_DATA_VERSION, CURRENT_DATA_VERSION);
@@ -224,10 +223,6 @@ public final class CharacterDeletionWorldData extends WorldSavedData {
         return Collections.unmodifiableList(result);
     }
 
-    public int getTombstoneCount() {
-        return this.tombstones.size();
-    }
-
     public int getQuarantinedEntryCount() {
         return this.quarantinedEntries.size();
     }
@@ -280,7 +275,7 @@ public final class CharacterDeletionWorldData extends WorldSavedData {
         NBTTagCompound tag = new NBTTagCompound();
         tag.setInteger(TAG_DATA_VERSION,
                 CharacterDeletionTombstone.CURRENT_DATA_VERSION);
-        writeUuid(tag, TAG_OWNER_UUID, tombstone.getOwnerId());
+        NbtTags.writeUuid(tag, TAG_OWNER_UUID, tombstone.getOwnerId());
         tag.setTag(TAG_CHARACTER, CharacterNbtCodec.writeCharacterRecord(
                 tombstone.getCharacterCopy()));
         tag.setLong(TAG_STATE_GENERATION, tombstone.getStateGeneration());
@@ -292,7 +287,7 @@ public final class CharacterDeletionWorldData extends WorldSavedData {
 
     private static CharacterDeletionTombstone readTombstone(
             NBTTagCompound tag) {
-        UUID ownerId = readUuid(tag, TAG_OWNER_UUID);
+        UUID ownerId = NbtTags.readUuid(tag, TAG_OWNER_UUID);
         if (ownerId == null
                 || !tag.hasKey(TAG_CHARACTER, Constants.NBT.TAG_COMPOUND)
                 || !tag.hasKey(TAG_STATE_GENERATION, Constants.NBT.TAG_LONG)
@@ -336,49 +331,6 @@ public final class CharacterDeletionWorldData extends WorldSavedData {
             throw new IllegalStateException(
                     "Character deletion data is read-only because it uses unsupported version "
                             + this.unsupportedDataVersion);
-        }
-    }
-
-    private static void warn(String message, Object... arguments) {
-        Object[] allArguments = new Object[arguments.length + 1];
-        allArguments[0] = LostTalesMetaData.MOD_ID;
-        System.arraycopy(arguments, 0, allArguments, 1, arguments.length);
-        try {
-            FMLLog.warning("[%s] " + message, allArguments);
-        } catch (Throwable ignored) {
-            // Storage recovery remains authoritative even before FML logging
-            // is available to standalone validation and repair tooling.
-        }
-    }
-
-    private static void writeUuid(NBTTagCompound tag, String key, UUID uuid) {
-        if (uuid != null) {
-            tag.setLong(key + "Most", uuid.getMostSignificantBits());
-            tag.setLong(key + "Least", uuid.getLeastSignificantBits());
-        }
-    }
-
-    private static UUID readUuid(NBTTagCompound tag, String key) {
-        String most = key + "Most";
-        String least = key + "Least";
-        if (!tag.hasKey(most, Constants.NBT.TAG_LONG)
-                || !tag.hasKey(least, Constants.NBT.TAG_LONG)) {
-            return null;
-        }
-        return new UUID(tag.getLong(most), tag.getLong(least));
-    }
-
-    private static void copyTagContents(NBTTagCompound source,
-                                        NBTTagCompound destination) {
-        Set<?> keys = source.func_150296_c();
-        for (Object keyObject : keys) {
-            if (keyObject instanceof String) {
-                String key = (String) keyObject;
-                NBTBase value = source.getTag(key);
-                if (value != null) {
-                    destination.setTag(key, value.copy());
-                }
-            }
         }
     }
 }

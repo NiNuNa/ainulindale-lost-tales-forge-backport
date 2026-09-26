@@ -11,6 +11,7 @@ import com.ninuna.losttales.character.registry.CharacterRaceGameplayRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.compat.lotr.LotrHalfTrollArmorAdapter;
 import com.ninuna.losttales.compat.lotr.LotrRaceProfileAdapter;
+import com.ninuna.losttales.util.LostTalesIdentifiers;
 import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
@@ -237,7 +238,7 @@ public final class CharacterRaceGameplayHandler {
             EntityPlayerMP player, RoleplayCharacter character) {
         if (player == null || character == null
                 || !CharacterRaceRegistry.HALF_TROLL.equals(
-                        CharacterRaceRegistry.normalizeIdentifier(
+                        LostTalesIdentifiers.normalize(
                                 character.getRaceId()))) {
             return true;
         }
@@ -286,7 +287,7 @@ public final class CharacterRaceGameplayHandler {
             EntityPlayerMP player, RoleplayCharacter character) {
         if (player == null || character == null
                 || !CharacterRaceRegistry.HALF_TROLL.equals(
-                        CharacterRaceRegistry.normalizeIdentifier(
+                        LostTalesIdentifiers.normalize(
                                 character.getRaceId()))) {
             return;
         }

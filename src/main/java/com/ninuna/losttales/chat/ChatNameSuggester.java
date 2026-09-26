@@ -39,7 +39,7 @@ public final class ChatNameSuggester {
                 || clamped - index - 1 > MAX_PREFIX_LENGTH) {
             return null;
         }
-        if (index > 0 && isNameCharacter(text.charAt(index - 1))) {
+        if (index > 0 && ChatMentions.isNameCharacter(text.charAt(index - 1))) {
             return null;
         }
         return new Query(index, text.substring(index + 1, clamped)
@@ -77,11 +77,7 @@ public final class ChatNameSuggester {
     }
 
     private static boolean isPrefixCharacter(char character) {
-        return isNameCharacter(character) || character == ' ';
-    }
-
-    private static boolean isNameCharacter(char character) {
-        return Character.isLetterOrDigit(character) || character == '_';
+        return ChatMentions.isNameCharacter(character) || character == ' ';
     }
 
     /** Where the query starts and what has been typed so far. */

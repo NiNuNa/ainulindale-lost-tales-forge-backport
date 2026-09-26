@@ -48,13 +48,13 @@ public final class LostTalesQuestObjectiveTextHelper {
             case KILL:
                 return translate("kill", count, targetName(objective,
                         getObjectiveTargetCount(objective) == 1 ? "enemy" : "enemies",
-                        "entity", "entityId", "target", "group"));
+                        "entity", "group"));
             case TALK: {
-                String who = targetName(objective, "", "entity", "entityId", "npc", "target");
+                String who = targetName(objective, "", "entity");
                 return who.length() == 0 ? translate("talk.anyone") : translate("talk", who);
             }
             case DELIVER: {
-                String who = targetName(objective, "", "entity", "entityId", "npc", "target");
+                String who = targetName(objective, "", "entity");
                 return who.length() == 0 ? translate("deliver.anyone", count, itemName(objective))
                         : translate("deliver", who, count, itemName(objective));
             }
@@ -81,11 +81,8 @@ public final class LostTalesQuestObjectiveTextHelper {
         if (LostTalesQuestObjectiveType.of(objective).countsToOne()) {
             return 1;
         }
-        try {
-            return Math.max(1, Integer.parseInt(objective.getParam("count", "1")));
-        } catch (Exception ignored) {
-            return 1;
-        }
+        return Math.max(1, LostTalesQuestParams.parseInt(
+                objective.getParam("count", "1"), 1));
     }
 
     public static int getObjectiveProgress(LostTalesQuestProgress progress, LostTalesQuestObjectiveDefinition objective, boolean currentStage, boolean questCompleted) {
@@ -96,8 +93,7 @@ public final class LostTalesQuestObjectiveTextHelper {
 
     /** The item a gathering, crafting or delivery asks for, by its name; "item" or "items" for none named. */
     private static String itemName(LostTalesQuestObjectiveDefinition objective) {
-        String item = firstNonEmpty(objective.getParam("item", ""),
-                objective.getParam("itemId", ""), objective.getParam("target", ""));
+        String item = objective.getParam("item", "").trim();
         if (item.length() > 0) {
             return LostTalesQuestRewardText.itemPhrase(item);
         }
@@ -111,12 +107,8 @@ public final class LostTalesQuestObjectiveTextHelper {
      * is the one written for a reader. {@code noun} names none at all.
      */
     private static String targetName(LostTalesQuestObjectiveDefinition objective,
-            String noun, String... params) {
-        String[] values = new String[params.length];
-        for (int i = 0; i < params.length; i++) {
-            values[i] = objective.getParam(params[i], "");
-        }
-        String target = firstNonEmpty(values);
+            String noun, String... keys) {
+        String target = LostTalesQuestParams.first(objective.getParams(), keys);
         int comma = target.indexOf(',');
         if (comma >= 0) {
             target = target.substring(0, comma).trim();
@@ -141,14 +133,5 @@ public final class LostTalesQuestObjectiveTextHelper {
 
     private static String translate(String key, Object... args) {
         return StatCollector.translateToLocalFormatted("gui.losttales.quest.objective." + key, args);
-    }
-
-    private static String firstNonEmpty(String... values) {
-        for (String value : values) {
-            if (value != null && value.trim().length() > 0) {
-                return value.trim();
-            }
-        }
-        return "";
     }
 }

@@ -23,6 +23,10 @@ public final class LostTalesRequestRateLimiter {
         QUICK_LOOT_MUTATION(20, 5000L),
         QUEST_ACTION(30, 5000L),
         MISSIVE_ACCEPT(10, 5000L),
+        // Taking a notice down and pinning a letter up are single clicks
+        // on a board's page, one per notice; a dozen in five seconds covers
+        // a player clearing a whole board and pinning some back.
+        MISSIVE_BOARD(12, 5000L),
         PARTY_SNAPSHOT(20, 5000L),
         PARTY_MUTATION(12, 5000L),
         // Allows ordinary high-rate clicking while bounding custom-packet floods.

@@ -8,6 +8,7 @@ import static org.junit.Assert.assertTrue;
 
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerCatalog;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import java.lang.reflect.Field;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -176,7 +177,7 @@ public final class LostTalesMapMarkerWaypointRegistryTest {
                         LostTalesMapMarkerDefinition.AUTOMATIC_Y,
                         LOTRWaypoint.BREE.getZCoord(),
                         128.0D, 8.0D,
-                        false, false, true);
+                        false, false, true, LostTalesMapMarkerSource.QUEST_DYNAMIC, false, "", 0);
 
         assertTrue(LostTalesMapMarkerWaypointRegistry
                 .matchesWaypoint(disabled, LOTRWaypoint.BREE));

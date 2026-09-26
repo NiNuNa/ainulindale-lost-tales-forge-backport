@@ -49,9 +49,4 @@ public final class LoreCharacterOwnershipResult {
     public boolean changed() {
         return this.status == Status.CLAIMED || this.status == Status.RELEASED;
     }
-
-    public boolean isSuccessfulOrIdempotent() {
-        return changed()
-                || this.status == Status.ALREADY_OWNED_BY_REQUESTER;
-    }
 }

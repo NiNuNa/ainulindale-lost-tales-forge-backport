@@ -6,15 +6,8 @@ import com.ninuna.losttales.chat.ChatRoleplayStatus;
 import com.ninuna.losttales.chat.ChatStatusLine;
 import com.ninuna.losttales.client.character.LostTalesClientAccount;
 import com.ninuna.losttales.config.LostTalesConfigFiles;
-import java.io.BufferedReader;
+import com.ninuna.losttales.util.LostTalesTextFiles;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -41,7 +34,6 @@ public final class ClientChatPresenceChoices {
     static final String FOLDER = LostTalesConfigFiles.CHAT_PRESENCE;
     /** Choices kept in all; the oldest touched go first past it. */
     static final int MAX_CHOICES = 512;
-    private static final Charset UTF_8 = Charset.forName("UTF-8");
     private static final char SEPARATOR = '\t';
 
     private static File storeFile;
@@ -312,51 +304,10 @@ public final class ClientChatPresenceChoices {
         if (file == null) {
             return;
         }
-        File parent = file.getParentFile();
-        if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
-            return;
-        }
-        Writer writer = null;
-        try {
-            writer = new OutputStreamWriter(new FileOutputStream(file), UTF_8);
-            for (String line : describe()) {
-                writer.write(line);
-                writer.write('\n');
-            }
-        } catch (IOException ignored) {
-            // Losing a remembered status must never break chat.
-        } finally {
-            closeQuietly(writer);
-        }
+        LostTalesTextFiles.writeLines(file, describe());
     }
 
     private static List<String> readLines(File file) {
-        if (file == null || !file.isFile()) {
-            return null;
-        }
-        BufferedReader reader = null;
-        try {
-            reader = new BufferedReader(new InputStreamReader(
-                    new FileInputStream(file), UTF_8));
-            List<String> lines = new ArrayList<String>();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                lines.add(line);
-            }
-            return lines;
-        } catch (IOException ignored) {
-            return null;
-        } finally {
-            closeQuietly(reader);
-        }
-    }
-
-    private static void closeQuietly(java.io.Closeable closeable) {
-        if (closeable != null) {
-            try {
-                closeable.close();
-            } catch (IOException ignored) {
-            }
-        }
+        return LostTalesTextFiles.readLines(file, Integer.MAX_VALUE);
     }
 }

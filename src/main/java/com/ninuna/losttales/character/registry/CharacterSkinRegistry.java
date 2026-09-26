@@ -1,11 +1,11 @@
 package com.ninuna.losttales.character.registry;
 
+import com.ninuna.losttales.util.LostTalesIdentifiers;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -137,7 +137,7 @@ public final class CharacterSkinRegistry {
     private CharacterSkinRegistry() {}
 
     public static CharacterSkinDefinition get(String id) {
-        return id == null ? null : DEFINITIONS.get(normalizeIdentifier(id));
+        return id == null ? null : DEFINITIONS.get(LostTalesIdentifiers.normalize(id));
     }
 
     public static Collection<CharacterSkinDefinition> getAll() {
@@ -146,7 +146,7 @@ public final class CharacterSkinRegistry {
 
     public static List<CharacterSkinDefinition> getCompatibleSkins(
             String raceId, String genderId) {
-        String canonicalRaceId = CharacterRaceRegistry.normalizeIdentifier(raceId);
+        String canonicalRaceId = LostTalesIdentifiers.normalize(raceId);
         List<CharacterSkinDefinition> raceSkins = BY_RACE.get(canonicalRaceId);
         if (raceSkins == null || raceSkins.isEmpty()) {
             return Collections.emptyList();
@@ -190,10 +190,6 @@ public final class CharacterSkinRegistry {
     public static boolean isAccountSkin(String skinId) {
         CharacterSkinDefinition definition = get(skinId);
         return definition != null && definition.isAccountSkin();
-    }
-
-    public static String normalizeIdentifier(String id) {
-        return id == null ? "" : id.trim().toLowerCase(Locale.ROOT);
     }
 
     private static void registerGenderedGroup(

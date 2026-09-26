@@ -2,6 +2,7 @@ package com.ninuna.losttales.character.server;
 
 import com.ninuna.losttales.character.switching.CharacterSwitchCoordinator;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.util.LostTalesMath;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -41,10 +42,10 @@ public final class CharacterStateCheckpointHandler {
                 (long) LostTalesConfig.characterStateCheckpointIntervalSeconds
                         * 20L);
         if (nextScheduleAt <= 0L) {
-            nextScheduleAt = safeAdd(serverTicks, interval);
+            nextScheduleAt = LostTalesMath.saturatingAdd(serverTicks, interval);
         } else if (serverTicks >= nextScheduleAt) {
             enqueueOnlinePlayers(server.getConfigurationManager().playerEntityList);
-            nextScheduleAt = safeAdd(serverTicks, interval);
+            nextScheduleAt = LostTalesMath.saturatingAdd(serverTicks, interval);
         }
 
         int budget = Math.max(1, Math.min(4,
@@ -94,10 +95,5 @@ public final class CharacterStateCheckpointHandler {
             }
         }
         return null;
-    }
-
-    private static long safeAdd(long left, long right) {
-        return right > 0L && left > Long.MAX_VALUE - right
-                ? Long.MAX_VALUE : left + right;
     }
 }

@@ -14,38 +14,17 @@ import static org.junit.Assert.assertTrue;
 public final class ChatLayoutMarkerTest {
 
     @Test
-    public void aBodyBreakCarriesTheSenderColourAndNoLabel() {
+    public void aBodyBreakCarriesTheSenderColour() {
         ChatComponentText marker = ChatLayoutMarker.bodyBreak(0x12AB34);
         assertTrue(ChatLayoutMarker.isBodyBreak(marker));
         assertFalse(ChatLayoutMarker.isAnchor(marker));
         assertFalse(ChatLayoutMarker.isLineBreak(marker));
         assertEquals(0x12AB34, ChatLayoutMarker.bodyColor(marker));
-        assertNull(ChatLayoutMarker.bodyLabel(marker));
         assertEquals("", marker.getUnformattedTextForChat());
-    }
-
-    @Test
-    public void aLabelledBodyBreakCarriesBothAndKeepsColonsInTheLabel() {
-        ChatComponentText marker = ChatLayoutMarker.bodyBreak(0x12AB34,
-                "Used the command: ");
-        assertTrue(ChatLayoutMarker.isBodyBreak(marker));
-        assertEquals(0x12AB34, ChatLayoutMarker.bodyColor(marker));
-        assertEquals("Used the command: ",
-                ChatLayoutMarker.bodyLabel(marker));
-        // The label is everything after the colour, colons included.
-        ChatComponentText nested = ChatLayoutMarker.bodyBreak(7, "a:b: ");
-        assertEquals(7, ChatLayoutMarker.bodyColor(nested));
-        assertEquals("a:b: ", ChatLayoutMarker.bodyLabel(nested));
-        // An empty label is the chevron.
-        assertNull(ChatLayoutMarker.bodyLabel(
-                ChatLayoutMarker.bodyBreak(7, "")));
-        assertNull(ChatLayoutMarker.bodyLabel(
-                ChatLayoutMarker.bodyBreak(7, null)));
         // Wrapped-line pieces copy the style, which carries the marker.
         ChatComponentText piece = new ChatComponentText("");
         piece.setChatStyle(marker.getChatStyle().createShallowCopy());
-        assertEquals("Used the command: ",
-                ChatLayoutMarker.bodyLabel(piece));
+        assertEquals(0x12AB34, ChatLayoutMarker.bodyColor(piece));
     }
 
     @Test
@@ -53,10 +32,9 @@ public final class ChatLayoutMarkerTest {
         ChatComponentText marker = new ChatComponentText("");
         marker.setChatStyle(new ChatStyle().setChatClickEvent(
                 new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
-                        "losttales-chat-layout:body:notacolour:label")));
+                        "losttales-chat-layout:body:notacolour")));
         assertTrue(ChatLayoutMarker.isBodyBreak(marker));
         assertEquals(-1, ChatLayoutMarker.bodyColor(marker));
-        assertEquals("label", ChatLayoutMarker.bodyLabel(marker));
     }
 
     @Test
@@ -64,14 +42,12 @@ public final class ChatLayoutMarkerTest {
         ChatComponentText plain = new ChatComponentText("plain");
         assertFalse(ChatLayoutMarker.isBodyBreak(plain));
         assertEquals(-1, ChatLayoutMarker.bodyColor(plain));
-        assertNull(ChatLayoutMarker.bodyLabel(plain));
         assertNull(ChatLayoutMarker.decode(plain));
         assertNull(ChatLayoutMarker.decode(null));
 
         assertTrue(ChatLayoutMarker.isAnchor(ChatLayoutMarker.anchor()));
         assertTrue(ChatLayoutMarker.isLineBreak(
                 ChatLayoutMarker.lineBreak()));
-        assertNull(ChatLayoutMarker.bodyLabel(ChatLayoutMarker.anchor()));
         assertEquals(-1, ChatLayoutMarker.bodyColor(
                 ChatLayoutMarker.lineBreak()));
 

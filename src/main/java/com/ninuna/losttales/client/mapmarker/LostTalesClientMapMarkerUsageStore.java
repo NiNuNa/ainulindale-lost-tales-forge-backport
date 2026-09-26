@@ -1,15 +1,13 @@
 package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.config.LostTalesConfigFiles;
+import com.ninuna.losttales.util.LostTalesCloseables;
+import com.ninuna.losttales.util.LostTalesTextFiles;
 import java.io.BufferedReader;
-import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -113,7 +111,7 @@ public final class LostTalesClientMapMarkerUsageStore {
         } catch (IOException ignored) {
             // Preferences are best-effort; starting empty is safe.
         } finally {
-            closeQuietly(reader);
+            LostTalesCloseables.closeQuietly(reader);
         }
     }
 
@@ -141,33 +139,14 @@ public final class LostTalesClientMapMarkerUsageStore {
         if (file == null) {
             return;
         }
-        File parent = file.getParentFile();
-        if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
-            return;
+        List<String> lines = new ArrayList<String>(
+                FAVORITE_IDS.size() + RECENT_IDS.size());
+        for (String id : FAVORITE_IDS) {
+            lines.add(FAVORITE + " " + id);
         }
-        Writer writer = null;
-        try {
-            writer = new OutputStreamWriter(
-                    new FileOutputStream(file), UTF_8);
-            for (String id : FAVORITE_IDS) {
-                writer.write(FAVORITE + " " + id + "\n");
-            }
-            for (String id : RECENT_IDS) {
-                writer.write(RECENT + " " + id + "\n");
-            }
-        } catch (IOException ignored) {
-            // Losing a preference write must never break the map or chat.
-        } finally {
-            closeQuietly(writer);
+        for (String id : RECENT_IDS) {
+            lines.add(RECENT + " " + id);
         }
-    }
-
-    private static void closeQuietly(Closeable closeable) {
-        if (closeable != null) {
-            try {
-                closeable.close();
-            } catch (IOException ignored) {
-            }
-        }
+        LostTalesTextFiles.writeLines(file, lines);
     }
 }

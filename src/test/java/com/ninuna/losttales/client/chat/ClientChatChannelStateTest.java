@@ -12,6 +12,7 @@ import com.ninuna.losttales.network.packet.LostTalesChatIdentitySyncPacket;
 import java.util.Collections;
 import java.util.UUID;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -20,13 +21,18 @@ import static org.junit.Assert.assertTrue;
 
 public final class ClientChatChannelStateTest {
 
+    @Before
+    public void twoWindows() {
+        TwoWindowLayout.reset();
+    }
+
     @After
     public void cleanUp() {
         ClientChatChannelState.clear();
         ClientChatIdentities.clear();
         ClientChatIdentitySelection.clear();
         ClientCharacterRosterCache.clear();
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
     }
 
     @Test

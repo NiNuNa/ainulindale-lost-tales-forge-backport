@@ -155,7 +155,7 @@ public final class LostTalesThirdPersonEntityActionService {
     }
 
     static boolean isFinitePoint(double x, double y, double z) {
-        return isFinite(x) && isFinite(y) && isFinite(z);
+        return Double.isFinite(x) && Double.isFinite(y) && Double.isFinite(z);
     }
 
     static boolean isWithinExpandedBounds(
@@ -178,7 +178,7 @@ public final class LostTalesThirdPersonEntityActionService {
         if (eye == null || hit == null || !isFinitePoint(
                 eye.xCoord, eye.yCoord, eye.zCoord)
                 || !isFinitePoint(hit.xCoord, hit.yCoord, hit.zCoord)
-                || !isFinite(reach) || reach < 0.0D) {
+                || !Double.isFinite(reach) || reach < 0.0D) {
             return false;
         }
         double permitted = reach + REACH_TOLERANCE;
@@ -191,7 +191,7 @@ public final class LostTalesThirdPersonEntityActionService {
         if (bounds == null || eye == null
                 || !isFinitePoint(
                 eye.xCoord, eye.yCoord, eye.zCoord)
-                || !isFinite(reach) || reach < 0.0D) {
+                || !Double.isFinite(reach) || reach < 0.0D) {
             return false;
         }
         double border = Math.max(0.0D, collisionBorder);
@@ -225,7 +225,7 @@ public final class LostTalesThirdPersonEntityActionService {
             EntityPlayerMP player, Entity target, Vec3 eye, Vec3 hit) {
         double targetDistance = interceptDistanceSquared(
                 target, eye, hit, TARGET_POSITION_TOLERANCE);
-        if (!isFinite(targetDistance)) {
+        if (!Double.isFinite(targetDistance)) {
             return false;
         }
 
@@ -251,7 +251,7 @@ public final class LostTalesThirdPersonEntityActionService {
             }
             double distance = interceptDistanceSquared(
                     candidate, eye, hit, 0.0D);
-            if (isFinite(distance)
+            if (Double.isFinite(distance)
                     && distance
                     + ENTITY_ORDER_TOLERANCE_SQUARED
                     < targetDistance) {
@@ -279,10 +279,6 @@ public final class LostTalesThirdPersonEntityActionService {
         return intercept == null || intercept.hitVec == null
                 ? Double.NaN
                 : start.squareDistanceTo(intercept.hitVec);
-    }
-
-    private static boolean isFinite(double value) {
-        return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 
     private static double clamp(double value, double minimum, double maximum) {

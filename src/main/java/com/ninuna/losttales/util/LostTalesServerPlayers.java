@@ -5,10 +5,19 @@ import java.util.UUID;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
 
-/** The players online on the running server, looked up by name or id. */
+/**
+ * The players of the running server: whether a player is one the server
+ * holds, and the online ones looked up by name or id.
+ */
 public final class LostTalesServerPlayers {
 
     private LostTalesServerPlayers() {}
+
+    /** Whether the player is one the server holds: present, with an id, in a server world. */
+    public static boolean isServerPlayer(EntityPlayerMP player) {
+        return player != null && player.getUniqueID() != null
+                && player.worldObj != null && !player.worldObj.isRemote;
+    }
 
     /**
      * The online player with that account name, case-insensitively and

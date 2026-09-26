@@ -6,7 +6,6 @@ import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 public final class CharacterSwitchAccountStateTest {
@@ -371,24 +370,6 @@ public final class CharacterSwitchAccountStateTest {
     @Test(expected = IllegalArgumentException.class)
     public void anAccountWithoutAnOwnerIsRejected() {
         new CharacterSwitchAccountState(null);
-    }
-
-    /** A version-1 manifest carries no death lockout and reads as none pending. */
-    @Test
-    public void aVersionOneManifestHasNoPendingDeath() {
-        CharacterSwitchTransaction transaction = journal();
-        CharacterSwitchAccountState account = new CharacterSwitchAccountState(
-                OWNER, 2, 2000L, 1000L, 1000L, 1000L, true, transaction);
-
-        assertEquals(2, account.getCooldownStage());
-        assertEquals(2000L, account.getNextAllowedAt());
-        assertEquals(1000L, account.getLastSuccessfulSwitchAt());
-        assertEquals(1000L, account.getDecayAnchorAt());
-        assertEquals(1000L, account.getLastObservedWallClock());
-        assertTrue(account.isFrozen());
-        assertFalse(account.isDeathPending());
-        assertEquals(0L, account.getDeathPendingAt());
-        assertSame(transaction, account.getTransaction());
     }
 
     /** Negative stored values are clamped so a corrupt manifest owes nothing. */

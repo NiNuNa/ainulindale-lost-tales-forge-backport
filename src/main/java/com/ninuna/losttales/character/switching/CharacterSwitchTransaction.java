@@ -31,46 +31,12 @@ public final class CharacterSwitchTransaction {
     private final long committedDecayAnchorAt;
     private final long committedLastObservedWallClock;
 
-    /** -1 for version-1 journals that predate player-state generations. */
+    /** The player-state generations the two sides are restored from; both positive. */
     private long sourceStateGeneration;
-    /** -1 for version-1 journals that predate player-state generations. */
     private long targetStateGeneration;
 
     private CharacterSwitchTransactionStatus status;
     private long completedAt;
-
-    /** Compatibility constructor for version-1 journals and focused tests. */
-    public CharacterSwitchTransaction(UUID transactionId,
-                                      UUID sourceCharacterId,
-                                      UUID targetCharacterId,
-                                      long sourceRosterRevision,
-                                      long targetRosterRevision,
-                                      long preparedAt,
-                                      long requestEpoch,
-                                      int requestId,
-                                      int previousCooldownStage,
-                                      long previousNextAllowedAt,
-                                      long previousLastSuccessfulSwitchAt,
-                                      long previousDecayAnchorAt,
-                                      long previousLastObservedWallClock,
-                                      int committedCooldownStage,
-                                      long committedNextAllowedAt,
-                                      long committedLastSuccessfulSwitchAt,
-                                      long committedDecayAnchorAt,
-                                      long committedLastObservedWallClock,
-                                      CharacterSwitchTransactionStatus status,
-                                      long completedAt) {
-        this(transactionId, sourceCharacterId, targetCharacterId,
-                sourceRosterRevision, targetRosterRevision, preparedAt,
-                requestEpoch, requestId,
-                previousCooldownStage, previousNextAllowedAt,
-                previousLastSuccessfulSwitchAt, previousDecayAnchorAt,
-                previousLastObservedWallClock,
-                committedCooldownStage, committedNextAllowedAt,
-                committedLastSuccessfulSwitchAt, committedDecayAnchorAt,
-                committedLastObservedWallClock,
-                -1L, -1L, status, completedAt);
-    }
 
     public CharacterSwitchTransaction(UUID transactionId,
                                       UUID sourceCharacterId,
@@ -97,6 +63,10 @@ public final class CharacterSwitchTransaction {
         if (transactionId == null) {
             throw new IllegalArgumentException("transaction ID is required");
         }
+        if (sourceStateGeneration <= 0L || targetStateGeneration <= 0L) {
+            throw new IllegalArgumentException(
+                    "both player-state generations must be positive");
+        }
         this.transactionId = transactionId;
         this.sourceCharacterId = sourceCharacterId;
         this.targetCharacterId = targetCharacterId;
@@ -120,10 +90,8 @@ public final class CharacterSwitchTransaction {
         this.committedDecayAnchorAt = Math.max(0L, committedDecayAnchorAt);
         this.committedLastObservedWallClock = Math.max(0L,
                 committedLastObservedWallClock);
-        this.sourceStateGeneration = sourceStateGeneration <= 0L
-                ? -1L : sourceStateGeneration;
-        this.targetStateGeneration = targetStateGeneration <= 0L
-                ? -1L : targetStateGeneration;
+        this.sourceStateGeneration = sourceStateGeneration;
+        this.targetStateGeneration = targetStateGeneration;
         this.status = status == null
                 ? CharacterSwitchTransactionStatus.RECOVERY_REQUIRED : status;
         this.completedAt = Math.max(0L, completedAt);
@@ -160,10 +128,6 @@ public final class CharacterSwitchTransaction {
             throw new IllegalArgumentException("target state generation must be positive");
         }
         this.targetStateGeneration = generation;
-    }
-    public boolean hasPlayerStateGenerations() {
-        return this.targetStateGeneration > 0L
-                && (this.sourceCharacterId == null || this.sourceStateGeneration > 0L);
     }
     public CharacterSwitchTransactionStatus getStatus() { return this.status; }
     public long getCompletedAt() { return this.completedAt; }

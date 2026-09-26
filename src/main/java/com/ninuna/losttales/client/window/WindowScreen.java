@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.window;
 
+import com.ninuna.losttales.client.diagnostics.LostTalesClientDiagnostics;
 import com.ninuna.losttales.client.gui.LostTalesPointerOwner;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiRegionBlur;
@@ -43,6 +44,14 @@ import org.lwjgl.opengl.GL11;
  * does. It is the game's own chat screen underneath, so the game and
  * other mods see the chat open while it is, and the field the chat types
  * into is the game's.</p>
+ *
+ * <p>The screen also stands without a world, over the menu Settings was
+ * opened from ({@link #openSettings}): then a part that needs a world —
+ * the chat's — is not made, so nothing is sent, no conversation is shown
+ * and the chat's history is left alone; only the pages that need no world
+ * show, and Settings stands on the bare screen, the menu it came from
+ * drawn behind it. Closing it, by Escape or once nothing stands on it,
+ * goes back to that menu.</p>
  */
 public final class WindowScreen extends GuiChat
         implements LostTalesPointerOwner {
@@ -56,6 +65,10 @@ public final class WindowScreen extends GuiChat
 
     private static final List<ScreenPart.Maker> MAKERS =
             new CopyOnWriteArrayList<ScreenPart.Maker>();
+    /** The chat field's place and length, as the game's chat screen makes it. */
+    private static final int FIELD_INSET = 4;
+    private static final int FIELD_HEIGHT = 12;
+    private static final int FIELD_LENGTH = 100;
 
     /** A page brought forward from outside, which takes the keys once the screen draws. */
     private static PageTab pageToFocus;
@@ -108,6 +121,8 @@ public final class WindowScreen extends GuiChat
     private final Settings settings = new Settings(this.menus);
     /** A tab's and a window's menus, the {@code +} and the tab search. */
     private final TabMenus tabMenus = new TabMenus(this, this.menus);
+    /** The short line over a window's bar saying why a page's tab closed. */
+    private final WindowNotice notice = new WindowNotice();
     /**
      * What the pointer is on this frame, found once before anything is
      * drawn: what every highlight, tip and card of the frame and the
@@ -156,15 +171,101 @@ public final class WindowScreen extends GuiChat
     private final List<PageTab> shownPages = new ArrayList<PageTab>();
     /** Whether depth testing was on as this frame began, for a page drawn as a screen of its own. */
     private boolean depthTestAtStart;
+    /** The screen closing goes back to; null for the game, or the main menu without a world. */
+    private final GuiScreen parent;
+    /**
+     * Whether the screen stands without a world: no part that needs one,
+     * nothing sent, and only what needs no world shown.
+     */
+    private final boolean worldless;
+    /** Whether Settings opens once the screen has drawn its first frame. */
+    private boolean settingsToOpen;
 
     public WindowScreen(String defaultText) {
+        this(defaultText, null);
+    }
+
+    /**
+     * A screen that goes back to {@code parent} as it closes. Made without
+     * a world, a part that needs one is left out by its maker.
+     */
+    private WindowScreen(String defaultText, GuiScreen parent) {
         super(defaultText == null ? "" : defaultText);
+        this.parent = parent;
+        this.worldless = !hasWorld();
         for (ScreenPart.Maker maker : MAKERS) {
             ScreenPart part = maker.make(this);
             if (part != null) {
                 this.parts.add(part);
             }
         }
+    }
+
+    /**
+     * Whether a world is loaded. Without one there is no conversation and
+     * no page that needs one, and nothing goes to a server.
+     */
+    public static boolean hasWorld() {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        return minecraft != null && minecraft.theWorld != null
+                && minecraft.thePlayer != null;
+    }
+
+    /**
+     * Opens Settings: in front on the window screen already open, else on
+     * a new one that goes back to {@code parent} as it closes — the
+     * settings hub, the character menu. Without a world the screen stands
+     * over {@code parent} with nothing but Settings on it.
+     */
+    public static void openSettings(GuiScreen parent) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft == null) {
+            return;
+        }
+        WindowScreen open = current();
+        if (open != null) {
+            open.showSettings();
+            return;
+        }
+        WindowScreen screen = new WindowScreen("", parent);
+        screen.settingsToOpen = true;
+        minecraft.displayGuiScreen(screen);
+    }
+
+    /** Settings in front, in the middle of the window the keys are in, else of the bare screen. */
+    private void showSettings() {
+        leaveSearchForMenu();
+        Window window = isEmpty() ? null : keysWindow();
+        this.settings.show(WindowMenus.centredIn(
+                window == null ? null : window.getId()));
+        syncTypingFocus();
+    }
+
+    /**
+     * Closes the screen: back to the screen it was opened from, else to
+     * the game — the main menu, without a world. A screen that stood
+     * without a world lets go of the pages it made, which the next world
+     * makes fresh.
+     */
+    public void closeScreen() {
+        if (this.worldless) {
+            WindowPages.forgetContents();
+        }
+        this.mc.displayGuiScreen(this.parent);
+    }
+
+    /** Whether the screen stands without a world: a part that needs one is not made for it. */
+    public boolean isWorldless() {
+        return this.worldless;
+    }
+
+    /**
+     * Whether the window screen open now stands without a world: there a
+     * conversation, and a page that needs a world, wait unseen.
+     */
+    public static boolean standsWithoutWorld() {
+        WindowScreen open = current();
+        return open != null && open.worldless;
     }
 
     /** Adds a system with work of its own on the screen; every screen opened from now on has one. */
@@ -254,7 +355,7 @@ public final class WindowScreen extends GuiChat
         return this.menus;
     }
 
-    /** Settings, where a system adds its sections. */
+    /** Settings, which every system's sections are given as it is made. */
     public Settings settings() {
         return this.settings;
     }
@@ -278,9 +379,20 @@ public final class WindowScreen extends GuiChat
         return this.focusedPage;
     }
 
-    /** The game's own handling of a key: typing into the field, Escape closing the screen. */
+    /**
+     * The game's own handling of a key: typing into the field, the sent
+     * history's keys. Escape closes the screen, back to the screen it was
+     * opened from; without a world nothing else is done, since there is no
+     * chat to type into.
+     */
     public void vanillaKeyTyped(char typedChar, int keyCode) {
-        super.keyTyped(typedChar, keyCode);
+        if (keyCode == Keyboard.KEY_ESCAPE) {
+            closeScreen();
+            return;
+        }
+        if (!this.worldless) {
+            super.keyTyped(typedChar, keyCode);
+        }
     }
 
     /** The game's item tooltip, the one every inventory shows. */
@@ -493,7 +605,11 @@ public final class WindowScreen extends GuiChat
         for (ScreenPart part : this.parts) {
             part.beforeInit();
         }
-        super.initGui();
+        if (this.worldless) {
+            initWithoutWorld();
+        } else {
+            super.initGui();
+        }
         this.toolStrip.bind(makeField());
         this.gestures.bind(this.mc, this.fontRendererObj, this.width,
                 this.height);
@@ -514,6 +630,27 @@ public final class WindowScreen extends GuiChat
     }
 
     /**
+     * Without a world the game's chat field is made as the game's chat
+     * screen makes it, never given the keys, and the chat's sent history
+     * is not read; the screen behind is sized to this one's.
+     */
+    private void initWithoutWorld() {
+        Keyboard.enableRepeatEvents(true);
+        this.inputField = new GuiTextField(this.fontRendererObj, FIELD_INSET,
+                this.height - FIELD_HEIGHT, this.width - FIELD_INSET,
+                FIELD_HEIGHT);
+        this.inputField.setMaxStringLength(FIELD_LENGTH);
+        this.inputField.setEnableBackgroundDrawing(false);
+        this.inputField.setCanLoseFocus(true);
+        this.inputField.setFocused(false);
+        if (this.parent != null && (this.parent.width != this.width
+                || this.parent.height != this.height)) {
+            this.parent.setWorldAndResolution(this.mc, this.width,
+                    this.height);
+        }
+    }
+
+    /**
      * A field for the search well or a page's bar, in the windows' one
      * look ({@link WindowFields}).
      */
@@ -524,11 +661,21 @@ public final class WindowScreen extends GuiChat
     @Override
     public void updateScreen() {
         super.updateScreen();
+        // Without a world the screen closes once nothing stands on it:
+        // Settings closed, and no page open.
+        if (this.worldless && !this.settingsToOpen && isEmpty()
+                && this.subWindows.openWindows().isEmpty()) {
+            closeScreen();
+            return;
+        }
         // Every page in front of its window keeps time: a caret, a list
-        // that follows the world.
-        for (Window window : WindowLayout.windows()) {
-            PageContent content = WindowPages.contentOf(window.getActiveTab());
-            if (content != null) {
+        // that follows the world. Without a world, only a page that needs
+        // none. A page may close its own tab as it ticks, and its window
+        // with it, so the windows are walked from a copy.
+        for (Window window : new ArrayList<Window>(WindowLayout.windows())) {
+            WindowTab front = window.getActiveTab();
+            PageContent content = WindowPages.contentOf(front);
+            if (content != null && (!this.worldless || front.isAvailable())) {
                 content.tick();
             }
         }
@@ -539,13 +686,22 @@ public final class WindowScreen extends GuiChat
 
     @Override
     public void onGuiClosed() {
-        super.onGuiClosed();
+        if (this.worldless) {
+            // The game's chat screen would reset the chat's scroll; there
+            // is no chat without a world.
+            Keyboard.enableRepeatEvents(false);
+        } else {
+            super.onGuiClosed();
+        }
         // A screen closed mid-drag ends the drag where it stands: this
         // instance is gone and nothing else would ever release it.
         this.gestures.cancelDrags();
         this.subWindows.cancel();
-        // The sub-windows close with the screen and come back with it.
-        SubWindowPlaces.rememberOpen(this.subWindows.openWindows());
+        // The sub-windows close with the screen and come back with it; a
+        // screen without a world keeps those of the last one with a world.
+        if (!this.worldless) {
+            SubWindowPlaces.rememberOpen(this.subWindows.openWindows());
+        }
         // A search belongs to the open screen and goes with it.
         WindowSearch.close();
         leavePage();
@@ -662,7 +818,7 @@ public final class WindowScreen extends GuiChat
             // With nothing to type into, Escape closes the screen, and
             // Ctrl+W the page holding the keys.
             if (keyCode == Keyboard.KEY_ESCAPE) {
-                this.mc.displayGuiScreen(null);
+                closeScreen();
             } else if (press.isCommand(Keyboard.KEY_W)
                     && this.focusedPage != null) {
                 closeTab(this.focusedPage);
@@ -1156,6 +1312,9 @@ public final class WindowScreen extends GuiChat
      */
     @Override
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+        if (this.worldless) {
+            drawBackdrop(partialTicks);
+        }
         // The screen is flat overlay content and takes no part in depth
         // testing, exactly as the HUD's chat pass does not: an item icon
         // drawn at a raised z leaves its depth behind, and with the test
@@ -1173,6 +1332,25 @@ public final class WindowScreen extends GuiChat
                 GL11.glEnable(GL11.GL_DEPTH_TEST);
             }
         }
+    }
+
+    /**
+     * Without a world nothing lies behind the screen: the screen it was
+     * opened from stands there, the pointer kept away from it, else the
+     * game's own menu background.
+     */
+    private void drawBackdrop(float partialTicks) {
+        if (this.parent != null) {
+            try {
+                this.parent.drawScreen(-1, -1, partialTicks);
+                return;
+            } catch (RuntimeException failed) {
+                LostTalesClientDiagnostics.warnOnce("window-screen-backdrop",
+                        "The screen behind Settings could not be drawn",
+                        failed);
+            }
+        }
+        drawDefaultBackground();
     }
 
     private void drawAll(int mouseX, int mouseY, float partialTicks) {
@@ -1228,7 +1406,13 @@ public final class WindowScreen extends GuiChat
         }
         if (this.subWindowsToRestore) {
             this.subWindowsToRestore = false;
-            restoreSubWindows();
+            if (!this.worldless) {
+                restoreSubWindows();
+            }
+        }
+        if (this.settingsToOpen) {
+            this.settingsToOpen = false;
+            showSettings();
         }
         boolean empty = isEmpty();
         boolean typing = !empty && hasField();
@@ -1236,6 +1420,7 @@ public final class WindowScreen extends GuiChat
         for (ScreenPart part : this.parts) {
             part.drawUnderSubWindows(empty, typing, pointerX, pointerY);
         }
+        this.notice.draw(this.fontRendererObj, this.width, System.nanoTime());
         // The sub-windows of the window typed in stand over every window
         // and whatever stands over the windows, and those on the bare
         // screen over them.
@@ -1822,6 +2007,26 @@ public final class WindowScreen extends GuiChat
                 ? (QuestionWindow)asking.content : new QuestionWindow();
         question.ask(title, detail, confirmLabel, action);
         openOverPage(page, SubWindowKind.QUESTION, key, question);
+    }
+
+    /**
+     * Shows a short notice over a window's bar: why a page's tab closed by
+     * itself. It is placed where the bar stands now and stays there, the
+     * window gone with its last tab or not; with the window not drawn, it
+     * stands over the bottom of the screen's middle. A new notice takes
+     * the old one's place.
+     */
+    public void showNotice(String windowId, String text) {
+        WindowFrame frame = windowId == null ? null
+                : WindowFrame.find(windowId);
+        if (frame != null && frame.drawn) {
+            this.notice.show(text, frame.drawnLeft()
+                    + (frame.boxRight - frame.boxLeft) / 2.0D,
+                    frame.barTop() + frame.motionY);
+        } else {
+            this.notice.show(text, this.width / 2.0D,
+                    this.height - WindowPlacement.TOOL_STRIP_HEIGHT);
+        }
     }
 
     /**
@@ -2682,9 +2887,15 @@ public final class WindowScreen extends GuiChat
         }
     }
 
-    /** A line to send, however it was asked for: the part that types sends it. */
+    /**
+     * A line to send, however it was asked for: the part that types sends
+     * it. Without a world nothing is sent, nor kept in the sent history.
+     */
     @Override
     public void func_146403_a(String text) {
+        if (this.worldless) {
+            return;
+        }
         for (ScreenPart part : this.parts) {
             if (part.send(text)) {
                 return;

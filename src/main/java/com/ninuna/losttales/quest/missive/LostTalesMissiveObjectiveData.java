@@ -11,8 +11,6 @@ import java.util.Map;
 public final class LostTalesMissiveObjectiveData {
     public static final String TYPE_KILL = "kill";
     public static final String TYPE_GATHER = "gather";
-    public static final String TYPE_CRAFT = "craft";
-    public static final String TYPE_GOTO = "goto";
 
     private final String id;
     private final String type;
@@ -46,11 +44,6 @@ public final class LostTalesMissiveObjectiveData {
 
     public Map<String, String> getParams() {
         return this.params;
-    }
-
-    public String getParam(String key, String fallback) {
-        String value = this.params.get(key);
-        return value == null ? fallback : value;
     }
 
     public boolean isValid() {

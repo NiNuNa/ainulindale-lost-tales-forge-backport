@@ -4,7 +4,6 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.compat.lotr.LotrQuestReference;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerCatalog;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
-import com.ninuna.losttales.mapmarker.LostTalesMapMarkerIdentity;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestDefinitionNbt;
@@ -12,6 +11,7 @@ import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import com.ninuna.losttales.quest.LostTalesQuestRegistry;
 import com.ninuna.losttales.quest.progress.LostTalesQuestHistoryEntry;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
+import com.ninuna.losttales.storage.NbtTags;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -438,10 +438,6 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         return Collections.unmodifiableCollection(new ArrayList<LostTalesQuestDefinition>(this.dynamicQuestDefinitions.values()));
     }
 
-    public LostTalesQuestDefinition getDynamicQuestDefinition(String questId) {
-        return questId == null || questId.length() == 0 ? null : this.dynamicQuestDefinitions.get(questId);
-    }
-
     public boolean rememberDynamicQuestDefinition(LostTalesQuestDefinition quest) {
         if (!isWritable()) {
             return false;
@@ -476,11 +472,6 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     public boolean isQuestFailed(String questId) {
         LostTalesQuestHistoryEntry entry = getQuestHistoryEntry(questId);
         return entry != null && entry.isFailed();
-    }
-
-    public boolean isQuestAbandoned(String questId) {
-        LostTalesQuestHistoryEntry entry = getQuestHistoryEntry(questId);
-        return entry != null && entry.isAbandoned();
     }
 
     public void startQuest(String questId, String firstStageId) {
@@ -645,10 +636,6 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     public boolean isQuestReferencePinned(String questReference) {
         return questReference != null
                 && this.pinnedQuestIds.contains(questReference);
-    }
-
-    public boolean hasPinnedQuest() {
-        return !getPinnedQuestIds().isEmpty();
     }
 
     public boolean unpinQuestId(String questId) {
@@ -914,17 +901,12 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 && firstKey.equals(markerCanonicalKey(second));
     }
 
+    /** A marker's key among this player's markers; empty for an id longer than a stored one may be. */
     private static String markerCanonicalKey(String markerId) {
         String normalized =
                 LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
-        if (normalized.length() == 0
-                || normalized.length() > MAX_IDENTIFIER_CHARACTERS) {
-            return "";
-        }
-        return LostTalesMapMarkerIdentity.create(
-                normalized,
-                LostTalesMapMarkerIdentity.Authority.QUEST_PLAYER)
-                .getCanonicalKey();
+        return normalized.length() > MAX_IDENTIFIER_CHARACTERS ? ""
+                : LostTalesQuestMarkerHelper.markerCanonicalKey(normalized);
     }
 
     private static LostTalesMapMarkerDefinition normalizeDynamicMarker(
@@ -961,12 +943,12 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                         <= MAX_IDENTIFIER_CHARACTERS
                 && safe(marker.getCategoryName(), "").length()
                         <= MAX_NAME_CHARACTERS
-                && isFinite(marker.getX())
-                && isFinite(marker.getY())
-                && isFinite(marker.getZ())
-                && isFinite(marker.getCompassFadeInRadius())
+                && Double.isFinite(marker.getX())
+                && Double.isFinite(marker.getY())
+                && Double.isFinite(marker.getZ())
+                && Double.isFinite(marker.getCompassFadeInRadius())
                 && marker.getCompassFadeInRadius() >= 0.0D
-                && isFinite(marker.getDiscoveryRadius())
+                && Double.isFinite(marker.getDiscoveryRadius())
                 && marker.getDiscoveryRadius() >= 0.0D;
     }
 
@@ -1039,17 +1021,17 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     private static boolean isStructurallyReasonable(NBTTagCompound data) {
-        if (!hasCompoundListWithinLimit(
+        if (!NbtTags.hasCompoundListWithinLimit(
                 data, "ActiveQuests", MAX_ACTIVE_QUESTS)
-                || !hasCompoundListWithinLimit(
+                || !NbtTags.hasCompoundListWithinLimit(
                 data, "PinnedQuestIds", MAX_ACTIVE_QUESTS)
-                || !hasCompoundListWithinLimit(
+                || !NbtTags.hasCompoundListWithinLimit(
                 data, "QuestHistory", MAX_QUEST_ID_HISTORY)
-                || !hasCompoundListWithinLimit(
+                || !NbtTags.hasCompoundListWithinLimit(
                 data, "DiscoveredMarkers", MAX_QUEST_ID_HISTORY)
-                || !hasCompoundListWithinLimit(
+                || !NbtTags.hasCompoundListWithinLimit(
                 data, "DynamicQuestDefinitions", MAX_DYNAMIC_QUESTS)
-                || !hasCompoundListWithinLimit(
+                || !NbtTags.hasCompoundListWithinLimit(
                 data, "DynamicMapMarkers", MAX_DYNAMIC_MARKERS)
                 || !hasReasonableOptionalString(
                 data, "PinnedMapMarkerId", MAX_IDENTIFIER_CHARACTERS)) {
@@ -1080,7 +1062,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                     entry.getString("Outcome")) == null
                     || !hasReasonableOptionalString(entry, "Detail",
                     MAX_HISTORY_DETAIL_CHARACTERS)
-                    || !hasCompoundListWithinLimit(entry,
+                    || !NbtTags.hasCompoundListWithinLimit(entry,
                     "CompletedOptionalObjectives",
                     LostTalesQuestProgress.MAX_OBJECTIVE_ENTRIES)
                     || !hasReasonableIdList(entry,
@@ -1148,29 +1130,11 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 : marker.getDouble("UnlockRadius");
         int priority = marker.hasKey("Priority", Constants.NBT.TAG_INT)
                 ? marker.getInteger("Priority") : 0;
-        return isFinite(x) && isFinite(y) && isFinite(z)
-                && isFinite(fadeRadius) && fadeRadius >= 0.0D
-                && isFinite(discoveryRadius) && discoveryRadius >= 0.0D
+        return Double.isFinite(x) && Double.isFinite(y) && Double.isFinite(z)
+                && Double.isFinite(fadeRadius) && fadeRadius >= 0.0D
+                && Double.isFinite(discoveryRadius) && discoveryRadius >= 0.0D
                 && priority >= LostTalesMapMarkerDefinition.MIN_PRIORITY
                 && priority <= LostTalesMapMarkerDefinition.MAX_PRIORITY;
-    }
-
-    private static boolean hasCompoundListWithinLimit(
-            NBTTagCompound owner, String key, int maximum) {
-        if (owner == null) {
-            return false;
-        }
-        if (!owner.hasKey(key)) {
-            return true;
-        }
-        NBTBase raw = owner.getTag(key);
-        if (!(raw instanceof NBTTagList)) {
-            return false;
-        }
-        NBTTagList list = (NBTTagList) raw;
-        return (list.tagCount() == 0
-                || list.func_150303_d() == Constants.NBT.TAG_COMPOUND)
-                && list.tagCount() <= maximum;
     }
 
     private static boolean hasReasonableRequiredString(
@@ -1187,9 +1151,4 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 || owner.hasKey(key, Constants.NBT.TAG_STRING)
                 && owner.getString(key).length() <= maximum);
     }
-
-    private static boolean isFinite(double value) {
-        return !Double.isNaN(value) && !Double.isInfinite(value);
-    }
-
 }

@@ -68,12 +68,7 @@ public final class ChatDeliveryMark {
         /** More messages were waiting than the bridge holds. */
         QUEUE_FULL(7, "gui.losttales.chat.delivery.reason.queue_full"),
         /** The bridge stopped before the post went out. */
-        STOPPED(8, "gui.losttales.chat.delivery.reason.stopped"),
-        /**
-         * A code this build does not know, from a newer server. Read,
-         * never sent.
-         */
-        UNKNOWN(-1, "gui.losttales.chat.delivery.reason.unknown");
+        STOPPED(8, "gui.losttales.chat.delivery.reason.stopped");
 
         private final int code;
         private final String langKey;
@@ -83,7 +78,7 @@ public final class ChatDeliveryMark {
             this.langKey = langKey;
         }
 
-        /** The byte the reason crosses the wire as; {@link #UNKNOWN} has none. */
+        /** The byte the reason crosses the wire as. */
         public int code() {
             return this.code;
         }
@@ -93,17 +88,14 @@ public final class ChatDeliveryMark {
             return this.langKey;
         }
 
-        /**
-         * The reason a wire code names; {@link #UNKNOWN} for a code this
-         * build does not know.
-         */
+        /** The reason a wire code names; null for a code that names none. */
         public static Reason fromCode(int code) {
             for (Reason reason : values()) {
                 if (reason.code == code) {
                     return reason;
                 }
             }
-            return UNKNOWN;
+            return null;
         }
     }
 }

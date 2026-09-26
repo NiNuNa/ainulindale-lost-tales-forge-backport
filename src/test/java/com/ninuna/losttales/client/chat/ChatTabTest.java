@@ -20,7 +20,7 @@ public final class ChatTabTest {
 
     @After
     public void cleanUp() {
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
         ClientChatChannelState.clear();
         ChatChannel.resetToBuiltIn();
     }
@@ -71,7 +71,8 @@ public final class ChatTabTest {
                 "Trade", com.ninuna.losttales.chat.ChatPresentationMode.IN_CHARACTER,
                 com.ninuna.losttales.chat.ChatRecipientRule.EVERYONE,
                 com.ninuna.losttales.chat.ChatChannelAccess.NONE,
-                0xC9A227, false);
+                0xC9A227, false,
+                com.ninuna.losttales.chat.ChatChannelScope.NONE);
     }
 
     @Test
@@ -146,7 +147,7 @@ public final class ChatTabTest {
             assertFalse(line.contains("whisper:"));
         }
         lines.add("muted npc:Grey Wanderer");
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
         WindowLayoutStore.load(lines);
         assertFalse(ChatLayout.isOpen(alex));
         assertFalse(ChatLayout.isMuted(alex));

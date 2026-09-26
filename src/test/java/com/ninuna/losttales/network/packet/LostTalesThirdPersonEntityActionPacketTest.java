@@ -15,7 +15,7 @@ public final class LostTalesThirdPersonEntityActionPacketTest {
         LostTalesThirdPersonEntityActionPacket original =
                 new LostTalesThirdPersonEntityActionPacket(
                         LostTalesThirdPersonEntityActionPacket.Action.ATTACK,
-                        42, 1.25D, 64.5D, -8.0D);
+                        42, 1.25D, 64.5D, -8.0D, false);
         ByteBuf buffer = Unpooled.buffer();
         original.toBytes(buffer);
 

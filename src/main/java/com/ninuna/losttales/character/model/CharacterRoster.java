@@ -218,17 +218,6 @@ public class CharacterRoster {
         return Collections.unmodifiableList(characters);
     }
 
-    public CharacterSlotState getSlotState(int slotIndex) {
-        validateSlotIndex(slotIndex);
-        if (slotIndex >= this.unlockedSlotCount) {
-            return CharacterSlotState.HIDDEN;
-        }
-        if (this.charactersBySlot.containsKey(Integer.valueOf(slotIndex))) {
-            return CharacterSlotState.OCCUPIED;
-        }
-        return CharacterSlotState.UNLOCKED;
-    }
-
     /**
      * Puts a changed copy of a character the roster already holds in its
      * place. The copy keeps the id and the slot — those are what the rest

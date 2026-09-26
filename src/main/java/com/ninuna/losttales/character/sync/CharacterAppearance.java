@@ -5,10 +5,10 @@ import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 
+import com.ninuna.losttales.util.LostTalesIdentifiers;
 import java.util.UUID;
 
 /**
@@ -125,14 +125,14 @@ public final class CharacterAppearance {
                 ? characterId : null;
         this.accountName = normalizeName(accountName);
         this.characterName = normalizeName(characterName);
-        this.raceId = CharacterRaceRegistry.normalizeIdentifier(raceId);
-        this.genderId = CharacterGenderRegistry.normalizeIdentifier(genderId);
-        this.skinId = CharacterSkinRegistry.normalizeIdentifier(skinId);
+        this.raceId = LostTalesIdentifiers.normalize(raceId);
+        this.genderId = LostTalesIdentifiers.normalize(genderId);
+        this.skinId = LostTalesIdentifiers.normalize(skinId);
         this.bodyTypeId = CharacterBodyTypeRegistry.contains(bodyTypeId)
-                ? CharacterBodyTypeRegistry.normalizeIdentifier(bodyTypeId)
+                ? LostTalesIdentifiers.normalize(bodyTypeId)
                 : CharacterBodyTypeRegistry.defaultFor(this.genderId);
         this.chestTypeId = CharacterChestTypeRegistry.contains(chestTypeId)
-                ? CharacterChestTypeRegistry.normalizeIdentifier(chestTypeId)
+                ? LostTalesIdentifiers.normalize(chestTypeId)
                 : CharacterChestTypeRegistry.defaultFor(this.genderId);
         this.showMinecraftCape = showMinecraftCape;
         this.cosmeticCapeId = CharacterCapeCatalog.normalizeSelection(cosmeticCapeId);
@@ -243,10 +243,6 @@ public final class CharacterAppearance {
 
     public String getGenderId() {
         return this.genderId;
-    }
-
-    public String getAppearanceGenderId() {
-        return CharacterGenderRegistry.appearanceGender(this.genderId);
     }
 
     public String getSkinId() {

@@ -432,9 +432,14 @@ public final class ChatTab extends WindowTab {
         return ChatLayout.isMuted(this);
     }
 
+    /**
+     * A conversation shows while its channel is open to the player, and
+     * never on the screen that stands without a world.
+     */
     @Override
     public boolean isAvailable() {
-        return ClientChatChannelState.isAvailable(this);
+        return !WindowScreen.standsWithoutWorld()
+                && ClientChatChannelState.isAvailable(this);
     }
 
     /**

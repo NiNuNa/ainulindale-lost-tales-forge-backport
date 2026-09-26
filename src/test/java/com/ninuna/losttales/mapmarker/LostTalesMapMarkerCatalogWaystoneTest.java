@@ -108,9 +108,7 @@ public final class LostTalesMapMarkerCatalogWaystoneTest {
         LostTalesMapMarkerDefinition marker =
                 new LostTalesMapMarkerDefinition(
                         "losttales:quest/runtime", "Quest Target",
-                        "quest", "white", "Quest", false,
-                        0, 1.0D, 64.0D, 2.0D,
-                        128.0D, 8.0D, true);
+                        "quest", "white", 0, 1.0D, 64.0D, 2.0D, true);
 
         assertEquals(LostTalesMapMarkerSource.QUEST_DYNAMIC,
                 marker.getSource());

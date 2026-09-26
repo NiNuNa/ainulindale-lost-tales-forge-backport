@@ -214,9 +214,9 @@ public class LostTalesQuestSyncPacket implements IMessage {
                 boolean requiresRegionUnlock = buf.readBoolean();
                 int priority = buf.readInt();
                 if (markerId.length() == 0
-                        || !isFinite(x) || !isFinite(y) || !isFinite(z)
-                        || !isFinite(compassFadeInRadius)
-                        || !isFinite(discoveryRadius)
+                        || !Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)
+                        || !Double.isFinite(compassFadeInRadius)
+                        || !Double.isFinite(discoveryRadius)
                         || compassFadeInRadius < 0.0D
                         || discoveryRadius < 0.0D) {
                     throw new LostTalesPacketCodec.DecodeException(
@@ -614,16 +614,12 @@ public class LostTalesQuestSyncPacket implements IMessage {
             LostTalesMapMarkerDefinition marker) {
         return marker != null && marker.getId() != null
                 && marker.getId().length() > 0
-                && isFinite(marker.getX()) && isFinite(marker.getY())
-                && isFinite(marker.getZ())
-                && isFinite(marker.getCompassFadeInRadius())
-                && isFinite(marker.getDiscoveryRadius())
+                && Double.isFinite(marker.getX()) && Double.isFinite(marker.getY())
+                && Double.isFinite(marker.getZ())
+                && Double.isFinite(marker.getCompassFadeInRadius())
+                && Double.isFinite(marker.getDiscoveryRadius())
                 && marker.getCompassFadeInRadius() >= 0.0D
                 && marker.getDiscoveryRadius() >= 0.0D;
-    }
-
-    private static boolean isFinite(double value) {
-        return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 
     private static String safeStatic(String value) {

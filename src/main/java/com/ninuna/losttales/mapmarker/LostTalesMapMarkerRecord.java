@@ -385,7 +385,7 @@ public final class LostTalesMapMarkerRecord {
     }
 
     private static double requireCoordinate(double value, String field) {
-        if (!isFinite(value) || Math.abs(value) > MAX_ABSOLUTE_COORDINATE) {
+        if (!Double.isFinite(value) || Math.abs(value) > MAX_ABSOLUTE_COORDINATE) {
             throw new IllegalArgumentException(
                     "marker " + field + " coordinate is invalid");
         }
@@ -393,7 +393,7 @@ public final class LostTalesMapMarkerRecord {
     }
 
     private static double requireRadius(double value, String field) {
-        if (!isFinite(value) || value < 0.0D || value > MAX_RADIUS) {
+        if (!Double.isFinite(value) || value < 0.0D || value > MAX_RADIUS) {
             throw new IllegalArgumentException(field + " is invalid");
         }
         return value;
@@ -412,10 +412,6 @@ public final class LostTalesMapMarkerRecord {
                     "waystone structure id is invalid");
         }
         return normalized;
-    }
-
-    private static boolean isFinite(double value) {
-        return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 
     public static final class Builder {

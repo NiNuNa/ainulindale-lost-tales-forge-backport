@@ -1,7 +1,7 @@
 package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.client.chat.ChatFrame;
-import com.ninuna.losttales.client.chat.ChatLayout;
+import com.ninuna.losttales.client.chat.TwoWindowLayout;
 import java.util.List;
 import org.junit.After;
 import org.junit.Test;
@@ -13,7 +13,7 @@ public final class WindowPlacementTest {
 
     @After
     public void cleanUp() {
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
     }
 
     /**
@@ -26,7 +26,7 @@ public final class WindowPlacementTest {
      */
     @Test
     public void aWindowFillingTheScreenTakesItAllAndGivesItBack() {
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
         Window console = WindowLayout.firstWindow();
         Window conversation = WindowLayout.windows().get(1);
         WindowPlacement.Box before = WindowPlacement.windowBounds(
@@ -71,7 +71,7 @@ public final class WindowPlacementTest {
      */
     @Test
     public void aWindowFillsTheHalfOrQuarterItIsSentTo() {
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
         Window window = WindowLayout.firstWindow();
         assertTrue(WindowLayout.setFill(window.getId(),
                 Window.ScreenFill.LEFT, false));
@@ -139,7 +139,7 @@ public final class WindowPlacementTest {
      */
     @Test
     public void theScreenHoldsOnlyAStripsWorthOfAWindow() {
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
         Window dragged = WindowLayout.firstWindow();
         WindowLayout.setWindowHeight(dragged.getId(),
                 WindowPlacement.heightForLines(1.0D, null), false);
@@ -207,7 +207,7 @@ public final class WindowPlacementTest {
      */
     @Test
     public void aTallWindowOverlapsItsNeighbourAndMovesALinkedOne() {
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
         Window console = WindowLayout.firstWindow();
         Window below = WindowLayout.windows().get(1);
         WindowLayout.setPosition(console.getId(), 0.0D, 10.0D, false);
@@ -266,7 +266,7 @@ public final class WindowPlacementTest {
      */
     @Test
     public void aWindowIsAsTallAsItsOwnHeightWhateverItHolds() {
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
         Window window = WindowLayout.firstWindow();
         assertEquals(0.0D, window.getOwnHeight(), 0.0D);
         ChatFrame frame = ChatFrame.of(window);
@@ -297,7 +297,7 @@ public final class WindowPlacementTest {
 
     @Test
     public void aLinkedWindowKeepsItsGapToItsTarget() {
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
         Window console = WindowLayout.firstWindow();
         Window below = WindowLayout.windows().get(1);
         WindowLayout.setWindowHeight(console.getId(),
@@ -375,7 +375,7 @@ public final class WindowPlacementTest {
      */
     @Test
     public void heightIsContinuousBetweenWholeLines() {
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
         // Twelve lines: 12 * 12 = 144 of room.
         assertEquals(39 + 2 + 144 + 35,
                 WindowPlacement.heightForLines(12.0D, null), 0.0001D);

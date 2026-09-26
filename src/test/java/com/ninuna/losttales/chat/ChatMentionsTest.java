@@ -25,6 +25,19 @@ public final class ChatMentionsTest {
     }
 
     @Test
+    public void aNameIsLettersDigitsAndUnderscores() {
+        assertTrue(ChatMentions.isNameCharacter('a'));
+        assertTrue(ChatMentions.isNameCharacter('Z'));
+        assertTrue(ChatMentions.isNameCharacter('7'));
+        assertTrue(ChatMentions.isNameCharacter('_'));
+        assertTrue(ChatMentions.isNameCharacter('\u00e9'));
+        assertFalse(ChatMentions.isNameCharacter('@'));
+        assertFalse(ChatMentions.isNameCharacter('#'));
+        assertFalse(ChatMentions.isNameCharacter(' '));
+        assertFalse(ChatMentions.isNameCharacter('-'));
+    }
+
+    @Test
     public void requiresWordBoundariesAroundTheMention() {
         assertFalse(ChatMentions.mentionsAny("@Player8123", NAMES));
         assertFalse(ChatMentions.mentionsAny("mail@Player812", NAMES));

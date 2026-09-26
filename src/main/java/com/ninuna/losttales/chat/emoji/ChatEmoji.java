@@ -119,7 +119,7 @@ public enum ChatEmoji {
     /** Domain-relative path of the sprite sheet inside the losttales assets. */
     public static final String TEXTURE_PATH = "textures/gui/emojis.png";
     /** The emoji variation selector (U+FE0F); optional after some emoji. */
-    private static final char VARIATION_SELECTOR = '\uFE0F';
+    static final char VARIATION_SELECTOR = '\uFE0F';
 
     private static final Map<String, ChatEmoji> BY_NAME =
             new HashMap<String, ChatEmoji>();

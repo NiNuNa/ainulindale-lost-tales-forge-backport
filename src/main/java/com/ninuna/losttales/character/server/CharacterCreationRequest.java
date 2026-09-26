@@ -31,46 +31,6 @@ public final class CharacterCreationRequest {
                                     String startingFactionId,
                                     String startingWaypointId,
                                     boolean unconventionalSettings,
-                                    String history) {
-        this(expectedRosterRevision, slotIndex, name, raceId, genderId,
-                skinId, age, startingFactionId, startingWaypointId,
-                unconventionalSettings, history, "");
-    }
-
-    /** An empty chest type lets validation pick the default for the sex. */
-    public CharacterCreationRequest(long expectedRosterRevision, int slotIndex,
-                                    String name, String raceId, String genderId,
-                                    String skinId, int age,
-                                    String startingFactionId,
-                                    String startingWaypointId,
-                                    boolean unconventionalSettings,
-                                    String history, String bodyTypeId) {
-        this(expectedRosterRevision, slotIndex, name, raceId, genderId,
-                skinId, age, startingFactionId, startingWaypointId,
-                unconventionalSettings, history, bodyTypeId, "");
-    }
-
-    /** The Minecraft cape shown and no cosmetic cape, which is what a new character wears unless asked otherwise. */
-    public CharacterCreationRequest(long expectedRosterRevision, int slotIndex,
-                                    String name, String raceId, String genderId,
-                                    String skinId, int age,
-                                    String startingFactionId,
-                                    String startingWaypointId,
-                                    boolean unconventionalSettings,
-                                    String history, String bodyTypeId,
-                                    String chestTypeId) {
-        this(expectedRosterRevision, slotIndex, name, raceId, genderId,
-                skinId, age, startingFactionId, startingWaypointId,
-                unconventionalSettings, history, bodyTypeId, chestTypeId,
-                true, 0);
-    }
-
-    public CharacterCreationRequest(long expectedRosterRevision, int slotIndex,
-                                    String name, String raceId, String genderId,
-                                    String skinId, int age,
-                                    String startingFactionId,
-                                    String startingWaypointId,
-                                    boolean unconventionalSettings,
                                     String history, String bodyTypeId,
                                     String chestTypeId, boolean showMinecraftCape,
                                     int cosmeticCapeId) {

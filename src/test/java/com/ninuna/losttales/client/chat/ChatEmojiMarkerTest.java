@@ -3,10 +3,10 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.network.packet.ChatPacketFixtures;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.IChatComponent;
@@ -110,9 +110,8 @@ public final class ChatEmojiMarkerTest {
     }
 
     private static LostTalesChatMessagePacket packet(String message) {
-        return new LostTalesChatMessagePacket(
-                ChatChannel.GLOBAL, UUID.randomUUID(), "Arathorn",
-                "RangerOfTheNorth", "Ranger", 0x55AA55, 0x336633,
-                message, 123456789L, "losttales:human_ranger_male_2");
+        return ChatPacketFixtures.line(ChatChannel.GLOBAL, "Arathorn", "RangerOfTheNorth", message)
+                .title("Ranger").colors(0x55AA55, 0x336633).at(123456789L)
+                .skin("losttales:human_ranger_male_2").build();
     }
 }

@@ -4,6 +4,7 @@ import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.server.CharacterNetworkRequestHandler;
 import com.ninuna.losttales.character.server.CharacterServerPacketDispatcher;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
+import com.ninuna.losttales.network.packet.LostTalesPacketCodec;
 import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
@@ -53,7 +54,7 @@ public final class CharacterCapeUpdateRequestPacket implements IMessage {
         try {
             this.requestId = buffer.readInt();
             this.expectedRosterRevision = buffer.readLong();
-            UUID characterId = CharacterPacketCodec.readUuid(buffer);
+            UUID characterId = LostTalesPacketCodec.readUuid(buffer);
             this.showMinecraftCape = buffer.readBoolean();
             this.cosmeticCapeId = buffer.readUnsignedShort();
             // Whether the request is the account's own.
@@ -62,7 +63,7 @@ public final class CharacterCapeUpdateRequestPacket implements IMessage {
             if (!forAccount && NIL_UUID.equals(characterId)) {
                 throw new CharacterPacketCodec.DecodeException("nil character id");
             }
-            CharacterPacketCodec.requireFinished(buffer);
+            LostTalesPacketCodec.requireFinished(buffer);
             if (this.expectedRosterRevision < 0L) {
                 throw new CharacterPacketCodec.DecodeException(
                         "missing roster revision");
@@ -82,7 +83,7 @@ public final class CharacterCapeUpdateRequestPacket implements IMessage {
     public void toBytes(ByteBuf buffer) {
         buffer.writeInt(this.requestId);
         buffer.writeLong(this.expectedRosterRevision);
-        CharacterPacketCodec.writeUuid(buffer,
+        LostTalesPacketCodec.writeUuid(buffer,
                 this.characterId == null ? NIL_UUID : this.characterId);
         buffer.writeBoolean(this.showMinecraftCape);
         buffer.writeShort(this.cosmeticCapeId);

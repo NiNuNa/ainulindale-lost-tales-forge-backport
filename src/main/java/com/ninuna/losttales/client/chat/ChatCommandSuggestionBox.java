@@ -1,8 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.client.window.PointerRegions;
-import com.ninuna.losttales.client.window.WindowStyle;
-import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -19,17 +17,7 @@ import net.minecraft.client.gui.FontRenderer;
  * row is the candidate currently standing in the field; walking the list
  * (Tab, or Up and Down) replaces the word, as vanilla's cycling does.
  */
-final class ChatCommandSuggestionBox {
-    /** Rows shown; more candidates fold into a trailing count. */
-    static final int MAX_ROWS = 8;
-    private static final int ROW_HEIGHT = 11;
-    /** The rows stand two pixels inside the frame's ink, as a framed button's content does. */
-    private static final int PADDING = WindowStyle.POPUP_INSET;
-    /**
-     * How far above the input anchor ({@link ChatInputBar#inputAnchor})
-     * the box ends: one pixel clear of the bar's top.
-     */
-    private static final int BOTTOM_MARGIN = 15;
+final class ChatCommandSuggestionBox extends ChatSuggestionBox {
 
     private List<String> candidates = Collections.emptyList();
     private int selectedIndex = -1;
@@ -52,37 +40,27 @@ final class ChatCommandSuggestionBox {
         this.selectedIndex = -1;
     }
 
+    @Override
     boolean isActive() {
         return !this.candidates.isEmpty();
     }
 
     /** Rows drawn: the candidates, capped, plus a possible fold row. */
-    private int rowCount() {
+    @Override
+    int shownRows() {
         int shown = Math.min(this.candidates.size(), MAX_ROWS);
         return shown + (this.candidates.size() > MAX_ROWS ? 1 : 0);
     }
 
-    boolean contains(FontRenderer font, double mouseX, double mouseY,
-                     int screenHeight, int inputX) {
-        if (!isActive()) {
-            return false;
-        }
-        int top = boxTop(screenHeight);
-        return LostTalesUiHitBox.contains(mouseX, mouseY, inputX, top,
-                boxWidth(font), screenHeight - BOTTOM_MARGIN - top);
+    /** The candidates shown; the fold row is not one. */
+    @Override
+    int pickableRows() {
+        return Math.min(this.candidates.size(), MAX_ROWS);
     }
 
-    /** The candidate index under the mouse, or -1. Fold row answers -1. */
-    int candidateAt(FontRenderer font, double mouseX, double mouseY,
-                    int screenHeight, int inputX) {
-        if (!contains(font, mouseX, mouseY, screenHeight, inputX)
-                || mouseY < boxTop(screenHeight) + PADDING) {
-            return -1;
-        }
-        int row = (int)Math.floor((mouseY - boxTop(screenHeight) - PADDING)
-                / (double)ROW_HEIGHT);
-        return row >= 0 && row < Math.min(this.candidates.size(), MAX_ROWS)
-                ? row : -1;
+    @Override
+    int rowHeight() {
+        return ROW_HEIGHT;
     }
 
     void draw(FontRenderer font, PointerRegions regions,
@@ -90,15 +68,10 @@ final class ChatCommandSuggestionBox {
         if (!isActive()) {
             return;
         }
-        int width = boxWidth(font);
-        int top = boxTop(screenHeight);
-        int bottom = screenHeight - BOTTOM_MARGIN;
-        int hoveredRow = candidateAt(font, mouseX, mouseY, screenHeight,
-                inputX);
-        regions.add(inputX, top, inputX + width, bottom);
+        int hoveredRow = rowAt(font, mouseX, mouseY, screenHeight, inputX);
         int shown = Math.min(this.candidates.size(), MAX_ROWS);
-        WindowStyle.drawPopupList(inputX, top, inputX + width,
-                bottom, top + PADDING, ROW_HEIGHT, litRow(hoveredRow, shown));
+        int top = drawFrame(font, regions, screenHeight, inputX,
+                litRow(hoveredRow, shown));
         for (int row = 0; row < shown; row++) {
             int rowTop = top + PADDING + row * ROW_HEIGHT;
             LostTalesUiInk.drawText(font,
@@ -126,7 +99,8 @@ final class ChatCommandSuggestionBox {
         return this.selectedIndex >= MAX_ROWS ? shown : this.selectedIndex;
     }
 
-    private int boxWidth(FontRenderer font) {
+    @Override
+    int boxWidth(FontRenderer font) {
         int width = 0;
         int shown = Math.min(this.candidates.size(), MAX_ROWS);
         for (int index = 0; index < shown; index++) {
@@ -138,10 +112,5 @@ final class ChatCommandSuggestionBox {
                     "+" + (this.candidates.size() - MAX_ROWS)));
         }
         return width + PADDING * 2;
-    }
-
-    private int boxTop(int screenHeight) {
-        return screenHeight - BOTTOM_MARGIN - rowCount() * ROW_HEIGHT
-                - PADDING * 2;
     }
 }

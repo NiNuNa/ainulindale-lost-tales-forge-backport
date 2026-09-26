@@ -85,8 +85,8 @@ public enum LostTalesUiSheet {
     /**
      * A question mark and an exclamation mark, each in the chat's ivory
      * and in a colour of its own — the question green, the exclamation
-     * crimson. Nothing draws them yet; they are here so the sheet and
-     * these constants stay one description of the artwork.
+     * crimson. The question heads a question window; the exclamation
+     * marks the message menu's report row and the report menu.
      */
     QUESTION(97, 26, 3, 5),
     QUESTION_LIT(101, 26, 3, 5),

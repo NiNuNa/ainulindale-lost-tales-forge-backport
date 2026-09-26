@@ -56,6 +56,8 @@ import org.lwjgl.opengl.GL11;
  */
 public final class LostTalesLotrMapMarkerIconOverlay {
     private static final int ICON_DRAW_SIZE = 13;
+    /** How wide and tall an editor's preview of a marker icon is drawn. */
+    public static final int EDITOR_ICON_SIZE = ICON_DRAW_SIZE;
     private static final float HIGHLIGHT_SCALE = 16.0F / ICON_DRAW_SIZE;
     private static final int ICON_HOVER_DRAW_SIZE =
             Math.round(ICON_DRAW_SIZE * HIGHLIGHT_SCALE);
@@ -3226,7 +3228,15 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     public static void renderEditorIconPreview(
             Minecraft minecraft, String iconName, String colorName,
             float centerX, float centerY) {
-        if (minecraft == null) {
+        renderEditorIconPreview(minecraft, iconName, colorName, centerX,
+                centerY, 1.0F);
+    }
+
+    /** As above at {@code alpha} (0 to 1): a preview fading with its window. */
+    public static void renderEditorIconPreview(
+            Minecraft minecraft, String iconName, String colorName,
+            float centerX, float centerY, float alpha) {
+        if (minecraft == null || alpha <= 0.0F) {
             return;
         }
         LostTalesCompassMarkerIcon icon =
@@ -3236,7 +3246,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         try {
             drawIconWithShadow(minecraft, centerX, centerY,
                     ICON_DRAW_SIZE, icon,
-                    color[0], color[1], color[2], 1.0F);
+                    color[0], color[1], color[2], Math.min(1.0F, alpha));
         } finally {
             endIconRender();
         }

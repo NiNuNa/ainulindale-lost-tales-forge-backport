@@ -4,7 +4,6 @@ import com.ninuna.losttales.chat.server.ChatIdentitySelection;
 import com.ninuna.losttales.network.packet.LostTalesChatIdentitySyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterProfilePacket;
 import java.io.File;
-import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.achievement.ELostTalesAchievement;
 import com.ninuna.losttales.accessory.AccessoryBootstrap;
@@ -45,7 +44,6 @@ import com.ninuna.losttales.event.LostTalesMobAggroEventHandler;
 import com.ninuna.losttales.event.LostTalesQuestObjectiveEventHandler;
 import com.ninuna.losttales.event.LostTalesQuestPlayerEventHandler;
 import com.ninuna.losttales.faction.ELostTalesFaction;
-import com.ninuna.losttales.gui.LostTalesGuiHandler;
 import com.ninuna.losttales.item.ELostTalesItem;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.server.LostTalesNetworkPlayerEventHandler;
@@ -56,6 +54,7 @@ import com.ninuna.losttales.network.server.LostTalesThirdPersonProjectileAimHand
 import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
 import com.ninuna.losttales.network.packet.LostTalesMapMarkerDiscoveryPacket;
 import com.ninuna.losttales.network.packet.LostTalesMapMarkerSnapshotPacket;
+import com.ninuna.losttales.network.packet.LostTalesMissiveBoardStatePacket;
 import com.ninuna.losttales.network.packet.LostTalesWaystoneStatePacket;
 import com.ninuna.losttales.network.packet.LostTalesChargeTierSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
@@ -88,6 +87,7 @@ import com.ninuna.losttales.party.server.PartyTrackingSyncManager;
 import com.ninuna.losttales.party.server.PartyPlayerEventHandler;
 import com.ninuna.losttales.party.server.PartySyncManager;
 import com.ninuna.losttales.quest.LostTalesQuestRegistry;
+import com.ninuna.losttales.quest.missive.MissiveBoardWatches;
 import com.ninuna.losttales.world.biome.ELostTalesBiome;
 import com.ninuna.losttales.world.map.LostTalesMapOverlay;
 import com.ninuna.losttales.world.map.road.ELostTalesRoad;
@@ -103,12 +103,9 @@ import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartedEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
 import cpw.mods.fml.common.event.FMLServerStoppingEvent;
-import cpw.mods.fml.common.network.NetworkRegistry;
 import cpw.mods.fml.common.registry.GameRegistry;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.world.World;
 import net.minecraftforge.common.MinecraftForge;
 import com.ninuna.losttales.chat.ChatChannelIconCatalog;
 import com.ninuna.losttales.chat.ChatCodeNames;
@@ -223,6 +220,7 @@ public class LostTalesCommonProxy {
         FMLCommonHandler.instance().bus().register(
                 waystoneGenerationHandler);
         FMLCommonHandler.instance().bus().register(chatRoleRosterWatcher);
+        FMLCommonHandler.instance().bus().register(new MissiveBoardWatches());
 
         ELostTalesItem.initAndRegisterItems();
         AccessoryBootstrap.initialize();
@@ -242,8 +240,6 @@ public class LostTalesCommonProxy {
                             + "the ring slot will reject server-side insertion",
                     LostTalesMetaData.MOD_ID);
         }
-        NetworkRegistry.INSTANCE.registerGuiHandler(LostTalesMod.instance, new LostTalesGuiHandler());
-
         ELostTalesStructure.initAndRegisterStructures();
         ELostTalesCrafting.initAndRegisterCrafting();
         ELostTalesFaction.initAndRegisterFactions();
@@ -277,18 +273,11 @@ public class LostTalesCommonProxy {
     }
 
     /**
-     * Client-only GUI construction hook. The common/server proxy returns null so
-     * dedicated servers never load client GUI classes.
+     * Opens the page of the missive letter in the player's inventory slot
+     * {@code inventorySlot}, on the client. The common/server proxy does
+     * nothing, so a dedicated server never loads a client class.
      */
-    public Object getClientGuiElement(int id, EntityPlayer player, World world, int x, int y, int z) {
-        return null;
-    }
-
-    /**
-     * Client-only missive reader hook. The common/server proxy is a no-op so
-     * dedicated servers never load client GUI classes.
-     */
-    public void openMissiveLetterGui(EntityPlayer player, ItemStack stack, int inventorySlot) {}
+    public void openMissiveLetterPage(int inventorySlot) {}
 
     /**
      * Client-bound packet hooks. The common/server proxy deliberately does
@@ -310,6 +299,9 @@ public class LostTalesCommonProxy {
 
     public void handleWaystoneState(
             LostTalesWaystoneStatePacket packet) {}
+
+    public void handleMissiveBoardState(
+            LostTalesMissiveBoardStatePacket packet) {}
 
     public void handleChargeTierSync(LostTalesChargeTierSyncPacket packet) {}
 
@@ -402,6 +394,7 @@ public class LostTalesCommonProxy {
         PartySyncManager.clear();
         PartyMemberStatusSyncManager.clear();
         PartyTrackingSyncManager.clear();
+        MissiveBoardWatches.clear();
         LostTalesChatRoleRosterWatcher.clear();
         ChatMessageIdAllocator.reset();
         ChatHistory.clear();
@@ -484,7 +477,8 @@ public class LostTalesCommonProxy {
             return;
         }
         LostTalesChatService.console(ChatConsoleEvent.Kind.SERVER,
-                ChatConsoleEvent.Severity.INFO, "Server", "Server started");
+                ChatConsoleEvent.Severity.INFO,
+                LostTalesServerBroadcastHook.SERVER_NAME, "Server started");
         LostTalesDiscordBridge.getInstance().onServerStarted();
     }
 
@@ -495,7 +489,8 @@ public class LostTalesCommonProxy {
         // server is next up. First, before the ids are reset below.
         if (!CharacterRoomWorldType.isRoomServer(MinecraftServer.getServer())) {
             LostTalesChatService.console(ChatConsoleEvent.Kind.SERVER,
-                    ChatConsoleEvent.Severity.INFO, "Server",
+                    ChatConsoleEvent.Severity.INFO,
+                    LostTalesServerBroadcastHook.SERVER_NAME,
                     "Server shutting down");
         }
         // The offline topic, queued before the stop, which gives the
@@ -522,6 +517,7 @@ public class LostTalesCommonProxy {
         PartySyncManager.clear();
         PartyMemberStatusSyncManager.clear();
         PartyTrackingSyncManager.clear();
+        MissiveBoardWatches.clear();
         LostTalesChatRoleRosterWatcher.clear();
         ChatChannel.resetToBuiltIn();
         ChatChannelIconCatalog.resetToDefaults();

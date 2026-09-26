@@ -18,6 +18,7 @@ import com.ninuna.losttales.client.quest.ClientQuestCatalog;
 import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.PageTab;
 import com.ninuna.losttales.client.window.ScreenPart;
+import com.ninuna.losttales.client.window.Settings;
 import com.ninuna.losttales.client.window.SubWindow;
 import com.ninuna.losttales.client.window.SubWindowAnchor;
 import com.ninuna.losttales.client.window.SubWindowPlaces;
@@ -97,10 +98,11 @@ public final class ChatScreenPart extends ScreenPart {
     /** Gap between the + and the line beside it. */
     private static final int EMPTY_STATE_GAP = 5;
 
+    /** The chat's part, on every screen with a world; without one there is no chat. */
     private static final ScreenPart.Maker MAKER = new ScreenPart.Maker() {
         @Override
         public ScreenPart make(WindowScreen screen) {
-            return new ChatScreenPart(screen);
+            return screen.isWorldless() ? null : new ChatScreenPart(screen);
         }
     };
 
@@ -165,19 +167,20 @@ public final class ChatScreenPart extends ScreenPart {
                         ChatScreenPart.this.outbox.forward(tab, messageId);
                     }
                 });
-        ChatSettingsSections.addTo(screen.settings(), this.notices);
     }
 
     /**
      * Gives every window screen opened from now on the chat's part and
-     * every window's field the chat's look, and registers the chat's kinds
-     * of sub-window before the layout file that remembers their places is
-     * read.
+     * every window's field the chat's look, gives every Settings the
+     * chat's sections — with or without a world, part or none — and
+     * registers the chat's kinds of sub-window before the layout file that
+     * remembers their places is read.
      */
     public static void install() {
         ChatSubWindows.install();
         ChatWindowFields.install();
         WindowScreen.addPart(MAKER);
+        Settings.addSections(ChatSettingsSections.SECTIONS);
     }
 
     /**
@@ -2622,7 +2625,7 @@ public final class ChatScreenPart extends ScreenPart {
     }
 
     /** A short confirmation above the bar: what the bar draws. */
-    private void showNotice(String text) {
+    void showNotice(String text) {
         this.bar.showNotice(text);
     }
 

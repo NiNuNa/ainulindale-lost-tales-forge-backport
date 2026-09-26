@@ -113,11 +113,11 @@ public final class LostTalesThirdPersonBlockActionService {
     }
 
     static boolean isWithinReach(Vec3 eye, Vec3 hit, double reach) {
-        if (eye == null || hit == null || !isFinite(reach)
+        if (eye == null || hit == null || !Double.isFinite(reach)
                 || reach < 0.0D
-                || !isFinite(eye.xCoord) || !isFinite(eye.yCoord)
-                || !isFinite(eye.zCoord) || !isFinite(hit.xCoord)
-                || !isFinite(hit.yCoord) || !isFinite(hit.zCoord)) {
+                || !Double.isFinite(eye.xCoord) || !Double.isFinite(eye.yCoord)
+                || !Double.isFinite(eye.zCoord) || !Double.isFinite(hit.xCoord)
+                || !Double.isFinite(hit.yCoord) || !Double.isFinite(hit.zCoord)) {
             return false;
         }
         double permitted = reach + REACH_TOLERANCE;
@@ -284,9 +284,5 @@ public final class LostTalesThirdPersonBlockActionService {
     private static boolean isUnitInterval(float value) {
         return !Float.isNaN(value) && !Float.isInfinite(value)
                 && value >= 0.0F && value <= 1.0F;
-    }
-
-    private static boolean isFinite(double value) {
-        return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 }

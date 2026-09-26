@@ -105,7 +105,7 @@ public final class DiscordCopyLivenessTest {
 
     /** A Discord member's own line, read from {@code channelId}. */
     private static DiscordMessageLinks.Copy memberLine(String discordId, String channelId) {
-        return new DiscordMessageLinks.Copy(discordId, "channel:" + channelId, "", "");
+        return new DiscordMessageLinks.Copy(discordId, "channel:" + channelId, "", "", "");
     }
 
     private static boolean live(DiscordChannelBindings bindings, ChatChannel channel,

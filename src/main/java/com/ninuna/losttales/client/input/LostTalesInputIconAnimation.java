@@ -72,7 +72,7 @@ final class LostTalesInputIconAnimation {
                 this.previouslyPressed = false;
                 this.releaseStartedNanos = nowNanos;
                 this.releaseFromPose = this.lastBasePose;
-                float heldShare = clamp01((float)elapsed(
+                float heldShare = LostTalesGuiEasing.clamp((float)elapsed(
                         this.pressStartedNanos, nowNanos) / 180_000_000.0F);
                 // A quick tap has less stored energy than a long press.
                 this.releaseStrength = 0.65F + 0.35F * heldShare;
@@ -115,7 +115,7 @@ final class LostTalesInputIconAnimation {
     private static Pose pressedPose(
             long elapsedNanos, long nowNanos, int keyCode) {
         if (elapsedNanos < PRESS_IMPACT_NANOS) {
-            float progress = easeOutCubic((float)elapsedNanos
+            float progress = LostTalesGuiEasing.easeOutCubic((float)elapsedNanos
                     / (float)PRESS_IMPACT_NANOS);
             return new Pose(PRESSED_FRAME, 0.0F, 0.72F * progress, 0.0F,
                     1.0F + 0.045F * progress,
@@ -142,7 +142,7 @@ final class LostTalesInputIconAnimation {
         // keep it from tracing the vertical line that a single sine produced,
         // while the envelope prevents a jump out of the impact settle.
         long heldNanos = elapsedNanos - PRESS_SETTLE_NANOS;
-        float envelope = smoothStep((float)heldNanos
+        float envelope = LostTalesGuiEasing.smoothStep((float)heldNanos
                 / (float)HELD_JITTER_RAMP_NANOS);
         double phase = phase(nowNanos, HELD_JITTER_PERIOD_NANOS, keyCode);
         float jitterX = envelope * (0.18F * (float)Math.sin(phase)
@@ -172,7 +172,7 @@ final class LostTalesInputIconAnimation {
                         0.0F, 0.16F, 0.16F, 1.0F)
                 : fromPose;
         if (elapsedNanos < RELEASE_FRAME_NANOS) {
-            float progress = smoothStep((float)elapsedNanos
+            float progress = LostTalesGuiEasing.smoothStep((float)elapsedNanos
                     / (float)RELEASE_FRAME_NANOS);
             return new Pose(RELEASE_FRAME,
                     lerp(from.offsetX, 0.0F, progress),
@@ -260,20 +260,8 @@ final class LostTalesInputIconAnimation {
         return (time + keyPhase) * TWO_PI;
     }
 
-    private static float easeOutCubic(float value) {
-        return LostTalesGuiEasing.easeOutCubic(value);
-    }
-
-    private static float smoothStep(float value) {
-        return LostTalesGuiEasing.smoothStep(value);
-    }
-
     private static float lerp(float from, float to, float progress) {
         return from + (to - from) * progress;
-    }
-
-    private static float clamp01(float value) {
-        return LostTalesGuiEasing.clamp(value);
     }
 
     private static long elapsed(long earlier, long later) {

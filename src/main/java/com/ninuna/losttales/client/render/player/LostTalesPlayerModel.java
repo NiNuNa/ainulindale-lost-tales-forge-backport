@@ -73,12 +73,6 @@ public final class LostTalesPlayerModel extends ModelBiped {
     private final ModelRenderer chestLeftOverlay;
     private final ModelRenderer chestRightOverlay;
 
-    /** The plain player body in Minecraft's layout, without a chest. */
-    public LostTalesPlayerModel(float inflation, boolean slim) {
-        this(inflation, slim, PlayerBodyShape.PLAYER,
-                CharacterSkinLayout.MINECRAFT_64X64, null, false);
-    }
-
     /**
      * @param inflation    box inflation, 0 for the skin and 1.0 / 0.5 for armor layers
      * @param slim         three-pixel arms instead of four

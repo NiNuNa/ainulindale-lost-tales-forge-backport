@@ -1,8 +1,9 @@
 package com.ninuna.losttales.quest;
 
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.Locale;
+import java.util.List;
 import java.util.Map;
 import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -74,48 +75,46 @@ public final class LostTalesQuestRewardHelper {
         }
         boolean granted = false;
 
-        int xp = parseInt(firstNonEmpty(rewards.get("experience"), rewards.get("xp"), rewards.get("experiencePoints")), 0);
+        int xp = LostTalesQuestParams.parseInt(rewards.get("experience"), 0);
         if (xp > 0) {
             player.addExperience(xp);
             granted = true;
         }
 
-        int levels = parseInt(firstNonEmpty(rewards.get("levels"), rewards.get("experienceLevels"), rewards.get("xpLevels")), 0);
+        int levels = LostTalesQuestParams.parseInt(rewards.get("levels"), 0);
         if (levels > 0) {
             player.addExperienceLevel(levels);
             granted = true;
         }
 
-        String singleItem = firstNonEmpty(rewards.get("item"), rewards.get("itemId"), rewards.get("stack"));
-        if (singleItem.length() > 0) {
-            int count = Math.max(1, parseInt(rewards.get("count"), 1));
-            int meta = Math.max(0, parseInt(rewards.get("meta"), 0));
-            granted |= giveItem(player, singleItem, count, meta);
-        }
-
-        String items = firstNonEmpty(rewards.get("items"), rewards.get("stacks"), rewards.get("itemStacks"));
-        if (items.length() > 0) {
-            String[] entries = items.replace(';', ',').split(",");
-            for (String entry : entries) {
-                granted |= giveItem(player, entry, 1, 0);
-            }
+        for (LostTalesQuestItemSpec item : itemsGranted(rewards)) {
+            granted |= giveItem(player, item);
         }
 
         return granted;
     }
 
-    private static boolean giveItem(EntityPlayerMP player, String itemSpec, int defaultCount, int defaultMeta) {
-        ParsedItem parsed = parseItemSpec(itemSpec, defaultCount, defaultMeta);
-        if (parsed.itemId.length() == 0 || parsed.count <= 0) {
+    /**
+     * The items a reward map grants: its {@code item}, then each of its
+     * {@code items}, read as {@link LostTalesQuestRewardText} names them.
+     */
+    static List<LostTalesQuestItemSpec> itemsGranted(Map<String, String> rewards) {
+        List<LostTalesQuestItemSpec> items = new ArrayList<LostTalesQuestItemSpec>();
+        LostTalesQuestItemSpec single = LostTalesQuestItemSpec.rewardItem(rewards);
+        if (single != null) {
+            items.add(single);
+        }
+        items.addAll(LostTalesQuestItemSpec.rewardItems(rewards));
+        return items;
+    }
+
+    private static boolean giveItem(EntityPlayerMP player, LostTalesQuestItemSpec spec) {
+        Item registered = spec.item();
+        if (registered == null) {
             return false;
         }
 
-        Object registered = Item.itemRegistry.getObject(parsed.itemId);
-        if (!(registered instanceof Item)) {
-            return false;
-        }
-
-        ItemStack stack = new ItemStack((Item) registered, parsed.count, parsed.meta);
+        ItemStack stack = new ItemStack(registered, spec.getCount(), spec.getMeta());
         if (!player.inventory.addItemStackToInventory(stack)) {
             EntityItem entityItem = player.dropPlayerItemWithRandomChoice(stack, false);
             if (entityItem != null) {
@@ -123,67 +122,5 @@ public final class LostTalesQuestRewardHelper {
             }
         }
         return true;
-    }
-
-    /**
-     * Supports id, id*count, id@meta, and id@meta*count.
-     * Example: minecraft:gold_ingot*3 or minecraft:wool@14*2.
-     */
-    private static ParsedItem parseItemSpec(String value, int defaultCount, int defaultMeta) {
-        String spec = value == null ? "" : value.trim();
-        int count = Math.max(1, defaultCount);
-        int meta = Math.max(0, defaultMeta);
-
-        int star = spec.lastIndexOf('*');
-        if (star >= 0 && star + 1 < spec.length()) {
-            count = Math.max(1, parseInt(spec.substring(star + 1), count));
-            spec = spec.substring(0, star);
-        }
-
-        int at = spec.lastIndexOf('@');
-        if (at >= 0 && at + 1 < spec.length()) {
-            meta = Math.max(0, parseInt(spec.substring(at + 1), meta));
-            spec = spec.substring(0, at);
-        }
-
-        return new ParsedItem(normalizeResourceId(spec), count, meta);
-    }
-
-    private static String normalizeResourceId(String value) {
-        if (value == null) {
-            return "";
-        }
-        String normalized = value.trim().toLowerCase(Locale.ROOT);
-        if (normalized.indexOf(':') < 0 && normalized.length() > 0) {
-            normalized = "minecraft:" + normalized;
-        }
-        return normalized;
-    }
-
-    private static String firstNonEmpty(String a, String b, String c) {
-        if (a != null && a.trim().length() > 0) return a.trim();
-        if (b != null && b.trim().length() > 0) return b.trim();
-        if (c != null && c.trim().length() > 0) return c.trim();
-        return "";
-    }
-
-    private static int parseInt(String value, int fallback) {
-        try {
-            return Integer.parseInt(value);
-        } catch (Exception ignored) {
-            return fallback;
-        }
-    }
-
-    private static final class ParsedItem {
-        private final String itemId;
-        private final int count;
-        private final int meta;
-
-        private ParsedItem(String itemId, int count, int meta) {
-            this.itemId = itemId;
-            this.count = count;
-            this.meta = meta;
-        }
     }
 }

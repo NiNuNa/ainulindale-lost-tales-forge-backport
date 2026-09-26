@@ -30,24 +30,10 @@ public final class CameraMotionProfile {
             double responseRate) {
         this(horizontalFollowLimit, verticalFollowLimit,
                 sideSway, verticalSway, forwardSway,
-                turnSway, swayCyclesPerBlock, responseRate,
-                0.0D, 0.0D, 0.0D, 0.0D);
-    }
-
-    public CameraMotionProfile(
-            double horizontalFollowLimit, double verticalFollowLimit,
-            double sideSway, double verticalSway, double forwardSway,
-            double turnSway, double swayCyclesPerBlock,
-            double responseRate, double idleSideSway,
-            double idleVerticalSway, double idleForwardSway,
-            double idleCyclesPerSecond) {
-        this(horizontalFollowLimit, verticalFollowLimit,
-                sideSway, verticalSway, forwardSway,
                 turnSway, 0.0D, 0.0D,
                 responseRate, 240.0D,
                 swayCyclesPerBlock, responseRate,
-                idleSideSway, idleVerticalSway,
-                idleForwardSway, idleCyclesPerSecond);
+                0.0D, 0.0D, 0.0D, 0.0D);
     }
 
     public CameraMotionProfile(

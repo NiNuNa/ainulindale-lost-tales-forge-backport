@@ -57,11 +57,6 @@ public final class ChatChannelGates {
             return this.readClosed;
         }
 
-        /** Whether nobody may send. */
-        public boolean isSendClosed() {
-            return this.sendClosed;
-        }
-
         boolean asksAnything() {
             return this.readClosed || this.sendClosed
                     || !this.readRoles.isEmpty() || !this.sendRoles.isEmpty();

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.quest;
 
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerIdentity;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -96,5 +97,20 @@ public final class LostTalesQuestMarkerHelper {
 
     public static String normalizeMarkerId(String markerId) {
         return markerId == null ? "" : markerId.trim();
+    }
+
+    /**
+     * The key a marker id names a player's quest marker by, so two
+     * spellings of one marker meet; empty for no id.
+     */
+    public static String markerCanonicalKey(String markerId) {
+        String normalized = normalizeMarkerId(markerId);
+        if (normalized.length() == 0) {
+            return "";
+        }
+        return LostTalesMapMarkerIdentity.create(
+                normalized,
+                LostTalesMapMarkerIdentity.Authority.QUEST_PLAYER)
+                .getCanonicalKey();
     }
 }

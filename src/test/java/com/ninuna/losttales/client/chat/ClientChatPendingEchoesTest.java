@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.network.packet.ChatPacketFixtures;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.List;
 import java.util.UUID;
@@ -100,7 +101,7 @@ public final class ClientChatPendingEchoesTest {
     }
 
     private static LostTalesChatMessagePacket packet() {
-        return new LostTalesChatMessagePacket(ChatChannel.OOC, SENDER,
-                "Steve", "Steve", "", 0xFFFFFF, 0xFFFFFF, "hello", 1L, "");
+        return ChatPacketFixtures.line(ChatChannel.OOC, "Steve", "Steve", "hello").sender(SENDER)
+                .build();
     }
 }

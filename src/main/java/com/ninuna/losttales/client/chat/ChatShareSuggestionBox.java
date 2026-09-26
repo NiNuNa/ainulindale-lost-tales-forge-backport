@@ -1,8 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.client.window.PointerRegions;
-import com.ninuna.losttales.client.window.WindowStyle;
-import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiItemIcon;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.chat.share.ChatShareKind;
@@ -22,18 +20,9 @@ import net.minecraft.entity.player.EntityPlayer;
  * send-time resolution all name the same stack or marker. Selection state
  * lives here; applying a completion is the chat screen's job.
  */
-final class ChatShareSuggestionBox {
-    static final int MAX_ROWS = 8;
-    private static final int ROW_HEIGHT = 12;
-    /** The rows stand two pixels inside the frame's ink, as a framed button's content does. */
-    private static final int PADDING = WindowStyle.POPUP_INSET;
+final class ChatShareSuggestionBox extends ChatSuggestionBox {
     /** Between the glyph's slot and its name. */
     private static final int ICON_GAP = 4;
-    /**
-     * How far above the input anchor ({@link ChatInputBar#inputAnchor})
-     * the box ends: one pixel clear of the bar's top.
-     */
-    private static final int BOTTOM_MARGIN = 15;
     /** Candidate snapshots are refreshed at most this often while open. */
     private static final long REFRESH_INTERVAL_NANOS = 250L * 1000000L;
 
@@ -120,6 +109,7 @@ final class ChatShareSuggestionBox {
         return changed;
     }
 
+    @Override
     boolean isActive() {
         return this.query != null && !this.matches.isEmpty()
                 && this.query.openIndex != this.dismissedOpenIndex;
@@ -150,29 +140,14 @@ final class ChatShareSuggestionBox {
         }
     }
 
-    boolean contains(FontRenderer font, double mouseX, double mouseY,
-                     int screenHeight, int inputX) {
-        if (!isActive()) {
-            return false;
-        }
-        int top = boxTop(screenHeight);
-        return LostTalesUiHitBox.contains(mouseX, mouseY, inputX, top,
-                boxWidth(font), screenHeight - BOTTOM_MARGIN - top);
+    @Override
+    int shownRows() {
+        return this.matches.size();
     }
 
-    /**
-     * The row under the point, or -1: the one test the row's highlight,
-     * a press and the pointer all ask.
-     */
-    int rowAt(FontRenderer font, double mouseX, double mouseY,
-              int screenHeight, int inputX) {
-        if (!contains(font, mouseX, mouseY, screenHeight, inputX)
-                || mouseY < boxTop(screenHeight) + PADDING) {
-            return -1;
-        }
-        int row = (int)Math.floor((mouseY - boxTop(screenHeight) - PADDING)
-                / (double)ROW_HEIGHT);
-        return row >= 0 && row < this.matches.size() ? row : -1;
+    @Override
+    int rowHeight() {
+        return GLYPH_ROW_HEIGHT;
     }
 
     /** The suggestion on a row, or null. */
@@ -187,21 +162,16 @@ final class ChatShareSuggestionBox {
         if (!isActive()) {
             return;
         }
-        int width = boxWidth(font);
-        int top = boxTop(screenHeight);
-        int bottom = screenHeight - BOTTOM_MARGIN;
         int hoveredRow = rowAt(font, mouseX, mouseY, screenHeight, inputX);
         if (hoveredRow >= 0) {
             this.selectedIndex = hoveredRow;
         }
-        regions.add(inputX, top, inputX + width, bottom);
-        WindowStyle.drawPopupList(inputX, top, inputX + width,
-                bottom, top + PADDING, ROW_HEIGHT,
+        int top = drawFrame(font, regions, screenHeight, inputX,
                 this.selectedIndex < this.matches.size()
                         ? this.selectedIndex : -1);
         for (int row = 0; row < this.matches.size(); row++) {
             ChatShareCandidates.Entry entry = this.matches.get(row);
-            int rowTop = top + PADDING + row * ROW_HEIGHT;
+            int rowTop = top + PADDING + row * GLYPH_ROW_HEIGHT;
             drawIcon(minecraft, entry, inputX + PADDING, rowTop + 1);
             LostTalesChatVisualStyle.drawPlain(font, entry.label(),
                     inputX + PADDING + ICON_SLOT + ICON_GAP, rowTop + 2,
@@ -232,17 +202,13 @@ final class ChatShareSuggestionBox {
         }
     }
 
-    private int boxWidth(FontRenderer font) {
+    @Override
+    int boxWidth(FontRenderer font) {
         int width = 0;
         for (int index = 0; index < this.matches.size(); index++) {
             width = Math.max(width,
                     font.getStringWidth(this.matches.get(index).label()));
         }
         return PADDING + ICON_SLOT + ICON_GAP + width + PADDING;
-    }
-
-    private int boxTop(int screenHeight) {
-        return screenHeight - BOTTOM_MARGIN
-                - this.matches.size() * ROW_HEIGHT - PADDING * 2;
     }
 }

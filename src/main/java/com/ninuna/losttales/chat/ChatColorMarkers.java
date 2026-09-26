@@ -17,8 +17,16 @@ public final class ChatColorMarkers {
 
     /** The mark for an RGB colour. */
     public static String value(int rgb) {
+        return PREFIX + hex(rgb);
+    }
+
+    /**
+     * An RGB colour as the chat's marks carry it: six lower-case hex
+     * digits, zero-padded, anything above the colour dropped.
+     */
+    public static String hex(int rgb) {
         String hex = Integer.toHexString(rgb & 0xFFFFFF);
-        StringBuilder result = new StringBuilder(PREFIX.length() + 6).append(PREFIX);
+        StringBuilder result = new StringBuilder(6);
         for (int index = hex.length(); index < 6; index++) {
             result.append('0');
         }

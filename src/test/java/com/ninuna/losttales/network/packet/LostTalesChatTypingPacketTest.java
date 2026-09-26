@@ -15,8 +15,7 @@ public final class LostTalesChatTypingPacketTest {
 
     @Test
     public void requestRoundTripsAndRejectsTrailingData() {
-        LostTalesChatTypingPacket original = new LostTalesChatTypingPacket(
-                ChatChannel.PARTY, "", true);
+        LostTalesChatTypingPacket original = ChatPacketFixtures.typing(ChatChannel.PARTY, "", true);
         ByteBuf buffer = Unpooled.buffer();
         original.toBytes(buffer);
         LostTalesChatTypingPacket decoded = new LostTalesChatTypingPacket();
@@ -26,7 +25,7 @@ public final class LostTalesChatTypingPacketTest {
         assertEquals("", decoded.getTarget());
         assertTrue(decoded.isTyping());
 
-        LostTalesChatTypingPacket whisper = new LostTalesChatTypingPacket(
+        LostTalesChatTypingPacket whisper = ChatPacketFixtures.typing(
                 ChatChannel.WHISPER, " Bilbo ", false);
         buffer = Unpooled.buffer();
         whisper.toBytes(buffer);
@@ -51,7 +50,7 @@ public final class LostTalesChatTypingPacketTest {
                 java.util.UUID.fromString("00000000-0000-0000-0000-0000000000c1");
         LostTalesChatTypingPacket original = new LostTalesChatTypingPacket(
                 ChatChannel.GLOBAL, "", true,
-                LostTalesChatSendPacket.IDENTITY_CHARACTER, character);
+                LostTalesChatSendPacket.IDENTITY_CHARACTER, character, "", null);
         ByteBuf buffer = Unpooled.buffer();
         try {
             original.toBytes(buffer);
@@ -85,13 +84,13 @@ public final class LostTalesChatTypingPacketTest {
     @Test
     public void requestRefusesAWhisperWithoutATargetAndATargetElsewhere() {
         try {
-            new LostTalesChatTypingPacket(ChatChannel.WHISPER, "", true);
+            ChatPacketFixtures.typing(ChatChannel.WHISPER, "", true);
             fail("a whisper needs its partner");
         } catch (IllegalArgumentException expected) {
             // The packet is never built.
         }
         try {
-            new LostTalesChatTypingPacket(ChatChannel.GLOBAL, "Bilbo", true);
+            ChatPacketFixtures.typing(ChatChannel.GLOBAL, "Bilbo", true);
             fail("only a whisper names a partner");
         } catch (IllegalArgumentException expected) {
             // The packet is never built.
@@ -110,8 +109,8 @@ public final class LostTalesChatTypingPacketTest {
     @Test
     public void syncRoundTripsAndRejectsAnEmptyNameOrUnknownChannel() {
         LostTalesChatTypingSyncPacket original =
-                new LostTalesChatTypingSyncPacket(ChatChannel.WHISPER,
-                        "Frodo", "Bilbo Baggins", true);
+                new LostTalesChatTypingSyncPacket(
+                        ChatChannel.WHISPER, "Frodo", "Bilbo Baggins", true, "", "");
         ByteBuf buffer = Unpooled.buffer();
         original.toBytes(buffer);
         LostTalesChatTypingSyncPacket decoded =
@@ -124,7 +123,7 @@ public final class LostTalesChatTypingPacketTest {
         assertTrue(decoded.isTyping());
 
         try {
-            new LostTalesChatTypingSyncPacket(ChatChannel.GLOBAL, "", " ", true);
+            new LostTalesChatTypingSyncPacket(ChatChannel.GLOBAL, "", " ", true, "", "");
             fail("a typist has a name");
         } catch (IllegalArgumentException expected) {
             // The packet is never built.

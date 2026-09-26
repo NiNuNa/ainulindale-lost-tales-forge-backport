@@ -107,14 +107,6 @@ public final class PartyInvitation {
         return now >= this.expiresAt;
     }
 
-    public boolean matchesPartyAndTarget(UUID expectedPartyId,
-                                         UUID expectedTargetCharacterId) {
-        return expectedPartyId != null
-                && expectedTargetCharacterId != null
-                && expectedPartyId.equals(this.partyId)
-                && expectedTargetCharacterId.equals(this.targetCharacterId);
-    }
-
     private static String normalizeName(String name) {
         if (name == null) {
             return "Unknown";

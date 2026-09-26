@@ -1,9 +1,9 @@
 package com.ninuna.losttales.character.registry;
 
+import com.ninuna.losttales.util.LostTalesIdentifiers;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -77,7 +77,7 @@ public final class CharacterBodyModelRegistry {
     private CharacterBodyModelRegistry() {}
 
     public static CharacterBodyModelDefinition get(String id) {
-        return DEFINITIONS.get(normalizeIdentifier(id));
+        return DEFINITIONS.get(LostTalesIdentifiers.normalize(id));
     }
 
     public static Collection<CharacterBodyModelDefinition> getAll() {
@@ -87,13 +87,13 @@ public final class CharacterBodyModelRegistry {
     /** The model a race's catalogue skins draw with; empty for an unknown race. */
     public static String getDefaultModelId(String raceId) {
         String modelId = DEFAULT_MODEL_BY_RACE.get(
-                CharacterRaceRegistry.normalizeIdentifier(raceId));
+                LostTalesIdentifiers.normalize(raceId));
         return modelId == null ? "" : modelId;
     }
 
     /** True when the model is one a character of that race may be drawn with. */
     public static boolean isCompatible(String raceId, String modelId) {
-        String normalized = normalizeIdentifier(modelId);
+        String normalized = LostTalesIdentifiers.normalize(modelId);
         if (normalized.length() == 0) {
             return false;
         }
@@ -101,18 +101,14 @@ public final class CharacterBodyModelRegistry {
             return true;
         }
         Set<String> extras = EXTRA_MODELS_BY_RACE.get(
-                CharacterRaceRegistry.normalizeIdentifier(raceId));
+                LostTalesIdentifiers.normalize(raceId));
         return extras != null && extras.contains(normalized);
-    }
-
-    public static String normalizeIdentifier(String id) {
-        return id == null ? "" : id.trim().toLowerCase(Locale.ROOT);
     }
 
     private static void register(Map<String, CharacterBodyModelDefinition> definitions,
                                  CharacterBodyModelDefinition definition) {
         String id = definition.getId();
-        if (!id.equals(normalizeIdentifier(id))) {
+        if (!id.equals(LostTalesIdentifiers.normalize(id))) {
             throw new IllegalArgumentException("Body model ID is not canonical: " + id);
         }
         if (definitions.containsKey(id)) {

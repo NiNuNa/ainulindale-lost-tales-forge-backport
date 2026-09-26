@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.render.player;
 
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
+import com.ninuna.losttales.util.LostTalesIdentifiers;
 
 /**
  * Texture coordinates used when a character head is flattened into a GUI
@@ -56,7 +57,7 @@ final class CharacterHeadIconLayout {
 
     static CharacterHeadIconLayout forConfiguredRace(String raceId) {
         String canonicalRace =
-                CharacterRaceRegistry.normalizeIdentifier(raceId);
+                LostTalesIdentifiers.normalize(raceId);
         if (CharacterRaceRegistry.HUMAN.equals(canonicalRace)
                 || CharacterRaceRegistry.ELF.equals(canonicalRace)
                 || CharacterRaceRegistry.DWARF.equals(canonicalRace)

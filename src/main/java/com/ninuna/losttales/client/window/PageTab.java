@@ -58,6 +58,12 @@ public final class PageTab extends WindowTab {
         return content().isAvailable();
     }
 
+    /** A page that stands for a thing in the world ends with the session. */
+    @Override
+    public boolean isKeptInLayout() {
+        return !this.page.opensFromWorld();
+    }
+
     /**
      * The page's own rows, under their heading with the chosen one marked
      * in honey, as a chosen status is; one that cannot be taken greyed.

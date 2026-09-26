@@ -7,9 +7,9 @@ import com.google.gson.JsonParser;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
+import com.ninuna.losttales.util.LostTalesCloseables;
 import com.ninuna.losttales.util.LostTalesDimensionHelper;
 import cpw.mods.fml.common.FMLLog;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
@@ -182,7 +182,7 @@ public final class LostTalesMapMarkerCatalog {
         } catch (RuntimeException e) {
             FMLLog.warning("[%s] Failed to parse map marker file %s.json: %s", LostTalesMetaData.MOD_ID, fileName, e.getMessage());
         } finally {
-            closeQuietly(reader);
+            LostTalesCloseables.closeQuietly(reader);
         }
     }
 
@@ -214,13 +214,13 @@ public final class LostTalesMapMarkerCatalog {
                 ? object.get("y").getAsDouble()
                 : LostTalesMapMarkerDefinition.AUTOMATIC_Y;
         double z = object.get("z").getAsDouble();
-        if (!isFinite(x) || !isFinite(y) || !isFinite(z)) {
+        if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) {
             return null;
         }
         double compassFadeInRadius = getDouble(object, "compassFadeInRadius", 128.0D);
         double discoveryRadius = Math.max(1.0D, getDouble(object, "discoveryRadius", 8.0D));
-        if (!isFinite(compassFadeInRadius)
-                || !isFinite(discoveryRadius)) {
+        if (!Double.isFinite(compassFadeInRadius)
+                || !Double.isFinite(discoveryRadius)) {
             return null;
         }
         boolean hidden = getBoolean(object, "hiddenUntilDiscovered", false);
@@ -263,10 +263,6 @@ public final class LostTalesMapMarkerCatalog {
         return normalized;
     }
 
-    private static boolean isFinite(double value) {
-        return !Double.isNaN(value) && !Double.isInfinite(value);
-    }
-
     private static boolean hasNumber(JsonObject object, String key) {
         JsonElement element = object.get(key);
         return element != null && element.isJsonPrimitive() && element.getAsJsonPrimitive().isNumber();
@@ -305,14 +301,6 @@ public final class LostTalesMapMarkerCatalog {
             return element.getAsBoolean();
         } catch (RuntimeException ignored) {
             return fallback;
-        }
-    }
-
-    private static void closeQuietly(Reader reader) {
-        if (reader != null) {
-            try {
-                reader.close();
-            } catch (IOException ignored) {}
         }
     }
 }

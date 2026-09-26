@@ -1,18 +1,27 @@
 package com.ninuna.losttales.client.motion;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import com.ninuna.losttales.config.LostTalesConfig;
+import java.io.File;
+import java.util.Arrays;
+import java.util.Collections;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 /** The three settings reach every time the motions give, and a missing motion lands at once. */
 public final class MotionsTest {
     private static final long MILLIS = 1000000L;
 
     private MotionTestSettings settings;
+
+    @Rule
+    public final TemporaryFolder folder = new TemporaryFolder();
 
     @Before
     public void setUp() {
@@ -87,6 +96,36 @@ public final class MotionsTest {
         assertEquals(200L * MILLIS, Motions.nanos("test.fade"));
         Motions.clearPreviews();
         assertEquals(0L, Motions.nanos("test.fade"));
+    }
+
+    @Test
+    public void aPreviewIsNamedUntilItIsCleared() {
+        assertTrue(Motions.isPreviewed("test.fade"));
+        assertFalse(Motions.isPreviewed(MotionIds.UI_BUTTON_LIFT));
+        assertEquals(Arrays.asList("test.fade", "test.follow"),
+                Motions.previewed());
+        Motions.clearPreview("test.fade");
+        assertFalse(Motions.isPreviewed("test.fade"));
+        assertEquals(Collections.singletonList("test.follow"),
+                Motions.previewed());
+    }
+
+    @Test
+    public void aMotionTheLabSavedIsNamedUntilItIsForgotten() {
+        File clientFolder = this.folder.getRoot();
+        Motions.initialize(clientFolder);
+        try {
+            assertFalse(Motions.isSaved(MotionIds.UI_BUTTON_LIT));
+            assertTrue(Motions.save(Motions.bundled(MotionIds.UI_BUTTON_LIT),
+                    null));
+            assertTrue(Motions.isSaved(MotionIds.UI_BUTTON_LIT));
+            assertFalse(Motions.isSaved(MotionIds.UI_BUTTON_LIFT));
+            assertTrue(Motions.forget(MotionIds.UI_BUTTON_LIT, null));
+            assertFalse(Motions.isSaved(MotionIds.UI_BUTTON_LIT));
+        } finally {
+            Motions.initialize(null);
+            Motions.reload(null);
+        }
     }
 
     @Test

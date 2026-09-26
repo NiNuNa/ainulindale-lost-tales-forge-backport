@@ -41,16 +41,16 @@ import org.lwjgl.input.Keyboard;
 
 /**
  * What a character says about itself, in a sub-window of the Characters
- * tab's window, its player's to change at any time (P6 a): three tabs of
- * its own — About, with Appearance, Personality and History, each a
+ * tab's window, its player's to change at any time (P6 a): three sections,
+ * each a word button at its top — About, with Appearance, Personality and History, each a
  * box of several lines; Facts, with the age and the six short facts; and
  * Glances. Save sends all of it, and the window closes once the server
  * has kept it; Cancel, the cross and Escape leave it as it was. The
- * window is as tall as its tallest tab, so it stands still as the tabs
- * change.
+ * window is as tall as its tallest section, so it stands still as the
+ * sections change.
  */
 final class ProfileEditWindow extends SubWindowContent {
-    /** The window's own tabs. */
+    /** The window's sections. */
     private enum Page {
         ABOUT("gui.losttales.character.profile.about"),
         FACTS("gui.losttales.character.profile.facts"),
@@ -66,7 +66,7 @@ final class ProfileEditWindow extends SubWindowContent {
     private static final String SAVE = "save";
     private static final String CANCEL = "cancel";
     private static final String CONTROL = "control";
-    private static final String TAB_PREFIX = "tab:";
+    private static final String SECTION_PREFIX = "section:";
     private static final int WIDTH = 300;
     private static final int PADDING = 6;
     private static final int CONTROL_GAP = 6;
@@ -79,7 +79,7 @@ final class ProfileEditWindow extends SubWindowContent {
     private final UUID characterId;
     private final Map<Page, List<CreatorControl>> pages =
             new EnumMap<Page, List<CreatorControl>>(Page.class);
-    private final Map<Page, LostTalesUiButtonMotion> tabMotions =
+    private final Map<Page, LostTalesUiButtonMotion> sectionMotions =
             new EnumMap<Page, LostTalesUiButtonMotion>(Page.class);
     private final Map<CharacterProfile.Section, CreatorTextArea> sections =
             new EnumMap<CharacterProfile.Section, CreatorTextArea>(
@@ -109,7 +109,7 @@ final class ProfileEditWindow extends SubWindowContent {
     ProfileEditWindow(UUID characterId) {
         this.characterId = characterId;
         for (Page each : Page.values()) {
-            this.tabMotions.put(each, new LostTalesUiButtonMotion(
+            this.sectionMotions.put(each, new LostTalesUiButtonMotion(
                     LostTalesUiButtonMotion.Character.LIFT));
         }
         restart();
@@ -214,7 +214,7 @@ final class ProfileEditWindow extends SubWindowContent {
     /* ---- Where things stand ---- */
 
     /**
-     * Places a tab's rows from the box's top left; answers where they
+     * Places a section's rows from the box's top left; answers where they
      * end. The facts stand two to a row under the age.
      */
     private int layOut(Page shown, int left, int top, int width) {
@@ -242,7 +242,7 @@ final class ProfileEditWindow extends SubWindowContent {
         return y;
     }
 
-    /** The rows' height the tallest tab takes. */
+    /** The rows' height the tallest section takes. */
     private int pageHeight(int width) {
         int tallest = 0;
         for (Page each : Page.values()) {
@@ -403,7 +403,7 @@ final class ProfileEditWindow extends SubWindowContent {
                 : (int)Math.floor(pointerY);
         String part = partAt(font, box, pointerX, pointerY);
         for (Page each : Page.values()) {
-            drawTab(font, box, each, (TAB_PREFIX + each.name()).equals(part),
+            drawSection(font, box, each, (SECTION_PREFIX + each.name()).equals(part),
                     alpha, surfaceAlpha);
         }
         for (CreatorControl control : this.pages.get(this.page)) {
@@ -425,16 +425,16 @@ final class ProfileEditWindow extends SubWindowContent {
     }
 
     /**
-     * One of the window's tabs: the one shown stands lit with its name in
+     * One of the window's section buttons: the one shown stands lit with its name in
      * honey, the others are buttons.
      */
-    private void drawTab(FontRenderer font, LostTalesUiHitBox box, Page each,
+    private void drawSection(FontRenderer font, LostTalesUiHitBox box, Page each,
                          boolean hovered, int alpha, int surfaceAlpha) {
-        LostTalesUiHitBox at = tabBox(font, box, each);
+        LostTalesUiHitBox at = sectionBox(font, box, each);
         String label = I18n.format(each.labelKey);
         if (each != this.page) {
             WordButton.draw(font, at, label, false, true, hovered,
-                    this.tabMotions.get(each), alpha, surfaceAlpha);
+                    this.sectionMotions.get(each), alpha, surfaceAlpha);
             return;
         }
         LostTalesUiFramedButton.drawSurface((float)at.left, (float)at.top,
@@ -468,8 +468,8 @@ final class ProfileEditWindow extends SubWindowContent {
         return I18n.format("gui.losttales.character.profile_edit.save");
     }
 
-    /** The tabs side by side at the window's top left, a framed button's gap apart. */
-    private static LostTalesUiHitBox tabBox(FontRenderer font,
+    /** The section buttons side by side at the window's top left, a framed button's gap apart. */
+    private static LostTalesUiHitBox sectionBox(FontRenderer font,
                                             LostTalesUiHitBox box, Page each) {
         double left = box.left + PADDING;
         for (Page before : Page.values()) {
@@ -510,8 +510,8 @@ final class ProfileEditWindow extends SubWindowContent {
             return CANCEL;
         }
         for (Page each : Page.values()) {
-            if (tabBox(font, box, each).contains(x, y)) {
-                return TAB_PREFIX + each.name();
+            if (sectionBox(font, box, each).contains(x, y)) {
+                return SECTION_PREFIX + each.name();
             }
         }
         return controlAt(x, y) != null ? CONTROL : null;
@@ -556,9 +556,9 @@ final class ProfileEditWindow extends SubWindowContent {
             save();
             return true;
         }
-        if (hover.part != null && hover.part.startsWith(TAB_PREFIX)
+        if (hover.part != null && hover.part.startsWith(SECTION_PREFIX)
                 && button == 0) {
-            show(Page.valueOf(hover.part.substring(TAB_PREFIX.length())));
+            show(Page.valueOf(hover.part.substring(SECTION_PREFIX.length())));
             return true;
         }
         CreatorControl control = controlAt(x, y);
@@ -572,7 +572,7 @@ final class ProfileEditWindow extends SubWindowContent {
         return true;
     }
 
-    /** Turns the window to one of its tabs; its first row takes the keys. */
+    /** Turns the window to one of its sections; its first row takes the keys. */
     private void show(Page shown) {
         if (shown == this.page) {
             return;
@@ -619,7 +619,7 @@ final class ProfileEditWindow extends SubWindowContent {
         }
     }
 
-    /** The next row of the tab that takes the keys, round from either end. */
+    /** The next row of the section that takes the keys, round from either end. */
     private void focusNext(int step) {
         List<CreatorControl> focusable = new ArrayList<CreatorControl>();
         for (CreatorControl control : this.pages.get(this.page)) {
@@ -641,7 +641,7 @@ final class ProfileEditWindow extends SubWindowContent {
         return this.focused != null;
     }
 
-    /** The tab's first row takes the keys as the window comes in front. */
+    /** The section's first row takes the keys as the window comes in front. */
     @Override
     public void takeKeys() {
         if (this.focused == null) {
@@ -660,8 +660,8 @@ final class ProfileEditWindow extends SubWindowContent {
     }
 
     /**
-     * A row takes its keys first; then Tab walks the tab's rows,
-     * Ctrl+Tab the window's tabs, and Return saves.
+     * A row takes its keys first; then Tab walks the section's rows,
+     * Ctrl+Tab the window's sections, and Return saves.
      */
     @Override
     public boolean keyTyped(char typedChar, int keyCode) {

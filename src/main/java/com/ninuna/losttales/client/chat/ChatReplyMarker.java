@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatColorMarkers;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import java.nio.charset.Charset;
 import java.util.Base64;
@@ -48,7 +49,7 @@ final class ChatReplyMarker {
             component.setChatStyle(component.getChatStyle()
                     .setChatClickEvent(new ClickEvent(
                             ClickEvent.Action.SUGGEST_COMMAND,
-                            PREFIX + colorHex(color) + ':' + messageId)));
+                            PREFIX + ChatColorMarkers.hex(color) + ':' + messageId)));
         }
         return component;
     }
@@ -71,7 +72,7 @@ final class ChatReplyMarker {
             component.setChatStyle(component.getChatStyle()
                     .setChatClickEvent(new ClickEvent(
                             ClickEvent.Action.SUGGEST_COMMAND,
-                            PREFIX + colorHex(color) + ':' + messageId
+                            PREFIX + ChatColorMarkers.hex(color) + ':' + messageId
                                     + ':' + senderId + ':'
                                     + (npc ? 'N' : accountLine ? 'A' : 'C')
                                     + ':' + Base64.getUrlEncoder()
@@ -101,7 +102,7 @@ final class ChatReplyMarker {
             component.setChatStyle(component.getChatStyle()
                     .setChatClickEvent(new ClickEvent(
                             ClickEvent.Action.SUGGEST_COMMAND,
-                            PREFIX + colorHex(color) + ':' + messageId
+                            PREFIX + ChatColorMarkers.hex(color) + ':' + messageId
                                     + ':' + (forward ? FORWARD : BUBBLE))));
         }
         return component;
@@ -235,14 +236,5 @@ final class ChatReplyMarker {
             return null;
         }
         return value.substring(PREFIX.length());
-    }
-
-    private static String colorHex(int color) {
-        String hex = Integer.toHexString(color & 0xFFFFFF);
-        StringBuilder result = new StringBuilder(6);
-        for (int index = hex.length(); index < 6; index++) {
-            result.append('0');
-        }
-        return result.append(hex).toString();
     }
 }

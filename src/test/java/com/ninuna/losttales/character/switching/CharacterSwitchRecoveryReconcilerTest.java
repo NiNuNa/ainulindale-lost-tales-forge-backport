@@ -92,7 +92,7 @@ public final class CharacterSwitchRecoveryReconcilerTest {
     }
 
     @Test
-    public void firstImportWithoutSourceCanAbortAndClear() {
+    public void aJournalFromTheAccountCanAbortAndClear() {
         CharacterSwitchAccountState account = account(transaction(
                 null, CharacterSwitchTransactionStatus.PREPARED));
 
@@ -251,7 +251,7 @@ public final class CharacterSwitchRecoveryReconcilerTest {
     private static CharacterSwitchTransaction transaction(
             UUID source,
             CharacterSwitchTransactionStatus status) {
-        return transaction(source, TARGET, source == null ? -1L : 20L, status);
+        return transaction(source, TARGET, 20L, status);
     }
 
     /** A journal between any two identities; a null id on either side is the account. */

@@ -1,6 +1,7 @@
 package com.ninuna.losttales.network.packet.character;
 
 import com.ninuna.losttales.character.server.CharacterProfileViews;
+import com.ninuna.losttales.network.packet.LostTalesPacketCodec;
 import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
 import com.ninuna.losttales.network.server.LostTalesServerPacketDispatcher;
 import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
@@ -37,8 +38,8 @@ public final class CharacterProfileRequestPacket implements IMessage {
     @Override
     public void fromBytes(ByteBuf buffer) {
         try {
-            this.characterId = CharacterPacketCodec.readUuid(buffer);
-            CharacterPacketCodec.requireFinished(buffer);
+            this.characterId = LostTalesPacketCodec.readUuid(buffer);
+            LostTalesPacketCodec.requireFinished(buffer);
             if (NIL_UUID.equals(this.characterId)) {
                 throw new CharacterPacketCodec.DecodeException("nil character id");
             }
@@ -50,7 +51,7 @@ public final class CharacterProfileRequestPacket implements IMessage {
 
     @Override
     public void toBytes(ByteBuf buffer) {
-        CharacterPacketCodec.writeUuid(buffer, this.characterId);
+        LostTalesPacketCodec.writeUuid(buffer, this.characterId);
     }
 
     public UUID getCharacterId() {

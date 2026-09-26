@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.camera;
 
 import com.ninuna.losttales.config.LostTalesConfigFiles;
 import com.ninuna.losttales.client.diagnostics.LostTalesClientDiagnostics;
+import com.ninuna.losttales.util.LostTalesCloseables;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -175,8 +176,8 @@ public final class CameraPresetFileStore {
                 }
             }
         } finally {
-            close(output);
-            close(input);
+            LostTalesCloseables.closeQuietly(output);
+            LostTalesCloseables.closeQuietly(input);
         }
 
         if (target.exists()) {
@@ -304,7 +305,7 @@ public final class CameraPresetFileStore {
                     throwable);
             return null;
         } finally {
-            close(reader);
+            LostTalesCloseables.closeQuietly(reader);
         }
     }
 
@@ -323,13 +324,5 @@ public final class CameraPresetFileStore {
         target.put(id.getConfigValue(), new CameraPresetDefinition(
                 CameraPresetDefinition.CURRENT_DATA_VERSION,
                 id.getConfigValue(), name, CameraPreset.forId(id)));
-    }
-
-    private static void close(java.io.Closeable closeable) {
-        if (closeable != null) {
-            try {
-                closeable.close();
-            } catch (IOException ignored) {}
-        }
     }
 }

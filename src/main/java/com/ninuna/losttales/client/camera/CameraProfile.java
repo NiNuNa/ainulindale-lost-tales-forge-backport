@@ -13,14 +13,6 @@ public final class CameraProfile {
     public CameraProfile(
             CameraProfileId id, double distance, double shoulderOffset,
             double verticalOffset, double fovOffset,
-            CameraSmoothing smoothing) {
-        this(id, distance, shoulderOffset, verticalOffset, fovOffset,
-                smoothing, CameraMotionProfile.NONE);
-    }
-
-    public CameraProfile(
-            CameraProfileId id, double distance, double shoulderOffset,
-            double verticalOffset, double fovOffset,
             CameraSmoothing smoothing, CameraMotionProfile motion) {
         if (id == null || smoothing == null || motion == null) {
             throw new IllegalArgumentException(

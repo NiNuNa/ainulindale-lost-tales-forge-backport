@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.client.chat.ChatLayout;
+import com.ninuna.losttales.client.chat.TwoWindowLayout;
 import java.util.List;
 import org.junit.After;
 import org.junit.Before;
@@ -21,12 +22,12 @@ public final class WindowResizeTest {
 
     @Before
     public void reset() {
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
     }
 
     @After
     public void cleanUp() {
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
     }
 
     @Test
@@ -82,7 +83,7 @@ public final class WindowResizeTest {
         }
         assertTrue("w3 did not record its height", found);
 
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
         WindowLayoutStore.load(lines);
         assertEquals(214.25D, WindowLayout.window("w3").getOwnHeight(),
                 1.0E-9D);
@@ -139,7 +140,7 @@ public final class WindowResizeTest {
         }
         assertTrue("w3 did not record its width", found);
 
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
         WindowLayoutStore.load(lines);
         assertEquals(420, WindowLayout.window("w3").getOwnWidth());
         assertEquals(0, WindowLayout.window("w1").getOwnWidth());
@@ -176,7 +177,7 @@ public final class WindowResizeTest {
             }
         }
         assertTrue("w3 did not record which side it is stuck to", found);
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
         WindowLayoutStore.load(lines);
         assertEquals(Window.LinkSide.RIGHT,
                 WindowLayout.window("w3").getLinkSide());

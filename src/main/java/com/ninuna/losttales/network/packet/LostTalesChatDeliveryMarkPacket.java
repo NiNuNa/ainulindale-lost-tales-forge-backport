@@ -14,10 +14,8 @@ import io.netty.buffer.ByteBuf;
  * on it can go. Sent to the line's sender alone, at most twice for one
  * line.
  *
- * <p>Ten bytes: the message id, the state and the reason. A reason code
- * this build does not know reads as
- * {@link ChatDeliveryMark.Reason#UNKNOWN}, so new reasons can be
- * appended; a state it does not know is malformed.</p>
+ * <p>Ten bytes: the message id, the state and the reason. A state or a
+ * reason code this build does not know is malformed.</p>
  */
 public final class LostTalesChatDeliveryMarkPacket implements IMessage {
     /** The id, the state and the reason: every mark is exactly this long. */
@@ -34,8 +32,7 @@ public final class LostTalesChatDeliveryMarkPacket implements IMessage {
                                            ChatDeliveryMark.State state,
                                            ChatDeliveryMark.Reason reason) {
         if (!ChatMessageIds.isServerId(messageId) || state == null
-                || reason == null
-                || reason == ChatDeliveryMark.Reason.UNKNOWN) {
+                || reason == null) {
             throw new IllegalArgumentException("invalid chat delivery mark");
         }
         this.messageId = messageId;
@@ -57,7 +54,8 @@ public final class LostTalesChatDeliveryMarkPacket implements IMessage {
             ChatDeliveryMark.Reason decodedReason =
                     ChatDeliveryMark.Reason.fromCode(buffer.readUnsignedByte());
             LostTalesPacketCodec.requireFinished(buffer);
-            if (!ChatMessageIds.isServerId(id) || decodedState == null) {
+            if (!ChatMessageIds.isServerId(id) || decodedState == null
+                    || decodedReason == null) {
                 throw new LostTalesPacketCodec.DecodeException(
                         "invalid chat delivery mark");
             }

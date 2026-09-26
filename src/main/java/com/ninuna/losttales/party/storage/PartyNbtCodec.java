@@ -1,10 +1,11 @@
 package com.ninuna.losttales.party.storage;
 
-import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.party.model.Party;
 import com.ninuna.losttales.party.model.PartyColor;
 import com.ninuna.losttales.party.model.PartyMember;
-import cpw.mods.fml.common.FMLLog;
+import com.ninuna.losttales.storage.NbtQuarantine;
+import com.ninuna.losttales.storage.NbtTags;
+import com.ninuna.losttales.util.LostTalesLog;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
@@ -24,13 +25,10 @@ import java.util.UUID;
 public final class PartyNbtCodec {
 
     public static final int CURRENT_ROOT_DATA_VERSION = 1;
-    public static final int CURRENT_QUARANTINE_DATA_VERSION = 1;
 
     private static final String TAG_DATA_VERSION = "DataVersion";
     private static final String TAG_PARTIES = "Parties";
     private static final String TAG_MEMBERS = "Members";
-    private static final String TAG_QUARANTINE = "Quarantine";
-    private static final String TAG_QUARANTINE_ENTRIES = "Entries";
     private static final String TAG_REASON = "Reason";
     private static final String TAG_PARTY_INDEX = "PartyIndex";
     private static final String TAG_MEMBER_INDEX = "MemberIndex";
@@ -70,7 +68,7 @@ public final class PartyNbtCodec {
             }
         }
         output.setTag(TAG_PARTIES, partyList);
-        output.setTag(TAG_QUARANTINE, writeQuarantine(quarantinedEntries));
+        NbtQuarantine.write(output, quarantinedEntries);
     }
 
     public static ReadResult read(NBTTagCompound source) {
@@ -78,25 +76,26 @@ public final class PartyNbtCodec {
         int version = safeSource.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
                 ? safeSource.getInteger(TAG_DATA_VERSION) : 0;
         if (version > CURRENT_ROOT_DATA_VERSION || version < 0) {
-            warn("Party data root uses unsupported version %d; data will remain read-only",
+            LostTalesLog.warning("Party data root uses unsupported version %d; data will remain read-only",
                     Integer.valueOf(version));
             return ReadResult.unsupported(safeSource, version);
         }
 
         boolean repaired = version != CURRENT_ROOT_DATA_VERSION;
-        QuarantineReadResult quarantineResult = readQuarantine(safeSource);
-        if (!quarantineResult.supported) {
-            warn("Party quarantine data is malformed or uses unsupported version %d; data will remain read-only",
-                    Integer.valueOf(quarantineResult.unsupportedVersion));
-            return ReadResult.unsupported(safeSource, quarantineResult.unsupportedVersion);
+        NbtQuarantine.Read quarantineResult = NbtQuarantine.read(safeSource);
+        if (!quarantineResult.isSupported()) {
+            LostTalesLog.warning("Party quarantine data is malformed or uses unsupported "
+                            + "version %d; data will remain read-only",
+                    Integer.valueOf(quarantineResult.getUnsupportedVersion()));
+            return ReadResult.unsupported(safeSource, quarantineResult.getUnsupportedVersion());
         }
-        repaired |= quarantineResult.repaired;
+        repaired |= quarantineResult.isRepaired();
         ArrayList<NBTTagCompound> quarantine =
-                new ArrayList<NBTTagCompound>(quarantineResult.entries);
+                new ArrayList<NBTTagCompound>(quarantineResult.getEntries());
 
         if (safeSource.hasKey(TAG_PARTIES)
                 && !safeSource.hasKey(TAG_PARTIES, Constants.NBT.TAG_LIST)) {
-            warn("Party data root has a malformed party list; preserving data read-only");
+            LostTalesLog.warning("Party data root has a malformed party list; preserving data read-only");
             return ReadResult.unsupported(safeSource, -1);
         }
         if (!safeSource.hasKey(TAG_PARTIES, Constants.NBT.TAG_LIST)) {
@@ -124,7 +123,7 @@ public final class PartyNbtCodec {
                 quarantine.add(createQuarantineEntry(
                         "duplicate_party_uuid", i, -1, rawParty));
                 repaired = true;
-                warn("Quarantining duplicate party UUID %s at index %d",
+                LostTalesLog.warning("Quarantining duplicate party UUID %s at index %d",
                         party.getPartyId(), Integer.valueOf(i));
                 continue;
             }
@@ -139,10 +138,10 @@ public final class PartyNbtCodec {
         NBTTagCompound entry = new NBTTagCompound();
         entry.setString(TAG_REASON, reason == null ? "unknown" : reason);
         if (partyId != null) {
-            writeUuid(entry, TAG_PARTY_UUID, partyId);
+            NbtTags.writeUuid(entry, TAG_PARTY_UUID, partyId);
         }
         if (characterId != null) {
-            writeUuid(entry, TAG_CHARACTER_UUID, characterId);
+            NbtTags.writeUuid(entry, TAG_CHARACTER_UUID, characterId);
         }
         return entry;
     }
@@ -150,8 +149,8 @@ public final class PartyNbtCodec {
     private static NBTTagCompound writeParty(Party party) {
         NBTTagCompound tag = new NBTTagCompound();
         tag.setInteger(TAG_DATA_VERSION, Party.CURRENT_DATA_VERSION);
-        writeUuid(tag, TAG_PARTY_UUID, party.getPartyId());
-        writeUuid(tag, TAG_LEADER_CHARACTER_UUID, party.getLeaderCharacterId());
+        NbtTags.writeUuid(tag, TAG_PARTY_UUID, party.getPartyId());
+        NbtTags.writeUuid(tag, TAG_LEADER_CHARACTER_UUID, party.getLeaderCharacterId());
         tag.setLong(TAG_CREATED_AT, party.getCreatedAt());
         tag.setLong(TAG_REVISION, party.getRevision());
 
@@ -159,8 +158,8 @@ public final class PartyNbtCodec {
         for (PartyMember member : party.getMembers()) {
             NBTTagCompound memberTag = new NBTTagCompound();
             memberTag.setInteger(TAG_DATA_VERSION, PartyMember.CURRENT_DATA_VERSION);
-            writeUuid(memberTag, TAG_CHARACTER_UUID, member.getCharacterId());
-            writeUuid(memberTag, TAG_OWNER_UUID, member.getOwnerId());
+            NbtTags.writeUuid(memberTag, TAG_CHARACTER_UUID, member.getCharacterId());
+            NbtTags.writeUuid(memberTag, TAG_OWNER_UUID, member.getOwnerId());
             memberTag.setString(TAG_CHARACTER_NAME, member.getCharacterName());
             memberTag.setLong(TAG_JOINED_AT, member.getJoinedAt());
             memberTag.setString(TAG_COLOR, member.getColor().getId());
@@ -170,49 +169,6 @@ public final class PartyNbtCodec {
         return tag;
     }
 
-    private static NBTTagCompound writeQuarantine(Collection<NBTTagCompound> entries) {
-        NBTTagCompound quarantine = new NBTTagCompound();
-        quarantine.setInteger(TAG_DATA_VERSION, CURRENT_QUARANTINE_DATA_VERSION);
-        NBTTagList list = new NBTTagList();
-        if (entries != null) {
-            for (NBTTagCompound entry : entries) {
-                if (entry != null) {
-                    list.appendTag(entry.copy());
-                }
-            }
-        }
-        quarantine.setTag(TAG_QUARANTINE_ENTRIES, list);
-        return quarantine;
-    }
-
-    private static QuarantineReadResult readQuarantine(NBTTagCompound root) {
-        if (!root.hasKey(TAG_QUARANTINE)) {
-            return QuarantineReadResult.success(
-                    Collections.<NBTTagCompound>emptyList(), true);
-        }
-        if (!root.hasKey(TAG_QUARANTINE, Constants.NBT.TAG_COMPOUND)) {
-            return QuarantineReadResult.unsupported(-1);
-        }
-        NBTTagCompound quarantine = root.getCompoundTag(TAG_QUARANTINE);
-        int version = quarantine.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
-                ? quarantine.getInteger(TAG_DATA_VERSION) : 0;
-        if (version > CURRENT_QUARANTINE_DATA_VERSION || version < 0) {
-            return QuarantineReadResult.unsupported(version);
-        }
-        if (quarantine.hasKey(TAG_QUARANTINE_ENTRIES)
-                && !quarantine.hasKey(TAG_QUARANTINE_ENTRIES, Constants.NBT.TAG_LIST)) {
-            return QuarantineReadResult.unsupported(-1);
-        }
-        ArrayList<NBTTagCompound> entries = new ArrayList<NBTTagCompound>();
-        NBTTagList list = quarantine.getTagList(
-                TAG_QUARANTINE_ENTRIES, Constants.NBT.TAG_COMPOUND);
-        for (int i = 0; i < list.tagCount(); i++) {
-            entries.add((NBTTagCompound) list.getCompoundTagAt(i).copy());
-        }
-        return QuarantineReadResult.success(entries,
-                version != CURRENT_QUARANTINE_DATA_VERSION);
-    }
-
     private static PartyReadResult readParty(NBTTagCompound source, int partyIndex) {
         if (source == null) {
             return PartyReadResult.failed(true, "missing_party");
@@ -220,13 +176,13 @@ public final class PartyNbtCodec {
         int version = source.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
                 ? source.getInteger(TAG_DATA_VERSION) : 0;
         if (version > Party.CURRENT_DATA_VERSION || version < 0) {
-            warn("Party at index %d uses unsupported version %d",
+            LostTalesLog.warning("Party at index %d uses unsupported version %d",
                     Integer.valueOf(partyIndex), Integer.valueOf(version));
             return PartyReadResult.unsupported(version);
         }
         boolean repaired = version != Party.CURRENT_DATA_VERSION;
 
-        UUID partyId = readUuid(source, TAG_PARTY_UUID);
+        UUID partyId = NbtTags.readUuid(source, TAG_PARTY_UUID);
         if (partyId == null) {
             return PartyReadResult.failed(true, "missing_or_invalid_party_uuid");
         }
@@ -288,7 +244,7 @@ public final class PartyNbtCodec {
             return PartyReadResult.failed(true, "party_has_no_valid_members");
         }
 
-        UUID leaderId = readUuid(source, TAG_LEADER_CHARACTER_UUID);
+        UUID leaderId = NbtTags.readUuid(source, TAG_LEADER_CHARACTER_UUID);
         if (leaderId == null || !containsCharacter(members, leaderId)) {
             leaderId = selectFirstMember(members).getCharacterId();
             repaired = true;
@@ -299,7 +255,7 @@ public final class PartyNbtCodec {
                     createdAt, revision, Party.CURRENT_DATA_VERSION);
             return PartyReadResult.success(party, repaired, quarantine);
         } catch (RuntimeException exception) {
-            warn("Skipping invalid party %s at index %d: %s",
+            LostTalesLog.warning("Skipping invalid party %s at index %d: %s",
                     partyId, Integer.valueOf(partyIndex), exception.toString());
             return PartyReadResult.failed(true, "invalid_party_structure");
         }
@@ -318,8 +274,8 @@ public final class PartyNbtCodec {
             return MemberReadResult.unsupported(version);
         }
         boolean repaired = version != PartyMember.CURRENT_DATA_VERSION;
-        UUID characterId = readUuid(source, TAG_CHARACTER_UUID);
-        UUID ownerId = readUuid(source, TAG_OWNER_UUID);
+        UUID characterId = NbtTags.readUuid(source, TAG_CHARACTER_UUID);
+        UUID ownerId = NbtTags.readUuid(source, TAG_OWNER_UUID);
         if (characterId == null) {
             return MemberReadResult.failed(true, "missing_or_invalid_character_uuid");
         }
@@ -407,28 +363,6 @@ public final class PartyNbtCodec {
         entry.setTag(TAG_ORIGINAL_DATA, originalData == null
                 ? new NBTTagCompound() : originalData.copy());
         return entry;
-    }
-
-    private static void writeUuid(NBTTagCompound tag, String key, UUID uuid) {
-        tag.setLong(key + "Most", uuid.getMostSignificantBits());
-        tag.setLong(key + "Least", uuid.getLeastSignificantBits());
-    }
-
-    private static UUID readUuid(NBTTagCompound tag, String key) {
-        String mostKey = key + "Most";
-        String leastKey = key + "Least";
-        if (!tag.hasKey(mostKey, Constants.NBT.TAG_LONG)
-                || !tag.hasKey(leastKey, Constants.NBT.TAG_LONG)) {
-            return null;
-        }
-        return new UUID(tag.getLong(mostKey), tag.getLong(leastKey));
-    }
-
-    private static void warn(String message, Object... arguments) {
-        Object[] allArguments = new Object[arguments.length + 1];
-        allArguments[0] = LostTalesMetaData.MOD_ID;
-        System.arraycopy(arguments, 0, allArguments, 1, arguments.length);
-        FMLLog.warning("[%s] " + message, allArguments);
     }
 
     public static final class ReadResult {
@@ -563,31 +497,6 @@ public final class PartyNbtCodec {
 
         private static MemberReadResult unsupported(int version) {
             return new MemberReadResult(null, false, version, "unsupported_version");
-        }
-    }
-
-    private static final class QuarantineReadResult {
-        private final boolean supported;
-        private final int unsupportedVersion;
-        private final boolean repaired;
-        private final List<NBTTagCompound> entries;
-
-        private QuarantineReadResult(boolean supported, int unsupportedVersion,
-                                     boolean repaired, List<NBTTagCompound> entries) {
-            this.supported = supported;
-            this.unsupportedVersion = unsupportedVersion;
-            this.repaired = repaired;
-            this.entries = entries;
-        }
-
-        private static QuarantineReadResult success(List<NBTTagCompound> entries,
-                                                    boolean repaired) {
-            return new QuarantineReadResult(true, -1, repaired, entries);
-        }
-
-        private static QuarantineReadResult unsupported(int version) {
-            return new QuarantineReadResult(false, version, false,
-                    Collections.<NBTTagCompound>emptyList());
         }
     }
 }

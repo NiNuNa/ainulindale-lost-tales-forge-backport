@@ -7,19 +7,16 @@ import java.nio.charset.Charset;
 import java.util.UUID;
 
 /**
- * Bounded packet primitives for the legacy Lost Tales packet formats.
+ * Bounded packet primitives shared by every Lost Tales packet.
  *
- * Two string framings are carried, and both are wire surface: the
- * {@code utf8} pair keeps Forge 1.7.10's ByteBufUtils format — a two-byte
- * maximum varint byte length followed by the UTF-8 payload — while the
- * {@code shortFramed} pair writes an unsigned short length, which is what
- * the character and party families were written against. Neither may be
- * swapped for the other: the bytes on the wire are what they are.
+ * Every string is framed as Forge 1.7.10's ByteBufUtils frames one: a
+ * varint byte length of at most two bytes, so no string is longer than
+ * 16383 bytes, followed by the UTF-8 payload.
  *
  * <p>Internal to the mod's packets. The character and party families sit
- * in packages of their own and reach these through their own small
- * classes, which hold the size limits those families bound their fields
- * by and nothing else.</p>
+ * in packages of their own and read and write through these too; the
+ * size limits those families bound their fields by live in their own
+ * small classes.</p>
  */
 public final class LostTalesPacketCodec {
 
@@ -35,7 +32,7 @@ public final class LostTalesPacketCodec {
 
     private LostTalesPacketCodec() {}
 
-    static String readUtf8String(ByteBuf buffer, int maximumBytes) {
+    public static String readUtf8String(ByteBuf buffer, int maximumBytes) {
         if (buffer == null || maximumBytes < 0) {
             throw new DecodeException("invalid string decoder arguments");
         }
@@ -49,7 +46,8 @@ public final class LostTalesPacketCodec {
         return new String(bytes, UTF_8);
     }
 
-    static void writeUtf8String(ByteBuf buffer, String value, int maximumBytes) {
+    public static void writeUtf8String(ByteBuf buffer, String value,
+                                       int maximumBytes) {
         if (buffer == null || maximumBytes < 0) {
             throw new IllegalArgumentException("invalid string encoder arguments");
         }
@@ -58,32 +56,6 @@ public final class LostTalesPacketCodec {
             throw new IllegalArgumentException("encoded string exceeds packet limit");
         }
         ByteBufUtils.writeVarInt(buffer, bytes.length, 2);
-        buffer.writeBytes(bytes);
-    }
-
-    /**
-     * A string behind an unsigned-short byte length. The bounded read
-     * checks the declared length before allocating.
-     */
-    public static String readShortFramedString(ByteBuf buffer, int maximumBytes) {
-        requireReadable(buffer, 2);
-        int length = buffer.readUnsignedShort();
-        if (length > maximumBytes) {
-            throw new DecodeException("string length exceeds limit");
-        }
-        requireReadable(buffer, length);
-        byte[] bytes = new byte[length];
-        buffer.readBytes(bytes);
-        return new String(bytes, UTF_8);
-    }
-
-    public static void writeShortFramedString(ByteBuf buffer, String value,
-                                              int maximumBytes) {
-        byte[] bytes = (value == null ? "" : value).getBytes(UTF_8);
-        if (bytes.length > maximumBytes) {
-            throw new IllegalArgumentException("encoded string exceeds packet limit");
-        }
-        buffer.writeShort(bytes.length);
         buffer.writeBytes(bytes);
     }
 

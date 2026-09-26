@@ -33,7 +33,7 @@ public final class SnapAssist {
     static final int PANE_PADDING = 8;
 
     private final MotionTransition shown =
-            new MotionTransition(MotionIds.CHAT_SNAP_ASSIST);
+            new MotionTransition(MotionIds.WINDOW_SNAP_ASSIST);
     private boolean open;
     /** The window whose landing opened the offer. */
     private String snappedId;

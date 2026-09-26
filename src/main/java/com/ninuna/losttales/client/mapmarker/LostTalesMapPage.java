@@ -101,10 +101,13 @@ public final class LostTalesMapPage extends PageContent {
         return shown != null ? shown : screen;
     }
 
-    /** The map's tab waits unseen where the map cannot stand in a window. */
+    /**
+     * The map's tab waits unseen where the map cannot stand in a window,
+     * and on the screen that stands without a world.
+     */
     @Override
     public boolean isAvailable() {
-        return standsInWindow();
+        return !WindowScreen.standsWithoutWorld() && standsInWindow();
     }
 
 

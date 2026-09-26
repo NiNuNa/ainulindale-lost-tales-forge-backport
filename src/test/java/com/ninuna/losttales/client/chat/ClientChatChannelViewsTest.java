@@ -297,7 +297,7 @@ public final class ClientChatChannelViewsTest {
      */
     @Test
     public void closedChannelsAccumulateUnreadUntilRestoredAndViewed() {
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
         try {
             assertTrue(ChatLayout.close(ChatChannel.PARTY));
             ClientChatChannelViews.record(-1, ChatChannel.PARTY,
@@ -319,7 +319,7 @@ public final class ClientChatChannelViewsTest {
             assertEquals(0, ClientChatChannelViews.unreadCount(
                     ChatChannel.PARTY));
         } finally {
-            ChatLayout.reset();
+            TwoWindowLayout.reset();
         }
     }
 

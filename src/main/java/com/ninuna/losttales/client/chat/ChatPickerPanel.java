@@ -205,7 +205,7 @@ abstract class ChatPickerPanel extends SubWindowContent {
             this.renderedScroll = this.scroll;
             return;
         }
-        this.renderedScroll = Motions.followTravel(MotionIds.CHAT_SCROLL,
+        this.renderedScroll = Motions.followTravel(MotionIds.WINDOW_SCROLL,
                 this.renderedScroll, this.scroll, elapsed);
     }
 

@@ -6,6 +6,7 @@ import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.Settings;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowLayout;
+import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowTab;
 import com.ninuna.losttales.config.LostTalesConfig;
 import java.util.ArrayList;
@@ -20,9 +21,31 @@ import net.minecraft.util.StatCollector;
 /**
  * The chat's sections of Settings, after the windows' own: its Look,
  * Messages, Mentions, Typing and Closed Feed, every channel's switches,
- * everyone ignored, and every shortcut the chat has.
+ * everyone ignored, and every shortcut the chat has. Every Settings has
+ * them, a screen's without a world too.
  */
-final class ChatSettingsSections {
+public final class ChatSettingsSections {
+    /**
+     * The chat's sections, given to every Settings as it is made. The
+     * Ignored section's notice shows over the bar of the chat on the
+     * screen open, and nowhere where there is none.
+     */
+    public static final Settings.Sections SECTIONS = new Settings.Sections() {
+        @Override
+        public void addTo(Settings settings) {
+            ChatSettingsSections.addTo(settings, new ChatNoticeSink() {
+                @Override
+                public void showNotice(String message) {
+                    WindowScreen screen = WindowScreen.current();
+                    ChatScreenPart part = screen == null ? null
+                            : screen.part(ChatScreenPart.class);
+                    if (part != null) {
+                        part.showNotice(message);
+                    }
+                }
+            });
+        }
+    };
     /** A channel's switches: the switch, then the tab's id. */
     private static final String CHANNEL_MUTE_PREFIX = "channel:mute:";
     private static final String CHANNEL_PINGS_PREFIX = "channel:pings:";
@@ -142,6 +165,18 @@ final class ChatSettingsSections {
                 @Override
                 protected void set(String name) {
                     LostTalesConfig.chatReplyHighlightColor = name;
+                }
+            });
+            look.add(new Settings.Colour("chatServerTextColor",
+                    "gui.losttales.chat.settings.color.server") {
+                @Override
+                protected String current() {
+                    return LostTalesConfig.chatServerTextColor;
+                }
+
+                @Override
+                protected void set(String name) {
+                    LostTalesConfig.chatServerTextColor = name;
                 }
             });
             look.add(new Settings.GamePercent("chatScale",
@@ -315,6 +350,20 @@ final class ChatSettingsSections {
             @Override
             protected void set(boolean on) {
                 LostTalesConfig.showChatSpeechBubbles = on;
+            }
+        });
+        // How many messages the history keeps, within the bounds its
+        // option is defined with: a safety bound, stepped by fifty.
+        messages.add(new Settings.Numeric("chatHistoryLines",
+                "gui.losttales.chat.settings.history_lines", 50.0D, 0) {
+            @Override
+            protected double get() {
+                return LostTalesConfig.chatHistoryLines;
+            }
+
+            @Override
+            protected void set(double value) {
+                LostTalesConfig.chatHistoryLines = (int)Math.round(value);
             }
         });
         return messages;

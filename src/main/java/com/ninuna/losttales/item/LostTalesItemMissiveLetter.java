@@ -17,12 +17,10 @@ import com.ninuna.losttales.quest.LostTalesQuestObjectiveTextHelper;
 import net.minecraft.util.StatCollector;
 
 /**
- * NBT-backed missive letter item.
- *
- * This item displays server-authored missive data. Right-clicking opens a
- * client-side reader with an Accept button. The button sends a small server
- * request that re-validates the player inventory slot before starting the quest
- * or consuming the letter.
+ * A missive letter: a board's notice, its missive kept in the stack's
+ * NBT. Using it opens the letter's page on the client, showing the letter
+ * in the slot it was used from; its Accept asks the server, which reads
+ * that slot again before starting the quest and using the letter up.
  */
 public class LostTalesItemMissiveLetter extends Item {
     public LostTalesItemMissiveLetter() {
@@ -98,7 +96,7 @@ public class LostTalesItemMissiveLetter extends Item {
     @Override
     public ItemStack onItemRightClick(ItemStack stack, World world, EntityPlayer player) {
         if (world.isRemote) {
-            LostTalesMod.proxy.openMissiveLetterGui(player, stack, player.inventory.currentItem);
+            LostTalesMod.proxy.openMissiveLetterPage(player.inventory.currentItem);
         }
         return stack;
     }

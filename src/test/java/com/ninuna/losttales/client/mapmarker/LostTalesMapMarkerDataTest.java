@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.mapmarker;
 
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -34,7 +35,8 @@ public final class LostTalesMapMarkerDataTest {
                         lotr.common.LOTRDimension.MIDDLE_EARTH.dimensionID,
                         12.0D, 64.0D, -8.0D,
                         128.0D, 8.0D,
-                        true, true, false, false);
+                        true, true, false, false, 0,
+                        LostTalesMapMarkerSource.CUSTOM_PRESET);
 
         assertTrue(
                 LostTalesLotrMapMarkerIconOverlay
@@ -97,6 +99,7 @@ public final class LostTalesMapMarkerDataTest {
                 lotr.common.LOTRDimension.MIDDLE_EARTH.dimensionID,
                 12.0D, 64.0D, -8.0D,
                 128.0D, 8.0D,
-                false, false, false, hasWaystone);
+                false, false, false, hasWaystone, 0,
+                LostTalesMapMarkerSource.CUSTOM_PRESET);
     }
 }

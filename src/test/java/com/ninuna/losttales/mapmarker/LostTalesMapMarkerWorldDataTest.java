@@ -25,7 +25,7 @@ public final class LostTalesMapMarkerWorldDataTest {
                         true, true, false,
                         LostTalesMapMarkerSource.CUSTOM_PRESET,
                         true,
-                        "losttales:glowstone_house");
+                        "losttales:glowstone_house", 0);
         LostTalesMapMarkerWorldData data =
                 new LostTalesMapMarkerWorldData("test");
         data.seedDefinitions(Collections.singleton(definition));
@@ -312,6 +312,6 @@ public final class LostTalesMapMarkerWorldDataTest {
                 true, true, false,
                 LostTalesMapMarkerSource.CUSTOM_PRESET,
                 true,
-                "losttales:glowstone_house");
+                "losttales:glowstone_house", 0);
     }
 }

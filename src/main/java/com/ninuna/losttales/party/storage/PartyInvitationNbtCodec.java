@@ -1,8 +1,9 @@
 package com.ninuna.losttales.party.storage;
 
-import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.party.model.PartyInvitation;
-import cpw.mods.fml.common.FMLLog;
+import com.ninuna.losttales.storage.NbtQuarantine;
+import com.ninuna.losttales.storage.NbtTags;
+import com.ninuna.losttales.util.LostTalesLog;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
@@ -20,15 +21,11 @@ import java.util.UUID;
 public final class PartyInvitationNbtCodec {
 
     public static final int CURRENT_ROOT_DATA_VERSION = 1;
-    public static final int CURRENT_QUARANTINE_DATA_VERSION = 1;
 
     private static final String TAG_DATA_VERSION = "DataVersion";
     private static final String TAG_INVITATIONS = "Invitations";
-    private static final String TAG_QUARANTINE = "Quarantine";
-    private static final String TAG_QUARANTINE_ENTRIES = "Entries";
     private static final String TAG_REASON = "Reason";
     private static final String TAG_INVITATION_INDEX = "InvitationIndex";
-    private static final String TAG_ORIGINAL_DATA = "OriginalData";
 
     private static final String TAG_INVITATION_UUID = "InvitationUUID";
     private static final String TAG_PARTY_UUID = "PartyUUID";
@@ -61,7 +58,7 @@ public final class PartyInvitationNbtCodec {
             }
         }
         output.setTag(TAG_INVITATIONS, list);
-        output.setTag(TAG_QUARANTINE, writeQuarantine(quarantinedEntries));
+        NbtQuarantine.write(output, quarantinedEntries);
     }
 
     public static ReadResult read(NBTTagCompound source) {
@@ -69,24 +66,24 @@ public final class PartyInvitationNbtCodec {
         int version = safeSource.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
                 ? safeSource.getInteger(TAG_DATA_VERSION) : 0;
         if (version > CURRENT_ROOT_DATA_VERSION || version < 0) {
-            warn("Party invitation data uses unsupported version %d; data will remain read-only",
+            LostTalesLog.warning("Party invitation data uses unsupported version %d; data will remain read-only",
                     Integer.valueOf(version));
             return ReadResult.unsupported(safeSource, version);
         }
 
         boolean repaired = version != CURRENT_ROOT_DATA_VERSION;
-        QuarantineReadResult quarantineResult = readQuarantine(safeSource);
-        if (!quarantineResult.supported) {
-            warn("Party invitation quarantine is malformed or unsupported; data will remain read-only");
-            return ReadResult.unsupported(safeSource, quarantineResult.unsupportedVersion);
+        NbtQuarantine.Read quarantineResult = NbtQuarantine.read(safeSource);
+        if (!quarantineResult.isSupported()) {
+            LostTalesLog.warning("Party invitation quarantine is malformed or unsupported; data will remain read-only");
+            return ReadResult.unsupported(safeSource, quarantineResult.getUnsupportedVersion());
         }
-        repaired |= quarantineResult.repaired;
+        repaired |= quarantineResult.isRepaired();
         ArrayList<NBTTagCompound> quarantine =
-                new ArrayList<NBTTagCompound>(quarantineResult.entries);
+                new ArrayList<NBTTagCompound>(quarantineResult.getEntries());
 
         if (safeSource.hasKey(TAG_INVITATIONS)
                 && !safeSource.hasKey(TAG_INVITATIONS, Constants.NBT.TAG_LIST)) {
-            warn("Party invitation root has a malformed invitation list; preserving data read-only");
+            LostTalesLog.warning("Party invitation root has a malformed invitation list; preserving data read-only");
             return ReadResult.unsupported(safeSource, -1);
         }
         if (!safeSource.hasKey(TAG_INVITATIONS, Constants.NBT.TAG_LIST)) {
@@ -104,15 +101,15 @@ public final class PartyInvitationNbtCodec {
                 return ReadResult.unsupported(safeSource, result.unsupportedVersion);
             }
             if (result.invitation == null) {
-                quarantine.add(createQuarantineEntry(
-                        result.failureReason, i, raw));
+                quarantine.add(NbtQuarantine.entry(
+                        result.failureReason, TAG_INVITATION_INDEX, i, raw));
                 repaired = true;
                 continue;
             }
             UUID invitationId = result.invitation.getInvitationId();
             if (invitations.containsKey(invitationId)) {
-                quarantine.add(createQuarantineEntry(
-                        "duplicate_invitation_uuid", i, raw));
+                quarantine.add(NbtQuarantine.entry(
+                        "duplicate_invitation_uuid", TAG_INVITATION_INDEX, i, raw));
                 repaired = true;
                 continue;
             }
@@ -129,13 +126,13 @@ public final class PartyInvitationNbtCodec {
         NBTTagCompound entry = new NBTTagCompound();
         entry.setString(TAG_REASON, reason == null ? "unknown" : reason);
         if (invitationId != null) {
-            writeUuid(entry, TAG_INVITATION_UUID, invitationId);
+            NbtTags.writeUuid(entry, TAG_INVITATION_UUID, invitationId);
         }
         if (partyId != null) {
-            writeUuid(entry, TAG_PARTY_UUID, partyId);
+            NbtTags.writeUuid(entry, TAG_PARTY_UUID, partyId);
         }
         if (targetCharacterId != null) {
-            writeUuid(entry, TAG_TARGET_CHARACTER_UUID, targetCharacterId);
+            NbtTags.writeUuid(entry, TAG_TARGET_CHARACTER_UUID, targetCharacterId);
         }
         return entry;
     }
@@ -143,16 +140,16 @@ public final class PartyInvitationNbtCodec {
     private static NBTTagCompound writeInvitation(PartyInvitation invitation) {
         NBTTagCompound tag = new NBTTagCompound();
         tag.setInteger(TAG_DATA_VERSION, PartyInvitation.CURRENT_DATA_VERSION);
-        writeUuid(tag, TAG_INVITATION_UUID, invitation.getInvitationId());
-        writeUuid(tag, TAG_PARTY_UUID, invitation.getPartyId());
-        writeUuid(tag, TAG_INVITING_CHARACTER_UUID,
+        NbtTags.writeUuid(tag, TAG_INVITATION_UUID, invitation.getInvitationId());
+        NbtTags.writeUuid(tag, TAG_PARTY_UUID, invitation.getPartyId());
+        NbtTags.writeUuid(tag, TAG_INVITING_CHARACTER_UUID,
                 invitation.getInvitingCharacterId());
-        writeUuid(tag, TAG_INVITING_OWNER_UUID, invitation.getInvitingOwnerId());
+        NbtTags.writeUuid(tag, TAG_INVITING_OWNER_UUID, invitation.getInvitingOwnerId());
         tag.setString(TAG_INVITING_CHARACTER_NAME,
                 invitation.getInvitingCharacterName());
-        writeUuid(tag, TAG_TARGET_CHARACTER_UUID,
+        NbtTags.writeUuid(tag, TAG_TARGET_CHARACTER_UUID,
                 invitation.getTargetCharacterId());
-        writeUuid(tag, TAG_TARGET_OWNER_UUID, invitation.getTargetOwnerId());
+        NbtTags.writeUuid(tag, TAG_TARGET_OWNER_UUID, invitation.getTargetOwnerId());
         tag.setString(TAG_TARGET_CHARACTER_NAME,
                 invitation.getTargetCharacterName());
         tag.setLong(TAG_CREATED_AT, invitation.getCreatedAt());
@@ -170,12 +167,12 @@ public final class PartyInvitationNbtCodec {
             return InvitationReadResult.unsupported(version);
         }
 
-        UUID invitationId = readUuid(source, TAG_INVITATION_UUID);
-        UUID partyId = readUuid(source, TAG_PARTY_UUID);
-        UUID invitingCharacterId = readUuid(source, TAG_INVITING_CHARACTER_UUID);
-        UUID invitingOwnerId = readUuid(source, TAG_INVITING_OWNER_UUID);
-        UUID targetCharacterId = readUuid(source, TAG_TARGET_CHARACTER_UUID);
-        UUID targetOwnerId = readUuid(source, TAG_TARGET_OWNER_UUID);
+        UUID invitationId = NbtTags.readUuid(source, TAG_INVITATION_UUID);
+        UUID partyId = NbtTags.readUuid(source, TAG_PARTY_UUID);
+        UUID invitingCharacterId = NbtTags.readUuid(source, TAG_INVITING_CHARACTER_UUID);
+        UUID invitingOwnerId = NbtTags.readUuid(source, TAG_INVITING_OWNER_UUID);
+        UUID targetCharacterId = NbtTags.readUuid(source, TAG_TARGET_CHARACTER_UUID);
+        UUID targetOwnerId = NbtTags.readUuid(source, TAG_TARGET_OWNER_UUID);
         if (invitationId == null || partyId == null
                 || invitingCharacterId == null || invitingOwnerId == null
                 || targetCharacterId == null || targetOwnerId == null) {
@@ -218,89 +215,6 @@ public final class PartyInvitationNbtCodec {
         } catch (IllegalArgumentException exception) {
             return InvitationReadResult.failed("invalid_invitation_fields");
         }
-    }
-
-    private static NBTTagCompound writeQuarantine(
-            Collection<NBTTagCompound> entries) {
-        NBTTagCompound quarantine = new NBTTagCompound();
-        quarantine.setInteger(TAG_DATA_VERSION,
-                CURRENT_QUARANTINE_DATA_VERSION);
-        NBTTagList list = new NBTTagList();
-        if (entries != null) {
-            for (NBTTagCompound entry : entries) {
-                if (entry != null) {
-                    list.appendTag(entry.copy());
-                }
-            }
-        }
-        quarantine.setTag(TAG_QUARANTINE_ENTRIES, list);
-        return quarantine;
-    }
-
-    private static QuarantineReadResult readQuarantine(NBTTagCompound root) {
-        if (!root.hasKey(TAG_QUARANTINE)) {
-            return QuarantineReadResult.success(
-                    Collections.<NBTTagCompound>emptyList(), true);
-        }
-        if (!root.hasKey(TAG_QUARANTINE,
-                Constants.NBT.TAG_COMPOUND)) {
-            return QuarantineReadResult.unsupported(-1);
-        }
-        NBTTagCompound quarantine = root.getCompoundTag(TAG_QUARANTINE);
-        int version = quarantine.hasKey(TAG_DATA_VERSION,
-                Constants.NBT.TAG_INT)
-                ? quarantine.getInteger(TAG_DATA_VERSION) : 0;
-        if (version > CURRENT_QUARANTINE_DATA_VERSION || version < 0) {
-            return QuarantineReadResult.unsupported(version);
-        }
-        if (quarantine.hasKey(TAG_QUARANTINE_ENTRIES)
-                && !quarantine.hasKey(TAG_QUARANTINE_ENTRIES,
-                Constants.NBT.TAG_LIST)) {
-            return QuarantineReadResult.unsupported(-1);
-        }
-        ArrayList<NBTTagCompound> entries = new ArrayList<NBTTagCompound>();
-        NBTTagList list = quarantine.getTagList(
-                TAG_QUARANTINE_ENTRIES, Constants.NBT.TAG_COMPOUND);
-        for (int i = 0; i < list.tagCount(); i++) {
-            entries.add((NBTTagCompound) list.getCompoundTagAt(i).copy());
-        }
-        return QuarantineReadResult.success(entries,
-                version != CURRENT_QUARANTINE_DATA_VERSION);
-    }
-
-    private static NBTTagCompound createQuarantineEntry(String reason,
-                                                        int invitationIndex,
-                                                        NBTTagCompound originalData) {
-        NBTTagCompound entry = new NBTTagCompound();
-        entry.setString(TAG_REASON, reason == null ? "unknown" : reason);
-        if (invitationIndex >= 0) {
-            entry.setInteger(TAG_INVITATION_INDEX, invitationIndex);
-        }
-        entry.setTag(TAG_ORIGINAL_DATA, originalData == null
-                ? new NBTTagCompound() : originalData.copy());
-        return entry;
-    }
-
-    private static void writeUuid(NBTTagCompound tag, String key, UUID uuid) {
-        tag.setLong(key + "Most", uuid.getMostSignificantBits());
-        tag.setLong(key + "Least", uuid.getLeastSignificantBits());
-    }
-
-    private static UUID readUuid(NBTTagCompound tag, String key) {
-        String mostKey = key + "Most";
-        String leastKey = key + "Least";
-        if (!tag.hasKey(mostKey, Constants.NBT.TAG_LONG)
-                || !tag.hasKey(leastKey, Constants.NBT.TAG_LONG)) {
-            return null;
-        }
-        return new UUID(tag.getLong(mostKey), tag.getLong(leastKey));
-    }
-
-    private static void warn(String message, Object... arguments) {
-        Object[] allArguments = new Object[arguments.length + 1];
-        allArguments[0] = LostTalesMetaData.MOD_ID;
-        System.arraycopy(arguments, 0, allArguments, 1, arguments.length);
-        FMLLog.warning("[%s] " + message, allArguments);
     }
 
     private static final Comparator<PartyInvitation> INVITATION_ORDER =
@@ -435,37 +349,6 @@ public final class PartyInvitationNbtCodec {
         private static InvitationReadResult unsupported(int version) {
             return new InvitationReadResult(
                     null, false, version, "unsupported_version");
-        }
-    }
-
-    private static final class QuarantineReadResult {
-        private final boolean supported;
-        private final int unsupportedVersion;
-        private final boolean repaired;
-        private final List<NBTTagCompound> entries;
-
-        private QuarantineReadResult(boolean supported,
-                                     int unsupportedVersion,
-                                     boolean repaired,
-                                     List<NBTTagCompound> entries) {
-            this.supported = supported;
-            this.unsupportedVersion = unsupportedVersion;
-            this.repaired = repaired;
-            this.entries = entries;
-        }
-
-        private static QuarantineReadResult success(
-                List<NBTTagCompound> entries, boolean repaired) {
-            return new QuarantineReadResult(
-                    true, -1, repaired, entries);
-        }
-
-        private static QuarantineReadResult unsupported(int version) {
-            return new QuarantineReadResult(
-                    false,
-                    version,
-                    false,
-                    Collections.<NBTTagCompound>emptyList());
         }
     }
 }

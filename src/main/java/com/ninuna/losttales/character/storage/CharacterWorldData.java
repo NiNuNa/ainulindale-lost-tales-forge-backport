@@ -2,7 +2,7 @@ package com.ninuna.losttales.character.storage;
 
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
-import net.minecraft.nbt.NBTBase;
+import com.ninuna.losttales.storage.NbtTags;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.WorldSavedData;
 
@@ -12,7 +12,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -71,7 +70,7 @@ public class CharacterWorldData extends WorldSavedData {
     @Override
     public void writeToNBT(NBTTagCompound compound) {
         if (this.readOnlyForNewerVersion && this.preservedNewerData != null) {
-            copyTagContents(this.preservedNewerData, compound);
+            NbtTags.copyContents(this.preservedNewerData, compound);
             return;
         }
         CharacterNbtCodec.write(compound, this.rosters.values(), this.quarantinedEntries);
@@ -176,20 +175,6 @@ public class CharacterWorldData extends WorldSavedData {
                     "Character data is read-only because its format is malformed or uses unsupported version "
                             + this.unsupportedDataVersion
             );
-        }
-    }
-
-    private static void copyTagContents(NBTTagCompound source, NBTTagCompound destination) {
-        Set<?> keySet = source.func_150296_c();
-        for (Object keyObject : keySet) {
-            if (!(keyObject instanceof String)) {
-                continue;
-            }
-            String key = (String) keyObject;
-            NBTBase value = source.getTag(key);
-            if (value != null) {
-                destination.setTag(key, value.copy());
-            }
         }
     }
 }

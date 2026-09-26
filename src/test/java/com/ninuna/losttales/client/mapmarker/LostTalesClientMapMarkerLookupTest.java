@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import java.util.Arrays;
 import java.util.Collections;
 import lotr.common.LOTRDimension;
@@ -42,7 +43,7 @@ public final class LostTalesClientMapMarkerLookupTest {
                         1.0D,
                         LostTalesMapMarkerDefinition.AUTOMATIC_Y,
                         2.0D, 128.0D, 8.0D,
-                        false, false, false);
+                        false, false, false, LostTalesMapMarkerSource.QUEST_DYNAMIC, false, "", 0);
         LostTalesClientMapMarkerStore.setServerMarkers(
                 Arrays.asList(marker));
 
@@ -98,6 +99,6 @@ public final class LostTalesClientMapMarkerLookupTest {
                 LOTRDimension.MIDDLE_EARTH.dimensionID,
                 x, LostTalesMapMarkerDefinition.AUTOMATIC_Y, z,
                 128.0D, 8.0D,
-                false, false, false);
+                false, false, false, LostTalesMapMarkerSource.QUEST_DYNAMIC, false, "", 0);
     }
 }

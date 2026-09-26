@@ -29,7 +29,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * Guards the component registry the state service builds in its
  * constructor: the set of components, the ids a saved snapshot is keyed
- * by, the bootstrap versions the migration reads, and the apply order.
+ * by, and the apply order.
  * The service is a singleton whose lists are private, so the registry is
  * read back by reflection from the same package.
  */
@@ -106,25 +106,6 @@ public final class CharacterPlayerStateServiceRegistryTest {
             ids.add(component.getId());
         }
         assertEquals(SAVED_COMPONENT_IDS, ids);
-    }
-
-    /**
-     * The migration fills in every component introduced after the version
-     * an account was bootstrapped at. A version outside the known range
-     * would make a component either unreachable or permanently missing.
-     */
-    @Test
-    public void everyComponentNamesAKnownBootstrapVersion() throws Exception {
-        List<CharacterStateComponent> components = registeredComponents();
-        Map<String, Integer> introducedAt = introducedAt();
-        assertEquals(components.size(), introducedAt.size());
-        for (CharacterStateComponent component : components) {
-            Integer version = introducedAt.get(component.getId());
-            assertNotNull("no bootstrap version for " + component.getId(), version);
-            assertTrue(component.getId() + " names bootstrap version " + version,
-                    version.intValue() >= 1 && version.intValue()
-                            <= CharacterPlayerStateAccount.CURRENT_BOOTSTRAP_VERSION);
-        }
     }
 
     /**
@@ -246,11 +227,6 @@ public final class CharacterPlayerStateServiceRegistryTest {
     private static Map<String, CharacterStateComponent> componentsById()
             throws Exception {
         return (Map<String, CharacterStateComponent>) read("componentsById");
-    }
-
-    @SuppressWarnings("unchecked")
-    private static Map<String, Integer> introducedAt() throws Exception {
-        return (Map<String, Integer>) read("introducedAt");
     }
 
     private static Object read(String fieldName) throws Exception {

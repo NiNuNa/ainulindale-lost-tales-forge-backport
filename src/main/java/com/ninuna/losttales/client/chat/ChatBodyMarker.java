@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatColorMarkers;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChatStyle;
@@ -35,7 +36,7 @@ final class ChatBodyMarker {
         ChatComponentText component = new ChatComponentText(text);
         ChatStyle style = component.getChatStyle().setChatClickEvent(
                 new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
-                        PREFIX + (color < 0 ? NO_COLOR : colorHex(color))));
+                        PREFIX + (color < 0 ? NO_COLOR : ChatColorMarkers.hex(color))));
         component.setChatStyle(style);
         return component;
     }
@@ -71,14 +72,5 @@ final class ChatBodyMarker {
             return null;
         }
         return value.substring(PREFIX.length());
-    }
-
-    private static String colorHex(int color) {
-        String hex = Integer.toHexString(color & 0xFFFFFF);
-        StringBuilder result = new StringBuilder(6);
-        for (int index = hex.length(); index < 6; index++) {
-            result.append('0');
-        }
-        return result.append(hex).toString();
     }
 }

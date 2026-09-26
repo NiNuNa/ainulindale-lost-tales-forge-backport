@@ -1,5 +1,6 @@
 package com.ninuna.losttales.character.switching;
 
+import com.ninuna.losttales.util.LostTalesMath;
 import java.util.UUID;
 
 /** Persistent account-owned switch cooldown, lifecycle lockout, and journal state. */
@@ -21,20 +22,6 @@ public final class CharacterSwitchAccountState {
     public CharacterSwitchAccountState(UUID ownerId) {
         this(ownerId, 0, 0L, 0L, 0L, 0L,
                 false, false, 0L, null);
-    }
-
-    /** Compatibility constructor for version-1 account manifests. */
-    public CharacterSwitchAccountState(UUID ownerId,
-                                       int cooldownStage,
-                                       long nextAllowedAt,
-                                       long lastSuccessfulSwitchAt,
-                                       long decayAnchorAt,
-                                       long lastObservedWallClock,
-                                       boolean frozen,
-                                       CharacterSwitchTransaction transaction) {
-        this(ownerId, cooldownStage, nextAllowedAt, lastSuccessfulSwitchAt,
-                decayAnchorAt, lastObservedWallClock, frozen,
-                false, 0L, transaction);
     }
 
     public CharacterSwitchAccountState(UUID ownerId,
@@ -120,7 +107,7 @@ public final class CharacterSwitchAccountState {
         int appliedStage = Math.min(Math.max(0, this.cooldownStage),
                 cooldownDurationsMillis.length - 1);
         long duration = Math.max(0L, cooldownDurationsMillis[appliedStage]);
-        long nextAllowed = safeAdd(safeNow, duration);
+        long nextAllowed = LostTalesMath.saturatingAdd(safeNow, duration);
         int nextStage = Math.min(appliedStage + 1, cooldownDurationsMillis.length - 1);
         return new CooldownCommit(nextStage, nextAllowed, safeNow, safeNow, safeNow);
     }
@@ -194,13 +181,6 @@ public final class CharacterSwitchAccountState {
         this.decayAnchorAt = Math.max(0L, decayAnchorAt);
         this.lastObservedWallClock = Math.max(this.lastObservedWallClock,
                 Math.max(0L, lastObservedWallClock));
-    }
-
-    private static long safeAdd(long left, long right) {
-        if (right > 0L && left > Long.MAX_VALUE - right) {
-            return Long.MAX_VALUE;
-        }
-        return left + right;
     }
 
     public static final class CooldownCommit {

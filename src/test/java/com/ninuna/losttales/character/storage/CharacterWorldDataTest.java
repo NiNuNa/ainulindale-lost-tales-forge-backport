@@ -7,6 +7,7 @@ import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
+import com.ninuna.losttales.storage.NbtQuarantine;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
@@ -96,7 +97,7 @@ public final class CharacterWorldDataTest {
     public void aNewerQuarantineHoldsTheWholeStoreReadOnly() {
         NBTTagCompound saved = savedRosters();
         saved.getCompoundTag("Quarantine").setInteger("DataVersion",
-                CharacterNbtCodec.CURRENT_QUARANTINE_DATA_VERSION + 1);
+                NbtQuarantine.CURRENT_DATA_VERSION + 1);
         NBTTagCompound expected = (NBTTagCompound) saved.copy();
 
         CharacterWorldData loaded = load(saved);
@@ -104,8 +105,24 @@ public final class CharacterWorldDataTest {
         loaded.writeToNBT(written);
 
         assertTrue(loaded.isReadOnlyForNewerVersion());
-        assertEquals(CharacterNbtCodec.CURRENT_QUARANTINE_DATA_VERSION + 1,
+        assertEquals(NbtQuarantine.CURRENT_DATA_VERSION + 1,
                 loaded.getUnsupportedDataVersion());
+        assertEquals(0, loaded.getRosterCount());
+        assertEquals(expected, written);
+    }
+
+    /** A quarantine that names no version is not this build's to read either. */
+    @Test
+    public void anUnversionedQuarantineHoldsTheWholeStoreReadOnly() {
+        NBTTagCompound saved = savedRosters();
+        saved.getCompoundTag("Quarantine").removeTag("DataVersion");
+        NBTTagCompound expected = (NBTTagCompound) saved.copy();
+
+        CharacterWorldData loaded = load(saved);
+        NBTTagCompound written = new NBTTagCompound();
+        loaded.writeToNBT(written);
+
+        assertTrue(loaded.isReadOnlyForNewerVersion());
         assertEquals(0, loaded.getRosterCount());
         assertEquals(expected, written);
     }

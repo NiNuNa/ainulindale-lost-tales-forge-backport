@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatColorMarkers;
 import java.nio.charset.Charset;
 import java.util.Base64;
 import net.minecraft.event.ClickEvent;
@@ -26,7 +27,7 @@ final class ChatTitleMarker {
             component.setChatStyle(component.getChatStyle()
                     .setChatClickEvent(new ClickEvent(
                             ClickEvent.Action.SUGGEST_COMMAND,
-                            PREFIX + colorHex(color) + ':'
+                            PREFIX + ChatColorMarkers.hex(color) + ':'
                                     + encodeText(epithet))));
         }
         return component;
@@ -75,15 +76,6 @@ final class ChatTitleMarker {
 
     private static String decodeText(String encoded) {
         return new String(Base64.getUrlDecoder().decode(encoded), UTF_8);
-    }
-
-    private static String colorHex(int color) {
-        String hex = Integer.toHexString(color & 0xFFFFFF);
-        StringBuilder result = new StringBuilder(6);
-        for (int index = hex.length(); index < 6; index++) {
-            result.append('0');
-        }
-        return result.append(hex).toString();
     }
 
     static final class Data {

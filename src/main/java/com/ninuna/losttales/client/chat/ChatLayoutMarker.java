@@ -103,20 +103,6 @@ final class ChatLayoutMarker {
         return marker(PREFIX + BODY + (senderColor & 0xFFFFFF));
     }
 
-    /**
-     * As above, opening the body behind {@code label} instead of the
-     * chevron: the words a line puts between its sender and its body,
-     * drawn in the sender's colour exactly as the chevron is. An empty
-     * label is the chevron.
-     */
-    static ChatComponentText bodyBreak(int senderColor, String label) {
-        if (label == null || label.length() == 0) {
-            return bodyBreak(senderColor);
-        }
-        return marker(PREFIX + BODY + (senderColor & 0xFFFFFF) + ':'
-                + label);
-    }
-
     static ChatComponentText indent(int closedWidth, int openWidth) {
         return indent(closedWidth, openWidth, -1, -1);
     }
@@ -262,31 +248,12 @@ final class ChatLayoutMarker {
         if (payload == null || !payload.startsWith(BODY)) {
             return -1;
         }
-        String fields = payload.substring(BODY.length());
-        int labelStart = fields.indexOf(':');
         try {
-            return Integer.parseInt(labelStart < 0 ? fields
-                    : fields.substring(0, labelStart)) & 0xFFFFFF;
+            return Integer.parseInt(payload.substring(BODY.length()))
+                    & 0xFFFFFF;
         } catch (NumberFormatException ignored) {
             return -1;
         }
-    }
-
-    /**
-     * The label a body break opens the body with: null for the chat's
-     * chevron, and when the component is not a body break at all.
-     */
-    static String bodyLabel(IChatComponent component) {
-        String payload = payloadOf(component);
-        if (payload == null || !payload.startsWith(BODY)) {
-            return null;
-        }
-        String fields = payload.substring(BODY.length());
-        int labelStart = fields.indexOf(':');
-        if (labelStart < 0) {
-            return null;
-        }
-        return fields.substring(labelStart + 1);
     }
 
     static final class Data {

@@ -2,11 +2,11 @@ package com.ninuna.losttales.util;
 
 import net.minecraft.entity.EntityLivingBase;
 /**
- * Small legacy equivalent of the placement-rotation helper used by the modern NeoForge code.
- *
- * Minecraft 1.7.10 stores block orientation in metadata instead of BlockState properties, so
- * this helper keeps the metadata math in one place and prevents every renderer/block from
- * inventing its own conversion.
+ * Where a placed block faces. A plushie or an urn placed by a player keeps
+ * its exact turn on its tile entity; the block's metadata holds a coarse
+ * facing as well, which is the one a block placed without a player
+ * ({@code /setblock}, a structure) faces by. The metadata math lives here
+ * so no block or renderer works it out on its own.
  */
 public final class LostTalesBlockRotationHelper {
 
@@ -25,29 +25,31 @@ public final class LostTalesBlockRotationHelper {
     }
 
     /**
-     * Converts the modern 16-step rotation idea into the metadata value expected by the
-     * existing 1.7.10 plushie renderer. New placements also persist the exact float
-     * rotation on the tile entity, but this is still useful for old saves and broken NBT.
+     * A plushie's facing in sixteen steps as metadata, from the placer's
+     * turn; the tile entity keeps the exact turn beside it.
      */
-    public static int getLegacyPlushieMetadata(EntityLivingBase entity) {
+    public static int getPlushieMetadata(EntityLivingBase entity) {
         return (14 - getSnappedRotationIndex(entity, 16)) & 15;
     }
 
-    public static float getLegacyPlushieRenderRotation(int metadata) {
+    /** The turn a plushie faces by when its tile entity keeps none. */
+    public static float getPlushieMetadataRotation(int metadata) {
         return normalizeDegrees(90.0F + ((14 - metadata) & 15) * (360.0F / 16.0F));
     }
 
-    public static int getLegacyDirectionalMetadata(EntityLivingBase entity) {
+    /** An urn's facing in four steps as metadata, from the placer's turn. */
+    public static int getDirectionalMetadata(EntityLivingBase entity) {
         int index = ((int)Math.floor((double)(entity.rotationYaw * 4.0F / 360.0F) + 0.5D) & 3);
-        int legacyDirection = (index + 2) % 4;
+        int direction = (index + 2) % 4;
 
-        if (legacyDirection == 0) return 1;
-        if (legacyDirection == 1) return 3;
-        if (legacyDirection == 2) return 0;
+        if (direction == 0) return 1;
+        if (direction == 1) return 3;
+        if (direction == 2) return 0;
         return 2;
     }
 
-    public static float getLegacyDirectionalRenderRotation(int metadata) {
+    /** The turn an urn faces by when its tile entity keeps none. */
+    public static float getDirectionalMetadataRotation(int metadata) {
         switch (metadata & 3) {
             case 1:
                 return 180.0F;

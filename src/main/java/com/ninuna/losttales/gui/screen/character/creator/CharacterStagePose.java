@@ -94,8 +94,6 @@ public final class CharacterStagePose {
     public float getZoom() { return this.zoom; }
     public float getPanX() { return this.panX; }
     public float getPanY() { return this.panY; }
-    public float getShotYaw() { return this.shotYaw; }
-    public float getShotZoom() { return this.shotZoom; }
     public float getFocus() { return this.shotFocus; }
 
     /** The turn as drawn this frame: the page's shot and the player's turn together. */

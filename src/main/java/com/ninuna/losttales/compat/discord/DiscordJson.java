@@ -64,13 +64,6 @@ public final class DiscordJson {
 
         Message(String id, String authorId, String authorName, boolean bot,
                 String content, Map<String, String> mentionNames,
-                String referencedMessageId, String editedTimestamp) {
-            this(id, authorId, authorName, bot, content, mentionNames,
-                    referencedMessageId, editedTimestamp, "", "");
-        }
-
-        Message(String id, String authorId, String authorName, boolean bot,
-                String content, Map<String, String> mentionNames,
                 String referencedMessageId, String editedTimestamp,
                 String channelId, String authorAvatarUrl) {
             this.channelId = channelId == null ? "" : channelId;

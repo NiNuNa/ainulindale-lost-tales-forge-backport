@@ -112,15 +112,15 @@ final class LostTalesCompassHeightIndicatorAnimation {
     private static Pose sample(long entranceAgeNanos, long idleAgeNanos,
                                int direction, int arrowIndex, int arrowCount,
                                float exitProgressIn) {
-        float entranceProgress = clamp01((float)entranceAgeNanos
+        float entranceProgress = LostTalesGuiEasing.clamp((float)entranceAgeNanos
                 / (float)ENTER_NANOS);
-        float entranceAlpha = smoothStep(entranceProgress);
+        float entranceAlpha = LostTalesGuiEasing.smoothStep(entranceProgress);
 
         // A damped response supplies both anticipation and one tiny overshoot.
         float response = 1.0F
                 - (float)Math.exp(-6.5F * entranceProgress)
                 * (float)Math.cos(8.0F * entranceProgress);
-        float idleBlend = smoothStep((entranceProgress - 0.42F) / 0.58F);
+        float idleBlend = LostTalesGuiEasing.smoothStep((entranceProgress - 0.42F) / 0.58F);
         double idleShare = (double)(idleAgeNanos % IDLE_PERIOD_NANOS)
                 / (double)IDLE_PERIOD_NANOS;
         double phase = idleShare * TWO_PI
@@ -132,7 +132,7 @@ final class LostTalesCompassHeightIndicatorAnimation {
         float entranceOffset = -direction * (1.0F - response) * 1.05F;
         float idleOffset = direction * 0.38F * wave * idleBlend;
         float flowOffset = direction * 0.16F * flowEmphasis;
-        float exitProgress = smoothStep(exitProgressIn);
+        float exitProgress = LostTalesGuiEasing.smoothStep(exitProgressIn);
         float exitOffset = arrowIndex == 0 ? 0.0F
                 : -0.55F * exitProgress;
 
@@ -146,7 +146,7 @@ final class LostTalesCompassHeightIndicatorAnimation {
                 - 0.08F * exitProgress;
         float idleAlpha = 0.975F
                 + 0.025F * (0.5F + 0.5F * wave);
-        float alpha = clamp01(entranceAlpha * idleAlpha
+        float alpha = LostTalesGuiEasing.clamp(entranceAlpha * idleAlpha
                 * (1.0F - exitProgress));
         float brightness = 0.82F + 0.18F * flowEmphasis;
 
@@ -170,7 +170,7 @@ final class LostTalesCompassHeightIndicatorAnimation {
         float center = 0.14F + sequenceIndex * 0.22F;
         float distance = Math.abs(cycle - center);
         distance = Math.min(distance, 1.0F - distance);
-        return smoothStep(1.0F - distance / 0.15F);
+        return LostTalesGuiEasing.smoothStep(1.0F - distance / 0.15F);
     }
 
     private static long delayed(long age, long delay) {
@@ -184,14 +184,6 @@ final class LostTalesCompassHeightIndicatorAnimation {
 
     private static long elapsed(long earlier, long later) {
         return later <= earlier ? 0L : later - earlier;
-    }
-
-    private static float smoothStep(float value) {
-        return LostTalesGuiEasing.smoothStep(value);
-    }
-
-    private static float clamp01(float value) {
-        return LostTalesGuiEasing.clamp(value);
     }
 
     static final class Frame {

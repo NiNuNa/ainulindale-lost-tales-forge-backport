@@ -10,8 +10,9 @@ import java.util.Map;
 /**
  * Where the player has put each kind of sub-window, remembered per
  * account in the layout file, and which windows were open when the
- * screen last closed. A window opens where its popup always opened until the
- * player moves or resizes it; from then on it opens where they left it.
+ * screen last closed. A window opens where its opener puts it, such as
+ * hanging from the control pressed, until the player moves or resizes
+ * it; from then on it opens where they left it.
  * A place is kept from the corner of the room it was left nearest to, so
  * a picker left in a window's bottom right corner opens in the bottom
  * right corner of whichever window it opens in, however large. A kind the
@@ -107,7 +108,7 @@ public final class SubWindowPlaces {
 
     private SubWindowPlaces() {}
 
-    /** The kind's remembered place, or null while it opens where its popup did. */
+    /** The kind's remembered place, or null while it opens where its opener puts it. */
     static synchronized Placement of(SubWindowKind kind) {
         return PLACED.get(kind);
     }

@@ -1,7 +1,7 @@
 package com.ninuna.losttales.mapmarker;
 
-import com.ninuna.losttales.LostTalesMetaData;
-import cpw.mods.fml.common.FMLLog;
+import com.ninuna.losttales.storage.NbtTags;
+import com.ninuna.losttales.util.LostTalesLog;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -72,7 +72,7 @@ public final class LostTalesMapMarkerNbtCodec {
         int version = safe.hasKey(DATA_VERSION, Constants.NBT.TAG_INT)
                 ? safe.getInteger(DATA_VERSION) : 0;
         if (version < 0 || version > CURRENT_DATA_VERSION) {
-            warn("Map marker data uses unsupported version %d; preserving it read-only",
+            LostTalesLog.warning("Map marker data uses unsupported version %d; preserving it read-only",
                     Integer.valueOf(version));
             return ReadResult.unsupported(safe, version);
         }
@@ -151,20 +151,20 @@ public final class LostTalesMapMarkerNbtCodec {
         tag.setBoolean("HasWaystone", record.hasWaystone());
         tag.setString("StructureType", record.getWaystoneStructureType());
         tag.setInteger("Priority", record.getPriority());
-        writeUuid(tag, "Owner", record.getOwnerPlayerId());
+        NbtTags.writeUuid(tag, "Owner", record.getOwnerPlayerId());
         tag.setString("Visibility",
                 record.getVisibility().getSerializedName());
         NBTTagList shared = new NBTTagList();
         for (UUID playerId : record.getSharedPlayerIds()) {
             NBTTagCompound entry = new NBTTagCompound();
-            writeUuid(entry, "Player", playerId);
+            NbtTags.writeUuid(entry, "Player", playerId);
             shared.appendTag(entry);
         }
         tag.setTag("SharedPlayers", shared);
         NBTTagList sharedFellowships = new NBTTagList();
         for (UUID fellowshipId : record.getSharedFellowshipIds()) {
             NBTTagCompound entry = new NBTTagCompound();
-            writeUuid(entry, "Fellowship", fellowshipId);
+            NbtTags.writeUuid(entry, "Fellowship", fellowshipId);
             sharedFellowships.appendTag(entry);
         }
         tag.setTag("SharedFellowships", sharedFellowships);
@@ -177,7 +177,7 @@ public final class LostTalesMapMarkerNbtCodec {
             tag.setInteger("LinkedX", record.getLinkedX());
             tag.setInteger("LinkedY", record.getLinkedY());
             tag.setInteger("LinkedZ", record.getLinkedZ());
-            writeUuid(tag, "LinkToken", record.getLinkToken());
+            NbtTags.writeUuid(tag, "LinkToken", record.getLinkToken());
         }
         tag.setLong("Revision", record.getRevision());
         return tag;
@@ -234,7 +234,7 @@ public final class LostTalesMapMarkerNbtCodec {
                                     tag.getString("StructureType"))
                             .priority(tag.hasKey("Priority", Constants.NBT.TAG_INT)
                                     ? tag.getInteger("Priority") : 0)
-                            .ownerPlayerId(readUuid(tag, "Owner"))
+                            .ownerPlayerId(NbtTags.readUuid(tag, "Owner"))
                             .visibility(
                                     LostTalesMapMarkerVisibility.forSerializedName(
                                             tag.getString("Visibility"),
@@ -255,7 +255,7 @@ public final class LostTalesMapMarkerNbtCodec {
                                             Constants.NBT.TAG_LONG)
                                             ? tag.getLong("Revision") : 1L);
             if (tag.getBoolean("Linked")) {
-                UUID token = readUuid(tag, "LinkToken");
+                UUID token = NbtTags.readUuid(tag, "LinkToken");
                 if (token == null
                         || !tag.hasKey("LinkedDimension",
                                 Constants.NBT.TAG_INT)
@@ -285,7 +285,7 @@ public final class LostTalesMapMarkerNbtCodec {
         int count = Math.min(
                 list.tagCount(), LostTalesMapMarkerRecord.MAX_SHARED_PLAYERS);
         for (int index = 0; index < count; index++) {
-            UUID playerId = readUuid(
+            UUID playerId = NbtTags.readUuid(
                     list.getCompoundTagAt(index), "Player");
             if (playerId != null) {
                 players.add(playerId);
@@ -310,7 +310,7 @@ public final class LostTalesMapMarkerNbtCodec {
                 LostTalesMapMarkerRecord
                         .MAX_SHARED_FELLOWSHIPS);
         for (int index = 0; index < count; index++) {
-            UUID fellowshipId = readUuid(
+            UUID fellowshipId = NbtTags.readUuid(
                     list.getCompoundTagAt(index),
                     "Fellowship");
             if (fellowshipId != null) {
@@ -353,37 +353,6 @@ public final class LostTalesMapMarkerNbtCodec {
     private static void trimQuarantine(List<NBTTagCompound> entries) {
         while (entries.size() > MAX_QUARANTINE) {
             entries.remove(0);
-        }
-    }
-
-    private static void writeUuid(
-            NBTTagCompound tag, String key, UUID value) {
-        if (value != null) {
-            tag.setLong(key + "Most", value.getMostSignificantBits());
-            tag.setLong(key + "Least", value.getLeastSignificantBits());
-        }
-    }
-
-    private static UUID readUuid(NBTTagCompound tag, String key) {
-        if (!tag.hasKey(key + "Most", Constants.NBT.TAG_LONG)
-                || !tag.hasKey(key + "Least", Constants.NBT.TAG_LONG)) {
-            return null;
-        }
-        return new UUID(
-                tag.getLong(key + "Most"), tag.getLong(key + "Least"));
-    }
-
-    private static void warn(String format, Object... args) {
-        Object[] values = new Object[
-                (args == null ? 0 : args.length) + 1];
-        values[0] = LostTalesMetaData.MOD_ID;
-        if (args != null) {
-            System.arraycopy(args, 0, values, 1, args.length);
-        }
-        try {
-            FMLLog.warning("[%s] " + format, values);
-        } catch (RuntimeException ignored) {
-            // FML's logger is not bootstrapped in isolated codec unit tests.
         }
     }
 

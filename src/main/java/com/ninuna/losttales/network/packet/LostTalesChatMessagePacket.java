@@ -4,7 +4,6 @@ import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
-import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatReactionSummary;
@@ -287,92 +286,6 @@ public final class LostTalesChatMessagePacket implements IMessage {
             ChatChannel channel, UUID senderId, String identityName,
             String accountName, String title,
             int titleColor, int nameColor,
-            String message, long timestampMillis, String skinId) {
-        this(channel, senderId, identityName, accountName, title,
-                titleColor, nameColor, message, timestampMillis, skinId,
-                null);
-    }
-
-    public LostTalesChatMessagePacket(
-            ChatChannel channel, UUID senderId, String identityName,
-            String accountName, String title,
-            int titleColor, int nameColor,
-            String message, long timestampMillis, String skinId,
-            List<ChatShowcase> showcases) {
-        this(channel, senderId, identityName, accountName, title,
-                titleColor, nameColor, message, timestampMillis, skinId,
-                showcases, "");
-    }
-
-    public LostTalesChatMessagePacket(
-            ChatChannel channel, UUID senderId, String identityName,
-            String accountName, String title,
-            int titleColor, int nameColor,
-            String message, long timestampMillis, String skinId,
-            List<ChatShowcase> showcases, String factionName) {
-        this(channel, senderId, identityName, accountName, title,
-                titleColor, nameColor, message, timestampMillis, skinId,
-                showcases, factionName, "");
-    }
-
-    public LostTalesChatMessagePacket(
-            ChatChannel channel, UUID senderId, String identityName,
-            String accountName, String title,
-            int titleColor, int nameColor,
-            String message, long timestampMillis, String skinId,
-            List<ChatShowcase> showcases, String factionName,
-            String partner) {
-        this(channel, senderId, identityName, accountName, title, titleColor,
-                nameColor, message, timestampMillis, skinId, showcases,
-                factionName, partner, 0);
-    }
-
-    public LostTalesChatMessagePacket(
-            ChatChannel channel, UUID senderId, String identityName,
-            String accountName, String title,
-            int titleColor, int nameColor,
-            String message, long timestampMillis, String skinId,
-            List<ChatShowcase> showcases, String factionName,
-            String partner, int roles) {
-        this(channel, senderId, identityName, accountName, title,
-                titleColor, nameColor, message, timestampMillis, skinId,
-                showcases, factionName, partner, roles,
-                // A caller that does not say takes the channel's word:
-                // out of character reads as the account, in character as
-                // a character. The server always says.
-                channel != null && ChatRolePresentation.showsRoles(channel));
-    }
-
-    public LostTalesChatMessagePacket(
-            ChatChannel channel, UUID senderId, String identityName,
-            String accountName, String title,
-            int titleColor, int nameColor,
-            String message, long timestampMillis, String skinId,
-            List<ChatShowcase> showcases, String factionName,
-            String partner, int roles, boolean accountLine) {
-        this(channel, senderId, identityName, accountName, title, titleColor,
-                nameColor, message, timestampMillis, skinId, showcases,
-                factionName, partner, roles, accountLine,
-                ChatMessageIds.NONE);
-    }
-
-    public LostTalesChatMessagePacket(
-            ChatChannel channel, UUID senderId, String identityName,
-            String accountName, String title,
-            int titleColor, int nameColor,
-            String message, long timestampMillis, String skinId,
-            List<ChatShowcase> showcases, String factionName,
-            String partner, int roles, boolean accountLine,
-            long messageId) {
-        this(channel, senderId, identityName, accountName, title, titleColor,
-                nameColor, message, timestampMillis, skinId, showcases,
-                factionName, partner, roles, accountLine, messageId, null);
-    }
-
-    public LostTalesChatMessagePacket(
-            ChatChannel channel, UUID senderId, String identityName,
-            String accountName, String title,
-            int titleColor, int nameColor,
             String message, long timestampMillis, String skinId,
             List<ChatShowcase> showcases, String factionName,
             String partner, int roles, boolean accountLine,
@@ -380,7 +293,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
         this(channel, senderId, identityName, accountName, title, titleColor,
                 nameColor, message, timestampMillis, skinId, showcases,
                 factionName, partner, roles, accountLine, messageId, reply,
-                "");
+                "", 0L, null, null, null, "");
     }
 
     public LostTalesChatMessagePacket(
@@ -395,22 +308,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
         this(channel, senderId, identityName, accountName, title, titleColor,
                 nameColor, message, timestampMillis, skinId, showcases,
                 factionName, partner, roles, accountLine, messageId, reply,
-                partnerIdentity, 0L);
-    }
-
-    public LostTalesChatMessagePacket(
-            ChatChannel channel, UUID senderId, String identityName,
-            String accountName, String title,
-            int titleColor, int nameColor,
-            String message, long timestampMillis, String skinId,
-            List<ChatShowcase> showcases, String factionName,
-            String partner, int roles, boolean accountLine,
-            long messageId, ChatReplyReference reply,
-            String partnerIdentity, long echoNonce) {
-        this(channel, senderId, identityName, accountName, title, titleColor,
-                nameColor, message, timestampMillis, skinId, showcases,
-                factionName, partner, roles, accountLine, messageId, reply,
-                partnerIdentity, echoNonce, null);
+                partnerIdentity, 0L, null, null, null, "");
     }
 
     public LostTalesChatMessagePacket(
@@ -426,24 +324,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
         this(channel, senderId, identityName, accountName, title, titleColor,
                 nameColor, message, timestampMillis, skinId, showcases,
                 factionName, partner, roles, accountLine, messageId, reply,
-                partnerIdentity, echoNonce, identityCharacterId, null, null);
-    }
-
-    public LostTalesChatMessagePacket(
-            ChatChannel channel, UUID senderId, String identityName,
-            String accountName, String title,
-            int titleColor, int nameColor,
-            String message, long timestampMillis, String skinId,
-            List<ChatShowcase> showcases, String factionName,
-            String partner, int roles, boolean accountLine,
-            long messageId, ChatReplyReference reply,
-            String partnerIdentity, long echoNonce,
-            UUID identityCharacterId, UUID ownCharacterId,
-            UUID partnerCharacterId) {
-        this(channel, senderId, identityName, accountName, title, titleColor,
-                nameColor, message, timestampMillis, skinId, showcases, factionName,
-                partner, roles, accountLine, messageId, reply, partnerIdentity,
-                echoNonce, identityCharacterId, ownCharacterId, partnerCharacterId,
+                partnerIdentity, echoNonce, identityCharacterId, null, null,
                 "");
     }
 

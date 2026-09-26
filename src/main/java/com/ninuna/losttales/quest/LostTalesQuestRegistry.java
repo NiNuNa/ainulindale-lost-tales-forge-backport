@@ -2,7 +2,8 @@ package com.ninuna.losttales.quest;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerCatalog;
-import java.io.IOException;
+import com.ninuna.losttales.util.LostTalesCloseables;
+import cpw.mods.fml.common.FMLLog;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
@@ -23,11 +24,6 @@ import java.util.Map;
  */
 public final class LostTalesQuestRegistry {
     private static final String INDEX_FILE = "quests/index.json";
-    private static final String[] FALLBACK_QUEST_FILES = new String[] {
-            "quests/tutorial/meet_nia.json",
-            "quests/tutorial/cheese_cache.json",
-            "quests/tutorial/starter_note.json"
-    };
 
     private static final Map<String, LostTalesQuestDefinition> STATIC_QUESTS_BY_ID = new LinkedHashMap<String, LostTalesQuestDefinition>();
     private static final Map<String, LostTalesQuestDefinition> RUNTIME_QUESTS_BY_ID = new LinkedHashMap<String, LostTalesQuestDefinition>();
@@ -145,17 +141,19 @@ public final class LostTalesQuestRegistry {
         Reader reader = null;
         try {
             reader = openClasspathReader(INDEX_FILE);
-            if (reader != null) {
+            if (reader == null) {
+                FMLLog.warning("[%s] No quest index at %s: no bundled quests load.",
+                        LostTalesMetaData.MOD_ID, INDEX_FILE);
+            } else {
                 files.addAll(LostTalesQuestDefinitionJsonParser.parseQuestIndex(reader));
             }
-        } catch (RuntimeException ignored) {
-            // Broken quest indexes should not prevent a server from starting.
+        } catch (RuntimeException exception) {
+            // A broken index leaves the server without bundled quests, not
+            // without a start.
+            FMLLog.warning("[%s] The quest index %s cannot be read, so no bundled quests load: %s",
+                    LostTalesMetaData.MOD_ID, INDEX_FILE, exception);
         } finally {
-            closeQuietly(reader);
-        }
-
-        if (files.isEmpty()) {
-            Collections.addAll(files, FALLBACK_QUEST_FILES);
+            LostTalesCloseables.closeQuietly(reader);
         }
         return files;
     }
@@ -171,7 +169,7 @@ public final class LostTalesQuestRegistry {
         } catch (RuntimeException ignored) {
             return null;
         } finally {
-            closeQuietly(reader);
+            LostTalesCloseables.closeQuietly(reader);
         }
     }
 
@@ -190,13 +188,5 @@ public final class LostTalesQuestRegistry {
             return "assets/" + domain + "/" + path;
         }
         return "assets/" + LostTalesMetaData.MOD_ID + "/" + normalized;
-    }
-
-    private static void closeQuietly(Reader reader) {
-        if (reader != null) {
-            try {
-                reader.close();
-            } catch (IOException ignored) {}
-        }
     }
 }

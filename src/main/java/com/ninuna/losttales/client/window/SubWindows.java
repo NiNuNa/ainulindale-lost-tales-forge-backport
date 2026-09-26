@@ -33,8 +33,6 @@ import org.lwjgl.opengl.GL11;
  * again.</p>
  */
 public final class SubWindows {
-    /** The tab's accent and name, which no channel colours here. */
-    static final int ACCENT_RGB = LostTalesUiInk.IVORY;
     /**
      * How far in from its window's edges a sub-window's room lies:
      * its own frame and two clear pixels, so a window pushed against the
@@ -99,9 +97,9 @@ public final class SubWindows {
      * Opens a window of {@code kind} holding {@code content} in window
      * {@code parentId}, in front: where the player left one of its kind
      * last — at the size they gave it, or else its content's own — and
-     * otherwise round {@code firstContentBox}, a screen box, where the
-     * popup it replaces always opened; a step down and along from another
-     * of its kind standing there already. The window of that kind and key
+     * otherwise round {@code firstContentBox}, a screen box its opener
+     * gives, hanging from the control pressed; a step down and along from
+     * another of its kind standing there already. The window of that kind and key
      * already out, or still fading, comes forward instead, moved into
      * {@code parentId} when it stood in another. A window that is not
      * drawn leaves the window to the bare screen.
@@ -493,8 +491,9 @@ public final class SubWindows {
         window.drawnTop = exactTop;
         window.fractionX = (float)(exactLeft - wholeLeft);
         window.fractionY = (float)(exactTop - wholeTop);
-        int surface = WindowStyle.insetArgb(share
-                * WindowStyle.opacity(minecraft));
+        float opacity = share * WindowStyle.opacity(minecraft);
+        int surface = WindowStyle.insetArgb(opacity);
+        int stripSurface = WindowStyle.stripArgb(opacity);
         boolean mine = hover != null && hover.subWindow == window;
         boolean onClose = mine && hover.is(WindowHover.Kind.SUB_WINDOW_CLOSE);
         window.closeMotion.advance(now, onClose, onClose,
@@ -506,7 +505,6 @@ public final class SubWindows {
         float top = wholeTop;
         float right = left + window.width;
         float bottom = top + window.height;
-        int rowBottom = wholeTop + SubWindow.STRIP_HEIGHT;
         // A window its room cannot hold is cut by the room's edge, and so
         // is whatever its content cuts for itself.
         boolean cut = window.overflowsRoom();
@@ -520,19 +518,16 @@ public final class SubWindows {
         GL11.glPushMatrix();
         GL11.glTranslatef(window.fractionX, window.fractionY, 0.0F);
         try {
-            window.tab = TabRow.layOutLoneTab(font, left, right,
-                    rowBottom, window.title(),
+            window.strip = SubWindowStrip.layOut(font, wholeLeft,
+                    wholeLeft + window.width, wholeTop, window.title(),
                     window.content.stripIcon() != null);
-            // One surface, the strip's and the content's, with the
-            // frame's ring round it and the tab's footprint left out: the
-            // tab wears its own surface in a single layer. The frame's
-            // edges lie over the ring.
-            fillAroundTab(left, top, right, bottom, window.tab, surface);
-            LostTalesUiWindowFrame.drawSurface(left, top, right, bottom,
-                    surface);
-            TabRow.drawLoneTab(font, window.tab, left, right,
-                    rowBottom, window.content.stripIcon(), ACCENT_RGB,
-                    window.closeMotion, alpha);
+            // The strip's surface and the content's side by side, never
+            // one over the other, with the frame's ring round them; the
+            // frame's edges lie over the ring.
+            SubWindowStrip.drawSurfaces(left, top, right, bottom,
+                    stripSurface, surface, alpha);
+            window.strip.drawContent(font, wholeLeft, wholeTop,
+                    window.content.stripIcon(), window.closeMotion, alpha);
             window.content.draw(minecraft, window.wholeContentBox(),
                     exactLeft, exactTop + SubWindow.STRIP_HEIGHT,
                     onContent ? pointerX - window.fractionX : WindowHover.AWAY,
@@ -552,29 +547,6 @@ public final class SubWindows {
                     (int)Math.ceil(exactLeft + window.width) + border,
                     (int)Math.ceil(exactTop + window.height) + border);
         }
-    }
-
-    /**
-     * The window's surface over its box, leaving out the footprint the
-     * strip's tab paints: its chamfered top row and its body down to the
-     * strip's rule.
-     */
-    private static void fillAroundTab(float left, float top, float right,
-                                      float bottom,
-                                      TabRow.LoneTab tab,
-                                      int surface) {
-        float tabTop = tab.top;
-        float tabBottom = tab.bottom();
-        LostTalesUiInk.fillRect(left, top, right, tabTop, surface);
-        LostTalesUiInk.fillRect(left, tabTop, tab.left + 1, tabTop + 1,
-                surface);
-        LostTalesUiInk.fillRect(tab.right - 1, tabTop, right, tabTop + 1,
-                surface);
-        LostTalesUiInk.fillRect(left, tabTop + 1, tab.left, tabBottom,
-                surface);
-        LostTalesUiInk.fillRect(tab.right, tabTop + 1, right, tabBottom,
-                surface);
-        LostTalesUiInk.fillRect(left, tabBottom, right, bottom, surface);
     }
 
     /** The tip of what the pointer rests on in a sub-window, over everything. */

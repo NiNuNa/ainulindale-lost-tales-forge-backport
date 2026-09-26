@@ -57,9 +57,8 @@ public final class CharacterBodyTypeValidationTest {
 
     @Test
     public void chestTypeIsValidatedAndDefaultsFromTheSex() {
-        CharacterCreationValidationResult chosen = validate(new CharacterCreationRequest(
-                0L, 0, "Adventurer", CharacterRaceRegistry.HUMAN, CharacterGenderRegistry.MALE,
-                "losttales:human_bree_male_0", 25, FACTION, WAYPOINT, false, "",
+        CharacterCreationValidationResult chosen = validate(request(
+                CharacterGenderRegistry.MALE, "losttales:human_bree_male_0",
                 CharacterBodyTypeRegistry.WIDE, CharacterChestTypeRegistry.FULL_LARGE));
         assertTrue(chosen.isValid());
         assertEquals(CharacterChestTypeRegistry.FULL_LARGE, chosen.getCreation().getChestTypeId());
@@ -70,9 +69,8 @@ public final class CharacterBodyTypeValidationTest {
         assertEquals(CharacterChestTypeRegistry.ROUNDED_MEDIUM,
                 defaulted.getCreation().getChestTypeId());
 
-        CharacterCreationValidationResult rejected = validate(new CharacterCreationRequest(
-                0L, 0, "Adventurer", CharacterRaceRegistry.HUMAN, CharacterGenderRegistry.MALE,
-                "losttales:human_bree_male_0", 25, FACTION, WAYPOINT, false, "",
+        CharacterCreationValidationResult rejected = validate(request(
+                CharacterGenderRegistry.MALE, "losttales:human_bree_male_0",
                 CharacterBodyTypeRegistry.WIDE, "losttales:huge"));
         assertEquals(CharacterErrorId.INVALID_CHEST_TYPE, rejected.getErrorId());
     }
@@ -94,11 +92,19 @@ public final class CharacterBodyTypeValidationTest {
                 new TestFactionResolver());
     }
 
+    /** An empty chest type lets validation pick the default for the sex. */
     private static CharacterCreationRequest request(String genderId, String skinId,
                                                      String bodyTypeId) {
+        return request(genderId, skinId, bodyTypeId, "");
+    }
+
+    private static CharacterCreationRequest request(String genderId, String skinId,
+                                                     String bodyTypeId,
+                                                     String chestTypeId) {
         return new CharacterCreationRequest(
                 0L, 0, "Adventurer", CharacterRaceRegistry.HUMAN, genderId,
-                skinId, 25, FACTION, WAYPOINT, false, "", bodyTypeId);
+                skinId, 25, FACTION, WAYPOINT, false, "", bodyTypeId,
+                chestTypeId, true, 0);
     }
 
     private static final class TestFactionResolver implements CharacterFactionResolver {

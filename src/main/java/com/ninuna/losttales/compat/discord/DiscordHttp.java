@@ -73,10 +73,6 @@ final class DiscordHttp {
         final String body;
         final DiscordRateLimit limit;
 
-        Reply(int status, String body) {
-            this(status, body, DiscordRateLimit.NONE);
-        }
-
         Reply(int status, String body, DiscordRateLimit limit) {
             this.status = status;
             this.body = body == null ? "" : body;

@@ -133,11 +133,11 @@ public final class LostTalesThirdPersonAimService {
     }
 
     static Vec3 normalizeDirection(double x, double y, double z) {
-        if (!isFinite(x) || !isFinite(y) || !isFinite(z)) {
+        if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) {
             return null;
         }
         double length = Math.sqrt(x * x + y * y + z * z);
-        if (!isFinite(length)
+        if (!Double.isFinite(length)
                 || length < MINIMUM_DIRECTION_LENGTH
                 || length > MAXIMUM_DIRECTION_LENGTH) {
             return null;
@@ -159,14 +159,14 @@ public final class LostTalesThirdPersonAimService {
     static Vec3 redirectMotion(
             double motionX, double motionY, double motionZ,
             Vec3 direction) {
-        if (direction == null || !isFinite(motionX)
-                || !isFinite(motionY) || !isFinite(motionZ)) {
+        if (direction == null || !Double.isFinite(motionX)
+                || !Double.isFinite(motionY) || !Double.isFinite(motionZ)) {
             return null;
         }
         double speed = Math.sqrt(
                 motionX * motionX + motionY * motionY
                         + motionZ * motionZ);
-        if (!isFinite(speed) || speed < MINIMUM_PROJECTILE_SPEED) {
+        if (!Double.isFinite(speed) || speed < MINIMUM_PROJECTILE_SPEED) {
             return null;
         }
         return Vec3.createVectorHelper(
@@ -176,12 +176,12 @@ public final class LostTalesThirdPersonAimService {
     }
 
     private static Vec3 normalizeAnyDirection(Vec3 vector) {
-        if (!isFinite(vector.xCoord) || !isFinite(vector.yCoord)
-                || !isFinite(vector.zCoord)) {
+        if (!Double.isFinite(vector.xCoord) || !Double.isFinite(vector.yCoord)
+                || !Double.isFinite(vector.zCoord)) {
             return null;
         }
         double length = vector.lengthVector();
-        return !isFinite(length) || length < 0.000001D
+        return !Double.isFinite(length) || length < 0.000001D
                 ? null : Vec3.createVectorHelper(
                 vector.xCoord / length,
                 vector.yCoord / length,
@@ -196,10 +196,6 @@ public final class LostTalesThirdPersonAimService {
 
     public static synchronized void clear() {
         AIM_STATES.clear();
-    }
-
-    private static boolean isFinite(double value) {
-        return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 
     private static final class AimState {

@@ -39,6 +39,9 @@ public final class SubWindowKind {
     /** Every setting, in sections. */
     public static final SubWindowKind SETTINGS = register("settings",
             "gui.losttales.window.sub.settings");
+    /** The field a number or a line of Settings is typed into. */
+    public static final SubWindowKind SETTING_VALUE = register(
+            "setting_value", "gui.losttales.window.sub.setting_value");
     /** A question before an action that cannot be undone ({@link QuestionWindow}). */
     public static final SubWindowKind QUESTION = register("question",
             "gui.losttales.window.sub.question");

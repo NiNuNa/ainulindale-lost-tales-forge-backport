@@ -31,23 +31,23 @@ public final class ChatChannel {
     private static final Map<String, ChatChannel> BY_ID =
             new LinkedHashMap<String, ChatChannel>();
 
-    public static final ChatChannel GLOBAL = register("global", "Global", ChatPresentationMode.IN_CHARACTER,
+    public static final ChatChannel GLOBAL = register("global", "Global Chat", ChatPresentationMode.IN_CHARACTER,
             ChatRecipientRule.EVERYONE, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.FERN_GREEN), true);
     // Orchid, the palette's pink, so the two open channels never share
     // a family: Global is green.
-    public static final ChatChannel PROXIMITY = register("proximity", "Proximity", ChatPresentationMode.IN_CHARACTER,
+    public static final ChatChannel PROXIMITY = register("proximity", "Proximity Chat", ChatPresentationMode.IN_CHARACTER,
             ChatRecipientRule.PROXIMITY, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.ORCHID), true);
     // Presentation shows the member's own party colour; this seafoam is
     // only the fallback outside a party.
-    public static final ChatChannel PARTY = register("party", "Party", ChatPresentationMode.IN_CHARACTER,
+    public static final ChatChannel PARTY = register("party", "Party Chat", ChatPresentationMode.IN_CHARACTER,
             ChatRecipientRule.PARTY, ChatChannelAccess.PARTY_MEMBERSHIP,
             LostTalesColors.rgb(LostTalesColors.SEAFOAM), false,
             ChatChannelScope.PARTY);
     // Presentation shows the sender's LOTR faction colour; this palette
     // honey is only the indicator/selector fallback.
-    public static final ChatChannel FACTION = register("faction", "Faction", ChatPresentationMode.IN_CHARACTER,
+    public static final ChatChannel FACTION = register("faction", "Faction Chat", ChatPresentationMode.IN_CHARACTER,
             ChatRecipientRule.FACTION, ChatChannelAccess.CHARACTER_FACTION,
             LostTalesColors.rgb(LostTalesColors.HONEY), true,
             ChatChannelScope.FACTION);
@@ -57,11 +57,11 @@ public final class ChatChannel {
      * to Discord channels, and its icon is then half its own and half
      * Discord's.
      */
-    public static final ChatChannel OOC = register("ooc", "OOC", ChatPresentationMode.OUT_OF_CHARACTER,
+    public static final ChatChannel OOC = register("ooc", "OOC Chat", ChatPresentationMode.OUT_OF_CHARACTER,
             ChatRecipientRule.EVERYONE, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.STEEL_BLUE), true);
     /** Staff channel: operators only, out of character. */
-    public static final ChatChannel OPERATOR = register("operator", "Operator", ChatPresentationMode.OUT_OF_CHARACTER,
+    public static final ChatChannel OPERATOR = register("operator", "Operator Chat", ChatPresentationMode.OUT_OF_CHARACTER,
             ChatRecipientRule.OPERATORS, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.CRIMSON), true);
     /**
@@ -233,6 +233,15 @@ public final class ChatChannel {
 
     public String getId() { return this.descriptor.getId(); }
     public String getDisplayName() { return this.descriptor.getDisplayName(); }
+
+    /**
+     * One faction's chat as it is named everywhere, the game and Discord
+     * alike: the faction's name and the word every conversation channel's
+     * name ends on ("Gondor Chat").
+     */
+    public static String factionChatName(String factionName) {
+        return factionName + " Chat";
+    }
     /** How the channel's lines present their sender; see {@link ChatRolePresentation}. */
     public ChatPresentationMode getPresentation() {
         return this.descriptor.getPresentation();

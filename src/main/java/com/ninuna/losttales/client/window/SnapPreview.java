@@ -251,9 +251,9 @@ public final class SnapPreview {
      */
     private static final class Track {
         private final MotionTransition shown =
-                new MotionTransition(MotionIds.CHAT_SNAP_PREVIEW);
+                new MotionTransition(MotionIds.WINDOW_SNAP_PREVIEW);
         private final MotionTransition glide =
-                new MotionTransition(MotionIds.CHAT_SNAP_PREVIEW, true);
+                new MotionTransition(MotionIds.WINDOW_SNAP_PREVIEW, true);
         /** What the running leg is bound for: a part of the screen, or none for the window itself. */
         private Window.ScreenFill legTo = Window.ScreenFill.NONE;
         /** Where the running leg set out: the pane as drawn then, or null for the window itself. */

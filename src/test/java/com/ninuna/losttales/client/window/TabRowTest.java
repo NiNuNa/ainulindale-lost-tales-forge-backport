@@ -365,7 +365,7 @@ public final class TabRowTest {
         tab.leg.settle(false);
         long start = 1000000000L;
         long half = com.ninuna.losttales.client.motion.Motions.nanos(
-                com.ninuna.losttales.client.motion.MotionIds.CHAT_TAB_MOVE)
+                com.ninuna.losttales.client.motion.MotionIds.WINDOW_TAB_MOVE)
                 / 2L;
         float early = tab.leg.advance(start, true);
         float halfway = tab.leg.advance(start + half, true);

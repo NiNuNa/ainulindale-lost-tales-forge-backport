@@ -105,16 +105,12 @@ public final class LostTalesChargeTierSyncPacket implements IMessage {
             double velocityMultiplier) {
         if (entityId < 0 || active && released
                 || tier < 0 || tier > 3
-                || !isFinite(velocityMultiplier)
+                || !Double.isFinite(velocityMultiplier)
                 || velocityMultiplier < MINIMUM_VELOCITY_MULTIPLIER
                 || velocityMultiplier > MAXIMUM_VELOCITY_MULTIPLIER) {
             return false;
         }
         return active || released || tier == 0;
-    }
-
-    private static boolean isFinite(double value) {
-        return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 
     /** Common-safe client handler; client work is routed by the sided proxy. */

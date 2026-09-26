@@ -5,7 +5,7 @@ import com.ninuna.losttales.character.state.CharacterPlayerStateRecord;
 import com.ninuna.losttales.character.state.CharacterPlayerStateWorldData;
 import com.ninuna.losttales.character.storage.CharacterNbtCodec;
 
-import java.util.Locale;
+import com.ninuna.losttales.util.LostTalesIdentifiers;
 import java.util.UUID;
 
 /** Durable metadata and player-state copy retained across lore-character owners. */
@@ -23,7 +23,7 @@ public final class LoreCharacterVaultEntry {
             RoleplayCharacter character,
             CharacterPlayerStateRecord playerState,
             long updatedAt) {
-        String normalized = normalize(loreCharacterId);
+        String normalized = LostTalesIdentifiers.normalize(loreCharacterId);
         if (normalized.length() == 0 || capturedOwnerId == null
                 || character == null || playerState == null
                 || !capturedOwnerId.equals(character.getOwnerId())
@@ -73,9 +73,5 @@ public final class LoreCharacterVaultEntry {
             CharacterPlayerStateRecord source) {
         return CharacterPlayerStateWorldData.readRecordCopy(
                 CharacterPlayerStateWorldData.writeRecordCopy(source));
-    }
-
-    private static String normalize(String id) {
-        return id == null ? "" : id.trim().toLowerCase(Locale.ROOT);
     }
 }

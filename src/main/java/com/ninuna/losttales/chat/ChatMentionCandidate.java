@@ -36,14 +36,7 @@ public final class ChatMentionCandidate {
 
     public ChatMentionCandidate(String key, String displayName,
                                 List<String> aliases) {
-        this(key, displayName, displayName, "", aliases);
-    }
-
-    public ChatMentionCandidate(String key, String displayName,
-                                String accountName, String characterName,
-                                List<String> aliases) {
-        this(key, displayName, accountName, characterName, aliases, "", "",
-                -1);
+        this(key, displayName, displayName, "", aliases, "", "", -1);
     }
 
     /**

@@ -1,14 +1,14 @@
 package com.ninuna.losttales.chat.server;
 
-import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatReportReason;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
-import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
-import cpw.mods.fml.common.FMLLog;
+import com.ninuna.losttales.storage.NbtQuarantine;
+import com.ninuna.losttales.storage.NbtTags;
+import com.ninuna.losttales.util.LostTalesLog;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import java.util.ArrayList;
@@ -36,40 +36,25 @@ import net.minecraftforge.common.util.Constants;
  * or another channel than the entry says, is quarantined with the entry
  * rather than shown to anyone. The audience is written in full — a line
  * restored without it would be a private line replayed to whoever asks
- * — and an entry whose audience cannot be read is quarantined too. Newer
- * data than this codec knows is left alone and the store goes
- * read-only; nothing is dropped or cut.</p>
+ * — and an entry whose audience cannot be read is quarantined too. An
+ * entry at another layout than this codec writes, or data newer than it
+ * knows, is left alone and the store goes read-only; nothing is dropped
+ * or cut.</p>
  */
 public final class ChatHistoryNbtCodec {
 
     public static final int CURRENT_ROOT_DATA_VERSION = 1;
     /**
-     * The newest entry layout this codec reads. An entry is written at
-     * the oldest layout that holds it: {@link #PLAIN_ENTRY_DATA_VERSION}
-     * without reactions, {@link #REACTED_ENTRY_DATA_VERSION} with
-     * reactions whose emoji are all the registry's, and this one when a
-     * reaction's emoji is foreign ({@code ChatForeignEmoji}). An older
-     * build reads every entry up to the layout it knows and keeps a
-     * newer one read-only rather than misreading its reactions.
+     * The one entry layout this codec writes and reads, with or without
+     * reactions and whatever their emoji.
      */
     public static final int CURRENT_ENTRY_DATA_VERSION = 3;
-    /** An entry with no reactions. */
-    static final int PLAIN_ENTRY_DATA_VERSION = 1;
-    /** An entry with reactions, every emoji one of the registry's. */
-    static final int REACTED_ENTRY_DATA_VERSION = 2;
-    /** An entry with at least one reaction whose emoji is foreign. */
-    static final int FOREIGN_ENTRY_DATA_VERSION = 3;
-    public static final int CURRENT_QUARANTINE_DATA_VERSION = 1;
     /** Safety bound on kept lines read back; entries past it are quarantined. */
     public static final int MAX_ENTRIES = ChatHistory.MAX_TOTAL;
 
     private static final String TAG_DATA_VERSION = "DataVersion";
     private static final String TAG_ENTRIES = "Entries";
-    private static final String TAG_QUARANTINE = "Quarantine";
-    private static final String TAG_QUARANTINE_ENTRIES = "Entries";
-    private static final String TAG_REASON = "Reason";
     private static final String TAG_ENTRY_INDEX = "EntryIndex";
-    private static final String TAG_ORIGINAL_DATA = "OriginalData";
 
     private static final String TAG_MESSAGE_ID = "MessageId";
     private static final String TAG_AUTHOR_UUID = "Author";
@@ -154,19 +139,19 @@ public final class ChatHistoryNbtCodec {
                 // A line the wire codec no longer accepts — a channel or
                 // a role the server has since lost — is kept by name in
                 // the quarantine rather than taking the save down with it.
-                quarantine.add(createQuarantineEntry("unwritable_line", index,
+                quarantine.add(NbtQuarantine.entry("unwritable_line", TAG_ENTRY_INDEX, index,
                         describe(entry)));
                 unwritable++;
             }
         }
         if (unwritable > 0) {
-            warn("%d kept chat lines could not be written to the save and were quarantined",
+            LostTalesLog.warning("%d kept chat lines could not be written to the save and were quarantined",
                     Integer.valueOf(unwritable));
         }
         output.setTag(TAG_ENTRIES, list);
         output.setTag(TAG_CONSOLE_EVENTS, writeConsoleEvents(consoleEvents,
                 consoleReactions));
-        output.setTag(TAG_QUARANTINE, writeQuarantine(quarantine));
+        NbtQuarantine.write(output, quarantine);
     }
 
     /**
@@ -196,7 +181,7 @@ public final class ChatHistoryNbtCodec {
             tag.setString(TAG_EVENT_TEXT, event.getText());
             tag.setString(TAG_EVENT_CONTEXT, event.getContext());
             if (event.getActorIdentity() != null) {
-                writeUuid(tag, TAG_EVENT_ACTOR_ID,
+                NbtTags.writeUuid(tag, TAG_EVENT_ACTOR_ID,
                         event.getActorIdentity().getPlayerId());
             }
             if (event.getReport() != null) {
@@ -246,7 +231,7 @@ public final class ChatHistoryNbtCodec {
             failureReason[0] = "invalid_event";
             return null;
         }
-        UUID actorId = readUuid(raw, TAG_EVENT_ACTOR_ID);
+        UUID actorId = NbtTags.readUuid(raw, TAG_EVENT_ACTOR_ID);
         ChatNamedPlayer actorIdentity = actorId == null ? null
                 : ChatNamedPlayer.account(actorId, actor);
         ChatConsoleEvent.Report report = null;
@@ -339,7 +324,7 @@ public final class ChatHistoryNbtCodec {
         int version = safeSource.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
                 ? safeSource.getInteger(TAG_DATA_VERSION) : 0;
         if (version > CURRENT_ROOT_DATA_VERSION || version < 0) {
-            warn("Chat history data uses unsupported version %d; data will remain read-only",
+            LostTalesLog.warning("Chat history data uses unsupported version %d; data will remain read-only",
                     Integer.valueOf(version));
             return ReadResult.unsupported(safeSource, version);
         }
@@ -349,13 +334,13 @@ public final class ChatHistoryNbtCodec {
         }
         boolean repaired = version != CURRENT_ROOT_DATA_VERSION
                 || !safeSource.hasKey(TAG_ENTRIES, Constants.NBT.TAG_LIST);
-        QuarantineReadResult quarantine = readQuarantine(safeSource);
-        if (!quarantine.supported) {
-            return ReadResult.unsupported(safeSource, quarantine.unsupportedVersion);
+        NbtQuarantine.Read quarantine = NbtQuarantine.read(safeSource);
+        if (!quarantine.isSupported()) {
+            return ReadResult.unsupported(safeSource, quarantine.getUnsupportedVersion());
         }
-        repaired |= quarantine.repaired;
+        repaired |= quarantine.isRepaired();
         List<NBTTagCompound> quarantinedEntries =
-                new ArrayList<NBTTagCompound>(quarantine.entries);
+                new ArrayList<NBTTagCompound>(quarantine.getEntries());
         List<ChatHistory.Entry> entries = new ArrayList<ChatHistory.Entry>();
         Set<Long> seenIds = new HashSet<Long>();
         NBTTagList list = safeSource.getTagList(TAG_ENTRIES,
@@ -367,19 +352,19 @@ public final class ChatHistoryNbtCodec {
                 return ReadResult.unsupported(safeSource, result.unsupportedVersion);
             }
             if (result.entry == null) {
-                quarantinedEntries.add(createQuarantineEntry(
-                        result.failureReason, index, raw));
+                quarantinedEntries.add(NbtQuarantine.entry(
+                        result.failureReason, TAG_ENTRY_INDEX, index, raw));
                 repaired = true;
                 continue;
             }
             Long id = Long.valueOf(result.entry.forOthers.getMessageId());
             if (!seenIds.add(id)) {
-                quarantinedEntries.add(createQuarantineEntry(
-                        "duplicate_message", index, raw));
+                quarantinedEntries.add(NbtQuarantine.entry(
+                        "duplicate_message", TAG_ENTRY_INDEX, index, raw));
                 repaired = true;
             } else if (entries.size() >= MAX_ENTRIES) {
-                quarantinedEntries.add(createQuarantineEntry(
-                        "over_capacity", index, raw));
+                quarantinedEntries.add(NbtQuarantine.entry(
+                        "over_capacity", TAG_ENTRY_INDEX, index, raw));
                 repaired = true;
             } else {
                 entries.add(result.entry);
@@ -403,23 +388,22 @@ public final class ChatHistoryNbtCodec {
             NBTTagCompound raw = eventList.getCompoundTagAt(index);
             String[] failureReason = new String[1];
             ChatConsoleEvent event = readConsoleEvent(raw, failureReason);
-            // An event's reactions read as the newest entry layout reads
-            // them; ones that cannot be read whole take the event into
-            // the quarantine with them.
+            // An event's reactions read as an entry's do; ones that cannot
+            // be read whole take the event into the quarantine with them.
             ChatReactions reactions = event == null ? null
-                    : readReactions(raw, FOREIGN_ENTRY_DATA_VERSION);
+                    : readReactions(raw);
             if (event == null || reactions == null) {
-                quarantinedEntries.add(createQuarantineEntry(
-                        event == null ? failureReason[0] : "invalid_reactions",
+                quarantinedEntries.add(NbtQuarantine.entry(
+                        event == null ? failureReason[0] : "invalid_reactions", TAG_ENTRY_INDEX,
                         index, raw));
                 repaired = true;
             } else if (!seenEventIds.add(Long.valueOf(event.getId()))) {
-                quarantinedEntries.add(createQuarantineEntry(
-                        "duplicate_event", index, raw));
+                quarantinedEntries.add(NbtQuarantine.entry(
+                        "duplicate_event", TAG_ENTRY_INDEX, index, raw));
                 repaired = true;
             } else if (events.size() >= MAX_CONSOLE_EVENTS) {
-                quarantinedEntries.add(createQuarantineEntry(
-                        "over_capacity", index, raw));
+                quarantinedEntries.add(NbtQuarantine.entry(
+                        "over_capacity", TAG_ENTRY_INDEX, index, raw));
                 repaired = true;
             } else {
                 events.add(event);
@@ -436,12 +420,10 @@ public final class ChatHistoryNbtCodec {
     static NBTTagCompound writeEntry(ChatHistory.Entry entry) {
         NBTTagCompound tag = new NBTTagCompound();
         boolean reacted = entry.reactions != null && !entry.reactions.isEmpty();
-        tag.setInteger(TAG_DATA_VERSION, !reacted ? PLAIN_ENTRY_DATA_VERSION
-                : entry.reactions.hasForeign() ? FOREIGN_ENTRY_DATA_VERSION
-                : REACTED_ENTRY_DATA_VERSION);
+        tag.setInteger(TAG_DATA_VERSION, CURRENT_ENTRY_DATA_VERSION);
         tag.setLong(TAG_MESSAGE_ID, entry.forOthers.getMessageId());
         if (entry.authorId != null) {
-            writeUuid(tag, TAG_AUTHOR_UUID, entry.authorId);
+            NbtTags.writeUuid(tag, TAG_AUTHOR_UUID, entry.authorId);
         }
         tag.setString(TAG_AUTHOR_NAME, entry.author);
         tag.setString(TAG_EXCERPT, entry.excerpt == null ? "" : entry.excerpt);
@@ -459,7 +441,7 @@ public final class ChatHistoryNbtCodec {
             audience.setTag(TAG_AUDIENCE_ACCOUNTS, writeUuids(accounts));
         }
         if (entry.audience.partyId() != null) {
-            writeUuid(audience, TAG_AUDIENCE_PARTY, entry.audience.partyId());
+            NbtTags.writeUuid(audience, TAG_AUDIENCE_PARTY, entry.audience.partyId());
         }
         audience.setString(TAG_AUDIENCE_FACTION, entry.audience.factionId() == null
                 ? "" : entry.audience.factionId());
@@ -485,7 +467,7 @@ public final class ChatHistoryNbtCodec {
             NBTTagList reactors = new NBTTagList();
             for (Map.Entry<UUID, String> reactor : kind.getValue().entrySet()) {
                 NBTTagCompound reactorTag = new NBTTagCompound();
-                writeUuid(reactorTag, TAG_REACTOR_ID, reactor.getKey());
+                NbtTags.writeUuid(reactorTag, TAG_REACTOR_ID, reactor.getKey());
                 reactorTag.setString(TAG_REACTOR_NAME, reactor.getValue());
                 String origin = reactions.originOf(kind.getKey(),
                         reactor.getKey());
@@ -503,14 +485,12 @@ public final class ChatHistoryNbtCodec {
     /**
      * The reactions an entry was written with, or null when they cannot
      * be read back whole: a list of the wrong kind, an emoji that is no
-     * reaction key, a foreign emoji without its layout, a reactor
-     * without an id, one named twice under one emoji, a channel that is
-     * no Discord id or one on a player's reaction, or more than the
-     * bounds allow. Such an entry is
+     * reaction key, a reactor without an id, one named twice under one
+     * emoji, a channel that is no Discord id or one on a player's
+     * reaction, or more than the bounds allow. Such an entry is
      * quarantined whole rather than kept with part of its reactions.
      */
-    private static ChatReactions readReactions(NBTTagCompound raw,
-                                               int version) {
+    private static ChatReactions readReactions(NBTTagCompound raw) {
         ChatReactions reactions = new ChatReactions();
         if (!raw.hasKey(TAG_REACTIONS)) {
             return reactions;
@@ -525,12 +505,7 @@ public final class ChatHistoryNbtCodec {
         for (int kindIndex = 0; kindIndex < kinds.tagCount(); kindIndex++) {
             NBTTagCompound kind = kinds.getCompoundTagAt(kindIndex);
             String emoji = kind.getString(TAG_REACTION_EMOJI);
-            // Before foreign emoji had a layout an entry held registry
-            // names alone; from then on a foreign key the registry has
-            // come to carry is filed under its name by the restore.
-            if (!kind.hasKey(TAG_REACTION_REACTORS, Constants.NBT.TAG_LIST)
-                    || (version < FOREIGN_ENTRY_DATA_VERSION
-                            && ChatEmoji.fromName(emoji) == null)) {
+            if (!kind.hasKey(TAG_REACTION_REACTORS, Constants.NBT.TAG_LIST)) {
                 return null;
             }
             NBTTagList reactors = kind.getTagList(TAG_REACTION_REACTORS,
@@ -541,7 +516,7 @@ public final class ChatHistoryNbtCodec {
             for (int index = 0; index < reactors.tagCount(); index++) {
                 NBTTagCompound reactor = reactors.getCompoundTagAt(index);
                 UUID id = reactor.hasKey(TAG_REACTOR_ID + TAG_UUID_MOST)
-                        ? readUuid(reactor, TAG_REACTOR_ID) : null;
+                        ? NbtTags.readUuid(reactor, TAG_REACTOR_ID) : null;
                 String origin = reactor.getString(TAG_REACTOR_ORIGIN);
                 if (id == null || (origin.length() > 0
                         && !(isDiscordChannelId(origin)
@@ -575,7 +550,7 @@ public final class ChatHistoryNbtCodec {
         }
         int version = raw.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
                 ? raw.getInteger(TAG_DATA_VERSION) : 0;
-        if (version > CURRENT_ENTRY_DATA_VERSION) {
+        if (version != CURRENT_ENTRY_DATA_VERSION) {
             return EntryReadResult.unsupported(version);
         }
         if (!raw.hasKey(TAG_MESSAGE_ID, Constants.NBT.TAG_LONG)
@@ -634,7 +609,7 @@ public final class ChatHistoryNbtCodec {
         }
         UUID partyId = null;
         if (audienceTag.hasKey(TAG_AUDIENCE_PARTY + TAG_UUID_MOST)) {
-            partyId = readUuid(audienceTag, TAG_AUDIENCE_PARTY);
+            partyId = NbtTags.readUuid(audienceTag, TAG_AUDIENCE_PARTY);
             if (partyId == null) {
                 return EntryReadResult.failure("invalid_audience");
             }
@@ -643,8 +618,8 @@ public final class ChatHistoryNbtCodec {
                 partyId, audienceTag.getString(TAG_AUDIENCE_FACTION),
                 audienceTag.getBoolean(TAG_AUDIENCE_GATED));
         UUID authorId = raw.hasKey(TAG_AUTHOR_UUID + TAG_UUID_MOST)
-                ? readUuid(raw, TAG_AUTHOR_UUID) : null;
-        ChatReactions reactions = readReactions(raw, version);
+                ? NbtTags.readUuid(raw, TAG_AUTHOR_UUID) : null;
+        ChatReactions reactions = readReactions(raw);
         if (reactions == null) {
             return EntryReadResult.failure("invalid_reactions");
         }
@@ -723,96 +698,6 @@ public final class ChatHistoryNbtCodec {
         return ids;
     }
 
-    private static void writeUuid(NBTTagCompound tag, String key, UUID value) {
-        tag.setLong(key + TAG_UUID_MOST, value.getMostSignificantBits());
-        tag.setLong(key + TAG_UUID_LEAST, value.getLeastSignificantBits());
-    }
-
-    private static UUID readUuid(NBTTagCompound tag, String key) {
-        String most = key + TAG_UUID_MOST;
-        String least = key + TAG_UUID_LEAST;
-        if (!tag.hasKey(most, Constants.NBT.TAG_LONG)
-                || !tag.hasKey(least, Constants.NBT.TAG_LONG)) {
-            return null;
-        }
-        return new UUID(tag.getLong(most), tag.getLong(least));
-    }
-
-    private static NBTTagCompound writeQuarantine(
-            Collection<NBTTagCompound> quarantinedEntries) {
-        NBTTagCompound root = new NBTTagCompound();
-        root.setInteger(TAG_DATA_VERSION, CURRENT_QUARANTINE_DATA_VERSION);
-        NBTTagList list = new NBTTagList();
-        if (quarantinedEntries != null) {
-            for (NBTTagCompound entry : quarantinedEntries) {
-                if (entry != null) {
-                    list.appendTag(entry.copy());
-                }
-            }
-        }
-        root.setTag(TAG_QUARANTINE_ENTRIES, list);
-        return root;
-    }
-
-    private static QuarantineReadResult readQuarantine(NBTTagCompound source) {
-        if (!source.hasKey(TAG_QUARANTINE)) {
-            return new QuarantineReadResult(true, -1,
-                    Collections.<NBTTagCompound>emptyList(), false);
-        }
-        if (!source.hasKey(TAG_QUARANTINE, Constants.NBT.TAG_COMPOUND)) {
-            return new QuarantineReadResult(false, -1,
-                    Collections.<NBTTagCompound>emptyList(), false);
-        }
-        NBTTagCompound root = source.getCompoundTag(TAG_QUARANTINE);
-        int version = root.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
-                ? root.getInteger(TAG_DATA_VERSION) : 0;
-        if (version > CURRENT_QUARANTINE_DATA_VERSION || version < 0) {
-            return new QuarantineReadResult(false, version,
-                    Collections.<NBTTagCompound>emptyList(), false);
-        }
-        List<NBTTagCompound> entries = new ArrayList<NBTTagCompound>();
-        if (root.hasKey(TAG_QUARANTINE_ENTRIES, Constants.NBT.TAG_LIST)) {
-            NBTTagList list = root.getTagList(TAG_QUARANTINE_ENTRIES,
-                    Constants.NBT.TAG_COMPOUND);
-            for (int index = 0; index < list.tagCount(); index++) {
-                entries.add((NBTTagCompound)list.getCompoundTagAt(index).copy());
-            }
-        }
-        return new QuarantineReadResult(true, -1, entries,
-                version != CURRENT_QUARANTINE_DATA_VERSION
-                        || !root.hasKey(TAG_QUARANTINE_ENTRIES,
-                                Constants.NBT.TAG_LIST));
-    }
-
-    private static NBTTagCompound createQuarantineEntry(String reason,
-                                                        int entryIndex,
-                                                        NBTTagCompound original) {
-        NBTTagCompound entry = new NBTTagCompound();
-        entry.setString(TAG_REASON, reason == null ? "unknown" : reason);
-        entry.setInteger(TAG_ENTRY_INDEX, entryIndex);
-        if (original != null) {
-            entry.setTag(TAG_ORIGINAL_DATA, original.copy());
-        }
-        return entry;
-    }
-
-    private static void warn(String format, Object... args) {
-        try {
-            FMLLog.warning("[%s] " + format, prependModId(args));
-        } catch (RuntimeException ignored) {
-            // FML's logger is not bootstrapped in isolated codec unit tests.
-        }
-    }
-
-    private static Object[] prependModId(Object[] args) {
-        Object[] values = new Object[(args == null ? 0 : args.length) + 1];
-        values[0] = LostTalesMetaData.MOD_ID;
-        if (args != null) {
-            System.arraycopy(args, 0, values, 1, args.length);
-        }
-        return values;
-    }
-
     /** Oldest first: ids are handed out in the order the server accepted the lines. */
     private static final Comparator<ChatHistory.Entry> ENTRY_ORDER =
             new Comparator<ChatHistory.Entry>() {
@@ -861,21 +746,6 @@ public final class ChatHistoryNbtCodec {
 
         static EntryReadResult unsupported(int version) {
             return new EntryReadResult(null, null, version, false);
-        }
-    }
-
-    private static final class QuarantineReadResult {
-        final boolean supported;
-        final int unsupportedVersion;
-        final List<NBTTagCompound> entries;
-        final boolean repaired;
-
-        QuarantineReadResult(boolean supported, int unsupportedVersion,
-                             List<NBTTagCompound> entries, boolean repaired) {
-            this.supported = supported;
-            this.unsupportedVersion = unsupportedVersion;
-            this.entries = entries;
-            this.repaired = repaired;
         }
     }
 

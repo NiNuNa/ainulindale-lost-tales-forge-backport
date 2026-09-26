@@ -20,6 +20,13 @@ public final class ChatColorMarkersTest {
     }
 
     @Test
+    public void aColourIsSixZeroPaddedLowerCaseDigits() {
+        assertEquals("00a0ff", ChatColorMarkers.hex(0x00A0FF));
+        assertEquals("000001", ChatColorMarkers.hex(1));
+        assertEquals("123456", ChatColorMarkers.hex(0xFF123456));
+    }
+
+    @Test
     public void anythingElseIsNotAMark() {
         assertNull(ChatColorMarkers.decode(null));
         assertNull(ChatColorMarkers.decode("/msg Steve "));

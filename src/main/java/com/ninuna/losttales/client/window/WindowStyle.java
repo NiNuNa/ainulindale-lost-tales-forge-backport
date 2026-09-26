@@ -185,6 +185,15 @@ public final class WindowStyle {
         return LostTalesUiInk.argb(LostTalesUiInk.SURFACE_RGB, Math.round(INSET_ALPHA * share));
     }
 
+    /**
+     * The tool strip's surface at {@code share} of its opacity: plum grey
+     * at two thirds, as the bar and a sub-window's strip wear it too.
+     */
+    public static int stripArgb(float share) {
+        return LostTalesUiInk.argb(LostTalesUiInk.SURFACE_HIGHLIGHT_RGB,
+                Math.round(INSET_ALPHA * share));
+    }
+
     /** How much of its opacity a control that cannot be taken here is drawn at. */
     public static final float UNAVAILABLE_OPACITY = 0.5F;
 
@@ -391,7 +400,7 @@ public final class WindowStyle {
     public static float hoverFade(float progress, boolean hovered,
                            double elapsed) {
         float target = hovered ? 1.0F : 0.0F;
-        float value = (float)Motions.follow(MotionIds.CHAT_HOVER_FADE,
+        float value = (float)Motions.follow(MotionIds.WINDOW_HOVER_FADE,
                 progress, target, elapsed);
         return Math.abs(target - value) < 0.02F ? target : value;
     }

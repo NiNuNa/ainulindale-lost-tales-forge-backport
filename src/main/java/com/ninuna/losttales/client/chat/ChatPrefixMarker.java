@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatColorMarkers;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChatStyle;
@@ -28,7 +29,7 @@ final class ChatPrefixMarker {
         if (component != null) {
             ChatStyle style = component.getChatStyle().setChatClickEvent(
                     new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
-                            CHANNEL + colorHex(color)));
+                            CHANNEL + ChatColorMarkers.hex(color)));
             component.setChatStyle(style);
         }
         return component;
@@ -74,14 +75,5 @@ final class ChatPrefixMarker {
             return null;
         }
         return value;
-    }
-
-    private static String colorHex(int color) {
-        String hex = Integer.toHexString(color & 0xFFFFFF);
-        StringBuilder result = new StringBuilder(6);
-        for (int index = hex.length(); index < 6; index++) {
-            result.append('0');
-        }
-        return result.append(hex).toString();
     }
 }

@@ -26,8 +26,7 @@ public final class LostTalesQuestObjectiveSelectionTest {
         LostTalesQuestDefinition quest = quest(firstRequired, firstOptional,
                 secondRequired, secondOptional);
 
-        LostTalesQuestProgress progress = new LostTalesQuestProgress(
-                quest.getId(), 99, "second");
+        LostTalesQuestProgress progress = progressAt(quest, 99, "second");
         progress.setObjectiveProgress("first_optional", 2);
 
         List<LostTalesQuestObjectiveDefinition> selected =
@@ -48,13 +47,16 @@ public final class LostTalesQuestObjectiveSelectionTest {
                 objective("b", true), objective("c", false),
                 objective("d", true));
         assertEquals(0, LostTalesQuestObjectiveSelection
-                .getCurrentStageIndex(quest,
-                        new LostTalesQuestProgress(quest.getId(), 1,
-                                "first")));
+                .getCurrentStageIndex(quest, progressAt(quest, 1, "first")));
         assertEquals(1, LostTalesQuestObjectiveSelection
-                .getCurrentStageIndex(quest,
-                        new LostTalesQuestProgress(quest.getId(), 99,
-                                "unknown")));
+                .getCurrentStageIndex(quest, progressAt(quest, 99, "unknown")));
+    }
+
+    /** The quest at that stage, with no objective progress, no start and no deadline. */
+    private static LostTalesQuestProgress progressAt(LostTalesQuestDefinition quest,
+                                                     int stageIndex, String stageId) {
+        return new LostTalesQuestProgress(quest.getId(), stageIndex, stageId,
+                null, 0L, 0L);
     }
 
     private static LostTalesQuestDefinition quest(

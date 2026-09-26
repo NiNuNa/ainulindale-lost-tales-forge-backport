@@ -39,9 +39,9 @@ public final class ThirdPersonTargetingSolver {
                 minecraft.playerController.extendedReach())
                 : blockReach;
         boolean withinReach = target != null && target.hitVec != null
-                && isFinite(target.hitVec.xCoord)
-                && isFinite(target.hitVec.yCoord)
-                && isFinite(target.hitVec.zCoord)
+                && Double.isFinite(target.hitVec.xCoord)
+                && Double.isFinite(target.hitVec.yCoord)
+                && Double.isFinite(target.hitVec.zCoord)
                 && eye.squareDistanceTo(target.hitVec)
                 <= square(permittedReach + REACH_TOLERANCE);
         Vec3 aim = withinReach
@@ -64,15 +64,11 @@ public final class ThirdPersonTargetingSolver {
     }
 
     static double sanitizeReach(double reach) {
-        return !isFinite(reach) || reach <= 0.0D
+        return !Double.isFinite(reach) || reach <= 0.0D
                 ? DEFAULT_REACH : reach;
     }
 
     private static double square(double value) {
         return value * value;
-    }
-
-    private static boolean isFinite(double value) {
-        return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 }

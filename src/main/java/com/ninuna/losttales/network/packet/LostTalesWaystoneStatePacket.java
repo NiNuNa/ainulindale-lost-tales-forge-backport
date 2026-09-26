@@ -5,12 +5,17 @@ import com.ninuna.losttales.mapmarker.LostTalesMapMarkerEditableSettings;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRelevance;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibility;
+import com.ninuna.losttales.mapmarker.LostTalesWaystoneStateReason;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 
-/** Authoritative state for the open waystone settings screen. */
+/**
+ * A waystone's settings as the server holds them, for the waystone's page:
+ * sent as the player uses the waystone, which opens the page on it, and as
+ * the answer to every request the page sends, saying why ({@link #getReason}).
+ */
 public final class LostTalesWaystoneStatePacket implements IMessage {
     private static final int MAX_PACKET_BYTES = 16384;
     private static final int MAX_MARKER_ID_BYTES = 1024;
@@ -29,6 +34,7 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
     private int sharedFellowshipCount;
     private boolean canEdit;
     private boolean canMakePublic;
+    private LostTalesWaystoneStateReason reason;
     private boolean malformed;
 
     public LostTalesWaystoneStatePacket() {}
@@ -36,7 +42,8 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
     public LostTalesWaystoneStatePacket(
             int dimensionId, int x, int y, int z,
             LostTalesMapMarkerRecord record,
-            boolean canEdit, boolean canMakePublic) {
+            boolean canEdit, boolean canMakePublic,
+            LostTalesWaystoneStateReason reason) {
         if (record == null) {
             throw new IllegalArgumentException(
                     "waystone state requires a marker record");
@@ -54,6 +61,7 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
                 record.getSharedFellowshipIds().size();
         this.canEdit = canEdit;
         this.canMakePublic = canMakePublic;
+        this.reason = reason;
         validate();
     }
 
@@ -115,6 +123,8 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
             this.sharedFellowshipCount = buffer.readInt();
             this.canEdit = buffer.readBoolean();
             this.canMakePublic = buffer.readBoolean();
+            this.reason = LostTalesWaystoneStateReason.fromNetworkId(
+                    buffer.readUnsignedByte());
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
@@ -165,6 +175,7 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
         buffer.writeInt(this.sharedFellowshipCount);
         buffer.writeBoolean(this.canEdit);
         buffer.writeBoolean(this.canMakePublic);
+        buffer.writeByte(this.reason.getNetworkId());
     }
 
     private void validate() {
@@ -173,6 +184,7 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
                 || !LostTalesPacketCodec.isUtf8WithinLimit(
                         this.markerId, MAX_MARKER_ID_BYTES)
                 || this.markerId.length() == 0
+                || this.reason == null
                 || this.revision < 1L
                 || !isValidSettings(this.settings)
                 || this.sharedPlayerCount < 0
@@ -251,6 +263,14 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
     public boolean canEdit() { return this.canEdit; }
     public boolean canMakePublic() {
         return this.canMakePublic;
+    }
+    /** Why it was sent: an opening, or the answer to a request. */
+    public LostTalesWaystoneStateReason getReason() {
+        return this.reason;
+    }
+    /** Whether the player used the waystone, and the page opens on it. */
+    public boolean isOpening() {
+        return this.reason == LostTalesWaystoneStateReason.OPENED;
     }
     public boolean isMalformed() { return this.malformed; }
 

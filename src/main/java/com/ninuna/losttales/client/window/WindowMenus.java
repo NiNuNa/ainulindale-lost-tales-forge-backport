@@ -14,8 +14,8 @@ import org.lwjgl.input.Keyboard;
  * ({@link MenuWindow}): the window's own — a tab's, a window's, the
  * palette, the {@code +}, the tab search, Settings — and those a system
  * adds, each kind with its {@link Source}. Each kind has one window. A
- * control opens it where the popup it replaced hung, or where the player
- * left its kind, and turns it to what it was pressed for while it stands;
+ * control opens it hanging from the control, or where the player left
+ * its kind, and turns it to what it was pressed for while it stands;
  * the same control pressed again puts it away. A row that acts closes
  * its window; a switch, a pick, a question, or a row that opens another
  * window leaves it standing.
@@ -47,6 +47,17 @@ public final class WindowMenus implements MenuWindow.Owner {
          */
         public abstract boolean act(MenuWindow menu, MenuWindow.Entry entry,
                                     SubWindow window, boolean back);
+
+        /**
+         * A row taken where the press landed on a part of it — a number's
+         * chevrons or its value ({@link MenuWindow#PART_LESS} and the
+         * others), null for the row as a whole — answering whether the
+         * window stays. Unless a source says otherwise, the row as a whole.
+         */
+        public boolean act(MenuWindow menu, MenuWindow.Entry entry,
+                           String part, SubWindow window, boolean back) {
+            return act(menu, entry, window, back);
+        }
 
         /** Whether typing into its field reads the rows again: a search. */
         public boolean readsAsTyped() {
@@ -237,7 +248,8 @@ public final class WindowMenus implements MenuWindow.Owner {
      * its field lets the keys go, as a picker does after a pick.
      */
     @Override
-    public void take(MenuWindow menu, MenuWindow.Entry entry, boolean back) {
+    public void take(MenuWindow menu, MenuWindow.Entry entry, String part,
+                     boolean back) {
         SubWindow window = windowOf(menu.kind);
         Source source = sourceOf(menu.kind);
         if (window == null || source == null || entry == null
@@ -248,7 +260,7 @@ public final class WindowMenus implements MenuWindow.Owner {
             this.windows.close(window);
             return;
         }
-        if (source.act(menu, entry, window, back)) {
+        if (source.act(menu, entry, part, window, back)) {
             if (window.isOpen()) {
                 source.rebuild(menu);
                 menu.releaseKeys();
@@ -273,7 +285,7 @@ public final class WindowMenus implements MenuWindow.Owner {
         if (press.is(Keyboard.KEY_RETURN) || press.is(Keyboard.KEY_NUMPADENTER)) {
             MenuWindow.Entry found = source.firstFound(menu);
             if (found != null) {
-                take(menu, found, false);
+                take(menu, found, null, false);
             }
             return;
         }

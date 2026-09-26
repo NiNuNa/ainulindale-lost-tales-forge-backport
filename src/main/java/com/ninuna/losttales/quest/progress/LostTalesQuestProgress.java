@@ -20,14 +20,6 @@ public final class LostTalesQuestProgress {
     private long deadlineWorldTime;
     private final Map<String, Integer> objectiveProgress = new LinkedHashMap<String, Integer>();
 
-    public LostTalesQuestProgress(String questId, int stageIndex, String stageId) {
-        this(questId, stageIndex, stageId, null, 0L, 0L);
-    }
-
-    public LostTalesQuestProgress(String questId, int stageIndex, String stageId, Map<String, Integer> objectiveProgress) {
-        this(questId, stageIndex, stageId, objectiveProgress, 0L, 0L);
-    }
-
     public LostTalesQuestProgress(String questId, int stageIndex, String stageId, Map<String, Integer> objectiveProgress, long acceptedWorldTime, long deadlineWorldTime) {
         this.questId = questId;
         this.stageIndex = Math.max(0, stageIndex);
@@ -92,14 +84,6 @@ public final class LostTalesQuestProgress {
 
     public boolean isExpired(long worldTime) {
         return this.hasTimeLimit() && Math.max(0L, worldTime) >= this.deadlineWorldTime;
-    }
-
-    public void setTiming(long acceptedWorldTime, long deadlineWorldTime) {
-        this.acceptedWorldTime = Math.max(0L, acceptedWorldTime);
-        this.deadlineWorldTime = Math.max(0L, deadlineWorldTime);
-        if (this.deadlineWorldTime > 0L && this.acceptedWorldTime > 0L && this.deadlineWorldTime < this.acceptedWorldTime) {
-            this.deadlineWorldTime = this.acceptedWorldTime;
-        }
     }
 
     public Map<String, Integer> getObjectiveProgress() {

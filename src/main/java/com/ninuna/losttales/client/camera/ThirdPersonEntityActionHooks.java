@@ -53,9 +53,9 @@ public final class ThirdPersonEntityActionHooks {
                 == MovingObjectPosition.MovingObjectType.ENTITY
                 && mouseOver.entityHit == target
                 && hit != null
-                && isFinite(hit.xCoord)
-                && isFinite(hit.yCoord)
-                && isFinite(hit.zCoord);
+                && Double.isFinite(hit.xCoord)
+                && Double.isFinite(hit.yCoord)
+                && Double.isFinite(hit.zCoord);
     }
 
     public static void handleAttack(
@@ -126,9 +126,5 @@ public final class ThirdPersonEntityActionHooks {
                     player, result == null ? itemStack : result));
         }
         return true;
-    }
-
-    private static boolean isFinite(double value) {
-        return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 }

@@ -168,9 +168,15 @@ public abstract class PageContent {
     /** Once a game tick, while the page is open: a list that follows the world. */
     public void tick() {}
 
-    /** Whether the page can be shown now; one that cannot waits in its window unseen. */
+    /**
+     * Whether the page can be shown now; one that cannot waits in its
+     * window unseen. A page needs a world unless it says otherwise, so on
+     * the screen that stands without one it waits; a page that works
+     * without one — the Motion Lab — answers true here itself, and then
+     * shows over the main menu with Settings.
+     */
     public boolean isAvailable() {
-        return true;
+        return !WindowScreen.standsWithoutWorld();
     }
 
     /* ---- The quick switcher ---- */

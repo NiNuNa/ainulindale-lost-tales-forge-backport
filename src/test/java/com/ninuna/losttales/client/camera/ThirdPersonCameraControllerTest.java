@@ -55,7 +55,7 @@ public final class ThirdPersonCameraControllerTest {
         CameraPose standing = pose(3.5D, 0.6D);
         CameraPose sprinting = pose(4.2D, 0.5D);
         CameraSmoothing smoothing = new CameraSmoothing(
-                10.0D, 10.0D, 10.0D, 10.0D, 10.0D, 10.0D);
+                10.0D, 10.0D, 10.0D, 10.0D, 10.0D, 10.0D, 10.0D);
 
         ThirdPersonCameraController.update(
                 "7@0", standing, smoothing, 1000000000L);

@@ -68,13 +68,9 @@ public final class PartyGoHereMarker {
     }
 
     public static boolean isValidCoordinates(double x, double y, double z) {
-        return isFinite(x) && isFinite(y) && isFinite(z)
+        return Double.isFinite(x) && Double.isFinite(y) && Double.isFinite(z)
                 && Math.abs(x) <= MAX_HORIZONTAL_COORDINATE
                 && Math.abs(z) <= MAX_HORIZONTAL_COORDINATE
                 && Math.abs(y) <= MAX_VERTICAL_COORDINATE;
-    }
-
-    private static boolean isFinite(double value) {
-        return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 }

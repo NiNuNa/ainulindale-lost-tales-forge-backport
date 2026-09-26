@@ -71,6 +71,15 @@ public final class LostTalesChatVisualStyle {
                 LostTalesColors.CORAL);
     }
 
+    /**
+     * What the Server and the Client say, in the client's chosen palette
+     * colour; honey, the colour of a join, until it chooses.
+     */
+    static int serverTextRgb() {
+        return paletteRgb(LostTalesConfig.chatServerTextColor,
+                LostTalesColors.HONEY);
+    }
+
     /** The line a reply's quote jumped to, while it is lit, in the chosen colour. */
     static int replyHighlightRgb() {
         return paletteRgb(LostTalesConfig.chatReplyHighlightColor,
@@ -769,6 +778,11 @@ public final class LostTalesChatVisualStyle {
         boolean afterHead = false;
         boolean identitySeen = false;
         boolean colours = chatColoursEnabled();
+        // The Server's and the Client's plain words, and the join yellow
+        // their own lines are sent in, wear the colour chosen for them.
+        // A quote row keeps the colours it was built with.
+        boolean serverWords = LostTalesChatPresentation.isSystemLine(chatLineId)
+                && !ChatReplyMarker.isQuoteRow(line);
         // The hovered run is known by the row it is on and its place
         // there, never by identity: a row's iterator hands out copies.
         // Nothing on any other row answers to it.
@@ -1036,12 +1050,15 @@ public final class LostTalesChatVisualStyle {
                     // greens and yellows rather than beside them.
                     rendered = styleCodesOnly(formatting)
                             + removeColorCodes(text);
-                    color = paletteRgb(part.getChatStyle().getColor());
+                    EnumChatFormatting asked = part.getChatStyle().getColor();
+                    color = serverWords && (asked == EnumChatFormatting.WHITE
+                            || asked == EnumChatFormatting.YELLOW)
+                            ? serverTextRgb() : paletteRgb(asked);
                     glyphColor = color;
                 } else {
                     rendered = removeExplicitWhite(formatting + text);
-                    color = LostTalesUiInk.IVORY;
-                    glyphColor = lastInlineColor(rendered, LostTalesUiInk.IVORY);
+                    color = serverWords ? serverTextRgb() : LostTalesUiInk.IVORY;
+                    glyphColor = lastInlineColor(rendered, color);
                 }
                 if (backdropped && !shadowPass) {
                     color = ChatRunBackdrops.wordsRgb(color, backdropLit);

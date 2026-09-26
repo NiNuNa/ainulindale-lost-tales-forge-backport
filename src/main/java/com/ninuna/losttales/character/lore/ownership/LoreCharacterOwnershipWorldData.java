@@ -1,10 +1,10 @@
 package com.ninuna.losttales.character.lore.ownership;
 
-import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.lore.LoreCharacterDefinition;
 import com.ninuna.losttales.character.lore.LoreCharacterRegistry;
-import cpw.mods.fml.common.FMLLog;
-import net.minecraft.nbt.NBTBase;
+import com.ninuna.losttales.storage.NbtTags;
+import com.ninuna.losttales.util.LostTalesIdentifiers;
+import com.ninuna.losttales.util.LostTalesLog;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.world.WorldSavedData;
@@ -17,7 +17,6 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -111,7 +110,7 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
             } catch (RuntimeException exception) {
                 failReadOnly(compound, version,
                         "malformed_record_" + index, raw);
-                warn("Lore-character ownership record %d is malformed; storage is read-only: %s",
+                LostTalesLog.warning("Lore-character ownership record %d is malformed; storage is read-only: %s",
                         Integer.valueOf(index), exception.toString());
                 return;
             }
@@ -133,7 +132,7 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
     @Override
     public synchronized void writeToNBT(NBTTagCompound compound) {
         if (this.readOnly && this.preservedData != null) {
-            copyTagContents(this.preservedData, compound);
+            NbtTags.copyContents(this.preservedData, compound);
             return;
         }
         compound.setInteger(TAG_DATA_VERSION, CURRENT_DATA_VERSION);
@@ -177,7 +176,7 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
     public synchronized LoreCharacterOwnershipRecord getRecord(
             String loreCharacterId) {
         return this.recordsByLoreId.get(
-                LoreCharacterOwnershipRecord.normalizeIdentifier(
+                LostTalesIdentifiers.normalize(
                         loreCharacterId));
     }
 
@@ -224,7 +223,7 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
                     getRecord(loreCharacterId));
         }
         String normalizedLoreId =
-                LoreCharacterOwnershipRecord.normalizeIdentifier(
+                LostTalesIdentifiers.normalize(
                         loreCharacterId);
         if (!LoreCharacterOwnershipRecord.isValidIdentifier(normalizedLoreId)
                 || ownerId == null || expectedRevision < 0L) {
@@ -304,7 +303,7 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
                     getRecord(loreCharacterId));
         }
         String normalizedLoreId =
-                LoreCharacterOwnershipRecord.normalizeIdentifier(
+                LostTalesIdentifiers.normalize(
                         loreCharacterId);
         if (!LoreCharacterOwnershipRecord.isValidIdentifier(normalizedLoreId)
                 || ownerId == null || expectedRevision < 0L) {
@@ -349,8 +348,8 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
         tag.setInteger(TAG_DATA_VERSION,
                 LoreCharacterOwnershipRecord.CURRENT_DATA_VERSION);
         tag.setString(TAG_LORE_CHARACTER_ID, record.getLoreCharacterId());
-        writeUuid(tag, TAG_CHARACTER_UUID, record.getCharacterId());
-        writeUuid(tag, TAG_OWNER_UUID, record.getOwnerId());
+        NbtTags.writeUuid(tag, TAG_CHARACTER_UUID, record.getCharacterId());
+        NbtTags.writeUuid(tag, TAG_OWNER_UUID, record.getOwnerId());
         tag.setLong(TAG_REVISION, record.getRevision());
         tag.setLong(TAG_CREATED_AT, record.getCreatedAt());
         tag.setLong(TAG_LAST_CLAIMED_AT, record.getLastClaimedAt());
@@ -407,15 +406,8 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
         quarantine.setTag("OriginalData", malformedEntry == null
                 ? new NBTTagCompound() : malformedEntry.copy());
         this.quarantinedEntries.add(quarantine);
-        warn("Lore-character ownership storage is read-only: %s",
+        LostTalesLog.warning("Lore-character ownership storage is read-only: %s",
                 this.readOnlyReason);
-    }
-
-    private static void writeUuid(NBTTagCompound tag, String key, UUID uuid) {
-        if (uuid != null) {
-            tag.setLong(key + "Most", uuid.getMostSignificantBits());
-            tag.setLong(key + "Least", uuid.getLeastSignificantBits());
-        }
     }
 
     private static UUID readRequiredUuid(NBTTagCompound tag, String key) {
@@ -435,28 +427,5 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
             throw new IllegalArgumentException(key + " is incomplete");
         }
         return hasMost ? new UUID(tag.getLong(most), tag.getLong(least)) : null;
-    }
-
-    private static void copyTagContents(NBTTagCompound source,
-                                        NBTTagCompound destination) {
-        Set<?> keys = source.func_150296_c();
-        for (Object keyObject : keys) {
-            if (keyObject instanceof String) {
-                String key = (String) keyObject;
-                NBTBase value = source.getTag(key);
-                if (value != null) {
-                    destination.setTag(key, value.copy());
-                }
-            }
-        }
-    }
-
-    private static void warn(String message, Object... arguments) {
-        Object[] all = new Object[arguments.length + 1];
-        all[0] = LostTalesMetaData.MOD_ID;
-        System.arraycopy(arguments, 0, all, 1, arguments.length);
-        try {
-            FMLLog.warning("[%s] " + message, all);
-        } catch (Throwable ignored) {}
     }
 }

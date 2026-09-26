@@ -11,16 +11,10 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.world.World;
 
 /**
- * Small first-pass radiant missive generator.
- *
- * This generator deliberately uses objective types and selectors already handled
- * by the existing 1.7.10 quest runtime. More immersive LOTR-region/faction
- * rules can be layered on later without changing the board tile entity.
+ * Writes a missive board's notices: kill-or-gather tasks built from the
+ * objective types and selectors the quest runtime already handles.
  */
 public final class LostTalesMissiveGenerator {
-    public static final int MIN_GENERATION_BATCH = 1;
-    public static final int MAX_GENERATION_BATCH = 3;
-
     private static final String GENERATOR_VERSION = "1";
     private static final long ONE_INGAME_DAY_TICKS = 24000L;
 

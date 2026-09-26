@@ -26,9 +26,8 @@ import java.util.Set;
  * {@link WindowLayout}'s; this keeps what only the chat means by them.
  *
  * <ul>
- * <li>The windows a new player starts with: a console window (the two
- * consoles and Operator) top-left, and a conversation window with every
- * other channel bottom-left.</li>
+ * <li>The window a new player starts with: Global and OOC, Global in
+ * front, filling the screen's bottom-left quarter.</li>
  * <li>Each conversation tab's three preferences: <em>muted</em> (its
  * lines stay out of the closed feed), <em>mentions muted</em> (its
  * mention cue is silent), and <em>hidden</em> (once closed it stays
@@ -49,11 +48,21 @@ import java.util.Set;
  * {@link ClientChatChannelState}.</p>
  */
 public final class ChatLayout {
-    private static final List<ChatTab> CONSOLE_WINDOW_TABS =
+    /** The tabs a new player's window holds, the first in front. */
+    private static final List<ChatTab> FIRST_TABS =
             Collections.unmodifiableList(Arrays.asList(
+                    ChatTab.of(ChatChannel.GLOBAL),
+                    ChatTab.of(ChatChannel.OOC)));
+    /**
+     * The channels a new player's window leaves closed that wait to be
+     * opened by hand rather than opening with their next line: staff
+     * talk and the consoles, which speak often and are not conversations.
+     */
+    private static final List<ChatTab> FIRST_HIDDEN =
+            Collections.unmodifiableList(Arrays.asList(
+                    ChatTab.of(ChatChannel.OPERATOR),
                     ChatTab.of(ChatChannel.CLIENT_CONSOLE),
-                    ChatTab.of(ChatChannel.SERVER_CONSOLE),
-                    ChatTab.of(ChatChannel.OPERATOR)));
+                    ChatTab.of(ChatChannel.SERVER_CONSOLE)));
     /**
      * Muted tabs: their lines stay out of the closed-chat feed.
      *
@@ -131,12 +140,7 @@ public final class ChatLayout {
                 return ChatTab.fromId(id);
             }
         });
-        WindowLayout.setDefaults(new Runnable() {
-            @Override
-            public void run() {
-                openDefaultWindows();
-            }
-        });
+        WindowLayout.setDefaults(DEFAULT_WINDOWS);
         WindowLayoutStore.addPart(PART);
     }
 
@@ -148,23 +152,24 @@ public final class ChatLayout {
     }
 
     /**
-     * The default windows: the console window (Client Console, Server
-     * Console, Operator) top-left and the conversation window with every
-     * other channel bottom-left. The two staff tabs are there for
-     * everyone and shown to whoever the server lets read them.
+     * A new player's window: Global and OOC, Global in front, snapped to
+     * the screen's bottom-left quarter. Every other channel starts closed;
+     * Proximity, Faction and Party open with their first line, and
+     * Operator and the consoles wait in the {@code +} until opened by hand.
+     * From then on the layout is whatever the player makes of it.
      */
-    private static void openDefaultWindows() {
-        WindowLayout.addWindow(CONSOLE_WINDOW_TABS,
-                ChatTab.of(ChatChannel.CLIENT_CONSOLE), 0.0D, 0.0D);
-        List<ChatTab> conversation = new ArrayList<ChatTab>();
-        for (ChatChannel channel : ChatChannel.presentationOrder()) {
-            if (!CONSOLE_WINDOW_TABS.contains(ChatTab.of(channel))) {
-                conversation.add(ChatTab.of(channel));
+    static final Runnable DEFAULT_WINDOWS = new Runnable() {
+        @Override
+        public void run() {
+            Window window = WindowLayout.addWindow(FIRST_TABS,
+                    FIRST_TABS.get(0), 0.0D, 100.0D);
+            if (window != null) {
+                WindowLayout.setFill(window.getId(),
+                        Window.ScreenFill.BOTTOM_LEFT, false);
             }
+            HIDDEN.addAll(FIRST_HIDDEN);
         }
-        WindowLayout.addWindow(conversation, ChatTab.of(ChatChannel.GLOBAL),
-                0.0D, 100.0D);
-    }
+    };
 
     /* ---- Where channels stand ---- */
 

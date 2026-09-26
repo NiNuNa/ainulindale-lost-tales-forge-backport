@@ -7,11 +7,11 @@ import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.registry.CharacterBodyModelRegistry;
-import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
 
+import com.ninuna.losttales.util.LostTalesIdentifiers;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.ArrayList;
@@ -198,8 +198,8 @@ public final class LoreCharacterDefinitionJsonParser {
         String genderId = requiredIdentifier(object.get("genderId"), path + ".genderId");
         String modelId = requiredIdentifier(object.get("modelId"), path + ".modelId");
         String skinId = requiredIdentifier(object.get("skinId"), path + ".skinId");
-        raceId = CharacterRaceRegistry.normalizeIdentifier(raceId);
-        genderId = CharacterGenderRegistry.normalizeIdentifier(genderId);
+        raceId = LostTalesIdentifiers.normalize(raceId);
+        genderId = LostTalesIdentifiers.normalize(genderId);
         CharacterRaceDefinition race = CharacterRaceRegistry.get(raceId);
         if (race == null) {
             throw invalid(path + ".raceId is not a supported playable race: " + raceId);

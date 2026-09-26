@@ -37,13 +37,10 @@ public final class LostTalesSkyrimUiStyle extends LostTalesColors {
      * Begins a run of untextured quads and answers the tessellator they
      * are added to.
      *
-     * <p>Rules, panels, fades and backdrops are all built from these, and
-     * each one set the same pieces of state up and put most of them back
-     * on its own. Most: some restored the draw colour afterwards and some
-     * did not, which is how a coloured quad tints the next thing drawn —
-     * the same class of fault as the blend state {@link #beginContent}
-     * exists for. One bracket, and every run puts back everything it
-     * changed.</p>
+     * <p>Rules, panels, fades and backdrops are all built from these.
+     * {@link #endQuads} puts back everything the run changed, the draw
+     * colour included, so a coloured quad never tints what is drawn
+     * next.</p>
      *
      * @param smooth whether the run shades between its vertices. A single
      *               flat quad does not, and asking for it would be two

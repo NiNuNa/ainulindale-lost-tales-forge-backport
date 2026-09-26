@@ -24,7 +24,7 @@ public final class ChatLayoutTest {
 
     @Before
     public void reset() {
-        ChatLayout.reset();
+        TwoWindowLayout.reset();
         this.changes = 0;
         WindowLayout.setChangeListener(new Runnable() {
             @Override
@@ -71,37 +71,66 @@ public final class ChatLayoutTest {
         assertFalse(ChatLayout.isHidden(bob));
     }
 
+    /**
+     * A new player starts with one window of Global and OOC, Global in
+     * front, in the screen's bottom-left quarter. The conversations left
+     * closed open with their first line; Operator and the consoles wait
+     * to be opened by hand. The file written from it reads back the same.
+     */
     @Test
-    public void defaultLayoutIsAConsoleWindowAndAConversationWindow() {
+    public void aNewPlayerStartsWithOneWindowOfGlobalAndOoc() {
+        ChatLayout.reset();
+        assertEquals(1, WindowLayout.windows().size());
+        Window window = WindowLayout.firstWindow();
+        assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.OOC),
+                ChatTab.channelsOf(window));
+        assertEquals(ChatChannel.GLOBAL, ChatTab.frontChannelOf(window));
+        assertEquals(Window.ScreenFill.BOTTOM_LEFT, window.getFill());
+        assertEquals(Arrays.asList(ChatChannel.PROXIMITY, ChatChannel.FACTION,
+                ChatChannel.PARTY, ChatChannel.OPERATOR,
+                ChatChannel.CLIENT_CONSOLE, ChatChannel.SERVER_CONSOLE),
+                ChatLayout.closedChannels());
+        assertFalse(ChatLayout.isHidden(ChatChannel.PROXIMITY));
+        assertFalse(ChatLayout.isHidden(ChatChannel.FACTION));
+        assertFalse(ChatLayout.isHidden(ChatChannel.PARTY));
+        assertTrue(ChatLayout.isHidden(ChatChannel.OPERATOR));
+        assertTrue(ChatLayout.isHidden(ChatChannel.CLIENT_CONSOLE));
+        assertTrue(ChatLayout.isHidden(ChatChannel.SERVER_CONSOLE));
+        // The closed-chat feed starts where vanilla draws the chat.
+        assertEquals(0.0D, ChatLayout.feedOffsetX(), 0.0D);
+        assertEquals(100.0D, ChatLayout.feedOffsetY(), 0.0D);
+
+        List<String> written = WindowLayoutStore.describe();
+        WindowLayoutStore.load(written);
+        assertEquals(1, WindowLayout.windows().size());
+        assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.OOC),
+                ChatTab.channelsOf(WindowLayout.firstWindow()));
+        assertEquals(Window.ScreenFill.BOTTOM_LEFT,
+                WindowLayout.firstWindow().getFill());
+        assertTrue(ChatLayout.isHidden(ChatChannel.SERVER_CONSOLE));
+        assertFalse(ChatLayout.isOpen(ChatChannel.PROXIMITY));
+        assertEquals(written, WindowLayoutStore.describe());
+    }
+
+    /** The two windows the other tests work in: the consoles, then the rest. */
+    @Test
+    public void theTestsTwoWindowsHoldEveryChannel() {
         assertEquals(2, WindowLayout.windows().size());
         Window console = WindowLayout.firstWindow();
         assertEquals("w1", console.getId());
         assertEquals(Arrays.asList(ChatChannel.CLIENT_CONSOLE,
                 ChatChannel.SERVER_CONSOLE, ChatChannel.OPERATOR),
                 ChatTab.channelsOf(console));
-        assertEquals(ChatChannel.CLIENT_CONSOLE, ChatTab.frontChannelOf(console));
-        assertEquals(0.0D, console.getOffsetX(), 0.0D);
-        assertEquals(0.0D, console.getOffsetY(), 0.0D);
         Window conversation = WindowLayout.windows().get(1);
         assertEquals("w2", conversation.getId());
         assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.PROXIMITY,
                 ChatChannel.FACTION, ChatChannel.OOC,
                 ChatChannel.PARTY), ChatTab.channelsOf(conversation));
         assertEquals(ChatChannel.GLOBAL, ChatTab.frontChannelOf(conversation));
-        assertEquals(0.0D, conversation.getOffsetX(), 0.0D);
-        assertEquals(100.0D, conversation.getOffsetY(), 0.0D);
-        // The closed-chat feed starts where vanilla draws the chat.
-        assertEquals(0.0D, ChatLayout.feedOffsetX(), 0.0D);
-        assertEquals(100.0D, ChatLayout.feedOffsetY(), 0.0D);
+        assertTrue(ChatLayout.closedChannels().isEmpty());
         ChatLayout.setFeedPosition(40.0D, -3.0D, true);
         assertEquals(40.0D, ChatLayout.feedOffsetX(), 0.0D);
         assertEquals(0.0D, ChatLayout.feedOffsetY(), 0.0D);
-        assertTrue(ChatLayout.closedChannels().isEmpty());
-        assertEquals(Arrays.asList(ChatChannel.CLIENT_CONSOLE,
-                ChatChannel.SERVER_CONSOLE, ChatChannel.OPERATOR,
-                ChatChannel.GLOBAL, ChatChannel.PROXIMITY, ChatChannel.FACTION,
-                ChatChannel.OOC, ChatChannel.PARTY),
-                ChatLayout.orderChannels());
     }
 
     @Test

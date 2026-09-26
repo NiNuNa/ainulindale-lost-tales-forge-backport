@@ -84,9 +84,6 @@ public final class LostTalesQuestDefinitionJsonParser {
         }
         if (normalized.startsWith("quests/")) {
             normalized = normalized.substring("quests/".length());
-        } else if (normalized.startsWith("quest/")) {
-            // Preserve IDs derived from legacy resource paths.
-            normalized = normalized.substring("quest/".length());
         }
         if (normalized.endsWith(".json")) {
             normalized = normalized.substring(0, normalized.length() - ".json".length());
@@ -100,14 +97,11 @@ public final class LostTalesQuestDefinitionJsonParser {
         String description = getString(object, "description", "");
         boolean repeatable = getBoolean(object, "repeatable", false);
         boolean restartable = getBoolean(object, "restartable", false);
-        String startMode = getString(object, "startMode", getString(object, "start", LostTalesQuestDefinition.START_MODE_LOCKED));
+        String startMode = getString(object, "startMode", LostTalesQuestDefinition.START_MODE_LOCKED);
         Map<String, String> prerequisites = parseStringMap(object.get("prerequisites"));
-        prerequisites.putAll(parseStringMap(object.get("requirements")));
         Map<String, String> rewards = parseStringMap(object.get("rewards"));
         Map<String, String> interaction = parseStringMap(object.get("interaction"));
-        interaction.putAll(parseStringMap(object.get("questGiver")));
         Map<String, String> markers = parseStringMap(object.get("markers"));
-        markers.putAll(parseStringMap(object.get("mapMarkers")));
         Map<String, String> journalLog = parseStringMap(object.get("journalLog"));
         Map<String, String> dialogue = parseStringMap(object.get("dialogue"));
         List<LostTalesQuestStageDefinition> stages = parseStages(object.get("stages"));

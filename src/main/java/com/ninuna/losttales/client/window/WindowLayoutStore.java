@@ -2,15 +2,8 @@ package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.client.character.LostTalesClientAccount;
 import com.ninuna.losttales.config.LostTalesConfigFiles;
-import java.io.BufferedReader;
+import com.ninuna.losttales.util.LostTalesTextFiles;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -67,7 +60,6 @@ public final class WindowLayoutStore {
 
     /** The folder under the client's, one file per account. */
     static final String FOLDER = LostTalesConfigFiles.WINDOW_LAYOUTS;
-    private static final Charset UTF_8 = Charset.forName("UTF-8");
     /** The most lines a layout file is read to; a layout is a few dozen. */
     static final int MAX_LINES = 4096;
     private static final List<Part> PARTS = new CopyOnWriteArrayList<Part>();
@@ -254,7 +246,7 @@ public final class WindowLayoutStore {
      * measured from, how far in from it, and both sizes for a kind the
      * player resized or neither for one they only moved; null where the
      * corner or a distance is missing, a size stands alone or anything is
-     * unreadable, which leaves the kind to open where its popup did.
+     * unreadable, which leaves the kind to open where its opener puts it.
      */
     private static SubWindowPlaces.Placement parseSubWindow(
             String[] parts) {
@@ -457,7 +449,7 @@ public final class WindowLayoutStore {
     }
 
     static synchronized void save() {
-        write(storeFile, describe());
+        LostTalesTextFiles.writeLines(storeFile, describe());
     }
 
     /**
@@ -484,30 +476,7 @@ public final class WindowLayoutStore {
         }
         lines.add(line);
         loadedLines = lines;
-        write(storeFile, lines);
-    }
-
-    private static void write(File file, List<String> lines) {
-        if (file == null) {
-            return;
-        }
-        File parent = file.getParentFile();
-        if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
-            return;
-        }
-        Writer writer = null;
-        try {
-            writer = new OutputStreamWriter(
-                    new FileOutputStream(file), UTF_8);
-            for (String line : lines) {
-                writer.write(line == null ? "" : line);
-                writer.write('\n');
-            }
-        } catch (IOException ignored) {
-            // Losing a layout write must never break the windows.
-        } finally {
-            closeQuietly(writer);
-        }
+        LostTalesTextFiles.writeLines(storeFile, lines);
     }
 
     /**
@@ -515,33 +484,6 @@ public final class WindowLayoutStore {
      * few dozen, so a longer file is broken and only its start is read.
      */
     private static List<String> readLines(File file) {
-        if (file == null || !file.isFile()) {
-            return null;
-        }
-        BufferedReader reader = null;
-        try {
-            reader = new BufferedReader(new InputStreamReader(
-                    new FileInputStream(file), UTF_8));
-            List<String> lines = new ArrayList<String>();
-            String line;
-            while (lines.size() < MAX_LINES
-                    && (line = reader.readLine()) != null) {
-                lines.add(line);
-            }
-            return lines;
-        } catch (IOException ignored) {
-            return null;
-        } finally {
-            closeQuietly(reader);
-        }
-    }
-
-    private static void closeQuietly(java.io.Closeable closeable) {
-        if (closeable != null) {
-            try {
-                closeable.close();
-            } catch (IOException ignored) {
-            }
-        }
+        return LostTalesTextFiles.readLines(file, MAX_LINES);
     }
 }
