@@ -63,20 +63,13 @@ public final class ClientChatChannelStateTest {
     }
 
     @Test
-    public void closedChannelsAreNeverSelectedAndCycleFollowsTheLayout() {
+    public void closedChannelsAreNeverSelected() {
         joinParty(acceptRoster("lotr:gondor"));
         WindowLayout.detach(ChatTab.of(ChatChannel.PROXIMITY), 0.0D, 0.0D);
         assertEquals(java.util.Arrays.asList(ChatChannel.CLIENT_CONSOLE,
                 ChatChannel.GLOBAL, ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.PARTY,
                 ChatChannel.PROXIMITY),
                 openChannels());
-        // Cycling stays within the window: Proximity is alone in its.
-        ClientChatChannelState.select(ChatTab.of(ChatChannel.PROXIMITY));
-        assertEquals(ChatChannel.PROXIMITY, ClientChatChannelState.cycle().getChannel());
-        ClientChatChannelState.select(ChatTab.of(ChatChannel.OOC));
-        assertEquals(ChatChannel.PARTY, ClientChatChannelState.cycle().getChannel());
-        assertEquals(ChatChannel.GLOBAL, ClientChatChannelState.cycle().getChannel());
-        assertEquals(ChatChannel.FACTION, ClientChatChannelState.cycle().getChannel());
         // A closed channel stays available (readable) but not selectable.
         ClientChatChannelState.select(ChatTab.of(ChatChannel.OOC));
         ChatLayout.close(ChatTab.of(ChatChannel.OOC));
@@ -113,21 +106,10 @@ public final class ClientChatChannelStateTest {
                 ChatChannel.PROXIMITY, ChatChannel.FACTION, ChatChannel.OOC,
                 ChatChannel.CLIENT_CONSOLE),
                 availableChannels());
-        // TAB cycles inside the selected channel's own window: Global,
-        // OOC and Proximity share the conversation window, the console
-        // lives elsewhere; the Party tab joins the round once joined.
-        ClientChatChannelState.select(ChatTab.of(ChatChannel.OOC));
-        assertEquals(ChatChannel.GLOBAL, ClientChatChannelState.cycle().getChannel());
-        assertEquals(ChatChannel.PROXIMITY,
-                ClientChatChannelState.cycle().getChannel());
-        assertEquals(ChatChannel.FACTION, ClientChatChannelState.cycle().getChannel());
-        assertEquals(ChatChannel.OOC, ClientChatChannelState.cycle().getChannel());
+        // The Party tab is there once the character played joins one.
         joinParty(null);
         assertTrue(ClientChatChannelState.isAvailable(ChatChannel.PARTY));
         assertTrue(ClientChatChannelState.canSend(ChatChannel.PARTY));
-        assertEquals(ChatChannel.PARTY, ClientChatChannelState.cycle().getChannel());
-        ClientChatChannelState.select(ChatTab.of(ChatChannel.CLIENT_CONSOLE));
-        assertEquals(ChatChannel.CLIENT_CONSOLE, ClientChatChannelState.cycle().getChannel());
         assertFalse(ClientChatChannelState.canSend(ChatChannel.OPERATOR));
         assertTrue(ClientChatChannelState.canSend(ChatChannel.CLIENT_CONSOLE));
         // The server's word arrives as channel ids: every channel open here.
@@ -276,22 +258,6 @@ public final class ClientChatChannelStateTest {
         assertTrue(ChatLayout.feedFilter().accepts(whisper, true));
         ChatLayout.setNotification(whisper, ChatNotification.NOTHING);
         assertFalse(ChatLayout.feedFilter().accepts(whisper, true));
-    }
-
-    /** Tab on its own stays inside the selected window, pages left out. */
-    @Test
-    public void tabWalksTheSelectedWindowsConversations() {
-        joinParty(null);
-        ClientChatChannelState.select(ChatTab.of(ChatChannel.CLIENT_CONSOLE));
-        assertEquals(ChatChannel.CLIENT_CONSOLE,
-                ClientChatChannelState.cycle().getChannel());
-        ClientChatChannelState.select(ChatTab.of(ChatChannel.OOC));
-        assertEquals(ChatChannel.PARTY,
-                ClientChatChannelState.cycle().getChannel());
-        assertEquals(ChatChannel.GLOBAL,
-                ClientChatChannelState.cycle().getChannel());
-        assertEquals(ChatChannel.PARTY,
-                ClientChatChannelState.cycleBack().getChannel());
     }
 
     /**

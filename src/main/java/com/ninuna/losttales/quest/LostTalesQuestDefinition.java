@@ -31,6 +31,7 @@ public final class LostTalesQuestDefinition {
     private final Map<String, String> markers;
     private final Map<String, String> journalLog;
     private final Map<String, String> dialogue;
+    private final Map<String, String> world;
     private final List<LostTalesQuestStageDefinition> stages;
 
     public LostTalesQuestDefinition(String id, String title, String description, boolean repeatable, String startMode, Map<String, String> prerequisites, Map<String, String> rewards, Map<String, String> interaction, Map<String, String> markers, Map<String, String> journalLog, List<LostTalesQuestStageDefinition> stages) {
@@ -57,6 +58,18 @@ public final class LostTalesQuestDefinition {
             Map<String, String> markers, Map<String, String> journalLog,
             Map<String, String> dialogue,
             List<LostTalesQuestStageDefinition> stages) {
+        this(id, title, description, repeatable, restartable, startMode,
+                prerequisites, rewards, interaction, markers, journalLog,
+                dialogue, Collections.<String, String>emptyMap(), stages);
+    }
+
+    public LostTalesQuestDefinition(String id, String title,
+            String description, boolean repeatable, boolean restartable,
+            String startMode, Map<String, String> prerequisites,
+            Map<String, String> rewards, Map<String, String> interaction,
+            Map<String, String> markers, Map<String, String> journalLog,
+            Map<String, String> dialogue, Map<String, String> world,
+            List<LostTalesQuestStageDefinition> stages) {
         this.id = id;
         this.title = title;
         this.description = description;
@@ -69,6 +82,7 @@ public final class LostTalesQuestDefinition {
         this.markers = Collections.unmodifiableMap(new LinkedHashMap<String, String>(markers == null ? Collections.<String, String>emptyMap() : markers));
         this.journalLog = Collections.unmodifiableMap(new LinkedHashMap<String, String>(journalLog == null ? Collections.<String, String>emptyMap() : journalLog));
         this.dialogue = Collections.unmodifiableMap(new LinkedHashMap<String, String>(dialogue == null ? Collections.<String, String>emptyMap() : dialogue));
+        this.world = Collections.unmodifiableMap(new LinkedHashMap<String, String>(world == null ? Collections.<String, String>emptyMap() : world));
         this.stages = Collections.unmodifiableList(new ArrayList<LostTalesQuestStageDefinition>(stages == null ? Collections.<LostTalesQuestStageDefinition>emptyList() : stages));
     }
 
@@ -79,6 +93,24 @@ public final class LostTalesQuestDefinition {
      */
     public Map<String, String> getDialogue() {
         return this.dialogue;
+    }
+
+    /**
+     * The quest's world block, as written: the {@code days} it runs for
+     * and the {@code least} a helper must add to be paid. Empty for a
+     * quest a player takes for themselves. Read it through
+     * {@link com.ninuna.losttales.quest.world.WorldQuestRules}.
+     */
+    public Map<String, String> getWorld() {
+        return this.world;
+    }
+
+    /**
+     * Whether the whole server works on this quest together: one shared
+     * count, started by an operator, never taken by a player.
+     */
+    public boolean isWorldQuest() {
+        return !this.world.isEmpty();
     }
 
     public String getId() {
@@ -148,8 +180,9 @@ public final class LostTalesQuestDefinition {
     }
 
     /**
-     * Optional display-only map marker hints, such as giver/objective/turnIn marker IDs.
-     * Marker discovery/sync can be layered on later without changing quest progress NBT.
+     * The map markers the quest names, by role: its giver, its objective,
+     * where it is handed in. They are revealed and shown; they never change
+     * the quest's progress.
      */
     public Map<String, String> getMarkers() {
         return this.markers;

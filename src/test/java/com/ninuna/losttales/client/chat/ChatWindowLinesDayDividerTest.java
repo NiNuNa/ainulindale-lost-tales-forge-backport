@@ -227,7 +227,7 @@ public final class ChatWindowLinesDayDividerTest {
             int id = chatLineIds[index];
             List<IChatComponent> wrapped = new ArrayList<IChatComponent>();
             wrapped.add(new ChatComponentText("message " + id));
-            pieces.add(new ChatWindowLines.Piece(false, 10 * id, wrapped, id));
+            pieces.add(new ChatWindowLines.Piece(false, false, 10 * id, wrapped, id));
         }
         return pieces;
     }

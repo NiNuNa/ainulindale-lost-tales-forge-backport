@@ -7,6 +7,7 @@ import com.ninuna.losttales.chat.ChatChannelSuggester;
 import com.ninuna.losttales.chat.ChatMarkdown;
 import com.ninuna.losttales.chat.ChatMentionCandidate;
 import com.ninuna.losttales.chat.ChatMessageIds;
+import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
@@ -26,10 +27,12 @@ import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.item.EnumRarity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumChatFormatting;
+import org.lwjgl.input.Keyboard;
 
 /**
  * The chat's one text field — the input bar, and every field of a small
@@ -86,6 +89,13 @@ import net.minecraft.util.EnumChatFormatting;
  * from the last key or caret move, and only while the field holds the
  * keys.</p>
  *
+ * <p>The chat's own message field grows in rows ({@link #rows}): its
+ * words wrap at its width, Shift+Return starts a paragraph on a row of
+ * its own ({@link #insertParagraph}), and past its last row it scrolls
+ * a row at a time. Up and Down move between the rows, Home and End go
+ * to a row's ends, and a click lands on the row under it. Every other
+ * field keeps one row that scrolls sideways.</p>
+ *
  * <p>How far vanilla has scrolled the text has no accessor, so it is
  * read reflectively by both its names, verified to be the int it is.
  * Without it the field falls back to vanilla's own drawing rather than
@@ -95,6 +105,8 @@ public final class ChatInputField extends GuiTextField {
     private static final Field LINE_SCROLL_OFFSET =
             resolve("lineScrollOffset", "field_146225_q");
     private static boolean fallbackLogged;
+    /** How tall one of the field's rows is: a message row's height. */
+    static final int ROW_HEIGHT = LostTalesChatOverlayRenderer.LINE_HEIGHT;
 
     private final FontRenderer font;
     private final int fieldHeight;
@@ -115,6 +127,18 @@ public final class ChatInputField extends GuiTextField {
     private MentionSource mentions;
     /** When the field last took a key or moved its caret: the caret's blink starts there. */
     private long caretNanos = System.nanoTime();
+    /** The most rows the field grows to; one keeps a single row that scrolls sideways. */
+    private int maxRows = 1;
+    /** The rows the field has room for where it stands now, at most {@link #maxRows}. */
+    private int rowRoom = 1;
+    /** The first row shown while more rows are typed than shown. */
+    private int topRow;
+    /** Where each row starts, as last laid out, and what it was laid out for. */
+    private int[] rowStarts = {0};
+    private String rowsText;
+    private int rowsWidth = -1;
+    private List<TokenPreview> rowsPreviews;
+    private int[] rowsStyles;
 
     public ChatInputField(FontRenderer font, int x, int y, int width, int height) {
         super(font, x, y, width, height);
@@ -157,6 +181,298 @@ public final class ChatInputField extends GuiTextField {
         return this.mentions;
     }
 
+    /**
+     * Lets the field grow to {@code rows} rows as its words wrap, with a
+     * paragraph break starting a row of its own: the chat's message
+     * field. Kept to one row where the field cannot be drawn its own way.
+     */
+    ChatInputField rows(int rows) {
+        this.maxRows = isStyled() ? Math.max(1, rows) : 1;
+        return this;
+    }
+
+    /** Whether the field lays its words out in rows. */
+    boolean hasRows() {
+        return this.maxRows > 1;
+    }
+
+    /** How many rows the window leaves the field room for, at most its own most. */
+    void roomForRows(int rows) {
+        this.rowRoom = Math.max(1, Math.min(this.maxRows, rows));
+    }
+
+    /** How many rows the field shows: as many as its words take, as many as it has room for. */
+    int shownRows() {
+        return hasRows() ? Math.min(this.rowRoom, layOutRows().length) : 1;
+    }
+
+    /**
+     * Whether what is typed may hold paragraphs: a message or a whisper,
+     * in a field of rows. A command is one line, and an action one
+     * sentence.
+     */
+    boolean takesParagraphs() {
+        String text = getText();
+        return hasRows() && (!ChatInputRules.isCommand(text)
+                || ChatInputRules.isWhisperCommand(text));
+    }
+
+    /**
+     * Starts a new paragraph at the caret, in place of what is selected
+     * (Shift+Return). Past a message's last paragraph a space goes in
+     * instead, and a field at its length takes nothing.
+     */
+    void insertParagraph() {
+        if (!takesParagraphs()) {
+            return;
+        }
+        String text = getText();
+        int breaks = 0;
+        for (int index = 0; index < text.length(); index++) {
+            if (text.charAt(index) == ChatMessageValidator.PARAGRAPH_BREAK) {
+                breaks++;
+            }
+        }
+        replaceSelection(breaks + 1 < ChatMessageValidator.MAX_PARAGRAPHS
+                ? String.valueOf(ChatMessageValidator.PARAGRAPH_BREAK) : " ");
+    }
+
+    private void replaceSelection(String inserted) {
+        String text = getText();
+        int from = Math.min(getCursorPosition(), getSelectionEnd());
+        int to = Math.max(getCursorPosition(), getSelectionEnd());
+        if (text.length() - (to - from) + inserted.length()
+                > getMaxStringLength()) {
+            return;
+        }
+        setText(text.substring(0, from) + inserted + text.substring(to));
+        setCursorPosition(from + inserted.length());
+    }
+
+    /**
+     * Pasted lines keep their breaks as paragraphs where what is typed
+     * takes them, as many as a message holds, and are joined by spaces
+     * in a command; in any other field they run together, as vanilla's
+     * field has them.
+     */
+    @Override
+    public void writeText(String typed) {
+        if (!hasRows() || typed == null
+                || (typed.indexOf('\n') < 0 && typed.indexOf('\r') < 0)) {
+            super.writeText(typed);
+            return;
+        }
+        String[] lines = typed.replace("\r\n", "\n").replace('\r', '\n')
+                .split("\n", -1);
+        for (int index = 0; index < lines.length; index++) {
+            if (index > 0 && takesParagraphs()) {
+                insertParagraph();
+            } else if (index > 0) {
+                super.writeText(" ");
+            }
+            super.writeText(lines[index]);
+        }
+    }
+
+    /**
+     * Moves the caret a row up or down, as near the place it stands
+     * across as that row allows; with {@code select} the selection's
+     * moving end goes instead, as Shift and the arrows move it. False
+     * when there is no row that way, so the key can walk what was sent.
+     */
+    boolean moveRow(int direction, boolean select) {
+        if (!hasRows()) {
+            return false;
+        }
+        String text = getText();
+        int[] starts = layOutRows();
+        int moving = getSelectionEnd();
+        int row = ChatInputRows.rowOf(starts, moving);
+        int target = row + direction;
+        if (target < 0 || target >= starts.length) {
+            return false;
+        }
+        int across = displayedX(text, previewsFor(text), starts[row], moving);
+        int index = indexInRow(starts, target, across);
+        if (select) {
+            setSelectionPos(index);
+        } else {
+            setCursorPosition(index);
+        }
+        return true;
+    }
+
+    /**
+     * Home and End go to the ends of the row the caret is on in a field
+     * of rows, Shift selecting as it does elsewhere; every other key is
+     * vanilla's.
+     */
+    @Override
+    public boolean textboxKeyTyped(char character, int keyCode) {
+        if (hasRows() && isFocused()
+                && (keyCode == Keyboard.KEY_HOME || keyCode == Keyboard.KEY_END)) {
+            int[] starts = layOutRows();
+            int row = ChatInputRows.rowOf(starts, getSelectionEnd());
+            int target = keyCode == Keyboard.KEY_HOME ? starts[row]
+                    : ChatInputRows.caretEnd(getText(), starts, row);
+            if (GuiScreen.isShiftKeyDown()) {
+                setSelectionPos(target);
+            } else {
+                setCursorPosition(target);
+            }
+            return true;
+        }
+        return super.textboxKeyTyped(character, keyCode);
+    }
+
+    /**
+     * Where each row of the words starts at the field's width, laid out
+     * again only when the words, the width or their previews change.
+     */
+    private int[] layOutRows() {
+        final String text = getText();
+        final List<TokenPreview> resolved = previewsFor(text);
+        int[] styles = stylesFor(text);
+        int width = getWidth();
+        if (text.equals(this.rowsText) && width == this.rowsWidth
+                && resolved == this.rowsPreviews && styles == this.rowsStyles) {
+            return this.rowStarts;
+        }
+        this.rowStarts = ChatInputRows.starts(text, new ChatInputRows.Measure() {
+            @Override
+            public int charWidth(int index) {
+                return ChatInputField.this.charWidth(text, index);
+            }
+
+            @Override
+            public int tokenEnd(int index) {
+                TokenPreview preview = previewAt(resolved, index);
+                return preview == null ? -1 : preview.end;
+            }
+
+            @Override
+            public int tokenWidth(int index) {
+                TokenPreview preview = previewAt(resolved, index);
+                return preview == null ? 0 : preview.width;
+            }
+        }, width);
+        this.rowsText = text;
+        this.rowsWidth = width;
+        this.rowsPreviews = resolved;
+        this.rowsStyles = styles;
+        return this.rowStarts;
+    }
+
+    /** The preview a token starting at {@code index} is shown as, or null. */
+    private static TokenPreview previewAt(List<TokenPreview> previews,
+                                          int index) {
+        for (int at = 0; at < previews.size(); at++) {
+            if (previews.get(at).start == index) {
+                return previews.get(at);
+            }
+        }
+        return null;
+    }
+
+    /** The raw index {@code across} display pixels into a row, never past where the caret may stand on it. */
+    private int indexInRow(int[] starts, int row, int across) {
+        String text = getText();
+        int index = rawIndexAtX(text, previewsFor(text), starts[row],
+                Math.max(0, across));
+        return Math.min(index, ChatInputRows.caretEnd(text, starts, row));
+    }
+
+    /** Top of a shown row's text: the top row at the field's own y, each next a row lower. */
+    private int rowTextTop(int row) {
+        return this.yPosition + (row - this.topRow) * ROW_HEIGHT;
+    }
+
+    /**
+     * The field in rows: each shown row drawn as the one row of a single
+     * field is, from its start, the tokens' backdrops first, then the
+     * caret's shadow, the words, the caret, and the selection over each
+     * row it takes. The row the selection's moving end stands on is kept
+     * in view.
+     */
+    private void drawRows() {
+        String text = getText();
+        List<TokenPreview> resolved = previewsFor(text);
+        int[] starts = layOutRows();
+        int shown = Math.min(this.rowRoom, starts.length);
+        int caret = getCursorPosition();
+        int selection = getSelectionEnd();
+        int moving = ChatInputRows.rowOf(starts, selection);
+        if (moving < this.topRow) {
+            this.topRow = moving;
+        } else if (moving >= this.topRow + shown) {
+            this.topRow = moving - shown + 1;
+        }
+        this.topRow = Math.max(0, Math.min(this.topRow, starts.length - shown));
+        int left = this.xPosition;
+        int last = this.topRow + shown;
+        int caretRow = ChatInputRows.rowOf(starts, caret);
+        boolean caretShown = caretLit() && caretRow >= this.topRow
+                && caretRow < last;
+        int caretX = left + displayedX(text, resolved, starts[caretRow], caret);
+        for (int row = this.topRow; row < last; row++) {
+            int from = starts[row];
+            int to = ChatInputRows.drawnEnd(text, starts, row);
+            for (TokenPreview preview : resolved) {
+                if (preview.start >= from && preview.end <= to
+                        && preview.kind != TokenKind.EMOJI) {
+                    int x = left + displayedX(text, resolved, from,
+                            preview.start);
+                    drawBackdrop(x, x + preview.width - 1, rowTextTop(row),
+                            preview.backdropRgb);
+                }
+            }
+        }
+        if (caretShown) {
+            drawCaretShadow(caretX, rowTextTop(caretRow));
+        }
+        for (int row = this.topRow; row < last; row++) {
+            drawSpan(text, resolved, starts[row],
+                    ChatInputRows.drawnEnd(text, starts, row), left,
+                    rowTextTop(row));
+        }
+        if (caretShown) {
+            drawCaretBar(caretX, rowTextTop(caretRow));
+        }
+        if (selection == caret) {
+            return;
+        }
+        int low = Math.min(caret, selection);
+        int high = Math.max(caret, selection);
+        for (int row = this.topRow; row < last; row++) {
+            int from = starts[row];
+            int start = Math.max(low, from);
+            int end = Math.min(high, ChatInputRows.drawnEnd(text, starts, row));
+            if (start < end) {
+                int top = rowTextTop(row);
+                drawSelection(left + displayedX(text, resolved, from, start),
+                        selectionBandTop(top),
+                        left + displayedX(text, resolved, from, end) - 1,
+                        selectionBandBottom(top));
+            }
+        }
+    }
+
+    /** A click on one of the shown rows: the caret lands where it points on it. */
+    private boolean clickRows(int mouseX, int mouseY, int button) {
+        int[] starts = layOutRows();
+        int shown = Math.min(this.rowRoom, starts.length);
+        int top = this.yPosition - WindowStyle.ROW_TEXT_TOP;
+        if (button != 0 || !isFocused() || !LostTalesUiHitBox.contains(
+                mouseX, mouseY, this.xPosition, top, getWidth(),
+                shown * ROW_HEIGHT)) {
+            return false;
+        }
+        int row = Math.min(starts.length - 1,
+                this.topRow + (mouseY - top) / ROW_HEIGHT);
+        setCursorPosition(indexInRow(starts, row, mouseX - this.xPosition));
+        return true;
+    }
+
     /** Whether the field can be drawn in the chat's own style. */
     static boolean isStyled() {
         return LINE_SCROLL_OFFSET != null;
@@ -176,6 +492,10 @@ public final class ChatInputField extends GuiTextField {
         if (!isStyled()) {
             logFallbackOnce();
             super.drawTextBox();
+            return;
+        }
+        if (hasRows()) {
+            drawRows();
             return;
         }
         int scrollOffset;
@@ -715,20 +1035,7 @@ public final class ChatInputField extends GuiTextField {
         if (caretVisible) {
             drawCaretShadow(caretX, top);
         }
-        int x = left;
-        int cursor = scrollOffset;
-        for (TokenPreview preview : resolved) {
-            if (preview.start < cursor) {
-                continue;
-            }
-            if (preview.end > visibleEnd) {
-                break;
-            }
-            x = drawPlainRuns(text, cursor, preview.start, x, top);
-            x = drawPreview(preview, x, top);
-            cursor = preview.end;
-        }
-        drawPlainRuns(text, cursor, visibleEnd, x, top);
+        drawSpan(text, resolved, scrollOffset, visibleEnd, left, top);
 
         if (caretVisible) {
             drawCaretBar(caretX, top);
@@ -742,6 +1049,29 @@ public final class ChatInputField extends GuiTextField {
             drawSelection(caretX, selectionBandTop(top), selectionX - 1,
                     selectionBandBottom(top));
         }
+    }
+
+    /**
+     * The raw range {@code [from, to)} from {@code left}: its plain runs
+     * and its previews in turn, a token the range cannot hold whole
+     * ending it.
+     */
+    private void drawSpan(String text, List<TokenPreview> resolved,
+                          int from, int to, int left, int top) {
+        int x = left;
+        int cursor = from;
+        for (TokenPreview preview : resolved) {
+            if (preview.start < cursor) {
+                continue;
+            }
+            if (preview.end > to) {
+                break;
+            }
+            x = drawPlainRuns(text, cursor, preview.start, x, top);
+            x = drawPreview(preview, x, top);
+            cursor = preview.end;
+        }
+        drawPlainRuns(text, cursor, to, x, top);
     }
 
     /**
@@ -1103,6 +1433,12 @@ public final class ChatInputField extends GuiTextField {
 
     @Override
     public void mouseClicked(int mouseX, int mouseY, int button) {
+        if (hasRows()) {
+            if (!clickRows(mouseX, mouseY, button)) {
+                super.mouseClicked(mouseX, mouseY, button);
+            }
+            return;
+        }
         String text = getText();
         List<TokenPreview> resolved = previewsFor(text);
         boolean inside = LostTalesUiHitBox.contains(mouseX, mouseY, this.xPosition,

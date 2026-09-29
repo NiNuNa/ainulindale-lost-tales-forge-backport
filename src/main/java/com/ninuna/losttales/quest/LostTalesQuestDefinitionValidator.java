@@ -1,6 +1,7 @@
 package com.ninuna.losttales.quest;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.quest.world.WorldQuestRules;
 import cpw.mods.fml.common.FMLLog;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -51,6 +52,9 @@ public final class LostTalesQuestDefinitionValidator {
             return;
         }
         validateDialogue(quest, out);
+        for (String problem : WorldQuestRules.problems(quest)) {
+            out.warn("quest=" + quest.getId() + " " + problem);
+        }
         for (LostTalesQuestStageDefinition stage : quest.getStages()) {
             if (stage == null) {
                 continue;

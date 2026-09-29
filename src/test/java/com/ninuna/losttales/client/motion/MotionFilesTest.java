@@ -29,7 +29,7 @@ public final class MotionFilesTest {
             MotionIds.WINDOW_HOVER_FADE, MotionIds.CHAT_SCROLLBAR_FADE,
             MotionIds.WINDOW_MARQUEE_RETURN, MotionIds.WINDOW_SNAP_BAR_PEEK,
             MotionIds.SCREEN_JOURNAL_SCROLL, MotionIds.SCREEN_DIALOGUE_GLIDE,
-            MotionIds.SCREEN_CHARACTERS_GLIDE);
+            MotionIds.SCREEN_CHARACTERS_GLIDE, MotionIds.WINDOW_BAR_GROW);
     private static final List<String> BUTTONS = Arrays.asList(
             MotionIds.UI_BUTTON_LIFT, MotionIds.UI_BUTTON_TURN,
             MotionIds.UI_BUTTON_SNAP);
@@ -157,6 +157,16 @@ public final class MotionFilesTest {
         assertTrue(hover.param("stagger_span") > 0.0F);
     }
 
+    /** The input bars arrive with their window unless the files give them an entrance of their own. */
+    @Test
+    public void theBarsRideTheirWindowUnlessGivenATime() throws Exception {
+        assertEquals(0, bundled().get(MotionIds.WINDOW_BAR_APPEAR)
+                .beat(Motion.ON).durationMillis());
+        assertEquals("a screen's strip rides its screen too (W25 a)", 0,
+                bundled().get(MotionIds.SCREEN_CONTROL_BAR).beat(Motion.ON)
+                        .durationMillis());
+    }
+
     @Test
     public void everyNumberTheCodeReadsIsThere() throws Exception {
         Map<String, Motion> motions = bundled();
@@ -173,6 +183,7 @@ public final class MotionFilesTest {
         params.put(MotionIds.WINDOW_TAB_MARQUEE, new String[] {"speed", "pause"});
         params.put(MotionIds.WINDOW_NOTICE, new String[] {"hold", "rise"});
         params.put(MotionIds.WINDOW_ANSWER, new String[] {"hold", "rise"});
+        params.put(MotionIds.WINDOW_VIEW_LINE, new String[] {"hold"});
         for (Map.Entry<String, String[]> entry : params.entrySet()) {
             for (String name : entry.getValue()) {
                 assertFalse(entry.getKey() + " " + name, Float.isNaN(

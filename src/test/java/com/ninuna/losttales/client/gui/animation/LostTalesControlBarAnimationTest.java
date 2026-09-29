@@ -5,6 +5,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+/** Given a time in the motion files, a control strip rises into place on its own and settles exactly. */
 public final class LostTalesControlBarAnimationTest {
     private static final float EPSILON = 0.0001F;
 

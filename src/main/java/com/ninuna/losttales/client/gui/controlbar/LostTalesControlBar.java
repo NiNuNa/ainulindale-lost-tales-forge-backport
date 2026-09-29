@@ -20,8 +20,9 @@ import org.lwjgl.opengl.GL11;
  * Reusable animated control strip for Lost Tales screens.
  *
  * <p>Screens only describe their input hints. This class owns their visual
- * language, responsive fitting, input-icon animation, ivory labels, and the
- * independently delayed entrance used by every bottom control bar.</p>
+ * language, responsive fitting, input-icon animation and ivory labels. The
+ * strip is drawn from the screen's origin and arrives with its screen
+ * ({@link LostTalesControlBarAnimation}).</p>
  */
 @SideOnly(Side.CLIENT)
 public final class LostTalesControlBar {
@@ -41,7 +42,7 @@ public final class LostTalesControlBar {
             Object screen, Minecraft minecraft, FontRenderer font,
             int screenWidth, int screenHeight, List<Hint> hints,
             int leftGroupSize, int centerReserved,
-            List<String> statusCandidates, boolean fixedCoordinates) {
+            List<String> statusCandidates) {
         if (screen == null || minecraft == null || font == null
                 || screenWidth <= 0 || screenHeight <= 0) {
             return false;
@@ -58,13 +59,13 @@ public final class LostTalesControlBar {
         }
         Layout layout = calculateLayout(screenWidth, safeHints,
                 leftGroupSize, centerReserved, statusWidths);
-        float offset = LostTalesControlBarAnimation.offsetY(screen);
-        beginRender(offset, fixedCoordinates);
+        float offset = LostTalesControlBarAnimation.shiftY(screen);
+        beginRender(screen);
         try {
             int top = Math.max(0, screenHeight - HEIGHT);
-            // The content retains its full fly-in/follow-through. Extending
-            // the fill in the opposite direction keeps the bottom edge
-            // covered even while the translated strip overshoots.
+            // The strip keeps its full fly-in and follow-through. Extending
+            // the fill the other way keeps the screen's bottom edge covered
+            // while the moved strip stands above its place.
             int fillTop = top;
             int fillBottom = screenHeight
                     + (int)Math.ceil(Math.max(0.0F, -offset)) + 1;
@@ -201,14 +202,13 @@ public final class LostTalesControlBar {
                 LostTalesColors.BORDER_DIM);
     }
 
-    private static void beginRender(float offset, boolean fixedCoordinates) {
+    /** The strip's own state and matrix: from the screen's origin, where the strip stands now. */
+    private static void beginRender(Object screen) {
         GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_COLOR_BUFFER_BIT
                 | GL11.GL_CURRENT_BIT | GL11.GL_TEXTURE_BIT);
         GL11.glPushMatrix();
-        if (fixedCoordinates) {
-            LostTalesGuiOrigin.load();
-        }
-        GL11.glTranslatef(0.0F, offset, 0.0F);
+        LostTalesGuiOrigin.load();
+        LostTalesControlBarAnimation.place(screen);
     }
 
     private static void endRender() {

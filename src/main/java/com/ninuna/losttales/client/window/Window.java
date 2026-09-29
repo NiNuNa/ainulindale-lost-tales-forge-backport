@@ -83,6 +83,14 @@ public final class Window {
                 named("centre_half", 3, 0, 6, 2);
         public static final ScreenFill RIGHT_QUARTER =
                 named("right_quarter", 9, 0, 3, 2);
+        /**
+         * The whole screen for the tab's content alone ({@link ContentView}):
+         * the window's row, strip and bar lie past the screen's edges. Never
+         * a window's own fill, never snapped to and never saved, so it is
+         * none of the named parts the layout file reads.
+         */
+        public static final ScreenFill CONTENT = new ScreenFill("content", 0,
+                0, COLUMNS, ROWS, 0.0D, 0.0D, 1.0D, 1.0D);
 
         /** The named part's id; empty for a free one. */
         private final String id;

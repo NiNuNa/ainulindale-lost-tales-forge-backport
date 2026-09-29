@@ -8,6 +8,7 @@ import com.ninuna.losttales.quest.LostTalesQuestTimeText;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.quest.progress.LostTalesQuestHistoryEntry;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
+import com.ninuna.losttales.quest.world.WorldQuestView;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -135,6 +136,43 @@ public final class LostTalesClientQuestNotificationStore {
             }
 
             notifyObjectiveChanges(questId, previous, next);
+        }
+    }
+
+    /**
+     * Shows as banners what changed between two lists of world quests: one
+     * that started, and one that succeeded, failed or was stopped, with
+     * the quest sounds. Counts moving are the tracker's to show, not news.
+     */
+    public static synchronized void notifyWorldQuests(
+            Map<String, WorldQuestView> previous,
+            Map<String, WorldQuestView> next) {
+        for (WorldQuestView view : next.values()) {
+            WorldQuestView before = previous.get(view.getQuestId());
+            boolean started = before == null || !before.isRunning()
+                    && view.isRunning();
+            if (view.isRunning() && started) {
+                addInfo(banner("world.started", view.getQuestId()));
+                playQuestSound(SOUND_PROGRESS, 0.35F, 1.0F);
+                continue;
+            }
+            if (before == null || !before.isRunning() || view.isRunning()) {
+                continue;
+            }
+            switch (view.getState()) {
+                case COMPLETED:
+                    addComplete(banner("world.completed", view.getQuestId()));
+                    playQuestSound(SOUND_COMPLETED, 0.45F, 1.0F);
+                    break;
+                case FAILED:
+                    addFailed(banner("world.failed", view.getQuestId()));
+                    playQuestSound(SOUND_FAILED, 0.3F, 0.8F);
+                    break;
+                default:
+                    add(banner("world.stopped", view.getQuestId()),
+                            Type.ABANDONED);
+                    break;
+            }
         }
     }
 

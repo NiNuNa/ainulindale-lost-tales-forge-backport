@@ -5,8 +5,6 @@ import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
-import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
-import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
 import com.ninuna.losttales.quest.progress.LostTalesQuestHistoryEntry;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
@@ -35,13 +33,9 @@ public class LostTalesQuestSyncPacket implements IMessage {
     static final int MAX_OBJECTIVE_PROGRESS = 512;
     static final int MAX_DYNAMIC_MARKERS = 2048;
     static final int MAX_DYNAMIC_QUESTS = 512;
-    static final int MAX_QUEST_STAGES = 256;
-    static final int MAX_STAGE_OBJECTIVES = 512;
-    static final int MAX_STRING_MAP_ENTRIES = 256;
     static final int MAX_IDENTIFIER_BYTES = 256;
     static final int MAX_NAME_BYTES = 1024;
     static final int MAX_TEXT_BYTES = 8192;
-    static final int MAX_MAP_VALUE_BYTES = 4096;
 
     private final List<LostTalesQuestProgress> activeQuests = new ArrayList<LostTalesQuestProgress>();
     private final List<LostTalesQuestHistoryEntry> questHistory = new ArrayList<LostTalesQuestHistoryEntry>();
@@ -235,7 +229,7 @@ public class LostTalesQuestSyncPacket implements IMessage {
             int dynamicQuestCount = LostTalesPacketCodec.readCount(
                     buf, MAX_DYNAMIC_QUESTS, "dynamic quest");
             for (int i = 0; i < dynamicQuestCount; i++) {
-                LostTalesQuestDefinition quest = readQuestDefinition(buf);
+                LostTalesQuestDefinition quest = LostTalesQuestDefinitionCodec.read(buf);
                 if (quest == null || quest.getId() == null
                         || quest.getId().length() == 0) {
                     throw new LostTalesPacketCodec.DecodeException(
@@ -337,7 +331,7 @@ public class LostTalesQuestSyncPacket implements IMessage {
                 this.dynamicQuestDefinitions.size(), MAX_DYNAMIC_QUESTS,
                 "dynamic quest");
         for (LostTalesQuestDefinition quest : this.dynamicQuestDefinitions) {
-            writeQuestDefinition(buf, quest);
+            LostTalesQuestDefinitionCodec.write(buf, quest);
         }
         if (buf.writerIndex() - startIndex > MAX_PACKET_BYTES) {
             throw new IllegalStateException(
@@ -381,140 +375,6 @@ public class LostTalesQuestSyncPacket implements IMessage {
 
     public boolean isMalformed() {
         return this.malformed;
-    }
-
-    private static void writeQuestDefinition(ByteBuf buf, LostTalesQuestDefinition quest) {
-        if (quest == null || quest.getId() == null
-                || quest.getId().length() == 0) {
-            throw new IllegalStateException("invalid dynamic quest");
-        }
-        writeIdentifier(buf, quest.getId());
-        writeName(buf, quest.getTitle());
-        writeText(buf, quest.getDescription());
-        buf.writeBoolean(quest.isRepeatable());
-        buf.writeBoolean(quest.isRestartable());
-        writeIdentifier(buf, quest.getStartMode());
-        writeStringMap(buf, quest.getPrerequisites(), "prerequisite");
-        writeStringMap(buf, quest.getRewards(), "reward");
-        writeStringMap(buf, quest.getInteraction(), "interaction");
-        writeStringMap(buf, quest.getMarkers(), "quest marker");
-        writeStringMap(buf, quest.getJournalLog(), "journal log");
-
-        List<LostTalesQuestStageDefinition> stages = quest.getStages();
-        LostTalesPacketCodec.writeCount(buf, stages.size(),
-                MAX_QUEST_STAGES, "quest stage");
-        for (LostTalesQuestStageDefinition stage : stages) {
-            if (stage == null) {
-                throw new IllegalStateException("invalid quest stage");
-            }
-            writeIdentifier(buf, stage.getId());
-            List<LostTalesQuestObjectiveDefinition> objectives =
-                    stage.getObjectives();
-            LostTalesPacketCodec.writeCount(buf, objectives.size(),
-                    MAX_STAGE_OBJECTIVES, "stage objective");
-            for (LostTalesQuestObjectiveDefinition objective : objectives) {
-                if (objective == null || objective.getId() == null
-                        || objective.getId().length() == 0
-                        || objective.getType() == null
-                        || objective.getType().length() == 0) {
-                    throw new IllegalStateException(
-                            "invalid quest objective");
-                }
-                writeIdentifier(buf, objective.getId());
-                writeIdentifier(buf, objective.getType());
-                writeText(buf, objective.getDescription());
-                buf.writeBoolean(objective.isOptional());
-                writeStringMap(buf, objective.getParams(),
-                        "objective parameter");
-            }
-        }
-    }
-
-    private static LostTalesQuestDefinition readQuestDefinition(ByteBuf buf) {
-        String id = readIdentifier(buf);
-        String title = readName(buf);
-        String description = readText(buf);
-        boolean repeatable = buf.readBoolean();
-        boolean restartable = buf.readBoolean();
-        String startMode = readIdentifier(buf);
-        Map<String, String> prerequisites = readStringMap(
-                buf, "prerequisite");
-        Map<String, String> rewards = readStringMap(buf, "reward");
-        Map<String, String> interaction = readStringMap(buf, "interaction");
-        Map<String, String> markers = readStringMap(buf, "quest marker");
-        Map<String, String> journalLog = readStringMap(buf, "journal log");
-
-        List<LostTalesQuestStageDefinition> stages = new ArrayList<LostTalesQuestStageDefinition>();
-        int stageCount = LostTalesPacketCodec.readCount(
-                buf, MAX_QUEST_STAGES, "quest stage");
-        for (int i = 0; i < stageCount; i++) {
-            String stageId = readIdentifier(buf);
-            List<LostTalesQuestObjectiveDefinition> objectives = new ArrayList<LostTalesQuestObjectiveDefinition>();
-            int objectiveCount = LostTalesPacketCodec.readCount(
-                    buf, MAX_STAGE_OBJECTIVES, "stage objective");
-            for (int j = 0; j < objectiveCount; j++) {
-                String objectiveId = readIdentifier(buf);
-                String objectiveType = readIdentifier(buf);
-                String objectiveDescription = readText(buf);
-                boolean optional = buf.readBoolean();
-                Map<String, String> params = readStringMap(
-                        buf, "objective parameter");
-                if (objectiveId.length() == 0
-                        || objectiveType.length() == 0) {
-                    throw new LostTalesPacketCodec.DecodeException(
-                            "invalid quest objective");
-                }
-                objectives.add(new LostTalesQuestObjectiveDefinition(
-                        objectiveId, objectiveType, objectiveDescription,
-                        optional, params));
-            }
-            stages.add(new LostTalesQuestStageDefinition(stageId, objectives));
-        }
-
-        if (id.length() == 0) {
-            throw new LostTalesPacketCodec.DecodeException(
-                    "dynamic quest ID is empty");
-        }
-        return new LostTalesQuestDefinition(id, title, description,
-                repeatable, restartable, startMode, prerequisites, rewards,
-                interaction, markers, journalLog, stages);
-    }
-
-    private static void writeStringMap(ByteBuf buf, Map<String, String> values,
-                                       String fieldName) {
-        if (values == null || values.isEmpty()) {
-            buf.writeInt(0);
-            return;
-        }
-        LostTalesPacketCodec.writeCount(buf, values.size(),
-                MAX_STRING_MAP_ENTRIES, fieldName);
-        for (Map.Entry<String, String> entry : values.entrySet()) {
-            if (entry.getKey() == null || entry.getKey().length() == 0) {
-                throw new IllegalStateException(
-                        "invalid " + fieldName + " key");
-            }
-            writeIdentifier(buf, entry.getKey());
-            LostTalesPacketCodec.writeUtf8String(
-                    buf, safeStatic(entry.getValue()), MAX_MAP_VALUE_BYTES);
-        }
-    }
-
-    private static Map<String, String> readStringMap(ByteBuf buf,
-                                                     String fieldName) {
-        LinkedHashMap<String, String> map = new LinkedHashMap<String, String>();
-        int count = LostTalesPacketCodec.readCount(
-                buf, MAX_STRING_MAP_ENTRIES, fieldName);
-        for (int i = 0; i < count; i++) {
-            String key = readIdentifier(buf);
-            String value = LostTalesPacketCodec.readUtf8String(
-                    buf, MAX_MAP_VALUE_BYTES);
-            if (key.length() == 0) {
-                throw new LostTalesPacketCodec.DecodeException(
-                        "invalid " + fieldName + " key");
-            }
-            map.put(key, value);
-        }
-        return map;
     }
 
     private void clearState() {

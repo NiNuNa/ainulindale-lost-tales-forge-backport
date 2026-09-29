@@ -11,8 +11,8 @@
     "curve": "ease_in_out"
   },
   "screen.control_bar": {
-    "about": "A screen's bottom control strip following its content in: waiting delay milliseconds, then rising travel pixels into place.",
-    "duration": 189,
+    "about": "A screen's bottom control strip's own entrance: waiting delay milliseconds, then rising travel pixels into place. At 0 milliseconds it has none and arrives with its screen's content; given a time, it comes up on its own instead.",
+    "duration": 0,
     "curve": "back_out",
     "params": { "delay": 31, "travel": 24 }
   },

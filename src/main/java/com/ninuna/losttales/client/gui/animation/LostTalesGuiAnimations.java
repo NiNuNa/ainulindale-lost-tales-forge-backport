@@ -76,11 +76,22 @@ public final class LostTalesGuiAnimations {
      */
     public static LostTalesGuiAnimationSample pushContentTransform(
             GuiScreen screen, int width, int height) {
+        GL11.glPushMatrix();
+        return applyContentTransform(screen, width, height);
+    }
+
+    /**
+     * Moves the matrix in force as the screen's content is moved now,
+     * round the screen's middle; the map only slides, never scales. What
+     * {@link #pushContentTransform} pushes, and what a control strip
+     * riding its screen takes on from the screen's origin.
+     */
+    static LostTalesGuiAnimationSample applyContentTransform(
+            GuiScreen screen, int width, int height) {
         LostTalesGuiAnimationSample sample = sample(screen);
         boolean projectiveMap = screen instanceof LostTalesLotrMapGui;
         float scaleX = projectiveMap ? 1.0F : sample.getScaleX();
         float scaleY = projectiveMap ? 1.0F : sample.getScaleY();
-        GL11.glPushMatrix();
         GL11.glTranslatef(width * 0.5F + sample.getTranslationX(),
                 height * 0.5F + sample.getTranslationY(), 0.0F);
         GL11.glScalef(scaleX, scaleY, 1.0F);

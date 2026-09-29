@@ -395,9 +395,9 @@ public final class WindowPlacement {
                         int screenWidth, int screenHeight) {
         WindowFrame frame = WindowFrame.find(window.getId());
         if (frame == null || !frame.hasSeenFill()) {
-            return window.getFill() == Window.ScreenFill.NONE ? resting
-                    : fillBounds(window.getFill(), minecraft, screenWidth,
-                            screenHeight);
+            Window.ScreenFill fill = ContentView.fillOf(window);
+            return fill == Window.ScreenFill.NONE ? resting
+                    : fillBounds(fill, minecraft, screenWidth, screenHeight);
         }
         WindowPlacement.Box from = frame.fillLegFrom();
         Window.ScreenFill to = frame.fillLegTo();
@@ -463,6 +463,15 @@ public final class WindowPlacement {
         int barHeight = barHeight(minecraft);
         int width = (int)Math.round(boxWidthForChatWidth(
                 fillChatWidth(fill, minecraft, screenWidth), minecraft));
+        if (fill == Window.ScreenFill.CONTENT) {
+            // What the tab holds from the screen's top to its bottom, edge
+            // to edge: the row and the strip above the top, the bar below
+            // the bottom, the frame past the sides.
+            double room = Math.max(1.0D, screenHeight - HISTORY_TOP_MARGIN
+                    - lineHeight(minecraft));
+            return new Box(0.0D, -rowHeight(minecraft), width,
+                    heightForRoom(room, minecraft), barHeight, room);
+        }
         double room = Math.max(1.0D, fill.height(screenHeight)
                 - 2.0D * margin - rowHeight(minecraft) - HISTORY_TOP_MARGIN
                 - barHeight);
@@ -474,6 +483,10 @@ public final class WindowPlacement {
     /** The chat width a window filling {@code fill} is laid out at. */
     static int fillChatWidth(Window.ScreenFill fill, Minecraft minecraft,
                              int screenWidth) {
+        if (fill == Window.ScreenFill.CONTENT) {
+            return Math.max(WindowLayout.MIN_WINDOW_SIZE,
+                    chatWidthForBox(screenWidth, minecraft));
+        }
         return Math.max(WindowLayout.MIN_WINDOW_SIZE, chatWidthForBox(
                 fill.width(screenWidth) - 2 * EDGE_MARGIN,
                 minecraft));
@@ -491,8 +504,9 @@ public final class WindowPlacement {
         int own = chatWidth(window, minecraft);
         WindowFrame frame = WindowFrame.find(window.getId());
         if (frame == null || !frame.hasSeenFill()) {
-            return window.getFill() == Window.ScreenFill.NONE ? own
-                    : fillChatWidth(window.getFill(), minecraft, screenWidth);
+            Window.ScreenFill fill = ContentView.fillOf(window);
+            return fill == Window.ScreenFill.NONE ? own
+                    : fillChatWidth(fill, minecraft, screenWidth);
         }
         WindowPlacement.Box from = frame.fillLegFrom();
         Window.ScreenFill to = frame.fillLegTo();

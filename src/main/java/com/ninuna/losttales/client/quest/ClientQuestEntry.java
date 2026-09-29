@@ -11,7 +11,9 @@ import java.util.List;
 public final class ClientQuestEntry {
     public enum Source {
         LOST_TALES,
-        LOTR
+        LOTR,
+        /** A world quest the whole server works on ({@link ClientWorldQuests}). */
+        WORLD
     }
 
     public enum Status {

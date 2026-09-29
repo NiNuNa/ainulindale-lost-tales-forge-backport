@@ -231,7 +231,7 @@ public class LostTalesCharacterMenuGui extends GuiScreen
                 I18n.format("gui.losttales.character_menu.hint.close")));
         LostTalesControlBar.render(this, this.mc, this.fontRendererObj,
                 this.width, this.height, hints, hints.size(), 116,
-                Collections.<String>emptyList(), true);
+                Collections.<String>emptyList());
     }
 
     @Override

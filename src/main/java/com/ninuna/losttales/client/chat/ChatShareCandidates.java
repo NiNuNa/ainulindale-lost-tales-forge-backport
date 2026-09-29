@@ -87,7 +87,10 @@ final class ChatShareCandidates {
         List<Integer> seenCounts = new ArrayList<Integer>();
         for (ClientQuestEntry quest : ClientQuestCatalog.getEntries(
                 net.minecraft.client.Minecraft.getMinecraft())) {
-            if (quest == null || !quest.isActive()) {
+            // A world quest is the whole server's, in nobody's quest log
+            // to share from.
+            if (quest == null || !quest.isActive()
+                    || quest.getSource() == ClientQuestEntry.Source.WORLD) {
                 continue;
             }
             String name = ChatShareTokenParser.plainName(quest.getTitle());

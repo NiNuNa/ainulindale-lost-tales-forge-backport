@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.client.chat.ChatFeedPlacement;
+import com.ninuna.losttales.client.window.ContentView;
 import com.ninuna.losttales.client.window.PageTab;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowDrawing;
@@ -309,7 +310,7 @@ public final class LostTalesChatOverlayRenderer {
         // shared list.
         // A window filling a part of the screen, or gliding to or from
         // it, is laid out at the width it is drawn at this instant.
-        frame.advanceFill(window.getFill());
+        frame.advanceFill(ContentView.fillOf(window));
         int chatWidth = WindowPlacement.drawnChatWidth(window, minecraft,
                 screenWidth);
         // The timestamp area and the member list glide in and out before
@@ -882,9 +883,11 @@ public final class LostTalesChatOverlayRenderer {
         }
         // A row carried to a new layout glides there while the view
         // reads the newest line. Scrolled away, the scroll holds the line
-        // being read in place, and the rows are set down at once.
+        // being read in place, and the rows are set down at once, but for
+        // a layout the scroll was carried with: a long message opened or
+        // folded.
         ChatRowGlide glide = frame.glide;
-        if (scrollLines > 0.0D) {
+        if (scrollLines > 0.0D && !glide.isCarried()) {
             glide.halt();
         }
         glide.advance(System.nanoTime(), stackPixelsPerUnit());

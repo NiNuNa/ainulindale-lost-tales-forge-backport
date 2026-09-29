@@ -67,6 +67,7 @@ import com.ninuna.losttales.client.party.ClientPartyMemberStatusCache;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.client.party.ClientPartyTrackingCache;
 import com.ninuna.losttales.client.quest.ClientQuestCatalog;
+import com.ninuna.losttales.client.quest.ClientWorldQuests;
 import com.ninuna.losttales.client.quest.LostTalesQuestDialogueHooks;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestNotificationStore;
@@ -166,7 +167,8 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         WindowSession.clear();
         LostTalesClientQuestProgressStore.clear();
         LostTalesClientQuestNotificationStore.clear();
-        LostTalesClientQuestDefinitionStore.clearDynamicQuestDefinitions();
+        LostTalesClientQuestDefinitionStore.clearServerSentDefinitions();
+        ClientWorldQuests.clear();
         ClientQuestCatalog.forget();
         LostTalesClientMapMarkerNotificationStore.clear();
         LostTalesClientMapMarkerStore.clearDynamicMarkers();

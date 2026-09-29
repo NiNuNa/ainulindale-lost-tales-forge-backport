@@ -4,6 +4,11 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestManager;
 import com.ninuna.losttales.quest.LostTalesQuestRegistry;
+import com.ninuna.losttales.quest.ServerQuestFiles;
+import com.ninuna.losttales.quest.ServerQuestSync;
+import com.ninuna.losttales.quest.world.WorldQuestRules;
+import com.ninuna.losttales.quest.world.WorldQuestRun;
+import com.ninuna.losttales.quest.world.WorldQuests;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import com.ninuna.losttales.permission.LostTalesCapability;
 import java.util.ArrayList;
@@ -16,14 +21,15 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.ChatComponentText;
+import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.util.EnumChatFormatting;
 /**
- * Small server-side debug/admin command for the first quest runtime stage.
- *
- * This is intentionally simple: it lets pack developers verify that quest definitions
- * load on the server and that player quest NBT survives saves before objective logic
- * and client sync are added.
+ * The quest admin command: what the server knows and each player holds,
+ * starting, finishing and resetting a player's quests, starter items and
+ * markers, reading the server's own quest files again, and starting and
+ * stopping world quests.
  */
 public class LostTalesCommandQuest extends LostTalesCommandBase {
 
@@ -40,7 +46,7 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return commandPrefix() + " <defs|list|scan|starter|start|complete|reset|abandon|pin|unpin|revealmarkers|trackmarker|untrackmarker> [id] [player]";
+        return commandPrefix() + " <defs|list|scan|starter|start|complete|reset|abandon|pin|unpin|revealmarkers|trackmarker|untrackmarker|reload|world> [id] [player]";
     }
 
     @Override
@@ -102,6 +108,16 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
 
         if ("starter".equalsIgnoreCase(action)) {
             giveStarterItem(sender, args);
+            return;
+        }
+
+        if ("reload".equalsIgnoreCase(action)) {
+            reloadServerQuests(sender);
+            return;
+        }
+
+        if ("world".equalsIgnoreCase(action)) {
+            worldQuest(sender, args);
             return;
         }
 
@@ -352,6 +368,83 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
         }
     }
 
+    /** Reads the server's own quest files again and sends them to everyone online. */
+    private void reloadServerQuests(ICommandSender sender) {
+        ServerQuestFiles.Result result = LostTalesQuestRegistry.loadServerQuests();
+        ServerQuestSync.sendToAll(MinecraftServer.getServer());
+        sender.addChatMessage(new ChatComponentTranslation(
+                "chat.losttales.quest.reload.done",
+                Integer.valueOf(result.quests.size()),
+                Integer.valueOf(result.problems.size())));
+    }
+
+    /** {@code world start|stop <id>} and {@code world list}. */
+    private void worldQuest(ICommandSender sender, String[] args) {
+        MinecraftServer server = MinecraftServer.getServer();
+        String verb = args.length >= 2 ? args[1] : "";
+        if ("list".equalsIgnoreCase(verb)) {
+            listWorldQuests(sender, server);
+            return;
+        }
+        if (args.length < 3 || !"start".equalsIgnoreCase(verb)
+                && !"stop".equalsIgnoreCase(verb)) {
+            sender.addChatMessage(new ChatComponentTranslation(
+                    "chat.losttales.quest.world.usage", commandPrefix()));
+            return;
+        }
+        String questId = args[2];
+        if ("stop".equalsIgnoreCase(verb)) {
+            sender.addChatMessage(new ChatComponentTranslation(
+                    WorldQuests.stop(server, questId)
+                            ? "chat.losttales.quest.world.stopped"
+                            : "chat.losttales.quest.world.not_running",
+                    questId));
+            return;
+        }
+        WorldQuests.StartResult result = WorldQuests.start(server, questId);
+        String key = "chat.losttales.quest.world.start."
+                + result.name().toLowerCase(java.util.Locale.ROOT);
+        if (result == WorldQuests.StartResult.NOT_READY) {
+            LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(
+                    questId);
+            java.util.List<String> problems = WorldQuestRules.problems(quest);
+            sender.addChatMessage(new ChatComponentTranslation(key, questId,
+                    problems.isEmpty() ? "" : problems.get(0)));
+            return;
+        }
+        sender.addChatMessage(new ChatComponentTranslation(key, questId,
+                Integer.valueOf(WorldQuests.MAX_RUNNING)));
+    }
+
+    private void listWorldQuests(ICommandSender sender, MinecraftServer server) {
+        java.util.List<WorldQuestRun> runs = WorldQuests.runs(server);
+        if (runs.isEmpty()) {
+            sender.addChatMessage(new ChatComponentTranslation(
+                    "chat.losttales.quest.world.none"));
+            return;
+        }
+        for (WorldQuestRun run : runs) {
+            LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(
+                    run.getQuestId());
+            int reached = 0;
+            int goal = 0;
+            for (com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition objective
+                    : WorldQuestRules.objectives(quest)) {
+                reached += Math.min(WorldQuestRules.goal(objective),
+                        run.getCount(objective.getId()));
+                goal += WorldQuestRules.goal(objective);
+            }
+            sender.addChatMessage(new ChatComponentTranslation(
+                    "chat.losttales.quest.world.line", run.getQuestId(),
+                    new ChatComponentTranslation(
+                            "chat.losttales.quest.world.state."
+                                    + run.getState().name().toLowerCase(
+                                            java.util.Locale.ROOT)),
+                    Integer.valueOf(reached), Integer.valueOf(goal),
+                    Integer.valueOf(run.getHelpers().size())));
+        }
+    }
+
     private void sendUsage(ICommandSender sender) {
         send(sender, EnumChatFormatting.GRAY + getCommandUsage(sender));
         send(sender, EnumChatFormatting.GRAY + "Examples:");
@@ -398,7 +491,19 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
     @Override
     public List addTabCompletionOptions(ICommandSender sender, String[] args) {
         if (args.length == 1) {
-            return getListOfStringsMatchingLastWord(args, "defs", "list", "scan", "starter", "start", "complete", "reset", "abandon", "pin", "unpin", "revealmarkers", "trackmarker", "untrackmarker");
+            return getListOfStringsMatchingLastWord(args, "defs", "list", "scan", "starter", "start", "complete", "reset", "abandon", "pin", "unpin", "revealmarkers", "trackmarker", "untrackmarker", "reload", "world");
+        }
+        if (args.length == 2 && "world".equalsIgnoreCase(args[0])) {
+            return getListOfStringsMatchingLastWord(args, "start", "stop", "list");
+        }
+        if (args.length == 3 && "world".equalsIgnoreCase(args[0])) {
+            List<String> ids = new ArrayList<String>();
+            for (LostTalesQuestDefinition quest : LostTalesQuestRegistry.getQuests()) {
+                if (quest.isWorldQuest()) {
+                    ids.add(quest.getId());
+                }
+            }
+            return getListOfStringsMatchingLastWord(args, ids.toArray(new String[ids.size()]));
         }
         if (args.length == 2 && ("starter".equalsIgnoreCase(args[0]) || "start".equalsIgnoreCase(args[0]) || "complete".equalsIgnoreCase(args[0]) || "reset".equalsIgnoreCase(args[0]) || "abandon".equalsIgnoreCase(args[0]) || "pin".equalsIgnoreCase(args[0]) || "revealmarkers".equalsIgnoreCase(args[0]))) {
             List<String> ids = new ArrayList<String>();

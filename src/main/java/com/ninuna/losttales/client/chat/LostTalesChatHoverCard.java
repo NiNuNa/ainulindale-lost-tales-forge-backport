@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.client.window.WindowStyle;
+import com.ninuna.losttales.client.window.WindowTab;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatPresence;
@@ -66,11 +67,12 @@ final class LostTalesChatHoverCard {
     private LostTalesChatHoverCard() {}
 
     /**
-     * The brief card of the identity a tab speaks as: what the head
-     * button shows on hover, so who the roleplaying channels speak as
-     * is read the way anyone else in the chat is.
+     * The brief card of who the player is on a tab: what its identity
+     * button shows on hover, so who the roleplaying channels speak as, or
+     * the character a page is about, is read the way anyone else in the
+     * chat is.
      */
-    static void drawForIdentity(Minecraft minecraft, ChatTab tab, int mouseX,
+    static void drawForIdentity(Minecraft minecraft, WindowTab tab, int mouseX,
                                 int mouseY, int screenWidth, int screenHeight) {
         if (minecraft == null || minecraft.thePlayer == null
                 || minecraft.fontRenderer == null) {

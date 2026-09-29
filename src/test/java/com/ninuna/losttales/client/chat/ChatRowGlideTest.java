@@ -167,6 +167,55 @@ public final class ChatRowGlideTest {
         assertEquals(1L, messages[2]);
     }
 
+    /**
+     * Read more opens a message with the view's scroll carried as far as
+     * the rows above moved: those stay still, the rows it adds fade in,
+     * and Read more and the message under it glide down from where they
+     * stood, even in a view scrolled back.
+     */
+    @Test
+    public void anOpenedMessagesRowsGlideWithTheScrollCarried() {
+        final int newest = 13;
+        ChatRowGlide glide = new ChatRowGlide();
+        lay(glide, START, row(newest, "n"), fold(NEWER), row(NEWER, "w4"),
+                row(NEWER, "w3"), row(NEWER, "w2"), row(NEWER, "w1"),
+                row(OLDER, "o"));
+        lay(glide, START, row(newest, "n"), fold(NEWER), row(NEWER, "w6"),
+                row(NEWER, "w5"), row(NEWER, "w4"), row(NEWER, "w3"),
+                row(NEWER, "w2"), row(NEWER, "w1"), row(OLDER, "o"));
+        glide.shifted(2 * LINE, START);
+        assertTrue(glide.isCarried());
+
+        glide.advance(START, 0.0F);
+        assertEquals("the message under it stood two rows higher",
+                2 * LINE, glide.lift(0), 0.001F);
+        assertEquals("and so did Read more", 2 * LINE, glide.lift(1), 0.001F);
+        assertEquals("an opened row lands in place", 0.0F, glide.lift(2), 0.0F);
+        assertEquals("and fades in", 0.0F, glide.shown(2), 0.0F);
+        for (int index = 4; index <= 8; index++) {
+            assertEquals("the rows above stay still", 0.0F,
+                    glide.lift(index), 0.001F);
+        }
+        glide.advance(START + DURATION + 1L, 0.0F);
+        assertEquals(0.0F, glide.lift(0), 0.0F);
+        assertTrue("carried no further", !glide.isCarried());
+    }
+
+    @Test
+    public void nothingIsCarriedAfterACut() {
+        ChatRowGlide glide = new ChatRowGlide();
+        lay(glide, START, row(OLDER, "a"));
+        lay(glide, START, row(NEWER, "b"), row(OLDER, "a"));
+        glide.shifted(LINE, START);
+        assertTrue(!glide.isCarried());
+    }
+
+    private static ChatLine fold(int chatLineId) {
+        ChatComponentText row = new ChatComponentText("");
+        row.appendSibling(ChatFoldMarker.toggle(chatLineId, false));
+        return new ChatLine(0, row, chatLineId);
+    }
+
     private static ChatStackRows lay(ChatRowGlide glide, long now,
                                      ChatLine... newestFirst) {
         List<ChatLine> lines = Arrays.asList(newestFirst);

@@ -1,6 +1,8 @@
 package com.ninuna.losttales.event;
 
 import com.ninuna.losttales.quest.LostTalesQuestManager;
+import com.ninuna.losttales.quest.ServerQuestSync;
+import com.ninuna.losttales.quest.world.WorldQuests;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSyncManager;
 import com.ninuna.losttales.compat.lotr.LostTalesLotrWaystoneTravelAdapter;
 import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
@@ -47,6 +49,11 @@ public final class LostTalesQuestPlayerEventHandler {
 
     @SubscribeEvent
     public void onPlayerLoggedIn(PlayerLoggedInEvent event) {
+        // The server's own quests first, so the quest log that follows
+        // finds every quest it names.
+        if (event.player instanceof EntityPlayerMP) {
+            ServerQuestSync.sendTo((EntityPlayerMP)event.player);
+        }
         refreshAndSyncIfServerPlayer(event.player);
     }
 
@@ -57,6 +64,7 @@ public final class LostTalesQuestPlayerEventHandler {
                     event.player.getUniqueID());
             LostTalesLotrWaystoneTravelAdapter.clearPending(
                     (EntityPlayerMP)event.player);
+            WorldQuests.forget(event.player.getUniqueID());
         }
     }
 

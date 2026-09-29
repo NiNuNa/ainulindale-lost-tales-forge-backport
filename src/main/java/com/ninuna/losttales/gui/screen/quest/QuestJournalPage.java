@@ -798,7 +798,8 @@ public final class QuestJournalPage extends PageContent {
      * The quest being read's actions: Track (or Stop tracking) and Share
      * from the left, Abandon last in red, or Clear for a finished LOTR
      * quest, which only such a quest may leave History by. Each is there
-     * whatever is read, greyed and saying why when it cannot be taken.
+     * whatever is read, greyed and saying why when it cannot be taken; a
+     * world quest takes none of them, being the whole server's.
      */
     @Override
     public List<BarItem> barItems() {
@@ -810,11 +811,13 @@ public final class QuestJournalPage extends PageContent {
         items.add(runningOnly(BarItem.button(TRACK, track,
                         new ItemStack(Items.compass))
                 .tip(WindowBar.withKey(track, TRACK_KEY)), quest,
-                "gui.losttales.quest.action.why.track"));
+                "gui.losttales.quest.action.why.track",
+                "gui.losttales.quest.action.why.world_track"));
         String share = translate("gui.losttales.quest.action.share");
         items.add(runningOnly(BarItem.button(SHARE, share,
                         LostTalesUiSheet.SEND, LostTalesUiSheet.SEND_HOVER)
-                .tip(share), quest, "gui.losttales.quest.action.why.share"));
+                .tip(share), quest, "gui.losttales.quest.action.why.share",
+                "gui.losttales.quest.action.why.world_share"));
         if (clears(quest)) {
             String clear = translate("gui.losttales.quest.action.clear");
             items.add(BarItem.button(CLEAR, clear, LostTalesUiSheet.CLOSE,
@@ -824,17 +827,24 @@ public final class QuestJournalPage extends PageContent {
             items.add(runningOnly(BarItem.button(ABANDON, abandon,
                             LostTalesUiSheet.CLOSE, LostTalesUiSheet.CLOSE_HOVER)
                     .tip(abandon).ending(), quest,
-                    "gui.losttales.quest.action.why.abandon"));
+                    "gui.losttales.quest.action.why.abandon",
+                    "gui.losttales.quest.action.why.world_abandon"));
         }
         return items;
     }
 
-    /** Greys an action for a quest not running, or with none read, saying why. */
+    /**
+     * Greys an action for a quest not running, for a world quest, or with
+     * none read, saying why.
+     */
     private static BarItem runningOnly(BarItem item, ClientQuestEntry quest,
-                                       String whyKey) {
+                                       String whyKey, String worldWhyKey) {
         if (quest == null) {
             return item.unavailable(translate(
                     "gui.losttales.quest.action.why.none"));
+        }
+        if (quest.getSource() == ClientQuestEntry.Source.WORLD) {
+            return item.unavailable(translate(worldWhyKey));
         }
         return quest.isActive() ? item : item.unavailable(translate(whyKey));
     }
@@ -1580,7 +1590,8 @@ public final class QuestJournalPage extends PageContent {
     }
 
     private void toggleSelectedQuestTracking(ClientQuestEntry quest) {
-        if (quest == null || !quest.isActive()) {
+        if (quest == null || !quest.isActive()
+                || quest.getSource() == ClientQuestEntry.Source.WORLD) {
             return;
         }
         if (quest.isTracked()) {

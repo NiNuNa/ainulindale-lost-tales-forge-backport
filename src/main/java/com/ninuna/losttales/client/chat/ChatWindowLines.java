@@ -834,7 +834,9 @@ public final class ChatWindowLines {
                         ? visible.get(runNewest).getUpdatedCounter()
                         : message.getUpdatedCounter();
                 Piece piece = this.wrapped.get(message);
-                if (piece == null || piece.grouped != grouped[index]) {
+                if (piece == null || piece.grouped != grouped[index]
+                        || piece.open != ChatFoldMarker.isOpen(
+                                message.getChatLineID())) {
                     piece = layOut(font, message, grouped[index], counter);
                 } else if (piece.updatedCounter != counter) {
                     piece = piece.on(counter);
@@ -853,7 +855,8 @@ public final class ChatWindowLines {
          * grouped message is laid out from the headerless form kept for
          * it, and from the full one when the history outlived that. In a
          * window, a message that names its speaker wears its time behind
-         * the name, written against today.
+         * the name, written against today. Long words fold as the
+         * reader left the message: folded, or opened.
          */
         private Piece layOut(FontRenderer font, ChatLine message,
                              boolean grouped, int updatedCounter) {
@@ -869,27 +872,32 @@ public final class ChatWindowLines {
                     said == null ? null
                             : ChatTimestampFormatter.formatDrawnStamp(
                                     said.longValue(),
-                                    System.currentTimeMillis()));
-            return new Piece(grouped, updatedCounter, wrappedLines,
-                    message.getChatLineID());
+                                    System.currentTimeMillis()),
+                    ChatFoldMarker.foldFor(message.getChatLineID()));
+            return new Piece(grouped,
+                    ChatFoldMarker.isOpen(message.getChatLineID()),
+                    updatedCounter, wrappedLines, message.getChatLineID());
         }
     }
 
     /**
-     * One message's lines, the form they were laid out in, and the
-     * arrival tick they are drawn with — a fading view's whole run
-     * shares the newest one, so the run fades out together.
+     * One message's lines, the form they were laid out in — grouped or
+     * not, opened or folded — and the arrival tick they are drawn with:
+     * a fading view's whole run shares the newest one, so the run fades
+     * out together.
      */
     static final class Piece {
         final boolean grouped;
+        final boolean open;
         final int updatedCounter;
         private final List<IChatComponent> wrappedLines;
         private final int chatLineId;
         final List<ChatLine> lines;
 
-        Piece(boolean grouped, int updatedCounter,
+        Piece(boolean grouped, boolean open, int updatedCounter,
               List<IChatComponent> wrappedLines, int chatLineId) {
             this.grouped = grouped;
+            this.open = open;
             this.updatedCounter = updatedCounter;
             this.wrappedLines = wrappedLines;
             this.chatLineId = chatLineId;
@@ -906,8 +914,8 @@ public final class ChatWindowLines {
 
         /** The same layout on another clock; nothing is wrapped again. */
         Piece on(int updatedCounter) {
-            return new Piece(this.grouped, updatedCounter, this.wrappedLines,
-                    this.chatLineId);
+            return new Piece(this.grouped, this.open, updatedCounter,
+                    this.wrappedLines, this.chatLineId);
         }
     }
 }

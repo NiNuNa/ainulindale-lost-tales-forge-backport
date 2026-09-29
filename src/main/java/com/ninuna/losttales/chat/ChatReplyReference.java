@@ -268,9 +268,12 @@ public final class ChatReplyReference {
         return this.forwardedFrom;
     }
 
-    /** The message as one glanceable line, cut with a trailing mark. */
+    /**
+     * The message as one glanceable line, its paragraphs run together,
+     * cut with a trailing mark.
+     */
     public static String excerptOf(String message) {
-        String text = message == null ? "" : message.trim();
+        String text = ChatMessageValidator.oneLine(message).trim();
         if (text.length() <= MAX_EXCERPT_CHARACTERS) {
             return text;
         }

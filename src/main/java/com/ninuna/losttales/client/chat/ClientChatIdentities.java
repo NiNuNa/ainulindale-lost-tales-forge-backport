@@ -5,6 +5,7 @@ import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
+import com.ninuna.losttales.client.window.WindowTab;
 import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
 import java.util.ArrayList;
 import java.util.List;
@@ -104,11 +105,30 @@ final class ClientChatIdentities {
         return ChatTab.ownerKeyOf(active == null ? null : active.getCharacterId());
     }
 
-    static synchronized Identity effectiveFor(ChatTab tab) {
-        if (!speaksInCharacter(tab)) {
+    /**
+     * Who the player is on a tab: on a conversation, who it speaks as; on
+     * a page, the character played, whom every page is about.
+     */
+    static synchronized Identity effectiveFor(WindowTab tab) {
+        if (tab != null && !(tab instanceof ChatTab)) {
+            return played();
+        }
+        ChatTab chat = (ChatTab)tab;
+        if (!speaksInCharacter(chat)) {
             return accountIdentity();
         }
-        return speaksAsPlayed(tab) ? played() : viewing();
+        return speaksAsPlayed(chat) ? played() : viewing();
+    }
+
+    /** Whether a tab's identity button shows the Narrator's mark: its voice is taken up and the tab speaks in character. */
+    static boolean narratesOn(WindowTab tab) {
+        return isNarrating() && tab instanceof ChatTab
+                && speaksInCharacter((ChatTab)tab);
+    }
+
+    /** Whether the identity button's menu chooses who the tab speaks as: Global, Faction, whispers. */
+    static boolean picksIdentity(WindowTab tab) {
+        return tab instanceof ChatTab && picksIdentity((ChatTab)tab);
     }
 
     /**

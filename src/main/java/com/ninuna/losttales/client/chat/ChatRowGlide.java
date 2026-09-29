@@ -4,9 +4,11 @@ import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.client.motion.MotionIds;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import net.minecraft.client.gui.ChatLine;
 import net.minecraft.util.IChatComponent;
 
@@ -31,7 +33,9 @@ import net.minecraft.util.IChatComponent;
  * the newest message has an entrance of its own, and a row already on
  * its way finishes its trip. The draw halts every trip while the view is
  * scrolled away from the newest line, where the scroll keeps the line
- * being read in place instead.</p>
+ * being read in place instead, but for a layout the scroll was carried
+ * with ({@link #shifted}): a long message opened or folded, whose rows
+ * glide on screen as far as the scroll did not carry them.</p>
  *
  * <p>Distances are pixels of stack, measured up from its bottom. A trip
  * is read from the instant it began, and a layout arriving during one
@@ -46,7 +50,9 @@ public final class ChatRowGlide {
     private static final int KIND_QUOTE = 2;
     private static final int KIND_CHIPS = 3;
     private static final int KIND_DAY = 4;
-    private static final int KINDS = 5;
+    /** A long message's Read more or Show less. */
+    private static final int KIND_FOLD = 5;
+    private static final int KINDS = 6;
     /** Nearer its place than this, in pixels of stack, a row has arrived. */
     private static final float ARRIVED = 0.01F;
 
@@ -63,6 +69,12 @@ public final class ChatRowGlide {
     private float deepestDrop;
     /** Whether this frame's lifts were worked out for the current layout. */
     private boolean moving;
+    /** The rows the last layout added, which fade in where they land. */
+    private Set<Key> added = new HashSet<Key>();
+    /** Whether the last layout was one this view's rows glide to. */
+    private boolean glided;
+    /** Whether the trips under way were set off with a scroll carried with them. */
+    private boolean carried;
 
     /**
      * Takes in a new layout of the view: {@code lines} as {@code rows}
@@ -94,6 +106,7 @@ public final class ChatRowGlide {
             }
         }
         Map<Key, Trip> next = new HashMap<Key, Trip>();
+        Set<Key> nextAdded = new HashSet<Key>();
         for (int index = 0; index < count; index++) {
             Key key = nextKeys[index];
             if (key == null) {
@@ -103,6 +116,7 @@ public final class ChatRowGlide {
             Integer old = glides ? before.get(key) : null;
             if (glides && old == null) {
                 next.put(key, new Trip(0.0F, now, now));
+                nextAdded.add(key);
                 continue;
             }
             if (old == null || nextPlaces[index] == this.places[old.intValue()]) {
@@ -124,7 +138,54 @@ public final class ChatRowGlide {
         this.keys = nextKeys;
         this.places = nextPlaces;
         this.messages = nextMessages;
+        this.added = nextAdded;
+        this.glided = glides;
+        this.carried = false;
         this.moving = false;
+    }
+
+    /**
+     * Carries the rows the last layout kept by the {@code pixels} of
+     * stack the view's scroll moved with it, so each glides on screen
+     * from where it was drawn: a row the scroll carried as far as the
+     * layout moved it stays still, one the layout left where it was
+     * glides the scroll's way, and the rows the layout added only fade
+     * in. The trips run even while the view is scrolled back
+     * ({@link #isCarried}). Nothing is carried after a cut.
+     */
+    void shifted(float pixels, long now) {
+        if (!this.glided) {
+            return;
+        }
+        this.carried = true;
+        if (Math.abs(pixels) < ARRIVED) {
+            return;
+        }
+        Map<Key, Trip> next = new HashMap<Key, Trip>();
+        for (int index = 0; index < this.keys.length; index++) {
+            Key key = this.keys[index];
+            if (key == null) {
+                continue;
+            }
+            Trip trip = this.trips.get(key);
+            if (this.added.contains(key)) {
+                if (trip != null) {
+                    next.put(key, trip);
+                }
+                continue;
+            }
+            float from = (trip == null ? 0.0F : trip.liftAt(now)) + pixels;
+            long fading = trip == null ? Trip.NOT_FADING : trip.fadeStarted;
+            if (Math.abs(from) >= ARRIVED || fading != Trip.NOT_FADING) {
+                next.put(key, new Trip(from, now, fading));
+            }
+        }
+        this.trips = next;
+    }
+
+    /** Whether the trips under way go on while the view is scrolled back. */
+    boolean isCarried() {
+        return this.carried;
     }
 
     /**
@@ -137,6 +198,7 @@ public final class ChatRowGlide {
         this.deepestDrop = 0.0F;
         if (this.trips.isEmpty()) {
             this.moving = false;
+            this.carried = false;
             return;
         }
         int count = this.keys.length;
@@ -158,6 +220,9 @@ public final class ChatRowGlide {
             if (iterator.next().isOver(now)) {
                 iterator.remove();
             }
+        }
+        if (this.trips.isEmpty()) {
+            this.carried = false;
         }
         this.moving = true;
     }
@@ -186,6 +251,7 @@ public final class ChatRowGlide {
     void halt() {
         this.trips.clear();
         this.moving = false;
+        this.carried = false;
     }
 
     /** Forgets the layout along with the view's history. */
@@ -246,6 +312,11 @@ public final class ChatRowGlide {
     private static int kindOf(IChatComponent row) {
         if (ChatLayoutMarker.isHeaderRow(row)) {
             return KIND_SPEAKER;
+        }
+        for (Object part : row) {
+            if (ChatFoldMarker.isMarker((IChatComponent)part)) {
+                return KIND_FOLD;
+            }
         }
         if (ChatReactionMarker.isReactionRow(row)) {
             return KIND_CHIPS;

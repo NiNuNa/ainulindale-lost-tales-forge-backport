@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
@@ -114,9 +115,11 @@ public final class ChatSpeechBubbles {
         if (speaker == null || body == null) {
             return;
         }
-        // The words over a head read as the words in the log do.
+        // The words over a head read as the words in the log do, their
+        // paragraphs run together on the bubble's lines.
         String spoken = ClientChatProfanity.filterMessage(
-                LostTalesChatVisualStyle.removeColorCodes(body).trim());
+                LostTalesChatVisualStyle.removeColorCodes(
+                        ChatMessageValidator.oneLine(body)).trim());
         if (spoken.length() == 0) {
             return;
         }

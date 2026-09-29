@@ -74,6 +74,10 @@ import com.ninuna.losttales.network.packet.LostTalesServerConfigSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesFastTravelArrivalPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesServerQuestSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesWorldQuestSyncPacket;
+import com.ninuna.losttales.quest.ServerQuestFiles;
+import com.ninuna.losttales.quest.world.WorldQuests;
 import com.ninuna.losttales.network.packet.AccessoryInventorySyncPacket;
 import com.ninuna.losttales.network.packet.AccessoryEffectSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
@@ -157,6 +161,7 @@ public class LostTalesCommonProxy {
     public void preInit(FMLPreInitializationEvent event) {
         loadConfig(event.getModConfigurationDirectory());
         LoreCharacterRegistry.load(event.getModConfigurationDirectory());
+        ServerQuestFiles.configure(event.getModConfigurationDirectory());
         GeckoLib.initialize();
         LostTalesNetworkHandler.registerCommonPackets();
         // Before any world can load: a world names its type by name.
@@ -227,6 +232,7 @@ public class LostTalesCommonProxy {
                 waystoneGenerationHandler);
         FMLCommonHandler.instance().bus().register(chatRoleRosterWatcher);
         FMLCommonHandler.instance().bus().register(new MissiveBoardWatches());
+        FMLCommonHandler.instance().bus().register(new WorldQuests());
         FMLCommonHandler.instance().bus().register(new LostTalesMapMarkerSyncManager());
 
         ELostTalesItem.initAndRegisterItems();
@@ -296,6 +302,10 @@ public class LostTalesCommonProxy {
     public void handleQuickLootContainerSync(LostTalesQuickLootContainerSyncPacket packet) {}
 
     public void handleQuestSync(LostTalesQuestSyncPacket packet) {}
+
+    public void handleServerQuestSync(LostTalesServerQuestSyncPacket packet) {}
+
+    public void handleWorldQuestSync(LostTalesWorldQuestSyncPacket packet) {}
 
     public void handleMobAggroSync(LostTalesMobAggroSyncPacket packet) {}
 
@@ -428,6 +438,9 @@ public class LostTalesCommonProxy {
         // Generated quests belong to the world that made them; each
         // player's saved data registers its own again as it loads.
         LostTalesQuestRegistry.clearRuntimeQuests();
+        // The server's own quest files, as they are on disk now.
+        LostTalesQuestRegistry.loadServerQuests();
+        WorldQuests.clear();
         LostTalesServerBroadcastHook.clear();
         ChatArrivals.clear();
         ChatWelcome.clear();
@@ -532,6 +545,8 @@ public class LostTalesCommonProxy {
         PartyDeclines.clear();
         PartyQuestProgressCoordinator.getInstance().clear();
         MissiveBoardWatches.clear();
+        LostTalesQuestRegistry.clearServerQuests();
+        WorldQuests.clear();
         LostTalesMapMarkerSyncManager.clear();
         LostTalesLotrWaystoneTravelAdapter.clear();
         LostTalesChatRoleRosterWatcher.clear();

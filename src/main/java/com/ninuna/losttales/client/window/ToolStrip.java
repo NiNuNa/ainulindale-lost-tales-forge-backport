@@ -24,9 +24,11 @@ import org.lwjgl.input.Mouse;
  * back in; over a page the page's own panel, the journal's quest list.
  * At its right end the search, a well a third of the strip wide naming
  * what it searches — {@code Search Global}, {@code Search active quests}
- * — with its magnifier at the well's right end; before the well the
- * member list's button, two people, which a page has none of, and before
- * that the cog, which opens the tab's menu. The panel buttons rest lit
+ * — with its magnifier at the well's right end; before the well the full
+ * screen button, which shows the tab alone on the whole screen
+ * ({@link ContentView}); before that the member list's button, two
+ * people, which a page has none of, and before that the cog, which opens
+ * the tab's menu. The panel buttons rest lit
  * while their panels are out, and the cog while its menu is. A cog with
  * nothing to choose and a well with nothing to search stay where they
  * are, greyed, and their tips say why.
@@ -52,6 +54,8 @@ public final class ToolStrip {
         /** The channel's cog: the menu of the tab in front. */
         SETTINGS,
         MEMBERS_TOGGLE,
+        /** The full screen button: the tab in front alone on the whole screen. */
+        VIEW,
         FIELD,
         /** The well's magnifier, or the cross it becomes while a search stands. */
         ICON,
@@ -115,6 +119,9 @@ public final class ToolStrip {
             LostTalesUiSheet.MEMBERS.getHeight();
     private static final int COG_WIDTH = LostTalesUiSheet.COG.getWidth();
     private static final int COG_HEIGHT = LostTalesUiSheet.COG.getHeight();
+    private static final int VIEW_WIDTH = LostTalesUiSheet.FULLSCREEN.getWidth();
+    private static final int VIEW_HEIGHT =
+            LostTalesUiSheet.FULLSCREEN.getHeight();
 
     /** Where one window's strip stands this frame, in its row's space. */
     static final class Layout {
@@ -132,6 +139,7 @@ public final class ToolStrip {
         int panelHeight;
         int settingsX;
         int membersX;
+        int viewX;
         /** Whether the strip has a member list button: a page's has none. */
         boolean hasMembers;
         /** Whether the count stands in the well; the query and the room decide. */
@@ -154,6 +162,8 @@ public final class ToolStrip {
         final LostTalesUiButtonMotion settingsMotion =
                 new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
         final LostTalesUiButtonMotion membersMotion =
+                new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
+        final LostTalesUiButtonMotion viewMotion =
                 new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
         /** The magnifier turns on its handle; the cross it becomes answers like a switch. */
         final LostTalesUiButtonMotion iconMotion =
@@ -254,8 +264,9 @@ public final class ToolStrip {
      * Where everything on a strip stands: the panel button, a glyph
      * {@code panelWidth} by {@code panelHeight} (none for a width of 0),
      * centred under the tab search; the well against the strip's right
-     * end, {@link #EDGE_MARGIN} in, a third of the strip wide; the member
-     * list's button, where the strip has one, and the cog before it. A
+     * end, {@link #EDGE_MARGIN} in, a third of the strip wide; the full
+     * screen button before it, the member list's button before that
+     * where the strip has one, and the cog before them. A
      * strip whose third is too narrow for a well, or leaves the buttons no
      * room, keeps none, and the buttons stand at its right end. A
      * {@code count} stands its text, {@code countWidth} wide, inside the
@@ -279,7 +290,7 @@ public final class ToolStrip {
         laid.wellRight = stripRight - EDGE_MARGIN;
         laid.wellLeft = laid.wellRight
                 - Math.floorDiv(stripRight - stripLeft, 3);
-        int buttons = COG_WIDTH + END_GAP
+        int buttons = COG_WIDTH + END_GAP + VIEW_WIDTH + END_GAP
                 + (members ? MEMBERS_WIDTH + END_GAP : 0);
         int floor = panelWidth > 0 ? laid.panelX + panelWidth + END_GAP
                 : searchButtonLeft + searchButtonSize + END_GAP;
@@ -287,8 +298,9 @@ public final class ToolStrip {
                 && laid.wellLeft - buttons >= floor;
         int buttonsRight = laid.hasWell ? laid.wellLeft - END_GAP
                 : stripRight - EDGE_MARGIN;
-        laid.membersX = buttonsRight - MEMBERS_WIDTH;
-        laid.settingsX = (members ? laid.membersX - END_GAP : buttonsRight)
+        laid.viewX = buttonsRight - VIEW_WIDTH;
+        laid.membersX = laid.viewX - END_GAP - MEMBERS_WIDTH;
+        laid.settingsX = (members ? laid.membersX : laid.viewX) - END_GAP
                 - COG_WIDTH;
         laid.iconSlotLeft = laid.wellRight - WELL_INSET
                 - LostTalesUiSheet.SEARCH.getWidth();
@@ -360,6 +372,11 @@ public final class ToolStrip {
                     LostTalesUiSheet.MEMBERS_HOVER, state.membersMotion,
                     laid.membersX, glyphTop(laid, MEMBERS_HEIGHT), ink);
         }
+        state.viewMotion.advance(now, under == Part.VIEW, under == Part.VIEW,
+                under == Part.VIEW && Mouse.isButtonDown(0));
+        LostTalesUiButton.drawGlyph(LostTalesUiSheet.FULLSCREEN,
+                LostTalesUiSheet.FULLSCREEN_HOVER, state.viewMotion,
+                laid.viewX, glyphTop(laid, VIEW_HEIGHT), ink);
         if (!laid.hasWell) {
             return;
         }
@@ -530,6 +547,9 @@ public final class ToolStrip {
                 MEMBERS_HEIGHT).contains(x, y)) {
             return Part.MEMBERS_TOGGLE;
         }
+        if (glyphBox(laid, laid.viewX, VIEW_WIDTH, VIEW_HEIGHT).contains(x, y)) {
+            return Part.VIEW;
+        }
         if (!laid.hasWell) {
             return null;
         }
@@ -594,6 +614,9 @@ public final class ToolStrip {
                         front.isMemberListOut(window)
                                 ? "gui.losttales.window.members.hide"
                                 : "gui.losttales.window.members.show");
+            case VIEW:
+                return StatCollector.translateToLocalFormatted(
+                        "gui.losttales.window.view.enter", front.title());
             case ICON:
                 return WindowSearch.isOpenOn(window.getId())
                         && WindowSearch.query().length() > 0

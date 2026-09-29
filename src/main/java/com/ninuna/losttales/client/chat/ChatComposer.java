@@ -4,6 +4,7 @@ import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.chat.ChatMessageIds;
+import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import net.minecraft.client.gui.FontRenderer;
@@ -56,7 +57,7 @@ final class ChatComposer {
                     ChatHeadMarker.Data head) {
         this.replyToMessageId = messageId;
         this.replyToName = name == null ? "" : name;
-        this.replyToExcerpt = excerpt == null ? "" : excerpt;
+        this.replyToExcerpt = ChatMessageValidator.oneLine(excerpt);
         this.replyToHead = head;
         this.replyTab = tab;
     }

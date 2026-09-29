@@ -73,6 +73,12 @@ public final class LostTalesQuestManager {
             sendQuestChat(player, "chat.losttales.quest.unknown", questId);
             return StartResult.UNKNOWN_QUEST;
         }
+        if (quest.isWorldQuest()) {
+            // The whole server works on it together; nobody takes it alone.
+            sendQuestChat(player, "chat.losttales.quest.world.not_personal",
+                    quest.getTitle());
+            return StartResult.START_NOT_ALLOWED;
+        }
 
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
         if (data == null) {

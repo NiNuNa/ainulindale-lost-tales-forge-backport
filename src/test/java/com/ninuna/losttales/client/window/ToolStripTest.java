@@ -9,8 +9,9 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * A window's tool strip: the panel button under the tab search, the
- * search's well the strip's right third, and before it the member list's
- * button, where the strip has one, and the cog. A standing search's count
+ * search's well the strip's right third, and before it the full screen
+ * button, the member list's button where the strip has one, and the cog.
+ * A standing search's count
  * stands inside the well, with the chevrons over a conversation; a narrow
  * strip keeps no well, and its buttons stand at its right end. A page's
  * strip is the same strip with the page's panel button and no member
@@ -36,7 +37,9 @@ public final class ToolStripTest {
         assertFalse(laid.counting);
         assertEquals(400 - 3, laid.wellRight);
         assertEquals(400 / 3, laid.wellRight - laid.wellLeft);
-        assertEquals(laid.wellLeft - END_GAP - LostTalesUiSheet.MEMBERS.getWidth(),
+        assertEquals(laid.wellLeft - END_GAP
+                - LostTalesUiSheet.FULLSCREEN.getWidth(), laid.viewX);
+        assertEquals(laid.viewX - END_GAP - LostTalesUiSheet.MEMBERS.getWidth(),
                 laid.membersX);
         assertEquals(laid.membersX - END_GAP - LostTalesUiSheet.COG.getWidth(),
                 laid.settingsX);
@@ -76,7 +79,9 @@ public final class ToolStripTest {
         ToolStrip.Layout laid = conversation(120, ToolStrip.Count.WALK);
         assertFalse(laid.hasWell);
         assertFalse(laid.counting);
-        assertEquals(120 - 3 - LostTalesUiSheet.MEMBERS.getWidth(),
+        assertEquals(120 - 3 - LostTalesUiSheet.FULLSCREEN.getWidth(),
+                laid.viewX);
+        assertEquals(laid.viewX - END_GAP - LostTalesUiSheet.MEMBERS.getWidth(),
                 laid.membersX);
     }
 
@@ -88,11 +93,12 @@ public final class ToolStripTest {
                 ToolStrip.Count.NONE, COUNT_WIDTH);
         ToolStrip.Layout chat = conversation(400, ToolStrip.Count.NONE);
         assertFalse(page.hasMembers);
-        // The same well, and the cog stands where the member list's
-        // button would.
+        // The same well and full screen button, and the cog stands where
+        // the member list's button would.
         assertEquals(chat.wellLeft, page.wellLeft);
         assertEquals(chat.wellRight, page.wellRight);
-        assertEquals(page.wellLeft - END_GAP - LostTalesUiSheet.COG.getWidth(),
+        assertEquals(chat.viewX, page.viewX);
+        assertEquals(page.viewX - END_GAP - LostTalesUiSheet.COG.getWidth(),
                 page.settingsX);
         assertEquals(3 + Math.floorDiv(15 - questWidth, 2), page.panelX);
     }

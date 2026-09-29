@@ -15,7 +15,7 @@ public final class DiscordMessageSanitizerTest {
     public void discordMarkupIsSpelledOutAndLinesAreFlattened() {
         Map<String, String> names = new HashMap<String, String>();
         names.put("1234", "Frodo");
-        assertEquals("hey @Frodo and @user, see #channel :smile: @role",
+        assertEquals("hey @Frodo and @user,\nsee #channel :smile: @role",
                 DiscordMessageSanitizer.inbound(
                         "hey <@1234> and <@!99>,\nsee <#55> <a:smile:7> <@&8>",
                         names));
@@ -43,8 +43,9 @@ public final class DiscordMessageSanitizerTest {
                         "# Title\n> quoted\n-# small\n>>> more"));
         assertEquals("", DiscordMessageSanitizer.normalizeMarkdown("``````"));
         assertEquals("", DiscordMessageSanitizer.normalizeMarkdown(null));
-        // Through the whole inbound path the line is one the chat accepts.
-        assertEquals("Title quoted `code` *it*",
+        // Through the whole inbound path the line is one the chat
+        // accepts, Discord's lines its paragraphs.
+        assertEquals("Title\nquoted\n`code`\n*it*",
                 DiscordMessageSanitizer.inbound(
                         "# Title\n> quoted\n```\ncode\n```\n_it_", null));
     }
@@ -52,7 +53,7 @@ public final class DiscordMessageSanitizerTest {
     @Test
     public void longMessagesAreCutToTheChatLimit() {
         StringBuilder text = new StringBuilder();
-        for (int index = 0; index < 80; index++) {
+        for (int index = 0; index < 300; index++) {
             text.append("word ");
         }
         String cut = DiscordMessageSanitizer.inbound(text.toString(), null);
@@ -276,7 +277,7 @@ public final class DiscordMessageSanitizerTest {
     @Test
     public void theWordsGiveWayBeforeTheFilesDo() {
         StringBuilder long_ = new StringBuilder();
-        for (int index = 0; index < 400; index++) {
+        for (int index = 0; index < 1500; index++) {
             long_.append('a');
         }
         String text = DiscordMessageSanitizer.inboundWithAttachments(long_.toString(), "",
@@ -285,5 +286,39 @@ public final class DiscordMessageSanitizerTest {
                 "https://discord.com/channels/1/2/3");
         assertTrue(text.length() <= com.ninuna.losttales.chat.ChatMessageValidator.MAX_CHARACTERS);
         assertTrue(text.endsWith("*map.png* https://discord.com/channels/1/2/3"));
+    }
+
+    /**
+     * Paragraphs cross both ways: a game message's are Discord's lines, an
+     * action's each in italics; a Discord message's lines are paragraphs,
+     * eight at most, a block of code one span.
+     */
+    @Test
+    public void paragraphsCrossBothWays() {
+        assertEquals("*Aldric bows.*\n*He waits.*",
+                DiscordMessageSanitizer.outboundAction("Aldric bows.\nHe waits."));
+        assertEquals("one\ntwo", DiscordMessageSanitizer.outbound("one\ntwo"));
+        assertEquals("a\nb\nc\nd\ne\nf\ng\nh i",
+                DiscordMessageSanitizer.inbound("a\n\nb\nc\nd\ne\nf\ng\nh\ni", null));
+        assertEquals("see `x = 1; y = 2`", DiscordMessageSanitizer.inbound(
+                "see ```\nx = 1;\ny = 2\n```", null));
+    }
+
+    /**
+     * A long turn naming many members can pass Discord's 2,000 once each
+     * name is its id: the post is cut short of it, never inside an id.
+     */
+    @Test
+    public void aPostIsCutToWhatDiscordTakes() {
+        assertEquals("short", DiscordMessageSanitizer.fitted("short"));
+        StringBuilder post = new StringBuilder();
+        while (post.length() < 1990) {
+            post.append('a');
+        }
+        post.append(" <@123456789012345678> the end");
+        String cut = DiscordMessageSanitizer.fitted(post.toString());
+        assertTrue(cut.length() <= DiscordMessageSanitizer.MAX_POST_CHARACTERS);
+        assertTrue(cut.endsWith(" ..."));
+        assertTrue(cut.indexOf('<') < 0);
     }
 }

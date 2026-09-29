@@ -7,6 +7,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiButton;
 import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiCaret;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiItemIcon;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
@@ -17,15 +18,18 @@ import java.util.List;
 import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.util.StatCollector;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
 
 /**
- * A page's input bar: the chat's bar strip at every window's foot, with
- * what the page puts on it ({@link BarItem}). It wears the chat bar's
- * surface, holes, well, dividers, framed buttons and glyphs, arrives with
- * the same entrance from below, and carries the window frame's lower
- * edges, so a page's window and a conversation's are one shape.
+ * A page's input bar: the chat's bar strip at every window's foot, the
+ * tab and identity buttons every bar starts with ({@link BarLead}), a
+ * divider, and what the page puts on it ({@link BarItem}). It wears the
+ * chat bar's
+ * surface, holes, well, dividers, framed buttons and glyphs, arrives as
+ * the chat's bar does, and carries the window frame's lower edges, so a
+ * page's window and a conversation's are one shape.
  *
  * <p>The layout is worked out from the page's items whenever it is asked
  * — to draw, to find what the pointer is on, to press — so the three
@@ -58,12 +62,23 @@ public final class WindowBar {
         public final int right;
         /** A button shown as its icon alone, the room being short. */
         public final boolean compact;
+        /** The tab and identity buttons as laid out; null for a page's own item. */
+        public final BarLead.Fit lead;
+        /** The page's first item after the tab and identity buttons: a divider stands before it. */
+        public final boolean afterLead;
 
         Placed(BarItem item, int left, int right, boolean compact) {
+            this(item, left, right, compact, null, false);
+        }
+
+        Placed(BarItem item, int left, int right, boolean compact,
+               BarLead.Fit lead, boolean afterLead) {
             this.item = item;
             this.left = left;
             this.right = right;
             this.compact = compact;
+            this.lead = lead;
+            this.afterLead = afterLead;
         }
     }
 
@@ -81,16 +96,45 @@ public final class WindowBar {
 
     private final Map<String, LostTalesUiButtonMotion> motions =
             new HashMap<String, LostTalesUiButtonMotion>();
+    /** Each window's tab and identity buttons: their light, marquee and beat. */
+    private final Map<String, BarLead> leads = new HashMap<String, BarLead>();
+    /** Who the player is on a tab, for the identity button. */
+    private final BarLead.Voice voice;
+
+    public WindowBar(BarLead.Voice voice) {
+        this.voice = voice;
+    }
+
+    /**
+     * What stands on the bar of a window with {@code tab} in front: the
+     * tab and identity buttons, then the page's own items. The identity
+     * button with nobody to show stands greyed and says why.
+     */
+    List<BarItem> itemsOf(WindowTab tab, PageContent content) {
+        List<BarItem> items = new ArrayList<BarItem>();
+        items.add(BarItem.tabButton(tab, StatCollector.translateToLocal(
+                "gui.losttales.window.bar.tab")));
+        BarItem identity = BarItem.identityButton();
+        if (this.voice == null || this.voice.faceFor(tab) == null) {
+            identity.unavailable(StatCollector.translateToLocal(
+                    "gui.losttales.window.bar.identity.none"));
+        }
+        items.add(identity);
+        items.addAll(content.barItems());
+        return items;
+    }
 
     /* ---- The layout ---- */
 
     /**
-     * The items laid on a bar from {@code left} to {@code right}: the
-     * buttons before the field from the left, the field in the room left
-     * over, the buttons after it, the words, the glyphs and an ending
-     * button from the right, the ending one last. Where the room is short
-     * every button gives up its word and keeps its icon, then the words
-     * go, then what no longer fits from the left group's end.
+     * The items laid on a bar from {@code left} to {@code right}: the tab
+     * and identity buttons first, then a divider and the buttons before
+     * the field from the left, the field in the room left over, the
+     * buttons after it, the words, the glyphs and an ending button from
+     * the right, the ending one last. Where the room is short the tab's
+     * name gives way first, down to its icon; then every button gives up
+     * its word and keeps its icon, then the words go, then what no longer
+     * fits from the left group's end.
      */
     public static List<Placed> layOut(List<BarItem> items, int left, int right,
                                       Measure measure) {
@@ -99,8 +143,14 @@ public final class WindowBar {
         List<BarItem> atRight = new ArrayList<BarItem>();
         List<BarItem> ending = new ArrayList<BarItem>();
         BarItem field = null;
+        BarItem tab = null;
+        BarItem identity = null;
         for (BarItem item : items) {
-            if (item.kind == BarItem.Kind.FIELD && field == null) {
+            if (item.kind == BarItem.Kind.TAB) {
+                tab = item;
+            } else if (item.kind == BarItem.Kind.IDENTITY) {
+                identity = item;
+            } else if (item.kind == BarItem.Kind.FIELD && field == null) {
                 field = item;
             } else if (item.ending) {
                 ending.add(item);
@@ -114,10 +164,15 @@ public final class WindowBar {
         }
         atRight.addAll(ending);
         int room = right - left;
+        boolean lead = tab != null;
+        int leadWidth = lead ? BarLead.wholeWidth(tab.tab, measure) : 0;
+        int leadLeast = lead ? BarLead.leastWidth(tab.tab, measure) : 0;
         boolean compact = false;
         boolean words = true;
         while (true) {
-            int needed = width(leading, compact, words, measure)
+            int needed = (lead ? GAP + leadWidth + (leading.isEmpty() ? 0
+                            : GAP + WindowStyle.DIVIDER_WIDTH) : 0)
+                    + width(leading, compact, words, measure)
                     + width(trailing, compact, words, measure)
                     + width(atRight, compact, words, measure)
                     + (field == null ? 0 : MIN_FIELD_WIDTH + 2 * (GAP
@@ -125,7 +180,9 @@ public final class WindowBar {
             if (needed <= room) {
                 break;
             }
-            if (!compact) {
+            if (leadWidth > leadLeast) {
+                leadWidth = Math.max(leadLeast, leadWidth - (needed - room));
+            } else if (!compact) {
                 compact = true;
             } else if (words) {
                 words = false;
@@ -139,11 +196,22 @@ public final class WindowBar {
         }
         List<Placed> placed = new ArrayList<Placed>();
         int x = left + GAP;
+        if (lead) {
+            BarLead.Fit fit = BarLead.fit(tab.tab, x, leadWidth, measure);
+            placed.add(new Placed(tab, fit.frameLeft, fit.frameRight, false,
+                    fit, false));
+            placed.add(new Placed(identity == null
+                    ? BarItem.identityButton() : identity, fit.identityLeft,
+                    fit.right, false, fit, false));
+            x = fit.right + (leading.isEmpty() ? 0
+                    : GAP + WindowStyle.DIVIDER_WIDTH + GAP);
+        }
         BarItem previous = null;
         for (BarItem item : leading) {
             x += gapBefore(previous, item);
             int width = widthOf(item, compact, measure);
-            placed.add(new Placed(item, x, x + width, compact));
+            placed.add(new Placed(item, x, x + width, compact, null,
+                    lead && previous == null));
             x += width;
             previous = item;
         }
@@ -168,7 +236,7 @@ public final class WindowBar {
         if (field != null) {
             // The well stands between two dividers, each a gap from what
             // stands beside it; at the bar's own edge there is no divider.
-            int wellLeft = leading.isEmpty() ? left + GAP
+            int wellLeft = leading.isEmpty() && !lead ? left + GAP
                     : leadingRight + GAP + WindowStyle.DIVIDER_WIDTH
                             + WELL_GAP;
             int wellRight = fromRight.isEmpty() ? right - GAP
@@ -252,7 +320,7 @@ public final class WindowBar {
 
     /* ---- Where the bar stands ---- */
 
-    /** The bar's entrance from below, the chat's bar's own: how far below its place it stands now. */
+    /** How far below its place the bar stands now, while bars come up on their own: the chat's bar's too. */
     public static float entranceOffset() {
         return WindowOpening.barOffset();
     }
@@ -263,7 +331,7 @@ public final class WindowBar {
     }
 
     static int left(WindowFrame frame) {
-        return (int)Math.floor(frame.boxLeft);
+        return (int)Math.floor(frame.barLeft());
     }
 
     static int right(WindowFrame frame) {
@@ -296,8 +364,8 @@ public final class WindowBar {
         int top = top(frame);
         double barX = x - fraction(frame);
         double barY = y - (frame.barTop() - top) - entranceOffset();
-        List<Placed> placed = layOut(content.barItems(), left(frame),
-                right(frame), measure(font));
+        List<Placed> placed = layOut(itemsOf(frame.page, content),
+                left(frame), right(frame), measure(font));
         for (Placed each : placed) {
             if (each.item.kind == BarItem.Kind.FIELD) {
                 int offer = offerAt(font, each, top, barX, barY);
@@ -317,6 +385,28 @@ public final class WindowBar {
             }
         }
         return new Hit(null, -1);
+    }
+
+    /**
+     * The identity button of a page window's bar as it stands on screen,
+     * for its menu to hang from; null while the bar is not drawn.
+     */
+    public LostTalesUiHitBox identityBox(FontRenderer font, WindowFrame frame,
+                                         PageContent content) {
+        if (font == null || frame == null || content == null || !frame.drawn) {
+            return null;
+        }
+        int top = top(frame);
+        for (Placed each : layOut(itemsOf(frame.page, content), left(frame),
+                right(frame), measure(font))) {
+            if (each.item.kind == BarItem.Kind.IDENTITY) {
+                return new LostTalesUiHitBox(each.left + fraction(frame),
+                        buttonTop(top) + (frame.barTop() - top)
+                                + entranceOffset(),
+                        BarLead.IDENTITY_SIZE, BarLead.IDENTITY_SIZE);
+            }
+        }
+        return null;
     }
 
     /** The row of a field's list under a point; -1 off the list. */
@@ -386,7 +476,7 @@ public final class WindowBar {
         int right = right(frame);
         float share = shown == null ? 1.0F : shown.getOpacity();
         int alpha = Math.round(255.0F * share);
-        List<Placed> placed = layOut(content.barItems(), left, right,
+        List<Placed> placed = layOut(itemsOf(frame.page, content), left, right,
                 measure(font));
         GL11.glPushMatrix();
         try {
@@ -414,6 +504,14 @@ public final class WindowBar {
                         break;
                     case FIELD:
                         drawField(font, each, top, alpha);
+                        break;
+                    case TAB:
+                        drawTabButton(minecraft, font, frame, each, top,
+                                pointed, share, alpha);
+                        break;
+                    case IDENTITY:
+                        drawIdentityButton(minecraft, frame, each, top,
+                                pointed, share, alpha);
                         break;
                     default:
                         break;
@@ -446,7 +544,9 @@ public final class WindowBar {
         int bottom = top + WindowPlacement.BAR_STRIP_HEIGHT;
         List<int[]> holes = new ArrayList<int[]>();
         for (Placed each : placed) {
-            if (each.item.kind == BarItem.Kind.BUTTON) {
+            if (each.item.kind == BarItem.Kind.BUTTON
+                    || each.item.kind == BarItem.Kind.TAB
+                    || each.item.kind == BarItem.Kind.IDENTITY) {
                 holes.add(new int[] {each.left, buttonTop(top), each.right,
                         buttonTop(top) + LostTalesUiFramedButton.HEIGHT, 1});
             } else if (each.item.kind == BarItem.Kind.FIELD) {
@@ -506,10 +606,21 @@ public final class WindowBar {
      */
     public static void drawFoot(int left, int top, int right, int surface,
                                 float windowHeight, int alpha) {
+        drawFoot(left, top, 0.0F, right, surface, windowHeight, alpha);
+    }
+
+    /**
+     * As above for a bar reaching {@code reach} above {@code top}, the
+     * chat's as it grows for the rows typed in it: the frame beside it
+     * and its edges start that far up.
+     */
+    public static void drawFoot(int left, int top, float reach, int right,
+                                int surface, float windowHeight, int alpha) {
         int bottom = top + WindowPlacement.BAR_STRIP_HEIGHT;
         int ring = WindowPlacement.FRAME_WIDTH;
-        LostTalesUiInk.fillRect(left - ring, top, left, bottom, surface);
-        LostTalesUiInk.fillRect(right, top, right + ring, bottom, surface);
+        float reached = top - reach;
+        LostTalesUiInk.fillRect(left - ring, reached, left, bottom, surface);
+        LostTalesUiInk.fillRect(right, reached, right + ring, bottom, surface);
         LostTalesUiInk.fillRect(left - ring, bottom, right + ring,
                 bottom + ring - 1, surface);
         // The ring's outermost corner pixels lie outside the frame's
@@ -517,7 +628,7 @@ public final class WindowBar {
         LostTalesUiInk.fillRect(left - ring + 1, bottom + ring - 1,
                 right + ring - 1, bottom + ring, surface);
         LostTalesUiWindowFrame.drawEdgesBelow(left, bottom - windowHeight,
-                right, bottom, top, alpha);
+                right, bottom, reached, alpha);
     }
 
     /**
@@ -572,6 +683,50 @@ public final class WindowBar {
         }
         LostTalesUiFramedButton.drawInk(placed.left, frameTop, width,
                 LostTalesUiFramedButton.HEIGHT, lit, alpha);
+    }
+
+    /** The tab button, lit and its cut name slid under the pointer ({@link BarLead}). */
+    private void drawTabButton(Minecraft minecraft, FontRenderer font,
+                               WindowFrame frame, Placed placed, int top,
+                               boolean pointed, float share, int alpha) {
+        BarLead lead = lead(frame);
+        lead.advanceTab(placed.lead, pointed);
+        lead.drawTab(minecraft, font, placed.lead, buttonTop(top), textTop(top),
+                fraction(frame), surfaceAlpha(minecraft, share), alpha);
+    }
+
+    /**
+     * The identity button: who the player is on the tab in front, lit
+     * under the pointer and while its menu is out; empty and unlit with
+     * nobody to show.
+     */
+    private void drawIdentityButton(Minecraft minecraft, WindowFrame frame,
+                                    Placed placed, int top, boolean pointed,
+                                    float share, int alpha) {
+        WindowTab tab = placed.lead.tab;
+        BarLead.Face face = this.voice == null ? null
+                : this.voice.faceFor(tab);
+        boolean live = pointed && face != null;
+        BarLead lead = lead(frame);
+        lead.advanceIdentity(live, face != null && this.voice.menuOutFor(tab),
+                live && Mouse.isButtonDown(0));
+        lead.drawIdentity(placed.lead, buttonTop(top), face,
+                surfaceAlpha(minecraft, share), alpha);
+    }
+
+    /** The framed buttons' surface at the share of it the bar shows. */
+    private static int surfaceAlpha(Minecraft minecraft, float share) {
+        return Math.round(WindowStyle.INSET_ALPHA * share
+                * WindowStyle.opacity(minecraft));
+    }
+
+    private BarLead lead(WindowFrame frame) {
+        BarLead lead = this.leads.get(frame.windowId);
+        if (lead == null) {
+            lead = new BarLead();
+            this.leads.put(frame.windowId, lead);
+        }
+        return lead;
     }
 
     /** A button's word: ivory, an ending one red; lit, both ivory; greyed, the aside tone. */
@@ -645,12 +800,21 @@ public final class WindowBar {
         item.field.drawTextBox();
     }
 
-    /** The dividers either side of the well, as the chat's bar parts its well from its buttons. */
+    /**
+     * The dividers: either side of the well, as the chat's bar parts its
+     * well from its buttons, and between the tab and identity buttons and
+     * the page's own first button.
+     */
     private static void drawDividers(List<Placed> placed, int top,
                                      float share) {
         int alpha = Math.round(WindowStyle.DIVIDER_ALPHA * share);
         for (int index = 0; index < placed.size(); index++) {
             Placed field = placed.get(index);
+            if (field.afterLead) {
+                WindowStyle.drawDivider(field.left - GAP
+                        - WindowStyle.DIVIDER_WIDTH, glyphTop(top),
+                        WindowStyle.LINE_HEIGHT, alpha);
+            }
             if (field.item.kind != BarItem.Kind.FIELD) {
                 continue;
             }
@@ -714,12 +878,13 @@ public final class WindowBar {
         return motion;
     }
 
-    /** The fraction of a pixel the window stands on across. */
+    /** The fraction of a pixel the bar stands on across. */
     private static float fraction(WindowFrame frame) {
-        return (float)(frame.boxLeft - Math.floor(frame.boxLeft));
+        return (float)(frame.barLeft() - Math.floor(frame.barLeft()));
     }
 
-    static Measure measure(final FontRenderer font) {
+    /** Measures with the game's font. */
+    public static Measure measure(final FontRenderer font) {
         return new Measure() {
             @Override
             public int width(String text) {

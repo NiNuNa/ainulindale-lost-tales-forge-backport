@@ -209,55 +209,6 @@ public final class ClientChatChannelState {
         lastUsedKnown = true;
     }
 
-    /** Next available tab of the selected tab's window, in row order. */
-    public static synchronized ChatTab cycle() {
-        return cycle(1);
-    }
-
-    /** The previous one, for walking the row the other way. */
-    public static synchronized ChatTab cycleBack() {
-        return cycle(-1);
-    }
-
-    /**
-     * The tab {@code step} places along the selected tab's window, in
-     * row order; a selection without a window walks every open tab.
-     */
-    private static synchronized ChatTab cycle(int step) {
-        ChatTab current = getSelected();
-        List<ChatTab> order = selectedWindowOrder(current);
-        int index = Math.max(0, order.indexOf(current));
-        choose(order.get(
-                ((index + step) % order.size() + order.size())
-                        % order.size()));
-        return selected;
-    }
-
-    /**
-     * The tabs of the selected tab's window in row order, those the
-     * player may use; every open tab when the selection has no window,
-     * and Global when nothing is open at all. Never empty.
-     */
-    private static List<ChatTab> selectedWindowOrder(ChatTab current) {
-        Window window = WindowLayout.windowOf(current);
-        List<ChatTab> order = new ArrayList<ChatTab>();
-        if (window != null) {
-            for (WindowTab each : window.getTabs()) {
-                ChatTab tab = ChatTab.from(each);
-                if (tab != null && isAvailable(tab)) {
-                    order.add(tab);
-                }
-            }
-        }
-        if (order.isEmpty()) {
-            order = getOpenTabs();
-        }
-        if (order.isEmpty()) {
-            order.add(ChatTab.of(ChatChannel.GLOBAL));
-        }
-        return order;
-    }
-
     /**
      * Available conversations open in some window, pages left out, in
      * window and tab order.

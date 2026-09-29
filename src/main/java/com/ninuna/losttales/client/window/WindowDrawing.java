@@ -30,7 +30,7 @@ public final class WindowDrawing {
                                   int screenWidth, int screenHeight,
                                   LostTalesGuiAnimationSample opening) {
         frame.showPage(page);
-        frame.advanceFill(window.getFill());
+        frame.advanceFill(ContentView.fillOf(window));
         WindowPlacement.Box box = WindowPlacement.windowBounds(
                 window, minecraft, screenWidth, screenHeight);
         GuiNewChat chat = WindowPlacement.chat(minecraft);
@@ -54,14 +54,13 @@ public final class WindowDrawing {
 
     /**
      * The page's box in a page window as drawn this frame: the window's
-     * width from under its tool strip down to its input bar's rule, laid
-     * on the display's grid.
+     * width from under its tool strip down to its foot's rule, laid on
+     * the display's grid.
      */
     public static LostTalesUiHitBox pageBox(WindowFrame frame) {
         double left = frame.drawnLeft();
         double top = LostTalesDisplayPixels.snap(frame.historyTop());
-        double bottom = LostTalesDisplayPixels.snap(
-                frame.barTop() + frame.motionY);
+        double bottom = frame.footTop();
         return new LostTalesUiHitBox(left, top, frame.boxRight - frame.boxLeft,
                 Math.max(0.0D, bottom - top));
     }
@@ -181,8 +180,8 @@ public final class WindowDrawing {
      * ({@link LostTalesUiWindowFrame#drawEdgesAbove}): the top edge, the
      * two top corners and the side edges' stretches above the bar. The
      * bar draws the rest with itself
-     * ({@link LostTalesUiWindowFrame#drawEdgesBelow}), so it rides the
-     * bar's entrance.
+     * ({@link LostTalesUiWindowFrame#drawEdgesBelow}), so they stand
+     * wherever the bar does.
      */
     public static void drawFrameEdges(Minecraft minecraft, WindowFrame frame,
                                       LostTalesGuiAnimationSample opening) {

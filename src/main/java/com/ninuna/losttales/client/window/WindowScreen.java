@@ -121,7 +121,28 @@ public final class WindowScreen extends GuiChat
     /** The pickers' windows, the menus and cards: whatever opens on a click and stays. */
     private final SubWindows subWindows = new SubWindows();
     /** The pages' input bars. */
-    private final WindowBar bar = new WindowBar();
+    private final WindowBar bar = new WindowBar(new BarLead.Voice() {
+        @Override
+        public BarLead.Face faceFor(WindowTab tab) {
+            for (ScreenPart part : WindowScreen.this.parts) {
+                BarLead.Face face = part.identityFace(tab);
+                if (face != null) {
+                    return face;
+                }
+            }
+            return null;
+        }
+
+        @Override
+        public boolean menuOutFor(WindowTab tab) {
+            for (ScreenPart part : WindowScreen.this.parts) {
+                if (part.identityMenuOut(tab)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    });
     /** Every menu the screen opens: the window's own, and each system's. */
     private final WindowMenus menus = new WindowMenus(this.subWindows);
     /** Every setting, the windows' own section first. */
@@ -130,6 +151,8 @@ public final class WindowScreen extends GuiChat
     private final TabMenus tabMenus = new TabMenus(this, this.menus);
     /** The short line over a window's bar saying why a page's tab closed. */
     private final WindowNotice notice = new WindowNotice();
+    /** The line saying how to leave a tab standing alone in full screen. */
+    private final ContentViewLine viewLine = new ContentViewLine();
     /**
      * What the pointer is on this frame, found once before anything is
      * drawn: what every highlight, tip and card of the frame and the
@@ -740,6 +763,7 @@ public final class WindowScreen extends GuiChat
         // A search belongs to the open screen and goes with it, and a
         // tip left showing waits for the next opening of the chat.
         WindowSearch.close();
+        ContentView.leave();
         FirstTips.screenClosed();
         leavePage();
         this.pressedPage = null;
@@ -765,6 +789,9 @@ public final class WindowScreen extends GuiChat
         if (handleSnapKey(press)) {
             return;
         }
+        if (viewKey(press)) {
+            return;
+        }
         if (tabKey(press)) {
             return;
         }
@@ -784,6 +811,13 @@ public final class WindowScreen extends GuiChat
                 return;
             }
             if (content != null && content.keyTyped(typedChar, keyCode)) {
+                return;
+            }
+            // Tab walks the page's window as it does a conversation's.
+            if (keyCode == Keyboard.KEY_TAB && !press.command && !press.alt
+                    && (content == null || !content.holdsKeys())) {
+                walkTabs(WindowLayout.windowOf(this.focusedPage),
+                        press.shift ? -1 : 1);
                 return;
             }
             if (keyCode != Keyboard.KEY_ESCAPE) {
@@ -838,6 +872,11 @@ public final class WindowScreen extends GuiChat
                 syncTypingFocus();
                 return;
             }
+            // Then a tab standing alone goes back into its window, before
+            // anything of the window itself.
+            if (ContentView.leave()) {
+                return;
+            }
         }
         if (menuShortcut(press)) {
             return;
@@ -865,11 +904,46 @@ public final class WindowScreen extends GuiChat
             }
             return;
         }
+        // A key that types, while a conversation stands alone, brings its
+        // bar back to be typed in.
+        if (press.types && this.focusedPage == null) {
+            ContentView.leave();
+        }
         for (ScreenPart part : this.parts) {
             if (part.keyTyped(press)) {
                 return;
             }
         }
+    }
+
+    /**
+     * Alt+Enter shows the tab in front of the window the keys are in alone
+     * on the whole screen, and puts it back, as the tool strip's button
+     * does.
+     */
+    private boolean viewKey(LostTalesKeyPress press) {
+        if (!press.alt || press.key != Keyboard.KEY_RETURN
+                && press.key != Keyboard.KEY_NUMPADENTER) {
+            return false;
+        }
+        toggleContentView(isEmpty() ? null : keysWindow());
+        return true;
+    }
+
+    /**
+     * Shows the tab in front of {@code window} alone on the whole screen
+     * with the keys ({@link ContentView}); while a tab stands alone, puts
+     * it back. The search goes, its well being out of sight.
+     */
+    private void toggleContentView(Window window) {
+        if (ContentView.leave() || window == null
+                || !ContentView.enter(window)) {
+            return;
+        }
+        if (WindowSearch.isOpenOn(window.getId())) {
+            closeSearch();
+        }
+        jumpToTab(window.getActiveTab());
     }
 
     /**
@@ -922,6 +996,25 @@ public final class WindowScreen extends GuiChat
             jumpToTab(next);
         }
         return true;
+    }
+
+    /**
+     * Walks {@code window}'s tabs {@code step} places from the one in
+     * front, round from one end to the other, pages and conversations
+     * alike, and gives the tab reached the keys: what a bar's tab button
+     * and Tab on a bar with nothing typed do.
+     */
+    public void walkTabs(Window window, int step) {
+        if (window == null) {
+            return;
+        }
+        List<WindowTab> row = WindowFrame.visibleTabs(window);
+        WindowTab from = WindowFrame.activeTab(window, row);
+        WindowTab next = TabWalk.step(row, from, step);
+        if (next != null && !next.equals(from)) {
+            TabSelection.clear();
+            jumpToTab(next);
+        }
     }
 
     /**
@@ -1182,6 +1275,9 @@ public final class WindowScreen extends GuiChat
                     front.toggleMemberList(press.window);
                 }
                 return;
+            case VIEW:
+                toggleContentView(press.window);
+                return;
             case FIELD:
                 searchIn(press.window);
                 this.toolStrip.clickField(press.row, x, y);
@@ -1291,6 +1387,11 @@ public final class WindowScreen extends GuiChat
         Window window = keysWindow();
         if (window == null || window.isLocked()) {
             return false;
+        }
+        if (keyCode == Keyboard.KEY_Z || SnapKeys.direction(keyCode) != null) {
+            // A tab standing alone goes back into its window, which the
+            // key then snaps.
+            ContentView.leave();
         }
         if (keyCode == Keyboard.KEY_Z) {
             if (this.snapFlyout.isKeyboardOpen()) {
@@ -1544,6 +1645,10 @@ public final class WindowScreen extends GuiChat
             part.drawOverSubWindows(typing, pointerX, pointerY, mouseX,
                     mouseY);
         }
+        drawIdentityCard(mouseX, mouseY);
+        this.viewLine.draw(this.fontRendererObj, this.width, pointerX,
+                pointerY, this.hover.is(WindowHover.Kind.VIEW_LEAVE),
+                this.regions);
         this.gestures.drawLineUpEdge();
         float shownOpacity = WindowOpening.sample().getOpacity();
         this.gestures.drawSnapBar(shownOpacity);
@@ -1564,6 +1669,31 @@ public final class WindowScreen extends GuiChat
         }
         if (this.hoverTip.length() > 0 && !this.snapFlyout.isShown()) {
             drawHoverTip();
+        }
+    }
+
+    /**
+     * Who the player is on a page, in a card beside the pointer resting on
+     * its bar's identity button while the button's menu is not out, as on
+     * the chat's bar.
+     */
+    private void drawIdentityCard(int mouseX, int mouseY) {
+        if (!this.hover.is(WindowHover.Kind.BAR) || this.hover.frame == null
+                || this.hover.barItem == null
+                || this.hover.barItem.kind != BarItem.Kind.IDENTITY
+                || this.hover.listRow >= 0) {
+            return;
+        }
+        PageTab page = this.hover.frame.page;
+        for (ScreenPart part : this.parts) {
+            if (part.identityMenuOut(page)) {
+                return;
+            }
+        }
+        for (ScreenPart part : this.parts) {
+            if (part.drawIdentityCard(page, mouseX, mouseY)) {
+                return;
+            }
         }
     }
 
@@ -1750,16 +1880,35 @@ public final class WindowScreen extends GuiChat
         String previewed = this.gestures.snapPreview().windowId();
         String typed = typedWindowId();
         List<PageTab> drawnPages = new ArrayList<PageTab>();
+        // A tab standing alone, or gliding to or from that, fades every
+        // other window away by how far it stands: gone once it stands.
+        ContentView.follow(keysWindow(), this.focusedPage != null);
+        WindowFrame alone = null;
+        float aloneShare = 0.0F;
+        for (Window window : windows) {
+            float share = WindowFrame.of(window).contentShare();
+            if (share > aloneShare) {
+                aloneShare = share;
+                alone = WindowFrame.of(window);
+            }
+        }
         for (int index = 0; index < windows.size(); index++) {
             Window window = windows.get(index);
+            WindowFrame frame = WindowFrame.of(window);
+            float others = alone == null || alone == frame ? 1.0F
+                    : 1.0F - aloneShare;
+            frame.setViewShare(others);
+            if (others <= 0.0F) {
+                frame.drawn = false;
+                continue;
+            }
             if (window.getId().equals(previewed)) {
                 drawSnapPreview(window, drawnBoxes, opening, partialTicks);
             }
             // A window just made from carried tabs fades in on its own,
             // inside the screen's own motion.
-            WindowFrame frame = WindowFrame.of(window);
             LostTalesGuiAnimationSample shown = opening.withOpacity(
-                    frame.appearShare());
+                    frame.appearShare() * others);
             if (drawnBoxes != null
                     && !WindowFrame.visibleTabs(window).isEmpty()) {
                 // A window over another one pastes its rectangle of the
@@ -1770,7 +1919,7 @@ public final class WindowScreen extends GuiChat
                 // overlapped window stays visible — softened — behind the
                 // one in front. Measured where the window stands this
                 // frame, a window gliding to or from the screen included.
-                frame.advanceFill(window.getFill());
+                frame.advanceFill(ContentView.fillOf(window));
                 WindowPlacement.Box box = WindowPlacement.windowBounds(window,
                         this.mc, this.width, this.height);
                 if (overlapsAny(drawnBoxes, box)) {
@@ -1916,7 +2065,7 @@ public final class WindowScreen extends GuiChat
                                  LostTalesGuiAnimationSample opening,
                                  float partialTicks) {
         SnapPreview preview = this.gestures.snapPreview();
-        WindowFrame.of(window).advanceFill(window.getFill());
+        WindowFrame.of(window).advanceFill(ContentView.fillOf(window));
         SnapPreview.Pane pane = preview.advance(this.mc,
                 WindowPlacement.windowBounds(window, this.mc, this.width,
                         this.height), this.width, this.height);
@@ -1933,7 +2082,8 @@ public final class WindowScreen extends GuiChat
                         if (other == null) {
                             return null;
                         }
-                        WindowFrame.of(other).advanceFill(other.getFill());
+                        WindowFrame.of(other).advanceFill(
+                                ContentView.fillOf(other));
                         return WindowPlacement.windowBounds(other,
                                 WindowScreen.this.mc,
                                 WindowScreen.this.width,
@@ -2213,8 +2363,10 @@ public final class WindowScreen extends GuiChat
 
     /**
      * A press on a page's bar: its window comes forward and the page takes
-     * the keys, then the page is told which item, or which row of its
-     * field's list, was pressed. A greyed item does nothing.
+     * the keys. The tab button walks the window's tabs, forward with a
+     * click and back with a right-click; the identity button opens its
+     * menu; anything else the page is told of, which item or which row of
+     * its field's list. A greyed item does nothing.
      */
     private void pressBar(WindowHover press, int button) {
         PageTab page = press.frame == null ? null : press.frame.page;
@@ -2224,11 +2376,45 @@ public final class WindowScreen extends GuiChat
         }
         WindowLayout.raise(press.frame.windowId);
         focusPage(page);
+        BarItem.Kind kind = press.barItem == null ? null : press.barItem.kind;
+        if (kind == BarItem.Kind.TAB) {
+            if (button == 0 || button == 1) {
+                walkTabs(WindowLayout.window(press.frame.windowId),
+                        button == 0 ? 1 : -1);
+            }
+            return;
+        }
+        if (kind == BarItem.Kind.IDENTITY) {
+            if (button == 0 && press.barItem.isAvailable()) {
+                pressIdentity(press.frame, page, content);
+            }
+            syncTypingFocus();
+            return;
+        }
         if (button == 0 && press.barItem != null
                 && (press.listRow >= 0 || press.barItem.isAvailable())) {
             content.barPressed(press.barItem.id, press.listRow);
         }
         syncTypingFocus();
+    }
+
+    /** A page bar's identity button pressed: the part that shows who the player is opens its menu there. */
+    private void pressIdentity(WindowFrame frame, PageTab page,
+                               PageContent content) {
+        LostTalesUiHitBox box = this.bar.identityBox(this.fontRendererObj,
+                frame, content);
+        if (box == null) {
+            return;
+        }
+        SubWindowAnchor anchor = SubWindowAnchor.inward(
+                (int)Math.floor(box.left), (int)Math.floor(box.top),
+                (int)Math.floor(box.right()), (int)Math.floor(box.bottom()),
+                frame, this.width, this.height);
+        for (ScreenPart part : this.parts) {
+            if (part.pressIdentity(page, anchor)) {
+                return;
+            }
+        }
     }
 
     /**
@@ -2253,7 +2439,7 @@ public final class WindowScreen extends GuiChat
     /**
      * A page's answer over its window's bar, drawn as a notice is: done
      * in ivory, refused and faults in red, on its way in the aside tone.
-     * It rides the bar's entrance and fades with its window.
+     * It stands wherever the bar does and fades with its window.
      */
     private void drawAnswer(WindowFrame frame, PageContent content,
                             LostTalesGuiAnimationSample shown) {
@@ -2296,7 +2482,7 @@ public final class WindowScreen extends GuiChat
         if (frame != null && frame.drawn) {
             this.notice.show(text, frame.drawnLeft()
                     + (frame.boxRight - frame.boxLeft) / 2.0D,
-                    frame.barTop() + frame.motionY);
+                    frame.barTop());
         } else {
             this.notice.show(text, this.width / 2.0D,
                     this.height - WindowPlacement.TOOL_STRIP_HEIGHT);
@@ -2369,6 +2555,9 @@ public final class WindowScreen extends GuiChat
             hover.snapZone = this.snapFlyout.zoneAt(x, y);
             hover.window = WindowLayout.window(this.snapFlyout.windowId());
             return hover;
+        }
+        if (this.viewLine.contains(x, y)) {
+            return new WindowHover(WindowHover.Kind.VIEW_LEAVE);
         }
         if (isEmpty()) {
             WindowHover sub = this.subWindows.hoverAt(x, y);
@@ -2675,6 +2864,12 @@ public final class WindowScreen extends GuiChat
         if (this.toolStrip.isFocused()
                 && !press.is(WindowHover.Kind.TOOL_STRIP)) {
             leaveSearch();
+        }
+        if (press.is(WindowHover.Kind.VIEW_LEAVE)) {
+            if (button == 0) {
+                ContentView.leave();
+            }
+            return;
         }
         if (this.focusedPage != null && !press.is(WindowHover.Kind.PAGE)
                 && !press.is(WindowHover.Kind.BAR)) {

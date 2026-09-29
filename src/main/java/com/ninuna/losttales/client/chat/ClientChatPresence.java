@@ -4,6 +4,7 @@ import com.ninuna.losttales.chat.ChatPresence;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.chat.ChatRoleplayStatus;
 import com.ninuna.losttales.chat.ChatStatusLine;
+import com.ninuna.losttales.client.window.WindowTab;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatPresencePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatPresenceSyncPacket;
@@ -307,10 +308,11 @@ public final class ClientChatPresence {
     }
 
     /**
-     * The identity a tab speaks as, whose status its menu sets: the chat
-     * identity on a roleplaying tab, the account on every other.
+     * The identity a tab shows, whose status its identity button's menu
+     * sets: the chat identity on a roleplaying tab, the account on every
+     * other conversation, the character played on a page.
      */
-    static ChatPresenceIdentity speakerOf(ChatTab tab) {
+    static ChatPresenceIdentity speakerOf(WindowTab tab) {
         ClientChatIdentities.Identity identity =
                 ClientChatIdentities.effectiveFor(tab);
         return identity == null || identity.account

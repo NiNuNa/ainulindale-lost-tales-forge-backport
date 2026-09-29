@@ -1,6 +1,8 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.BarLead;
 import com.ninuna.losttales.client.window.TabIcons;
+import com.ninuna.losttales.client.window.WindowBar;
 import com.ninuna.losttales.client.window.WindowPlacement;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
@@ -93,10 +95,10 @@ public final class ChatInputBarTest {
         assertEquals(ChatReactionMarker.ICON + 2 * ChatReactionMarker.PAD,
                 ChatReactionMarker.HEIGHT);
         assertEquals(LostTalesUiFramedButton.HEIGHT,
-                ChatInputBar.CHARACTER_BUTTON_SIZE);
+                BarLead.IDENTITY_SIZE);
         assertEquals(LostTalesChatOverlayRenderer.HEAD_SIZE
                         + 2 * LostTalesUiFramedButton.WIDE_INSET,
-                ChatInputBar.CHARACTER_BUTTON_SIZE);
+                BarLead.IDENTITY_SIZE);
         assertEquals(LostTalesUiFramedButton.HEIGHT, ChatInputBar.CONTENT_HEIGHT);
     }
 
@@ -113,7 +115,7 @@ public final class ChatInputBarTest {
         assertEquals(1 + 2 + LostTalesUiFramedButton.HEIGHT + 2,
                 WindowPlacement.BAR_STRIP_HEIGHT);
         assertEquals(3, ChatInputBar.BAR_GAP);
-        assertEquals(2, ChatInputBar.BUTTON_GAP);
+        assertEquals(2, BarLead.BUTTON_GAP);
     }
 
     /**
@@ -181,35 +183,33 @@ public final class ChatInputBarTest {
                 ChatInputBar.NOTICE_LIFETIME_MILLIS - 1.0F) < 0.01F);
     }
 
-    /** The indicator names the channel as its tab does, its icon before it. */
+    /** The tab button names the channel as its tab does. */
     @Test
-    public void theIndicatorNamesTheChannelAsItsTabDoes() {
+    public void theTabButtonNamesTheChannelAsItsTabDoes() {
         ClientChatChannelState.clear();
-        assertEquals(ClientChatChannelState.displayName(
-                ChatTab.of(ChatChannel.OOC)),
-                ChatInputBar.indicatorLabel(ChatTab.of(ChatChannel.OOC)));
+        ChatTab ooc = ChatTab.of(ChatChannel.OOC);
+        assertEquals(ClientChatChannelState.displayName(ooc),
+                BarLead.fit(ooc, 0, 1000, new WindowBar.Measure() {
+                    @Override
+                    public int width(String text) {
+                        return text.length() * 6;
+                    }
+                }).label);
     }
 
     /**
-     * The indicator gives the field what it lacks of its comfortable
-     * width, the name first and then the gap after the icon, down to
-     * the icon alone. The whole name's last column is spacing, so the
-     * first pixel it gives up wins the field nothing and goes with the
-     * second: each pixel the field lacks moves the divider by one.
+     * The tab and identity buttons give the field what it lacks of its
+     * comfortable width, the name first, down to the icon alone: each
+     * pixel the field lacks moves the divider by one.
      */
     @Test
-    public void theIndicatorGivesItsNameUpForTheField() {
-        int whole = TabIcons.GAP + 40;
+    public void theTabButtonGivesItsNameUpForTheField() {
+        int whole = 80;
         int comfortable = ChatInputBar.COMFORTABLE_FIELD_WIDTH;
-        assertEquals(whole, ChatInputBar.indicatorShown(whole, comfortable));
-        assertEquals(whole,
-                ChatInputBar.indicatorShown(whole, comfortable + 30));
-        assertEquals(whole - 2,
-                ChatInputBar.indicatorShown(whole, comfortable - 1));
-        assertEquals(whole - 11,
-                ChatInputBar.indicatorShown(whole, comfortable - 10));
-        assertEquals(0, ChatInputBar.indicatorShown(whole,
-                comfortable - whole));
-        assertEquals(0, ChatInputBar.indicatorShown(whole, 0));
+        assertEquals(whole, ChatInputBar.leadWidth(whole, comfortable));
+        assertEquals(whole, ChatInputBar.leadWidth(whole, comfortable + 30));
+        assertEquals(whole - 1, ChatInputBar.leadWidth(whole, comfortable - 1));
+        assertEquals(whole - 10,
+                ChatInputBar.leadWidth(whole, comfortable - 10));
     }
 }

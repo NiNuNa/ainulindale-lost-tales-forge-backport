@@ -7,11 +7,13 @@ import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.item.ItemStack;
 
 /**
- * One thing on a page's input bar, as the chat's bar reads left to right
- * (U2 a): a button with an icon and a word, the field where the page
- * takes words, quiet words, and small glyph buttons at the right end. A
- * button that ends something (Abandon, Leave, Delete) stands last on the
- * right, in red. A page makes its items afresh every frame.
+ * One thing on a page's input bar, as the chat's bar reads left to right:
+ * the tab and identity buttons every bar starts with, which the bar puts
+ * there itself ({@link BarLead}); then what the page puts there, a button
+ * with an icon and a word, the field where the page takes words, quiet
+ * words, and small glyph buttons at the right end. A button that ends
+ * something (Abandon, Leave, Delete) stands last on the right, in red. A
+ * page makes its items afresh every frame.
  *
  * <p>An action that cannot be taken now is still there, greyed, and its
  * tip says why (rule 25). Every button's tip names what it does and its
@@ -26,14 +28,25 @@ public final class BarItem {
         /** The page's own field, in a well, with a list of what it offers above it. */
         FIELD,
         /** Quiet words, as the chat's counter stands before its glyphs. */
-        WORDS
+        WORDS,
+        /** The tab button every bar starts with; the bar's own, never a page's. */
+        TAB,
+        /** The identity button beside it; the bar's own, never a page's. */
+        IDENTITY
     }
+
+    /** The tab button's id, which no page item takes. */
+    public static final String TAB_ID = "window.tab";
+    /** The identity button's id, which no page item takes. */
+    public static final String IDENTITY_ID = "window.identity";
 
     public final Kind kind;
     /** What the page is told when the item is pressed. */
     public final String id;
     /** A button's word, a field's hint, the words themselves. */
     public final String label;
+    /** The tab a tab button names. */
+    WindowTab tab;
     ItemStack icon;
     LostTalesUiSheet glyph;
     LostTalesUiSheet glyphLit;
@@ -50,6 +63,20 @@ public final class BarItem {
         this.kind = kind;
         this.id = id == null ? "" : id;
         this.label = label == null ? "" : label;
+    }
+
+    /** The tab button for {@code tab}: its tip says what it does and its keys. */
+    static BarItem tabButton(WindowTab tab, String tip) {
+        BarItem item = new BarItem(Kind.TAB, TAB_ID,
+                tab == null ? "" : tab.title());
+        item.tab = tab;
+        item.tip = tip == null ? "" : tip;
+        return item;
+    }
+
+    /** The identity button; its card stands for its tip. */
+    static BarItem identityButton() {
+        return new BarItem(Kind.IDENTITY, IDENTITY_ID, "");
     }
 
     /** A framed button with a word, and an item's picture before it. */

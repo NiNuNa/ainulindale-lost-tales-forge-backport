@@ -994,25 +994,49 @@ final class ChatMenus {
     /* ---- The character menu and the status line ---- */
 
     /**
-     * The character menu, hung from the head button — a switch, as the
+     * The character menu, hung from an identity button — a switch, as the
      * button is — with a search field over its rows that narrows them as
-     * it is typed into. It follows the tab being typed in: on an account
-     * channel, which always speaks as the account, it is the status rows
-     * alone, since nothing there chooses an identity, with no roster and
-     * no search field.
+     * it is typed into. Opened from the chat's bar ({@code page} null) it
+     * follows the conversation typed in; opened from a page's bar it is
+     * about that page. Where nothing chooses an identity — an account
+     * channel, Proximity, Party, a page — it is the status rows alone, for
+     * the identity the tab shows, with no roster and no search field.
      */
-    void toggleCharacterMenu(SubWindowAnchor anchor) {
-        this.menus.show(ChatSubWindows.CHARACTERS, null,
+    void toggleCharacterMenu(WindowTab page, SubWindowAnchor anchor) {
+        this.menus.show(ChatSubWindows.CHARACTERS, aboutFor(page),
                 WindowMenus.hangingFrom(anchor), true);
+    }
+
+    /** Whether the character menu is out for the identity button of {@code tab}'s bar: it rests lit. */
+    boolean isCharacterMenuOutFor(WindowTab tab) {
+        return this.menus.isOpenFor(ChatSubWindows.CHARACTERS, aboutFor(tab));
+    }
+
+    /** What the character menu is about for a tab's bar: a page, or nothing for the conversation typed in. */
+    private static WindowTab aboutFor(WindowTab tab) {
+        return tab instanceof ChatTab ? null : tab;
+    }
+
+    /** The tab the character menu speaks for: the page it is about, else the conversation typed in. */
+    private static WindowTab subjectOf(MenuWindow menu) {
+        return menu.about() instanceof WindowTab ? (WindowTab)menu.about()
+                : ClientChatChannelState.getSelected();
     }
 
     /** Who the chat speaks as and what it says of itself. */
     private final class CharacterSource extends WindowMenus.Source {
-        /** The field, the name and the rows, for the tab typed in now. */
+        /** A menu about a page stands while the page is in a window. */
+        @Override
+        public boolean stillStands(MenuWindow menu) {
+            return !(menu.about() instanceof WindowTab)
+                    || WindowLayout.windowOf((WindowTab)menu.about()) != null;
+        }
+
+        /** The field, the name and the rows, for the tab the menu speaks for. */
         @Override
         public void rebuild(MenuWindow menu) {
-            boolean statusOnly = !ClientChatIdentities.picksIdentity(
-                    ClientChatChannelState.getSelected());
+            WindowTab subject = subjectOf(menu);
+            boolean statusOnly = !ClientChatIdentities.picksIdentity(subject);
             if (statusOnly && menu.hasField()) {
                 menu.closeField();
             } else if (!statusOnly && !menu.hasField()) {
@@ -1024,7 +1048,7 @@ final class ChatMenus {
             menu.setTitle(StatCollector.translateToLocal(statusOnly
                     ? "gui.losttales.chat.character_selection.status"
                     : "gui.losttales.chat.sub.characters"), null);
-            menu.setRows(characterSelectionEntries(menu.filter(),
+            menu.setRows(characterSelectionEntries(subject, menu.filter(),
                     statusOnly));
         }
 
@@ -1056,13 +1080,13 @@ final class ChatMenus {
         @Override
         public boolean act(MenuWindow menu, MenuWindow.Entry entry,
                            SubWindow window, boolean back) {
+            WindowTab subject = subjectOf(menu);
             if (ENTRY_STATUS_LINE.equals(entry.id)) {
                 ChatMenus.this.menus.show(ChatSubWindows.STATUS_LINE,
-                        ClientChatPresence.speakerOf(
-                                ClientChatChannelState.getSelected()),
+                        ClientChatPresence.speakerOf(subject),
                         WindowMenus.besideWindow(window), true);
             } else {
-                chooseIdentityOrStatus(entry);
+                chooseIdentityOrStatus(entry, subject);
                 ChatMenus.this.host.identityChosen();
             }
             return true;
@@ -1070,29 +1094,32 @@ final class ChatMenus {
     }
 
     /**
-     * The selected chat identity, then the owned characters and the owned
-     * lore characters, each section under its header. A filter keeps the
+     * The chat identity, then the owned characters and the owned lore
+     * characters, each section under its header; where the tab chooses no
+     * identity, the one it shows and its statuses alone. A filter keeps the
      * rows whose names hold it and drops a section with nothing left; one
      * that matches nothing says so under the current identity rather than
      * closing the menu under the hand that is typing.
      */
-    private List<MenuWindow.Entry> characterSelectionEntries(String filter,
-                                                             boolean statusOnly) {
+    private List<MenuWindow.Entry> characterSelectionEntries(
+            WindowTab subject, String filter, boolean statusOnly) {
         UUID self = this.mc.thePlayer == null ? null
                 : this.mc.thePlayer.getUniqueID();
         ClientChatIdentities.Identity current = ClientChatIdentities.viewing();
         List<MenuWindow.Entry> entries = new ArrayList<MenuWindow.Entry>();
         if (statusOnly) {
-            // The account speaking, and what it may say of itself.
-            entries.add(MenuWindow.Entry.passive(
-                    ClientChatIdentities.accountName())
-                    .withPicture(head(self, "")));
+            // The identity the tab shows, and what it may say of itself.
+            ClientChatIdentities.Identity shown =
+                    ClientChatIdentities.effectiveFor(subject);
+            entries.add(MenuWindow.Entry.passive(shown.name)
+                    .withPicture(head(self, shown.account ? ""
+                            : shown.skinId)));
             WindowMenus.addSection(entries, StatCollector.translateToLocal(
                     "gui.losttales.chat.character_selection.status"),
-                    statusRows());
+                    statusRows(subject));
             WindowMenus.addSection(entries, StatCollector.translateToLocal(
                     "gui.losttales.chat.character_selection.roleplay"),
-                    roleplayRows());
+                    roleplayRows(subject));
             return entries;
         }
         entries.add(MenuWindow.Entry.passive(ClientChatIdentities.isNarrating()
@@ -1126,20 +1153,19 @@ final class ChatMenus {
         }
         WindowMenus.addSection(entries, StatCollector.translateToLocal(
                 "gui.losttales.chat.character_selection.status"),
-                statusRows());
+                statusRows(subject));
         WindowMenus.addSection(entries, StatCollector.translateToLocal(
                 "gui.losttales.chat.character_selection.roleplay"),
-                roleplayRows());
+                roleplayRows(subject));
         return entries;
     }
 
     /**
-     * The role-play statuses to choose from for the identity the selected
-     * tab speaks as (P4 a), each with its mark, the one it has marked.
+     * The role-play statuses to choose from for the identity {@code tab}
+     * shows, each with its mark, the one it has marked.
      */
-    private static List<MenuWindow.Entry> roleplayRows() {
-        ChatPresenceIdentity speaker = ClientChatPresence.speakerOf(
-                ClientChatChannelState.getSelected());
+    private static List<MenuWindow.Entry> roleplayRows(WindowTab tab) {
+        ChatPresenceIdentity speaker = ClientChatPresence.speakerOf(tab);
         ChatRoleplayStatus chosen = ClientChatPresence.chosenRoleplay(speaker);
         List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
         for (final ChatRoleplayStatus status : ChatRoleplayStatus.values()) {
@@ -1165,15 +1191,15 @@ final class ChatMenus {
     }
 
     /**
-     * The statuses to choose from for the identity the selected tab
-     * speaks as — the chat identity on a roleplaying tab, the account on
-     * any other — each with the sphere it shows, lighting to the ivory
-     * one under the pointer, and the one chosen for it marked; and under
-     * them the identity's status line, in italics, or the way to set one.
+     * The statuses to choose from for the identity {@code tab} shows —
+     * the chat identity on a roleplaying tab, the account on any other
+     * conversation, the character played on a page — each with the
+     * sphere it shows, lighting to the ivory one under the pointer, and
+     * the one chosen for it marked; and under them the identity's status
+     * line, in italics, or the way to set one.
      */
-    private static List<MenuWindow.Entry> statusRows() {
-        ChatPresenceIdentity speaker = ClientChatPresence.speakerOf(
-                ClientChatChannelState.getSelected());
+    private static List<MenuWindow.Entry> statusRows(WindowTab tab) {
+        ChatPresenceIdentity speaker = ClientChatPresence.speakerOf(tab);
         ChatPresence chosen = ClientChatPresence.chosen(speaker);
         List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
         for (ChatPresence presence : ChatPresence.values()) {
@@ -1223,16 +1249,20 @@ final class ChatMenus {
                 null).withPicture(head(self, identity.skinId));
     }
 
-    /** A choice applies to every roleplaying conversation. */
-    private static void chooseIdentityOrStatus(MenuWindow.Entry entry) {
+    /**
+     * A row taken: a status for the identity {@code subject} shows, or a
+     * voice or identity, which applies to every roleplaying conversation.
+     */
+    private static void chooseIdentityOrStatus(MenuWindow.Entry entry,
+                                               WindowTab subject) {
         if (ENTRY_NARRATOR.equals(entry.id)) {
             ClientChatIdentities.setNarrating(!ClientChatIdentities.isNarrating());
             return;
         }
         if (entry.id.startsWith(ENTRY_ROLEPLAY_PREFIX)) {
             try {
-                ClientChatPresence.chooseRoleplay(ClientChatPresence.speakerOf(
-                                ClientChatChannelState.getSelected()),
+                ClientChatPresence.chooseRoleplay(
+                        ClientChatPresence.speakerOf(subject),
                         ChatRoleplayStatus.valueOf(entry.id.substring(
                                 ENTRY_ROLEPLAY_PREFIX.length())));
             } catch (IllegalArgumentException ignored) {
@@ -1242,8 +1272,8 @@ final class ChatMenus {
         }
         if (entry.id.startsWith(ENTRY_STATUS_PREFIX)) {
             try {
-                ClientChatPresence.choose(ClientChatPresence.speakerOf(
-                                ClientChatChannelState.getSelected()),
+                ClientChatPresence.choose(
+                        ClientChatPresence.speakerOf(subject),
                         ChatPresence.valueOf(entry.id.substring(
                                 ENTRY_STATUS_PREFIX.length())));
             } catch (IllegalArgumentException ignored) {

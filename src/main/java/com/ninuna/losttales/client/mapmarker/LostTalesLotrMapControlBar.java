@@ -35,7 +35,7 @@ public final class LostTalesLotrMapControlBar {
         return LostTalesControlBar.render(gui, minecraft, font,
                 gui.width, gui.height, collectHints(minecraft, font, gui),
                 LEFT_GROUP_SIZE, CENTER_RESERVED,
-                Arrays.asList(LostTalesLotrMapCalendar.describe()), true);
+                Arrays.asList(LostTalesLotrMapCalendar.describe()));
     }
 
     private static List<Hint> collectHints(

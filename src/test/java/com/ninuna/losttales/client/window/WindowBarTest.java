@@ -11,9 +11,10 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Every page's bar reads as the chat's does: buttons from the left, the
- * field in the room left over, words and glyphs from the right, and an
- * ending button last; a short bar gives up words before anything else.
+ * Every page's bar reads as the chat's does: the tab and identity buttons
+ * first, then buttons from the left, the field in the room left over,
+ * words and glyphs from the right, and an ending button last; a short bar
+ * gives up the tab's name first, then words, before anything else.
  */
 public final class WindowBarTest {
     /** Six pixels a letter: enough to lay a bar out without a font. */
@@ -104,6 +105,59 @@ public final class WindowBarTest {
                     each.right - each.left);
         }
         assertEquals(2, placed.size());
+    }
+
+    /** The tab and identity buttons, as the bar puts them before a page's items. */
+    private static List<BarItem> withLead(String tab, BarItem... items) {
+        List<BarItem> all = new java.util.ArrayList<BarItem>();
+        all.add(BarItem.tabButton(new BarLeadTest.Tab(tab, true), ""));
+        all.add(BarItem.identityButton());
+        all.addAll(Arrays.asList(items));
+        return all;
+    }
+
+    @Test
+    public void theTabAndIdentityButtonsComeFirstThenADivider() {
+        List<WindowBar.Placed> placed = WindowBar.layOut(withLead("Journal",
+                button("track"), button("abandon").ending()), 0, 400, SIX);
+        WindowBar.Placed tab = of(placed, BarItem.TAB_ID);
+        WindowBar.Placed identity = of(placed, BarItem.IDENTITY_ID);
+        WindowBar.Placed track = of(placed, "track");
+        assertEquals(WindowBar.GAP, tab.left);
+        assertEquals(tab.right + BarLead.BUTTON_GAP, identity.left);
+        assertEquals(BarLead.IDENTITY_SIZE, identity.right - identity.left);
+        assertEquals("the page's own start past a divider", identity.right
+                + WindowBar.GAP + WindowStyle.DIVIDER_WIDTH + WindowBar.GAP,
+                track.left);
+        assertTrue(track.afterLead);
+        assertFalse(of(placed, "abandon").afterLead);
+        assertEquals(400 - WindowBar.GAP, of(placed, "abandon").right);
+    }
+
+    @Test
+    public void aFieldAfterTheLeadStandsPastItsOwnDivider() {
+        List<WindowBar.Placed> placed = WindowBar.layOut(withLead("Party",
+                BarItem.field("invite", null, "Invite")), 0, 300, SIX);
+        WindowBar.Placed identity = of(placed, BarItem.IDENTITY_ID);
+        WindowBar.Placed field = of(placed, "invite");
+        assertEquals(identity.right + WindowBar.GAP + WindowStyle.DIVIDER_WIDTH
+                + WindowBar.WELL_GAP, field.left);
+        assertFalse(field.afterLead);
+    }
+
+    @Test
+    public void aShortBarGivesUpTheTabsNameBeforeAnyWord() {
+        List<BarItem> items = withLead("Motion Lab", button("replay"),
+                button("save"));
+        List<WindowBar.Placed> roomy = WindowBar.layOut(items, 0, 400, SIX);
+        // The least room everything fits whole in: the last button's edge.
+        int wide = of(roomy, "save").right;
+        List<WindowBar.Placed> tight = WindowBar.layOut(items, 0, wide - 7,
+                SIX);
+        WindowBar.Placed tab = of(tight, BarItem.TAB_ID);
+        assertEquals(of(roomy, BarItem.TAB_ID).right - 7, tab.right);
+        assertFalse("the buttons keep their words",
+                of(tight, "replay").compact);
     }
 
     @Test

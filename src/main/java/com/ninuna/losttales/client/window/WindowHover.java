@@ -56,7 +56,9 @@ public class WindowHover {
         /** Anything else painted over the windows, answering to nothing. */
         OVERLAY,
         /** What a screen part draws: its hover says what. */
-        CONTENT
+        CONTENT,
+        /** The line at the top of the screen that puts a tab standing alone back into its window. */
+        VIEW_LEAVE
     }
 
     public static final WindowHover NONE = new WindowHover(Kind.NONE);
@@ -113,6 +115,7 @@ public class WindowHover {
             case SUB_WINDOW_CLOSE:
             case SUB_WINDOW_STRIP:
             case TAB_ROW:
+            case VIEW_LEAVE:
                 return true;
             case STRIP:
                 // A strip moves its window only while the window is not

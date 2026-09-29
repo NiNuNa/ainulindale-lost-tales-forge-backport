@@ -17,6 +17,39 @@ public final class WindowPlacementTest {
     }
 
     /**
+     * A tab standing alone takes the whole screen for what it holds: the
+     * window's row and strip past the top edge, its bar past the bottom
+     * one and its frame past the sides. Nothing the window keeps changes,
+     * so putting it back gives it its own box again.
+     */
+    @Test
+    public void aTabStandingAloneHasItsFurniturePastTheScreensEdges() {
+        TwoWindowLayout.reset();
+        Window conversation = WindowLayout.windows().get(1);
+        WindowPlacement.Box before = WindowPlacement.windowBounds(
+                conversation, null, 1000, 600);
+        assertTrue(ContentView.enter(conversation));
+        try {
+            WindowPlacement.Box alone = WindowPlacement.windowBounds(
+                    conversation, null, 1000, 600);
+            assertEquals(0.0D, alone.x, 0.0001D);
+            assertEquals(-WindowPlacement.rowHeight(null), alone.y, 0.0001D);
+            assertEquals("the bar starts at the bottom edge", 600.0D,
+                    alone.barTop(), 0.0001D);
+            assertEquals(WindowPlacement.boxWidthForChatWidth(
+                    WindowPlacement.chatWidthForBox(1000.0D, null), null),
+                    alone.width, 0.0001D);
+            assertEquals(Window.ScreenFill.NONE, conversation.getFill());
+        } finally {
+            ContentView.leave();
+        }
+        WindowPlacement.Box after = WindowPlacement.windowBounds(
+                conversation, null, 1000, 600);
+        assertEquals(before.x, after.x, 0.0001D);
+        assertEquals(before.y, after.y, 0.0001D);
+    }
+
+    /**
      * A window filling the screen stands between the margins with room
      * for its frame — without a Minecraft instance the margin is zero,
      * so the 1000 by 600 screen less the frame's two pixels on every side —

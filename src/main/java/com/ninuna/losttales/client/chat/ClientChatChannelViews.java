@@ -76,6 +76,12 @@ public final class ClientChatChannelViews {
     private static final Map<ChatTab, Anchor> ANCHORS =
             new HashMap<ChatTab, Anchor>();
     /**
+     * The row of a message a view keeps where it stands on its next
+     * layout, once: see {@link #keepInPlace}.
+     */
+    private static final Map<ChatTab, KeptRow> KEPT_ROWS =
+            new HashMap<ChatTab, KeptRow>();
+    /**
      * How many times the player has moved each view themselves. A hold
      * is taken against the reading it was made from, so a wheel turn,
      * a scrollbar drag or a jump replaces it rather than being undone
@@ -321,6 +327,11 @@ public final class ClientChatChannelViews {
         }
         double current = target(view);
         List<ChatLine> lines = frame.lines;
+        if (placeKeptRow(view, frame, current)) {
+            // The page is held again from where it rests now.
+            ANCHORS.remove(view);
+            return;
+        }
         if (current <= 0.0D || lines == null || lines.isEmpty()) {
             ANCHORS.remove(view);
             // Back at the newest message: nothing is waiting below any
@@ -384,6 +395,79 @@ public final class ClientChatChannelViews {
     }
 
     /**
+     * Keeps a row of a message where it stands while the message is laid
+     * out again, whether the view is scrolled back or not: its top row
+     * ({@code top}), so a long message just opened goes on under the row
+     * being read, or its foot, so one just folded keeps the run clicked
+     * under the pointer. Taken from the layout drawn now, and put back
+     * once on the next.
+     */
+    static synchronized void keepInPlace(ChatTab tab, ChatFrame frame,
+                                         int chatLineId, boolean top) {
+        ChatTab view = key(tab);
+        int index = view == null || frame == null || frame.lines == null
+                ? -1 : rowOf(frame.lines, chatLineId, top);
+        if (index < 0) {
+            return;
+        }
+        frame.resolveRows();
+        ChatStackRows rows = frame.rows;
+        double scrollPixels = rows.offsetOf(target(view));
+        KEPT_ROWS.put(view, new KeptRow(chatLineId, top,
+                scrollPixels - rows.top(LostTalesChatOverlayRenderer
+                        .rowOfLine(index, frame.dividerLineIndex)),
+                scrollPixels, revision(view)));
+    }
+
+    /**
+     * Puts the view back on the row {@link #keepInPlace} kept, if one
+     * waits and the player has not scrolled since, and has the rows glide
+     * on screen from where they were ({@link ChatRowGlide#shifted}).
+     * Answers whether it did.
+     */
+    private static boolean placeKeptRow(ChatTab view, ChatFrame frame,
+                                        double current) {
+        KeptRow kept = KEPT_ROWS.remove(view);
+        List<ChatLine> lines = frame.lines;
+        if (kept == null || kept.revision != revision(view) || lines == null) {
+            return false;
+        }
+        int index = rowOf(lines, kept.chatLineId, kept.top);
+        if (index < 0) {
+            return false;
+        }
+        frame.resolveRows();
+        ChatStackRows rows = frame.rows;
+        double offset = Math.max(0.0D, Math.min(frame.scrollCeiling(),
+                rows.rowsAt(rows.top(LostTalesChatOverlayRenderer.rowOfLine(
+                        index, frame.dividerLineIndex)) + kept.deltaPixels)));
+        place(view, offset, current);
+        frame.glide.shifted((float)(rows.offsetOf(offset)
+                - kept.scrollPixels), System.nanoTime());
+        return true;
+    }
+
+    /**
+     * The index of a message's top row in a view's lines, or of its
+     * foot, which comes first there; -1 when the view does not show it.
+     */
+    static int rowOf(List<ChatLine> lines, int chatLineId, boolean top) {
+        int found = -1;
+        for (int index = 0; index < lines.size(); index++) {
+            ChatLine line = lines.get(index);
+            if (line != null && line.getChatLineID() == chatLineId) {
+                if (!top) {
+                    return index;
+                }
+                found = index;
+            } else if (found >= 0) {
+                break;
+            }
+        }
+        return found;
+    }
+
+    /**
      * The first message older than the unread divider at
      * {@code divider}, past any filler between them, or -1 for none.
      */
@@ -412,6 +496,28 @@ public final class ClientChatChannelViews {
         Ease ease = RENDERED.get(view);
         if (ease != null) {
             ease.value = Math.max(0.0D, ease.value + bounded - current);
+        }
+    }
+
+    /** A row of a message a view keeps where it stands. */
+    private static final class KeptRow {
+        final int chatLineId;
+        /** The message's top row, or else its foot. */
+        final boolean top;
+        /** Pixels of stack from the bottom of that row up to the view's offset. */
+        final double deltaPixels;
+        /** Where the view's offset stood, in pixels of stack, when the row was kept. */
+        final double scrollPixels;
+        /** The scroll this was taken against; a later one drops it. */
+        final int revision;
+
+        KeptRow(int chatLineId, boolean top, double deltaPixels,
+                double scrollPixels, int revision) {
+            this.chatLineId = chatLineId;
+            this.top = top;
+            this.deltaPixels = deltaPixels;
+            this.scrollPixels = scrollPixels;
+            this.revision = revision;
         }
     }
 
@@ -810,6 +916,7 @@ public final class ClientChatChannelViews {
         SCROLL.clear();
         RENDERED.clear();
         ANCHORS.clear();
+        KEPT_ROWS.clear();
         SCROLL_REVISION.clear();
         WAITING_BELOW.clear();
         UNREAD_PINGS.clear();
@@ -856,6 +963,7 @@ public final class ClientChatChannelViews {
         SCROLL.clear();
         RENDERED.clear();
         ANCHORS.clear();
+        KEPT_ROWS.clear();
         SCROLL_REVISION.clear();
         WAITING_BELOW.clear();
         UNREAD_PINGS.clear();

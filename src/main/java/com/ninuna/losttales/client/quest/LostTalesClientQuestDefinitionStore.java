@@ -14,14 +14,15 @@ import java.util.List;
 import java.util.Map;
 import net.minecraft.client.resources.IResourceManager;
 /**
- * Client cache for bundled and server-synced quest definitions.
- *
- * Bundled quests still come from client resources. Dynamic definitions are synced
- * from the logical server so generated missives can appear in the journal and HUD
- * after acceptance.
+ * Every quest definition the client knows, from three places: the quests
+ * bundled with the mod, read from its own resources; the quests the server
+ * wrote in its own folder, sent as the player joins; and the missives the
+ * player took, sent with their quest log. A bundled quest's id is never
+ * taken by the other two.
  */
 public final class LostTalesClientQuestDefinitionStore {
     private static final Map<String, LostTalesQuestDefinition> STATIC_QUESTS = new LinkedHashMap<String, LostTalesQuestDefinition>();
+    private static final Map<String, LostTalesQuestDefinition> SERVER_QUESTS = new LinkedHashMap<String, LostTalesQuestDefinition>();
     private static final Map<String, LostTalesQuestDefinition> DYNAMIC_QUESTS = new LinkedHashMap<String, LostTalesQuestDefinition>();
     private static volatile List<LostTalesQuestDefinition> quests = Collections.emptyList();
     private static volatile boolean loaded;
@@ -34,11 +35,12 @@ public final class LostTalesClientQuestDefinitionStore {
 
     public static synchronized LostTalesQuestDefinition getQuest(String id) {
         if (id == null) return null;
-        LostTalesQuestDefinition dynamicQuest = DYNAMIC_QUESTS.get(id);
-        if (dynamicQuest != null) {
-            return dynamicQuest;
+        LostTalesQuestDefinition staticQuest = STATIC_QUESTS.get(id);
+        if (staticQuest != null) {
+            return staticQuest;
         }
-        return STATIC_QUESTS.get(id);
+        LostTalesQuestDefinition serverQuest = SERVER_QUESTS.get(id);
+        return serverQuest != null ? serverQuest : DYNAMIC_QUESTS.get(id);
     }
 
     public static synchronized void ensureLoaded(IResourceManager resourceManager) {
@@ -72,17 +74,42 @@ public final class LostTalesClientQuestDefinitionStore {
         rebuildQuestList();
     }
 
-    public static synchronized void clearDynamicQuestDefinitions() {
-        if (!DYNAMIC_QUESTS.isEmpty()) {
+    /**
+     * The server's own quests, as one packet of them carries them:
+     * {@code first} starts the list afresh. A quest that takes a bundled
+     * quest's id is left out.
+     */
+    public static synchronized void addServerQuestDefinitions(boolean first,
+            Collection<LostTalesQuestDefinition> serverQuests) {
+        if (first) {
+            SERVER_QUESTS.clear();
+        }
+        if (serverQuests != null) {
+            for (LostTalesQuestDefinition quest : serverQuests) {
+                if (quest != null && quest.getId() != null
+                        && quest.getId().length() > 0
+                        && !STATIC_QUESTS.containsKey(quest.getId())) {
+                    SERVER_QUESTS.put(quest.getId(), quest);
+                }
+            }
+        }
+        rebuildQuestList();
+    }
+
+    /** Forgets what the server sent, its own quests and the missives, as the player leaves it. */
+    public static synchronized void clearServerSentDefinitions() {
+        if (!DYNAMIC_QUESTS.isEmpty() || !SERVER_QUESTS.isEmpty()) {
             DYNAMIC_QUESTS.clear();
+            SERVER_QUESTS.clear();
             rebuildQuestList();
         }
     }
 
     private static void rebuildQuestList() {
         LinkedHashMap<String, LostTalesQuestDefinition> merged = new LinkedHashMap<String, LostTalesQuestDefinition>();
-        merged.putAll(STATIC_QUESTS);
         merged.putAll(DYNAMIC_QUESTS);
+        merged.putAll(SERVER_QUESTS);
+        merged.putAll(STATIC_QUESTS);
 
         ArrayList<LostTalesQuestDefinition> rebuilt = new ArrayList<LostTalesQuestDefinition>(merged.values());
         Collections.sort(rebuilt, new Comparator<LostTalesQuestDefinition>() {

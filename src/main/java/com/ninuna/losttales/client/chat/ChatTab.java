@@ -404,6 +404,11 @@ public final class ChatTab extends WindowTab {
         return ChatLayout.isMuted(this);
     }
 
+    @Override
+    public boolean isReadOnly() {
+        return !ClientChatChannelState.canSend(this);
+    }
+
     /**
      * A conversation shows while its channel is open to the player, and
      * never on the screen that stands without a world.

@@ -80,6 +80,11 @@ public abstract class WindowTab {
         return false;
     }
 
+    /** Whether nothing typed in the tab can be sent: its bar's tab button names it in italics. */
+    public boolean isReadOnly() {
+        return false;
+    }
+
     /**
      * Whether the layout file keeps the tab where it stands. A
      * conversation that ends with the session is left out of it.

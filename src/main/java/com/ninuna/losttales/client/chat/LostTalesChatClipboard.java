@@ -203,7 +203,8 @@ final class LostTalesChatClipboard {
         for (Object value : line) {
             IChatComponent part = (IChatComponent)value;
             if (ChatPrefixMarker.isMarker(part)
-                    || ChatBodyMarker.isMarker(part)) {
+                    || ChatBodyMarker.isMarker(part)
+                    || ChatFoldMarker.isMarker(part)) {
                 continue;
             }
             ChatEmoji emoji = ChatEmojiMarker.decode(part);

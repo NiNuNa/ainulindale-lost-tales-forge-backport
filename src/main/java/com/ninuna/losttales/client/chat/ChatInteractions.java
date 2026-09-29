@@ -32,6 +32,8 @@ final class ChatInteractions {
         PERSON,
         /** A covered spoiler is read. */
         SPOILER,
+        /** A long message's Read more opens it, its Show less folds it. */
+        FOLD,
         /** A channel link brings its tab forward. */
         CHANNEL_LINK,
         /** A reply's quote leads to the message it quotes. */
@@ -84,6 +86,9 @@ final class ChatInteractions {
         if (ChatSpoilerMarker.isMarker(part)) {
             return ChatSpoilerMarker.isRevealed(part) ? Action.CONSUMED
                     : Action.SPOILER;
+        }
+        if (ChatFoldMarker.isMarker(part)) {
+            return Action.FOLD;
         }
         if (ChatChannelLinkMarker.isMarker(part)) {
             return Action.CHANNEL_LINK;
@@ -259,6 +264,7 @@ final class ChatInteractions {
                 || ChatLayoutMarker.isMarker(part)
                 || ChatSpacerMarker.isMarker(part)
                 || ChatSpoilerMarker.isMarker(part)
+                || ChatFoldMarker.isMarker(part)
                 || ChatHeadMarker.isMarker(part)
                 || ChatShowcaseMarker.decode(part) != null
                 || ChatMentionMarker.decode(part) != null

@@ -1020,7 +1020,7 @@ public final class LostTalesConfig {
                     "welcomeLines",
                     CATEGORY_CHAT,
                     chatWelcomeLines,
-                    "Server only: what a new player is greeted with the first time they join this world, as Server lines in OOC Chat that wait there unread: the rules, a Discord invite, anything. One line each, at most 8 lines of 256 characters; a web address becomes a link. Empty greets nobody."
+                    "Server only: what a new player is greeted with the first time they join this world, as Server lines in OOC Chat that wait there unread: the rules, a Discord invite, anything. One line each, at most 8 lines of 1,024 characters; a web address becomes a link. Empty greets nobody."
             );
             chatAuditLogEnabled = config.getBoolean(
                     "auditLog",

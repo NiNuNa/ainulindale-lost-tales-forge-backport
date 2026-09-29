@@ -13,12 +13,13 @@ public final class ChatAction {
     private ChatAction() {}
 
     /**
-     * The words as the line keeps them: trimmed, and ended with a full
-     * stop when they end on a letter or a digit and a message still has
-     * room for one. Empty for no words.
+     * The words as the line keeps them: one paragraph, since an action is
+     * one sentence and its wrapped rows start at the edge, trimmed, and
+     * ended with a full stop when they end on a letter or a digit and a
+     * message still has room for one. Empty for no words.
      */
     public static String sentence(String words) {
-        String text = words == null ? "" : words.trim();
+        String text = ChatMessageValidator.oneLine(words).trim();
         if (text.length() == 0) {
             return "";
         }

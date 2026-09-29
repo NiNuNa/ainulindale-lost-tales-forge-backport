@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.window;
 import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.client.motion.MotionIds;
+import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.client.motion.MotionTransition;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -62,6 +63,20 @@ public class WindowFrame {
     public double room;
     /** Top of the input bar at rest, one chat line below the baseline. */
     private double restingBarTop;
+    /**
+     * How far the bar reaches above its resting top, easing toward what
+     * the window was asked for this frame ({@link #growBar}): the chat's
+     * field grows a row at a time as a long message wraps. The message
+     * room gives the rows up; the window's box stays where it stands.
+     */
+    private double barGrowth;
+    /** What {@link #barGrowth} is easing to: asked afresh each frame, none unless asked. */
+    private double barGrowthAsked;
+    private long barGrowthNanos;
+    /** The most the bar may reach up: the message room less one line. */
+    private double barGrowthLimit;
+    /** {@link #barGrowth} laid on the display's grid, as everything drawn from it is. */
+    private double drawnBarGrowth;
     /** Chat scale the box was drawn at; sizes one empty line. */
     public float scale = 1.0F;
     /** Opening motion the window was drawn with this frame. */
@@ -77,6 +92,12 @@ public class WindowFrame {
     private boolean appearing;
     /** How much of its opacity the window showed when last drawn. */
     private float shown = 1.0F;
+    /**
+     * How much of the window shows while another window's tab stands
+     * alone on the screen ({@link ContentView}): set by the screen every
+     * frame, all of it otherwise.
+     */
+    private float viewShare = 1.0F;
     /**
      * How far the window has come along its glide to the part of the
      * screen it fills, or back to its own box, eased from the moment it
@@ -240,8 +261,12 @@ public class WindowFrame {
         this.boxTop = LostTalesDisplayPixels.snap(box.y);
         this.boxRight = this.boxLeft + box.width;
         this.boxBottom = this.boxTop + box.height;
-        this.baseline = LostTalesDisplayPixels.snap(box.baseline());
         this.restingBarTop = LostTalesDisplayPixels.snap(box.barTop());
+        this.barGrowthLimit = Math.max(0.0D, box.room - WindowStyle.LINE_HEIGHT);
+        advanceBarGrowth();
+        // A grown bar raises the edge the newest message sits on with it.
+        this.baseline = LostTalesDisplayPixels.snap(box.baseline())
+                - this.drawnBarGrowth;
         this.scale = chatScale <= 0.0F ? 1.0F : chatScale;
         this.motionX = openingMotionX;
         this.motionY = openingMotionY;
@@ -251,6 +276,48 @@ public class WindowFrame {
         // The stack fills the box until the draw lays it on the drawn
         // baseline.
         this.stackTop = this.baseline + this.motionY - this.room;
+    }
+
+    /**
+     * Asks the window's bar to reach {@code pixels} above its resting top
+     * this frame, before the window is laid out: asked every frame it
+     * should, it eases back down once nothing asks.
+     */
+    public void growBar(double pixels) {
+        this.barGrowthAsked = Math.max(0.0D, pixels);
+    }
+
+    /** How far the bar reaches above its resting top as drawn this frame. */
+    public double barGrowth() {
+        return this.drawnBarGrowth;
+    }
+
+    /** The most the bar may reach above its resting top in the window's room. */
+    public double barGrowthLimit() {
+        return this.barGrowthLimit;
+    }
+
+    /**
+     * Moves the bar's growth toward what was asked, on the bar's own
+     * motion, and forgets the ask; the first frame stands it there.
+     */
+    private void advanceBarGrowth() {
+        double asked = Math.min(this.barGrowthAsked, this.barGrowthLimit);
+        this.barGrowthAsked = 0.0D;
+        long now = System.nanoTime();
+        if (this.barGrowthNanos == 0L) {
+            this.barGrowth = asked;
+        } else {
+            double elapsed = Math.min(0.25D,
+                    Math.max(0.0D, (now - this.barGrowthNanos) / 1.0E9D));
+            this.barGrowth = Motions.followTravel(MotionIds.WINDOW_BAR_GROW,
+                    this.barGrowth, asked, elapsed);
+            if (Math.abs(this.barGrowth - asked) < 0.01D) {
+                this.barGrowth = asked;
+            }
+        }
+        this.barGrowthNanos = now;
+        this.drawnBarGrowth = LostTalesDisplayPixels.snap(this.barGrowth);
     }
 
     /**
@@ -316,11 +383,17 @@ public class WindowFrame {
     }
 
     /**
-     * The share {@link #appearShare} last gave: what the window's input
-     * bar, drawn after the window, fades in by.
+     * The share the window showed when last drawn, its fade in and any
+     * fading away for a tab standing alone: what the window's input bar,
+     * drawn after the window, fades by.
      */
     public float shownShare() {
-        return this.shown;
+        return this.shown * this.viewShare;
+    }
+
+    /** How much of the window shows while another window's tab stands alone on the screen. */
+    void setViewShare(float share) {
+        this.viewShare = Math.max(0.0F, Math.min(1.0F, share));
     }
 
     /** Whether {@link #advanceFill} has placed the window at all yet. */
@@ -370,6 +443,19 @@ public class WindowFrame {
     }
 
     /**
+     * How far the window stands toward showing its tab alone on the whole
+     * screen, 0..1 ({@link ContentView}): what every other window fades
+     * away by as it comes and back as it goes.
+     */
+    public float contentShare() {
+        if (this.fillLegTo == Window.ScreenFill.CONTENT) {
+            return this.fillMotion.clamped();
+        }
+        return this.fillLegFromFill == Window.ScreenFill.CONTENT
+                ? 1.0F - this.fillMotion.clamped() : 0.0F;
+    }
+
+    /**
      * Whether the window stands in its own box, and not in a part of
      * the screen or on the way to or from one. Its edges are its own to
      * resize only then.
@@ -411,11 +497,36 @@ public class WindowFrame {
     }
 
     /**
-     * Top of the window's input bar at rest. The bar has an entrance of
-     * its own and does not ride the window's opening motion.
+     * Top of the window's foot, its bar strip, where the window's opening
+     * carries it this frame: where what the window holds ends.
+     */
+    public double footTop() {
+        return LostTalesDisplayPixels.snap(this.restingBarTop + this.motionY)
+                - this.drawnBarGrowth;
+    }
+
+    /**
+     * Top of the window's input bar as it is drawn, grown as far as it
+     * reaches: on the window's foot, or at rest there while the bars come
+     * up from below on their own ({@link WindowOpening#barsEnterOnTheirOwn}).
      */
     public double barTop() {
-        return this.restingBarTop;
+        return barRestTop() - this.drawnBarGrowth;
+    }
+
+    /**
+     * Where the bar's top would stand ungrown: what its controls, which
+     * stay on its last row, are placed from.
+     */
+    public double barRestTop() {
+        return WindowOpening.barsEnterOnTheirOwn() ? this.restingBarTop
+                : LostTalesDisplayPixels.snap(this.restingBarTop + this.motionY);
+    }
+
+    /** Left edge of the window's input bar as it is drawn, as {@link #barTop} places it. */
+    public double barLeft() {
+        return WindowOpening.barsEnterOnTheirOwn() ? this.boxLeft
+                : drawnLeft();
     }
 
     /**

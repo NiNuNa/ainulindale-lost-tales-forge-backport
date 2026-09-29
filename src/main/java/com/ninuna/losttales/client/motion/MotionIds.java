@@ -43,7 +43,7 @@ public final class MotionIds {
 
     /* ---- window: the window system every tab stands in ---- */
 
-    /** The input bars coming up from below as the window screen opens. */
+    /** The input bars' own entrance from below, none by default: they arrive with their window. */
     public static final String WINDOW_BAR_APPEAR = "window.bar.appear";
     /** A sub-window opening where it stands, and fading out there as it closes. */
     public static final String WINDOW_SUB_OPEN = "window.sub.open";
@@ -83,6 +83,10 @@ public final class MotionIds {
     public static final String WINDOW_NOTICE = "window.notice";
     /** A page's answer over its bar coming up, standing while it is read and fading. */
     public static final String WINDOW_ANSWER = "window.answer";
+    /** The line saying how to leave a tab standing alone in full screen, coming and going. */
+    public static final String WINDOW_VIEW_LINE = "window.view.line";
+    /** An input bar growing a row taller as the words typed in it wrap, and back. */
+    public static final String WINDOW_BAR_GROW = "window.bar.grow";
 
     /* ---- hud ---- */
 
@@ -95,7 +99,7 @@ public final class MotionIds {
     public static final String SCREEN_OPEN = "screen.open";
     /** The veil and blur behind a screen fading in. */
     public static final String SCREEN_BACKDROP = "screen.backdrop";
-    /** A screen's bottom control strip following its content in. */
+    /** A screen's bottom control strip's own entrance, none by default: it arrives with its screen. */
     public static final String SCREEN_CONTROL_BAR = "screen.control_bar";
     /** The journal's categories folding and its search opening. */
     public static final String SCREEN_JOURNAL_FOLD = "screen.journal.fold";

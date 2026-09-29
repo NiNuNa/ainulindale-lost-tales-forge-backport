@@ -32,12 +32,14 @@ final class ChatMessageWrapper {
      * the body. The header is laid out against the room its own large
      * size leaves it, the size the stack draws it at. {@code stamp} is
      * the time the open window stands behind the name, as the chat draws
-     * it, or null for none.
+     * it, or null for none. {@code fold} folds long words
+     * ({@link ChatFoldMarker}); a line vanilla lays out never folds.
      */
     static List<IChatComponent> wrap(final FontRenderer font,
                                      IChatComponent root, int width,
                                      final boolean colours,
-                                     boolean chatOpen, String stamp) {
+                                     boolean chatOpen, String stamp,
+                                     ChatLineWrapper.Fold fold) {
         List<IChatComponent> lines = null;
         if (font != null && root != null && width > 0) {
             ChatLineWrapper.TextMetrics metrics =
@@ -58,7 +60,7 @@ final class ChatMessageWrapper {
                     stamp == null ? null : ChatStampMarker.of(stamp,
                             stampWidth(metrics.width(stamp),
                                     LostTalesChatVisualStyle.stackSmallScale(),
-                                    speakerScale)));
+                                    speakerScale)), fold);
         }
         if (lines != null && !lines.isEmpty()) {
             return lines;

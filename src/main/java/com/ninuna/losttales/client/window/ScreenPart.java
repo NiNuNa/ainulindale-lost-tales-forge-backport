@@ -100,6 +100,31 @@ public abstract class ScreenPart {
         return false;
     }
 
+    /* ---- The identity button on every bar ---- */
+
+    /** Who the player is on {@code tab}, for its bar's identity button; null for a part with nobody to show. */
+    public BarLead.Face identityFace(WindowTab tab) {
+        return null;
+    }
+
+    /**
+     * The identity button pressed on {@code tab}'s bar: its menu, hung
+     * from {@code anchor}, out or away again. False for a part with none.
+     */
+    public boolean pressIdentity(WindowTab tab, SubWindowAnchor anchor) {
+        return false;
+    }
+
+    /** Whether the identity button's menu is out for {@code tab}: the button rests lit. */
+    public boolean identityMenuOut(WindowTab tab) {
+        return false;
+    }
+
+    /** The card of who the player is on {@code tab}, beside the pointer resting on its identity button; false for none. */
+    public boolean drawIdentityCard(WindowTab tab, int mouseX, int mouseY) {
+        return false;
+    }
+
     /* ---- What the windows ask of it ---- */
 
     /** A window was taken hold of: false leaves the screen to bring it forward. */

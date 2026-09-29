@@ -5,7 +5,10 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-/** Every window's input bar comes up from below and settles exactly in place. */
+/**
+ * Given a time in the motion files, every window's input bar comes up
+ * from below on its own and settles exactly in place.
+ */
 public final class WindowOpeningTest {
     private static final float EPSILON = 1.0E-4F;
 

@@ -121,7 +121,9 @@ public final class LostTalesNetworkHandlerDiscriminatorTest {
             "LostTalesMissiveBoardStatePacket CLIENT",
             "LostTalesMissiveBoardRequestPacket SERVER",
             "CharacterLookUpdateRequestPacket SERVER",
-            "CharacterRestoreRequestPacket SERVER"
+            "CharacterRestoreRequestPacket SERVER",
+            "LostTalesServerQuestSyncPacket CLIENT",
+            "LostTalesWorldQuestSyncPacket CLIENT"
     };
 
     /** One registerMessage call, read back off the stack that fed it. */

@@ -5,9 +5,12 @@ import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveSelection;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveTextHelper;
+import com.ninuna.losttales.quest.LostTalesQuestRewardText;
 import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
 import com.ninuna.losttales.quest.progress.LostTalesQuestHistoryEntry;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
+import com.ninuna.losttales.quest.world.WorldQuestRules;
+import com.ninuna.losttales.quest.world.WorldQuestView;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -66,7 +69,9 @@ public final class ClientQuestCatalog {
         ArrayList<ClientQuestEntry> entries = new ArrayList<ClientQuestEntry>();
         for (LostTalesQuestDefinition quest
                 : LostTalesClientQuestDefinitionStore.getQuests()) {
-            ClientQuestEntry entry = createLostTalesEntry(minecraft, quest);
+            ClientQuestEntry entry = quest != null && quest.isWorldQuest()
+                    ? createWorldEntry(minecraft, quest)
+                    : createLostTalesEntry(minecraft, quest);
             if (entry != null) {
                 entries.add(entry);
             }
@@ -162,6 +167,72 @@ public final class ClientQuestCatalog {
                 progress, history);
     }
 
+    /**
+     * A world quest's entry while the world keeps a run of it: the whole
+     * server's counts as its objectives, how many helped and this
+     * player's part under its title, its time left while it runs, and on
+     * the tracker for as long as it runs.
+     */
+    private static ClientQuestEntry createWorldEntry(Minecraft minecraft,
+            LostTalesQuestDefinition quest) {
+        WorldQuestView view = ClientWorldQuests.view(quest.getId());
+        if (view == null) {
+            return null;
+        }
+        ClientQuestEntry.Status status;
+        switch (view.getState()) {
+            case RUNNING:
+                status = ClientQuestEntry.Status.ACTIVE;
+                break;
+            case COMPLETED:
+                status = ClientQuestEntry.Status.COMPLETED;
+                break;
+            case FAILED:
+                status = ClientQuestEntry.Status.FAILED;
+                break;
+            default:
+                status = ClientQuestEntry.Status.ABANDONED;
+                break;
+        }
+        ArrayList<ClientQuestEntry.Objective> objectives =
+                new ArrayList<ClientQuestEntry.Objective>();
+        for (LostTalesQuestObjectiveDefinition objective
+                : WorldQuestRules.objectives(quest)) {
+            int goal = WorldQuestRules.goal(objective);
+            int count = Math.min(goal, view.getCount(objective.getId()));
+            String description = objective.getDescription() == null
+                    || objective.getDescription().length() == 0
+                    ? objective.getId() : objective.getDescription();
+            objectives.add(new ClientQuestEntry.Objective(
+                    StatCollector.translateToLocalFormatted(
+                            "gui.losttales.quest.world.objective",
+                            description, Integer.valueOf(count),
+                            Integer.valueOf(goal)),
+                    count, goal, count >= goal, false));
+        }
+        long remainingTicks = -1L;
+        if (view.isRunning() && minecraft != null
+                && minecraft.theWorld != null) {
+            remainingTicks = Math.max(0L, view.getEndsAt()
+                    - minecraft.theWorld.getTotalWorldTime());
+        }
+        String subtitle = StatCollector.translateToLocalFormatted(
+                "gui.losttales.quest.world.part",
+                Integer.valueOf(view.getHelpers()),
+                Integer.valueOf(view.getMine()),
+                Integer.valueOf(WorldQuestRules.least(quest)));
+        List<String> rewards = new ArrayList<String>();
+        String summary = LostTalesQuestRewardText.summary(quest.getRewards());
+        if (summary.length() > 0) {
+            rewards.add(summary);
+        }
+        return new ClientQuestEntry(ClientQuestEntry.Source.WORLD,
+                quest.getId(), quest.getTitle(), subtitle, category(quest),
+                quest.getDescription(), status, view.isRunning(), 1, 1,
+                remainingTicks, objectives, rewards,
+                Collections.<ClientQuestEntry.Target>emptyList(), null, null);
+    }
+
     private static List<LostTalesQuestObjectiveDefinition> visibleObjectives(
             LostTalesQuestDefinition quest, LostTalesQuestProgress progress,
             boolean completed) {
@@ -199,6 +270,9 @@ public final class ClientQuestCatalog {
     }
 
     private static String category(LostTalesQuestDefinition quest) {
+        if (quest != null && quest.isWorldQuest()) {
+            return "World";
+        }
         String id = quest == null || quest.getId() == null
                 ? "" : quest.getId();
         int colon = id.indexOf(':');

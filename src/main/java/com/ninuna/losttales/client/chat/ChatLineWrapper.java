@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatMessageValidator;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.util.ChatComponentText;
@@ -96,6 +97,25 @@ final class ChatLineWrapper {
         int width(String text);
     }
 
+    /**
+     * How a long message's words fold. Words taking more than
+     * {@link #keptRows} rows and one more keep their first
+     * {@code keptRows} while folded and all of them once open, and
+     * {@link #toggle} stands on a row of its own under them: Read more
+     * while folded, Show less once open.
+     */
+    static final class Fold {
+        final int keptRows;
+        final boolean open;
+        final IChatComponent toggle;
+
+        Fold(int keptRows, boolean open, IChatComponent toggle) {
+            this.keptRows = keptRows;
+            this.open = open;
+            this.toggle = toggle;
+        }
+    }
+
     private ChatLineWrapper() {}
 
     /**
@@ -130,6 +150,16 @@ final class ChatLineWrapper {
                                      int width, boolean chatOpen,
                                      float headerScale, float bodyScale,
                                      float quoteScale, IChatComponent stamp) {
+        return wrap(metrics, root, width, chatOpen, headerScale, bodyScale,
+                quoteScale, stamp, null);
+    }
+
+    /** The same, folding long words as {@code fold} says; null never folds. */
+    static List<IChatComponent> wrap(TextMetrics metrics, IChatComponent root,
+                                     int width, boolean chatOpen,
+                                     float headerScale, float bodyScale,
+                                     float quoteScale, IChatComponent stamp,
+                                     Fold fold) {
         if (metrics == null || root == null || width <= 0) {
             return null;
         }
@@ -273,7 +303,7 @@ final class ChatLineWrapper {
                 builder.appendText(part);
             }
         }
-        return builder.finish();
+        return builder.finish(fold);
     }
 
     /**
@@ -516,6 +546,8 @@ final class ChatLineWrapper {
         private int messageFirstRow;
         /** The first row of the body, or -1 while the line has opened none. */
         private int bodyFirstRow = -1;
+        /** The first row under the words, or -1 while nothing stands there. */
+        private int underFirstRow = -1;
 
         Builder(TextMetrics metrics, int bodyWidth, int headerWidth,
                 int closedIndent, int openIndent, int maxIndent,
@@ -613,6 +645,9 @@ final class ChatLineWrapper {
             if (!this.fresh) {
                 newLine();
             }
+            if (this.underFirstRow < 0) {
+                this.underFirstRow = this.lines.size();
+            }
         }
 
         private void newLine() {
@@ -665,6 +700,15 @@ final class ChatLineWrapper {
 
         void appendText(IChatComponent part) {
             String text = part.getUnformattedTextForChat();
+            int paragraph = text.indexOf(ChatMessageValidator.PARAGRAPH_BREAK);
+            if (paragraph >= 0) {
+                // A paragraph ends its row; the next opens a row of its
+                // own under the words, as a wrapped row does.
+                appendText(copy(part, text.substring(0, paragraph)));
+                newLine();
+                appendText(copy(part, text.substring(paragraph + 1)));
+                return;
+            }
             if (text.length() == 0) {
                 place(copy(part), 0);
                 return;
@@ -730,8 +774,11 @@ final class ChatLineWrapper {
             }
         }
 
-        List<IChatComponent> finish() {
+        List<IChatComponent> finish(Fold fold) {
             this.lines.add(this.current);
+            if (fold != null) {
+                fold(fold);
+            }
             // Every row from the body break down carries a message's own
             // words, the reactions under them included, so the feed can
             // draw them at a size of its own.
@@ -741,6 +788,35 @@ final class ChatLineWrapper {
                         ChatLayoutMarker.bodyRow());
             }
             return this.lines;
+        }
+
+        /**
+         * Folds words that take more rows than the fold keeps and one
+         * more, and stands the fold's run on a row of its own under what
+         * is kept, inset like the words, above whatever stands under
+         * them. A message one row longer than the fold keeps is left
+         * whole: folded it would be no shorter.
+         */
+        private void fold(Fold fold) {
+            if (this.bodyFirstRow < 0 || fold.toggle == null) {
+                return;
+            }
+            int wordsEnd = this.underFirstRow >= 0 ? this.underFirstRow
+                    : this.lines.size();
+            if (wordsEnd - this.bodyFirstRow <= fold.keptRows + 1) {
+                return;
+            }
+            int kept = fold.open ? wordsEnd
+                    : this.bodyFirstRow + Math.max(1, fold.keptRows);
+            ChatComponentText row = new ChatComponentText("");
+            row.appendSibling(ChatLayoutMarker.indent(this.closedIndent,
+                    this.openIndent, this.nameColor, this.titleColor));
+            row.appendSibling(copy(fold.toggle));
+            List<IChatComponent> under = new ArrayList<IChatComponent>(
+                    this.lines.subList(wordsEnd, this.lines.size()));
+            this.lines.subList(kept, this.lines.size()).clear();
+            this.lines.add(row);
+            this.lines.addAll(under);
         }
     }
 }

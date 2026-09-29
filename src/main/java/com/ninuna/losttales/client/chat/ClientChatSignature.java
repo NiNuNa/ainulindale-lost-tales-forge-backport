@@ -5,6 +5,7 @@ import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.client.window.WindowTab;
 import com.ninuna.losttales.compat.lotr.LotrFactionColors;
 import com.ninuna.losttales.chat.ChatNarrator;
 import net.minecraft.client.Minecraft;
@@ -28,18 +29,21 @@ final class ClientChatSignature {
 
     private ClientChatSignature() {}
 
-    /** How the tab's current identity signs a line built here. */
-    static Signature of(ChatTab tab) {
+    /**
+     * How the tab's current identity signs a line built here; a page
+     * signs as the character played, in no channel.
+     */
+    static Signature of(WindowTab tab) {
         Minecraft minecraft = Minecraft.getMinecraft();
         String account = minecraft == null || minecraft.thePlayer == null
                 ? "" : minecraft.thePlayer.getCommandSenderName();
         ClientChatIdentities.Identity identity =
                 ClientChatIdentities.effectiveFor(tab);
-        ChatChannel channel = tab == null ? null : tab.getChannel();
+        ChatChannel channel = tab instanceof ChatTab
+                ? ((ChatTab)tab).getChannel() : null;
         int roles = ChatRolePresentation.rolesShown(channel,
                 statedRoleMask(identity));
-        if (ClientChatIdentities.isNarrating()
-                && ClientChatIdentities.speaksInCharacter(tab)) {
+        if (ClientChatIdentities.narratesOn(tab)) {
             // The Narrator's voice over the identity: its name, colour
             // and mark, on the line the identity would sign.
             return new Signature(ChatNarrator.NAME, account,

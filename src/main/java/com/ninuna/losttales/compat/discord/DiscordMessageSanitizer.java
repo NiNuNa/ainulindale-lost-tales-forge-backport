@@ -42,6 +42,8 @@ public final class DiscordMessageSanitizer {
     private static final Pattern CUSTOM_EMOJI_NAME =
             Pattern.compile("[A-Za-z0-9_]{1,32}");
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+    /** Whitespace on a line: everything but a line break. */
+    private static final Pattern SPACES = Pattern.compile("[^\\S\\n\\r]+");
     /** A fenced block, with or without a language tag on its first line. */
     private static final Pattern CODE_FENCE =
             Pattern.compile("```(?:[A-Za-z0-9_+-]*\\n)?([\\s\\S]*?)```");
@@ -59,6 +61,8 @@ public final class DiscordMessageSanitizer {
      * name goes.
      */
     static final int MAX_NAME_BYTES = 64;
+    /** The most characters a Discord message holds. */
+    static final int MAX_POST_CHARACTERS = 2000;
 
     private static final Charset UTF_8 = Charset.forName("UTF-8");
 
@@ -91,7 +95,9 @@ public final class DiscordMessageSanitizer {
         text = unicodeToShortcodes(text);
         text = normalizeMarkdown(text);
         text = stripUnsendable(text);
-        text = WHITESPACE.matcher(text).replaceAll(" ").trim();
+        // Discord's lines are the chat's paragraphs, eight at most.
+        text = ChatMessageValidator.paragraphs(
+                SPACES.matcher(text).replaceAll(" "));
         if (text.length() > ChatMessageValidator.MAX_CHARACTERS) {
             text = text.substring(0, ChatMessageValidator.MAX_CHARACTERS - 3)
                     .trim() + "...";
@@ -206,7 +212,9 @@ public final class DiscordMessageSanitizer {
             Matcher fence = CODE_FENCE.matcher(folded);
             StringBuffer fenced = new StringBuffer();
             while (fence.find()) {
-                String inner = fence.group(1).trim().replace('`', '\'');
+                // A block of code is one span of the chat's inline code.
+                String inner = WHITESPACE.matcher(fence.group(1).trim())
+                        .replaceAll(" ").replace('`', '\'');
                 fence.appendReplacement(fenced, Matcher.quoteReplacement(
                         inner.length() == 0 ? "" : "`" + inner + "`"));
             }
@@ -380,15 +388,52 @@ public final class DiscordMessageSanitizer {
     }
 
     /**
+     * A post cut to what Discord takes, ending on "..." and never inside
+     * a mention, channel or emoji in Discord's own brackets, nor between
+     * the halves of a character. A long role-play turn naming many
+     * members can pass the limit once each name is written as Discord's
+     * id.
+     */
+    static String fitted(String content) {
+        if (content == null || content.length() <= MAX_POST_CHARACTERS) {
+            return content == null ? "" : content;
+        }
+        int end = MAX_POST_CHARACTERS - 3;
+        int open = content.lastIndexOf('<', end - 1);
+        if (open >= 0 && content.indexOf('>', open) >= end) {
+            end = open;
+        }
+        if (end > 0 && Character.isHighSurrogate(content.charAt(end - 1))) {
+            end--;
+        }
+        return content.substring(0, end) + "...";
+    }
+
+    /**
      * An action as Discord shows it: its words in italics under the
      * speaker's name, as the game shows <em>Aldric draws his sword.</em>
-     * (Nils, 2026-09-28, C2 a). Empty for no words.
+     * (Nils, 2026-09-28, C2 a), each paragraph in italics of its own.
+     * Empty for no words.
      */
     public static String outboundAction(String message) {
         String words = outbound(message).trim();
         if (words.length() == 0) {
             return "";
         }
+        StringBuilder action = new StringBuilder(words.length() + 8);
+        for (String paragraph : words.split("\n")) {
+            if (paragraph.trim().length() > 0) {
+                if (action.length() > 0) {
+                    action.append('\n');
+                }
+                action.append(italic(paragraph.trim()));
+            }
+        }
+        return action.toString();
+    }
+
+    /** Words in Discord's italics. */
+    private static String italic(String words) {
         int backslashes = 0;
         for (int at = words.length() - 1; at >= 0 && words.charAt(at) == '\\'; at--) {
             backslashes++;

@@ -1,7 +1,7 @@
 {
   "window.bar.appear": {
-    "about": "The input bars coming up from below as the chat opens, with a small swing as they land.",
-    "duration": 180,
+    "about": "The input bars' own entrance, up from below with a small swing as they land. At 0 milliseconds they have none and arrive with their window; given a time, they come up on their own instead.",
+    "duration": 0,
     "curve": "ease_in_out",
     "params": { "distance": 13, "swing": 1.25, "swings": 2.5 }
   },
@@ -100,5 +100,16 @@
     "curve": "ease_out",
     "off": { "duration": 250, "curve": "ease_in" },
     "params": { "hold": 3000, "rise": 3 }
+  },
+  "window.view.line": {
+    "about": "The line at the top of the screen saying how to leave a tab standing alone in full screen: fading in, standing hold milliseconds as the tab comes to stand alone and while the pointer is near the top, then fading out where it stands.",
+    "duration": 150,
+    "curve": "ease_out",
+    "off": { "duration": 250, "curve": "ease_in" },
+    "params": { "hold": 2500 }
+  },
+  "window.bar.grow": {
+    "about": "An input bar growing a row taller as the words typed in it wrap onto another row, and shrinking back: most of the way in this many seconds.",
+    "follow": 0.05
   }
 }

@@ -16,16 +16,17 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 /**
- * Common quest definition registry used by the logical server.
- *
- * This deliberately reads bundled assets from the mod classpath instead of using
- * modern datapacks. That keeps the runtime compatible with Forge 1.7.10 and makes
- * quest definitions available on dedicated servers.
+ * Every quest the logical server knows, from three places: the quest files
+ * bundled with the mod, read from its classpath; the files a server writes
+ * in its own folder ({@link ServerQuestFiles}), read as it starts; and the
+ * quests made while the game runs, missives. A bundled quest's id is never
+ * taken by the other two, nor a server file's by a missive.
  */
 public final class LostTalesQuestRegistry {
     private static final String INDEX_FILE = "quests/index.json";
 
     private static final Map<String, LostTalesQuestDefinition> STATIC_QUESTS_BY_ID = new LinkedHashMap<String, LostTalesQuestDefinition>();
+    private static final Map<String, LostTalesQuestDefinition> SERVER_QUESTS_BY_ID = new LinkedHashMap<String, LostTalesQuestDefinition>();
     private static final Map<String, LostTalesQuestDefinition> RUNTIME_QUESTS_BY_ID = new LinkedHashMap<String, LostTalesQuestDefinition>();
     private static List<LostTalesQuestDefinition> sortedQuests = Collections.emptyList();
     private static boolean loaded;
@@ -62,7 +63,54 @@ public final class LostTalesQuestRegistry {
     public static synchronized LostTalesQuestDefinition getQuest(String questId) {
         ensureLoaded();
         LostTalesQuestDefinition fileQuest = STATIC_QUESTS_BY_ID.get(questId);
-        return fileQuest != null ? fileQuest : RUNTIME_QUESTS_BY_ID.get(questId);
+        if (fileQuest != null) {
+            return fileQuest;
+        }
+        LostTalesQuestDefinition serverQuest = SERVER_QUESTS_BY_ID.get(questId);
+        return serverQuest != null ? serverQuest : RUNTIME_QUESTS_BY_ID.get(questId);
+    }
+
+    /**
+     * Reads the server's own quest files again ({@link ServerQuestFiles}),
+     * in place of those read before, and logs every file left out and why.
+     * Answers what the read found.
+     */
+    public static synchronized ServerQuestFiles.Result loadServerQuests() {
+        ensureLoaded();
+        ServerQuestFiles.Result result = ServerQuestFiles.read(
+                ServerQuestFiles.directory(), STATIC_QUESTS_BY_ID.keySet());
+        SERVER_QUESTS_BY_ID.clear();
+        for (LostTalesQuestDefinition quest : result.quests) {
+            SERVER_QUESTS_BY_ID.put(quest.getId(), quest);
+            // A missive made before the file takes the id no longer.
+            RUNTIME_QUESTS_BY_ID.remove(quest.getId());
+        }
+        rebuildSortedQuests();
+        for (String problem : result.problems) {
+            FMLLog.warning("[%s] Server quest left out: %s",
+                    LostTalesMetaData.MOD_ID, problem);
+        }
+        if (!result.quests.isEmpty()) {
+            FMLLog.info("[%s] Read %d server quest files",
+                    LostTalesMetaData.MOD_ID,
+                    Integer.valueOf(result.quests.size()));
+            LostTalesMapMarkerCatalog.logQuestMarkerWarnings(result.quests);
+        }
+        return result;
+    }
+
+    /** Forgets the server's own quests as the server stops. */
+    public static synchronized void clearServerQuests() {
+        if (!SERVER_QUESTS_BY_ID.isEmpty()) {
+            SERVER_QUESTS_BY_ID.clear();
+            rebuildSortedQuests();
+        }
+    }
+
+    /** The server's own quests, in the order their files were read: what every player is sent. */
+    public static synchronized List<LostTalesQuestDefinition> getServerQuests() {
+        return Collections.unmodifiableList(
+                new ArrayList<LostTalesQuestDefinition>(SERVER_QUESTS_BY_ID.values()));
     }
 
     public static synchronized Collection<LostTalesQuestDefinition> getQuests() {
@@ -106,7 +154,8 @@ public final class LostTalesQuestRegistry {
 
     private static boolean mayRegisterRuntime(LostTalesQuestDefinition quest) {
         return quest != null && quest.getId() != null && quest.getId().length() > 0
-                && !STATIC_QUESTS_BY_ID.containsKey(quest.getId());
+                && !STATIC_QUESTS_BY_ID.containsKey(quest.getId())
+                && !SERVER_QUESTS_BY_ID.containsKey(quest.getId());
     }
 
     public static synchronized void clearRuntimeQuests() {
@@ -120,6 +169,7 @@ public final class LostTalesQuestRegistry {
     private static void rebuildSortedQuests() {
         LinkedHashMap<String, LostTalesQuestDefinition> merged = new LinkedHashMap<String, LostTalesQuestDefinition>();
         merged.putAll(STATIC_QUESTS_BY_ID);
+        merged.putAll(SERVER_QUESTS_BY_ID);
         merged.putAll(RUNTIME_QUESTS_BY_ID);
 
         List<LostTalesQuestDefinition> sorted = new ArrayList<LostTalesQuestDefinition>(merged.values());

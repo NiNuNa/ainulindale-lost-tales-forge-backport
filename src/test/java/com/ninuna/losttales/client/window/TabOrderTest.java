@@ -45,6 +45,21 @@ public final class TabOrderTest {
 
     /* ---- W5: the tab keys ---- */
 
+    /**
+     * A bar's tab button and Tab walk the one window's row, pages and
+     * conversations alike, round from one end to the other.
+     */
+    @Test
+    public void theBarWalksItsWindowsRowRound() {
+        Window window = WindowLayout.addWindow(row(this.a, this.hidden,
+                this.b, this.c), this.b, 0.0D, 0.0D);
+        List<WindowTab> row = WindowFrame.visibleTabs(window);
+        assertSame(this.c, TabWalk.step(row, this.b, 1));
+        assertSame(this.a, TabWalk.step(row, this.c, 1));
+        assertSame("a tab that cannot be shown is passed over", this.a,
+                TabWalk.step(row, this.b, -1));
+    }
+
     @Test
     public void ctrlTabWalksEveryWindowsTabsInOrderAndComesRound() {
         Window first = WindowLayout.addWindow(row(this.a, this.b), this.a,

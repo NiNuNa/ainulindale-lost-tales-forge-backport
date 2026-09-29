@@ -27,10 +27,39 @@ public final class ChatMessageValidatorTest {
                 ChatMessageValidator.MAX_CHARACTERS + 1)));
     }
 
+    /**
+     * Up to eight paragraphs, in the one form a message keeps them: each
+     * trimmed, none empty; anything else is refused, and the normalizer
+     * puts any text in that form.
+     */
+    @Test
+    public void paragraphsAreKeptInOneForm() {
+        assertTrue(ChatMessageValidator.isValid("two\nparagraphs"));
+        assertFalse(ChatMessageValidator.isValid("two\n\nblank"));
+        assertFalse(ChatMessageValidator.isValid("space \nbefore"));
+        assertFalse(ChatMessageValidator.isValid("space\n after"));
+        assertFalse(ChatMessageValidator.isValid("return\r\nbreak"));
+        StringBuilder eight = new StringBuilder("p");
+        for (int index = 1; index < ChatMessageValidator.MAX_PARAGRAPHS; index++) {
+            eight.append("\np");
+        }
+        assertTrue(ChatMessageValidator.isValid(eight.toString()));
+        assertFalse(ChatMessageValidator.isValid(eight + "\np"));
+
+        assertEquals("one\ntwo", ChatMessageValidator.paragraphs(
+                "  one  \r\n\n\r  two \n  "));
+        assertEquals("a\nb\nc\nd\ne\nf\ng\nh i j",
+                ChatMessageValidator.paragraphs("a\nb\nc\nd\ne\nf\ng\nh\ni\nj"));
+        assertEquals("", ChatMessageValidator.paragraphs(" \n \n"));
+        assertEquals("one two", ChatMessageValidator.oneLine("one\ntwo"));
+        assertEquals("one\\ntwo", ChatMessageValidator.logged("one\ntwo"));
+        assertEquals("an action is one paragraph", "Aldric bows. He waits.",
+                ChatAction.sentence("Aldric bows.\nHe waits"));
+    }
+
     @Test
     public void sectionSignsAndControlCharactersAreRefused() {
         assertFalse(ChatMessageValidator.isValid("gold §6text"));
-        assertFalse(ChatMessageValidator.isValid("two\nlines"));
         assertFalse(ChatMessageValidator.isValid("bell"));
         // The ampersand form is how players write a colour; it passes.
         assertTrue(ChatMessageValidator.isValid("gold &6text"));

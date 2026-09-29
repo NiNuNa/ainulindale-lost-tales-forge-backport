@@ -7,6 +7,7 @@ import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatChannelSuggester;
+import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatMentionCandidate;
 import com.ninuna.losttales.chat.ChatNameSuggester;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
@@ -349,8 +350,9 @@ final class ChatInputCompletion implements ChatInputField.MentionSource {
         ClientCommandHandler.instance.autoComplete(beforeCursor,
                 this.field.getText().substring(wordStart)
                         .toLowerCase(Locale.ROOT));
-        this.mc.thePlayer.sendQueue.addToSendQueue(
-                new C14PacketTabComplete(beforeCursor));
+        // The server reads the request as one line, as it reads commands.
+        this.mc.thePlayer.sendQueue.addToSendQueue(new C14PacketTabComplete(
+                ChatMessageValidator.oneLine(beforeCursor)));
         this.completionWaiting = true;
         this.completionTab = ClientChatChannelState.getSelected();
     }

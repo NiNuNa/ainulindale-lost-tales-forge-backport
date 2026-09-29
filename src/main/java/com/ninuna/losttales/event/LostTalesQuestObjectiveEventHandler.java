@@ -3,6 +3,7 @@ package com.ninuna.losttales.event;
 import com.ninuna.losttales.quest.LostTalesQuestInteractionHelper;
 import com.ninuna.losttales.quest.LostTalesQuestManager;
 import com.ninuna.losttales.party.quest.PartyQuestProgressCoordinator;
+import com.ninuna.losttales.quest.world.WorldQuests;
 import com.ninuna.losttales.world.map.waypoint.LostTalesWaypointFastTravelPolicy;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent;
@@ -36,6 +37,7 @@ public final class LostTalesQuestObjectiveEventHandler {
         EntityPlayerMP player = resolveQuestKillCredit(event.source);
         if (player != null) {
             PartyQuestProgressCoordinator.getInstance().handleAuthoritativeKill(player, event.entityLiving);
+            WorldQuests.handleKill(player, event.entityLiving);
         }
     }
 
@@ -57,6 +59,7 @@ public final class LostTalesQuestObjectiveEventHandler {
         }
 
         LostTalesQuestManager.handleItemCrafted((EntityPlayerMP) event.player, event.crafting);
+        WorldQuests.handleCraft((EntityPlayerMP) event.player, event.crafting);
     }
 
     @SubscribeEvent
@@ -113,6 +116,7 @@ public final class LostTalesQuestObjectiveEventHandler {
         PartyQuestProgressCoordinator.getInstance()
                 .handleAuthoritativeTravel((EntityPlayerMP) event.player);
         LostTalesQuestManager.handlePlayerTick((EntityPlayerMP) event.player);
+        WorldQuests.handlePlayerTick((EntityPlayerMP) event.player);
     }
 
     private EntityPlayerMP resolveQuestKillCredit(DamageSource source) {

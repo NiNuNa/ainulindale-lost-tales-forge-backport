@@ -16,6 +16,7 @@ import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.input.LostTalesKeyPress;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
 import com.ninuna.losttales.client.quest.ClientQuestCatalog;
+import com.ninuna.losttales.client.window.BarLead;
 import com.ninuna.losttales.client.window.FirstTips;
 import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.PageTab;
@@ -237,7 +238,8 @@ public final class ChatScreenPart extends ScreenPart {
         GuiTextField vanillaField = this.screen.inputField();
         ChatInputField styled = new ChatInputField(this.fontRendererObj,
                 vanillaField.xPosition, vanillaField.yPosition,
-                vanillaField.getWidth(), ChatInputBar.FIELD_HEIGHT);
+                vanillaField.getWidth(), ChatInputBar.FIELD_HEIGHT)
+                .rows(ChatInputBar.MAX_FIELD_ROWS);
         styled.setEnableBackgroundDrawing(false);
         styled.setCanLoseFocus(false);
         styled.setFocused(true);
@@ -354,10 +356,37 @@ public final class ChatScreenPart extends ScreenPart {
         return new LostTalesUiHitBox(this.bar.characterButtonLeft()
                 + this.bar.fractionX(), this.bar.characterButtonTop()
                 + this.bar.fractionY() + this.bar.entranceOffset(),
-                ChatInputBar.CHARACTER_BUTTON_SIZE,
-                ChatInputBar.CHARACTER_BUTTON_SIZE);
+                BarLead.IDENTITY_SIZE,
+                BarLead.IDENTITY_SIZE);
     }
 
+    /* ---- The identity button on every bar ---- */
+
+    /** Who the player is on a tab, drawn as the chat's own bar draws it. */
+    @Override
+    public BarLead.Face identityFace(WindowTab tab) {
+        return this.bar.faceFor(tab);
+    }
+
+    /** The character menu, about the page whose bar was pressed. */
+    @Override
+    public boolean pressIdentity(WindowTab tab, SubWindowAnchor anchor) {
+        this.menus.toggleCharacterMenu(tab, anchor);
+        this.screen.syncTypingFocus();
+        return true;
+    }
+
+    @Override
+    public boolean identityMenuOut(WindowTab tab) {
+        return this.menus.isCharacterMenuOutFor(tab);
+    }
+
+    @Override
+    public boolean drawIdentityCard(WindowTab tab, int mouseX, int mouseY) {
+        LostTalesChatHoverCard.drawForIdentity(this.mc, tab, mouseX, mouseY,
+                this.screen.width, this.screen.height);
+        return true;
+    }
 
     /**
      * Writes {@code token} into the field being typed in as a word of its
@@ -533,10 +562,16 @@ public final class ChatScreenPart extends ScreenPart {
         if (this.completion.handleSuggestionKey(keyCode)) {
             return true;
         }
-        // Up and Down walk what was sent from the selected tab, and from
-        // it alone: each tab keeps its own history. Handled here, never
-        // by vanilla, whose single history mixes every tab's lines.
+        // Up and Down move between the rows of what is typed; past the
+        // first or the last they walk what was sent from the selected
+        // tab, and from it alone: each tab keeps its own history.
+        // Handled here, never by vanilla, whose single history mixes
+        // every tab's lines.
         if (keyCode == Keyboard.KEY_UP || keyCode == Keyboard.KEY_DOWN) {
+            if (this.inputField.moveRow(keyCode == Keyboard.KEY_UP ? -1 : 1,
+                    press.shift)) {
+                return true;
+            }
             String recalled = ClientChatChannelState.recallSent(
                     ClientChatChannelState.getSelected(),
                     keyCode == Keyboard.KEY_UP ? -1 : 1,
@@ -548,24 +583,32 @@ public final class ChatScreenPart extends ScreenPart {
             }
             return true;
         }
-        // Tab and the arrows walk the tabs of the window being typed
-        // in. All three need an empty field: with text in it the arrows
-        // belong to the caret, as they do in any text field.
+        // Tab and the arrows walk every tab of the window being typed
+        // in, pages too: Tab and Right forward, Shift+Tab and Left back.
+        // They need an empty field: with text in it the arrows belong to
+        // the caret, as they do in any text field, and Tab completes.
         if (this.inputField.getText().length() == 0
-                && (keyCode == Keyboard.KEY_TAB
-                        || keyCode == Keyboard.KEY_RIGHT)) {
-            ClientChatChannelState.cycle();
-            this.tabActions.syncSelection();
-            return true;
-        }
-        if (this.inputField.getText().length() == 0
-                && keyCode == Keyboard.KEY_LEFT) {
-            ClientChatChannelState.cycleBack();
-            this.tabActions.syncSelection();
+                && (keyCode == Keyboard.KEY_TAB || keyCode == Keyboard.KEY_RIGHT
+                        || keyCode == Keyboard.KEY_LEFT)) {
+            boolean back = keyCode == Keyboard.KEY_LEFT
+                    || keyCode == Keyboard.KEY_TAB && press.shift;
+            this.screen.walkTabs(WindowLayout.windowOf(
+                    ClientChatChannelState.getSelected()), back ? -1 : 1);
             return true;
         }
         if (keyCode == Keyboard.KEY_RETURN
                 || keyCode == Keyboard.KEY_NUMPADENTER) {
+            if (press.shift && this.inputField.hasRows()) {
+                // Shift+Return starts a paragraph in a message or a
+                // whisper; Return alone sends.
+                if (this.inputField.takesParagraphs()) {
+                    this.inputField.insertParagraph();
+                    ClientChatChannelState.markUsed();
+                    enforceLimit();
+                    this.completion.refreshAfterTyping();
+                }
+                return true;
+            }
             submitInput();
             return true;
         }
@@ -819,6 +862,9 @@ public final class ChatScreenPart extends ScreenPart {
                         ChatLayout.isToolbarCollapsed()
                                 ? "gui.losttales.chat.toolbar.expand"
                                 : "gui.losttales.chat.toolbar.collapse");
+            case INDICATOR:
+                return StatCollector.translateToLocal(
+                        "gui.losttales.window.bar.tab");
             default:
                 // The head button's hover shows the chosen identity's card
                 // instead of words.
@@ -947,19 +993,18 @@ public final class ChatScreenPart extends ScreenPart {
             case CHARACTER_BUTTON:
                 // A switch: pressed with its menu out, it puts it away.
                 if (button == 0) {
-                    this.menus.toggleCharacterMenu(characterButtonAnchor());
+                    this.menus.toggleCharacterMenu(null,
+                            characterButtonAnchor());
                     this.screen.syncTypingFocus();
                 }
                 return true;
             case INDICATOR:
                 // A left click walks the window's tabs forward and a
-                // right click back, as Ctrl+Right and Ctrl+Left do.
-                if (button == 0) {
-                    this.tabActions.selectChannel(
-                            ClientChatChannelState.cycle());
-                } else if (button == 1) {
-                    this.tabActions.selectChannel(
-                            ClientChatChannelState.cycleBack());
+                // right click back, pages too, as Tab and Shift+Tab do.
+                if (button == 0 || button == 1) {
+                    this.screen.walkTabs(WindowLayout.windowOf(
+                            ClientChatChannelState.getSelected()),
+                            button == 0 ? 1 : -1);
                 }
                 return true;
             case SEND_BUTTON:
@@ -1142,6 +1187,11 @@ public final class ChatScreenPart extends ScreenPart {
     public void beforeWindows(double pointerX, double pointerY) {
         ChatFrame live = this.bar.activeFrame();
         this.liveWindowId = live == null ? null : live.windowId;
+        if (live != null) {
+            // The bar being typed in grows a row for each row its words
+            // take; every other bar eases back to one.
+            live.growBar(this.bar.growthWanted());
+        }
         ChatHover chat = ChatHover.of(this.screen.hover());
         LostTalesChatPresentation.beginFrame();
         LostTalesChatPresentation.setHoveredLine(shadedLine(pointerX,
@@ -1286,7 +1336,8 @@ public final class ChatScreenPart extends ScreenPart {
                     this.bar.fractionY() + entrance, 0.0F);
             this.bar.drawBar(barRight);
             this.bar.drawCharacterSelectionButton(controlX, controlY,
-                    this.menus.isOpen(ChatSubWindows.CHARACTERS));
+                    this.menus.isCharacterMenuOutFor(
+                            ClientChatChannelState.getSelected()));
             this.bar.drawIndicator(barRight, controlX, controlY);
             this.bar.drawToolbarToggle(barRight, controlX, controlY);
             this.bar.drawPickerButtons(barRight,
@@ -1342,7 +1393,8 @@ public final class ChatScreenPart extends ScreenPart {
         // identity's own brief card, who the roleplaying channels speak
         // as right now, while the button's own menu is not out.
         if (ChatHover.is(hover, ChatHover.Kind.CHARACTER_BUTTON)
-                && !this.menus.isOpen(ChatSubWindows.CHARACTERS)) {
+                && !this.menus.isCharacterMenuOutFor(
+                        ClientChatChannelState.getSelected())) {
             LostTalesChatHoverCard.drawForIdentity(this.mc,
                     ClientChatChannelState.getSelected(), mouseX, mouseY,
                     this.screen.width, this.screen.height);
@@ -1368,7 +1420,13 @@ public final class ChatScreenPart extends ScreenPart {
      */
     @Override
     public boolean send(String text) {
-        String message = text == null ? "" : text.trim();
+        // A message keeps its paragraphs in the one form the server
+        // accepts; a command is one line, as the game reads it.
+        String message = ChatInputRules.isCommand(text)
+                && !ChatInputRules.isActionCommand(text)
+                && !ChatInputRules.isWhisperCommand(text)
+                ? ChatMessageValidator.oneLine(text).trim()
+                : ChatMessageValidator.paragraphs(text);
         this.sent = true;
         ClientChatChannelState.setDraft("");
         // The tab the line was typed in, taken before a whisper command
@@ -1577,7 +1635,8 @@ public final class ChatScreenPart extends ScreenPart {
      * the server who ran what, and where. The tab in front stays in
      * front.
      */
-    private void sendCommand(String command) {
+    private void sendCommand(String typed) {
+        String command = ChatMessageValidator.oneLine(typed).trim();
         ChatTab typedIn = ClientChatChannelState.getSelected();
         LostTalesChatPresentation.expectCommandOutput(typedIn);
         LostTalesChatPresentation.echoCommand(typedIn, command);
@@ -1835,7 +1894,9 @@ public final class ChatScreenPart extends ScreenPart {
                 continue;
             }
             double top = frame.barTop();
-            if (x >= frame.boxLeft && x < frame.boxRight && barY >= top
+            double left = frame.barLeft();
+            if (x >= left && x < left + (frame.boxRight - frame.boxLeft)
+                    && barY >= top
                     && barY < top + WindowPlacement.BAR_STRIP_HEIGHT) {
                 return frame;
             }
@@ -2352,6 +2413,20 @@ public final class ChatScreenPart extends ScreenPart {
             case SPOILER:
                 ChatSpoilerMarker.reveal(part);
                 return true;
+            case FOLD: {
+                // Read more keeps the message's top row where it stands,
+                // so the words go on under the row being read; Show less
+                // keeps its foot, so the run clicked stays under the
+                // pointer.
+                int chatLineId = ChatFoldMarker.lineIdOf(part).intValue();
+                boolean open = ChatFoldMarker.flip(chatLineId);
+                ChatFrame frame = hit.band.frame;
+                if (frame != null) {
+                    ClientChatChannelViews.keepInPlace(frame.view, frame,
+                            chatLineId, open);
+                }
+                return true;
+            }
             case CHANNEL_LINK:
                 openChannelLink(ChatChannelLinkMarker.decode(part));
                 return true;
@@ -2671,8 +2746,8 @@ public final class ChatScreenPart extends ScreenPart {
         Window window = WindowLayout.windowOf(
                 ClientChatChannelState.getSelected());
         return SubWindowAnchor.inward(left, top,
-                left + ChatInputBar.CHARACTER_BUTTON_SIZE,
-                top + ChatInputBar.CHARACTER_BUTTON_SIZE,
+                left + BarLead.IDENTITY_SIZE,
+                top + BarLead.IDENTITY_SIZE,
                 window == null ? null : ChatFrame.find(window.getId()),
                 this.screen.width, this.screen.height);
     }

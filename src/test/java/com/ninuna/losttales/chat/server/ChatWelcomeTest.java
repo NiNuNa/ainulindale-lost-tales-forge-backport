@@ -31,7 +31,7 @@ public final class ChatWelcomeTest {
     @Test
     public void linesAreCleanBoundedAndNeverBlank() {
         StringBuilder long_ = new StringBuilder();
-        for (int index = 0; index < 300; index++) {
+        while (long_.length() <= ChatMessageValidator.MAX_CHARACTERS) {
             long_.append('a');
         }
         List<String> lines = ChatWelcome.lines(new String[] {

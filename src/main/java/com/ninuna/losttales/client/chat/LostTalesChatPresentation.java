@@ -1656,6 +1656,7 @@ public final class LostTalesChatPresentation {
         CHIP_FADES.clear();
         ChatLineHover.clear();
         ChatSpoilerMarker.clear();
+        ChatFoldMarker.clear();
     }
 
     public static void clear() {
@@ -1686,6 +1687,7 @@ public final class LostTalesChatPresentation {
         commandTab = null;
         commandUntilMillis = 0L;
         ChatSpoilerMarker.clear();
+        ChatFoldMarker.clear();
     }
 
     private static int allocateChatLineId() {

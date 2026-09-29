@@ -87,6 +87,8 @@ import com.ninuna.losttales.network.packet.LostTalesWaystoneStatePacket;
 import com.ninuna.losttales.network.packet.LostTalesChargeTierSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesMobAggroSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesServerQuestSyncPacket;
+import com.ninuna.losttales.network.packet.LostTalesWorldQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatAccessPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
@@ -372,6 +374,22 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     public void handleQuickLootContainerSync(LostTalesQuickLootContainerSyncPacket packet) {
         if (packet != null) {
             LostTalesClientQuickLootCache.update(packet.getX(), packet.getY(), packet.getZ(), packet.getTitle(), packet.isSealed(), packet.getItems());
+        }
+    }
+
+    @Override
+    public void handleWorldQuestSync(LostTalesWorldQuestSyncPacket packet) {
+        if (packet != null) {
+            com.ninuna.losttales.client.quest.ClientWorldQuests.update(
+                    packet.getViews());
+        }
+    }
+
+    @Override
+    public void handleServerQuestSync(LostTalesServerQuestSyncPacket packet) {
+        if (packet != null) {
+            LostTalesClientQuestDefinitionStore.addServerQuestDefinitions(
+                    packet.isFirst(), packet.getQuests());
         }
     }
 

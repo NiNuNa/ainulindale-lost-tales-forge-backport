@@ -3660,7 +3660,8 @@ public final class LostTalesDiscordBridge {
                 pinged = post.pinged;
                 reply = DiscordHttp.postWebhook(webhook,
                         DiscordJson.webhookLineBody(next.username,
-                                next.avatarUrl, header + post.content,
+                                next.avatarUrl, DiscordMessageSanitizer.fitted(
+                                        header + post.content),
                                 post.pinged));
             } else {
                 DiscordMessageLinks.Copy copy = copyThrough(next, webhook);
@@ -3670,8 +3671,9 @@ public final class LostTalesDiscordBridge {
                 }
                 reply = next.kind == Outbound.Kind.EDIT
                         ? DiscordHttp.editWebhookMessage(webhook, copy.discordId,
-                                DiscordJson.webhookLineEditBody(copy.header
-                                        + postFor(next, webhook, true).content))
+                                DiscordJson.webhookLineEditBody(
+                                        DiscordMessageSanitizer.fitted(copy.header
+                                                + postFor(next, webhook, true).content)))
                         : DiscordHttp.deleteWebhookMessage(webhook, copy.discordId);
             }
             // What the reply says of the webhook's bucket, a limit's own

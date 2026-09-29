@@ -745,6 +745,9 @@ public final class WindowGestures {
         WindowFrame frame = target.frame;
         WindowLayout.raise(frame.windowId);
         this.host.selectWindow(window);
+        if (ContentView.isOn(window)) {
+            return;
+        }
         if (outOfItsOwnBox(window)) {
             armFillResize(target.edge, window);
             return;
@@ -1144,6 +1147,11 @@ public final class WindowGestures {
      */
     public void armWindowDrag(WindowFrame frame, int mouseX, int mouseY) {
         WindowLayout.raise(frame.windowId);
+        if (ContentView.isOn(frame.windowId)) {
+            // A tab standing alone keeps the whole screen until it is
+            // put back into its window.
+            return;
+        }
         this.windowDrag = new WindowDrag(frame.windowId,
                 WindowPlacement.preciseMouseX(this.mc, this.screenWidth)
                         - frame.boxLeft,

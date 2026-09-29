@@ -1440,7 +1440,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
                 : "gui.losttales.character.creator.status.server");
         LostTalesControlBar.render(this, this.mc, this.fontRendererObj,
                 this.width, this.height, hints, leftHints, 0,
-                Arrays.asList(status), true);
+                Arrays.asList(status));
     }
 
     // ------------------------------------------------------------------

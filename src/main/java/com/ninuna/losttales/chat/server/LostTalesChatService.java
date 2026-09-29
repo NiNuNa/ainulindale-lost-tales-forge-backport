@@ -374,7 +374,8 @@ public final class LostTalesChatService {
 
         FMLLog.info(action ? "[losttales/chat/%s] * %s (%s) %s%s%s"
                         : "[losttales/chat/%s] <%s (%s)> %s%s%s",
-                logName(channel, replyScope), identityName, accountName, message,
+                logName(channel, replyScope), identityName, accountName,
+                ChatMessageValidator.logged(message),
                 whisperTarget == null ? ""
                         : " -> " + whisperTarget.getCommandSenderName(),
                 showcases.isEmpty() ? ""
@@ -513,7 +514,8 @@ public final class LostTalesChatService {
                 .withNamedPlayers(ChatMentionTargets.ofDiscordLine(channel,
                         factionScope, routing.recipients, message));
         FMLLog.info("[losttales/chat/%s] <%s (discord)> %s",
-                logName(channel, factionScope), displayName, message);
+                logName(channel, factionScope), displayName,
+                ChatMessageValidator.logged(message));
         deliver(packet, null, routing,
                 LostTalesChatMessagePacket.DISCORD_SENDER_ID, displayName);
         // Recorded under the member's own sender id, the same id a mute
@@ -746,7 +748,7 @@ public final class LostTalesChatService {
             return;
         }
         FMLLog.info("[losttales/chat/discord] edited message %d: %s",
-                Long.valueOf(messageId), message);
+                Long.valueOf(messageId), ChatMessageValidator.logged(message));
         if (author != null) {
             ChatAuditLog.logDiscordEdit(messageId, author.getPlayerId(),
                     author.getAccount(), message);
@@ -955,7 +957,8 @@ public final class LostTalesChatService {
             return;
         }
         FMLLog.info("[losttales/chat/edit] <%s> %s",
-                editor.getCommandSenderName(), message);
+                editor.getCommandSenderName(),
+                ChatMessageValidator.logged(message));
         ChatAuditLog.logEdit(messageId, editor.getUniqueID(),
                 editor.getCommandSenderName(), message);
         tellRecipients(recipients,

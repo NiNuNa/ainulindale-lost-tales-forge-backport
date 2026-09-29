@@ -104,6 +104,7 @@ public final class LostTalesQuestDefinitionJsonParser {
         Map<String, String> markers = parseStringMap(object.get("markers"));
         Map<String, String> journalLog = parseStringMap(object.get("journalLog"));
         Map<String, String> dialogue = parseStringMap(object.get("dialogue"));
+        Map<String, String> world = parseStringMap(object.get("world"));
         List<LostTalesQuestStageDefinition> stages = parseStages(object.get("stages"));
 
         if (id == null || id.length() == 0) {
@@ -111,7 +112,7 @@ public final class LostTalesQuestDefinitionJsonParser {
         }
         return new LostTalesQuestDefinition(id, title, description,
                 repeatable, restartable, startMode, prerequisites, rewards,
-                interaction, markers, journalLog, dialogue, stages);
+                interaction, markers, journalLog, dialogue, world, stages);
     }
 
     private static List<LostTalesQuestStageDefinition> parseStages(JsonElement element) {
