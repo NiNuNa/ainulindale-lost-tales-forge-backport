@@ -44,7 +44,7 @@ public final class CameraProfileResolverTest {
             boolean riding, boolean swimming, boolean sneaking,
             boolean sprinting, boolean moving) {
         return CameraProfileResolver.resolve(
-                riding, swimming, sneaking, sprinting, moving);
+                riding, swimming, false, false, false, sneaking, sprinting, moving);
     }
 
     private static CameraProfileId resolveActions(

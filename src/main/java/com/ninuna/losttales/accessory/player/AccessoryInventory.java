@@ -24,14 +24,6 @@ public final class AccessoryInventory implements IInventory {
         this.owner = owner;
     }
 
-    public EntityPlayer getOwner() {
-        return this.owner;
-    }
-
-    public long getRevision() {
-        return this.revision;
-    }
-
     @Override
     public int getSizeInventory() {
         return SLOT_COUNT;

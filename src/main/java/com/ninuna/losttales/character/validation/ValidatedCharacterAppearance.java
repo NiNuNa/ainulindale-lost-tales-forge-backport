@@ -13,7 +13,6 @@ package com.ninuna.losttales.character.validation;
 public final class ValidatedCharacterAppearance {
 
     private final String name;
-    private final String normalizedNameKey;
     private final String raceId;
     private final String genderId;
     private final String skinId;
@@ -22,13 +21,12 @@ public final class ValidatedCharacterAppearance {
     private final String history;
     private final int age;
 
-    public ValidatedCharacterAppearance(String name, String normalizedNameKey,
+    public ValidatedCharacterAppearance(String name,
                                         String raceId, String genderId,
                                         String skinId, String bodyTypeId,
                                         String chestTypeId, String history,
                                         int age) {
         this.name = name;
-        this.normalizedNameKey = normalizedNameKey;
         this.raceId = raceId;
         this.genderId = genderId;
         this.skinId = skinId;
@@ -39,7 +37,6 @@ public final class ValidatedCharacterAppearance {
     }
 
     public String getName() { return this.name; }
-    public String getNormalizedNameKey() { return this.normalizedNameKey; }
     public String getRaceId() { return this.raceId; }
     public String getGenderId() { return this.genderId; }
     public String getSkinId() { return this.skinId; }

@@ -82,8 +82,6 @@ public final class ClientChatChannelState {
             new HashMap<String, String>();
     private static final HashMap<String, Long> FACTION_NAMES_ASKED =
             new HashMap<String, Long>();
-    /** Server-stated operator status; the Operator tab exists only with it. */
-    private static boolean operatorAccess;
     /**
      * Every capability the server says this player holds, by id. The
      * menus ask this rather than a flag of their own, so a capability
@@ -164,10 +162,6 @@ public final class ClientChatChannelState {
         return selected;
     }
 
-    public static synchronized ChatChannel getSelectedChannel() {
-        return getSelected().getChannel();
-    }
-
     /** The player's own pick: the input goes there, and it is the last used. */
     public static synchronized void select(ChatTab tab) {
         choose(isSelectable(tab) ? tab : fallbackTab());
@@ -215,10 +209,6 @@ public final class ClientChatChannelState {
         lastUsedKnown = true;
     }
 
-    public static synchronized void select(ChatChannel channel) {
-        select(ChatTab.of(channel));
-    }
-
     /** Next available tab of the selected tab's window, in row order. */
     public static synchronized ChatTab cycle() {
         return cycle(1);
@@ -241,42 +231,6 @@ public final class ClientChatChannelState {
                 ((index + step) % order.size() + order.size())
                         % order.size()));
         return selected;
-    }
-
-    /**
-     * The tab at {@code ordinal} (from one) along the selected tab's
-     * window, the way a browser's Ctrl+1 to Ctrl+8 reach its tabs; nine
-     * is always the last tab, whatever the row holds. A number past the
-     * row leaves the selection where it is.
-     */
-    public static synchronized WindowTab selectOrdinal(int ordinal) {
-        ChatTab current = getSelected();
-        if (ordinal < 1) {
-            return current;
-        }
-        // Counted along the row as it is drawn, pages and all; a page
-        // chosen this way is shown, never typed into.
-        Window window = WindowLayout.windowOf(current);
-        List<WindowTab> order = new ArrayList<WindowTab>();
-        if (window != null) {
-            for (WindowTab tab : window.getTabs()) {
-                if (tab.isAvailable()) {
-                    order.add(tab);
-                }
-            }
-        }
-        if (order.isEmpty()) {
-            order.addAll(selectedWindowOrder(current));
-        }
-        int index = ordinal >= 9 ? order.size() - 1 : ordinal - 1;
-        if (index >= order.size()) {
-            return current;
-        }
-        WindowTab chosen = order.get(index);
-        if (chosen instanceof ChatTab) {
-            choose((ChatTab)chosen);
-        }
-        return chosen;
     }
 
     /**
@@ -305,35 +259,6 @@ public final class ClientChatChannelState {
     }
 
     /**
-     * Next (or previous) open tab across every window, in window and
-     * tab order — the keyboard's way from one window to another.
-     */
-    public static synchronized ChatTab cycleAll(boolean backward) {
-        ChatTab current = getSelected();
-        List<ChatTab> order = getOpenTabs();
-        if (order.isEmpty()) {
-            return current;
-        }
-        int index = order.indexOf(current);
-        int step = backward ? -1 : 1;
-        choose(order.get(
-                ((index < 0 ? 0 : index) + step + order.size())
-                        % order.size()));
-        return selected;
-    }
-
-    /** Available channels in presentation order (plain tabs only). */
-    public static synchronized List<ChatChannel> getAvailableChannels() {
-        ArrayList<ChatChannel> result = new ArrayList<ChatChannel>();
-        for (ChatChannel channel : ChatChannel.presentationOrder()) {
-            if (isAvailable(channel)) {
-                result.add(channel);
-            }
-        }
-        return Collections.unmodifiableList(result);
-    }
-
-    /**
      * Available conversations open in some window, pages left out, in
      * window and tab order.
      */
@@ -346,15 +271,6 @@ public final class ClientChatChannelState {
             }
         }
         return result;
-    }
-
-    /** The channels of the open, available tabs, in window and tab order. */
-    public static synchronized List<ChatChannel> getOpenChannels() {
-        ArrayList<ChatChannel> result = new ArrayList<ChatChannel>();
-        for (ChatTab tab : getOpenTabs()) {
-            result.add(tab.getChannel());
-        }
-        return Collections.unmodifiableList(result);
     }
 
     public static synchronized void ensureAvailable() {
@@ -371,10 +287,6 @@ public final class ClientChatChannelState {
         return tab != null && isAvailable(tab) && ChatLayout.isOpen(tab);
     }
 
-    public static synchronized boolean isSelectable(ChatChannel channel) {
-        return isSelectable(ChatTab.of(channel));
-    }
-
     /**
      * Whether the player may close the tab: it is open and its window is
      * unlocked. Nothing is held back — the last tab of the last window
@@ -386,21 +298,22 @@ public final class ClientChatChannelState {
 
     /**
      * Closes the tab under {@link #isClosable} and moves the selection
-     * off it if it was selected: onto its neighbour in the same window,
-     * so the input stays where the player was working and no other
-     * window comes forward for it; only a window emptied by the close
-     * hands the selection elsewhere. Closing never mutes: the channel
-     * keeps receiving and keeps its own mute setting.
+     * off it if it was selected: onto the tab its window brings forward
+     * in its place, the one to its right or else to its left, so the
+     * input stays where the player was working and no other window comes
+     * forward for it. A page brought forward keeps the front, and the
+     * input waits in another conversation of that window; only a window
+     * emptied by the close hands the selection elsewhere. Closing never
+     * mutes: the channel keeps receiving and keeps its own choice.
      */
     public static synchronized boolean close(ChatTab tab) {
         Window window = WindowLayout.windowOf(tab);
-        int index = window == null ? -1 : window.getTabs().indexOf(tab);
         boolean wasSelected = tab != null && tab.equals(selected);
         if (!isClosable(tab) || !ChatLayout.close(tab)) {
             return false;
         }
         if (wasSelected) {
-            ChatTab neighbour = neighbourIn(window, index);
+            ChatTab neighbour = neighbourIn(window);
             choose(neighbour != null ? neighbour : fallbackTab());
         }
         ensureAvailable();
@@ -408,23 +321,19 @@ public final class ClientChatChannelState {
     }
 
     /**
-     * The tab that takes a closed tab's place in its window: the one now
-     * standing where it stood, else the last, else any selectable one;
+     * The conversation that takes a closed tab's place in its window: the
+     * one the window brought forward, else any selectable one it holds;
      * null when the window is gone or holds nothing selectable.
      */
-    private static ChatTab neighbourIn(Window window, int index) {
-        if (window == null || index < 0) {
+    private static ChatTab neighbourIn(Window window) {
+        if (window == null) {
             return null;
         }
-        List<WindowTab> tabs = window.getTabs();
-        if (tabs.isEmpty()) {
-            return null;
+        ChatTab front = ChatTab.from(window.getActiveTab());
+        if (isSelectable(front)) {
+            return front;
         }
-        ChatTab nearest = ChatTab.from(tabs.get(Math.min(index, tabs.size() - 1)));
-        if (isSelectable(nearest)) {
-            return nearest;
-        }
-        for (WindowTab each : tabs) {
+        for (WindowTab each : window.getTabs()) {
             ChatTab candidate = ChatTab.from(each);
             if (isSelectable(candidate)) {
                 return candidate;
@@ -457,39 +366,6 @@ public final class ClientChatChannelState {
         return tab.isWhisper()
                 ? tab.getOwnerKey().equals(ClientChatIdentities.viewIdentityKey())
                 : tab.getOwnerKey().equals(scopeKeyRead(tab.getChannel()));
-    }
-
-    /**
-     * Whether any window has a tab the player can currently see. The one
-     * question the chat screen asks to tell its two states apart: with
-     * windows it draws them and takes input for the selected tab, and
-     * without it shows its empty state. Channels exist either way.
-     */
-    public static synchronized boolean hasVisibleWindow() {
-        List<Window> windows = WindowLayout.windows();
-        for (int index = 0; index < windows.size(); index++) {
-            if (isVisible(windows.get(index))) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Whether the window has a tab the player can currently see. One
-     * that has not is not drawn and is in nothing's way until one of its
-     * channels becomes available.
-     */
-    public static synchronized boolean isVisible(Window window) {
-        if (window == null) {
-            return false;
-        }
-        for (WindowTab tab : window.getTabs()) {
-            if (tab.isAvailable()) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
@@ -650,7 +526,7 @@ public final class ClientChatChannelState {
                                     appearance.getCharacterName());
             if (same) {
                 return LotrFactionColors.forFactionId(
-                        appearance.getStartingFactionId(), plain);
+                        appearance.getFactionId(), plain);
             }
         }
         return plain;
@@ -772,15 +648,20 @@ public final class ClientChatChannelState {
      * Visible label for a channel. Faction shows the chat of the LOTR
      * faction ("Gondor Chat") the identity its tab speaks as belongs to,
      * so the tab, indicator and message prefix all agree and follow the
-     * chat identity. Party shows its leader's name ("Aldric's Party
-     * Chat") while the chat identity is in one, since a party has no name
-     * of its own.
+     * chat identity. Party shows the name its leader gave it ("The Grey
+     * Company Chat"), else its leader's ("Aldric's Party Chat"), while the
+     * character played is in one.
      */
     public static synchronized String displayName(ChatChannel channel) {
         if (channel == null) {
             return "";
         }
         if (channel == ChatChannel.PARTY) {
+            String named = ClientChatIdentitySelection.partyName();
+            if (named.length() > 0) {
+                return StatCollector.translateToLocalFormatted(
+                        "gui.losttales.chat.party.titled", named);
+            }
             String leader = ClientChatIdentitySelection.partyLeader();
             return leader.length() == 0 ? channel.getDisplayName()
                     : StatCollector.translateToLocalFormatted(
@@ -839,10 +720,6 @@ public final class ClientChatChannelState {
      */
     public static synchronized void setRoleMask(int mask) {
         roleMask = ChatAccountRole.isValidMask(mask) ? mask : 0;
-    }
-
-    public static synchronized int getRoleMask() {
-        return roleMask;
     }
 
     /**
@@ -949,12 +826,6 @@ public final class ClientChatChannelState {
     /** Whether the server said this sender is under a mute. */
     public static synchronized boolean isMutedSender(UUID sender) {
         return sender != null && MUTED_SENDERS.contains(sender);
-    }
-
-    /** Replaces the online role roster with the server's statement. */
-    public static synchronized void setRoleHolders(
-            Map<String, Integer> holders) {
-        setRoleHolders(holders, null, null);
     }
 
     /**
@@ -1075,16 +946,6 @@ public final class ClientChatChannelState {
         return account.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
-    /** Applies the server's statement of Operator-channel access. */
-    public static synchronized void setOperatorAccess(boolean access) {
-        operatorAccess = access;
-        ensureAvailable();
-    }
-
-    public static synchronized boolean hasOperatorAccess() {
-        return operatorAccess;
-    }
-
     /** Applies the server's statement of whether this player may moderate. */
     public static synchronized void setCanModerate(boolean allowed) {
         canModerate = allowed;
@@ -1195,7 +1056,6 @@ public final class ClientChatChannelState {
         PARTNER_CHARACTER_IDS.clear();
         FACTION_NAMES.clear();
         FACTION_NAMES_ASKED.clear();
-        operatorAccess = false;
         canModerate = false;
         canEditServerConfig = false;
         capabilities = java.util.Collections.emptySet();
@@ -1277,7 +1137,7 @@ public final class ClientChatChannelState {
             if (character != null && ownerKey.equals(
                     ChatTab.ownerKeyOf(character.getCharacterId()))) {
                 return LotrCharacterAdapter.factionIdOrUnaligned(
-                        character.getStartingFactionId());
+                        character.getFactionId());
             }
         }
         return "";
@@ -1314,7 +1174,7 @@ public final class ClientChatChannelState {
                 : roster.getCharacter(worn.characterId);
         return character == null ? ""
                 : LotrCharacterAdapter.factionIdOrUnaligned(
-                        character.getStartingFactionId());
+                        character.getFactionId());
     }
 
     /**

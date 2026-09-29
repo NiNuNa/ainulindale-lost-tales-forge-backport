@@ -28,12 +28,9 @@ public final class CharacterSwitchRecoveryReconcilerTest {
                 SOURCE, CharacterSwitchTransactionStatus.PREPARED);
         CharacterSwitchAccountState account = account(transaction);
 
-        CharacterSwitchRecoveryReconciler.Result result =
-                CharacterSwitchRecoveryReconciler.reconcile(
-                        TARGET, account, 5000L);
-
-        assertEquals(CharacterSwitchRecoveryReconciler.Action.COMMIT_TARGET,
-                result.getAction());
+        CharacterSwitchRecoveryReconciler.reconcile(
+                TARGET, account, 5000L);
+
         assertSame(transaction, account.getTransaction());
         assertEquals(CharacterSwitchTransactionStatus.COMMITTED,
                 transaction.getStatus());
@@ -50,9 +47,7 @@ public final class CharacterSwitchRecoveryReconcilerTest {
                 CharacterSwitchRecoveryReconciler
                         .finalizeAfterDurablePlayerSave(
                                 TARGET, account, 5000L);
-
-        assertEquals(CharacterSwitchRecoveryReconciler.Action.CLEAR_JOURNAL,
-                result.getAction());
+
         assertEquals(CharacterErrorId.NONE, result.getErrorId());
         assertNull(account.getTransaction());
         assertEquals(4, account.getCooldownStage());
@@ -64,13 +59,9 @@ public final class CharacterSwitchRecoveryReconcilerTest {
         CharacterSwitchAccountState account = account(transaction(
                 SOURCE, CharacterSwitchTransactionStatus.PREPARED));
 
-        CharacterSwitchRecoveryReconciler.Result result =
-                CharacterSwitchRecoveryReconciler
-                        .finalizeAfterDurablePlayerSave(
-                                SOURCE, account, 5000L);
-
-        assertEquals(CharacterSwitchRecoveryReconciler.Action.CLEAR_JOURNAL,
-                result.getAction());
+        CharacterSwitchRecoveryReconciler.finalizeAfterDurablePlayerSave(
+                SOURCE, account, 5000L);
+
         assertNull(account.getTransaction());
         assertEquals(2, account.getCooldownStage());
         assertEquals(2000L, account.getNextAllowedAt());
@@ -81,13 +72,9 @@ public final class CharacterSwitchRecoveryReconcilerTest {
         CharacterSwitchAccountState account = account(transaction(
                 SOURCE, CharacterSwitchTransactionStatus.COMMITTED));
 
-        CharacterSwitchRecoveryReconciler.Result result =
-                CharacterSwitchRecoveryReconciler
-                        .finalizeAfterDurablePlayerSave(
-                                TARGET, account, 5000L);
-
-        assertEquals(CharacterSwitchRecoveryReconciler.Action.CLEAR_JOURNAL,
-                result.getAction());
+        CharacterSwitchRecoveryReconciler.finalizeAfterDurablePlayerSave(
+                TARGET, account, 5000L);
+
         assertNull(account.getTransaction());
     }
 
@@ -96,13 +83,9 @@ public final class CharacterSwitchRecoveryReconcilerTest {
         CharacterSwitchAccountState account = account(transaction(
                 null, CharacterSwitchTransactionStatus.PREPARED));
 
-        CharacterSwitchRecoveryReconciler.Result result =
-                CharacterSwitchRecoveryReconciler
-                        .finalizeAfterDurablePlayerSave(
-                                null, account, 5000L);
-
-        assertEquals(CharacterSwitchRecoveryReconciler.Action.CLEAR_JOURNAL,
-                result.getAction());
+        CharacterSwitchRecoveryReconciler.finalizeAfterDurablePlayerSave(
+                null, account, 5000L);
+
         assertNull(account.getTransaction());
         assertFalse(account.isFrozen());
     }
@@ -117,10 +100,7 @@ public final class CharacterSwitchRecoveryReconcilerTest {
                 CharacterSwitchRecoveryReconciler
                         .finalizeAfterDurablePlayerSave(
                                 UNKNOWN, account, 5000L);
-
-        assertEquals(
-                CharacterSwitchRecoveryReconciler.Action.REQUIRE_MANUAL_RECOVERY,
-                result.getAction());
+
         assertEquals(CharacterErrorId.SWITCH_RECOVERY_REQUIRED,
                 result.getErrorId());
         assertSame(transaction, account.getTransaction());
@@ -137,9 +117,7 @@ public final class CharacterSwitchRecoveryReconcilerTest {
                 CharacterSwitchRecoveryReconciler
                         .finalizeAfterDurablePlayerSave(
                                 TARGET, account, 5000L);
-
-        assertEquals(CharacterSwitchRecoveryReconciler.Action.NO_JOURNAL,
-                result.getAction());
+
         assertEquals(CharacterErrorId.NONE, result.getErrorId());
         assertNull(account.getTransaction());
     }
@@ -150,13 +128,9 @@ public final class CharacterSwitchRecoveryReconcilerTest {
                 SOURCE, null, 20L, CharacterSwitchTransactionStatus.PREPARED);
         CharacterSwitchAccountState account = account(transaction);
 
-        CharacterSwitchRecoveryReconciler.Result result =
-                CharacterSwitchRecoveryReconciler
-                        .finalizeAfterDurablePlayerSave(
-                                null, account, 5000L);
-
-        assertEquals(CharacterSwitchRecoveryReconciler.Action.CLEAR_JOURNAL,
-                result.getAction());
+        CharacterSwitchRecoveryReconciler.finalizeAfterDurablePlayerSave(
+                null, account, 5000L);
+
         assertNull(account.getTransaction());
         assertEquals(4, account.getCooldownStage());
     }
@@ -167,13 +141,9 @@ public final class CharacterSwitchRecoveryReconcilerTest {
                 null, TARGET, 20L, CharacterSwitchTransactionStatus.PREPARED);
         CharacterSwitchAccountState account = account(transaction);
 
-        CharacterSwitchRecoveryReconciler.Result result =
-                CharacterSwitchRecoveryReconciler
-                        .finalizeAfterDurablePlayerSave(
-                                null, account, 5000L);
-
-        assertEquals(CharacterSwitchRecoveryReconciler.Action.CLEAR_JOURNAL,
-                result.getAction());
+        CharacterSwitchRecoveryReconciler.finalizeAfterDurablePlayerSave(
+                null, account, 5000L);
+
         assertNull(account.getTransaction());
         assertEquals(2, account.getCooldownStage());
         assertFalse(account.isFrozen());
@@ -240,9 +210,7 @@ public final class CharacterSwitchRecoveryReconcilerTest {
 
         CharacterSwitchRecoveryReconciler.Result result =
                 CharacterSwitchRecoveryReconciler.reconcile(SOURCE, account, 5000L);
-
-        assertEquals(CharacterSwitchRecoveryReconciler.Action.CLEAR_JOURNAL,
-                result.getAction());
+
         assertEquals(CharacterErrorId.NONE, result.getErrorId());
         assertNull(account.getTransaction());
         assertFalse(account.isFrozen());

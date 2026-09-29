@@ -166,7 +166,7 @@ public final class LoreCharacterRegistryTest {
 
         assertTrue(LoreCharacterRegistry.getLoadErrors().toString(),
                 LoreCharacterRegistry.getLoadErrors().isEmpty());
-        assertEquals(82, LoreCharacterRegistry.getAll().size());
+        assertEquals(80, LoreCharacterRegistry.getAll().size());
         assertNotNull(LoreCharacterRegistry.get("losttales:gandalf"));
         assertNotNull(LoreCharacterRegistry.get("losttales:frodo"));
         assertNotNull(LoreCharacterRegistry.get("losttales:eomer"));
@@ -187,7 +187,7 @@ public final class LoreCharacterRegistryTest {
 
         LoreCharacterRegistry.load(configRoot);
 
-        assertEquals(82, LoreCharacterRegistry.getAll().size());
+        assertEquals(80, LoreCharacterRegistry.getAll().size());
         assertEquals(1, LoreCharacterRegistry.getLoadErrors().size());
         assertTrue(LoreCharacterRegistry.getLoadErrors().get(0)
                 .contains("duplicates display name"));
@@ -202,7 +202,7 @@ public final class LoreCharacterRegistryTest {
 
         LoreCharacterRegistry.load(configRoot);
 
-        assertEquals(82, LoreCharacterRegistry.getAll().size());
+        assertEquals(80, LoreCharacterRegistry.getAll().size());
         assertEquals("Gandalf",
                 LoreCharacterRegistry.get("losttales:gandalf").getName());
         assertEquals(1, LoreCharacterRegistry.getLoadErrors().size());
@@ -222,7 +222,7 @@ public final class LoreCharacterRegistryTest {
         assertTrue(LoreCharacterRegistry.getLoadErrors().toString(),
                 LoreCharacterRegistry.getLoadErrors().isEmpty());
         assertNotNull(LoreCharacterRegistry.get("myserver:server_entry"));
-        assertEquals(83, LoreCharacterRegistry.getAll().size());
+        assertEquals(81, LoreCharacterRegistry.getAll().size());
     }
 
     private File createExternalDefinition(String filename, String id,

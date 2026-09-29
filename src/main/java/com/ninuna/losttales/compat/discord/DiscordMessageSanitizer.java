@@ -6,6 +6,7 @@ import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
 import com.ninuna.losttales.chat.emoji.ChatEmojiShortcodes;
 import java.nio.charset.Charset;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -24,8 +25,12 @@ import java.util.regex.Pattern;
  * characters, section signs and whatever no font can draw go, and the
  * result is cut to the chat's own length. Outbound, a canonical
  * shortcode becomes the Unicode emoji Discord renders — the mod's own
- * sprites stay literal text — and nothing else is rewritten: the webhook
- * is told to ping nobody instead.
+ * sprites stay literal text — and what Discord would draw and the game
+ * does not is broken with a zero-width space
+ * ({@link #breakDiscordOnlyMarkup}), so a post reads on Discord as its
+ * line read in the game. The mentions a player types are broken the same
+ * way, and the webhook pings only the members the server resolved
+ * ({@link DiscordMentions}).
  */
 public final class DiscordMessageSanitizer {
     private static final Pattern USER_MENTION = Pattern.compile("<@!?(\\d+)>");
@@ -92,6 +97,65 @@ public final class DiscordMessageSanitizer {
                     .trim() + "...";
         }
         return ChatMessageValidator.isValid(text) ? text : "";
+    }
+
+    /** The longest file or sticker name the chat shows. */
+    static final int MAX_ATTACHED_NAME = 32;
+
+    /**
+     * A member's message as the chat shows it, with what it carries
+     * besides its words (Nils, 2026-09-28, D3 a): a forward's words behind
+     * *[Forwarded]*, each sticker as *[Sticker: name]*, and each file by
+     * its name in italics, followed by the message's own link on Discord,
+     * where the file is. The address stays in sight: no word stands in for
+     * a link. {@code words} and {@code forwarded} are already
+     * {@link #inbound}'s; the words give way first when all of it is longer
+     * than a chat line, and the link goes before a file name does.
+     */
+    static String inboundWithAttachments(String words, String forwarded,
+                                         List<String> stickers, List<String> files,
+                                         String messageLink) {
+        StringBuilder extras = new StringBuilder();
+        if ((words == null || words.length() == 0) && forwarded != null
+                && forwarded.length() > 0) {
+            words = "*[Forwarded]* " + forwarded;
+        }
+        for (String sticker : stickers) {
+            String name = attachedName(sticker);
+            if (name.length() > 0) {
+                extras.append(" *[Sticker: ").append(name).append("]*");
+            }
+        }
+        boolean anyFile = false;
+        for (String file : files) {
+            String name = attachedName(file);
+            if (name.length() > 0) {
+                extras.append(" *").append(name).append('*');
+                anyFile = true;
+            }
+        }
+        String link = anyFile && messageLink != null ? " " + messageLink : "";
+        String tail = extras.toString() + link;
+        if (tail.length() > ChatMessageValidator.MAX_CHARACTERS / 2) {
+            tail = extras.toString();
+        }
+        String body = words == null ? "" : words;
+        int room = ChatMessageValidator.MAX_CHARACTERS - tail.length();
+        if (body.length() > room) {
+            body = room > 3 ? body.substring(0, room - 3).trim() + "..." : "";
+        }
+        String text = (body + tail).trim();
+        return ChatMessageValidator.isValid(text) ? text : "";
+    }
+
+    /** A file or sticker name as plain words: no marks, no codes, cut short. */
+    private static String attachedName(String name) {
+        if (name == null) {
+            return "";
+        }
+        String plain = stripUnsendable(name).replaceAll("[*_~|`\\\\\\[\\]]", "").trim();
+        return plain.length() > MAX_ATTACHED_NAME
+                ? plain.substring(0, MAX_ATTACHED_NAME - 3) + "..." : plain;
     }
 
     /**
@@ -182,6 +246,95 @@ public final class DiscordMessageSanitizer {
     }
 
     /**
+     * A player's text with what Discord would draw and the game does not
+     * broken by a zero-width space, which neither side shows: the
+     * {@code ](} of a masked link {@code [text](url)}, which would hide
+     * the address it leads to, and the mark that opens a line as a
+     * heading ({@code #}, {@code ##}, {@code ###}), subtext ({@code -#},
+     * which the bridge's own reply header is written in), a block quote
+     * ({@code >}, {@code >>>}) or a list item ({@code -}, {@code *},
+     * {@code +}, {@code 1.}), each only where Discord would read it so:
+     * at a line's start, spaces aside, and followed by a space. The
+     * inline marks both sides read alike — {@code **}, {@code *},
+     * {@code __}, {@code ~~}, {@code ||} and {@code `} — cross unchanged.
+     * A zero-width space rather than a backslash, since no backslash a
+     * player types can undo it and a code span shows none.
+     */
+    static String breakDiscordOnlyMarkup(String text) {
+        if (text == null || text.length() == 0) {
+            return text == null ? "" : text;
+        }
+        StringBuilder out = new StringBuilder(text.length() + 8);
+        boolean lineStart = true;
+        for (int index = 0; index < text.length(); index++) {
+            char character = text.charAt(index);
+            if (lineStart && !isSpace(character)) {
+                lineStart = false;
+                if (opensBlock(text, index)) {
+                    out.append(DiscordMentions.BREAK);
+                }
+            }
+            out.append(character);
+            if (character == ']' && index + 1 < text.length()
+                    && text.charAt(index + 1) == '(') {
+                out.append(DiscordMentions.BREAK);
+            }
+            if (character == '\n') {
+                lineStart = true;
+            }
+        }
+        return out.toString();
+    }
+
+    /**
+     * Whether the first mark of a line, at {@code at}, would make Discord
+     * draw the line as a heading, subtext, block quote or list item.
+     */
+    private static boolean opensBlock(String text, int at) {
+        char first = text.charAt(at);
+        if (first == '#') {
+            int end = at;
+            while (end < text.length() && text.charAt(end) == '#') {
+                end++;
+            }
+            return end - at <= 3 && spaceAt(text, end);
+        }
+        if (first == '-') {
+            return spaceAt(text, at + 1) || (at + 1 < text.length()
+                    && text.charAt(at + 1) == '#' && spaceAt(text, at + 2));
+        }
+        if (first == '*' || first == '+') {
+            return spaceAt(text, at + 1);
+        }
+        if (first == '>') {
+            return spaceAt(text, at + 1)
+                    || (text.startsWith(">>>", at) && spaceAt(text, at + 3));
+        }
+        if (first >= '0' && first <= '9') {
+            int end = at;
+            while (end < text.length() && text.charAt(end) >= '0'
+                    && text.charAt(end) <= '9') {
+                end++;
+            }
+            return end < text.length() && text.charAt(end) == '.'
+                    && spaceAt(text, end + 1);
+        }
+        return false;
+    }
+
+    private static boolean spaceAt(String text, int index) {
+        return index < text.length() && isSpace(text.charAt(index));
+    }
+
+    /**
+     * Any kind of space, a line break and a no-break space among them:
+     * Discord's parser takes each for the space a mark needs.
+     */
+    private static boolean isSpace(char character) {
+        return Character.isWhitespace(character) || Character.isSpaceChar(character);
+    }
+
+    /**
      * Registered Unicode emoji become canonical shortcodes. A form the
      * registry does not carry becomes its Discord name between colons,
      * the longest listed sequence first, so a family or a flag is one
@@ -227,20 +380,39 @@ public final class DiscordMessageSanitizer {
     }
 
     /**
+     * An action as Discord shows it: its words in italics under the
+     * speaker's name, as the game shows <em>Aldric draws his sword.</em>
+     * (Nils, 2026-09-28, C2 a). Empty for no words.
+     */
+    public static String outboundAction(String message) {
+        String words = outbound(message).trim();
+        if (words.length() == 0) {
+            return "";
+        }
+        int backslashes = 0;
+        for (int at = words.length() - 1; at >= 0 && words.charAt(at) == '\\'; at--) {
+            backslashes++;
+        }
+        // A last backslash would escape the closing mark.
+        return "*" + words + (backslashes % 2 == 1 ? "\\" : "") + "*";
+    }
+
+    /**
      * The line a webhook post opens with when the game message answers
      * one Discord holds: Discord's small subtext, an arrow, the quoted
-     * author in bold and the quoted text — linked to the original when
-     * a jump URL is known, plain when it is not. The closest thing to a
-     * native reply a webhook can carry: Discord accepts no
-     * {@code message_reference} on a webhook execution, so the header
+     * author in bold and the quoted text, an action's in italics — linked
+     * to the original when a jump URL is known, plain when it is not. The
+     * closest thing to a native reply a webhook can carry: Discord accepts
+     * no {@code message_reference} on a webhook execution, so the header
      * says in markdown what the reply banner would have said.
      */
     public static String replyHeader(String author, String excerpt,
-                                     String jumpUrl) {
+                                     boolean action, String jumpUrl) {
         String name = escapeMarkdown(outbound(author));
         String quoted = escapeMarkdown(outbound(excerpt));
         String body = "**" + name + "**"
-                + (quoted.length() == 0 ? "" : " — " + quoted);
+                + (quoted.length() == 0 ? ""
+                        : action ? " *" + quoted + "*" : " — " + quoted);
         if (jumpUrl != null && jumpUrl.length() > 0) {
             body = "[" + body + "](" + jumpUrl + ")";
         }

@@ -52,7 +52,6 @@ public final class CharacterRoomLayoutTest {
                     Material expected = onEdge ? Material.WALL : Material.NONE;
                     assertEquals(x + "," + y + "," + z, expected,
                             CharacterRoomLayout.materialAt(x, y, z));
-                    assertEquals(!onEdge, CharacterRoomLayout.isInside(x, y, z));
                 }
             }
         }
@@ -64,15 +63,13 @@ public final class CharacterRoomLayoutTest {
         assertEquals(Material.NONE, CharacterRoomLayout.materialAt(0, FLOOR, -OUTER - 1));
         assertEquals(Material.NONE, CharacterRoomLayout.materialAt(0, FLOOR - 1, 0));
         assertEquals(Material.NONE, CharacterRoomLayout.materialAt(0, CEILING + 1, 0));
-        assertFalse(CharacterRoomLayout.isInside(0, FLOOR, 0));
-        assertFalse(CharacterRoomLayout.isInside(0, CEILING, 0));
     }
 
     @Test
     public void spawnStandsOnTheFloorInsideTheRoom() {
-        assertTrue(CharacterRoomLayout.isInside(CharacterRoomLayout.SPAWN_X,
+        assertTrue(interior(CharacterRoomLayout.SPAWN_X,
                 CharacterRoomLayout.SPAWN_Y, CharacterRoomLayout.SPAWN_Z));
-        assertTrue(CharacterRoomLayout.isInside(CharacterRoomLayout.SPAWN_X,
+        assertTrue(interior(CharacterRoomLayout.SPAWN_X,
                 CharacterRoomLayout.SPAWN_Y + 1, CharacterRoomLayout.SPAWN_Z));
         assertEquals(Material.FLOOR, CharacterRoomLayout.materialAt(
                 CharacterRoomLayout.SPAWN_X, CharacterRoomLayout.SPAWN_Y - 1,
@@ -114,7 +111,7 @@ public final class CharacterRoomLayoutTest {
         for (int x = -OUTER; x <= OUTER; x++) {
             for (int z = -OUTER; z <= OUTER; z++) {
                 for (int y = FLOOR; y <= CEILING; y++) {
-                    if (!CharacterRoomLayout.isInside(x, y, z)) {
+                    if (!interior(x, y, z)) {
                         continue;
                     }
                     assertSolidBeyondInterior(x + 1, y, z);
@@ -129,10 +126,17 @@ public final class CharacterRoomLayoutTest {
     }
 
     private static void assertSolidBeyondInterior(int x, int y, int z) {
-        if (CharacterRoomLayout.isInside(x, y, z)) {
+        if (interior(x, y, z)) {
             return;
         }
         assertTrue(x + "," + y + "," + z,
                 CharacterRoomLayout.materialAt(x, y, z) != Material.NONE);
+    }
+
+    /** Air within the box's bounds: the room's interior. */
+    private static boolean interior(int x, int y, int z) {
+        return Math.abs(x) <= OUTER && Math.abs(z) <= OUTER
+                && y >= FLOOR && y <= CEILING
+                && CharacterRoomLayout.materialAt(x, y, z) == Material.NONE;
     }
 }

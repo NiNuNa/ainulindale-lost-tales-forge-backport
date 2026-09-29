@@ -55,19 +55,13 @@ public final class ClientPartyTrackingCache {
         if (matching == null) {
             return false;
         }
-        UUID localCharacterId = matching.getActiveCharacterId();
+        UUID localIdentityId = matching.getActiveIdentityId();
         for (PartyGoHereMarkerSnapshot marker : matching.getGoHereMarkers()) {
-            if (localCharacterId.equals(marker.getOwnerCharacterId())) {
+            if (localIdentityId.equals(marker.getOwnerIdentityId())) {
                 return true;
             }
         }
         return false;
-    }
-
-    public static synchronized boolean isStale(
-            PartyStateSnapshot partyState) {
-        return matchesPartyState(snapshot, partyState)
-                && isCurrentSnapshotStale();
     }
 
     /**
@@ -79,10 +73,6 @@ public final class ClientPartyTrackingCache {
         renderedMarkers = matchesPartyState(snapshot, partyState)
                 ? buildMapMarkers(snapshot)
                 : Collections.<LostTalesMapMarkerData>emptyList();
-    }
-
-    public static synchronized PartyTrackingSnapshot getSnapshot() {
-        return snapshot;
     }
 
     public static synchronized void clear() {
@@ -107,10 +97,10 @@ public final class ClientPartyTrackingCache {
         for (PartyGoHereMarkerSnapshot marker
                 : tracking.getGoHereMarkers()) {
             markers.add(new LostTalesMapMarkerData(
-                    "party_go_here:" + marker.getOwnerCharacterId(),
+                    "party_go_here:" + marker.getOwnerIdentityId(),
                     marker.getOwnerCharacterName(),
                     LostTalesCompassMarkerIcon.QUEST.name(),
-                    marker.getOwnerColor().getId(),
+                    marker.getOwnerColor().getTint(),
                     "Go Here",
                     "A personal marker for this roleplaying character. It is shared while in a party.",
                     false,
@@ -146,9 +136,9 @@ public final class ClientPartyTrackingCache {
         if (!partyState.isAvailable()) {
             return false;
         }
-        if (partyState.getActiveCharacterId() == null
-                || !tracking.getActiveCharacterId().equals(
-                partyState.getActiveCharacterId())) {
+        if (partyState.getActiveIdentityId() == null
+                || !tracking.getActiveIdentityId().equals(
+                partyState.getActiveIdentityId())) {
             return false;
         }
         if (partyState.getParty() == null) {

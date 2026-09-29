@@ -18,7 +18,7 @@ import net.minecraft.entity.player.EntityPlayerMP;
  * character, the one time the world asks for it.
  *
  * <p>The server decides everything. It re-finds the roster and the
- * default character from its own store, checks that this world has not
+ * account character from its own store, checks that this world has not
  * already had its reading, and puts every field through the same
  * validation a character somebody is making goes through. A request that
  * names a race, sex or skin this server does not offer is refused, not
@@ -26,7 +26,7 @@ import net.minecraft.entity.player.EntityPlayerMP;
  *
  * <p>The payload is sent even when the account has no template, with
  * {@code offered} false: the reading is what is being spent, and spending
- * it is what makes a world's default character that world's from then
+ * it is what makes a world's account character that world's from then
  * on.</p>
  */
 public final class CharacterTemplateAdoptRequestPacket implements IMessage {

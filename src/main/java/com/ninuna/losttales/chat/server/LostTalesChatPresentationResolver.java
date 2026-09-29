@@ -37,16 +37,16 @@ final class LostTalesChatPresentationResolver {
         String factionName = "";
         if (character != null) {
             factionColor = LotrFactionColors.forFactionId(
-                    character.getStartingFactionId(), factionColor);
+                    character.getFactionId(), factionColor);
             // The epithet names the sender's people, which is not always
             // what the realm is called: a Lothlórien character is a
             // Galadhrim Miner. Formatting codes stay behind; the client
             // colours the title.
             String name = LotrCharacterAdapter.getInstance()
-                    .getFactionDisplayName(character.getStartingFactionId());
+                    .getFactionDisplayName(character.getFactionId());
             String plain = ChatFormattingCodes.stripSectionCodes(name).trim();
             factionName = FactionDemonyms.of(
-                    character.getStartingFactionId(), plain);
+                    character.getFactionId(), plain);
         }
         // The faction explorer renders LOTRFaction#getFactionColor(). Keep
         // title and character name on that exact same RGB source.

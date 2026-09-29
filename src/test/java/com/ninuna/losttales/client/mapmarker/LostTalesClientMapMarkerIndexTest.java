@@ -32,8 +32,6 @@ public final class LostTalesClientMapMarkerIndexTest {
         assertSame(quest, snapshot.findById(world.getId()));
         assertSame(quest, snapshot.findMappedWaypointMarker(
                 "HOBBITON", "", 0, 0));
-        assertEquals(Collections.singleton(quest.getId()),
-                snapshot.getMarkerIds());
     }
 
     @Test

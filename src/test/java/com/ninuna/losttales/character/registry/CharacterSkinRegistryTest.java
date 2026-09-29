@@ -28,7 +28,7 @@ public final class CharacterSkinRegistryTest {
     public void bundledSkinsShipAsSkinSizedTextures() throws Exception {
         int bundled = 0;
         for (CharacterSkinDefinition definition : CharacterSkinRegistry.getAll()) {
-            if (!definition.isBundled()) {
+            if (!isBundled(definition)) {
                 continue;
             }
             bundled++;
@@ -52,7 +52,7 @@ public final class CharacterSkinRegistryTest {
     @Test
     public void lotrSkinsStayInsideTheLotrNamespace() {
         for (CharacterSkinDefinition definition : CharacterSkinRegistry.getAll()) {
-            if (definition.isBundled() || definition.isAccountSkin()) {
+            if (isBundled(definition) || definition.isAccountSkin()) {
                 continue;
             }
             assertTrue(definition.getId() + " must point into LOTR Legacy",
@@ -74,7 +74,7 @@ public final class CharacterSkinRegistryTest {
 
         CharacterSkinDefinition exiled = CharacterSkinRegistry.get(EXILED_DWARF);
         assertNotNull(exiled);
-        assertTrue(exiled.isBundled());
+        assertTrue(isBundled(exiled));
         assertEquals("losttales:textures/skins/dwarf/exiled_male/0.png",
                 exiled.getTextureLocation());
         assertTrue(CharacterSkinRegistry.isCompatible(EXILED_DWARF,
@@ -111,7 +111,7 @@ public final class CharacterSkinRegistryTest {
     public void everyRaceButTheHalfTrollOffersTheAccountSkinFirst() {
         for (CharacterRaceDefinition race : CharacterRaceRegistry.getAll()) {
             CharacterSkinDefinition first = CharacterSkinRegistry.getCompatibleSkins(
-                    race.getId(), race.getDefaultGenderId()).get(0);
+                    race.getId(), race.getAllowedGenderIds().iterator().next()).get(0);
             boolean halfTroll = CharacterRaceRegistry.HALF_TROLL.equals(race.getId());
             assertEquals(race.getId(), !halfTroll, first.isAccountSkin());
             if (!halfTroll) {
@@ -133,7 +133,7 @@ public final class CharacterSkinRegistryTest {
                 CharacterSkinRegistry.ACCOUNT_SKIN_ID);
         assertNotNull(account);
         assertTrue(account.isAccountSkin());
-        assertFalse(account.isBundled());
+        assertFalse(isBundled(account));
         assertEquals(CharacterRaceRegistry.HUMAN, account.getRaceId());
         assertTrue(CharacterSkinRegistry.isCompatible(CharacterSkinRegistry.ACCOUNT_SKIN_ID,
                 CharacterRaceRegistry.HUMAN, CharacterGenderRegistry.FEMALE));
@@ -149,7 +149,7 @@ public final class CharacterSkinRegistryTest {
             String fallback = CharacterSkinRegistry.getDefaultSkinId(
                     CharacterRaceRegistry.HUMAN, CharacterGenderRegistry.MALE,
                     new java.util.UUID(seed, seed * 31L));
-            assertFalse(fallback, CharacterSkinRegistry.isAccountSkin(fallback));
+            assertFalse(fallback, CharacterSkinRegistry.get(fallback).isAccountSkin());
         }
     }
 
@@ -179,5 +179,11 @@ public final class CharacterSkinRegistryTest {
         for (String group : groups) {
             assertTrue("skin group " + group + " has no en_US name", named.contains(group));
         }
+    }
+
+    /** Whether the texture ships inside the Lost Tales jar. */
+    private static boolean isBundled(CharacterSkinDefinition definition) {
+        return definition.getTextureLocation().startsWith(
+                CharacterSkinRegistry.BUNDLED_TEXTURE_ROOT);
     }
 }

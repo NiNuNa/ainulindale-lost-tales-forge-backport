@@ -75,7 +75,8 @@ public final class CharacterAppearanceTest {
         assertFalse(account.isMinecraftCapeVisible());
         assertEquals(CharacterCapeCatalog.RANGER, account.getCosmeticCapeId());
         // No roster written yet: the account with the defaults.
-        CharacterAppearance fresh = CharacterAppearance.fromRoster(PLAYER, "Steve", null);
+        CharacterAppearance fresh = CharacterAppearance.fromRoster(PLAYER, "Steve", null,
+                CharacterBodyTypeRegistry.WIDE);
         assertTrue(fresh.isAccount());
         assertEquals(RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
                 fresh.isMinecraftCapeVisible());

@@ -65,14 +65,6 @@ public final class ProjectileLaunchGeometry {
                 .add(forward.scale(offsets.forward * modelScale));
     }
 
-    /** Blends the held-item release point into the exact physical path. */
-    public static List<TargetingVector> useVisualOrigin(
-            List<TargetingVector> physicalTrajectory,
-            TargetingVector visualOrigin) {
-        return useVisualOrigin(
-                physicalTrajectory, visualOrigin, 3.0D);
-    }
-
     public static List<TargetingVector> useVisualOrigin(
             List<TargetingVector> physicalTrajectory,
             TargetingVector visualOrigin, double blendDistance) {

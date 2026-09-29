@@ -79,8 +79,7 @@ public final class ClientCharacterAppearanceCache {
                         active.getSkinId(),
                         active.isMinecraftCapeVisible(),
                         active.getCosmeticCapeId(),
-                        active.getStartingFactionId(),
-                        active.getRoleplayLevel(),
+                        active.getFactionId(),
                         active.getAge(),
                         active.getBodyTypeId(),
                         active.getChestTypeId());

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.character.LostTalesClientAccount;
 import com.ninuna.losttales.config.LostTalesConfigFiles;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.util.LostTalesCloseables;
@@ -18,6 +19,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Client-side emoji preferences: favorites and how often each emoji has been
@@ -28,8 +30,8 @@ import java.util.Set;
  * corrupt the file or crash the client.
  */
 public final class ChatEmojiUsageStore {
-    /** Under the client's config folder. */
-    static final String FILE_PATH = LostTalesConfigFiles.CHAT_EMOJIS;
+    /** The folder under the client's, one file per account. */
+    static final String FOLDER = LostTalesConfigFiles.CHAT_EMOJIS;
     private static final Charset UTF_8 = Charset.forName("UTF-8");
     private static final int MAX_COUNT = 1000000;
 
@@ -40,9 +42,18 @@ public final class ChatEmojiUsageStore {
 
     private ChatEmojiUsageStore() {}
 
+    /**
+     * Reads the signed-in account's file as the client starts; with no
+     * account to name, nothing is read or written.
+     */
     public static synchronized void initialize(File configDirectory) {
-        storeFile = configDirectory == null
-                ? null : new File(configDirectory, FILE_PATH);
+        initialize(configDirectory, configDirectory == null ? null
+                : LostTalesClientAccount.templateId());
+    }
+
+    static synchronized void initialize(File configDirectory, UUID accountId) {
+        storeFile = configDirectory == null || accountId == null ? null
+                : new File(new File(configDirectory, FOLDER), accountId + ".txt");
         favoriteNames.clear();
         useCounts.clear();
         load();

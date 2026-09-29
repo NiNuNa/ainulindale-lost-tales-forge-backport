@@ -183,18 +183,6 @@ public class LostTalesKeyBindings {
         return getKeyDisplayName(MODIFIER);
     }
 
-    public static String getUseKeyDisplayName() {
-        return getKeyDisplayName(USE);
-    }
-
-    public static String getCharacterMenuKeyDisplayName() {
-        return getKeyDisplayName(CHARACTER_MENU);
-    }
-
-    public static String getQuestJournalKeyDisplayName() {
-        return getKeyDisplayName(QUEST_JOURNAL);
-    }
-
     public static boolean isCharacterMenuKey(int keyCode) {
         return isKeyboardKey(CHARACTER_MENU, keyCode);
     }

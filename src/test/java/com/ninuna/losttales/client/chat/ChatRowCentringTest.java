@@ -81,10 +81,6 @@ public final class ChatRowCentringTest {
         // A box as tall as the row fills it.
         assertEquals(0, TEXT_TOP + WindowStyle.centredBoxTop(
                 LINE));
-        // A one-row rule is the capitals' middle row, where a divider's
-        // rule runs.
-        assertEquals(LostTalesChatOverlayRenderer.DIVIDER_RULE_OFFSET,
-                TEXT_TOP + WindowStyle.centredBoxTop(1));
     }
 
     @Test
@@ -222,7 +218,9 @@ public final class ChatRowCentringTest {
 
     @Test
     public void aDividerRuleAndItsDateShareTheCapitalsMiddle() {
-        int rule = LostTalesChatOverlayRenderer.DIVIDER_RULE_OFFSET;
+        // A one-row rule is the capitals' middle row, where a divider's
+        // rule runs.
+        int rule = TEXT_TOP + WindowStyle.centredBoxTop(1);
         // A one-pixel rule cannot stand on the middle of twelve rows: it
         // takes the upper middle row, five above it and six below, the
         // odd clear row below it as the capitals have theirs.

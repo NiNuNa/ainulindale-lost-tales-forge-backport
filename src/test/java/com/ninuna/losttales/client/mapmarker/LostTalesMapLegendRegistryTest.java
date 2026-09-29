@@ -128,8 +128,6 @@ public final class LostTalesMapLegendRegistryTest {
 
             assertTrue(LostTalesClientMapMarkerVisibility
                     .isMapVisible(location));
-            assertTrue(LostTalesClientMapMarkerVisibility
-                    .isNonDiscoverableVisible(location));
             assertFalse(LostTalesMapLegendRegistry
                     .isMarkerVisible(location));
         } finally {

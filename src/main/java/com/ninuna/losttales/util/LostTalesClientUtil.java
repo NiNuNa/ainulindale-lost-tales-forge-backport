@@ -13,7 +13,6 @@ import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import lotr.client.LOTRTextures;
 import lotr.client.gui.LOTRMapLabels;
-import lotr.common.world.biome.LOTRBiome;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
@@ -26,7 +25,6 @@ import org.lwjgl.input.Keyboard;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Collections;
@@ -282,19 +280,6 @@ public final class LostTalesClientUtil {
         int blue = ((overlayColor & 255) * alpha
                 + (baseColor & 255) * inverse) / 255;
         return 0xFF000000 | red << 16 | green << 8 | blue;
-    }
-
-    public static ResourceLocation getTextureResourceLocation(InputStream input,
-                                                               String textureName) {
-        BufferedImage image = LostTalesUtil.getImage(input);
-        return image == null ? null : Minecraft.getMinecraft().getTextureManager()
-                .getDynamicTextureLocation(textureName, new DynamicTexture(image));
-    }
-
-    public static LOTRMapLabels addMapLabel(String enumName, LOTRBiome biomeLabel,
-                                            int x, int y, float scale, int angle,
-                                            float zoomMin, float zoomMax) {
-        return addMapLabel(enumName, (Object)biomeLabel, x, y, scale, angle, zoomMin, zoomMax);
     }
 
     public static LOTRMapLabels addMapLabel(String enumName, String stringLabel,

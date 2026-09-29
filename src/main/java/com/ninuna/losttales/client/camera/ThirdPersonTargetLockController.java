@@ -119,10 +119,6 @@ public final class ThirdPersonTargetLockController {
                 && isValidLockedTarget(player, target);
     }
 
-    public static EntityLivingBase getTarget(EntityPlayerSP player) {
-        return hasTarget(player) ? target : null;
-    }
-
     public static void reset() {
         target = null;
         contextKey = null;

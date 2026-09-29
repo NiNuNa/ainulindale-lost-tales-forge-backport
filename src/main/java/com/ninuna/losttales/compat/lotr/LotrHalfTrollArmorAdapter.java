@@ -27,17 +27,6 @@ public final class LotrHalfTrollArmorAdapter {
         return requiredItem != null && stack.getItem() == requiredItem;
     }
 
-    public static boolean isHalfTrollArmor(ItemStack stack) {
-        if (stack == null) {
-            return false;
-        }
-        Item item = stack.getItem();
-        return item == LOTRMod.bootsHalfTroll
-                || item == LOTRMod.legsHalfTroll
-                || item == LOTRMod.bodyHalfTroll
-                || item == LOTRMod.helmetHalfTroll;
-    }
-
     public static Item getRequiredItem(int equipmentSlot) {
         switch (equipmentSlot) {
             case SLOT_BOOTS:

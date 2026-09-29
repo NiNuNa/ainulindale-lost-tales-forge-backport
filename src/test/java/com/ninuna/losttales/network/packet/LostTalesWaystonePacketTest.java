@@ -44,8 +44,8 @@ public final class LostTalesWaystonePacketTest {
                 decoded.getSettings().getY(), 0.0D);
         assertEquals("losttales:glowstone_house",
                 decoded.getSettings().getWaystoneStructureType());
-        assertEquals(LostTalesMapMarkerRelevance.HIGH,
-                decoded.getSettings().getRelevance());
+        assertEquals(LostTalesMapMarkerRelevance.HIGH.getRank(),
+                decoded.getSettings().getPriority());
     }
 
     @Test
@@ -99,12 +99,11 @@ public final class LostTalesWaystonePacketTest {
         assertTrue(decoded.canEdit());
         assertFalse(decoded.canMakePublic());
         assertEquals(record.getDescription(),
-                decoded.getDescription());
+                decoded.getSettings().getDescription());
         assertEquals(record.getDimensionId(),
-                decoded.getMarkerDimensionId());
+                decoded.getSettings().getDimensionId());
         assertEquals(1, decoded.getSharedFellowshipCount());
-        assertEquals(LostTalesMapMarkerRelevance.VERY_HIGH,
-                decoded.getRelevance());
+        assertEquals(73, decoded.getSettings().getPriority());
         assertTrue("using the waystone opens its page", decoded.isOpening());
     }
 

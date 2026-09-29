@@ -94,14 +94,14 @@ public final class PartyMemberStatusSyncManager {
             return false;
         }
 
-        Party party = view.partyData.getPartyForCharacter(
-                receiver.activeCharacterId);
+        Party party = view.partyData.getPartyForIdentity(
+                receiver.activeIdentityId);
         PartyStatusSnapshot content = party == null
                 ? PartyStatusSnapshot.noParty(
                 recipient.getUniqueID(), 1L,
-                receiver.activeCharacterId)
+                receiver.activeIdentityId)
                 : buildPartyContent(recipient.getUniqueID(),
-                receiver.activeCharacterId, party, view.onlineByOwner);
+                receiver.activeIdentityId, party, view.onlineByOwner);
 
         SentState sent = SENT_STATES.get(recipient.getUniqueID());
         if (!content.hasParty() && !force
@@ -132,7 +132,7 @@ public final class PartyMemberStatusSyncManager {
 
     private static PartyStatusSnapshot buildPartyContent(
             UUID recipientOwnerId,
-            UUID activeCharacterId,
+            UUID activeIdentityId,
             Party party,
             Map<UUID, OnlinePlayerContext> onlineByOwner) {
         ArrayList<PartyMemberStatusSnapshot> statuses =
@@ -144,7 +144,7 @@ public final class PartyMemberStatusSyncManager {
         return new PartyStatusSnapshot(
                 recipientOwnerId,
                 1L,
-                activeCharacterId,
+                activeIdentityId,
                 party.getPartyId(),
                 party.getRevision(),
                 statuses);
@@ -152,14 +152,14 @@ public final class PartyMemberStatusSyncManager {
 
     private static PartyMemberStatusSnapshot buildMemberStatus(
             PartyMember member, OnlinePlayerContext online) {
-        UUID characterId = member.getCharacterId();
+        UUID identityId = member.getIdentityId();
         if (online == null || online.player == null) {
-            return PartyMemberStatusSnapshot.offline(characterId);
+            return PartyMemberStatusSnapshot.offline(identityId);
         }
         // The owner is online as another identity: a different character,
         // or the account itself.
-        if (!characterId.equals(online.activeCharacterId)) {
-            return PartyMemberStatusSnapshot.inactive(characterId);
+        if (!identityId.equals(online.activeIdentityId)) {
+            return PartyMemberStatusSnapshot.inactive(identityId);
         }
 
         EntityPlayerMP player = online.player;
@@ -169,11 +169,11 @@ public final class PartyMemberStatusSyncManager {
             maximumHealth = player.getMaxHealth();
             health = player.getHealth();
         } catch (RuntimeException exception) {
-            return PartyMemberStatusSnapshot.unavailable(characterId);
+            return PartyMemberStatusSnapshot.unavailable(identityId);
         }
         if (!Float.isFinite(maximumHealth) || !Float.isFinite(health)
                 || maximumHealth <= 0.0F) {
-            return PartyMemberStatusSnapshot.unavailable(characterId);
+            return PartyMemberStatusSnapshot.unavailable(identityId);
         }
         maximumHealth = Math.min(maximumHealth,
                 PartyMemberStatusSnapshot.MAX_SYNCHRONIZED_HEALTH);
@@ -181,7 +181,7 @@ public final class PartyMemberStatusSyncManager {
         boolean dead = player.isDead || !player.isEntityAlive()
                 || health <= 0.0F;
         return PartyMemberStatusSnapshot.online(
-                characterId,
+                identityId,
                 dead,
                 player.dimension,
                 health,
@@ -195,12 +195,12 @@ public final class PartyMemberStatusSyncManager {
         return source.hasParty()
                 ? new PartyStatusSnapshot(
                 source.getOwnerId(), sequence,
-                source.getActiveCharacterId(),
+                source.getActiveIdentityId(),
                 source.getPartyId(), source.getPartyRevision(),
                 source.getMemberStatuses())
                 : PartyStatusSnapshot.noParty(
                 source.getOwnerId(), sequence,
-                source.getActiveCharacterId());
+                source.getActiveIdentityId());
     }
 
     private static ServerView collectServerView() {
@@ -284,12 +284,12 @@ public final class PartyMemberStatusSyncManager {
     private static final class OnlinePlayerContext {
         private final EntityPlayerMP player;
         /** The id the player is playing as; never null. */
-        private final UUID activeCharacterId;
+        private final UUID activeIdentityId;
 
         private OnlinePlayerContext(EntityPlayerMP player,
-                                    UUID activeCharacterId) {
+                                    UUID activeIdentityId) {
             this.player = player;
-            this.activeCharacterId = activeCharacterId;
+            this.activeIdentityId = activeIdentityId;
         }
     }
 

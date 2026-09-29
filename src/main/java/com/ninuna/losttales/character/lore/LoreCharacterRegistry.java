@@ -1,5 +1,6 @@
 package com.ninuna.losttales.character.lore;
 
+import com.ninuna.losttales.character.validation.CharacterNames;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.util.LostTalesCloseables;
 import com.ninuna.losttales.util.LostTalesIdentifiers;
@@ -13,7 +14,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
-import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -99,10 +99,6 @@ public final class LoreCharacterRegistry {
     public static synchronized LoreCharacterDefinition getByName(String name) {
         ensureLoaded();
         return DEFINITIONS_BY_NAME.get(normalizeName(name));
-    }
-
-    public static synchronized boolean contains(String id) {
-        return get(id) != null;
     }
 
     public static synchronized Collection<LoreCharacterDefinition> getAll() {
@@ -279,18 +275,7 @@ public final class LoreCharacterRegistry {
     }
 
     static String normalizeName(String name) {
-        if (name == null) {
-            return "";
-        }
-        String decomposed = Normalizer.normalize(name.trim(), Normalizer.Form.NFKD);
-        StringBuilder normalized = new StringBuilder();
-        for (int index = 0; index < decomposed.length(); index++) {
-            char character = decomposed.charAt(index);
-            if (Character.isLetterOrDigit(character)) {
-                normalized.append(Character.toLowerCase(character));
-            }
-        }
-        return normalized.toString();
+        return CharacterNames.key(name);
     }
 
     private static File resolveExternalDirectory(File modConfigurationDirectory) {

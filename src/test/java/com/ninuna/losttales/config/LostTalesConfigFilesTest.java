@@ -59,8 +59,6 @@ public final class LostTalesConfigFilesTest {
         assertEquals(new File(configDirectory, "losttales/server/channels.cfg"),
                 LostTalesConfigFiles.channelsOptions(configDirectory));
         assertFalse(new File(configDirectory, "losttales/client").exists());
-        assertEquals(new File(configDirectory, "losttales/lore_characters"),
-                LostTalesConfigFiles.file(configDirectory, "lore_characters"));
     }
 
     private static void delete(File file) {

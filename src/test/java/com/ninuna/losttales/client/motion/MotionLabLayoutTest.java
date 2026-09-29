@@ -10,8 +10,8 @@ import org.junit.Test;
 /**
  * The Motion Lab keeps its list and the picked motion side by side where
  * the page is wide enough and lets them take turns where it is not; the
- * motion's column stacks its name, what it is for, the sample and the
- * status line over the rows, and gives what it is for no more lines than
+ * motion's column stacks its name, what it is for and the sample over
+ * the rows, and gives what it is for no more lines than
  * leave the rows room; each row's stepper stands at its right, a chevron
  * either side of the value.
  */
@@ -59,7 +59,7 @@ public final class MotionLabLayoutTest {
     }
 
     @Test
-    public void theColumnStacksNameAboutSampleAndStatusOverTheRows() {
+    public void theColumnStacksNameAboutAndSampleOverTheRows() {
         MotionLabLayout layout = new MotionLabLayout(480, 166, true, 2);
         LostTalesUiHitBox content = layout.content();
         assertEquals(content.top, layout.name().top, EXACT);
@@ -70,9 +70,8 @@ public final class MotionLabLayoutTest {
                 layout.sample().top, EXACT);
         assertEquals("a third of the column", (int)content.height / 3,
                 layout.sample().height, EXACT);
-        assertEquals(layout.sample().bottom() + MotionLabLayout.GAP / 2,
-                layout.status().top, EXACT);
-        assertEquals(layout.status().bottom(), layout.rows().top, EXACT);
+        assertEquals(layout.sample().bottom() + MotionLabLayout.GAP,
+                layout.rows().top, EXACT);
         assertEquals(content.bottom(), layout.rows().bottom(), EXACT);
     }
 

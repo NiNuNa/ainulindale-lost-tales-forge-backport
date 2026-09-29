@@ -244,20 +244,6 @@ public final class LostTalesMapMarkerRecord {
                 this.priority);
     }
 
-    public LostTalesMapMarkerRecord withSettings(
-            String name, String colorName, boolean hasFastTravel,
-            double discoveryRadius,
-            LostTalesMapMarkerVisibility visibility) {
-        return toBuilder()
-                .name(name)
-                .colorName(colorName)
-                .fastTravel(hasFastTravel)
-                .radii(this.compassFadeInRadius, discoveryRadius)
-                .visibility(visibility)
-                .revision(this.revision + 1L)
-                .build();
-    }
-
     public LostTalesMapMarkerRecord withEditableSettings(
             LostTalesMapMarkerEditableSettings settings) {
         if (settings == null) {
@@ -315,19 +301,11 @@ public final class LostTalesMapMarkerRecord {
     public String getCategoryName() { return this.categoryName; }
     public String getDescription() { return this.description; }
     public boolean hasFastTravel() { return this.hasFastTravel; }
-    public String getLotrWaypointId() {
-        return LostTalesMapMarkerIdResolver.resolveLotrWaypointId(this.id);
-    }
     public int getDimensionId() { return this.dimensionId; }
     public double getX() { return this.x; }
     public double getY() { return this.y; }
     public boolean hasExplicitY() {
         return !LostTalesMapMarkerHeightResolver.isAutomatic(this.y);
-    }
-    public double getEffectiveY(World world) {
-        return LostTalesMapMarkerHeightResolver.resolve(
-                world, this.dimensionId,
-                this.x, this.y, this.z);
     }
     public double getEffectiveY(World world, double fallbackY) {
         return LostTalesMapMarkerHeightResolver.resolveOr(
@@ -550,11 +528,6 @@ public final class LostTalesMapMarkerRecord {
             this.linkedY = y;
             this.linkedZ = z;
             this.linkToken = token;
-            return this;
-        }
-        public Builder clearLink() {
-            this.linked = false;
-            this.linkToken = null;
             return this;
         }
         public Builder revision(long value) { this.revision = value; return this; }

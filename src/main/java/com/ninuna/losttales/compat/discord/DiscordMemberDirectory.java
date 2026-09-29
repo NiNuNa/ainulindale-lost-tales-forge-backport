@@ -223,6 +223,17 @@ public final class DiscordMemberDirectory implements DiscordMemberStatuses.Sourc
         return false;
     }
 
+    /** How long a server whose members could not be asked for waits to be asked again. */
+    static final long ASK_AGAIN_MILLIS = 5000L;
+
+    /** The server's members could not be asked for: they are asked for again in a moment. */
+    synchronized void askAgainLater(String guildId, long now) {
+        Guild guild = this.guilds.get(guildId);
+        if (guild != null && guild.retryAt == 0L) {
+            guild.retryAt = now + ASK_AGAIN_MILLIS;
+        }
+    }
+
     /** The servers whose members Discord said to wait for and may be asked for again now. */
     synchronized List<String> dueRequests(long now) {
         List<String> due = new ArrayList<String>();

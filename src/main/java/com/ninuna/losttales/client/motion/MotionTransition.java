@@ -105,11 +105,6 @@ public final class MotionTransition {
         this.legDurationNanos = 0L;
     }
 
-    /** The value as last advanced, overshoot included. */
-    public float value() {
-        return this.value;
-    }
-
     /** The value bounded to 0 to 1: what an index or an alpha reads. */
     public float clamped() {
         return Math.max(0.0F, Math.min(1.0F, this.value));

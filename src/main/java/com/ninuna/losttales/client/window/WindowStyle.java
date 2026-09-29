@@ -111,7 +111,7 @@ public final class WindowStyle {
 
     /**
      * Where a carried window will land, lit: the edge of the window it
-     * sticks to, and the zone of a snap layout it fills. Honey, the
+     * lines up with, and the zone of a snap layout it fills. Honey, the
      * palette's yellow.
      */
     public static final int LANDING_RGB = LostTalesColors.rgb(LostTalesColors.HONEY);
@@ -145,21 +145,13 @@ public final class WindowStyle {
     public static final int INSET_ALPHA = Math.round(255.0F * 2.0F / 3.0F);
 
     /**
-     * The windows' inset surface: plum black, the palette's darkest, at two
-     * thirds. The typing well, the timestamp column and a tab nobody has
-     * picked or is pointing at all wear exactly this.
-     */
-    public static final int SURFACE_INSET = LostTalesSkyrimUiStyle.withAlpha(
-            LostTalesSkyrimUiStyle.PLUM_BLACK, INSET_ALPHA);
-
-    /**
      * A window's panel and the rows framing it, in the
      * palette colour the client chose; plum black until it chooses.
      * Read on every draw, so a choice made in a window's menu shows the
      * same frame.
      */
     public static int backdropRgb() {
-        return LostTalesColors.rgb(LostTalesColors.paletteColor(LostTalesConfig.chatBackgroundColor,
+        return LostTalesColors.rgb(LostTalesColors.paletteColor(LostTalesConfig.windowBackgroundColor,
                 LostTalesColors.PLUM_BLACK));
     }
 
@@ -344,9 +336,15 @@ public final class WindowStyle {
      */
     public static void drawPopupLine(FontRenderer font, String text, int x, int y,
                               float opacity) {
+        drawPopupLine(font, text, LostTalesUiInk.IVORY, x, y, opacity);
+    }
+
+    /** As above, its words in {@code rgb}: a page's answer in red where it was refused. */
+    public static void drawPopupLine(FontRenderer font, String text, int rgb,
+                                     int x, int y, float opacity) {
         drawPopup(x, y, x + popupLineWidth(font, text), y + POPUP_LINE_HEIGHT,
                 opacity);
-        LostTalesUiInk.drawText(font, text, x + POPUP_INSET, y + POPUP_INSET, LostTalesUiInk.IVORY,
+        LostTalesUiInk.drawText(font, text, x + POPUP_INSET, y + POPUP_INSET, rgb,
                 Math.round(255.0F * Math.max(0.0F, Math.min(1.0F, opacity))));
     }
 

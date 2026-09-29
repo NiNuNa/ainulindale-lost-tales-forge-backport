@@ -67,6 +67,11 @@ public class LostTalesColors {
     public static final int GREEN = MEADOW_GREEN;
     public static final int RED = SALMON;
     public static final int PURPLE = ORCHID;
+    /**
+     * The Motion Lab's tab. Lavender was asked for and the palette has
+     * none, so slate blue stands in until one is chosen.
+     */
+    public static final int MOTION_LAB_TONE = SLATE_BLUE;
 
     /** Ivory used by map artwork, HUD labels, and default chat identities. */
     public static final int HUD_LABEL = IVORY;

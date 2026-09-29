@@ -70,13 +70,6 @@ final class ChatInlineIcons {
      * wider.
      */
     static final int MARK_HEAD_SLOT_WIDTH = 13;
-    /**
-     * The slot a head wearing a presence sphere reserves: the sphere
-     * stands past the face, and the head and its sphere are one icon, so
-     * what follows keeps its clear space from the sphere.
-     */
-    static final int PRESENCE_HEAD_SLOT_WIDTH =
-            HEAD_SLOT_WIDTH + LostTalesUiCornerMark.OVERHANG_X;
     /** Where the face starts inside that slot. */
     static final float HEAD_SLOT_INSET = 1.0F;
     /** The clear space a name keeps from what is written either side. */

@@ -10,7 +10,7 @@ public final class PartyMemberStatusSnapshot {
     public static final int NO_DIMENSION = Integer.MIN_VALUE;
     public static final float MAX_SYNCHRONIZED_HEALTH = 1000000.0F;
 
-    private final UUID characterId;
+    private final UUID identityId;
     private final PartyMemberAvailability availability;
     private final int dimensionId;
     private final float health;
@@ -18,18 +18,18 @@ public final class PartyMemberStatusSnapshot {
     private final ItemStack helmet;
     private final ItemStack heldItem;
 
-    private PartyMemberStatusSnapshot(UUID characterId,
+    private PartyMemberStatusSnapshot(UUID identityId,
                                       PartyMemberAvailability availability,
                                       int dimensionId,
                                       float health,
                                       float maximumHealth,
                                       ItemStack helmet,
                                       ItemStack heldItem) {
-        if (characterId == null || availability == null) {
+        if (identityId == null || availability == null) {
             throw new IllegalArgumentException(
                     "party member status identity and availability are required");
         }
-        this.characterId = characterId;
+        this.identityId = identityId;
         this.availability = availability;
         if (!availability.hasLiveEntityData()) {
             if (dimensionId != NO_DIMENSION || health != 0.0F
@@ -57,29 +57,20 @@ public final class PartyMemberStatusSnapshot {
         this.heldItem = copy(heldItem);
     }
 
-    public static PartyMemberStatusSnapshot offline(UUID characterId) {
-        return unavailable(characterId, PartyMemberAvailability.OFFLINE);
+    public static PartyMemberStatusSnapshot offline(UUID identityId) {
+        return unavailable(identityId, PartyMemberAvailability.OFFLINE);
     }
 
-    public static PartyMemberStatusSnapshot inactive(UUID characterId) {
-        return unavailable(characterId,
+    public static PartyMemberStatusSnapshot inactive(UUID identityId) {
+        return unavailable(identityId,
                 PartyMemberAvailability.INACTIVE_CHARACTER);
     }
 
-    public static PartyMemberStatusSnapshot unavailable(UUID characterId) {
-        return unavailable(characterId, PartyMemberAvailability.UNAVAILABLE);
+    public static PartyMemberStatusSnapshot unavailable(UUID identityId) {
+        return unavailable(identityId, PartyMemberAvailability.UNAVAILABLE);
     }
 
-    public static PartyMemberStatusSnapshot online(UUID characterId,
-                                                    boolean dead,
-                                                    int dimensionId,
-                                                    float health,
-                                                    float maximumHealth) {
-        return online(characterId, dead, dimensionId, health,
-                maximumHealth, null, null);
-    }
-
-    public static PartyMemberStatusSnapshot online(UUID characterId,
+    public static PartyMemberStatusSnapshot online(UUID identityId,
                                                     boolean dead,
                                                     int dimensionId,
                                                     float health,
@@ -87,7 +78,7 @@ public final class PartyMemberStatusSnapshot {
                                                     ItemStack helmet,
                                                     ItemStack heldItem) {
         return new PartyMemberStatusSnapshot(
-                characterId,
+                identityId,
                 dead ? PartyMemberAvailability.DEAD
                         : PartyMemberAvailability.ACTIVE,
                 dimensionId,
@@ -98,17 +89,7 @@ public final class PartyMemberStatusSnapshot {
     }
 
     public static PartyMemberStatusSnapshot decoded(
-            UUID characterId,
-            PartyMemberAvailability availability,
-            int dimensionId,
-            float health,
-            float maximumHealth) {
-        return decoded(characterId, availability, dimensionId,
-                health, maximumHealth, null, null);
-    }
-
-    public static PartyMemberStatusSnapshot decoded(
-            UUID characterId,
+            UUID identityId,
             PartyMemberAvailability availability,
             int dimensionId,
             float health,
@@ -119,22 +100,22 @@ public final class PartyMemberStatusSnapshot {
             throw new IllegalArgumentException("availability is required");
         }
         if (!availability.hasLiveEntityData()) {
-            return unavailable(characterId, availability);
+            return unavailable(identityId, availability);
         }
         return new PartyMemberStatusSnapshot(
-                characterId, availability, dimensionId,
+                identityId, availability, dimensionId,
                 health, maximumHealth, helmet, heldItem);
     }
 
     private static PartyMemberStatusSnapshot unavailable(
-            UUID characterId, PartyMemberAvailability availability) {
+            UUID identityId, PartyMemberAvailability availability) {
         return new PartyMemberStatusSnapshot(
-                characterId, availability, NO_DIMENSION, 0.0F, 0.0F,
+                identityId, availability, NO_DIMENSION, 0.0F, 0.0F,
                 null, null);
     }
 
-    public UUID getCharacterId() {
-        return this.characterId;
+    public UUID getIdentityId() {
+        return this.identityId;
     }
 
     public PartyMemberAvailability getAvailability() {
@@ -163,10 +144,6 @@ public final class PartyMemberStatusSnapshot {
         return copy(this.heldItem);
     }
 
-    public boolean isDead() {
-        return this.availability == PartyMemberAvailability.DEAD;
-    }
-
     @Override
     public boolean equals(Object value) {
         if (this == value) {
@@ -177,7 +154,7 @@ public final class PartyMemberStatusSnapshot {
         }
         PartyMemberStatusSnapshot other =
                 (PartyMemberStatusSnapshot) value;
-        return this.characterId.equals(other.characterId)
+        return this.identityId.equals(other.identityId)
                 && this.availability == other.availability
                 && this.dimensionId == other.dimensionId
                 && Float.floatToIntBits(this.health)
@@ -190,7 +167,7 @@ public final class PartyMemberStatusSnapshot {
 
     @Override
     public int hashCode() {
-        int result = this.characterId.hashCode();
+        int result = this.identityId.hashCode();
         result = 31 * result + this.availability.hashCode();
         result = 31 * result + this.dimensionId;
         result = 31 * result + Float.floatToIntBits(this.health);

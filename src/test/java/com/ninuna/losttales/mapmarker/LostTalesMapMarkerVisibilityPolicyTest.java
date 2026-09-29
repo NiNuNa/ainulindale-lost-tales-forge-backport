@@ -33,11 +33,9 @@ public final class LostTalesMapMarkerVisibilityPolicyTest {
                 shared, stranger, false));
 
         LostTalesMapMarkerRecord publicRecord =
-                shared.withSettings(
-                        shared.getName(), shared.getColorName(),
-                        shared.hasFastTravel(),
-                        shared.getDiscoveryRadius(),
-                        LostTalesMapMarkerVisibility.PUBLIC);
+                shared.toBuilder()
+                        .visibility(LostTalesMapMarkerVisibility.PUBLIC)
+                        .build();
         assertTrue(LostTalesMapMarkerVisibilityPolicy.canView(
                 publicRecord, stranger, false));
     }

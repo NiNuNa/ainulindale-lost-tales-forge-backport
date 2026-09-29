@@ -133,10 +133,6 @@ public final class LostTalesCompassHudRenderHelper {
         GL11.glPopMatrix();
     }
 
-    public static void drawTexturedRect(Minecraft minecraft, ResourceLocation texture, float x, float y, int u, int v, int width, int height, int textureWidth, int textureHeight, float alpha) {
-        drawTexturedRectTinted(minecraft, texture, x, y, u, v, width, height, textureWidth, textureHeight, 1.0F, 1.0F, 1.0F, alpha);
-    }
-
     /**
      * Draws a textured GUI quad with alpha testing temporarily disabled.
      *
@@ -148,19 +144,6 @@ public final class LostTalesCompassHudRenderHelper {
      */
     public static void drawTexturedRectNoAlphaTest(Minecraft minecraft, ResourceLocation texture, float x, float y, int u, int v, int width, int height, int textureWidth, int textureHeight, float alpha) {
         drawTexturedRectTintedAdvanced(minecraft, texture, x, y, u, v, width, height, textureWidth, textureHeight, 1.0F, 1.0F, 1.0F, alpha, true);
-    }
-
-    /**
-     * Draws a textured GUI quad with a simple GL color tint.
-     *
-     * <p>Minecraft 1.7.10 does not have GuiGraphics-style ARGB blits, so the
-     * compass renderer tints the currently-bound texture through the legacy
-     * fixed-function GL color. This is especially important for marker shadows:
-     * drawing the sprite a second time without a black tint produces a pale/white
-     * duplicate instead of the dark text-like shadow used by the NeoForge version.</p>
-     */
-    public static void drawTexturedRectTinted(Minecraft minecraft, ResourceLocation texture, float x, float y, int u, int v, int width, int height, int textureWidth, int textureHeight, float red, float green, float blue, float alpha) {
-        drawTexturedRectTintedAdvanced(minecraft, texture, x, y, u, v, width, height, textureWidth, textureHeight, red, green, blue, alpha, false);
     }
 
     private static void drawTexturedRectTintedAdvanced(Minecraft minecraft, ResourceLocation texture, float x, float y, int u, int v, int width, int height, int textureWidth, int textureHeight, float red, float green, float blue, float alpha, boolean disableAlphaTest) {
@@ -203,10 +186,6 @@ public final class LostTalesCompassHudRenderHelper {
             }
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
         }
-    }
-
-    public static void drawTexturedRectWithShadow(Minecraft minecraft, ResourceLocation texture, float x, float y, int u, int v, int width, int height, int textureWidth, int textureHeight, float alpha, float shadowAlpha) {
-        drawTexturedRectWithShadowTinted(minecraft, texture, x, y, u, v, width, height, textureWidth, textureHeight, 1.0F, 1.0F, 1.0F, alpha, shadowAlpha);
     }
 
     public static void drawTexturedRectWithShadowTinted(Minecraft minecraft, ResourceLocation texture, float x, float y, int u, int v, int width, int height, int textureWidth, int textureHeight, float red, float green, float blue, float alpha, float shadowAlpha) {

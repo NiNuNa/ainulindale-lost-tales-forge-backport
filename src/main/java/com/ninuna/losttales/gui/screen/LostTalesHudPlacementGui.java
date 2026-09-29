@@ -13,6 +13,7 @@ import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderer;
 import com.ninuna.losttales.gui.hud.loot.LostTalesQuickLootHudRenderer;
 import com.ninuna.losttales.gui.hud.LostTalesNotificationHud;
+import com.ninuna.losttales.gui.hud.party.LostTalesPartyHudRenderer;
 import com.ninuna.losttales.gui.hud.party.PartyHudLayout;
 import com.ninuna.losttales.gui.hud.quest.LostTalesQuestHudRenderer;
 import java.util.ArrayList;
@@ -578,8 +579,8 @@ public class LostTalesHudPlacementGui extends GuiScreen
                 return LostTalesCompassHudRenderer.getPlacementHeight();
             }
             if (this == PARTY) {
-                return PartyHudLayout.PANEL_PADDING * 2
-                        + PartyHudLayout.ROW_HEIGHT * 3;
+                return PartyHudLayout.height(
+                        LostTalesPartyHudRenderer.placementRows());
             }
             if (this == QUICK_LOOT) {
                 return LostTalesQuickLootHudRenderer.getPlacementHeight();

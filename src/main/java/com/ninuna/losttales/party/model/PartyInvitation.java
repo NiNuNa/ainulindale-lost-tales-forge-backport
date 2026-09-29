@@ -3,10 +3,10 @@ package com.ninuna.losttales.party.model;
 import java.util.UUID;
 
 /**
- * Immutable server-owned invitation for one character to join one party.
+ * Immutable server-owned invitation for one identity to join one party.
  *
- * Account UUIDs and names are validation/display snapshots. Character UUIDs
- * remain the authoritative identities.
+ * Account UUIDs and names are validation/display snapshots. The identity
+ * ids, a character's or the account's own, are what the party goes by.
  */
 public final class PartyInvitation {
 
@@ -14,10 +14,10 @@ public final class PartyInvitation {
 
     private final UUID invitationId;
     private final UUID partyId;
-    private final UUID invitingCharacterId;
+    private final UUID invitingIdentityId;
     private final UUID invitingOwnerId;
     private final String invitingCharacterName;
-    private final UUID targetCharacterId;
+    private final UUID targetIdentityId;
     private final UUID targetOwnerId;
     private final String targetCharacterName;
     private final long createdAt;
@@ -25,10 +25,10 @@ public final class PartyInvitation {
 
     public PartyInvitation(UUID invitationId,
                            UUID partyId,
-                           UUID invitingCharacterId,
+                           UUID invitingIdentityId,
                            UUID invitingOwnerId,
                            String invitingCharacterName,
-                           UUID targetCharacterId,
+                           UUID targetIdentityId,
                            UUID targetOwnerId,
                            String targetCharacterName,
                            long createdAt,
@@ -39,13 +39,13 @@ public final class PartyInvitation {
         if (partyId == null) {
             throw new IllegalArgumentException("partyId must not be null");
         }
-        if (invitingCharacterId == null || invitingOwnerId == null) {
+        if (invitingIdentityId == null || invitingOwnerId == null) {
             throw new IllegalArgumentException("inviting identity must not be null");
         }
-        if (targetCharacterId == null || targetOwnerId == null) {
+        if (targetIdentityId == null || targetOwnerId == null) {
             throw new IllegalArgumentException("target identity must not be null");
         }
-        if (invitingCharacterId.equals(targetCharacterId)) {
+        if (invitingIdentityId.equals(targetIdentityId)) {
             throw new IllegalArgumentException("a character cannot invite itself");
         }
         if (createdAt < 0L || expiresAt <= createdAt) {
@@ -53,10 +53,10 @@ public final class PartyInvitation {
         }
         this.invitationId = invitationId;
         this.partyId = partyId;
-        this.invitingCharacterId = invitingCharacterId;
+        this.invitingIdentityId = invitingIdentityId;
         this.invitingOwnerId = invitingOwnerId;
         this.invitingCharacterName = normalizeName(invitingCharacterName);
-        this.targetCharacterId = targetCharacterId;
+        this.targetIdentityId = targetIdentityId;
         this.targetOwnerId = targetOwnerId;
         this.targetCharacterName = normalizeName(targetCharacterName);
         this.createdAt = createdAt;
@@ -71,8 +71,8 @@ public final class PartyInvitation {
         return this.partyId;
     }
 
-    public UUID getInvitingCharacterId() {
-        return this.invitingCharacterId;
+    public UUID getInvitingIdentityId() {
+        return this.invitingIdentityId;
     }
 
     public UUID getInvitingOwnerId() {
@@ -83,8 +83,8 @@ public final class PartyInvitation {
         return this.invitingCharacterName;
     }
 
-    public UUID getTargetCharacterId() {
-        return this.targetCharacterId;
+    public UUID getTargetIdentityId() {
+        return this.targetIdentityId;
     }
 
     public UUID getTargetOwnerId() {

@@ -1,6 +1,8 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.client.motion.Motions;
@@ -65,14 +67,34 @@ public final class ChatSpeechBubbles {
         UUID speaker = packet.getSenderId();
         // The Narrator tells; nothing is said over a head.
         if (speaker == null || !ChatRolePresentation.isInCharacter(channel)
-                || packet.isNarrator()
+                || packet.isNarrator() || !spokenAsPlayed(packet)
                 || !ClientChatChannelState.isAvailable(LostTalesChatPresentation.fileUnder(packet))) {
             return;
         }
         // The name and its colour are the chat's own, so a hobbit is the
-        // same green over their head as in the log.
+        // same green over their head as in the log. An action floats as
+        // the sentence it is in the chat.
         file(speaker, packet.getIdentityName(), packet.getNameColor(),
-                packet.getMessage());
+                packet.getMessage(), packet.isAction());
+    }
+
+    /**
+     * Whether the line wears the character its speaker is playing: words
+     * spoken as another of their characters stay in the chat, since the
+     * body they would float over is somebody else (Nils, 2026-09-28, C3 a).
+     * A speaker whose look is not known yet is taken at their word.
+     */
+    private static boolean spokenAsPlayed(LostTalesChatMessagePacket packet) {
+        CharacterAppearance appearance =
+                ClientCharacterAppearanceCache.getAuthoritative(packet.getSenderId());
+        if (appearance == null) {
+            return true;
+        }
+        UUID played = appearance.getCharacterId() == null
+                ? packet.getSenderId() : appearance.getCharacterId();
+        UUID spoken = packet.getIdentityCharacterId() == null
+                ? packet.getSenderId() : packet.getIdentityCharacterId();
+        return played.equals(spoken);
     }
 
     /**
@@ -84,11 +106,11 @@ public final class ChatSpeechBubbles {
      */
     public static synchronized void receiveNpc(UUID speaker, String name,
                                                int nameColor, String body) {
-        file(speaker, name, nameColor, body);
+        file(speaker, name, nameColor, body, false);
     }
 
     private static void file(UUID speaker, String name, int nameColor,
-                             String body) {
+                             String body, boolean action) {
         if (speaker == null || body == null) {
             return;
         }
@@ -107,7 +129,7 @@ public final class ChatSpeechBubbles {
         }
         speech.name = name == null ? "" : name;
         speech.nameColor = nameColor & 0xFFFFFF;
-        speech.lines.add(new Line(spoken, System.nanoTime()));
+        speech.lines.add(new Line(spoken, System.nanoTime(), action));
         while (speech.lines.size() > MAX_LINES) {
             speech.lines.remove(0);
         }
@@ -164,14 +186,20 @@ public final class ChatSpeechBubbles {
         final List<Line> lines = new ArrayList<Line>(MAX_LINES);
     }
 
-    /** One thing said, and when. */
+    /** One thing said or done, and when. */
     static final class Line {
         final String text;
         final long spokenNanos;
+        /**
+         * Whether it is an action: drawn as the sentence the speaker's
+         * name opens, in italics, as the chat shows it.
+         */
+        final boolean action;
 
-        private Line(String text, long spokenNanos) {
+        private Line(String text, long spokenNanos, boolean action) {
             this.text = text;
             this.spokenNanos = spokenNanos;
+            this.action = action;
         }
 
         /** Full strength while it is held, then out over the fade. */

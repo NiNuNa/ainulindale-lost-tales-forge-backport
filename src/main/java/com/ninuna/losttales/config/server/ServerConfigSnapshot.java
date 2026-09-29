@@ -67,16 +67,9 @@ public final class ServerConfigSnapshot {
 
     private ServerConfigSnapshot() {}
 
-    /** The entries of every category not excluded, in category then key order. */
-    public static List<ServerConfigEntry> fromConfiguration(Configuration config,
-                                                            Set<String> excludedCategories,
-                                                            Set<String> secretKeys) {
-        return fromConfiguration(config, excludedCategories,
-                Collections.<String>emptySet(), secretKeys);
-    }
-
     /**
-     * As above, leaving out the {@code excludedKeys} too, each named
+     * The entries of every category not excluded, in category then key
+     * order, leaving out the {@code excludedKeys} too, each named
      * {@code category.key} in lower case.
      */
     public static List<ServerConfigEntry> fromConfiguration(Configuration config,

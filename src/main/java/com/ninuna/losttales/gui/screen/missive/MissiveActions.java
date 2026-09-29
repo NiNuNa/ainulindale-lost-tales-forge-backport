@@ -77,4 +77,24 @@ final class MissiveActions {
         return questIdNow != null && openedQuestId != null
                 && openedQuestId.equals(questIdNow);
     }
+
+    /** The lang keys of the server's lines about a missive. */
+    static final String MISSIVE_LINES = "chat.losttales.missive.";
+    /** The lang keys of a quest's lines about a requirement not met. */
+    static final String REQUIREMENT_LINES = "chat.losttales.quest.requires.";
+
+    /**
+     * Whether a line the server says in the chat, by its lang key, answers
+     * a request of a missive page: its own lines about a missive, and a
+     * quest's about a requirement an Accept does not meet.
+     */
+    static boolean answersRequest(String key) {
+        return key != null && (key.startsWith(MISSIVE_LINES)
+                || saysRequirement(key));
+    }
+
+    /** Whether the line is a quest's about a requirement not met. */
+    static boolean saysRequirement(String key) {
+        return key != null && key.startsWith(REQUIREMENT_LINES);
+    }
 }

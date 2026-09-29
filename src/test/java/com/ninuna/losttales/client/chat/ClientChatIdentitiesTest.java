@@ -41,15 +41,23 @@ public final class ClientChatIdentitiesTest {
     }
 
     @Test
-    public void selectionAppliesToEveryRoleplayingChannelAndNeverToAccountChannels() {
+    public void theChoiceReachesGlobalFactionAndWhispersAndNeverAccountChannels() {
         roster(ARAGORN, ARAGORN, LEGOLAS);
         ClientChatIdentities.select(identityOf(LEGOLAS));
-        for (ChatChannel channel : new ChatChannel[] {ChatChannel.GLOBAL, ChatChannel.PROXIMITY,
-                ChatChannel.FACTION, ChatChannel.PARTY, ChatChannel.WHISPER}) {
+        for (ChatChannel channel : new ChatChannel[] {ChatChannel.GLOBAL,
+                ChatChannel.FACTION, ChatChannel.WHISPER}) {
             ChatTab tab = channel == ChatChannel.WHISPER
                     ? ChatTab.whisper("Steve", "Steve", LEGOLAS.toString()) : ChatTab.of(channel);
             assertEquals(LEGOLAS, ClientChatIdentities.effectiveFor(tab).characterId);
             assertEquals(LEGOLAS, ClientChatIdentities.wireCharacterId(tab));
+        }
+        // The world around the player and the party hear the character played.
+        for (ChatChannel channel : new ChatChannel[] {ChatChannel.PROXIMITY, ChatChannel.PARTY}) {
+            ChatTab tab = ChatTab.of(channel);
+            assertEquals(ARAGORN, ClientChatIdentities.effectiveFor(tab).characterId);
+            assertEquals(LostTalesChatSendPacket.IDENTITY_DEFAULT,
+                    ClientChatIdentities.wireKind(tab));
+            assertNull(ClientChatIdentities.wireCharacterId(tab));
         }
         assertEquals(LEGOLAS, ClientChatIdentities.effectiveFor(ChatTab.npc("Guard")).characterId);
         for (ChatChannel channel : new ChatChannel[] {ChatChannel.OOC, ChatChannel.OPERATOR, ChatChannel.CLIENT_CONSOLE}) {
@@ -68,7 +76,8 @@ public final class ClientChatIdentitiesTest {
         roster(LEGOLAS, ARAGORN, LEGOLAS);
         ClientChatChannelState.select(ooc);
         ClientChatChannelState.select(global);
-        assertEquals(ARAGORN, ClientChatIdentities.effectiveFor(proximity).characterId);
+        assertEquals(ARAGORN, ClientChatIdentities.effectiveFor(global).characterId);
+        assertEquals(LEGOLAS, ClientChatIdentities.effectiveFor(proximity).characterId);
         assertEquals(ARAGORN.toString(), ClientChatIdentities.viewIdentityKey());
     }
 
@@ -120,16 +129,15 @@ public final class ClientChatIdentitiesTest {
             summaries.add(new CharacterSummary(id, summaries.size(),
                     id.equals(ARAGORN) ? "Aragorn" : "Legolas", "human", "male",
                     "skin", RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                    RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, 30, "GONDOR", 1, 0L, 1L,
-                    RoleplayCharacter.CURRENT_DATA_VERSION, "", ""));
+                    RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, 30, "GONDOR", "", ""));
         }
         ClientCharacterRosterCache.acceptRoster(0, new CharacterRosterSnapshot(
                 OWNER, Math.max(1, summaries.size()), active, 1L,
-                RoleplayCharacter.CURRENT_DATA_VERSION,
                 summaries.isEmpty() ? Collections.<CharacterSummary>emptyList()
                         : Arrays.asList(summaries.toArray(
                                 new CharacterSummary[summaries.size()])),
                 RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true));
+                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true,
+                Collections.<com.ninuna.losttales.character.sync.DeletedCharacterSummary>emptyList()));
     }
 }

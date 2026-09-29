@@ -61,12 +61,6 @@ public final class CharacterRoomLayout {
         return Material.NONE;
     }
 
-    /** Whether that position is open air inside the box. */
-    public static boolean isInside(int x, int y, int z) {
-        return Math.abs(x) <= INNER_HALF && Math.abs(z) <= INNER_HALF
-                && y > FLOOR_Y && y < CEILING_Y;
-    }
-
     /** Whether any block of the room falls within that chunk. */
     public static boolean touchesChunk(int chunkX, int chunkZ) {
         int minX = chunkX << 4;

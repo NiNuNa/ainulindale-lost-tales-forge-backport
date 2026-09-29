@@ -1,9 +1,7 @@
 package com.ninuna.losttales.client.window;
 
-import java.util.Arrays;
 import org.junit.Test;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
@@ -49,8 +47,6 @@ public final class PageSearchTest {
     public void caseAndSpacingDoNotMatter() {
         assertTrue(PageSearch.of("NIA").matches(NIA));
         assertTrue(PageSearch.of("  Gather   STICKS ").matches(NIA));
-        assertEquals(Arrays.asList("gather", "sticks"),
-                PageSearch.of("  Gather   STICKS ").words());
     }
 
     @Test

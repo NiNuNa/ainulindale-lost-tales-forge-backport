@@ -32,6 +32,10 @@ import static org.junit.Assert.assertTrue;
  * then and are still entitled to now.
  */
 public final class ChatHistoryTest {
+    /** An edit naming nobody. */
+    private static final List<com.ninuna.losttales.chat.ChatNamedPlayer> NOBODY =
+            Collections.<com.ninuna.losttales.chat.ChatNamedPlayer>emptyList();
+
     private static final UUID ALICE = UUID.randomUUID();
     private static final UUID BOB = UUID.randomUUID();
     private static final UUID CAROL = UUID.randomUUID();
@@ -65,11 +69,11 @@ public final class ChatHistoryTest {
                 ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB), false));
 
         assertTrue(ChatHistory.quoteFor(
-                whisper, BOB, ChatChannel.WHISPER, "").exists());
+                whisper, ChatHistoryRequesters.reader(BOB), ChatChannel.WHISPER, "").exists());
         assertFalse("a whisper quoted into Global would reach everyone",
-                ChatHistory.quoteFor(whisper, BOB, ChatChannel.GLOBAL, "").exists());
+                ChatHistory.quoteFor(whisper, ChatHistoryRequesters.reader(BOB), ChatChannel.GLOBAL, "").exists());
         assertFalse(ChatHistory.quoteFor(
-                whisper, BOB, ChatChannel.OOC, "").exists());
+                whisper, ChatHistoryRequesters.reader(BOB), ChatChannel.OOC, "").exists());
     }
 
     @Test
@@ -81,16 +85,16 @@ public final class ChatHistoryTest {
                 "gondor");
 
         assertTrue(ChatHistory.quoteFor(
-                gondor, BOB, ChatChannel.FACTION, "gondor").exists());
+                gondor, ChatHistoryRequesters.reader(BOB), ChatChannel.FACTION, "gondor").exists());
         assertFalse(ChatHistory.quoteFor(
-                gondor, BOB, ChatChannel.FACTION, "rohan").exists());
+                gondor, ChatHistoryRequesters.reader(BOB), ChatChannel.FACTION, "rohan").exists());
     }
 
     @Test
     public void aRecipientIsQuotedTheMessageTheyWereSent() {
         long id = record(ChatChannel.GLOBAL, ALICE, "meet me at the gate",
                 Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
-        ChatReplyReference quote = ChatHistory.quoteFor(id, BOB, ChatChannel.GLOBAL, "");
+        ChatReplyReference quote = ChatHistory.quoteFor(id, ChatHistoryRequesters.reader(BOB), ChatChannel.GLOBAL, "");
         assertTrue(quote.exists());
         assertEquals(id, quote.getMessageId());
         assertEquals("Aldric", quote.getAuthor());
@@ -106,12 +110,12 @@ public final class ChatHistoryTest {
     public void aLineForEveryoneIsQuotedByAnyone() {
         long open = record(ChatChannel.GLOBAL, ALICE, "Alice joined the game",
                 Arrays.asList(ALICE), ChatHistory.Audience.everyone());
-        assertTrue(ChatHistory.quoteFor(open, BOB, ChatChannel.GLOBAL, "").isAnchored());
+        assertTrue(ChatHistory.quoteFor(open, ChatHistoryRequesters.reader(BOB), ChatChannel.GLOBAL, "").isAnchored());
         long closed = record(ChatChannel.GLOBAL, ALICE, "for Alice alone",
                 Arrays.asList(ALICE), ChatHistory.Audience.accounts(
                         Arrays.asList(ALICE), false));
-        assertFalse(ChatHistory.quoteFor(closed, BOB, ChatChannel.GLOBAL, "").isAnchored());
-        assertTrue(ChatHistory.quoteFor(closed, ALICE, ChatChannel.GLOBAL, "").isAnchored());
+        assertFalse(ChatHistory.quoteFor(closed, ChatHistoryRequesters.reader(BOB), ChatChannel.GLOBAL, "").isAnchored());
+        assertTrue(ChatHistory.quoteFor(closed, ChatHistoryRequesters.reader(ALICE), ChatChannel.GLOBAL, "").isAnchored());
     }
 
     @Test
@@ -154,11 +158,12 @@ public final class ChatHistoryTest {
         long id = record(ChatChannel.WHISPER, ALICE, "the key is under the barrel",
                 Arrays.asList(ALICE, BOB),
                 ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB), false));
-        assertFalse(ChatHistory.quoteFor(id, CAROL, ChatChannel.WHISPER, "").exists());
+        assertFalse(ChatHistory.quoteFor(id, ChatHistoryRequesters.reader(CAROL), ChatChannel.WHISPER, "").exists());
         assertFalse(ChatHistory.quoteFor(id, null, ChatChannel.WHISPER, "").exists());
-        assertFalse(ChatHistory.quoteFor(1234L, ALICE, ChatChannel.WHISPER, "").exists());
+        assertFalse(ChatHistory.quoteFor(1234L, ChatHistoryRequesters.reader(ALICE), ChatChannel.WHISPER, "").exists());
         assertFalse(ChatHistory.quoteFor(
-                ChatMessageIds.NONE, ALICE, ChatChannel.WHISPER, "").exists());
+                ChatMessageIds.NONE, ChatHistoryRequesters.reader(ALICE),
+                ChatChannel.WHISPER, "").exists());
     }
 
     @Test
@@ -183,7 +188,7 @@ public final class ChatHistoryTest {
         long id = record(ChatChannel.GLOBAL, ALICE, long_.toString(),
                 Collections.singletonList(ALICE), ChatHistory.Audience.everyone());
         String excerpt = ChatHistory.quoteFor(
-                id, ALICE, ChatChannel.GLOBAL, "").getExcerpt();
+                id, ChatHistoryRequesters.reader(ALICE), ChatChannel.GLOBAL, "").getExcerpt();
         assertTrue(excerpt.length() < ChatReplyReference.MAX_EXCERPT_CHARACTERS + 5);
         assertTrue(excerpt.endsWith("..."));
     }
@@ -192,11 +197,11 @@ public final class ChatHistoryTest {
     public void onlyTheAuthorMayChangeAMessage() {
         long id = record(ChatChannel.GLOBAL, ALICE, "meet me at the gate",
                 Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
-        assertNull(ChatHistory.applyEdit(id, BOB, "meet me at the tower"));
+        assertNull(ChatHistory.applyEdit(id, BOB, "meet me at the tower", NOBODY));
         assertNull(ChatHistory.remove(id, BOB));
-        assertNull(ChatHistory.applyEdit(id, null, "nobody at all"));
+        assertNull(ChatHistory.applyEdit(id, null, "nobody at all", NOBODY));
         assertEquals("meet me at the gate", ChatHistory.quoteFor(
-                id, BOB, ChatChannel.GLOBAL, "").getExcerpt());
+                id, ChatHistoryRequesters.reader(BOB), ChatChannel.GLOBAL, "").getExcerpt());
     }
 
     /** An edit reaches exactly who was sent the original, and the replay says the new words. */
@@ -204,13 +209,13 @@ public final class ChatHistoryTest {
     public void anEditIsToldToEveryoneWhoWasSentTheMessageAndReplaysEdited() {
         long id = record(ChatChannel.GLOBAL, ALICE, "meet me at the gate",
                 Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
-        Set<UUID> told = ChatHistory.applyEdit(id, ALICE, "meet me at the tower");
+        Set<UUID> told = ChatHistory.applyEdit(id, ALICE, "meet me at the tower", NOBODY);
         assertNotNull(told);
         assertTrue(told.contains(ALICE));
         assertTrue(told.contains(BOB));
         assertFalse(told.contains(CAROL));
         assertEquals("meet me at the tower", ChatHistory.quoteFor(
-                id, BOB, ChatChannel.GLOBAL, "").getExcerpt());
+                id, ChatHistoryRequesters.reader(BOB), ChatChannel.GLOBAL, "").getExcerpt());
         List<LostTalesChatMessagePacket> replay = ChatHistory.replayFor(
                 requester(CAROL), ChatMessageIds.NONE);
         assertEquals(1, replay.size());
@@ -224,14 +229,14 @@ public final class ChatHistoryTest {
         Set<UUID> told = ChatHistory.remove(id, ALICE);
         assertNotNull(told);
         assertTrue(told.contains(BOB));
-        assertFalse(ChatHistory.quoteFor(id, BOB, ChatChannel.GLOBAL, "").exists());
-        assertNull(ChatHistory.applyEdit(id, ALICE, "or that"));
+        assertFalse(ChatHistory.quoteFor(id, ChatHistoryRequesters.reader(BOB), ChatChannel.GLOBAL, "").exists());
+        assertNull(ChatHistory.applyEdit(id, ALICE, "or that", NOBODY));
         assertTrue(ChatHistory.replayFor(requester(CAROL), ChatMessageIds.NONE).isEmpty());
         // A moderator's removal likewise, and it says whose the message was.
         long other = record(ChatChannel.GLOBAL, BOB, "and that", Arrays.asList(ALICE, BOB),
                 ChatHistory.Audience.everyone());
         ChatHistory.Removal removal = ChatHistory.removeByOperator(other);
-        assertEquals(BOB, removal.authorId);
+        assertEquals("Aldric", removal.author);
         assertTrue(removal.recipients.contains(ALICE));
         assertNull(ChatHistory.removeByOperator(other));
         assertEquals(0, ChatHistory.size());
@@ -246,17 +251,17 @@ public final class ChatHistoryTest {
                 Collections.singletonList(ALICE), ChatHistory.Audience.everyone());
         long oldestOoc = record(ChatChannel.OOC, ALICE, "and out of character",
                 Collections.singletonList(ALICE), ChatHistory.Audience.everyone());
-        for (int index = 0; index < ChatHistory.MAX_PER_CHANNEL; index++) {
+        for (int index = 0; index < ChatHistory.perChannelCapacity(); index++) {
             record(ChatChannel.GLOBAL, ALICE, "and another",
                     Collections.singletonList(ALICE), ChatHistory.Audience.everyone());
         }
         assertFalse(ChatHistory.quoteFor(
-                oldestGlobal, ALICE, ChatChannel.GLOBAL, "").exists());
-        assertNull(ChatHistory.applyEdit(oldestGlobal, ALICE, "on reflection"));
+                oldestGlobal, ChatHistoryRequesters.reader(ALICE), ChatChannel.GLOBAL, "").exists());
+        assertNull(ChatHistory.applyEdit(oldestGlobal, ALICE, "on reflection", NOBODY));
         // The other channel's line was not the one to go.
         assertTrue(ChatHistory.quoteFor(
-                oldestOoc, ALICE, ChatChannel.OOC, "").exists());
-        assertEquals(ChatHistory.MAX_PER_CHANNEL + 1, ChatHistory.size());
+                oldestOoc, ChatHistoryRequesters.reader(ALICE), ChatChannel.OOC, "").exists());
+        assertEquals(ChatHistory.perChannelCapacity() + 1, ChatHistory.size());
         ChatHistory.clear();
         assertEquals(0, ChatHistory.size());
     }
@@ -275,7 +280,7 @@ public final class ChatHistoryTest {
                         ChatHistory.Audience.everyone());
             }
             assertEquals(3, ChatHistory.size());
-            assertFalse(ChatHistory.quoteFor(first, ALICE, ChatChannel.GLOBAL, "").exists());
+            assertFalse(ChatHistory.quoteFor(first, ChatHistoryRequesters.reader(ALICE), ChatChannel.GLOBAL, "").exists());
             LostTalesConfig.chatHistoryPerChannel = ChatHistory.MAX_TOTAL * 2;
             assertEquals(ChatHistory.MAX_TOTAL, ChatHistory.perChannelCapacity());
         } finally {
@@ -624,8 +629,8 @@ public final class ChatHistoryTest {
         long id = record(ChatChannel.OOC, ALICE, "https://example.com/gif",
                 Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
         assertNull("nobody is told of an edit that changes nothing",
-                ChatHistory.applyEdit(id, ALICE, "https://example.com/gif"));
-        assertNotNull(ChatHistory.applyEdit(id, ALICE, "a real edit"));
+                ChatHistory.applyEdit(id, ALICE, "https://example.com/gif", NOBODY));
+        assertNotNull(ChatHistory.applyEdit(id, ALICE, "a real edit", NOBODY));
     }
 
     /* ---- reactions ---- */
@@ -671,7 +676,7 @@ public final class ChatHistoryTest {
         long id = record(ChatChannel.GLOBAL, ALICE, "hail",
                 Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
         ChatHistory.react(id, reader(BOB), BOB, "Beren", "smile", true);
-        assertNotNull(ChatHistory.applyEdit(id, ALICE, "hail, friends"));
+        assertNotNull(ChatHistory.applyEdit(id, ALICE, "hail, friends", NOBODY));
         assertEquals(1, ChatHistory.reactionsFor(id, BOB).find("smile").count);
     }
 
@@ -800,11 +805,11 @@ public final class ChatHistoryTest {
             long second = record(ChatChannel.WHISPER, ALICE, "two", Arrays.asList(ALICE, BOB), withBob);
             long third = record(ChatChannel.WHISPER, ALICE, "three", Arrays.asList(ALICE, BOB), withBob);
             assertFalse("the pair's oldest line went",
-                    ChatHistory.quoteFor(first, BOB, ChatChannel.WHISPER, "").exists());
-            assertTrue(ChatHistory.quoteFor(second, BOB, ChatChannel.WHISPER, "").exists());
-            assertTrue(ChatHistory.quoteFor(third, BOB, ChatChannel.WHISPER, "").exists());
+                    ChatHistory.quoteFor(first, ChatHistoryRequesters.reader(BOB), ChatChannel.WHISPER, "").exists());
+            assertTrue(ChatHistory.quoteFor(second, ChatHistoryRequesters.reader(BOB), ChatChannel.WHISPER, "").exists());
+            assertTrue(ChatHistory.quoteFor(third, ChatHistoryRequesters.reader(BOB), ChatChannel.WHISPER, "").exists());
             assertTrue("the other pair's line stays",
-                    ChatHistory.quoteFor(aside, CAROL, ChatChannel.WHISPER, "").exists());
+                    ChatHistory.quoteFor(aside, ChatHistoryRequesters.reader(CAROL), ChatChannel.WHISPER, "").exists());
         } finally {
             LostTalesConfig.chatHistoryPerChannel = kept;
         }
@@ -830,11 +835,11 @@ public final class ChatHistoryTest {
             long third = record(ChatChannel.FACTION, ALICE, "three",
                     Arrays.asList(ALICE), gondor, "gondor");
             assertFalse("the faction's oldest line went",
-                    ChatHistory.quoteFor(first, ALICE, ChatChannel.FACTION, "gondor").exists());
-            assertTrue(ChatHistory.quoteFor(second, ALICE, ChatChannel.FACTION, "gondor").exists());
-            assertTrue(ChatHistory.quoteFor(third, ALICE, ChatChannel.FACTION, "gondor").exists());
+                    ChatHistory.quoteFor(first, ChatHistoryRequesters.reader(ALICE), ChatChannel.FACTION, "gondor").exists());
+            assertTrue(ChatHistory.quoteFor(second, ChatHistoryRequesters.reader(ALICE), ChatChannel.FACTION, "gondor").exists());
+            assertTrue(ChatHistory.quoteFor(third, ChatHistoryRequesters.reader(ALICE), ChatChannel.FACTION, "gondor").exists());
             assertTrue("the other faction's line stays",
-                    ChatHistory.quoteFor(rohan, BOB, ChatChannel.FACTION, "rohan").exists());
+                    ChatHistory.quoteFor(rohan, ChatHistoryRequesters.reader(BOB), ChatChannel.FACTION, "rohan").exists());
 
             UUID otherParty = UUID.randomUUID();
             ChatHistory.Audience ours = ChatHistory.Audience.party(PARTY, Arrays.asList(ALICE, BOB));
@@ -847,9 +852,9 @@ public final class ChatHistoryTest {
             record(ChatChannel.PARTY, ALICE, "hold", Arrays.asList(ALICE, BOB), ours, ourScope);
             record(ChatChannel.PARTY, ALICE, "charge", Arrays.asList(ALICE, BOB), ours, ourScope);
             assertFalse("the party's oldest line went",
-                    ChatHistory.quoteFor(formUp, BOB, ChatChannel.PARTY, ourScope).exists());
+                    ChatHistory.quoteFor(formUp, ChatHistoryRequesters.reader(BOB), ChatChannel.PARTY, ourScope).exists());
             assertTrue("the other party's line stays",
-                    ChatHistory.quoteFor(theirs, CAROL, ChatChannel.PARTY, otherParty.toString()).exists());
+                    ChatHistory.quoteFor(theirs, ChatHistoryRequesters.reader(CAROL), ChatChannel.PARTY, otherParty.toString()).exists());
         } finally {
             LostTalesConfig.chatHistoryPerChannel = kept;
         }
@@ -947,6 +952,90 @@ public final class ChatHistoryTest {
                 LostTalesChatMessagePacket.SERVER_SENDER_ID, "Server restarting",
                 Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
         assertNull(ChatHistory.forwardable(server, reader(BOB)));
+    }
+
+    /**
+     * A kept action stays one: its quote reads as the sentence it is, a
+     * forward carries it on as one, and an edit changes its words and
+     * nothing else. A line that was said is none of these.
+     */
+    @Test
+    public void anActionIsKeptQuotedForwardedAndEditedAsOne() {
+        long id = ChatMessageIdAllocator.next();
+        ChatHistory.record(id, ALICE, "Aldric", null,
+                line(id, ChatChannel.GLOBAL, ALICE, "draws his sword.")
+                        .withAction(true),
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
+        assertTrue(ChatHistory.isAction(id));
+        ChatReplyReference quote = ChatHistory.quoteFor(id, ChatHistoryRequesters.reader(BOB),
+                ChatChannel.GLOBAL, "");
+        assertTrue(quote.exists());
+        assertTrue(quote.isAction());
+        assertEquals("draws his sword.", quote.getExcerpt());
+        assertTrue(ChatHistory.quoteForDiscordChannel(id).isAction());
+        ChatHistory.Forwardable forward = ChatHistory.forwardable(id,
+                reader(BOB));
+        assertNotNull(forward);
+        assertTrue(forward.action);
+        assertFalse("the forward's quote names its author, not an action",
+                forward.reference.isAction());
+        assertNotNull(ChatHistory.applyEdit(id, ALICE, "sheathes it.", NOBODY));
+        assertTrue(ChatHistory.isAction(id));
+        assertTrue(ChatHistory.quoteFor(id, ChatHistoryRequesters.reader(BOB), ChatChannel.GLOBAL, "")
+                .isAction());
+        assertEquals("sheathes it.", ChatHistory.quoteFor(id, ChatHistoryRequesters.reader(BOB),
+                ChatChannel.GLOBAL, "").getExcerpt());
+
+        long said = record(ChatChannel.GLOBAL, ALICE, "hello",
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
+        assertFalse(ChatHistory.isAction(said));
+        assertFalse(ChatHistory.quoteFor(said, ChatHistoryRequesters.reader(BOB), ChatChannel.GLOBAL, "")
+                .isAction());
+        assertFalse(ChatHistory.forwardable(said, reader(BOB)).action);
+        assertFalse(ChatHistory.isAction(said + 99));
+    }
+
+    /**
+     * A line is shown again, by a quote or a forward, only where everyone
+     * reading could already read it: an open line anywhere, a private line
+     * back into its own conversation or into a whisper whose two people
+     * both could read it.
+     */
+    @Test
+    public void aLineIsShownAgainOnlyToThoseWhoCouldReadIt() {
+        long open = record(ChatChannel.OOC, ALICE, "meet at the gate",
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
+        assertTrue(ChatHistory.mayShowTo(open, ChatChannel.GLOBAL, "",
+                reader(BOB), null));
+
+        long whisper = record(ChatChannel.WHISPER, ALICE, "the vault code",
+                Arrays.asList(ALICE, BOB),
+                ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB), false));
+        assertFalse("never into Global", ChatHistory.mayShowTo(whisper,
+                ChatChannel.GLOBAL, "", reader(BOB), null));
+        assertTrue("back to the one who sent it", ChatHistory.mayShowTo(whisper,
+                ChatChannel.WHISPER, "", reader(BOB), reader(ALICE)));
+        assertFalse("never to somebody else", ChatHistory.mayShowTo(whisper,
+                ChatChannel.WHISPER, "", reader(BOB), reader(CAROL)));
+
+        long party = record(ChatChannel.PARTY, ALICE, "form up",
+                Arrays.asList(ALICE, BOB),
+                ChatHistory.Audience.party(PARTY, Arrays.asList(ALICE, BOB)),
+                PARTY.toString());
+        assertTrue("its own party", ChatHistory.mayShowTo(party,
+                ChatChannel.PARTY, PARTY.toString(), reader(BOB), null));
+        assertFalse("another party", ChatHistory.mayShowTo(party,
+                ChatChannel.PARTY, UUID.randomUUID().toString(), reader(BOB), null));
+        assertFalse("OOC", ChatHistory.mayShowTo(party,
+                ChatChannel.OOC, "", reader(BOB), null));
+
+        long near = record(ChatChannel.PROXIMITY, ALICE, "psst",
+                Arrays.asList(ALICE, BOB),
+                ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB), false));
+        assertFalse("Proximity reaches others now", ChatHistory.mayShowTo(near,
+                ChatChannel.PROXIMITY, "", reader(BOB), null));
+        assertTrue("a whisper between two who heard it", ChatHistory.mayShowTo(near,
+                ChatChannel.WHISPER, "", reader(BOB), reader(ALICE)));
     }
 
     private static long record(ChatChannel channel, UUID author, String text,

@@ -7,12 +7,15 @@ import com.ninuna.losttales.network.server.LostTalesServerPacketDispatcher;
 import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
+import cpw.mods.fml.common.eventhandler.Event;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.item.ItemStack;
+import net.minecraftforge.event.ForgeEventFactory;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 
 public class LostTalesQuickLootDropItemPacket implements IMessage {
     private int x;
@@ -62,8 +65,8 @@ public class LostTalesQuickLootDropItemPacket implements IMessage {
             return;
         }
         LostTalesQuickLootInventoryHelper.InventoryAccess access =
-                LostTalesQuickLootInventoryHelper.resolve(player.worldObj, x, y, z);
-        if (!LostTalesQuickLootInventoryHelper.isUsableBy(player, access) || access.isSealed()) {
+                LostTalesQuickLootInventoryHelper.resolveFor(player, x, y, z);
+        if (access == null || access.isSealed() || !mayTakeFrom(player, access)) {
             return;
         }
 
@@ -105,6 +108,35 @@ public class LostTalesQuickLootDropItemPacket implements IMessage {
                         access.getX(), access.getY(), access.getZ(), inventory),
                 player
         );
+    }
+
+    /**
+     * Taking something out is opening the container, so it is asked of every
+     * mod as a right-click on the block would be: a claim or protection mod
+     * that cancels the click keeps the container shut.
+     */
+    private static boolean mayTakeFrom(
+            EntityPlayerMP player, LostTalesQuickLootInventoryHelper.InventoryAccess access) {
+        PlayerInteractEvent event = ForgeEventFactory.onPlayerInteract(
+                player, PlayerInteractEvent.Action.RIGHT_CLICK_BLOCK,
+                access.getX(), access.getY(), access.getZ(),
+                sideFacing(player, access), player.worldObj);
+        return !event.isCanceled() && event.useBlock != Event.Result.DENY;
+    }
+
+    /** The block's face turned most toward the player. */
+    private static int sideFacing(
+            EntityPlayerMP player, LostTalesQuickLootInventoryHelper.InventoryAccess access) {
+        double dx = player.posX - ((double) access.getX() + 0.5D);
+        double dy = player.posY + (double) player.getEyeHeight() - ((double) access.getY() + 0.5D);
+        double dz = player.posZ - ((double) access.getZ() + 0.5D);
+        if (Math.abs(dy) >= Math.abs(dx) && Math.abs(dy) >= Math.abs(dz)) {
+            return dy > 0.0D ? 1 : 0;
+        }
+        if (Math.abs(dx) >= Math.abs(dz)) {
+            return dx > 0.0D ? 5 : 4;
+        }
+        return dz > 0.0D ? 3 : 2;
     }
 
     public static class Handler implements IMessageHandler<LostTalesQuickLootDropItemPacket, IMessage> {

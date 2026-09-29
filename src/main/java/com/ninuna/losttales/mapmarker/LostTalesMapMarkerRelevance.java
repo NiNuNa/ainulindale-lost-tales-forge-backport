@@ -23,11 +23,6 @@ public enum LostTalesMapMarkerRelevance {
     public String getSerializedName() { return this.serializedName; }
     public int getRank() { return this.rank; }
 
-    public LostTalesMapMarkerRelevance next() {
-        LostTalesMapMarkerRelevance[] values = values();
-        return values[(ordinal() + 1) % values.length];
-    }
-
     public static LostTalesMapMarkerRelevance fromSerializedName(
             String value) {
         String normalized = value == null ? ""

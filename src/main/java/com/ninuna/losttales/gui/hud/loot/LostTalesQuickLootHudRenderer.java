@@ -199,7 +199,9 @@ public final class LostTalesQuickLootHudRenderer {
 
         if (slots.isEmpty()) {
             drawQuickLootTexture(minecraft, TEXTURE, panelX, rowY, 0, ROW_TEXTURE_V, TEXTURE_WIDTH, ROW_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT, 1.0F);
-            font.drawStringWithShadow(StatCollector.translateToLocal("quickLootHud.losttales.empty"), itemNameX, rowY + 7, 0xFFFFFF);
+            font.drawStringWithShadow(StatCollector.translateToLocal(
+                    snapshot.sealed ? "quickLootHud.losttales.sealed" : "quickLootHud.losttales.empty"),
+                    itemNameX, rowY + 7, 0xFFFFFF);
         } else {
             for (int i = 0; i < rowsToDraw; i++) {
                 int actualRow = scrollOffset + i;

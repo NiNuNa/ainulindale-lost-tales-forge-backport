@@ -36,6 +36,7 @@ public final class PartyNbtCodec {
 
     private static final String TAG_PARTY_UUID = "PartyUUID";
     private static final String TAG_LEADER_CHARACTER_UUID = "LeaderCharacterUUID";
+    private static final String TAG_NAME = "Name";
     private static final String TAG_CHARACTER_UUID = "CharacterUUID";
     private static final String TAG_OWNER_UUID = "OwnerUUID";
     private static final String TAG_CHARACTER_NAME = "CharacterName";
@@ -134,14 +135,14 @@ public final class PartyNbtCodec {
 
     public static NBTTagCompound createQuarantineEntry(String reason,
                                                         UUID partyId,
-                                                        UUID characterId) {
+                                                        UUID identityId) {
         NBTTagCompound entry = new NBTTagCompound();
         entry.setString(TAG_REASON, reason == null ? "unknown" : reason);
         if (partyId != null) {
             NbtTags.writeUuid(entry, TAG_PARTY_UUID, partyId);
         }
-        if (characterId != null) {
-            NbtTags.writeUuid(entry, TAG_CHARACTER_UUID, characterId);
+        if (identityId != null) {
+            NbtTags.writeUuid(entry, TAG_CHARACTER_UUID, identityId);
         }
         return entry;
     }
@@ -150,7 +151,8 @@ public final class PartyNbtCodec {
         NBTTagCompound tag = new NBTTagCompound();
         tag.setInteger(TAG_DATA_VERSION, Party.CURRENT_DATA_VERSION);
         NbtTags.writeUuid(tag, TAG_PARTY_UUID, party.getPartyId());
-        NbtTags.writeUuid(tag, TAG_LEADER_CHARACTER_UUID, party.getLeaderCharacterId());
+        NbtTags.writeUuid(tag, TAG_LEADER_CHARACTER_UUID, party.getLeaderIdentityId());
+        tag.setString(TAG_NAME, party.getName());
         tag.setLong(TAG_CREATED_AT, party.getCreatedAt());
         tag.setLong(TAG_REVISION, party.getRevision());
 
@@ -158,7 +160,7 @@ public final class PartyNbtCodec {
         for (PartyMember member : party.getMembers()) {
             NBTTagCompound memberTag = new NBTTagCompound();
             memberTag.setInteger(TAG_DATA_VERSION, PartyMember.CURRENT_DATA_VERSION);
-            NbtTags.writeUuid(memberTag, TAG_CHARACTER_UUID, member.getCharacterId());
+            NbtTags.writeUuid(memberTag, TAG_CHARACTER_UUID, member.getIdentityId());
             NbtTags.writeUuid(memberTag, TAG_OWNER_UUID, member.getOwnerId());
             memberTag.setString(TAG_CHARACTER_NAME, member.getCharacterName());
             memberTag.setLong(TAG_JOINED_AT, member.getJoinedAt());
@@ -198,6 +200,17 @@ public final class PartyNbtCodec {
             revision = 0L;
             repaired = true;
         }
+        ArrayList<NBTTagCompound> quarantine = new ArrayList<NBTTagCompound>();
+        // A name that is not well formed is kept in the quarantine and the
+        // party stands without it.
+        String name = source.hasKey(TAG_NAME, Constants.NBT.TAG_STRING)
+                ? source.getString(TAG_NAME) : "";
+        if (!Party.isWellFormedName(name)) {
+            quarantine.add(createQuarantineEntry(
+                    "invalid_party_name", partyIndex, -1, source));
+            name = "";
+            repaired = true;
+        }
 
         if (source.hasKey(TAG_MEMBERS)
                 && !source.hasKey(TAG_MEMBERS, Constants.NBT.TAG_LIST)) {
@@ -205,8 +218,7 @@ public final class PartyNbtCodec {
         }
         NBTTagList memberList = source.getTagList(TAG_MEMBERS, Constants.NBT.TAG_COMPOUND);
         ArrayList<PartyMember> members = new ArrayList<PartyMember>();
-        ArrayList<NBTTagCompound> quarantine = new ArrayList<NBTTagCompound>();
-        Set<UUID> characterIds = new java.util.HashSet<UUID>();
+        Set<UUID> identityIds = new java.util.HashSet<UUID>();
         Set<PartyColor> usedColors = EnumSet.noneOf(PartyColor.class);
 
         for (int i = 0; i < memberList.tagCount(); i++) {
@@ -224,7 +236,7 @@ public final class PartyNbtCodec {
                 repaired = true;
                 continue;
             }
-            if (!characterIds.add(member.getCharacterId())) {
+            if (!identityIds.add(member.getIdentityId())) {
                 quarantine.add(createQuarantineEntry(
                         "duplicate_member_character_uuid", partyIndex, i, rawMember));
                 repaired = true;
@@ -246,12 +258,12 @@ public final class PartyNbtCodec {
 
         UUID leaderId = NbtTags.readUuid(source, TAG_LEADER_CHARACTER_UUID);
         if (leaderId == null || !containsCharacter(members, leaderId)) {
-            leaderId = selectFirstMember(members).getCharacterId();
+            leaderId = selectFirstMember(members).getIdentityId();
             repaired = true;
         }
 
         try {
-            Party party = new Party(partyId, leaderId, members,
+            Party party = new Party(partyId, leaderId, members, name,
                     createdAt, revision, Party.CURRENT_DATA_VERSION);
             return PartyReadResult.success(party, repaired, quarantine);
         } catch (RuntimeException exception) {
@@ -274,9 +286,9 @@ public final class PartyNbtCodec {
             return MemberReadResult.unsupported(version);
         }
         boolean repaired = version != PartyMember.CURRENT_DATA_VERSION;
-        UUID characterId = NbtTags.readUuid(source, TAG_CHARACTER_UUID);
+        UUID identityId = NbtTags.readUuid(source, TAG_CHARACTER_UUID);
         UUID ownerId = NbtTags.readUuid(source, TAG_OWNER_UUID);
-        if (characterId == null) {
+        if (identityId == null) {
             return MemberReadResult.failed(true, "missing_or_invalid_character_uuid");
         }
         if (ownerId == null) {
@@ -306,7 +318,7 @@ public final class PartyNbtCodec {
             return MemberReadResult.failed(true, "no_available_party_color");
         }
         return MemberReadResult.success(
-                new PartyMember(characterId, ownerId, name, joinedAt, color), repaired);
+                new PartyMember(identityId, ownerId, name, joinedAt, color), repaired);
     }
 
     private static PartyMember selectFirstMember(List<PartyMember> members) {
@@ -320,19 +332,19 @@ public final class PartyNbtCodec {
                 if (left.getJoinedAt() > right.getJoinedAt()) {
                     return 1;
                 }
-                return left.getCharacterId().toString().compareTo(right.getCharacterId().toString());
+                return left.getIdentityId().toString().compareTo(right.getIdentityId().toString());
             }
         });
         return ordered.get(0);
     }
 
     private static boolean containsCharacter(List<PartyMember> members,
-                                             UUID characterId) {
-        if (characterId == null || members == null) {
+                                             UUID identityId) {
+        if (identityId == null || members == null) {
             return false;
         }
         for (PartyMember member : members) {
-            if (member != null && characterId.equals(member.getCharacterId())) {
+            if (member != null && identityId.equals(member.getIdentityId())) {
                 return true;
             }
         }

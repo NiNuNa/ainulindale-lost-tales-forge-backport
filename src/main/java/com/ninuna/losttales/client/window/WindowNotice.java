@@ -14,7 +14,8 @@ import org.lwjgl.opengl.GL11;
  * ({@link MotionIds#WINDOW_NOTICE}, its {@code hold} and {@code rise}).
  * It keeps the place it was shown at, so it stays where the bar stood
  * even once the window has gone with its last tab. One stands at a
- * time; a new one takes the old one's place.
+ * time; a new one takes the old one's place. A page's answer over its
+ * bar is drawn the same way ({@link #drawLine}).
  */
 final class WindowNotice {
     /** Clear pixels between the notice and the bar under it, as over the chat's bar. */
@@ -56,20 +57,40 @@ final class WindowNotice {
         if (opacity <= 0.0F) {
             return;
         }
-        int width = WindowStyle.popupLineWidth(font, this.text);
-        int left = (int)Math.floor(this.centreX) - width / 2;
+        drawLine(font, this.text, LostTalesUiInk.IVORY, this.centreX,
+                this.barTop, 0.0F, screenWidth, opacity, standing
+                        ? (1.0F - opacity) * Motions.param(
+                                MotionIds.WINDOW_NOTICE, "rise", 3.0F)
+                        : 0.0F);
+    }
+
+    /**
+     * One notice line as every notice and page answer is drawn: a
+     * one-line popup centred on {@code centreX}, {@link #GAP} clear pixels
+     * over a bar whose top is {@code barTop} and which stands
+     * {@code barOffset} below it now, kept {@link #MARGIN} inside the
+     * screen's sides, its words in {@code rgb}, {@code rise} pixels short
+     * of its place. The fractions of its place and its rise are drawn
+     * through the matrix, never rounded to a pixel.
+     */
+    static void drawLine(FontRenderer font, String text, int rgb,
+                         double centreX, double barTop, float barOffset,
+                         int screenWidth, float opacity, float rise) {
+        if (text == null || text.length() == 0 || opacity <= 0.0F) {
+            return;
+        }
+        int width = WindowStyle.popupLineWidth(font, text);
+        int left = (int)Math.floor(centreX) - width / 2;
         left = Math.max(MARGIN, Math.min(screenWidth - width - MARGIN, left));
-        int top = (int)Math.floor(this.barTop) - GAP
+        int top = (int)Math.floor(barTop) - GAP
                 - WindowStyle.POPUP_LINE_HEIGHT;
-        // It rises as it comes and fades out where it stands; the rise is
-        // drawn through the matrix, never rounded to a pixel.
-        float rise = standing ? (1.0F - opacity) * Motions.param(
-                MotionIds.WINDOW_NOTICE, "rise", 3.0F) : 0.0F;
         GL11.glPushMatrix();
         try {
-            GL11.glTranslatef(0.0F, rise, 0.0F);
+            GL11.glTranslatef((float)(centreX - Math.floor(centreX)),
+                    (float)(barTop - Math.floor(barTop)) + barOffset + rise,
+                    0.0F);
             LostTalesUiInk.beginContent();
-            WindowStyle.drawPopupLine(font, this.text, left, top, opacity);
+            WindowStyle.drawPopupLine(font, text, rgb, left, top, opacity);
         } finally {
             GL11.glPopMatrix();
         }

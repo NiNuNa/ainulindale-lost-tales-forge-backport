@@ -8,7 +8,7 @@ import java.util.UUID;
 /** Immutable server-authoritative position for one currently trackable member. */
 public final class PartyTrackedMemberSnapshot {
 
-    private final UUID characterId;
+    private final UUID identityId;
     private final String characterName;
     private final PartyColor color;
     private final int dimensionId;
@@ -16,15 +16,15 @@ public final class PartyTrackedMemberSnapshot {
     private final double y;
     private final double z;
 
-    public PartyTrackedMemberSnapshot(UUID characterId,
+    public PartyTrackedMemberSnapshot(UUID identityId,
                                       String characterName,
                                       PartyColor color,
                                       int dimensionId,
                                       double x,
                                       double y,
                                       double z) {
-        if (characterId == null) {
-            throw new IllegalArgumentException("characterId must not be null");
+        if (identityId == null) {
+            throw new IllegalArgumentException("identityId must not be null");
         }
         if (color == null) {
             throw new IllegalArgumentException("color must not be null");
@@ -32,7 +32,7 @@ public final class PartyTrackedMemberSnapshot {
         if (!PartyGoHereMarker.isValidCoordinates(x, y, z)) {
             throw new IllegalArgumentException("position is invalid");
         }
-        this.characterId = characterId;
+        this.identityId = identityId;
         this.characterName = normalizeName(characterName);
         this.color = color;
         this.dimensionId = dimensionId;
@@ -41,8 +41,8 @@ public final class PartyTrackedMemberSnapshot {
         this.z = z;
     }
 
-    public UUID getCharacterId() {
-        return this.characterId;
+    public UUID getIdentityId() {
+        return this.identityId;
     }
 
     public String getCharacterName() {
@@ -79,7 +79,7 @@ public final class PartyTrackedMemberSnapshot {
         }
         PartyTrackedMemberSnapshot other =
                 (PartyTrackedMemberSnapshot) value;
-        return this.characterId.equals(other.characterId)
+        return this.identityId.equals(other.identityId)
                 && this.characterName.equals(other.characterName)
                 && this.color == other.color
                 && this.dimensionId == other.dimensionId
@@ -93,7 +93,7 @@ public final class PartyTrackedMemberSnapshot {
 
     @Override
     public int hashCode() {
-        int result = this.characterId.hashCode();
+        int result = this.identityId.hashCode();
         result = 31 * result + this.characterName.hashCode();
         result = 31 * result + this.color.hashCode();
         result = 31 * result + this.dimensionId;

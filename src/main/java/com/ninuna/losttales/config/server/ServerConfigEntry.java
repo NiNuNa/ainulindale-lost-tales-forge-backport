@@ -138,11 +138,4 @@ public final class ServerConfigEntry {
     public List<String> getValidValues() {
         return this.validValues;
     }
-
-    /** The same entry with other values, for a client's edited copy. */
-    public ServerConfigEntry withValues(List<String> replacement) {
-        return new ServerConfigEntry(this.category, this.key, this.type, this.list,
-                replacement, this.defaults, this.minValue, this.maxValue, this.comment,
-                this.langKey, this.secret, this.validValues);
-    }
 }

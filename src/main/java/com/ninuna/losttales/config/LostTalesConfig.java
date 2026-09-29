@@ -18,6 +18,7 @@ import com.ninuna.losttales.chat.ChatChannelIconCatalog;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.permission.LostTalesPermissionCatalog;
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.party.model.Party;
 import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
 import com.ninuna.losttales.chat.profanity.ChatProfanityMode;
 import com.ninuna.losttales.chat.profanity.ChatProfanityWords;
@@ -134,6 +135,7 @@ public final class LostTalesConfig {
     public static int partyTrackingHeartbeatTicks = 100;
     public static boolean enableSharedQuestProgress = true;
     public static int partySharedQuestRadius = 32;
+    public static int partyMaxMembers = 4;
 
     public static boolean showQuickLootHud = true;
     public static boolean linkShowQuickLootHud = false;
@@ -177,7 +179,8 @@ public final class LostTalesConfig {
      */
     public static String chatProfanityFilter = ChatProfanityMode.SILLY.name();
     public static boolean enableChatMessageGrouping = true;
-    public static boolean enableChatBackgroundBlur = true;
+    /** Whether the world blurs behind every window while the window screen is open. */
+    public static boolean windowBackgroundBlur = true;
     public static boolean enableNpcChatStyling = true;
     public static boolean showChatSpeechBubbles = true;
     public static boolean enableChatPings = true;
@@ -185,12 +188,12 @@ public final class LostTalesConfig {
     static final String DEFAULT_CHAT_PING_SOUND = "losttales:chat.ping";
     public static String chatPingSound = DEFAULT_CHAT_PING_SOUND;
     /**
-     * The open chat's surfaces, each a palette entry by name: the
-     * history panel and the rows that frame it, the line under the
-     * pointer, and a line that mentions this player. Names, not
-     * numbers, so every choice is one of the palette's colours.
+     * Every window's surface, and the chat's own surfaces, each a palette
+     * entry by name: the windows' background, the line under the
+     * pointer, and a line that mentions this player. Names, not numbers,
+     * so every choice is one of the palette's colours.
      */
-    public static final String DEFAULT_CHAT_BACKGROUND_COLOR = "PLUM_BLACK";
+    public static final String DEFAULT_WINDOW_BACKGROUND_COLOR = "PLUM_BLACK";
     public static final String DEFAULT_CHAT_SELECTED_LINE_COLOR = "PLUM_GRAY";
     public static final String DEFAULT_CHAT_MENTION_LINE_COLOR = "CORAL";
     public static final String DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR = "APRICOT";
@@ -201,7 +204,7 @@ public final class LostTalesConfig {
      * default the mention colour a shade lighter.
      */
     public static final String CHAT_COLOR_AUTOMATIC = "AUTO";
-    public static String chatBackgroundColor = DEFAULT_CHAT_BACKGROUND_COLOR;
+    public static String windowBackgroundColor = DEFAULT_WINDOW_BACKGROUND_COLOR;
     public static String chatSelectedLineColor = DEFAULT_CHAT_SELECTED_LINE_COLOR;
     public static String chatMentionLineColor = DEFAULT_CHAT_MENTION_LINE_COLOR;
     /** A line that mentions this player, under the pointer; automatic until chosen. */
@@ -239,10 +242,10 @@ public final class LostTalesConfig {
     /** The same row in the closed feed, as large as the feed's words. */
     public static String chatFeedQuoteSize = CHAT_SIZE_SAME;
     /**
-     * Whether the game's HUD and the mod's panels fade out while the chat
-     * screen is open, leaving the world and the chat.
+     * Whether the game's HUD and the mod's panels fade out while the
+     * window screen is open, leaving the world and the windows.
      */
-    public static boolean hideHudWhileChatting = true;
+    public static boolean hideHudWithWindows = true;
     /**
      * Whether anything of the mod's moves: every screen, HUD panel and
      * chat motion. Off, everything stands where it ends.
@@ -292,6 +295,8 @@ public final class LostTalesConfig {
     public static boolean chatTypingIndicators = true;
     /** Words the server adds to the chat's profanity list, one per line as word=replacement. */
     public static String[] chatProfanityWords = new String[0];
+    /** What a new player is greeted with on their first join, in OOC Chat; none greets nobody. */
+    public static String[] chatWelcomeLines = new String[0];
     /** The config-defined permissions a role may grant; see {@code ChatRoleConfig}. */
     public static String[] chatPermissions = new String[0];
     /** The config-defined chat roles; see {@code ChatRoleConfig}. */
@@ -413,19 +418,6 @@ public final class LostTalesConfig {
     public static double chargeTierThreeKnockback = 0.24D;
 
     private LostTalesConfig() {}
-
-    /** Whether the category is the client's own; see {@link #CLIENT_CATEGORIES}. */
-    public static boolean isClientCategory(String category) {
-        if (category == null) {
-            return false;
-        }
-        String root = category;
-        int split = root.indexOf(Configuration.CATEGORY_SPLITTER);
-        if (split >= 0) {
-            root = root.substring(0, split);
-        }
-        return CLIENT_CATEGORIES.contains(root.toLowerCase(java.util.Locale.ROOT));
-    }
 
     /**
      * Reads the client's options from {@code clientFile}, the server's
@@ -622,7 +614,7 @@ public final class LostTalesConfig {
                     characterDeletionRetentionDays,
                     1,
                     3650,
-                    "Minimum number of days a deleted character and its player-state generations remain recoverable before an administrator may permanently purge them."
+                    "Days a deleted character stays restorable by its player from the roster; after that the server purges it and its saved state at the next start or at the owner's next login."
             );
             sanitizeCharacterSwitchOptions();
 
@@ -871,6 +863,14 @@ public final class LostTalesConfig {
                     128,
                     "Maximum block distance for conservative party-shared kill and travel objective progress. Members must be online, alive, in the same dimension, using the party character, and independently possess the matching quest."
             );
+            partyMaxMembers = config.getInt(
+                    "maxMembers",
+                    CATEGORY_PARTY,
+                    partyMaxMembers,
+                    Party.MIN_MEMBER_LIMIT,
+                    Party.MAX_MEMBERS,
+                    "The most members a party may have. A party with more members than a lowered limit keeps them all, and can invite again once it is below the limit."
+            );
 
             showQuickLootHud = config.getBoolean(
                     "showQuickLootHud",
@@ -1016,6 +1016,12 @@ public final class LostTalesConfig {
                     chatProfanityWords,
                     "Words added to the chat's profanity list beside the ones the mod bundles, one per line as word=replacement, both a run of letters: the word, matched whole with stretched letters and the common endings, and the silly word that stands in for it. Sent to every client with its chat access, refused in a character's name, and applied to what the Discord bridge posts when discord.profanityFilter says so. An entry naming a bundled word replaces its stand-in."
             );
+            chatWelcomeLines = config.getStringList(
+                    "welcomeLines",
+                    CATEGORY_CHAT,
+                    chatWelcomeLines,
+                    "Server only: what a new player is greeted with the first time they join this world, as Server lines in OOC Chat that wait there unread: the rules, a Discord invite, anything. One line each, at most 8 lines of 256 characters; a web address becomes a link. Empty greets nobody."
+            );
             chatAuditLogEnabled = config.getBoolean(
                     "auditLog",
                     CATEGORY_CHAT,
@@ -1048,13 +1054,13 @@ public final class LostTalesConfig {
                     "permissions",
                     CATEGORY_ROLES,
                     chatPermissions,
-                    "What a role may grant, in the server's own words, one per line as <id>=capability:<id>;capability:<id>;desc:<text>. capability may repeat and names something the code can do: chat.moderate (mute, unmute, remove any message), chat.server_console.read (the Server Console), chat.narrate (speak as the Narrator in the roleplaying channels), roles.manage (/losttales role), server.config (the server settings, which includes these roles and permissions), character.admin, quest.admin, party.admin, mapmarker.manage, waystone.manage, hud.admin. A permission naming no capability the code has is kept and allows nothing. A role's grant naming no permission here is read as the capability of that id, so grant:chat.moderate needs nothing defined."
+                    "What a role may grant, in the server's own words, one per line as <id>=capability:<id>;capability:<id>. capability may repeat and names something the code can do: chat.moderate (mute, unmute, remove any message), chat.server_console.read (the Server Console), chat.narrate (speak as the Narrator in the roleplaying channels), roles.manage (/losttales role), server.config (the server settings, which includes these roles and permissions), character.admin, quest.admin, party.admin, mapmarker.manage, waystone.manage, hud.admin. A permission naming no capability the code has is kept and allows nothing. A role's grant naming no permission here is read as the capability of that id, so grant:chat.moderate needs nothing defined."
             );
             chatRoles = config.getStringList(
                     "definitions",
                     CATEGORY_ROLES,
                     new String[] {ChatRoleConfig.DEFAULT_OPERATOR_ENTRY},
-                    "The chat roles, one per line as <id>=name:<text>;color:<RRGGBB>;mention:<true|false>;rank:<number>;op:<level>;faction:<FACTION>@<rank>;grant:<permission>;icon:<emoji:<name>|item:<id>|channel:<id>>;desc:<text>. Every option is optional: a role is held by the accounts and characters listed under members, by anyone with the op level, and by anyone whose played identity holds the LOTR faction rank (a rank code name such as gondor.knight, or an alignment number). Lower rank comes first and colours the name; rank never grants anything. grant names a permission from the permissions list, or a capability directly; it may repeat, and one naming neither is kept and allows nothing until a permission of that id is defined. icon is what the role's heading wears in a member list; channel:<id> wears whatever that channel wears. The operator entry a fresh file starts with is a role like any other and wears the Operator channel's icon; the Lost Tales Team mark is the code's alone and cannot be listed. Edit live from the Server Settings screen or /losttales role."
+                    "The chat roles, one per line as <id>=name:<text>;colour:<RRGGBB>;mention:<true|false>;rank:<number>;op:<level>;faction:<FACTION>@<rank>;grant:<permission>;icon:<emoji:<name>|item:<id>|channel:<id>>;desc:<text>. Every option is optional: a role is held by the accounts and characters listed under members, by anyone with the op level, and by anyone whose played identity holds the LOTR faction rank (a rank code name such as gondor.knight, or an alignment number). Lower rank comes first and colours the name; rank never grants anything. grant names a permission from the permissions list, or a capability directly; it may repeat, and one naming neither is kept and allows nothing until a permission of that id is defined. icon is what the role's heading wears in a member list; channel:<id> wears whatever that channel wears. The operator entry a fresh file starts with is a role like any other and wears the Operator channel's icon; the Lost Tales Team mark is the code's alone and cannot be listed. Edit live from the Server Settings screen or /losttales role."
             );
             chatRoleMembers = config.getStringList(
                     "members",
@@ -1200,11 +1206,11 @@ public final class LostTalesConfig {
                     enableChatMessageGrouping,
                     "Drop the repeated head and name when the same identity sends several messages in a row."
             );
-            enableChatBackgroundBlur = config.getBoolean(
-                    "enableChatBackgroundBlur",
+            windowBackgroundBlur = config.getBoolean(
+                    "windowBackgroundBlur",
                     CATEGORY_CLIENT,
-                    enableChatBackgroundBlur,
-                    "Blur the world inside each open chat window's box; the rest of the screen stays sharp. Needs enableGuiBackgroundBlur."
+                    windowBackgroundBlur,
+                    "Blur the world inside each window's box while the window screen is open; the rest of the screen stays sharp. Needs enableGuiBackgroundBlur."
             );
             enableChatPings = config.getBoolean(
                     "enableChatPings",
@@ -1218,13 +1224,13 @@ public final class LostTalesConfig {
                     chatPingSound,
                     "Sound event played when a chat message @-mentions you; empty disables the sound."
             );
-            chatBackgroundColor = paletteName(config.getString(
-                    "chatBackgroundColor",
+            windowBackgroundColor = paletteName(config.getString(
+                    "windowBackgroundColor",
                     CATEGORY_CLIENT,
-                    chatBackgroundColor,
-                    "Palette colour of the open chat's history panel and the rows framing it. Set in Settings.",
+                    windowBackgroundColor,
+                    "Palette colour of every window's surface while the window screen is open. Set in Settings.",
                     LostTalesColors.paletteNames()
-            ), DEFAULT_CHAT_BACKGROUND_COLOR);
+            ), DEFAULT_WINDOW_BACKGROUND_COLOR);
             chatSelectedLineColor = paletteName(config.getString(
                     "chatSelectedLineColor",
                     CATEGORY_CLIENT,
@@ -1300,11 +1306,11 @@ public final class LostTalesConfig {
                             + "feed's own words: SMALLER, SAME or LARGER. "
                             + "SAME, the default, draws the quote as large "
                             + "as the words it stands over.");
-            hideHudWhileChatting = config.getBoolean(
-                    "hideHudWhileChatting",
+            hideHudWithWindows = config.getBoolean(
+                    "hideHudWithWindows",
                     CATEGORY_CLIENT,
-                    hideHudWhileChatting,
-                    "Fade the game's HUD (hotbar, health, crosshair and the rest) and the Lost Tales panels out while the chat screen is open, and back in when it closes."
+                    hideHudWithWindows,
+                    "Fade the game's HUD (hotbar, health, crosshair and the rest) and the Lost Tales panels out while the window screen is open, and back in when it closes."
             );
             devSkinOverridePath = config.getString(
                     "devSkinOverridePath",
@@ -1601,11 +1607,6 @@ public final class LostTalesConfig {
     /** The server's options file, which the server settings screen and commands edit. */
     public static File getServerConfigFile() {
         return loadedServerFile;
-    }
-
-    /** The client's options file; null on a dedicated server. */
-    public static File getClientConfigFile() {
-        return loadedClientFile;
     }
 
     /** Every file as one configuration, over the files last loaded. */
@@ -2119,14 +2120,16 @@ public final class LostTalesConfig {
         config.get(CATEGORY_CHANNELS, "icons", chatChannelIcons).set(chatChannelIcons);
         config.get(CATEGORY_CHAT, "profanityWords", chatProfanityWords)
                 .set(chatProfanityWords);
+        config.get(CATEGORY_CHAT, "welcomeLines", chatWelcomeLines)
+                .set(chatWelcomeLines);
         config.get(CATEGORY_CLIENT, "enableChatEmojis",
                 enableChatEmojis).set(enableChatEmojis);
         config.get(CATEGORY_CLIENT, "convertChatEmoticons",
                 convertChatEmoticons).set(convertChatEmoticons);
         config.get(CATEGORY_CLIENT, "enableChatMessageGrouping",
                 enableChatMessageGrouping).set(enableChatMessageGrouping);
-        config.get(CATEGORY_CLIENT, "enableChatBackgroundBlur",
-                enableChatBackgroundBlur).set(enableChatBackgroundBlur);
+        config.get(CATEGORY_CLIENT, "windowBackgroundBlur",
+                windowBackgroundBlur).set(windowBackgroundBlur);
         config.get(CATEGORY_CLIENT, "sendChatTypingStatus",
                 sendChatTypingStatus).set(sendChatTypingStatus);
         config.get(CATEGORY_CLIENT, "showChatTypingIndicators",
@@ -2139,8 +2142,8 @@ public final class LostTalesConfig {
                 enableChatPings).set(enableChatPings);
         config.get(CATEGORY_CLIENT, "chatPingSound",
                 chatPingSound).set(chatPingSound);
-        config.get(CATEGORY_CLIENT, "chatBackgroundColor",
-                chatBackgroundColor).set(chatBackgroundColor);
+        config.get(CATEGORY_CLIENT, "windowBackgroundColor",
+                windowBackgroundColor).set(windowBackgroundColor);
         config.get(CATEGORY_CLIENT, "chatSelectedLineColor",
                 chatSelectedLineColor).set(chatSelectedLineColor);
         config.get(CATEGORY_CLIENT, "chatMentionLineColor",
@@ -2164,8 +2167,8 @@ public final class LostTalesConfig {
                 CATEGORY_CLIENT, "chatProfanityFilter", chatProfanityFilter);
         profanityProperty.set(chatProfanityFilter);
         profanityProperty.setValidValues(ChatProfanityMode.names());
-        config.get(CATEGORY_CLIENT, "hideHudWhileChatting",
-                hideHudWhileChatting).set(hideHudWhileChatting);
+        config.get(CATEGORY_CLIENT, "hideHudWithWindows",
+                hideHudWithWindows).set(hideHudWithWindows);
         config.get(CATEGORY_CLIENT, "animations",
                 animations).set(animations);
         config.get(CATEGORY_CLIENT, "animationSpeed",
@@ -2288,6 +2291,7 @@ public final class LostTalesConfig {
         config.get(CATEGORY_PARTY, "trackingHeartbeatTicks", partyTrackingHeartbeatTicks).set(partyTrackingHeartbeatTicks);
         config.get(CATEGORY_PARTY, "enableSharedQuestProgress", enableSharedQuestProgress).set(enableSharedQuestProgress);
         config.get(CATEGORY_PARTY, "sharedQuestRadius", partySharedQuestRadius).set(partySharedQuestRadius);
+        config.get(CATEGORY_PARTY, "maxMembers", partyMaxMembers).set(partyMaxMembers);
         config.get(CATEGORY_CLIENT, "showQuickLootHud", showQuickLootHud).set(showQuickLootHud);
         config.get(CATEGORY_CLIENT, "linkShowQuickLootHud", linkShowQuickLootHud).set(linkShowQuickLootHud);
         config.get(CATEGORY_CLIENT, "quickLootHudOffsetX", quickLootHudOffsetX).set(quickLootHudOffsetX);

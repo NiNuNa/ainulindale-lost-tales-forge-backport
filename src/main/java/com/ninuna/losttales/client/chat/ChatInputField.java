@@ -284,21 +284,6 @@ public final class ChatInputField extends GuiTextField {
     }
 
     /**
-     * The caret where no glyph stands after it: at the end of what is
-     * typed, or in an empty field. A caret inside the text lays its
-     * shadow before the text and its bar after it instead
-     * ({@link #drawCaretShadow}, {@link #drawCaretBar}).
-     */
-    static void drawCaret(int x, int textTop) {
-        drawCaret(x, textTop, 0xFF);
-    }
-
-    /** As above at {@code alpha} (0-255): a field in a window fading in or out. */
-    static void drawCaret(int x, int textTop, int alpha) {
-        LostTalesUiCaret.draw(x, caretTop(textTop), CONTENT_HEIGHT, alpha);
-    }
-
-    /**
      * The caret: a one-pixel ivory bar a clear row short of the well at
      * both ends, wherever it stands. After the last character vanilla
      * draws an underscore instead, which hangs past the field's end and

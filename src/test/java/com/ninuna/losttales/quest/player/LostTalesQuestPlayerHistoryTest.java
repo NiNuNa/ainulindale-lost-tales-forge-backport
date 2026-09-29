@@ -38,7 +38,7 @@ public final class LostTalesQuestPlayerHistoryTest {
         assertNotNull(abandoned);
         assertTrue(abandoned.isAbandoned());
         assertEquals(40L, abandoned.getWorldTime());
-        assertFalse(loaded.isQuestFailed("losttales:choice"));
+        assertFalse(abandoned.isFailed());
     }
 
     @Test

@@ -50,7 +50,7 @@ public final class LostTalesChatPresentationTest {
                 ChatChannel.GLOBAL, ChatNarrator.NAME, "Steve", "the gate falls")
                 .colors(0, ChatNarrator.color()).at(123456789L).skin(ChatNarrator.SKIN_ID).build();
         assertTrue(packet.isNarrator());
-        IChatComponent message = LostTalesChatPresentation.build(packet);
+        IChatComponent message = build(packet);
         boolean marked = false;
         boolean italicWords = false;
         for (Object value : message) {
@@ -91,7 +91,7 @@ public final class LostTalesChatPresentationTest {
      */
     @Test
     public void theNameIsTheFirstPartToAnswerAfterTheHead() {
-        IChatComponent message = LostTalesChatPresentation.build(
+        IChatComponent message = build(
                 ChatPacketFixtures.line(ChatChannel.GLOBAL, "Arathorn", "RangerOfTheNorth", "hello")
                         .colors(0x55AA55, 0x336633).at(123456789L).build());
         boolean afterHead = false;
@@ -124,7 +124,7 @@ public final class LostTalesChatPresentationTest {
                         ChatChannel.GLOBAL, "Arathorn", "RangerOfTheNorth", "The road is clear.")
                         .title("Ranger").colors(0x55AA55, 0x336633).at(123456789L)
                         .skin("losttales:human_ranger_male_2").build();
-        IChatComponent message = LostTalesChatPresentation.build(packet);
+        IChatComponent message = build(packet);
 
         StringBuilder plainText = new StringBuilder();
         ClickEvent reply = null;
@@ -201,7 +201,7 @@ public final class LostTalesChatPresentationTest {
                         .build();
         ChatTitleMarker.Data marker = null;
         StringBuilder plainText = new StringBuilder();
-        for (Object value : LostTalesChatPresentation.build(titled)) {
+        for (Object value : build(titled)) {
             IChatComponent part = (IChatComponent)value;
             plainText.append(part.getUnformattedTextForChat());
             ChatTitleMarker.Data decoded = ChatTitleMarker.decode(part);
@@ -219,7 +219,7 @@ public final class LostTalesChatPresentationTest {
                 ChatPacketFixtures.line(ChatChannel.GLOBAL, "Aldric", "Aldric123", "Good harvest.")
                         .colors(0x55AA55, 0x336633).at(123456789L).faction("Gondor").build();
         plainText.setLength(0);
-        for (Object value : LostTalesChatPresentation.build(untitled)) {
+        for (Object value : build(untitled)) {
             IChatComponent part = (IChatComponent)value;
             plainText.append(part.getUnformattedTextForChat());
             assertFalse(ChatTitleMarker.isMarker(part));
@@ -290,7 +290,7 @@ public final class LostTalesChatPresentationTest {
                         .colors(0x55AA55, 0x336633).at(123456789L)
                         .skin("losttales:human_ranger_male_2").build();
         StringBuilder plainText = new StringBuilder();
-        for (Object value : LostTalesChatPresentation.build(packet)) {
+        for (Object value : build(packet)) {
             plainText.append(((IChatComponent)value)
                     .getUnformattedTextForChat());
         }
@@ -310,7 +310,7 @@ public final class LostTalesChatPresentationTest {
     public void factionChannelUsesTheFactionSnapshotColor() {
         String prefix = ClientChatChannelState.displayName(ChatChannel.FACTION);
         assertNotEquals(ChatChannel.FACTION.getDisplayName(), prefix);
-        IChatComponent message = LostTalesChatPresentation.build(
+        IChatComponent message = build(
                 ChatPacketFixtures.line(ChatChannel.FACTION, "Amdir", "Player", "Mae govannen.")
                         .colors(0x778899, 0x245A32).at(123456789L).skin("losttales:elf_high_male_0")
                         .build());
@@ -384,7 +384,7 @@ public final class LostTalesChatPresentationTest {
                         ChatChannel.GLOBAL, "Arathorn", "RangerOfTheNorth", "&6gold words")
                         .colors(0x55AA55, 0x336633).at(123456789L)
                         .skin("losttales:human_ranger_male_2").build();
-        IChatComponent message = LostTalesChatPresentation.build(packet);
+        IChatComponent message = build(packet);
         StringBuilder plainText = new StringBuilder();
         ChatHeadMarker.Data marker = null;
         for (Object value : message) {
@@ -429,14 +429,14 @@ public final class LostTalesChatPresentationTest {
         LostTalesChatMessagePacket tagged = ChatPacketFixtures.line(
                 ChatChannel.OOC, "Steve", "Steve", "hello")
                 .colors(0xFCECD1, ChatAccountRole.TEAM.getColor()).at(123456789L)
-                .roles(ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR, ChatAccountRole.TEAM))
+                .roles(ChatRoleFixtures.maskOf(ChatRoleFixtures.OPERATOR, ChatAccountRole.TEAM))
                 .build();
         // Without a loaded language a built-in's name reads as its key.
         String operatorTag = "[" + ChatRoleFixtures.OPERATOR.getDisplayName() + "]";
         String developerTag = "[" + ChatAccountRole.TEAM.getDisplayName() + "]";
         StringBuilder plain = new StringBuilder();
         Integer openingBracketRgb = null;
-        for (Object value : LostTalesChatPresentation.build(tagged)) {
+        for (Object value : build(tagged)) {
             IChatComponent part = (IChatComponent)value;
             String text = part.getUnformattedTextForChat();
             plain.append(text);
@@ -451,7 +451,7 @@ public final class LostTalesChatPresentationTest {
         // the packet's, which the server set to the primary role's.
         assertEquals(Integer.valueOf(1), openingBracketRgb);
         assertEquals(ChatAccountRole.TEAM.getColor(),
-                markerOf(LostTalesChatPresentation.build(tagged)).nameColor);
+                markerOf(build(tagged)).nameColor);
     }
 
     /**
@@ -462,19 +462,19 @@ public final class LostTalesChatPresentationTest {
      */
     @Test
     public void directMessagesFollowTheCommonIdentityRules() {
-        int roles = ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR);
+        int roles = ChatRoleFixtures.maskOf(ChatRoleFixtures.OPERATOR);
         LostTalesChatMessagePacket whisper =
                 ChatPacketFixtures.line(ChatChannel.WHISPER, "Steve", "Steve", "hello")
                         .colors(0xFCECD1, ChatAccountRole.nameColor(roles)).at(123456789L)
                         .partner("Alex").roles(roles).accountLine(true).build();
         String operatorTag = "[" + ChatRoleFixtures.OPERATOR.getDisplayName() + "]";
         StringBuilder plain = new StringBuilder();
-        for (Object value : LostTalesChatPresentation.build(whisper)) {
+        for (Object value : build(whisper)) {
             plain.append(((IChatComponent)value).getUnformattedTextForChat());
         }
         assertFalse(plain.toString().contains(operatorTag));
         assertEquals(ChatRoleFixtures.OPERATOR.getColor(),
-                markerOf(LostTalesChatPresentation.build(whisper))
+                markerOf(build(whisper))
                         .nameColor);
 
         // Signed with a character instead: no tag, the character's
@@ -486,7 +486,7 @@ public final class LostTalesChatPresentationTest {
                         .accountLine(false).build();
         StringBuilder character = new StringBuilder();
         for (Object value
-                : LostTalesChatPresentation.build(asCharacter)) {
+                : build(asCharacter)) {
             character.append(((IChatComponent)value)
                     .getUnformattedTextForChat());
         }
@@ -494,7 +494,7 @@ public final class LostTalesChatPresentationTest {
         assertTrue(character.toString().contains("Aldric"));
         assertFalse(character.toString().contains("(Steve)"));
         assertEquals(0x55AA55,
-                markerOf(LostTalesChatPresentation.build(asCharacter))
+                markerOf(build(asCharacter))
                         .nameColor);
     }
 
@@ -504,7 +504,7 @@ public final class LostTalesChatPresentationTest {
      */
     @Test
     public void markupStylesTheBodyAndDropsItsMarkers() {
-        IChatComponent message = LostTalesChatPresentation.build(
+        IChatComponent message = build(
                 ChatPacketFixtures.line(
                         ChatChannel.GLOBAL, "Aldric", "Steve", "a **bold** and `code` word")
                         .colors(0x55AA55, 0x336633).at(123456789L).build());
@@ -668,7 +668,7 @@ public final class LostTalesChatPresentationTest {
     public void theServersOwnWordsReadInTheJoinYellow() {
         for (ChatConsoleEvent.Kind kind : new ChatConsoleEvent.Kind[] {
                 ChatConsoleEvent.Kind.SERVER, ChatConsoleEvent.Kind.MODERATION,
-                ChatConsoleEvent.Kind.ROLES, ChatConsoleEvent.Kind.CONFIG}) {
+                ChatConsoleEvent.Kind.CONFIG}) {
             assertEquals(kind.name(), EnumChatFormatting.YELLOW,
                     LostTalesChatPresentation.consoleWordsColour(consoleEntry(
                             kind, ChatConsoleEvent.Severity.NOTICE)));
@@ -714,6 +714,16 @@ public final class LostTalesChatPresentationTest {
         assertFalse(LostTalesChatPresentation.repliesTo(
                 com.ninuna.losttales.chat.ChatReplyReference.of(99L,
                         "Arathorn", "hello"), player));
+    }
+
+    /** A forward answers nobody, so it pings nobody, its author least of all. */
+    @Test
+    public void aForwardPingsNobody() {
+        UUID player = UUID.randomUUID();
+        com.ninuna.losttales.chat.ChatReplyReference forward =
+                com.ninuna.losttales.chat.ChatReplyReference.forward(1234L,
+                        "Arathorn", 0, "#ooc/1234").withHead(player, true, "");
+        assertFalse(LostTalesChatPresentation.repliesTo(forward, player));
     }
 
     /**
@@ -896,5 +906,11 @@ public final class LostTalesChatPresentationTest {
             }
         }
         return null;
+    }
+
+    /** The line as the chat shows it, filed where its packet says. */
+    private static IChatComponent build(LostTalesChatMessagePacket packet) {
+        return LostTalesChatPresentation.build(packet,
+                LostTalesChatPresentation.fileUnder(packet), new int[0], false);
     }
 }

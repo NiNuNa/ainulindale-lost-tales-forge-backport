@@ -13,23 +13,25 @@ import java.nio.charset.Charset;
 import java.util.regex.Pattern;
 
 /**
- * The three HTTPS calls the bridge makes, on plain {@link HttpURLConnection}
- * so the mod carries no library: a bot-authorised GET of a channel's
- * messages, a webhook POST, and a bot-authorised PATCH of the channel's
- * topic. Bodies are bounded, timeouts are short, and a reply is returned
- * as status, text and what its headers say of the rate limit — the
- * caller decides what a status means. A reply read to its end leaves its
- * connection in the JVM's keep-alive pool, so the next call to Discord
- * skips the TCP and TLS handshake. The token and the webhook URL never
- * reach a log.
+ * Every HTTPS call the bridge makes to Discord, on plain
+ * {@link HttpURLConnection} so the mod carries no library: the bot's REST
+ * calls, the webhooks' posts and corrections, and the answers to slash
+ * commands. Bodies are bounded and timeouts are short. A redirect is
+ * never followed and counts as a failure, so a request's token goes to
+ * the address it was written for or nowhere. A reply is its status, its
+ * text and what its headers say of the rate limit; the caller decides
+ * what a status means. A reply read to its end leaves its connection in
+ * the JVM's keep-alive pool, so the next call to Discord skips the TCP
+ * and TLS handshake. Neither the bot token nor a webhook's address
+ * reaches a log ({@link #describe}).
  *
- * <p>Java 8's {@code HttpURLConnection} refuses {@code PATCH} as a
- * method name, so the topic write opens as a POST and sets the method
- * on the connection's own field, the way every library-free client on
- * this JVM does; when that cannot be done the write fails with
+ * <p>Java 8's {@code HttpURLConnection} refuses {@code PATCH} as a method
+ * name. A request that needs one opens as a POST and
+ * {@link DiscordHttpPatch} writes the method into the connection; when
+ * that cannot be done the request fails with
  * {@link PatchUnsupportedException} and the caller stops trying.</p>
  */
-final class DiscordHttp {
+public final class DiscordHttp {
     static final String API_BASE = "https://discord.com/api/v10";
     private static final int CONNECT_TIMEOUT_MILLIS = 5000;
     private static final int READ_TIMEOUT_MILLIS = 8000;
@@ -51,9 +53,10 @@ final class DiscordHttp {
      * A failure as a log may show it: its kind and its message, with the
      * token of any webhook or slash command address in it blanked, since
      * whoever holds a webhook's address can post through it, and a slash
-     * command's can answer for the bot while it lasts.
+     * command's can answer for the bot while it lasts. Every failure the
+     * bridge logs goes through here, the gateway's among them.
      */
-    static String describe(Throwable failure) {
+    public static String describe(Throwable failure) {
         if (failure == null) {
             return "";
         }
@@ -306,10 +309,15 @@ final class DiscordHttp {
         }
     }
 
-    private static HttpURLConnection open(String url, String method)
+    /**
+     * A connection to Discord, not yet connected. It follows no redirect:
+     * the Authorization header set on it must never reach another host.
+     */
+    static HttpURLConnection open(String url, String method)
             throws IOException {
         HttpURLConnection connection =
                 (HttpURLConnection)new URL(url).openConnection();
+        connection.setInstanceFollowRedirects(false);
         connection.setRequestMethod(method);
         connection.setConnectTimeout(CONNECT_TIMEOUT_MILLIS);
         connection.setReadTimeout(READ_TIMEOUT_MILLIS);
@@ -319,7 +327,12 @@ final class DiscordHttp {
         return connection;
     }
 
-    private static Reply exchange(HttpURLConnection connection, String body)
+    /**
+     * Sends the body, when there is one, and reads the reply. A redirect
+     * is a failure: Discord's API never answers with one, and following
+     * it would be the only way a request could leave for another host.
+     */
+    static Reply exchange(HttpURLConnection connection, String body)
             throws IOException {
         // A reply read to its end hands its socket back to the JVM's
         // keep-alive pool for the next call; only an exchange that broke
@@ -339,6 +352,10 @@ final class DiscordHttp {
                 }
             }
             int status = connection.getResponseCode();
+            if (status >= 300 && status < 400) {
+                throw new IOException("Discord answered HTTP " + status
+                        + ", a redirect, which is not followed");
+            }
             DiscordRateLimit limit = rateLimitOf(connection);
             InputStream stream = status >= 400
                     ? connection.getErrorStream() : connection.getInputStream();

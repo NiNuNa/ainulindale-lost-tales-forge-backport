@@ -12,7 +12,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -44,7 +43,6 @@ public final class CharacterIndexTest {
         CharacterIndex index = data.characterIndex();
         assertNotNull(data.findCharacter(CHARACTER));
         assertTrue(data.containsCharacter(CHARACTER));
-        assertSame(roster, index.rosterOf(CHARACTER));
         assertEquals(1, index.countOf(CHARACTER));
         assertEquals(0, index.countOf(OTHER));
         assertTrue(index.isAccountOwner(OWNER_A));
@@ -79,7 +77,6 @@ public final class CharacterIndexTest {
 
         CharacterIndex index = data.characterIndex();
         assertNull(index.find(CHARACTER));
-        assertNull(index.rosterOf(CHARACTER));
         assertTrue(index.isAmbiguous(CHARACTER));
         assertTrue(index.contains(CHARACTER));
         assertEquals(2, index.countOf(CHARACTER));

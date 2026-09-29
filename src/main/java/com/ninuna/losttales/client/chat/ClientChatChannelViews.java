@@ -4,8 +4,6 @@ import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.client.motion.MotionIds;
-import com.ninuna.losttales.client.window.TabSelection;
-import com.ninuna.losttales.client.window.WindowOpening;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -142,16 +140,9 @@ public final class ClientChatChannelViews {
         return ChatTab.viewed(tab);
     }
 
-    /** Remembers a new Lost Tales line's tab and counts it unread elsewhere. */
-    public static synchronized void record(int chatLineId, ChatTab tab,
-                                           ChatTab selected,
-                                           boolean mentionsLocalPlayer) {
-        record(chatLineId, tab, selected, mentionsLocalPlayer,
-                ChatMessageIds.NONE, System.currentTimeMillis(), false);
-    }
-
     /**
-     * As above, for a line the server named, said at
+     * Remembers a new Lost Tales line's tab and counts it unread
+     * elsewhere; a line the server named was said at
      * {@code timestampMillis}. {@code serverId} is where the view's read
      * mark moves once the line is seen: a message's own id, or for a
      * console line the id of the entry it shows, which comes from the
@@ -285,13 +276,6 @@ public final class ClientChatChannelViews {
             iterator.remove();
         }
         invalidateCache();
-    }
-
-    public static synchronized void record(int chatLineId, ChatChannel channel,
-                                           ChatChannel selected,
-                                           boolean mentionsLocalPlayer) {
-        record(chatLineId, ChatTab.of(channel), ChatTab.of(selected),
-                mentionsLocalPlayer);
     }
 
     /** Remembers when a printed line was said. */
@@ -618,10 +602,6 @@ public final class ClientChatChannelViews {
         }
     }
 
-    public static synchronized void markViewed(ChatChannel channel) {
-        markViewed(ChatTab.of(channel));
-    }
-
     /** Unread messages that mentioned the player, capped at MAX_UNREAD + 1. */
     public static synchronized int unreadPingCount(ChatTab tab) {
         tab = ChatTab.viewed(tab);
@@ -645,66 +625,14 @@ public final class ClientChatChannelViews {
         return unreadCount(ChatTab.of(channel));
     }
 
-    public static synchronized int unreadPingCount(ChatChannel channel) {
-        return unreadPingCount(ChatTab.of(channel));
-    }
-
-    public static synchronized int unreadOtherCount(ChatChannel channel) {
-        return unreadOtherCount(ChatTab.of(channel));
-    }
-
     public static synchronized boolean hasUnread(ChatTab tab) {
         tab = ChatTab.viewed(tab);
         return unreadPingCount(tab) + unreadOtherCount(tab) > 0;
     }
 
-    public static synchronized boolean hasUnread(ChatChannel channel) {
-        return hasUnread(ChatTab.of(channel));
-    }
-
-    public static synchronized boolean hasUnreadMention(ChatTab tab) {
-        tab = ChatTab.viewed(tab);
-        return unreadPingCount(tab) > 0;
-    }
-
-    public static synchronized boolean hasUnreadMention(ChatChannel channel) {
-        return hasUnreadMention(ChatTab.of(channel));
-    }
-
     /** The recorded tab, or null for vanilla and untracked lines. */
     public static synchronized ChatTab tabOf(int chatLineId) {
         return TAB_BY_LINE_ID.get(Integer.valueOf(chatLineId));
-    }
-
-    /** The recorded channel, or null for vanilla and untracked lines. */
-    public static synchronized ChatChannel channelOf(int chatLineId) {
-        ChatTab tab = tabOf(chatLineId);
-        return tab == null ? null : tab.getChannel();
-    }
-
-    /**
-     * The lines shown for {@code view} (null meaning the combined feed), in
-     * vanilla's newest-first order.
-     */
-    public static synchronized List<ChatLine> visibleLines(
-            List<ChatLine> drawnLines, ChatTab view) {
-        if (view == null) {
-            return drawnLines == null
-                    ? Collections.<ChatLine>emptyList() : drawnLines;
-        }
-        // Reading a conversation this client has never been sent — one
-        // of another of the player's characters — asks for it once.
-        ChatTab read = ChatTab.viewed(view);
-        String scope = ClientChatContextHistory.scopeOf(read);
-        if (scope.length() > 0) {
-            ClientChatContextHistory.request(read, scope);
-        }
-        return visibleLines(drawnLines, ChatLineFilter.of(view));
-    }
-
-    public static synchronized List<ChatLine> visibleLines(
-            List<ChatLine> drawnLines, ChatChannel view) {
-        return visibleLines(drawnLines, ChatTab.of(view));
     }
 
     /**
@@ -729,9 +657,13 @@ public final class ClientChatChannelViews {
             if (line == null) {
                 continue;
             }
-            // Untracked lines belong to the console wherever its tab lives.
+            // Untracked lines belong to the console wherever its tab lives;
+            // a line addressed to the player passes where only such lines
+            // of its conversation do.
             if (filter.accepts(TAB_BY_LINE_ID.get(
-                    Integer.valueOf(line.getChatLineID())))) {
+                    Integer.valueOf(line.getChatLineID())),
+                    LostTalesChatPresentation.isPingedLine(
+                            line.getChatLineID()))) {
                 visible.add(line);
             }
         }
@@ -768,12 +700,6 @@ public final class ClientChatChannelViews {
             SCROLL.put(view, Double.valueOf(clamped));
         }
         return clamped;
-    }
-
-    public static synchronized double getScroll(ChatChannel view,
-                                                int totalLines,
-                                                double roomLines) {
-        return getScroll(ChatTab.of(view), totalLines, roomLines);
     }
 
     /**
@@ -844,33 +770,6 @@ public final class ClientChatChannelViews {
         }
     }
 
-    public static synchronized void scroll(ChatTab tab, int delta,
-                                           int totalLines,
-                                           double roomLines) {
-        ChatTab view = key(tab);
-        if (view == null) {
-            return;
-        }
-        SCROLL.put(view, Double.valueOf(target(view) + delta));
-        noteScrolled(view);
-        getScroll(view, totalLines, roomLines);
-    }
-
-    public static synchronized void scroll(ChatChannel view, int delta,
-                                           int totalLines,
-                                           double roomLines) {
-        scroll(ChatTab.of(view), delta, totalLines, roomLines);
-    }
-
-    /** Drops every view back to the newest line. */
-    public static synchronized void resetScroll() {
-        SCROLL.clear();
-        RENDERED.clear();
-        ANCHORS.clear();
-        SCROLL_REVISION.clear();
-        WAITING_BELOW.clear();
-    }
-
     private static double target(ChatTab view) {
         Double value = view == null ? null : SCROLL.get(view);
         return value == null ? 0.0D : value.doubleValue();
@@ -918,7 +817,6 @@ public final class ClientChatChannelViews {
         UNREAD_DIVIDERS.clear();
         NEWEST_MESSAGE_BY_VIEW.clear();
         sessionArrival = ChatMessageIds.NONE;
-        WindowOpening.clear();
         invalidateCache();
         ChatGroupRuns.clear();
         ClientChatMessageIds.clear();
@@ -932,7 +830,6 @@ public final class ClientChatChannelViews {
         ClientChatIdentities.clear();
         ClientChatIdentitySelection.clear();
         ClientChatConsoleEvents.clear();
-        TabSelection.clear();
         // The history is gone with the world, and so are its conversations
         // and what was said in them.
         ChatLayout.closeConversations();
@@ -976,7 +873,6 @@ public final class ClientChatChannelViews {
         ChatWindowLines.clear();
         ChatFrame.clear();
         ClientChatConsoleEvents.clear();
-        TabSelection.clear();
     }
 
     /** Line ids remembered: the history's capacity and a margin. */
@@ -989,7 +885,12 @@ public final class ClientChatChannelViews {
         return value == null ? 0 : value.intValue();
     }
 
-    private static void invalidateCache() {
+    /**
+     * Forgets every view's lines: what a filter passes has changed for a
+     * line already standing, as when a line is found to be addressed to
+     * the player after it was printed.
+     */
+    static synchronized void invalidateCache() {
         CACHE.clear();
     }
 

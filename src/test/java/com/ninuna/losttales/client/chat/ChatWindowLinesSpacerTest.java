@@ -43,7 +43,7 @@ public final class ChatWindowLinesSpacerTest {
         // 4 is a system line: no entry.
         remember(5, ALICE, 5000L);
         int[] newestFirst = {5, 4, 3, 2, 1};
-        boolean[] grouped = ChatGroupRuns.continuationsOf(newestFirst);
+        boolean[] grouped = ChatGroupRuns.continuationsOf(newestFirst, null);
         boolean[] spacers = ChatWindowLines.spacersAfter(newestFirst, grouped);
         // Alice(5) opens a run over the system line: spaced.
         assertTrue(spacers[0]);
@@ -63,7 +63,7 @@ public final class ChatWindowLinesSpacerTest {
         remember(1, ALICE, 1000L);
         remember(2, ALICE, 1000L + 10L * 60L * 1000L);
         int[] newestFirst = {2, 1};
-        boolean[] grouped = ChatGroupRuns.continuationsOf(newestFirst);
+        boolean[] grouped = ChatGroupRuns.continuationsOf(newestFirst, null);
         assertFalse(grouped[0]);
         assertTrue(ChatWindowLines.spacersAfter(newestFirst, grouped)[0]);
     }
@@ -73,7 +73,7 @@ public final class ChatWindowLinesSpacerTest {
     public void systemLinesSideBySideAreNotSpaced() {
         int[] newestFirst = {9, 8, 7};
         boolean[] spacers = ChatWindowLines.spacersAfter(newestFirst,
-                ChatGroupRuns.continuationsOf(newestFirst));
+                ChatGroupRuns.continuationsOf(newestFirst, null));
         assertFalse(spacers[0]);
         assertFalse(spacers[1]);
         assertFalse(spacers[2]);

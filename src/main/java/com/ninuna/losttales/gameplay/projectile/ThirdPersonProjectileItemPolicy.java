@@ -3,7 +3,6 @@ package com.ninuna.losttales.gameplay.projectile;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.CopyOnWriteArraySet;
 import net.minecraft.item.EnumAction;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemBow;
@@ -31,12 +30,6 @@ public final class ThirdPersonProjectileItemPolicy {
                     "LOTRItemBow", "LOTRItemCrossbow",
                     "LOTRItemSpear", "LOTRItemThrowingAxe",
                     "LOTRItemBlowgun", "LOTRItemSling"));
-    private static final Set<Class<? extends Item>> REGISTERED_PROJECTILES =
-            new CopyOnWriteArraySet<Class<? extends Item>>();
-    private static final Set<Class<? extends Item>> REGISTERED_RANGED_WEAPONS =
-            new CopyOnWriteArraySet<Class<? extends Item>>();
-    private static final Set<Class<? extends Item>> REGISTERED_CHARGEABLE =
-            new CopyOnWriteArraySet<Class<? extends Item>>();
 
     private ThirdPersonProjectileItemPolicy() {}
 
@@ -56,11 +49,6 @@ public final class ThirdPersonProjectileItemPolicy {
         if (item.getItemUseAction(stack) == EnumAction.bow) {
             return true;
         }
-        if (matches(item, REGISTERED_PROJECTILES)
-                || matches(item, REGISTERED_RANGED_WEAPONS)
-                || matches(item, REGISTERED_CHARGEABLE)) {
-            return true;
-        }
         Class<?> type = item.getClass();
         return type.getName().startsWith("lotr.common.item.")
                 && LOTR_PROJECTILE_ITEMS.contains(type.getSimpleName());
@@ -73,8 +61,7 @@ public final class ThirdPersonProjectileItemPolicy {
         }
         Item item = stack.getItem();
         return item instanceof ItemBow
-                || item.getItemUseAction(stack) == EnumAction.bow
-                || matches(item, REGISTERED_CHARGEABLE);
+                || item.getItemUseAction(stack) == EnumAction.bow;
     }
 
     /** Returns whether holding the item should select a weapon camera state. */
@@ -82,12 +69,10 @@ public final class ThirdPersonProjectileItemPolicy {
         if (!isSupported(stack)) {
             return false;
         }
-        Item item = stack.getItem();
-        if (isChargeable(stack)
-                || matches(item, REGISTERED_RANGED_WEAPONS)) {
+        if (isChargeable(stack)) {
             return true;
         }
-        Class<?> type = item.getClass();
+        Class<?> type = stack.getItem().getClass();
         return type.getName().startsWith("lotr.common.item.")
                 && LOTR_RANGED_WEAPONS.contains(type.getSimpleName());
     }
@@ -101,38 +86,5 @@ public final class ThirdPersonProjectileItemPolicy {
     public static boolean isActivelyAiming(ItemStack stack,
                                            boolean usingItem) {
         return isActivelyCharging(stack, usingItem);
-    }
-
-    public static void registerProjectileItem(
-            Class<? extends Item> itemType) {
-        REGISTERED_PROJECTILES.add(requireType(itemType));
-    }
-
-    public static void registerRangedWeaponItem(
-            Class<? extends Item> itemType) {
-        REGISTERED_RANGED_WEAPONS.add(requireType(itemType));
-    }
-
-    public static void registerChargeableItem(
-            Class<? extends Item> itemType) {
-        REGISTERED_CHARGEABLE.add(requireType(itemType));
-    }
-
-    private static boolean matches(
-            Item item, Set<Class<? extends Item>> types) {
-        for (Class<? extends Item> type : types) {
-            if (type.isInstance(item)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static Class<? extends Item> requireType(
-            Class<? extends Item> itemType) {
-        if (itemType == null) {
-            throw new IllegalArgumentException("itemType");
-        }
-        return itemType;
     }
 }

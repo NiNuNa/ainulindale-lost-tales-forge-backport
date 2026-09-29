@@ -156,14 +156,21 @@ public final class CharacterTemplateStoreTest {
         assertEquals(0, CharacterTemplateStore.load(ACCOUNT).getAge());
     }
 
-    /** A newline inside a value would read back as another entry. */
+    /**
+     * A History keeps its paragraphs, and a line break inside it never
+     * reads back as another entry; a backslash reads back as itself.
+     */
     @Test
-    public void aValueCarryingANewlineIsFlattened() throws IOException {
+    public void aValueKeepsItsLineBreaksAndInjectsNoEntry() throws IOException {
+        String history = "First line\nname=Injected\n\nA path\\n and a \\ too";
         CharacterTemplateStore.save(ACCOUNT, new CharacterTemplate(
-                "Aldric", "", "", "", "", "", "",
-                "First line\nname=Injected", 0, false));
+                "Aldric", "", "", "", "", "", "", history, 0, false));
 
-        assertEquals("Aldric", CharacterTemplateStore.load(ACCOUNT).getName());
+        CharacterTemplate loaded = CharacterTemplateStore.load(ACCOUNT);
+        assertEquals("Aldric", loaded.getName());
+        assertEquals(history, loaded.getHistory());
+        assertEquals(history, CharacterTemplateStore.unescape(
+                CharacterTemplateStore.escape(history)));
     }
 
     /** Saving twice leaves one file, not a file and a half-written one. */

@@ -4,6 +4,7 @@ import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatCodeNames;
 import com.ninuna.losttales.chat.ChatRecipientRule;
 import com.ninuna.losttales.compat.discord.DiscordBindingEntries;
+import com.ninuna.losttales.compat.discord.DiscordBridgePolicy;
 import com.ninuna.losttales.compat.discord.DiscordBridgeDirection;
 import com.ninuna.losttales.compat.discord.DiscordLinkCodes;
 import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
@@ -154,6 +155,12 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
                 + describe(direction) + ". The code works once, for "
                 + DiscordLinkCodes.LIFETIME_MILLIS / 60000L + " minutes, and needs a"
                 + " member who may manage that channel's webhooks.");
+        if (DiscordBridgePolicy.isLimitedInGame(named.channel)) {
+            LostTalesCommandConfig.send(sender, EnumChatFormatting.YELLOW
+                    + "Only some players read " + LostTalesDiscordBridge.gameChannelName(key)
+                    + " in the game. On Discord, everyone who can see the linked channel"
+                    + " reads it: link it to a channel only your staff can see.");
+        }
     }
 
     /**

@@ -129,4 +129,20 @@ public final class LostTalesDiscordBridgeIntakeTest {
                 "proximity=GAME_TO_DISCORD;channel=333;webhook=" + HOOK_B + "-p");
         assertTrue(LostTalesDiscordBridge.topicsLeft(kept, same, true).isEmpty());
     }
+
+    /** A restart reads on from where it got to, but only in channels read both before and after. */
+    @Test
+    public void aRestartReadsOnOnlyWhereItReadBefore() {
+        java.util.Map<String, String> seen = new java.util.HashMap<String, String>();
+        seen.put("5", "100");
+        seen.put("6", "200");
+        seen.put("7", "300");
+        LostTalesDiscordBridge.keepSeenOfChannelsStillRead(seen,
+                bound("ooc=DISCORD_TO_GAME;channel=5", "global=DISCORD_TO_GAME;channel=6"),
+                bound("ooc=DISCORD_TO_GAME;channel=5", "global=DISCORD_TO_GAME;channel=7"));
+        assertEquals(Collections.singletonMap("5", "100"), seen);
+        LostTalesDiscordBridge.keepSeenOfChannelsStillRead(seen,
+                DiscordChannelBindings.EMPTY, bound("ooc=DISCORD_TO_GAME;channel=5"));
+        assertTrue("a start after a stop reads from the newest line", seen.isEmpty());
+    }
 }

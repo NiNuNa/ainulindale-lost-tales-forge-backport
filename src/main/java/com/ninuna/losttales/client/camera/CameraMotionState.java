@@ -61,13 +61,6 @@ public final class CameraMotionState {
 
     public CameraMotionOffset update(
             CameraPose target, CameraMotionProfile profile,
-            double multiplier, double deltaSeconds) {
-        return update(target, profile, multiplier, deltaSeconds,
-                Double.NaN, Double.NaN);
-    }
-
-    public CameraMotionOffset update(
-            CameraPose target, CameraMotionProfile profile,
             double multiplier, double deltaSeconds,
             double stridePhase, double strideIntensity) {
         if (target == null || profile == null) {

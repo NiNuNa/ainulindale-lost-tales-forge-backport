@@ -21,9 +21,9 @@ import net.minecraft.client.gui.FontRenderer;
  * edge). The screen arms them from its presses, feeds them the pointer
  * every frame and every mouse event, and asks them what is being
  * dragged; they move the layout live and write it down once, on
- * release. A carried window's landing is shown
- * as it is found: the neighbour's edge lit, the snap bar at the top of
- * the screen, and the preview pane in the part of the screen it fills.
+ * release. A carried window's landing is shown as it is found: the edge
+ * of the neighbour it lines up with lit, the snap bar at the top of the
+ * screen, and the preview pane in the part of the screen it fills.
  */
 public final class WindowGestures {
     /** What the screen the windows stand on does for the drags. */
@@ -65,8 +65,8 @@ public final class WindowGestures {
         LostTalesMapCursor.Pose pose();
     }
 
-    /** Distance from another window's edge at which a drag snaps and links. */
-    public static final int LINK_SNAP = 6;
+    /** Distance from another window's edge at which a carried window lines up with it. */
+    public static final int LINE_UP_REACH = 6;
 
     /** Pointer travel before a press on a tab becomes a drag. */
     public static final int DRAG_THRESHOLD = 4;
@@ -245,13 +245,13 @@ public final class WindowGestures {
     }
 
     /**
-     * The edge a carried window is about to link to, lit along its whole
-     * length: the target's frame on that side, both of its pixels, from
-     * corner to corner, where the frame is drawn — so the light lies in
-     * the gap the two windows will keep, over the frame it stands for,
-     * and never on either window's own pixels.
+     * The edge a carried window lines up with, lit along its whole
+     * length: the neighbour's frame on that side, both of its pixels,
+     * from corner to corner, where the frame is drawn — so the light lies
+     * in the gap the two windows keep, over the frame it stands for, and
+     * never on either window's own pixels.
      */
-    public void drawLinkHighlight() {
+    public void drawLineUpEdge() {
         Landing landing = activeLanding();
         if (landing == null || landing.snapTargetId == null) {
             return;
@@ -267,7 +267,7 @@ public final class WindowGestures {
         float bottom = (float)(target.boxBottom + target.motionY);
         int colour = LostTalesUiInk.argb(
                 WindowStyle.LANDING_RGB, 0xFF);
-        switch (landing.snapSide) {
+        switch (landing.edge) {
             case ABOVE:
                 LostTalesUiInk.fillRect(left - ring, top - ring,
                         right + ring, top, colour);
@@ -388,8 +388,6 @@ public final class WindowGestures {
         if (this.windowDrag != null) {
             WindowDrag drag = this.windowDrag;
             this.windowDrag = null;
-            // Touching another window only shows what it would stick to;
-            // locking it is what sticks it.
             land(drag.windowId, drag.landing);
             WindowLayout.persist();
         }
@@ -526,8 +524,6 @@ public final class WindowGestures {
         /** Pointer's offset from the edge it took hold of. */
         final double grabX;
         final double grabY;
-        final int pressX;
-        final int pressY;
         /**
          * A resize is live from the press, so nothing under the pointer
          * has to be overcome before the edge moves.
@@ -549,8 +545,7 @@ public final class WindowGestures {
 
         WindowResize(String windowId, ResizeEdge edge, double left,
                      double right, double top, double bottom, double grabX,
-                     double grabY, int pressX, int pressY, double height,
-                     Window window) {
+                     double grabY, double height, Window window) {
             this.windowId = windowId;
             this.edge = edge;
             this.startLeft = left;
@@ -563,8 +558,6 @@ public final class WindowGestures {
             this.bottom = bottom;
             this.grabX = grabX;
             this.grabY = grabY;
-            this.pressX = pressX;
-            this.pressY = pressY;
             this.height = height;
             this.storedHeight = window.getOwnHeight();
             this.storedWidth = window.getOwnWidth();
@@ -768,7 +761,6 @@ public final class WindowGestures {
                 right, top, bottom,
                 pointerX - (target.edge.fromLeft ? left : right),
                 pointerY - (target.edge.fromTop ? top : bottom),
-                mouseX, mouseY,
                 WindowPlacement.currentHeight(window, this.mc), window);
     }
 
@@ -1033,7 +1025,7 @@ public final class WindowGestures {
         double pointer = across
                 ? WindowPlacement.preciseMouseX(this.mc, this.screenWidth)
                 : WindowPlacement.preciseMouseY(this.mc, this.screenHeight);
-        double room = (across ? WindowPlacement.minBoxWidth(this.mc)
+        double room = (across ? WindowPlacement.MIN_BOX_WIDTH
                 : WindowPlacement.minHeight(this.mc))
                 + 2.0D * WindowPlacement.EDGE_MARGIN;
         double least = room / size;
@@ -1084,17 +1076,25 @@ public final class WindowGestures {
 
     /* ---- Moving a window ---- */
 
+    /** Which side of a neighbour a carried window lines up on. */
+    enum Edge {
+        ABOVE,
+        BELOW,
+        LEFT,
+        RIGHT
+    }
+
     /**
      * Where a carried window lands when the button comes up: the
-     * neighbour whose edge it has snapped to, and the part of the screen
+     * neighbour whose edge it lines up with, and the part of the screen
      * it fills. One rides every carry, whether the window was taken by
      * its strip or carried out of a row by its tabs.
      */
     static final class Landing {
-        /** Window whose edge the carried one is snapped to right now, or null. */
+        /** Window whose edge the carried one lines up with right now, or null. */
         String snapTargetId;
-        /** Which side of that target the carried window sits on. */
-        Window.LinkSide snapSide = Window.LinkSide.BELOW;
+        /** Which side of that neighbour the carried window stands on. */
+        Edge edge = Edge.BELOW;
         /**
          * The part of the screen the window fills on release — the
          * pointer is in a screen edge's zone, a corner's, or a layout's
@@ -1185,12 +1185,11 @@ public final class WindowGestures {
     /**
      * Carries a window to where the pointer asks for it — its left edge
      * at {@code x}, its baseline at {@code baseline} — the same whether it
-     * was taken by its strip or carried out of a row by its tabs: windows
-     * stuck together move as one piece; a window alone sticks to a
-     * neighbour's edge it comes near; and with the pointer in a snap
-     * zone — a screen edge, a corner, a layout on the snap bar — the
-     * preview shows the part of the screen the window fills when the
-     * button comes up, which outranks sticking to a neighbour. The
+     * was taken by its strip or carried out of a row by its tabs: it
+     * lines up with a neighbour's edge it comes near, and with the
+     * pointer in a snap zone — a screen edge, a corner, a layout on the
+     * snap bar — the preview shows the part of the screen the window
+     * fills when the button comes up, which outranks lining up. The
      * window itself goes on following the pointer at its own size.
      */
     private void carry(Window window, Landing landing, double x,
@@ -1198,15 +1197,6 @@ public final class WindowGestures {
         WindowPlacement.Anchor anchor = WindowPlacement.constrainWindow(
                 window, this.mc, x, baseline, this.screenWidth,
                 this.screenHeight);
-        List<Window> group = WindowLayout.linkedGroup(window);
-        if (group.size() > 1) {
-            moveGroup(window, group, anchor);
-            landing.snapTargetId = null;
-            landing.screenFill = Window.ScreenFill.NONE;
-            this.snapBar.hide();
-            this.snapPreview.aim(window.getId(), Window.ScreenFill.NONE);
-            return;
-        }
         WindowPlacement.Anchor snapped = snapToNeighbour(window, anchor,
                 landing);
         WindowLayout.setPosition(window.getId(),
@@ -1269,43 +1259,6 @@ public final class WindowGestures {
         }
         this.snapPreview.release(fills);
         this.snapBar.hide();
-    }
-
-    /**
-     * Moves stuck windows as one piece: every one of them takes the same
-     * step the carried one took, in both directions, so the group keeps
-     * its shape whichever way it is carried. The step is measured between
-     * resting boxes, all read before any of them moves; a resting box is
-     * also where a window that has just given the screen back is going.
-     */
-    private void moveGroup(Window window, List<Window> group,
-                           WindowPlacement.Anchor anchor) {
-        List<WindowPlacement.Box> resting =
-                new ArrayList<WindowPlacement.Box>(group.size());
-        for (int index = 0; index < group.size(); index++) {
-            resting.add(WindowPlacement.restingBounds(group.get(index),
-                    this.mc, this.screenWidth, this.screenHeight));
-        }
-        int carried = group.indexOf(window);
-        WindowPlacement.Box origin = carried >= 0 ? resting.get(carried)
-                : WindowPlacement.restingBounds(window, this.mc,
-                        this.screenWidth, this.screenHeight);
-        double deltaX = anchor.x - origin.x;
-        double deltaY = anchor.baseline - origin.baseline();
-        for (int index = 0; index < group.size(); index++) {
-            Window member = group.get(index);
-            WindowPlacement.Box at = resting.get(index);
-            WindowPlacement.Anchor moved =
-                    WindowPlacement.constrainWindow(member, this.mc,
-                            at.x + deltaX, at.baseline() + deltaY,
-                            this.screenWidth, this.screenHeight);
-            WindowLayout.setPosition(member.getId(),
-                    WindowPlacement.windowPercentX(member, moved.x,
-                            this.mc, this.screenWidth),
-                    WindowPlacement.windowPercentY(member,
-                            moved.baseline, this.mc, this.screenHeight),
-                    false);
-        }
     }
 
     /**
@@ -1413,10 +1366,10 @@ public final class WindowGestures {
     }
 
     /**
-     * Snaps the carried window to another window's edge when it comes
-     * within a few pixels of it, a window gap apart, and remembers that
-     * edge in {@code landing} so it can be lit and a lock can link the
-     * two; the snapped place is returned.
+     * Lines the carried window up with another window's edge when it
+     * comes within a few pixels of it, a window gap apart, and remembers
+     * that edge in {@code landing} so it can be lit; the place it lines up
+     * at is returned.
      */
     private WindowPlacement.Anchor snapToNeighbour(Window window,
                                    WindowPlacement.Anchor anchor,
@@ -1435,31 +1388,30 @@ public final class WindowGestures {
         for (int index = 0; index < frames.size(); index++) {
             WindowFrame frame = frames.get(index);
             Window other = WindowLayout.window(frame.windowId);
-            // A window filling the screen has no edge of its own to be
-            // stuck to.
+            // A window filling the screen has no edge of its own to
+            // line up with.
             if (other == null || other == window
-                    || other.getFill() != Window.ScreenFill.NONE
-                    || window.getId().equals(other.getLinkTarget())) {
+                    || other.getFill() != Window.ScreenFill.NONE) {
                 continue;
             }
             boolean overlapsColumn = anchor.x < frame.boxRight + margin
                     && anchor.x + width + margin > frame.boxLeft;
             if (overlapsColumn) {
                 double aboveGap = Math.abs(frame.boxTop - margin - bottom);
-                if (aboveGap <= LINK_SNAP && aboveGap < best) {
+                if (aboveGap <= LINE_UP_REACH && aboveGap < best) {
                     best = aboveGap;
                     baseline = frame.boxTop - margin - barHeight;
                     x = anchor.x;
                     landing.snapTargetId = other.getId();
-                    landing.snapSide = Window.LinkSide.ABOVE;
+                    landing.edge = Edge.ABOVE;
                 }
                 double belowGap = Math.abs(top - (frame.boxBottom + margin));
-                if (belowGap <= LINK_SNAP && belowGap < best) {
+                if (belowGap <= LINE_UP_REACH && belowGap < best) {
                     best = belowGap;
                     baseline = frame.boxBottom + margin + (height - barHeight);
                     x = anchor.x;
                     landing.snapTargetId = other.getId();
-                    landing.snapSide = Window.LinkSide.BELOW;
+                    landing.edge = Edge.BELOW;
                 }
             }
             // A side snap wants the two windows level with one another,
@@ -1471,7 +1423,7 @@ public final class WindowGestures {
             }
             double leftGap = Math.abs(
                     anchor.x + width + margin - frame.boxLeft);
-            if (leftGap <= LINK_SNAP && leftGap < best) {
+            if (leftGap <= LINE_UP_REACH && leftGap < best) {
                 best = leftGap;
                 // A side snap moves the window onto the edge it is
                 // catching, exactly as a top or bottom snap does; the
@@ -1479,16 +1431,16 @@ public final class WindowGestures {
                 x = frame.boxLeft - margin - width;
                 baseline = anchor.baseline;
                 landing.snapTargetId = other.getId();
-                landing.snapSide = Window.LinkSide.LEFT;
+                landing.edge = Edge.LEFT;
             }
             double rightGap = Math.abs(
                     anchor.x - (frame.boxRight + margin));
-            if (rightGap <= LINK_SNAP && rightGap < best) {
+            if (rightGap <= LINE_UP_REACH && rightGap < best) {
                 best = rightGap;
                 x = frame.boxRight + margin;
                 baseline = anchor.baseline;
                 landing.snapTargetId = other.getId();
-                landing.snapSide = Window.LinkSide.RIGHT;
+                landing.edge = Edge.RIGHT;
             }
         }
         return WindowPlacement.constrainWindow(window, this.mc, x,
@@ -1977,8 +1929,8 @@ public final class WindowGestures {
 
     /**
      * Keeps a torn-off window's row under the pointer as it moves, and
-     * carries it as a window taken by its strip is carried — sticking to
-     * a neighbour, snapping into a part of the screen. A window filling a
+     * carries it as a window taken by its strip is carried — lining up
+     * with a neighbour, snapping into a part of the screen. A window filling a
      * part of the screen gives it back the moment it is carried, taking
      * its own size again with the tab still under the hand.
      */

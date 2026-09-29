@@ -93,8 +93,7 @@ public final class LoreCharacterTransferCoordinator {
             if (definition == null) {
                 return failure(CharacterErrorId.LORE_CHARACTER_UNKNOWN, roster);
             }
-            if (!definition.hasAppearance()
-                    || !LoreCharacterRegistry.getLoadErrors().isEmpty()) {
+            if (!definition.hasAppearance()) {
                 return failure(
                         CharacterErrorId.LORE_CHARACTER_DEFINITION_INCOMPLETE,
                         roster);
@@ -142,8 +141,9 @@ public final class LoreCharacterTransferCoordinator {
                 state = CharacterPlayerStateService.getInstance()
                         .createDefaultRecord(character);
             } else {
-                character = rebind(vault.getCharacterCopy(),
-                        player.getUniqueID(), slotIndex);
+                character = rebind(vault.getCharacterCopy(), definition,
+                        player.getUniqueID(), slotIndex,
+                        System.currentTimeMillis());
                 state = vault.getPlayerStateCopy();
             }
             if (account.getRecord(characterId) != null) {
@@ -390,8 +390,11 @@ public final class LoreCharacterTransferCoordinator {
                 }
                 RoleplayCharacter character = rebind(
                         vault.getCharacterCopy(),
+                        LoreCharacterRegistry.get(
+                                transaction.getLoreCharacterId()),
                         transaction.getTargetOwnerId(),
-                        transaction.getTargetSlot());
+                        transaction.getTargetSlot(),
+                        System.currentTimeMillis());
                 if (!roster.addCharacter(character)) {
                     return CharacterErrorId.SLOT_OCCUPIED;
                 }
@@ -547,12 +550,27 @@ public final class LoreCharacterTransferCoordinator {
         return "bree";
     }
 
-    private static RoleplayCharacter rebind(
-            RoleplayCharacter source, UUID ownerId, int slotIndex) {
-        return RoleplayCharacter.builder(source)
+    /**
+     * The released character as its new owner's: made now, as far as the
+     * chat is concerned, so its faction's history before the claim stays
+     * with those who could read it then. Its profile and age come from its
+     * lore file again, which nobody edits; what it lived through — its
+     * inventory, its place, its alignment and pledge — stays with its
+     * saved state from the last holder. A file gone since leaves the
+     * record's own.
+     */
+    static RoleplayCharacter rebind(RoleplayCharacter source,
+                                    LoreCharacterDefinition definition,
+                                    UUID ownerId, int slotIndex,
+                                    long claimedAt) {
+        RoleplayCharacter.Builder builder = RoleplayCharacter.builder(source)
                 .owner(ownerId).slot(slotIndex)
-                .dataVersion(RoleplayCharacter.CURRENT_DATA_VERSION)
-                .build();
+                .createdAt(claimedAt);
+        if (definition != null) {
+            builder.profile(definition.getProfile())
+                    .age(definition.getAge());
+        }
+        return builder.build();
     }
 
     private static UUID uniqueId(Stores stores) {
@@ -581,8 +599,7 @@ public final class LoreCharacterTransferCoordinator {
         if (status == LoreCharacterOwnershipResult.Status.UNKNOWN_LORE_CHARACTER) {
             return CharacterErrorId.LORE_CHARACTER_UNKNOWN;
         }
-        if (status == LoreCharacterOwnershipResult.Status.APPEARANCE_NOT_CONFIGURED
-                || status == LoreCharacterOwnershipResult.Status.DEFINITION_REGISTRY_INVALID) {
+        if (status == LoreCharacterOwnershipResult.Status.APPEARANCE_NOT_CONFIGURED) {
             return CharacterErrorId.LORE_CHARACTER_DEFINITION_INCOMPLETE;
         }
         return CharacterErrorId.INTERNAL_ERROR;

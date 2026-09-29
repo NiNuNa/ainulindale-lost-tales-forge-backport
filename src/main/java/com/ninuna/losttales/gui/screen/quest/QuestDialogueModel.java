@@ -93,9 +93,6 @@ public final class QuestDialogueModel {
     public String getSubtitle() { return this.subtitle; }
     public String getQuestTitle() { return this.questTitle; }
     public String getObjective() { return this.objective; }
-    public Mood getMood() { return this.mood; }
-    /** Whether the player has asked for more and been told. */
-    public boolean isToldMore() { return this.toldMore; }
 
     /** What the speaker is saying right now. */
     public String getSaid() {
@@ -144,15 +141,6 @@ public final class QuestDialogueModel {
     public String labelOf(Reply reply) {
         return reply == null ? ""
                 : this.labels.get(reply.ordinal());
-    }
-
-    /**
-     * Whether saying this ends the conversation. Asking for more does
-     * not; everything else does, because taking a quest, refusing it or
-     * handing it over is the end of what there was to talk about.
-     */
-    public static boolean ends(Reply reply) {
-        return reply != Reply.MORE;
     }
 
     private static String safe(String value) {

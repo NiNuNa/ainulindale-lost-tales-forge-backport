@@ -66,18 +66,24 @@ public final class ChatReplyReference {
      * {@code #code/id} names it; empty for a reply.
      */
     private final String forwardedFrom;
+    /**
+     * Whether the quoted line is an action, whose excerpt is what its
+     * author did: the quote reads as the sentence, the author's name
+     * opening it. Never a forward's.
+     */
+    private final boolean action;
 
     private ChatReplyReference(long messageId, String author,
                                String excerpt, int authorColor) {
         this(messageId, author, excerpt, authorColor, null, false, "",
-                false, "");
+                false, "", false);
     }
 
     private ChatReplyReference(long messageId, String author,
                                String excerpt, int authorColor,
                                UUID senderId, boolean accountLine,
                                String skinId, boolean npcLine,
-                               String forwardedFrom) {
+                               String forwardedFrom, boolean action) {
         this.messageId = messageId;
         this.author = author == null ? "" : author;
         this.excerpt = excerpt == null ? "" : excerpt;
@@ -87,6 +93,7 @@ public final class ChatReplyReference {
         this.skinId = skinId == null ? "" : skinId;
         this.npcLine = npcLine;
         this.forwardedFrom = forwardedFrom == null ? "" : forwardedFrom;
+        this.action = action;
     }
 
     /**
@@ -102,7 +109,27 @@ public final class ChatReplyReference {
         }
         return new ChatReplyReference(this.messageId, this.author,
                 this.excerpt, this.authorColor, senderId, accountLine,
-                skinId, false, this.forwardedFrom);
+                skinId, false, this.forwardedFrom, this.action);
+    }
+
+    /**
+     * The same quote of an action, or of a line that is not one. A quote
+     * of nothing and a forward are never an action's: a forward's line
+     * carries that itself.
+     */
+    public ChatReplyReference asAction(boolean action) {
+        if (action == this.action || (action && (!exists() || isForward()))) {
+            return this;
+        }
+        return new ChatReplyReference(this.messageId, this.author,
+                this.excerpt, this.authorColor, this.senderId,
+                this.accountLine, this.skinId, this.npcLine,
+                this.forwardedFrom, action);
+    }
+
+    /** Whether the quoted line is an action rather than something said. */
+    public boolean isAction() {
+        return this.action;
     }
 
     /**
@@ -116,7 +143,7 @@ public final class ChatReplyReference {
         }
         return new ChatReplyReference(this.messageId, this.author,
                 this.excerpt, this.authorColor, npcId, false, texturePath,
-                true, this.forwardedFrom);
+                true, this.forwardedFrom, this.action);
     }
 
     /**
@@ -228,7 +255,7 @@ public final class ChatReplyReference {
             return NONE;
         }
         return new ChatReplyReference(messageId, name, "", authorColor, null,
-                false, "", false, link);
+                false, "", false, link, false);
     }
 
     /** Whether this is a forward's: the message a forward carries on. */

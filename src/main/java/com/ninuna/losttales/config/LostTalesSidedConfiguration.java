@@ -45,16 +45,6 @@ public final class LostTalesSidedConfiguration extends Configuration {
     }
 
     /**
-     * Opens the client's and the server's files; every category not the
-     * client's is the server's.
-     */
-    public static LostTalesSidedConfiguration open(File clientFile, File serverFile,
-                                                  Set<String> clientCategories) {
-        return open(clientFile, serverFile, clientCategories,
-                new HashMap<String, File>());
-    }
-
-    /**
      * Opens every file. {@code clientFile} may be null for a side kept in
      * memory; {@code filesByCategory} names the categories with a file of
      * their own; a file named more than once is opened once.
@@ -106,16 +96,6 @@ public final class LostTalesSidedConfiguration extends Configuration {
         }
         Configuration owner = this.byCategory.get(root.toLowerCase(Locale.ROOT));
         return owner == null ? this.server : owner;
-    }
-
-    /** The client's half, as the client's own screen edits it. */
-    public Configuration getClientSide() {
-        return this.client;
-    }
-
-    /** The server's main file, as the server's settings screen edits it. */
-    public Configuration getServerSide() {
-        return this.server;
     }
 
     @Override

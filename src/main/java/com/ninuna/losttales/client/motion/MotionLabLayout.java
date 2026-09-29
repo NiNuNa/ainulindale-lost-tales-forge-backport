@@ -10,8 +10,8 @@ import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
  * button folds away, beside the picked motion, split by one rule. A page
  * too narrow for both shows one of them over the whole body: the list
  * while it is out, else the motion. The motion's column holds its name,
- * what it is for, the sample, a status line and then its rows, the only
- * part that scrolls. Each row ends in a stepper: a chevron either side
+ * what it is for, the sample and then its rows, the only part that
+ * scrolls. Each row ends in a stepper: a chevron either side
  * of the value.</p>
  *
  * <p>Free of Minecraft: the geometry is arithmetic, and a test can ask it
@@ -45,8 +45,6 @@ final class MotionLabLayout {
     /** The sample's height: a third of the column, within these. */
     static final int SAMPLE_MIN_HEIGHT = 32;
     static final int SAMPLE_MAX_HEIGHT = 64;
-    /** The line under the sample that says what the last action did. */
-    static final int STATUS_HEIGHT = 12;
     /** One row of the motion. */
     static final int ROW_HEIGHT = 12;
     /** The stepper's width: two fifths of the rows, within these. */
@@ -153,7 +151,7 @@ final class MotionLabLayout {
             return 0;
         }
         int room = (int)content.height - NAME_HEIGHT - GAP - sampleHeight()
-                - GAP / 2 - STATUS_HEIGHT - MIN_ROWS * ROW_HEIGHT;
+                - GAP - MIN_ROWS * ROW_HEIGHT;
         return Math.max(0, Math.min(Math.min(this.aboutLines, MAX_ABOUT_LINES),
                 room / ABOUT_LINE));
     }
@@ -181,21 +179,13 @@ final class MotionLabLayout {
                 content.width, sampleHeight());
     }
 
-    /** The line under the sample saying what the last action did. */
-    LostTalesUiHitBox status() {
-        LostTalesUiHitBox sample = sample();
-        return new LostTalesUiHitBox(sample.left, sample.bottom() + GAP / 2,
-                sample.width, sample.width <= 0 ? 0 : STATUS_HEIGHT);
-    }
-
-    /** The rows: the rest of the column, where they scroll; empty where no room is left. */
+    /** The rows: the rest of the column under the sample, where they scroll; empty where no room is left. */
     LostTalesUiHitBox rows() {
         LostTalesUiHitBox content = content();
-        LostTalesUiHitBox status = status();
         if (content.width <= 0) {
             return none();
         }
-        double top = status.bottom();
+        double top = sample().bottom() + GAP;
         return new LostTalesUiHitBox(content.left, top, content.width,
                 Math.max(0.0D, content.bottom() - top));
     }

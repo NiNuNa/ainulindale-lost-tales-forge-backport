@@ -11,6 +11,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public final class LostTalesMapMarkerWorldDataTest {
@@ -32,11 +33,11 @@ public final class LostTalesMapMarkerWorldDataTest {
         LostTalesMapMarkerRecord seeded =
                 data.getRecord(definition.getId());
         assertNotNull(seeded);
-        assertTrue(data.getOrCreateLotrTravelId(
-                definition.getId()) > 0);
+        int travelId = data.getOrCreateLotrTravelId(definition.getId());
+        assertTrue(travelId > 0);
 
         assertTrue(data.removeRecord(definition.getId()));
-        assertEquals(0, data.getLotrTravelId(definition.getId()));
+        assertNull(data.findByLotrTravelId(travelId));
         data.seedDefinitions(Collections.singleton(definition));
 
         assertEquals(null, data.getRecord(definition.getId()));
@@ -72,10 +73,10 @@ public final class LostTalesMapMarkerWorldDataTest {
                 new LostTalesMapMarkerWorldData("restored");
         restored.readFromNBT(serialized);
 
-        assertEquals(first,
-                restored.getLotrTravelId("losttales:first"));
-        assertEquals(second,
-                restored.getLotrTravelId("losttales:second"));
+        assertEquals("losttales:first",
+                restored.findByLotrTravelId(first).getId());
+        assertEquals("losttales:second",
+                restored.findByLotrTravelId(second).getId());
     }
 
     @Test
@@ -89,14 +90,13 @@ public final class LostTalesMapMarkerWorldDataTest {
                 "LOTR:WAYPOINT:hobbiton"));
         int travelId = data.getOrCreateLotrTravelId(
                 "lotr:waypoint:hobbiton");
-        assertEquals(travelId, data.getLotrTravelId(
+        assertEquals(travelId, data.getOrCreateLotrTravelId(
                 "LOTR:WAYPOINT:HOBBITON"));
         assertTrue(data.removeRecord(
                 "LOTR:WAYPOINT:hobbiton"));
         assertEquals(null, data.getRecord(
                 "lotr:waypoint:HOBBITON"));
-        assertEquals(0, data.getLotrTravelId(
-                "lotr:waypoint:hobbiton"));
+        assertNull(data.findByLotrTravelId(travelId));
     }
 
     @Test
@@ -151,11 +151,11 @@ public final class LostTalesMapMarkerWorldDataTest {
         assertEquals(1, restored.getRecords().size());
         assertEquals("New Hobbiton", restored.getRecord(
                 "lotr:waypoint:HOBBITON").getName());
-        assertEquals(1, restored.getQuarantinedEntryCount());
         NBTTagCompound repaired = new NBTTagCompound();
         restored.writeToNBT(repaired);
         NBTTagList quarantine = repaired.getTagList(
                 "Quarantine", Constants.NBT.TAG_COMPOUND);
+        assertEquals(1, quarantine.tagCount());
         assertTrue(quarantine.getCompoundTagAt(0).hasKey(
                 "OriginalData", Constants.NBT.TAG_COMPOUND));
         assertEquals("lotr:waypoint:HOBBITON",

@@ -4,7 +4,6 @@ import com.ninuna.losttales.permission.LostTalesCapability;
 import com.ninuna.losttales.permission.LostTalesPermissionCatalog;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedHashSet;
 import java.util.List;
 import org.junit.After;
 import org.junit.Before;
@@ -37,24 +36,19 @@ public final class ChatPermissionConfigTest {
 
     @After
     public void tearDown() {
-        LostTalesPermissionCatalog.resetToEmpty();
+        LostTalesPermissionCatalog.install(LostTalesPermissionCatalog.empty());
     }
 
-    /** A permission names capabilities, may describe itself, and keeps its order. */
+    /** A permission names capabilities and keeps its order. */
     @Test
     public void aPermissionNamesTheCapabilitiesItReaches() {
         LostTalesPermissionCatalog catalog = ChatRoleConfig.parsePermissions(new String[] {
-                "keeper=capability:chat.moderate;capability:chat.server_console.read;"
-                        + "desc:Keeps the peace.",
+                "keeper=capability:chat.moderate;capability:chat.server_console.read",
                 "builder=capability:waystone.manage",
         }, collect);
         assertTrue(warnings.toString(), warnings.isEmpty());
         assertEquals(Arrays.asList("keeper", "builder"), catalog.ids());
-        assertEquals(new LinkedHashSet<String>(Arrays.asList("chat.moderate",
-                        "chat.server_console.read")),
-                catalog.capabilityIdsOf("keeper"));
-        assertEquals("Keeps the peace.", catalog.descriptionOf("keeper"));
-        assertEquals("", catalog.descriptionOf("builder"));
+        assertTrue(catalog.reaches("keeper", LostTalesCapability.CHAT_SERVER_CONSOLE_READ));
         assertTrue(catalog.reaches("keeper", LostTalesCapability.CHAT_MODERATE));
         assertFalse(catalog.reaches("keeper", LostTalesCapability.WAYSTONE_MANAGE));
     }
@@ -82,8 +76,7 @@ public final class ChatPermissionConfigTest {
         assertEquals(1, warnings.size());
         assertTrue(warnings.get(0), warnings.get(0).contains("fly.to.the.moon"));
         assertTrue(catalog.isDefined("keeper"));
-        assertEquals(java.util.Collections.singleton("chat.moderate"),
-                catalog.capabilityIdsOf("keeper"));
+        assertTrue(catalog.reaches("keeper", LostTalesCapability.CHAT_MODERATE));
     }
 
     /**
@@ -154,24 +147,6 @@ public final class ChatPermissionConfigTest {
         assertFalse(catalog.reaches("chat.moderate", LostTalesCapability.SERVER_CONFIG));
         assertTrue(catalog.isKnown("chat.moderate"));
         assertFalse(catalog.isKnown("build.everything"));
-    }
-
-    /** The entry a permission is written as reads back as the same permission. */
-    @Test
-    public void aPermissionRoundTripsThroughItsEntry() {
-        String entry = ChatRoleConfig.formatPermission("keeper",
-                new LinkedHashSet<String>(Arrays.asList("chat.moderate",
-                        "chat.server_console.read")),
-                "Keeps the peace.");
-        assertEquals("keeper=capability:chat.moderate;capability:chat.server_console.read;"
-                + "desc:Keeps the peace.", entry);
-        LostTalesPermissionCatalog catalog = ChatRoleConfig.parsePermissions(
-                new String[] {entry}, collect);
-        assertTrue(warnings.toString(), warnings.isEmpty());
-        assertEquals(new LinkedHashSet<String>(Arrays.asList("chat.moderate",
-                        "chat.server_console.read")),
-                catalog.capabilityIdsOf("keeper"));
-        assertEquals("Keeps the peace.", catalog.descriptionOf("keeper"));
     }
 
     /** More permissions than the catalogue holds are dropped, with one warning. */

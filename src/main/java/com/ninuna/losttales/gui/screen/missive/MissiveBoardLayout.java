@@ -6,7 +6,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
  * Where every part of the missive board's page stands, worked out from
  * the page's box alone: the notices in a list, the panel the tool
  * strip's left button folds away, beside the picked notice's letter, the
- * two split by one rule, and a status line under the letter. A page too
+ * two split by one rule. A page too
  * narrow for both shows one of them over the whole body: the list while
  * it is out, else the letter. Free of Minecraft, so a test can ask it
  * every question the page does.
@@ -26,8 +26,6 @@ final class MissiveBoardLayout {
             2 * MARGIN + LIST_MIN_WIDTH + 2 * GUTTER + 1 + LETTER_MIN_WIDTH;
     /** One notice in the list: its title, and its giver and time left under it. */
     static final int ROW_HEIGHT = 24;
-    /** The line under the letter saying what the last request came to. */
-    static final int STATUS_HEIGHT = 14;
     /** How far a row's surface reaches left of the list's words, where it also answers the pointer. */
     static final int ROW_BLEED = 2;
 
@@ -91,11 +89,10 @@ final class MissiveBoardLayout {
     }
 
     /**
-     * The letter's column, the status line under it included: right of
-     * the rule beside the list, the whole body while the list is folded,
-     * and empty while a narrow page shows the list.
+     * The letter: right of the rule beside the list, the whole body while
+     * the list is folded, and empty while a narrow page shows the list.
      */
-    private LostTalesUiHitBox column() {
+    LostTalesUiHitBox letter() {
         if (!isSplit()) {
             return this.listOut ? none() : body();
         }
@@ -103,24 +100,6 @@ final class MissiveBoardLayout {
         return new LostTalesUiHitBox(left, MARGIN,
                 Math.max(0, this.pageWidth - MARGIN - left),
                 Math.max(0, this.pageHeight - 2 * MARGIN));
-    }
-
-    /** The letter, above the status line. */
-    LostTalesUiHitBox letter() {
-        LostTalesUiHitBox column = column();
-        return new LostTalesUiHitBox(column.left, column.top, column.width,
-                Math.max(0.0D, column.height - STATUS_HEIGHT));
-    }
-
-    /** The status line, under the letter. */
-    LostTalesUiHitBox status() {
-        LostTalesUiHitBox column = column();
-        if (column.width <= 0) {
-            return none();
-        }
-        return new LostTalesUiHitBox(column.left,
-                Math.max(column.top, column.bottom() - STATUS_HEIGHT),
-                column.width, Math.min(column.height, STATUS_HEIGHT));
     }
 
     /** The notice's row at {@code index} of the list, scrolled by {@code scroll} pixels. */

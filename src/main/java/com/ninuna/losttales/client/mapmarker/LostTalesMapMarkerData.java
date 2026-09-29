@@ -140,20 +140,6 @@ public final class LostTalesMapMarkerData {
         return this.x;
     }
 
-    public double getY() {
-        return this.y;
-    }
-
-    public boolean hasExplicitY() {
-        return !LostTalesMapMarkerHeightResolver.isAutomatic(this.y);
-    }
-
-    public double getEffectiveY(World world) {
-        return LostTalesMapMarkerHeightResolver.resolve(
-                world, this.dimensionId,
-                this.x, this.y, this.z);
-    }
-
     public double getEffectiveY(World world, double fallbackY) {
         return LostTalesMapMarkerHeightResolver.resolveOr(
                 world, this.dimensionId,
@@ -189,10 +175,6 @@ public final class LostTalesMapMarkerData {
 
     public boolean requiresRegionUnlock() {
         return this.requiresRegionUnlock;
-    }
-
-    public boolean hasWaystone() {
-        return this.hasWaystone;
     }
 
     public int getPriority() {

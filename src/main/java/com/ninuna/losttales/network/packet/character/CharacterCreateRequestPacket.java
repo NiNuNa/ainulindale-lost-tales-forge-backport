@@ -93,7 +93,7 @@ public final class CharacterCreateRequestPacket implements IMessage {
                 throw new CharacterPacketCodec.DecodeException("cape id out of range");
             }
             if (!CharacterRoster.isCreatableSlotIndex(this.slotIndex)) {
-                // The default character's slot is not one a request may
+                // The account character's slot is not one a request may
                 // name, and a byte can carry any of 256 values.
                 throw new CharacterPacketCodec.DecodeException("slot out of range");
             }

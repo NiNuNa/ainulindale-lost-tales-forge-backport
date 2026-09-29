@@ -44,6 +44,25 @@ public final class ChatGroupRunsTest {
                 true, timestamp, true, new ChatComponentText("grouped"));
     }
 
+    /**
+     * An action names its speaker in its own sentence: it never stands
+     * under the name row before it, and the line after it opens a run of
+     * its own rather than standing headless under the action.
+     */
+    @Test
+    public void anActionStandsAlone() {
+        remember(1, ChatChannel.GLOBAL, ALICE, "Alice", START);
+        ChatGroupRuns.remember(2, ChatTab.of(ChatChannel.GLOBAL), ALICE,
+                "Alice", true, START + 1000L, false, true,
+                new ChatComponentText("grouped"));
+        remember(3, ChatChannel.GLOBAL, ALICE, "Alice", START + 2000L);
+        remember(4, ChatChannel.GLOBAL, ALICE, "Alice", START + 3000L);
+        assertArrayEquals(new boolean[] { true, false, false, false },
+                ChatGroupRuns.continuationsOf(newestFirst(1, 2, 3, 4), null));
+        assertArrayEquals(new boolean[] { true, false, false, false },
+                ChatGroupRuns.continuationsInFeed(newestFirst(1, 2, 3, 4)));
+    }
+
     /** Ids as a view holds them: newest first, like vanilla's history. */
     private static int[] newestFirst(int... oldestFirst) {
         int[] ids = new int[oldestFirst.length];
@@ -67,10 +86,10 @@ public final class ChatGroupRunsTest {
 
         // The Global window shows only its own two messages.
         assertArrayEquals(new boolean[] { true, false },
-                ChatGroupRuns.continuationsOf(newestFirst(1, 3)));
+                ChatGroupRuns.continuationsOf(newestFirst(1, 3), null));
         // The feed shows all three, in order.
         assertArrayEquals(new boolean[] { false, false, false },
-                ChatGroupRuns.continuationsOf(newestFirst(1, 2, 3)));
+                ChatGroupRuns.continuationsOf(newestFirst(1, 2, 3), null));
     }
 
     /**
@@ -87,8 +106,6 @@ public final class ChatGroupRunsTest {
         int[] ids = newestFirst(1, 2, 3, 4);
         // Without a rule: one run from 1 for eight minutes, then 4 opens one.
         assertArrayEquals(new boolean[] { false, true, true, false },
-                ChatGroupRuns.continuationsOf(ids));
-        assertArrayEquals(ChatGroupRuns.continuationsOf(ids),
                 ChatGroupRuns.continuationsOf(ids, null));
         // A rule over 2: 2 opens a run, and 3 and 4 fall inside its span.
         assertArrayEquals(new boolean[] { true, true, false, false },
@@ -129,7 +146,7 @@ public final class ChatGroupRunsTest {
         remember(2, ChatChannel.GLOBAL, ALICE, "Alice", START + 1000L);
         remember(3, ChatChannel.GLOBAL, ALICE, "Alice", START + 2000L);
         assertArrayEquals(new boolean[] { true, true, false },
-                ChatGroupRuns.continuationsOf(newestFirst(1, 2, 3)));
+                ChatGroupRuns.continuationsOf(newestFirst(1, 2, 3), null));
     }
 
     /**
@@ -151,7 +168,7 @@ public final class ChatGroupRunsTest {
         // Newest first, so only line 5 continues anything.
         assertArrayEquals(
                 new boolean[] { false, true, false, false, false, false },
-                ChatGroupRuns.continuationsOf(newestFirst(1, 2, 3, 4, 5, 99)));
+                ChatGroupRuns.continuationsOf(newestFirst(1, 2, 3, 4, 5, 99), null));
         assertNull(ChatGroupRuns.of(99));
         assertNotNull(ChatGroupRuns.of(1));
     }
@@ -163,7 +180,7 @@ public final class ChatGroupRunsTest {
         remember(2, ChatChannel.GLOBAL, ALICE, "Alice", START + 1000L);
         LostTalesConfig.enableChatMessageGrouping = false;
         assertArrayEquals(new boolean[] { false, false },
-                ChatGroupRuns.continuationsOf(newestFirst(1, 2)));
+                ChatGroupRuns.continuationsOf(newestFirst(1, 2), null));
     }
 
     /**
@@ -209,7 +226,7 @@ public final class ChatGroupRunsTest {
         assertArrayEquals(expected,
                 ChatGroupRuns.continuationsInFeed(newestFirst(oldestFirst)));
         assertArrayEquals(expected,
-                ChatGroupRuns.continuationsOf(newestFirst(oldestFirst)));
+                ChatGroupRuns.continuationsOf(newestFirst(oldestFirst), null));
     }
 
     /**
@@ -245,7 +262,7 @@ public final class ChatGroupRunsTest {
         remember(2, ChatChannel.GLOBAL, ALICE, "Alice", START + 300000L);
         remember(3, ChatChannel.GLOBAL, ALICE, "Alice", START + 600000L);
         assertArrayEquals(new boolean[] { false, true, false },
-                ChatGroupRuns.continuationsOf(newestFirst(1, 2, 3)));
+                ChatGroupRuns.continuationsOf(newestFirst(1, 2, 3), null));
         // The feed would have kept none of that: every gap is past its
         // own span.
         assertArrayEquals(new boolean[] { false, false, false },
@@ -266,7 +283,7 @@ public final class ChatGroupRunsTest {
         remember(3, ChatChannel.GLOBAL, ALICE, "Alice", START + 2000L);
         // Newest first: 3 continues 2, but 2 never continues 1.
         assertArrayEquals(new boolean[] { true, false, false },
-                ChatGroupRuns.continuationsOf(newestFirst(1, 2, 3)));
+                ChatGroupRuns.continuationsOf(newestFirst(1, 2, 3), null));
     }
 
     /** A message with no grouped form of its own is never grouped. */
@@ -275,6 +292,6 @@ public final class ChatGroupRunsTest {
         ChatGroupRuns.remember(1, ChatTab.of(ChatChannel.GLOBAL), ALICE,
                 "Alice", true, START, true, null);
         assertNull(ChatGroupRuns.of(1));
-        assertFalse(ChatGroupRuns.continuationsOf(new int[] { 1 })[0]);
+        assertFalse(ChatGroupRuns.continuationsOf(new int[] { 1 }, null)[0]);
     }
 }

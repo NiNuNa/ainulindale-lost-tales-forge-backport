@@ -102,13 +102,6 @@ public final class LostTalesTileEntityWaystone
 
     public String getMarkerId() { return this.markerId; }
     public UUID getLinkToken() { return this.linkToken; }
-    public UUID getOwnerPlayerId() { return this.ownerPlayerId; }
-    public String getDisplayName() { return this.displayName; }
-    public LostTalesMapMarkerVisibility getVisibility() {
-        return this.visibility;
-    }
-    public long getMarkerRevision() { return this.markerRevision; }
-    public int getSharedPlayerCount() { return this.sharedPlayerCount; }
 
     public boolean isUseableByPlayer(EntityPlayer player) {
         return player != null && this.worldObj != null

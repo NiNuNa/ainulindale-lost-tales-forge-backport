@@ -178,18 +178,6 @@ public class LostTalesUiTextField extends GuiTextField {
                 layers);
     }
 
-    /** The placeholder shown while the field is empty and unfocused. */
-    public void drawHint(String hint) {
-        if (hint == null || hint.length() == 0 || getText().length() > 0
-                || isFocused()) {
-            return;
-        }
-        LostTalesUiInk.beginContent();
-        drawShadowedText(this.font.trimStringToWidth(hint, getWidth()),
-                textLeft(), textTop(),
-                LostTalesColors.rgb(LostTalesColors.TEXT_DIM), 0xC8);
-    }
-
     /**
      * Moves the first drawn character so the caret is always on screen,
      * and never leaves blank room at the end while text runs off the

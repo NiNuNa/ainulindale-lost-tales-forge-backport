@@ -51,6 +51,12 @@ public final class MotionIds {
     public static final String WINDOW_TAB_MOVE = "window.tab.move";
     /** A tab's own controls going and coming as the row narrows. */
     public static final String WINDOW_TAB_CONTROLS = "window.tab.controls";
+    /** A carried tab rising its pixel off the row, and settling back. */
+    public static final String WINDOW_TAB_LIFT = "window.tab.lift";
+    /** The glow a tab put down gives once, fading. */
+    public static final String WINDOW_TAB_GLOW = "window.tab.glow";
+    /** A name cut short read whole under a resting pointer. */
+    public static final String WINDOW_TAB_MARQUEE = "window.tab.marquee";
     /** The snap assist's panes. */
     public static final String WINDOW_SNAP_ASSIST = "window.snap.assist";
     /** The snap layouts' flyout, and the snap bar's fade and its way down. */
@@ -75,6 +81,8 @@ public final class MotionIds {
     public static final String WINDOW_MARQUEE_RETURN = "window.marquee.return";
     /** A short notice over a window's bar coming up, standing a moment and fading. */
     public static final String WINDOW_NOTICE = "window.notice";
+    /** A page's answer over its bar coming up, standing while it is read and fading. */
+    public static final String WINDOW_ANSWER = "window.answer";
 
     /* ---- hud ---- */
 

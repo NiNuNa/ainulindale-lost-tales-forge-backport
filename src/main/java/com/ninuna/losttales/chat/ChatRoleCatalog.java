@@ -200,31 +200,4 @@ public final class ChatRoleCatalog {
                 : this.characterMembers.get(roleId.trim().toLowerCase(Locale.ROOT));
         return assigned == null ? Collections.<UUID>emptySet() : assigned;
     }
-
-    /** Every account assignment, role id to accounts. */
-    public Map<String, Set<UUID>> members() {
-        return this.members;
-    }
-
-    /** Every character assignment, role id to character ids. */
-    public Map<String, Set<UUID>> characterMembers() {
-        return this.characterMembers;
-    }
-
-    /** The config roles only, in config (bit) order, for writing back. */
-    public List<ChatAccountRole> configRoles() {
-        List<ChatAccountRole> custom = new ArrayList<ChatAccountRole>();
-        for (ChatAccountRole role : this.roles) {
-            if (role.getBitIndex() >= FIRST_CONFIG_BIT) {
-                custom.add(role);
-            }
-        }
-        Collections.sort(custom, new Comparator<ChatAccountRole>() {
-            @Override
-            public int compare(ChatAccountRole left, ChatAccountRole right) {
-                return left.getBitIndex() - right.getBitIndex();
-            }
-        });
-        return custom;
-    }
 }

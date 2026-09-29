@@ -53,7 +53,6 @@ public final class LostTalesClientWaystoneTravelContext {
             this.createdAtMillis = createdAtMillis;
         }
 
-        public int getDimensionId() { return this.dimensionId; }
         public int getX() { return this.x; }
         public int getY() { return this.y; }
         public int getZ() { return this.z; }

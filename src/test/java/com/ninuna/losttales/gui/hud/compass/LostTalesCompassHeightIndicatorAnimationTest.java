@@ -120,12 +120,12 @@ public final class LostTalesCompassHeightIndicatorAnimationTest {
                 above.frame("above", -1, 2, firstBeat);
         LostTalesCompassHeightIndicatorAnimation.Frame belowFirst =
                 below.frame("below", 1, 2, firstBeat);
-        assertTrue(aboveFirst.getPose(1).getFlowEmphasis() > 0.95F);
-        assertTrue(aboveFirst.getPose(1).getFlowEmphasis()
-                > aboveFirst.getPose(0).getFlowEmphasis() + 0.8F);
-        assertTrue(belowFirst.getPose(0).getFlowEmphasis() > 0.95F);
-        assertTrue(belowFirst.getPose(0).getFlowEmphasis()
-                > belowFirst.getPose(1).getFlowEmphasis() + 0.8F);
+        assertTrue(flowOf(aboveFirst.getPose(1)) > 0.95F);
+        assertTrue(flowOf(aboveFirst.getPose(1))
+                > flowOf(aboveFirst.getPose(0)) + 0.8F);
+        assertTrue(flowOf(belowFirst.getPose(0)) > 0.95F);
+        assertTrue(flowOf(belowFirst.getPose(0))
+                > flowOf(belowFirst.getPose(1)) + 0.8F);
 
         long secondBeat = started
                 + LostTalesCompassHeightIndicatorAnimation
@@ -134,7 +134,7 @@ public final class LostTalesCompassHeightIndicatorAnimationTest {
                         .FLOW_PERIOD_NANOS * 36L / 100L;
         LostTalesCompassHeightIndicatorAnimation.Frame belowSecond =
                 below.frame("below", 1, 2, secondBeat);
-        assertTrue(belowSecond.getPose(1).getFlowEmphasis() > 0.95F);
+        assertTrue(flowOf(belowSecond.getPose(1)) > 0.95F);
         assertTrue(belowSecond.getPose(1).getBrightness()
                 > belowSecond.getPose(0).getBrightness() + 0.15F);
         assertTrue(belowSecond.getPose(1).getScaleY()
@@ -156,8 +156,8 @@ public final class LostTalesCompassHeightIndicatorAnimationTest {
                         .FLOW_PERIOD_NANOS * 70L / 100L;
         LostTalesCompassHeightIndicatorAnimation.Frame quiet =
                 animation.frame("marker", 1, 2, quietBeat);
-        assertTrue(quiet.getPose(0).getFlowEmphasis() < 0.01F);
-        assertTrue(quiet.getPose(1).getFlowEmphasis() < 0.01F);
+        assertTrue(flowOf(quiet.getPose(0)) < 0.01F);
+        assertTrue(flowOf(quiet.getPose(1)) < 0.01F);
     }
 
     @Test
@@ -199,5 +199,11 @@ public final class LostTalesCompassHeightIndicatorAnimationTest {
                                 + LostTalesCompassHeightIndicatorAnimation
                                         .EXIT_NANOS + 1L);
         assertEquals(1, collapsed.getArrowCount());
+    }
+
+    /** How strongly the flow lights an arrow, read back from its brightness. */
+    private static float flowOf(
+            LostTalesCompassHeightIndicatorAnimation.Pose pose) {
+        return (pose.getBrightness() - 0.82F) / 0.18F;
     }
 }

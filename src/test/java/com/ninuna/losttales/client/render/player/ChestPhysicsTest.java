@@ -11,11 +11,11 @@ public final class ChestPhysicsTest {
     @Test
     public void startsAtRestAndStaysThereWithoutInput() {
         ChestPhysics physics = new ChestPhysics();
-        assertTrue(physics.isAtRest());
+        assertTrue(atRest(physics));
         for (int tick = 0; tick < 20; tick++) {
             physics.tick(0.0F, 0.0F, 0.0F, 0, 0.35F);
         }
-        assertTrue(physics.isAtRest());
+        assertTrue(atRest(physics));
         assertEquals(0.0F, physics.bounceY(0.5F), 0.0F);
     }
 
@@ -30,7 +30,7 @@ public final class ChestPhysicsTest {
             physics.tick(0.0F, 0.0F, 0.0F, 0, 0.35F);
         }
         assertTrue(peak > 0.02F);
-        assertTrue(physics.isAtRest());
+        assertTrue(atRest(physics));
     }
 
     @Test
@@ -50,7 +50,7 @@ public final class ChestPhysicsTest {
         for (int tick = 0; tick < 10; tick++) {
             physics.tick(1.0F, 1.0F, 45.0F, 1, 0.0F);
         }
-        assertTrue(physics.isAtRest());
+        assertTrue(atRest(physics));
     }
 
     @Test
@@ -70,5 +70,11 @@ public final class ChestPhysicsTest {
         assertTrue(low < mid && mid < high);
         assertTrue(mid - low > high - mid);
         assertTrue(high < 1.0F && low > 0.5F);
+    }
+
+    /** Drawn nowhere off its place, this tick or the last. */
+    private static boolean atRest(ChestPhysics physics) {
+        return physics.swayX(0.0F) == 0.0F && physics.swayX(1.0F) == 0.0F
+                && physics.bounceY(0.0F) == 0.0F && physics.bounceY(1.0F) == 0.0F;
     }
 }

@@ -1,6 +1,5 @@
 package com.ninuna.losttales.character.deletion;
 
-import com.ninuna.losttales.character.model.CharacterProgression;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 
 import java.util.UUID;
@@ -100,15 +99,6 @@ public final class CharacterDeletionTombstone {
     }
 
     private static RoleplayCharacter copyCharacter(RoleplayCharacter source) {
-        CharacterProgression progression = source.getProgression();
-        CharacterProgression progressionCopy = progression == null
-                ? new CharacterProgression()
-                : new CharacterProgression(
-                        progression.getDataVersion(),
-                        progression.getExperiencePoints(),
-                        progression.getExtensionDataCopy());
-        return RoleplayCharacter.builder(source)
-                .progression(progressionCopy)
-                .build();
+        return RoleplayCharacter.builder(source).build();
     }
 }

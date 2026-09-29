@@ -48,10 +48,10 @@ public final class LostTalesConfigFiles {
      * people sharing a machine keep their own arrangement.
      */
     public static final String WINDOW_LAYOUTS = "windows";
-    /** Emoji favourites and use counts, under the client folder. */
-    public static final String CHAT_EMOJIS = "chat/emojis.txt";
-    /** The ignore list, under the client folder. */
-    public static final String CHAT_IGNORES = "chat/ignores.txt";
+    /** Emoji favourites and use counts, a folder under the client folder, one file per account. */
+    public static final String CHAT_EMOJIS = "chat/emojis";
+    /** The ignore lists, a folder under the client folder, one file per account. */
+    public static final String CHAT_IGNORES = "chat/ignores";
     /** This installation's own profanity words, under the client folder; never written. */
     public static final String CHAT_PROFANITY = "chat/profanity.txt";
     /**
@@ -124,11 +124,6 @@ public final class LostTalesConfigFiles {
     /** The server's channels file. */
     public static File channelsOptions(File modConfigDirectory) {
         return serverFile(modConfigDirectory, CHANNELS_OPTIONS);
-    }
-
-    /** A file of that name straight in the mod's folder. */
-    public static File file(File modConfigDirectory, String name) {
-        return new File(directory(modConfigDirectory), name);
     }
 
     private static File ensured(File folder) {

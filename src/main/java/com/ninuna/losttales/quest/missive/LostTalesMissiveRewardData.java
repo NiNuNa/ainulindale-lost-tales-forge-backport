@@ -16,10 +16,6 @@ public final class LostTalesMissiveRewardData {
         return this.rewards;
     }
 
-    public boolean isEmpty() {
-        return this.rewards.isEmpty();
-    }
-
     public static LostTalesMissiveRewardData empty() {
         return new LostTalesMissiveRewardData(Collections.<String, String>emptyMap());
     }

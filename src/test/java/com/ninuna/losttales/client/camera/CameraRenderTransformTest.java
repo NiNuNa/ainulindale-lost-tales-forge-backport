@@ -19,7 +19,7 @@ public final class CameraRenderTransformTest {
         CameraRenderTransform transform = CameraRenderTransform.resolve(
                 10.0D, 20.0D, 30.0D,
                 0.0D, 0.0D, 2.0D,
-                pose, motion, 70.0D);
+                pose, motion);
 
         assertEquals(-0.65D, transform.getTranslateX(), EPSILON);
         assertEquals(-0.325D, transform.getTranslateY(), EPSILON);

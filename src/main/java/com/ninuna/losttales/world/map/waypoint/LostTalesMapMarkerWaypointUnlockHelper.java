@@ -16,10 +16,6 @@ import net.minecraft.entity.player.EntityPlayerMP;
 public final class LostTalesMapMarkerWaypointUnlockHelper {
     private LostTalesMapMarkerWaypointUnlockHelper() {}
 
-    public static boolean unlockWaypointForDiscoveredMarker(EntityPlayer player, String markerId) {
-        return unlockWaypointForDiscoveredMarker(player, LostTalesMapMarkerCatalog.getMarker(markerId));
-    }
-
     public static boolean unlockWaypointForDiscoveredMarker(EntityPlayer player, LostTalesMapMarkerDefinition marker) {
         if (!(player instanceof EntityPlayerMP) || marker == null
                 || !marker.hasFastTravel() || !marker.isDiscoverable()) {
@@ -37,28 +33,6 @@ public final class LostTalesMapMarkerWaypointUnlockHelper {
             return false;
         }
         lotrData.unlockFTRegion(region);
-        return true;
-    }
-
-    public static boolean lockWaypointForForgottenMarker(EntityPlayer player, String markerId) {
-        if (!(player instanceof EntityPlayerMP)) {
-            return false;
-        }
-        LostTalesMapMarkerDefinition marker =
-                LostTalesMapMarkerCatalog.getMarker(markerId);
-        if (marker == null || !marker.isDiscoverable()) {
-            return false;
-        }
-        LOTRWaypoint.Region region =
-                LostTalesMapMarkerWaypointRegistry.getRegionForMarker(markerId);
-        if (region == null) {
-            return false;
-        }
-        LOTRPlayerData lotrData = LOTRLevelData.getData(player);
-        if (lotrData == null || !lotrData.isFTRegionUnlocked(region)) {
-            return false;
-        }
-        lotrData.lockFTRegion(region);
         return true;
     }
 

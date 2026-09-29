@@ -71,9 +71,6 @@ public final class ChatRowSizesTest {
             assertEquals("factor " + factor,
                     LostTalesChatVisualStyle.rowPixels(1.0F, factor, -1),
                     LostTalesChatVisualStyle.smallPixels(1.0F, factor));
-            assertEquals("factor " + factor,
-                    LostTalesChatVisualStyle.rowPixels(1.0F, factor, 1),
-                    LostTalesChatVisualStyle.largePixels(1.0F, factor));
         }
     }
 
@@ -174,8 +171,7 @@ public final class ChatRowSizesTest {
                     LostTalesChatVisualStyle.rowRise(1.0F, factor, small));
             // Which is the row's own change of height, all of it above
             // the line it stands on.
-            float largeScale = LostTalesChatVisualStyle.largeTextScale(
-                    factor);
+            float largeScale = (factor + 1) / (float)factor;
             assertEquals("factor " + factor,
                     TEXT_OFFSET * (largeScale - 1.0F),
                     LostTalesChatVisualStyle.rowRise(1.0F, factor, large)
@@ -197,7 +193,7 @@ public final class ChatRowSizesTest {
         // Whole pixels of the stack at every GUI scale, so nothing below
         // a row lands between them.
         for (int factor = 1; factor <= 4; factor++) {
-            float large = LostTalesChatVisualStyle.largeTextScale(factor);
+            float large = (factor + 1) / (float)factor;
             float small = LostTalesChatVisualStyle.smallTextScale(factor);
             assertEquals("factor " + factor, LINE * large,
                     ChatStackRows.rowHeight(large), 0.0001F);
@@ -214,7 +210,7 @@ public final class ChatRowSizesTest {
     public void theWrapperMarksTheSpeakersRowsAndTheWords() {
         List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
                 message("<Aldric> ", "aaa bbb ccc ddd eee fff ggg hhh"),
-                100, true);
+                100, true, 1.0F, 1.0F, 1.0F, null);
         assertNotNull(lines);
         assertTrue(lines.size() > 2);
         assertTrue(ChatLayoutMarker.isHeaderRow(lines.get(0)));
@@ -245,7 +241,7 @@ public final class ChatRowSizesTest {
         root.appendSibling(ChatLayoutMarker.bodyBreak(0xFFFFFF));
         root.appendSibling(text("hello"));
         List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS, root, 200,
-                true);
+                true, 1.0F, 1.0F, 1.0F, null);
         assertEquals(3, lines.size());
         assertTrue(ChatReplyMarker.isQuoteRow(lines.get(0)));
         assertFalse(ChatLayoutMarker.isHeaderRow(lines.get(0)));
@@ -253,11 +249,11 @@ public final class ChatRowSizesTest {
         assertTrue(ChatLayoutMarker.isHeaderRow(lines.get(1)));
         assertTrue(ChatLayoutMarker.isBodyRow(lines.get(2)));
         assertEquals(ChatStackRows.quoteRowHeight(true),
-                ChatStackRows.heightOf(new ChatLine(0, lines.get(0), 1)));
+                heightOf(new ChatLine(0, lines.get(0), 1)));
         assertEquals(ChatStackRows.speakerRowHeight(true),
-                ChatStackRows.heightOf(new ChatLine(0, lines.get(1), 1)));
+                heightOf(new ChatLine(0, lines.get(1), 1)));
         assertEquals(ChatStackRows.messageRowHeight(true),
-                ChatStackRows.heightOf(new ChatLine(0, lines.get(2), 1)));
+                heightOf(new ChatLine(0, lines.get(2), 1)));
     }
 
     /**
@@ -271,7 +267,7 @@ public final class ChatRowSizesTest {
         root.appendSibling(ChatLayoutMarker.bodyBreak(0xFFFFFF));
         root.appendSibling(text("and on, down from the door"));
         List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS, root,
-                100, true);
+                100, true, 1.0F, 1.0F, 1.0F, null);
         assertNotNull(lines);
         for (int index = 0; index < lines.size(); index++) {
             assertFalse("row " + index,
@@ -299,9 +295,9 @@ public final class ChatRowSizesTest {
         // 66 the row has when it is drawn half again as big.
         ChatComponentText root = message("<Aldric Grey> ", "hello");
         List<IChatComponent> whole = ChatLineWrapper.wrap(METRICS, root,
-                100, true, 1.0F, 1.0F);
+                100, true, 1.0F, 1.0F, 1.0F, null);
         List<IChatComponent> large = ChatLineWrapper.wrap(METRICS, root,
-                100, true, 1.5F, 1.0F);
+                100, true, 1.5F, 1.0F, 1.0F, null);
         assertEquals(2, whole.size());
         assertEquals(3, large.size());
         assertTrue(ChatLayoutMarker.isHeaderRow(large.get(0)));
@@ -313,9 +309,9 @@ public final class ChatRowSizesTest {
         // the feed, and the name's row stands over it either way.
         ChatComponentText long_ = message("<A> ", "aaaaaa bbbbbb cccccc");
         assertEquals(4, ChatLineWrapper.wrap(METRICS, long_, 78, true,
-                1.0F, 1.0F).size());
+                1.0F, 1.0F, 1.0F, null).size());
         assertEquals(2, ChatLineWrapper.wrap(METRICS, long_, 78, true,
-                1.0F, 0.5F).size());
+                1.0F, 0.5F, 1.0F, null).size());
     }
 
     /**
@@ -363,5 +359,12 @@ public final class ChatRowSizesTest {
         component.setChatStyle(new ChatStyle().setColor(
                 EnumChatFormatting.WHITE));
         return component;
+    }
+
+    /** A line's row height in the open window, as the rows lay it out. */
+    private static int heightOf(ChatLine line) {
+        ChatStackRows rows = new ChatStackRows();
+        rows.reset(java.util.Collections.singletonList(line), -1, true);
+        return rows.height(0);
     }
 }

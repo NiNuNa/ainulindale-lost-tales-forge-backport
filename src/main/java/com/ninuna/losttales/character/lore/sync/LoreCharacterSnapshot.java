@@ -3,15 +3,14 @@ package com.ninuna.losttales.character.lore.sync;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 
 /** Complete private view of lore definitions and current world ownership. */
 public final class LoreCharacterSnapshot {
 
     private final List<LoreCharacterSummary> characters;
-    private final Map<String, LoreCharacterSummary> byId;
     private final boolean ownershipReadOnly;
     private final boolean transferReadOnly;
 
@@ -21,14 +20,12 @@ public final class LoreCharacterSnapshot {
             boolean transferReadOnly) {
         ArrayList<LoreCharacterSummary> accepted =
                 new ArrayList<LoreCharacterSummary>();
-        LinkedHashMap<String, LoreCharacterSummary> indexed =
-                new LinkedHashMap<String, LoreCharacterSummary>();
+        Set<String> ids = new HashSet<String>();
         if (characters != null) {
             for (LoreCharacterSummary character : characters) {
                 if (character != null && character.getId().length() > 0
-                        && !indexed.containsKey(character.getId())) {
+                        && ids.add(character.getId())) {
                     accepted.add(character);
-                    indexed.put(character.getId(), character);
                 }
             }
         }
@@ -40,15 +37,11 @@ public final class LoreCharacterSnapshot {
             }
         });
         this.characters = Collections.unmodifiableList(accepted);
-        this.byId = Collections.unmodifiableMap(indexed);
         this.ownershipReadOnly = ownershipReadOnly;
         this.transferReadOnly = transferReadOnly;
     }
 
     public List<LoreCharacterSummary> getCharacters() { return this.characters; }
-    public LoreCharacterSummary get(String id) {
-        return id == null ? null : this.byId.get(id);
-    }
     public boolean isOwnershipReadOnly() { return this.ownershipReadOnly; }
     public boolean isTransferReadOnly() { return this.transferReadOnly; }
     public boolean canMutate() {

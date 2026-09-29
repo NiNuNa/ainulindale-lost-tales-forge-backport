@@ -193,10 +193,6 @@ public final class CharacterDeletionWorldData extends WorldSavedData {
         return this.readOnlyForNewerVersion;
     }
 
-    public int getUnsupportedDataVersion() {
-        return this.unsupportedDataVersion;
-    }
-
     public CharacterDeletionTombstone getTombstone(UUID characterId) {
         return characterId == null ? null : this.tombstones.get(characterId);
     }
@@ -221,6 +217,41 @@ public final class CharacterDeletionWorldData extends WorldSavedData {
             }
         });
         return Collections.unmodifiableList(result);
+    }
+
+    /**
+     * Committed tombstones past their retention, soonest due first, at
+     * most {@code limit}: the owner's, or everyone's for a null owner.
+     */
+    public List<CharacterDeletionTombstone> getExpired(UUID ownerId, long now,
+                                                      int limit) {
+        ArrayList<CharacterDeletionTombstone> due =
+                new ArrayList<CharacterDeletionTombstone>();
+        for (CharacterDeletionTombstone tombstone : this.tombstones.values()) {
+            if ((ownerId == null || ownerId.equals(tombstone.getOwnerId()))
+                    && tombstone.isPurgeAllowed(now)) {
+                due.add(tombstone);
+            }
+        }
+        sortByPurgeTime(due);
+        return due.size() <= Math.max(0, limit) ? due
+                : new ArrayList<CharacterDeletionTombstone>(
+                        due.subList(0, Math.max(0, limit)));
+    }
+
+    /** Orders tombstones soonest purged first, then by character id. */
+    public static void sortByPurgeTime(List<CharacterDeletionTombstone> tombstones) {
+        Collections.sort(tombstones, new Comparator<CharacterDeletionTombstone>() {
+            @Override
+            public int compare(CharacterDeletionTombstone left,
+                               CharacterDeletionTombstone right) {
+                if (left.getPurgeAfter() != right.getPurgeAfter()) {
+                    return left.getPurgeAfter() < right.getPurgeAfter() ? -1 : 1;
+                }
+                return left.getCharacterId().toString().compareTo(
+                        right.getCharacterId().toString());
+            }
+        });
     }
 
     public int getQuarantinedEntryCount() {

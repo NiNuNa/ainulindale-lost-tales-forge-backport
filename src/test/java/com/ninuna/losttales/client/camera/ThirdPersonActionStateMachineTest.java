@@ -12,14 +12,11 @@ public final class ThirdPersonActionStateMachineTest {
         ThirdPersonActionStateMachine machine =
                 new ThirdPersonActionStateMachine();
         ThirdPersonGameplayState first = machine.update(
-                true, false, false, true,
-                false, 2, 0);
+                true, false, false, false, false, true, false, 2, 0);
         ThirdPersonGameplayState second = machine.update(
-                false, false, false, true,
-                false, 2, 0);
+                false, false, false, false, false, true, false, 2, 0);
         ThirdPersonGameplayState third = machine.update(
-                false, false, false, true,
-                false, 2, 0);
+                false, false, false, false, false, true, false, 2, 0);
 
         assertTrue(first.isAttacking());
         assertTrue(first.isAttackCommitted());
@@ -32,17 +29,13 @@ public final class ThirdPersonActionStateMachineTest {
         ThirdPersonActionStateMachine machine =
                 new ThirdPersonActionStateMachine();
         assertTrue(machine.update(
-                true, false, false, false,
-                false, 0, 2).isCombat());
+                true, false, false, false, false, false, false, 0, 2).isCombat());
         assertTrue(machine.update(
-                false, false, false, false,
-                false, 0, 2).isCombat());
+                false, false, false, false, false, false, false, 0, 2).isCombat());
         assertTrue(machine.update(
-                false, false, false, false,
-                false, 0, 2).isCombat());
+                false, false, false, false, false, false, false, 0, 2).isCombat());
         assertFalse(machine.update(
-                false, false, false, false,
-                false, 0, 2).isCombat());
+                false, false, false, false, false, false, false, 0, 2).isCombat());
     }
 
     @Test
@@ -50,19 +43,16 @@ public final class ThirdPersonActionStateMachineTest {
         ThirdPersonActionStateMachine machine =
                 new ThirdPersonActionStateMachine();
         assertFalse(machine.update(
-                false, false, false, true,
-                false, 0, 0).isCombat());
+                false, false, false, false, false, true, false, 0, 0).isCombat());
         assertTrue(machine.update(
-                false, false, false, true,
-                true, 0, 0).isCombat());
+                false, false, false, false, false, true, true, 0, 0).isCombat());
     }
 
     @Test
     public void aimingOverridesCombatAndCountsAsCombat() {
         ThirdPersonGameplayState state =
                 new ThirdPersonActionStateMachine().update(
-                        false, true, false, false,
-                        false, 0, 0);
+                        false, true, true, false, false, false, false, 0, 0);
         assertTrue(state.isAiming());
         assertTrue(state.isCombat());
     }
@@ -71,8 +61,7 @@ public final class ThirdPersonActionStateMachineTest {
     public void directionalItemCanFaceAimWithoutEnteringCombat() {
         ThirdPersonGameplayState state =
                 new ThirdPersonActionStateMachine().update(
-                        false, false, true, false, false,
-                        false, 0, 0);
+                        false, false, true, false, false, false, false, 0, 0);
         assertTrue(state.shouldFaceAim());
         assertFalse(state.isAiming());
         assertFalse(state.isCombat());

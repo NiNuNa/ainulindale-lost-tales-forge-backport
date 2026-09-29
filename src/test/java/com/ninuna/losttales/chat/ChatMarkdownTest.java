@@ -271,8 +271,5 @@ public final class ChatMarkdownTest {
         assertFalse(ChatMarkdown.hasMarkup(null));
         assertTrue(ChatMarkdown.hasMarkup("a *b* c"));
         assertTrue(ChatMarkdown.hasMarkup("`x`"));
-        assertEquals(1, ChatMarkdown.plain("hello").size());
-        assertTrue(ChatMarkdown.plain("hello").get(0).isPlain());
-        assertTrue(ChatMarkdown.plain("").isEmpty());
     }
 }

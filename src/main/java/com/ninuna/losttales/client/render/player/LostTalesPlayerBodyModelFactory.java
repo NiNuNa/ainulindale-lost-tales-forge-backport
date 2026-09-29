@@ -55,7 +55,6 @@ final class LostTalesPlayerBodyModelFactory {
         if (shape == null) {
             return null;
         }
-        boolean slim = CharacterBodyTypeRegistry.SLIM.equals(bodyTypeId);
         ModelBiped mainModel = createMainModel(
                 definition, layout, bodyTypeId, chestTypeId);
         ModelBiped chestArmorModel = new LostTalesPlayerModel(
@@ -63,6 +62,6 @@ final class LostTalesPlayerBodyModelFactory {
         ModelBiped armorModel = new LostTalesPlayerModel(
                 LEGGINGS_INFLATION, false, shape, layout, null, true);
         return new LostTalesConfiguredPlayerRenderer(
-                definition, bodyTypeId, chestTypeId, mainModel, chestArmorModel, armorModel);
+                definition, mainModel, chestArmorModel, armorModel);
     }
 }

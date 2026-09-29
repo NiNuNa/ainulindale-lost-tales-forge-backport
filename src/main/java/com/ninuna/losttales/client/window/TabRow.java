@@ -171,7 +171,7 @@ public final class TabRow {
      */
     static final double DRAFT_SHARE = 2.0D / 3.0D;
     static final double CLOSE_SHARE = 1.0D / 3.0D;
-    /** How far a carried tab rises off the row, and how long it takes to. */
+    /** How far a carried tab rises off the row ({@code window.tab.lift}). */
     private static final float LIFT_PIXELS = 1.0F;
     /**
      * The depths the carried run's mask is laid at: its footprint in
@@ -190,13 +190,11 @@ public final class TabRow {
      * ({@code TabRowTest} reads the sheet to hold both).
      */
     static final int LIFT_SEAM_ROW = 8;
-    private static final double LIFT_SECONDS = 0.05D;
     /**
-     * The glow a tab put down gives once in its channel's colour, on its
-     * own surface and the tool strip's: how long it takes to fade, and
-     * how far toward the colour the two go at their brightest.
+     * How far toward its channel's colour a tab put down glows at its
+     * brightest, on its own surface and the tool strip's; the glow fades
+     * on {@code window.tab.glow}.
      */
-    private static final double GLOW_SECONDS = 0.45D;
     private static final float GLOW_TINT = 0.45F;
     /** Gap between the name and the draft mark after it, and after the {@code +}. */
     private static final int COUNTER_GAP = 3;
@@ -259,15 +257,6 @@ public final class TabRow {
      * point it swapped at, which undoes it about where it was made.
      */
     private static final int SWAP_UNDO = 4;
-    /**
-     * The hover marquee that shows a cut name whole: it waits for the
-     * pointer to rest, slides the name left about three letters a second
-     * until the end is in view, rests there long enough to read, and
-     * slides back — and again for as long as the pointer stays.
-     */
-    static final double MARQUEE_START_DELAY_SECONDS = 0.5D;
-    static final double MARQUEE_SPEED_PX_PER_SECOND = 20.0D;
-    static final double MARQUEE_END_PAUSE_SECONDS = 0.8D;
     /** The hairline dividing the row's controls. */
     private static final int DIVIDER_WIDTH =
             WindowStyle.DIVIDER_WIDTH;
@@ -542,17 +531,10 @@ public final class TabRow {
     public static final class Hit {
         public final HitKind kind;
         public final WindowTab tab;
-        /** Whether the tab's name is cut short in the row; false for anything but a tab. */
-        final boolean labelClipped;
 
         Hit(HitKind kind, WindowTab tab) {
-            this(kind, tab, false);
-        }
-
-        Hit(HitKind kind, WindowTab tab, boolean labelClipped) {
             this.kind = kind;
             this.tab = tab;
-            this.labelClipped = labelClipped;
         }
     }
 
@@ -721,6 +703,22 @@ public final class TabRow {
     }
 
     /**
+     * The row's {@code +} where it answers, in screen space: what a new
+     * player's first tip points at. Null while the row does not show it.
+     */
+    public LostTalesUiHitBox restoreControlBox(Row row) {
+        if (this.restoreX < 0) {
+            return null;
+        }
+        LostTalesUiHitBox box = endControlBox(this.restoreX,
+                this.restoreWidth, LostTalesUiSheet.PLUS.getHeight(),
+                row.rowBottom);
+        return new LostTalesUiHitBox(box.left + row.offsetX + row.fractionX
+                + this.restoreRunFraction, box.top + row.fractionY,
+                box.width, box.height);
+    }
+
+    /**
      * The window's fullscreen control where it answers, in screen space:
      * the box the snap layouts hang from. Null while the row does not
      * show the control.
@@ -770,7 +768,7 @@ public final class TabRow {
                     .contains(localX, localY)) {
                 return new Hit(HitKind.DRAFT, tab.tab);
             }
-            return new Hit(HitKind.TAB, tab.tab, tab.labelWidth > tab.labelRoom);
+            return new Hit(HitKind.TAB, tab.tab);
         }
         if (searchBox(row.left, bottom).contains(localX, localY)) {
             return new Hit(HitKind.SEARCH, null);
@@ -2109,9 +2107,7 @@ public final class TabRow {
         if (landed) {
             this.toolGlow = 1.0F;
         }
-        this.toolGlow = Motions.enabled()
-                ? Math.max(0.0F, this.toolGlow - (float)(elapsed / GLOW_SECONDS))
-                : 0.0F;
+        this.toolGlow = faded(this.toolGlow, elapsed);
         this.carriedLastFrame = carried;
         for (int index = this.leavingTabs.size() - 1; index >= 0; index--) {
             Tab tab = this.leavingTabs.get(index);
@@ -2178,18 +2174,25 @@ public final class TabRow {
 
     /**
      * A tab's own short beats: rising a pixel off the row while the hand
-     * carries it and settling back after, and the glow of a tab put down
-     * fading.
+     * carries it and settling back after ({@code window.tab.lift}), and
+     * the glow of a tab put down fading ({@code window.tab.glow}), each
+     * at the speed in force; reduced motion sets the lift down at once.
      */
     private static void advanceBeats(Tab tab, boolean carried,
                                      double elapsed) {
-        float rise = Motions.enabled()
-                ? (float)(elapsed / LIFT_SECONDS) : 1.0F;
+        long liftNanos = Motions.travelNanos(MotionIds.WINDOW_TAB_LIFT);
+        float rise = liftNanos <= 0L ? 1.0F
+                : (float)(elapsed * 1.0E9D / liftNanos);
         tab.lift = carried ? Math.min(1.0F, tab.lift + rise)
                 : Math.max(0.0F, tab.lift - rise);
-        tab.glow = Motions.enabled()
-                ? Math.max(0.0F, tab.glow - (float)(elapsed / GLOW_SECONDS))
-                : 0.0F;
+        tab.glow = faded(tab.glow, elapsed);
+    }
+
+    /** A glow {@code elapsed} seconds further along its fade; out at once while motion is off. */
+    private static float faded(float glow, double elapsed) {
+        long glowNanos = Motions.nanos(MotionIds.WINDOW_TAB_GLOW);
+        return glowNanos <= 0L ? 0.0F : Math.max(0.0F,
+                glow - (float)(elapsed * 1.0E9D / glowNanos));
     }
 
     /**
@@ -2347,32 +2350,55 @@ public final class TabRow {
 
     /**
      * How far left a hovered name is shifted after {@code elapsedSeconds}
-     * of hovering, given the {@code overflowPx} of it the tab cannot
-     * show: nothing during the start delay, then out to the overflow,
-     * a pause, back to nothing, a pause, and round again. Zero when
-     * nothing overflows. A pure reading of the clock, so it looks the
-     * same at any frame rate.
+     * of hovering, as {@code window.tab.marquee} times it at the speed in
+     * force; under reduced motion the slides are jumps. Every cut name
+     * that slides under the pointer reads it: a tab's, the channel
+     * button's, a member row's.
      */
     public static double marqueeOffset(double elapsedSeconds, int overflowPx) {
+        double speed = Motions.speed();
+        double pxPerSecond = Motions.reduced() ? Double.POSITIVE_INFINITY
+                : Motions.param(MotionIds.WINDOW_TAB_MARQUEE, "speed", 20.0F)
+                        * speed;
+        return marqueeOffset(elapsedSeconds, overflowPx,
+                Motions.nanos(MotionIds.WINDOW_TAB_MARQUEE) / 1.0E9D,
+                pxPerSecond, Motions.param(MotionIds.WINDOW_TAB_MARQUEE,
+                        "pause", 800.0F) / 1000.0D / speed);
+    }
+
+    /**
+     * How far left a hovered name is shifted after {@code elapsedSeconds}
+     * of hovering, given the {@code overflowPx} of it the tab cannot
+     * show: nothing for {@code delaySeconds}, then out to the overflow at
+     * {@code pxPerSecond} (infinite for a jump), {@code pauseSeconds}
+     * there, back to nothing, a pause, and round again. Zero when nothing
+     * overflows. A pure reading of the clock, so it looks the same at any
+     * frame rate.
+     */
+    static double marqueeOffset(double elapsedSeconds, int overflowPx,
+                                double delaySeconds, double pxPerSecond,
+                                double pauseSeconds) {
         if (overflowPx <= 0) {
             return 0.0D;
         }
-        double time = elapsedSeconds - MARQUEE_START_DELAY_SECONDS;
+        double time = elapsedSeconds - delaySeconds;
         if (time <= 0.0D) {
             return 0.0D;
         }
-        double slide = overflowPx / MARQUEE_SPEED_PX_PER_SECOND;
-        double cycle = 2.0D * (slide + MARQUEE_END_PAUSE_SECONDS);
+        double slide = pxPerSecond > 0.0D ? overflowPx / pxPerSecond : 0.0D;
+        double cycle = 2.0D * (slide + pauseSeconds);
+        if (cycle <= 0.0D) {
+            return 0.0D;
+        }
         double phase = time % cycle;
         if (phase < slide) {
-            return phase * MARQUEE_SPEED_PX_PER_SECOND;
+            return phase * pxPerSecond;
         }
-        if (phase < slide + MARQUEE_END_PAUSE_SECONDS) {
+        if (phase < slide + pauseSeconds) {
             return overflowPx;
         }
-        if (phase < 2.0D * slide + MARQUEE_END_PAUSE_SECONDS) {
-            return overflowPx - (phase - slide - MARQUEE_END_PAUSE_SECONDS)
-                    * MARQUEE_SPEED_PX_PER_SECOND;
+        if (phase < 2.0D * slide + pauseSeconds) {
+            return overflowPx - (phase - slide - pauseSeconds) * pxPerSecond;
         }
         return 0.0D;
     }
@@ -3068,7 +3094,7 @@ public final class TabRow {
             int draftX = draftShown ? draftLeft(x, icon,
                     (int)Math.floor(settled.labelRoom)) : -1;
             Tab built = new Tab(channel, index, icon, label, labelWidth,
-                    (int)Math.floor(settled.labelRoom), draft, x, tabWidth,
+                    draft, x, tabWidth,
                     closeX, draftX,
                     isTrue(this.cachedMuted.get(channel)));
             built.toLeft = cursor - row.left;
@@ -3394,8 +3420,7 @@ public final class TabRow {
                 + Math.min(DEFAULT_TAB_WIDTH, widest) * tabs.size();
         // The screen lays the row out two pixels inside the window's box
         // on either side.
-        return Math.max((int)Math.ceil(WindowPlacement.minBoxWidth(minecraft)),
-                rowWidth + 4);
+        return Math.max(WindowPlacement.MIN_BOX_WIDTH, rowWidth + 4);
     }
 
     /**
@@ -3434,7 +3459,7 @@ public final class TabRow {
         }
         int rowWidth = SEARCH_RUN + endControlsWidth(window)
                 + TAB_GAP * (tabs.size() - 1) + reservedRowWidth(tabs);
-        return Math.max((int)Math.ceil(WindowPlacement.minBoxWidth(minecraft)),
+        return Math.max(WindowPlacement.MIN_BOX_WIDTH,
                 rowWidth + STRIP_INSET * 2);
     }
 
@@ -3542,13 +3567,6 @@ public final class TabRow {
         final String label;
         final int labelWidth;
         /**
-         * Pixels the name keeps once the tab has settled at its width,
-         * beside whichever buttons that width holds; less than the name
-         * is wide when the row is crowded. The draw reads its own from
-         * the width the tab is drawn at.
-         */
-        final int labelRoom;
-        /**
          * How far the name is shifted left to show its hidden end while
          * the tab is hovered, and how long the pointer has rested on it;
          * both carried on when the row is laid out again.
@@ -3620,14 +3638,13 @@ public final class TabRow {
         final boolean muted;
 
         Tab(WindowTab tab, int rowIndex, boolean icon, String label,
-            int labelWidth, int labelRoom, boolean draft, int x, int width,
+            int labelWidth, boolean draft, int x, int width,
             int closeX, int draftX, boolean muted) {
             this.tab = tab;
             this.rowIndex = rowIndex;
             this.icon = icon;
             this.label = label;
             this.labelWidth = labelWidth;
-            this.labelRoom = labelRoom;
             this.draft = draft;
             this.x = x;
             this.width = width;

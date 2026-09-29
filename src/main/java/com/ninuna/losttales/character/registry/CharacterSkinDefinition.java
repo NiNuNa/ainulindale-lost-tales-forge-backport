@@ -60,11 +60,6 @@ public final class CharacterSkinDefinition {
         return this.raceId;
     }
 
-    /** Empty for a unisex skin. */
-    public String getGenderId() {
-        return this.genderId;
-    }
-
     public String getDisplayGroupId() {
         return this.displayGroupId;
     }
@@ -85,11 +80,6 @@ public final class CharacterSkinDefinition {
 
     public CharacterSkinLayout getLayout() {
         return this.layout;
-    }
-
-    /** True when the texture ships inside the Lost Tales jar. */
-    public boolean isBundled() {
-        return this.textureLocation.startsWith(CharacterSkinRegistry.BUNDLED_TEXTURE_ROOT);
     }
 
     /** True when the texture is the player's own Minecraft account skin. */

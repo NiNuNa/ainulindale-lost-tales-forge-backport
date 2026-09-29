@@ -8,7 +8,9 @@ import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.character.CharacterCapeUpdateRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterCreateRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterDeleteRequestPacket;
+import com.ninuna.losttales.network.packet.character.CharacterLookUpdateRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterProfileUpdateRequestPacket;
+import com.ninuna.losttales.network.packet.character.CharacterRestoreRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterRosterRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterSelectRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterTemplateAdoptRequestPacket;
@@ -18,7 +20,10 @@ import com.ninuna.losttales.network.packet.character.LoreCharacterReleaseRequest
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/** Client-side request facade used by the later profile and management GUIs. */
+/**
+ * Every character request the client sends, each under a request id of its
+ * own that the roster cache follows until the server answers it.
+ */
 public final class ClientCharacterNetwork {
 
     private static final AtomicInteger NEXT_REQUEST_ID = new AtomicInteger(1);
@@ -50,7 +55,7 @@ public final class ClientCharacterNetwork {
         });
     }
 
-    /** Offers the account's template for this world's default character. */
+    /** Offers the account character's look for this world's account character. */
     public static int adoptTemplate(final CharacterTemplateAdoption adoption) {
         if (adoption == null || adoption.getExpectedRosterRevision() < 0L) {
             throw new IllegalArgumentException("adoption and revision must be valid");
@@ -139,6 +144,48 @@ public final class ClientCharacterNetwork {
                                 characterId,
                                 profile,
                                 age));
+            }
+        });
+    }
+
+    /** A new look for one character: its skin, arm width and chest. */
+    public static int updateLook(final long expectedRosterRevision,
+                                 final UUID characterId,
+                                 final String skinId,
+                                 final String bodyTypeId,
+                                 final String chestTypeId) {
+        if (expectedRosterRevision < 0L || characterId == null) {
+            throw new IllegalArgumentException("revision and character must be valid");
+        }
+        final int requestId = nextRequestId();
+        return send(requestId, CharacterOperationType.LOOK_UPDATE, new Runnable() {
+            @Override
+            public void run() {
+                LostTalesNetworkHandler.CHANNEL.sendToServer(
+                        new CharacterLookUpdateRequestPacket(
+                                requestId,
+                                expectedRosterRevision,
+                                characterId,
+                                skinId,
+                                bodyTypeId,
+                                chestTypeId));
+            }
+        });
+    }
+
+    /** Brings back one of the player's own deleted characters. */
+    public static int restoreCharacter(final long expectedRosterRevision,
+                                       final UUID characterId) {
+        if (expectedRosterRevision < 0L || characterId == null) {
+            throw new IllegalArgumentException("revision and character must be valid");
+        }
+        final int requestId = nextRequestId();
+        return send(requestId, CharacterOperationType.RESTORE, new Runnable() {
+            @Override
+            public void run() {
+                LostTalesNetworkHandler.CHANNEL.sendToServer(
+                        new CharacterRestoreRequestPacket(
+                                requestId, expectedRosterRevision, characterId));
             }
         });
     }

@@ -8,6 +8,8 @@ import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.character.sync.CharacterOperationFeedback;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
+import com.ninuna.losttales.character.sync.DeletedCharacterSummary;
+import com.ninuna.losttales.compat.lotr.LotrFactionColors;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterDisplayNames;
 import com.ninuna.losttales.client.character.ClientCharacterNetwork;
@@ -52,17 +54,19 @@ import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 
 /**
- * The Characters tab (C1 a): the account's character and every slot in
- * a roster the tool strip's left button folds away, and the picked
- * character's profile beside it in one column (C2 a), its figure live
- * for the one played and posed from its look for any other (C3 a). The
- * window holds the rest: the well's search narrows the roster, and the
- * input bar holds Play as, Edit Profile, Capes and Delete, last in red —
- * Create in Play as's place for an empty slot. Edit Profile, Capes, the
- * lore characters and the question before a deletion open as sub-windows
- * in the tab's window; the creator stays a screen of its own. Another
- * person's profile, opened from their card or their menu (P5 a), stands
- * in the roster's place, read only, until Back.
+ * The Characters tab (C1 a): the account character and every slot in a
+ * roster the tool strip's left button folds away, the deleted characters
+ * still to be restored at its foot (R6 a), and the picked character's
+ * profile beside it in one column (C2 a), its figure live for the one
+ * played and posed from its look for any other (C3 a). The window holds
+ * the rest: the well's search narrows the roster, and the input bar holds
+ * Play as, Edit Profile, Change Look, Capes and Delete, last in red —
+ * Create in Play as's place for an empty slot, Restore alone for a deleted
+ * character. Edit Profile, Change Look, Capes, the lore characters and the
+ * questions before a deletion or a restore open as sub-windows in the
+ * tab's window; the creator stays a screen of its own. Another person's
+ * profile, opened from their card or their menu (P5 a), stands in the
+ * roster's place, read only, until Back.
  *
  * <p>It draws only the server's roster and never changes it on its own;
  * every request is checked again by the server.</p>
@@ -80,8 +84,6 @@ public final class CharactersPage extends PageContent {
     /** A head before a name, and its gap. */
     private static final int HEAD = 8;
     private static final int HEAD_GAP = 4;
-    /** Nothing picked yet: the one played is picked as the roster arrives. */
-    private static final int NOT_PICKED = Integer.MIN_VALUE;
 
     /** The roster's button at the strip's left end: the person. */
     private static final ToolStrip.Panel ROSTER_PANEL = new ToolStrip.Panel(
@@ -93,7 +95,9 @@ public final class CharactersPage extends PageContent {
     private static final String PLAY_AS = "play_as";
     private static final String CREATE = "create";
     private static final String EDIT = "edit";
+    private static final String LOOK = "look";
     private static final String CAPES = "capes";
+    private static final String RESTORE = "restore";
     private static final String DELETE = "delete";
     private static final String REFRESH = "refresh";
     private static final String BACK = "back";
@@ -120,7 +124,8 @@ public final class CharactersPage extends PageContent {
     private int width = -1;
     private int height = -1;
     private boolean rosterOut = true;
-    private int pickedSlot = NOT_PICKED;
+    /** The row picked, by its key; null until one is, when the one played is picked as the roster arrives. */
+    private String pickedKey;
     /** Where the roster and the profile were scrolled to, and where they stand on screen, gliding there. */
     private int rosterScroll;
     private int profileScroll;
@@ -134,8 +139,6 @@ public final class CharactersPage extends PageContent {
     private String query = "";
     private int pendingRequestId;
     private int rosterRequestId;
-    private String statusMessage = "";
-    private boolean statusError;
     /** Whether the figure is held and turning. */
     private boolean holdingFigure;
     /** The person whose profile stands in the roster's place; null for the player's own. */
@@ -170,20 +173,20 @@ public final class CharactersPage extends PageContent {
     /** The row picked, the one played until another is. */
     private CharacterRosterRows.Row picked(CharacterRosterSnapshot snapshot,
                                            List<CharacterRosterRows.Row> rows) {
-        CharacterRosterRows.Row row = CharacterRosterRows.atSlot(rows,
-                this.pickedSlot);
+        CharacterRosterRows.Row row = CharacterRosterRows.atKey(rows,
+                this.pickedKey);
         if (row == null && snapshot != null && this.query.length() == 0) {
             row = CharacterRosterRows.played(snapshot, rows);
             if (row != null) {
-                pick(row.slot);
+                pick(row.key());
             }
         }
         return row;
     }
 
-    private void pick(int slot) {
-        if (slot != this.pickedSlot) {
-            this.pickedSlot = slot;
+    private void pick(String key) {
+        if (key != null && !key.equals(this.pickedKey)) {
+            this.pickedKey = key;
             this.profileScroll = 0;
             this.shownProfileScroll = 0.0D;
             this.figure.reset();
@@ -193,12 +196,14 @@ public final class CharactersPage extends PageContent {
     /** The slot a lore character is claimed into: the empty one picked, else the first empty one; -1 for none. */
     int claimSlot() {
         CharacterRosterSnapshot snapshot = snapshot();
-        if (snapshot != null && CharacterRoster.isCreatableSlotIndex(
-                this.pickedSlot) && snapshot.getCharacterAtSlot(
-                        this.pickedSlot) == null
-                && snapshot.getSlotState(this.pickedSlot)
+        CharacterRosterRows.Row row = snapshot == null ? null
+                : CharacterRosterRows.atKey(CharacterRosterRows.of(snapshot,
+                        accountName(), ""), this.pickedKey);
+        if (row != null && row.kind == CharacterRosterRows.Kind.EMPTY
+                && CharacterRoster.isCreatableSlotIndex(row.slot)
+                && snapshot.getSlotState(row.slot)
                         == CharacterSlotState.UNLOCKED) {
-            return this.pickedSlot;
+            return row.slot;
         }
         return CharacterRosterRows.firstEmptySlot(snapshot);
     }
@@ -228,7 +233,10 @@ public final class CharactersPage extends PageContent {
             this.visit = null;
             if (own != null) {
                 this.query = "";
-                pick(own.getSlotIndex());
+                pick(new CharacterRosterRows.Row(own.isDefault()
+                        ? CharacterRosterRows.Kind.ACCOUNT
+                        : CharacterRosterRows.Kind.CHARACTER,
+                        own.getSlotIndex(), own).key());
             }
             return;
         }
@@ -255,12 +263,14 @@ public final class CharactersPage extends PageContent {
 
     /* ---- Requests ---- */
 
-    /** Follows a request to the server: its answer stands at the page's foot. */
+    /** Follows a request to the server: its answer stands over the page's bar, and what it is doing until then. */
     void track(int requestId, String workingKey) {
         this.pendingRequestId = requestId;
-        this.statusMessage = workingKey == null ? ""
-                : I18n.format(workingKey);
-        this.statusError = false;
+        if (workingKey == null) {
+            clearAnswer();
+        } else {
+            sayWorking(I18n.format(workingKey));
+        }
     }
 
     /** Whether a request is on its way; everything that would send another waits. */
@@ -282,15 +292,16 @@ public final class CharactersPage extends PageContent {
         CharacterOperationFeedback feedback =
                 ClientCharacterRosterCache.getOperation(completed);
         if (feedback == null) {
-            this.statusMessage = "";
+            clearAnswer();
             return;
         }
         ClientCharacterRosterCache.clearOperation(completed);
-        this.statusError = !feedback.isSuccessful();
-        this.statusMessage = feedback.isSuccessful()
-                ? ClientCharacterDisplayNames.operationSuccess(
-                        feedback.getOperationType().getId())
-                : ClientCharacterDisplayNames.error(feedback);
+        if (feedback.isSuccessful()) {
+            sayDone(ClientCharacterDisplayNames.operationSuccess(
+                    feedback.getOperationType().getId()));
+        } else {
+            sayRefused(ClientCharacterDisplayNames.error(feedback));
+        }
     }
 
     /** Asks the server for the roster where none is known, or its last answer failed. */
@@ -308,7 +319,7 @@ public final class CharactersPage extends PageContent {
     }
 
     private void refresh() {
-        this.statusMessage = "";
+        clearAnswer();
         this.rosterRequestId = ClientCharacterNetwork.requestRoster();
     }
 
@@ -389,15 +400,6 @@ public final class CharactersPage extends PageContent {
                 drawProfile(snapshot, picked, layout, clipX, clipY, alpha);
             }
         }
-        if (this.statusMessage.length() > 0) {
-            LostTalesUiInk.drawText(this.font, this.font.trimStringToWidth(
-                            this.statusMessage, this.width
-                                    - 2 * CharactersLayout.MARGIN),
-                    CharactersLayout.MARGIN, this.height
-                            - CharactersLayout.MARGIN - NOTE_LINE + 2,
-                    this.statusError ? LostTalesColors.rgb(LostTalesColors.RED)
-                            : WindowStyle.asideRgb(), alpha);
-        }
     }
 
     /** A message alone in the middle of the page, in the aside tone. */
@@ -417,8 +419,12 @@ public final class CharactersPage extends PageContent {
     /* ---- The roster ---- */
 
     private static int rowHeight(CharacterRosterRows.Row row) {
-        return row.kind == CharacterRosterRows.Kind.HEADING ? HEADING_HEIGHT
-                : ROW_HEIGHT;
+        return isHeading(row) ? HEADING_HEIGHT : ROW_HEIGHT;
+    }
+
+    private static boolean isHeading(CharacterRosterRows.Row row) {
+        return row.kind == CharacterRosterRows.Kind.HEADING
+                || row.kind == CharacterRosterRows.Kind.DELETED_HEADING;
     }
 
     private static int contentHeight(List<CharacterRosterRows.Row> rows) {
@@ -482,11 +488,15 @@ public final class CharactersPage extends PageContent {
                          int y, boolean picked, boolean hovered, int alpha) {
         int left = (int)roster.left;
         int right = (int)roster.right();
-        if (row.kind == CharacterRosterRows.Kind.HEADING) {
-            String name = LostTalesSkyrimUiStyle.uppercase(I18n.format(
-                    "gui.losttales.character.heading.slots",
-                    Integer.valueOf(CharacterRosterRows.filledSlots(snapshot)),
-                    Integer.valueOf(snapshot.getUnlockedSlotCount())));
+        if (isHeading(row)) {
+            String name = LostTalesSkyrimUiStyle.uppercase(
+                    row.kind == CharacterRosterRows.Kind.DELETED_HEADING
+                            ? I18n.format("gui.losttales.character.heading.deleted")
+                            : I18n.format("gui.losttales.character.heading.slots",
+                                    Integer.valueOf(CharacterRosterRows
+                                            .filledSlots(snapshot)),
+                                    Integer.valueOf(snapshot
+                                            .getUnlockedSlotCount())));
             int textTop = y + LostTalesUiInk.centredStart(HEADING_HEIGHT, 7);
             LostTalesUiInk.drawText(this.font, name, left, textTop,
                     LostTalesColors.rgb(LostTalesColors.TEXT), alpha);
@@ -525,6 +535,21 @@ public final class CharactersPage extends PageContent {
         }
         drawHead(row, left, textTop + LostTalesUiInk.CAP_HEIGHT / 2 - HEAD / 2,
                 alpha);
+        if (row.kind == CharacterRosterRows.Kind.DELETED) {
+            // A deleted character stands in italics in the aside tone,
+            // the days left to restore it at the right.
+            String daysLeft = daysText(row.deleted.getDaysLeft());
+            int daysWidth = this.font.getStringWidth(daysLeft) + 4;
+            LostTalesUiInk.drawText(this.font, "\u00a7o" + this.font
+                            .trimStringToWidth(row.deleted.getName(),
+                                    Math.max(0, right - nameX - daysWidth)),
+                    nameX, textTop, picked ? LostTalesUiInk.IVORY
+                            : WindowStyle.asideRgb(), alpha);
+            LostTalesUiInk.drawText(this.font, daysLeft,
+                    right - this.font.getStringWidth(daysLeft), textTop,
+                    WindowStyle.asideRgb(), alpha);
+            return;
+        }
         boolean played = CharacterRosterRows.isPlayed(snapshot, row);
         String name = row.character == null ? accountName()
                 : row.character.getName();
@@ -569,8 +594,8 @@ public final class CharactersPage extends PageContent {
         if (owner == null) {
             return;
         }
-        final String skinId = row.character == null ? ""
-                : row.character.getSkinId();
+        final String skinId = row.deleted != null ? row.deleted.getSkinId()
+                : row.character == null ? "" : row.character.getSkinId();
         final float opacity = alpha / 255.0F;
         final Minecraft minecraft = this.mc;
         LostTalesUiFlatLayers.draw(alpha, x - 1.0F, y - 1.0F, x + HEAD + 2.0F,
@@ -603,8 +628,7 @@ public final class CharactersPage extends PageContent {
         for (CharacterRosterRows.Row row : rows) {
             int rowHeight = rowHeight(row);
             if (y >= top && y < top + rowHeight) {
-                return row.kind == CharacterRosterRows.Kind.HEADING ? null
-                        : row;
+                return isHeading(row) ? null : row;
             }
             top += rowHeight;
         }
@@ -629,6 +653,10 @@ public final class CharactersPage extends PageContent {
                     alpha);
             return;
         }
+        if (picked.kind == CharacterRosterRows.Kind.DELETED) {
+            drawDeleted(profile, picked.deleted, alpha);
+            return;
+        }
         boolean played = CharacterRosterRows.isPlayed(snapshot, picked);
         LostTalesUiHitBox words = layout.words();
         CharacterSummary character = picked.character;
@@ -642,9 +670,47 @@ public final class CharactersPage extends PageContent {
                 ClientCharacterProfileCache.get(characterId),
                 ClientCharacterProfileCache.isUnavailable(characterId),
                 accountName(), played, isLore(character));
-        drawColumn(layout, column, played ? this.mc.thePlayer : null,
-                snapshot.getOwnerId(), lookOf(snapshot, character), clipX,
-                clipY, alpha);
+        // While Change Look is open the figure wears the look it holds.
+        LookEditWindow editing = character == null ? null
+                : LookEditWindow.openFor(character.getCharacterId());
+        CharacterAppearance draft = editing == null ? null
+                : editing.draftLook(snapshot.getOwnerId());
+        drawColumn(layout, column, played && draft == null
+                        ? this.mc.thePlayer : null,
+                snapshot.getOwnerId(), draft != null ? draft
+                        : lookOf(snapshot, character), clipX, clipY, alpha);
+    }
+
+    /** Whole days, as the roster says them: one day, or so many days. */
+    private static String daysText(int days) {
+        return days == 1 ? I18n.format("gui.losttales.character.deleted.day")
+                : I18n.format("gui.losttales.character.deleted.days",
+                        Integer.valueOf(days));
+    }
+
+    /** A deleted character: its name, how long it can still be restored, and how. */
+    private void drawDeleted(LostTalesUiHitBox box,
+                             DeletedCharacterSummary deleted, int alpha) {
+        int y = (int)box.top;
+        LostTalesUiInk.drawText(this.font, this.font.trimStringToWidth(
+                deleted.getName(), (int)box.width), (int)box.left, y,
+                LostTalesUiInk.IVORY, alpha);
+        y += NOTE_LINE + 2;
+        LostTalesUiInk.drawText(this.font, this.font.trimStringToWidth(
+                        I18n.format("gui.losttales.character.deleted.facts",
+                                ClientCharacterDisplayNames.race(
+                                        deleted.getRaceId())),
+                        (int)box.width), (int)box.left, y,
+                WindowStyle.asideRgb(), alpha);
+        y += NOTE_LINE + 6;
+        for (Object line : this.font.listFormattedStringToWidth(I18n.format(
+                        "gui.losttales.character.deleted.detail",
+                        daysText(deleted.getDaysLeft())),
+                Math.max(1, (int)box.width))) {
+            LostTalesUiInk.drawText(this.font, String.valueOf(line),
+                    (int)box.left, y, WindowStyle.asideRgb(), alpha);
+            y += NOTE_LINE;
+        }
     }
 
     /**
@@ -756,7 +822,7 @@ public final class CharactersPage extends PageContent {
             if (row.kind == CharacterRosterRows.Kind.LORE) {
                 openLoreCharacters();
             } else {
-                pick(row.slot);
+                pick(row.key());
             }
             return true;
         }
@@ -857,11 +923,25 @@ public final class CharactersPage extends PageContent {
         if (pickable.isEmpty()) {
             return;
         }
-        int at = pickable.indexOf(CharacterRosterRows.atSlot(pickable,
-                this.pickedSlot));
+        int at = pickable.indexOf(CharacterRosterRows.atKey(pickable,
+                this.pickedKey));
         int next = at < 0 ? 0 : Math.max(0, Math.min(pickable.size() - 1,
                 at + step));
-        pick(pickable.get(next).slot);
+        pick(pickable.get(next).key());
+    }
+
+    /**
+     * The tab wears the played character's faction colour, as the
+     * character's lines do; ivory before the roster has come.
+     */
+    @Override
+    public int tone() {
+        CharacterRosterSnapshot snapshot = snapshot();
+        CharacterSummary played = snapshot == null ? null
+                : snapshot.getActiveCharacter();
+        return played == null ? LostTalesUiInk.IVORY
+                : LotrFactionColors.forFactionId(played.getFactionId(),
+                        LostTalesUiInk.IVORY);
     }
 
     /* ---- The window's strip ---- */
@@ -905,7 +985,7 @@ public final class CharactersPage extends PageContent {
             endVisit();
             for (CharacterRosterRows.Row row : rows(snapshot())) {
                 if (row.pickable()) {
-                    pick(row.slot);
+                    pick(row.key());
                     break;
                 }
             }
@@ -944,7 +1024,7 @@ public final class CharactersPage extends PageContent {
                 accountName(), words)) {
             if (row.kind == CharacterRosterRows.Kind.ACCOUNT
                     || row.kind == CharacterRosterRows.Kind.CHARACTER) {
-                found.add(new MenuWindow.Entry(String.valueOf(row.slot),
+                found.add(new MenuWindow.Entry(row.key(),
                         row.character == null ? accountName()
                                 : row.character.getName()).withValue(
                         ClientCharacterDisplayNames.race(
@@ -960,20 +1040,17 @@ public final class CharactersPage extends PageContent {
     @Override
     public void show(String id) {
         endVisit();
-        try {
-            pick(Integer.parseInt(id));
-        } catch (NumberFormatException unreadable) {
-            // A row this page never made names no slot.
-        }
+        pick(id);
     }
 
     /* ---- The window's bar ---- */
 
     /**
      * Play as, lit for the one played — Create for an empty slot — then
-     * Edit Profile, Capes, and Delete last in red. Each is there whatever
-     * is picked, greyed with the reason where it cannot be taken. While
-     * the roster is not known, Refresh alone.
+     * Edit Profile, Change Look, Capes, and Delete last in red. Each is
+     * there whatever is picked, greyed with the reason where it cannot be
+     * taken. A deleted character picked shows Restore alone; while the
+     * roster is not known, Refresh alone.
      */
     @Override
     public List<BarItem> barItems() {
@@ -996,6 +1073,18 @@ public final class CharactersPage extends PageContent {
             return items;
         }
         CharacterRosterRows.Row picked = picked(snapshot, rows(snapshot));
+        if (picked != null && picked.kind == CharacterRosterRows.Kind.DELETED) {
+            // A deleted character offers its restore alone.
+            String restore = I18n.format("gui.losttales.character.restore");
+            items.add(orBusy(BarItem.button(RESTORE, restore,
+                    new ItemStack(Items.nether_star)).tip(I18n.format(
+                            "gui.losttales.character.restore_tip",
+                            picked.deleted.getName())),
+                    CharacterRosterRows.firstEmptySlot(snapshot) < 0
+                            ? I18n.format("gui.losttales.character.error.restore_no_slot")
+                            : busy));
+            return items;
+        }
         CharacterSummary character = picked == null ? null : picked.character;
         boolean played = CharacterRosterRows.isPlayed(snapshot, picked);
         boolean lore = isLore(character);
@@ -1031,6 +1120,16 @@ public final class CharactersPage extends PageContent {
                 : lore ? I18n.format(
                         "gui.losttales.character.error.lore_character_cannot_edit")
                 : busy));
+        String look = I18n.format("gui.losttales.character.look.button");
+        items.add(orBusy(BarItem.button(LOOK, look, new ItemStack(
+                Items.leather_chestplate)).tip(look), character == null
+                ? I18n.format(picked == null
+                        || picked.kind == CharacterRosterRows.Kind.EMPTY
+                        ? "gui.losttales.character.pick"
+                        : "gui.losttales.character.not_made")
+                : lore ? I18n.format(
+                        "gui.losttales.character.error.lore_character_keeps_look")
+                : busy));
         String capes = I18n.format("gui.losttales.character.cape.button");
         items.add(orBusy(BarItem.button(CAPES, capes, new ItemStack(
                 Items.leather)).tip(capes), picked == null
@@ -1048,6 +1147,8 @@ public final class CharactersPage extends PageContent {
                         "gui.losttales.character.error.delete_default_character")
                 : lore ? I18n.format(
                         "gui.losttales.character.error.lore_character_cannot_delete")
+                : played ? I18n.format(
+                        "gui.losttales.character.error.delete_active_character")
                 : busy));
         return items;
     }
@@ -1086,11 +1187,18 @@ public final class CharactersPage extends PageContent {
                     "gui.losttales.character.selecting");
         } else if (EDIT.equals(id) && character != null && !isLore(character)) {
             openEditor(character);
-        } else if (CAPES.equals(id)) {
+        } else if (LOOK.equals(id) && character != null && !isLore(character)) {
+            openLookEditor(character);
+        } else if (CAPES.equals(id)
+                && picked.kind != CharacterRosterRows.Kind.DELETED) {
             openCapes(character);
         } else if (DELETE.equals(id) && character != null
-                && !character.isDefault() && !isLore(character)) {
+                && !character.isDefault() && !isLore(character)
+                && !CharacterRosterRows.isPlayed(snapshot, picked)) {
             askToDelete(snapshot, character);
+        } else if (RESTORE.equals(id)
+                && picked.kind == CharacterRosterRows.Kind.DELETED) {
+            askToRestore(snapshot, picked.deleted);
         }
     }
 
@@ -1118,6 +1226,24 @@ public final class CharactersPage extends PageContent {
         screen.openOverPage(tab, CharacterSubWindows.PROFILE_EDIT, key, editor);
     }
 
+    /** Change Look for the character picked: its skin, arm width and chest. */
+    private void openLookEditor(CharacterSummary character) {
+        WindowScreen screen = WindowScreen.current();
+        PageTab tab = WindowPages.tab(PAGE_ID);
+        if (screen == null || tab == null) {
+            return;
+        }
+        String key = character.getCharacterId().toString();
+        SubWindow open = screen.subWindows().find(
+                CharacterSubWindows.LOOK_EDIT, key);
+        LookEditWindow editor = open != null
+                && open.content instanceof LookEditWindow
+                ? (LookEditWindow)open.content
+                : new LookEditWindow(character.getCharacterId());
+        editor.restart();
+        screen.openOverPage(tab, CharacterSubWindows.LOOK_EDIT, key, editor);
+    }
+
     /** The capes of the character picked; the account's own while its record is not made. */
     private void openCapes(CharacterSummary character) {
         WindowScreen screen = WindowScreen.current();
@@ -1130,10 +1256,39 @@ public final class CharactersPage extends PageContent {
 
     private void openLoreCharacters() {
         WindowScreen screen = WindowScreen.current();
-        if (screen != null) {
-            screen.menus().show(CharacterSubWindows.LORE, null,
-                    WindowMenus.centredIn(windowId()), true);
+        PageTab tab = WindowPages.tab(PAGE_ID);
+        if (screen == null || tab == null) {
+            return;
         }
+        SubWindow open = screen.subWindows().find(CharacterSubWindows.LORE, "");
+        LoreCharactersWindow lore = open != null
+                && open.content instanceof LoreCharactersWindow
+                ? (LoreCharactersWindow)open.content : new LoreCharactersWindow();
+        lore.restart();
+        screen.openOverPage(tab, CharacterSubWindows.LORE, "", lore);
+    }
+
+    /** Asks before a deleted character is restored; on the player's yes it goes with the roster as it stood. */
+    private void askToRestore(final CharacterRosterSnapshot snapshot,
+                              final DeletedCharacterSummary deleted) {
+        WindowScreen screen = WindowScreen.current();
+        if (screen == null) {
+            return;
+        }
+        screen.ask(WindowPages.tab(PAGE_ID),
+                I18n.format("gui.losttales.character.restore_question",
+                        deleted.getName()),
+                I18n.format("gui.losttales.character.restore_detail"),
+                I18n.format("gui.losttales.character.confirm_restore"),
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        track(ClientCharacterNetwork.restoreCharacter(
+                                snapshot.getRevision(),
+                                deleted.getCharacterId()),
+                                "gui.losttales.character.restoring");
+                    }
+                });
     }
 
     /** Asks before a character is deleted; on the player's yes it goes with the roster as it stood. */

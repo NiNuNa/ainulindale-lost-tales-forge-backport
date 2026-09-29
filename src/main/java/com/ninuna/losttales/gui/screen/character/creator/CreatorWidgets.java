@@ -33,16 +33,8 @@ public final class CreatorWidgets {
 
     /**
      * An arrow box: a small framed square with a chevron pointing the
-     * way it steps. Dimmed when there is nothing to step to.
-     */
-    static void drawArrowBox(FontRenderer font, int x, int y,
-                             boolean pointsRight, boolean enabled,
-                             boolean hovered) {
-        drawArrowBox(font, x, y, pointsRight, enabled, hovered, null);
-    }
-
-    /**
-     * The same, answering the pointer through {@code motion}: the box
+     * way it steps, dimmed when there is nothing to step to. It answers
+     * the pointer through {@code motion}: the box
      * keeps its place and the chevron inside it rises, drops while the
      * arrow is held, and springs back, as every framed button in the mod
      * does. A null motion draws it still.
@@ -104,18 +96,10 @@ public final class CreatorWidgets {
 
     /**
      * A button in the panel language: framed, filled, its label centred,
-     * brighter under the pointer and dimmed when it cannot be pressed.
-     */
-    public static void drawButton(FontRenderer font, int x, int y, int width,
-                                  int height, String label, boolean enabled,
-                                  boolean hovered) {
-        drawButton(font, x, y, width, height, label, enabled, hovered, null);
-    }
-
-    /**
-     * The same, answering the pointer through {@code motion}: the frame
-     * and its brackets keep their place and the label moves inside them.
-     * A null motion draws it still.
+     * brighter under the pointer and dimmed when it cannot be pressed. It
+     * answers the pointer through {@code motion}: the frame and its
+     * brackets keep their place and the label moves inside them. A null
+     * motion draws it still.
      */
     public static void drawButton(FontRenderer font, int x, int y, int width,
                                   int height, String label, boolean enabled,

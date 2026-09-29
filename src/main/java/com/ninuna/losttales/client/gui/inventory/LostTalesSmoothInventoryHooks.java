@@ -81,7 +81,7 @@ public final class LostTalesSmoothInventoryHooks {
             if (isCreativeScreen(screen)
                     || screen != transferScreen
                     || now - transferIntentNanos > TRANSFER_INTENT_NANOS
-                    || changedSlots > MAX_TRANSFER_SLOT_CHANGES) {
+                    || isBulkChange(changedSlots)) {
                 pendingSources.clear();
                 motions.clear();
             } else {

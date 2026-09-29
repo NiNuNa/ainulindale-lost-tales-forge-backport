@@ -32,14 +32,15 @@ import org.lwjgl.opengl.GL11;
  * against the way it is about to travel, swings through, overshoots and
  * rings back to rest, squashing as it lands and stretching as it springs
  * open; the body leans with the shackle as it goes over, and the shadow
- * trails the whole thing rather than moving with it. Hovering plays a
- * shorter tell of the same shape — a nudge the way a click would send it
- * — so the control says which way it is about to go before it is
- * pressed. All of it is read from elapsed time, so it looks the same at
- * any frame rate. It is timed by hand rather than by a motion file, as
- * the key hints are, and keeps to the motion settings all the same: it
- * plays at the speed in force, and with the Animations switch off or
- * motion reduced the shackle simply stands where the lock is.</p>
+ * trails the whole thing rather than moving with it. The pointer is
+ * answered once, as every button answers it ({@code TabRow}'s button
+ * motion lifts and springs the whole padlock), and the lock itself
+ * stands still while the pointer rests on it: only its colourway crosses
+ * over. The turn is read from elapsed time, so it looks the same at any
+ * frame rate. It is timed by hand rather than by a motion file, and
+ * keeps to the motion settings all the same: it plays at the speed in
+ * force, and with the Animations switch off or motion reduced the
+ * shackle simply stands where the lock is.</p>
  */
 final class LockAnimation {
     /**
@@ -87,19 +88,6 @@ final class LockAnimation {
     private static final long TURN_ACTION_NANOS = 130000000L;
     /** The overshoot ringing back to rest, the frames already home. */
     private static final long TURN_SETTLE_NANOS = 230000000L;
-    /** The nudge hovering arrives on, before it settles into its stance. */
-    private static final long TELL_NANOS = 220000000L;
-    /**
-     * The strain a shut padlock is under while the pointer rests on it:
-     * a fast tremor riding a slow swell, the two on periods that do not
-     * divide each other so the shake never traces one line. The swell is
-     * cubed, which spends most of its time low and gathers into a short
-     * heave — a thing pushing against a catch rather than a thing
-     * wobbling.
-     */
-    private static final long STRAIN_PERIOD_NANOS = 190000000L;
-    private static final long SWELL_PERIOD_NANOS = 1150000000L;
-    private static final double TWO_PI = Math.PI * 2.0D;
     /**
      * Longest gap between draws the motion counts: a control that was
      * off screen, or a stalled frame, comes back at rest rather than
@@ -118,7 +106,6 @@ final class LockAnimation {
     /** +1 while shutting, -1 while opening: the way everything leans. */
     private float direction;
     private long turnStartedNanos;
-    private long hoverStartedNanos;
     private boolean previouslyLocked;
     private boolean seen;
     private long lastSeenNanos;
@@ -240,16 +227,15 @@ final class LockAnimation {
     }
 
     /**
-     * Reads the timelines the lock's own state started, and returns the
-     * pose for this instant. Everything is measured from when a turn or
-     * a tell began rather than accumulated, so the motion is the same
-     * however often the screen is drawn.
+     * Reads the turn the lock's own state started, and returns the pose
+     * for this instant: measured from when the turn began rather than
+     * accumulated, so the motion is the same however often the screen is
+     * drawn. At rest the pose is square, the pointer on the lock or not.
      */
     private Pose advance(boolean locked, boolean hovered, long nowNanos) {
         if (this.seen && nowNanos - this.lastSeenNanos > STALE_AFTER_NANOS) {
             // Away long enough that finishing would read as a glitch.
             this.turnStartedNanos = 0L;
-            this.hoverStartedNanos = 0L;
             this.swing = locked ? 1.0F : 0.0F;
         }
         this.lastSeenNanos = nowNanos;
@@ -274,14 +260,8 @@ final class LockAnimation {
                 hovered, sinceDrawn);
         if (!Motions.flourishes()) {
             this.turnStartedNanos = 0L;
-            this.hoverStartedNanos = 0L;
             this.swing = locked ? 1.0F : 0.0F;
             return pose(0.0F, 0.0F, 0.0F, 1.0F, 1.0F);
-        }
-        if (!hovered) {
-            this.hoverStartedNanos = 0L;
-        } else if (this.hoverStartedNanos == 0L) {
-            this.hoverStartedNanos = nowNanos;
         }
         if (this.turnStartedNanos != 0L) {
             long elapsed = Motions.paced(nowNanos - this.turnStartedNanos);
@@ -291,13 +271,6 @@ final class LockAnimation {
             }
             this.turnStartedNanos = 0L;
             this.swing = this.turnTo;
-            // A turn that ended under the pointer hands straight over to
-            // the stance, rather than the stance starting mid-way.
-            this.hoverStartedNanos = hovered ? nowNanos : 0L;
-        }
-        if (hovered) {
-            return hoverPose(Motions.paced(nowNanos - this.hoverStartedNanos),
-                    Motions.paced(nowNanos), locked);
         }
         return pose(0.0F, 0.0F, 0.0F, 1.0F, 1.0F);
     }
@@ -335,73 +308,6 @@ final class LockAnimation {
         float ring = decay * (float)Math.cos(progress * Math.PI * 2.4D);
         return pose(0.50F * lean * ring, 0.40F * ring, 2.1F * lean * ring,
                 1.0F + 0.065F * ring, 1.0F - 0.085F * ring);
-    }
-
-    /**
-     * What the lock does under the pointer. It arrives on one soft hump
-     * the way a click would send it — lifting when a click would spring
-     * it open, pressing down when a click would shut it — and then holds
-     * a stance rather than going still, the arrival easing into the
-     * stance so there is no seam between them.
-     */
-    private Pose hoverPose(long elapsedNanos, long nowNanos,
-                           boolean locked) {
-        float entry = LostTalesGuiEasing.clamp((float)elapsedNanos / (float)TELL_NANOS);
-        float hump = (float)Math.sin(entry * Math.PI)
-                * (float)Math.exp(-1.4F * entry);
-        float settled = LostTalesGuiEasing.smoothStep(entry);
-        return locked
-                ? pressurePose(nowNanos, settled, hump)
-                : easePose(nowNanos, settled, hump);
-    }
-
-    /**
-     * A shut padlock under the pointer is under pressure: something
-     * behind the shackle heaving against the catch and not quite getting
-     * out. A fast tremor rides a slow swell, the swell cubed so it
-     * gathers rather than wobbles — the body stretches up and narrows on
-     * each heave, rocks hardest at the top of one, and drops back. It
-     * says the lock is holding something in and that a click would let
-     * it go.
-     */
-    private static Pose pressurePose(long nowNanos, float settled,
-                                     float hump) {
-        double strain = phase(nowNanos, STRAIN_PERIOD_NANOS);
-        double swellPhase = phase(nowNanos, SWELL_PERIOD_NANOS);
-        float tremor = 0.34F * (float)Math.sin(strain)
-                + 0.18F * (float)Math.sin(strain * 1.87D + 0.7D);
-        float rise = (float)((Math.sin(swellPhase) + 1.0D) * 0.5D);
-        float swell = rise * rise * rise;
-        // The rock is strongest where the heave is, so the lean and the
-        // strain read as one effort rather than two loops.
-        float rock = (1.9F * (float)Math.sin(strain * 0.73D + 0.3D)
-                + 1.0F * (float)Math.sin(strain * 1.31D + 1.4D))
-                * (0.35F + 0.65F * swell);
-        return pose(settled * 0.26F * tremor,
-                settled * (-0.78F * swell + 0.20F * tremor) - 0.40F * hump,
-                settled * rock - 0.95F * hump,
-                1.0F - settled * 0.078F * swell,
-                1.0F + settled * 0.104F * swell + 0.024F * hump);
-    }
-
-    /**
-     * An open padlock under the pointer is at ease: a slow breath and
-     * the faintest lean the way a click would shut it. The contrast is
-     * the point — the two states should not need reading twice.
-     */
-    private static Pose easePose(long nowNanos, float settled, float hump) {
-        double breath = phase(nowNanos, SWELL_PERIOD_NANOS * 2L);
-        float sway = (float)Math.sin(breath);
-        return pose(settled * 0.06F * sway + 0.16F * hump,
-                settled * (0.16F + 0.09F * sway) + 0.34F * hump,
-                settled * (0.35F + 0.28F * sway) + 0.95F * hump,
-                1.0F, 1.0F - 0.030F * hump);
-    }
-
-    /** Where a loop of {@code periodNanos} stands, in radians. */
-    private static double phase(long nowNanos, long periodNanos) {
-        return (double)Math.floorMod(nowNanos, periodNanos)
-                / (double)periodNanos * TWO_PI;
     }
 
     /** A pose, with the shadow's own trailing offset worked out from it. */

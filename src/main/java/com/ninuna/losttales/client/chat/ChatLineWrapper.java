@@ -43,6 +43,14 @@ import net.minecraft.util.IChatComponent;
  * here, so the stored message never holds it and copying a line copies
  * what was said.</p>
  *
+ * <p>An action is a sentence rather than a speaker and their words: its
+ * {@link ChatLayoutMarker#actionBreak() action break} opens the words on
+ * the row the header is on, behind no chevron, and its continuations
+ * start at the edge. It has no row naming its speaker, so it is never
+ * drawn at the speaker's size and never wears the time behind a name.
+ * An open window takes its head for the avatar slot as it does a name
+ * row's, which draws nothing on a row of words.</p>
+ *
  * <p>A row drawn at another size than the words has another width in
  * its own text ({@link #roomFor}), so the header and the body are each
  * laid out against the room their size leaves them and marked for it
@@ -89,31 +97,6 @@ final class ChatLineWrapper {
     }
 
     private ChatLineWrapper() {}
-
-    /**
-     * Wraps a Lost Tales line for the closed HUD, channel prefix and all.
-     */
-    static List<IChatComponent> wrap(TextMetrics metrics, IChatComponent root,
-                                     int width) {
-        return wrap(metrics, root, width, false);
-    }
-
-    /**
-     * Wraps a Lost Tales line with every row at the words' own size, for
-     * a caller with no display to ask what the other sizes are.
-     */
-    static List<IChatComponent> wrap(TextMetrics metrics, IChatComponent root,
-                                     int width, boolean chatOpen) {
-        return wrap(metrics, root, width, chatOpen, 1.0F, 1.0F);
-    }
-
-    /** As below, with a reply's quote row at the words' own size. */
-    static List<IChatComponent> wrap(TextMetrics metrics, IChatComponent root,
-                                     int width, boolean chatOpen,
-                                     float headerScale, float bodyScale) {
-        return wrap(metrics, root, width, chatOpen, headerScale, bodyScale,
-                1.0F, null);
-    }
 
     /**
      * The width a row drawn at {@code rowScale} of the words has in its
@@ -208,9 +191,14 @@ final class ChatLineWrapper {
         // that size leaves it; a line that is words from its first row
         // down keeps the whole width.
         boolean opensBody = false;
+        boolean action = false;
         for (int index = bodyIndex + 1; index < parts.size(); index++) {
             if (ChatLayoutMarker.isBodyBreak(parts.get(index))) {
                 opensBody = true;
+                break;
+            }
+            if (ChatLayoutMarker.isActionBreak(parts.get(index))) {
+                action = true;
                 break;
             }
         }
@@ -219,7 +207,7 @@ final class ChatLineWrapper {
         // Laid out for an open window, the speaker's brackets go and the
         // head becomes the row's avatar.
         boolean[] dropped = new boolean[parts.size()];
-        int avatarIndex = chatOpen && opensBody
+        int avatarIndex = chatOpen && (opensBody || action)
                 ? markAvatarHeader(parts, bodyIndex, dropped) : -1;
         if (prefix > headerWidth) {
             return null;
@@ -268,6 +256,8 @@ final class ChatLineWrapper {
                 // The reactions stand on a row of their own under the
                 // words, where the body's own continuations start.
                 builder.breakRow();
+            } else if (ChatLayoutMarker.isActionBreak(part)) {
+                builder.beginAction();
             } else if (ChatLayoutMarker.isBodyBreak(part)) {
                 if (chatOpen && stamp != null && builder.used > 0) {
                     // The name's row ends on the time, a space clear of
@@ -298,7 +288,8 @@ final class ChatLineWrapper {
                                 boolean[] dropped) {
         int bodyBreak = -1;
         for (int index = bodyIndex + 1; index < parts.size(); index++) {
-            if (ChatLayoutMarker.isBodyBreak(parts.get(index))) {
+            if (ChatLayoutMarker.isBodyBreak(parts.get(index))
+                    || ChatLayoutMarker.isActionBreak(parts.get(index))) {
                 bodyBreak = index;
                 break;
             }
@@ -576,6 +567,21 @@ final class ChatLineWrapper {
             place(ChatBodyMarker.separator(BODY_SEPARATOR, senderColor),
                     separatorWidth);
             this.lineStart = separatorWidth;
+        }
+
+        /**
+         * Ends an action's header and opens its words on the row the
+         * header is on, behind no chevron: the name and the words are one
+         * sentence. Every continuation line starts at the edge, and none
+         * of the rows names a speaker, so none is drawn at the large
+         * size.
+         */
+        void beginAction() {
+            this.width = this.bodyWidth;
+            this.closedIndent = 0;
+            this.openIndent = 0;
+            this.indent = 0;
+            this.bodyFirstRow = this.lines.size();
         }
 
         void place(IChatComponent piece, int pieceWidth) {

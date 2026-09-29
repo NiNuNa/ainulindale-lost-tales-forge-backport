@@ -81,17 +81,17 @@ public final class ChatTabTest {
         assertFalse(ChatTab.of(ChatChannel.OOC).isWhisper());
         assertEquals("ooc", ChatTab.of(ChatChannel.OOC).id());
         assertSame(ChatTab.of(ChatChannel.OOC), ChatTab.fromId("ooc"));
-        ChatTab steve = ChatTab.whisper("Steve");
+        ChatTab steve = ChatTab.whisper("Steve", "");
         assertNotNull(steve);
         assertTrue(steve.isWhisper());
         assertEquals(ChatChannel.WHISPER, steve.getChannel());
         assertEquals("Steve", steve.getPartner());
-        assertEquals(steve, ChatTab.whisper("steve "));
-        assertEquals(steve.hashCode(), ChatTab.whisper("STEVE").hashCode());
-        assertFalse(steve.equals(ChatTab.whisper("Alex")));
+        assertEquals(steve, ChatTab.whisper("steve ", ""));
+        assertEquals(steve.hashCode(), ChatTab.whisper("STEVE", "").hashCode());
+        assertFalse(steve.equals(ChatTab.whisper("Alex", "")));
         assertEquals("whisper:Steve", steve.id());
         assertEquals(steve, ChatTab.fromId("whisper:Steve"));
-        assertNull(ChatTab.whisper(" "));
+        assertNull(ChatTab.whisper(" ", ""));
         assertNull(ChatTab.fromId("whisper:"));
         assertNull(ChatTab.fromId("whisper"));
         assertNull(ChatTab.fromId("nope"));
@@ -113,12 +113,12 @@ public final class ChatTabTest {
 
     @Test
     public void whispersOpenOnceInTheAskingWindowAndPersist() {
-        ChatTab steve = ChatLayout.openWhisper("Steve", "w2");
+        ChatTab steve = ChatLayout.openWhisper("Steve", "", "w2");
         assertNotNull(steve);
         assertTrue(WindowLayout.window("w2").contains(steve));
         // Opened again, the same tab with its original casing, wherever
         // it was asked for; the front tab is left alone.
-        ChatTab again = ChatLayout.openWhisper("steve", "w1");
+        ChatTab again = ChatLayout.openWhisper("steve", "", "w1");
         assertEquals(steve, again);
         assertEquals("Steve", again.getPartner());
         assertFalse(WindowLayout.window("w1").contains(steve));
@@ -127,7 +127,7 @@ public final class ChatTabTest {
         assertEquals(1, countWhispers());
         // A locked preferred window is passed over for an unlocked one.
         WindowLayout.setLocked("w1", true);
-        ChatTab alex = ChatLayout.openWhisper("Alex", "w1");
+        ChatTab alex = ChatLayout.openWhisper("Alex", "", "w1");
         assertTrue(WindowLayout.window("w2").contains(alex));
         // Whispers cycle like any tab and never count as closed channels.
         ClientChatChannelState.select(steve);
@@ -136,24 +136,29 @@ public final class ChatTabTest {
         ChatLayout.close(steve);
         assertTrue(ChatLayout.closedChannels().isEmpty());
         assertFalse(ChatLayout.isOpen(steve));
-        assertNull(ChatLayout.openWhisper("", "w2"));
-        // Conversations are not layout: neither the tab nor its mute is
-        // written, and an older file's whisper tab is dropped on load.
-        ChatLayout.setMuted(alex, true);
+        assertNull(ChatLayout.openWhisper("", "", "w2"));
+        // A conversation's tab is not a window's: no window line names
+        // it, and an older file's whisper tab is dropped on load. Its
+        // notification choice is kept, on a line of its own; an NPC
+        // conversation's never is.
+        ChatLayout.setNotification(alex, ChatNotification.NOTHING);
         assertTrue(ChatLayout.isMuted(alex));
         List<String> lines = WindowLayoutStore.describe();
-        assertFalse(lines.contains("muted whisper:Alex"));
+        assertTrue(lines.contains("notify\tnothing\twhisper:Alex"));
         for (String line : lines) {
-            assertFalse(line.contains("whisper:"));
+            assertFalse(line.startsWith("window ")
+                    && line.contains("whisper:"));
         }
-        lines.add("muted npc:Grey Wanderer");
+        lines.add("notify\tnothing\tnpc:Grey Wanderer");
         TwoWindowLayout.reset();
         WindowLayoutStore.load(lines);
         assertFalse(ChatLayout.isOpen(alex));
-        assertFalse(ChatLayout.isMuted(alex));
+        assertTrue(ChatLayout.isMuted(alex));
+        assertFalse(ChatLayout.isMuted(ChatTab.npc("Grey Wanderer")));
+        ChatLayout.setNotification(alex, ChatNotification.EVERYTHING);
         assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.PROXIMITY,
                 ChatChannel.FACTION, ChatChannel.OOC,
-                ChatChannel.PARTY), ChatTab.channelsOf(WindowLayout.window("w2")));
+                ChatChannel.PARTY), ChatLayoutViews.channelsOf(WindowLayout.window("w2")));
         // They also end with the session: closed along with the history.
         ChatTab wanderer = ChatLayout.openTab(
                 ChatTab.npc("Grey Wanderer"), "w2");
@@ -164,7 +169,7 @@ public final class ChatTabTest {
         assertFalse(ChatLayout.isOpen(wanderer));
         assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.PROXIMITY,
                 ChatChannel.FACTION, ChatChannel.OOC,
-                ChatChannel.PARTY), ChatTab.channelsOf(WindowLayout.window("w2")));
+                ChatChannel.PARTY), ChatLayoutViews.channelsOf(WindowLayout.window("w2")));
     }
 
     private static int countWhispers() {
@@ -185,15 +190,13 @@ public final class ChatTabTest {
      */
     @Test
     public void eachIdentityIsItsOwnConversation() {
-        ChatTab account = ChatTab.whisper("Steve");
+        ChatTab account = ChatTab.whisper("Steve", "");
         ChatTab aldric = ChatTab.whisper("Steve", "Aldric");
         ChatTab beren = ChatTab.whisper("Steve", "Beren");
         assertFalse(account.equals(aldric));
         assertFalse(aldric.equals(beren));
         assertEquals("Steve", aldric.getPartner());
         assertEquals("Aldric", aldric.getPartnerIdentity());
-        assertTrue(account.isAccountConversation());
-        assertFalse(aldric.isAccountConversation());
         // Naming the account as the identity is the account's own.
         assertEquals(account, ChatTab.whisper("Steve", "Steve"));
         assertEquals(account, ChatTab.whisper("Steve", ""));
@@ -205,7 +208,7 @@ public final class ChatTabTest {
     public void identityIdsRoundTripAndOlderIdsStillRead() {
         ChatTab aldric = ChatTab.whisper("Steve", "Aldric");
         assertEquals(aldric, ChatTab.fromId(aldric.id()));
-        assertEquals(ChatTab.whisper("Steve"),
+        assertEquals(ChatTab.whisper("Steve", ""),
                 ChatTab.fromId("whisper:Steve"));
         // An identity may hold the separator; the account never can.
         ChatTab odd = ChatTab.whisper("Steve", "A|B");
@@ -233,7 +236,7 @@ public final class ChatTabTest {
         assertEquals(asMine, ChatTab.fromId(asMine.id()));
         // Held as a character, a conversation with the account too.
         ChatTab accountAsMine = ChatTab.whisper("Steve", "", ChatTab.ownerKeyOf(mine));
-        assertTrue(accountAsMine.isAccountConversation());
+        assertEquals("Steve", accountAsMine.getPartnerIdentity());
         assertEquals("whisper:Steve|Steve|own:" + mine, accountAsMine.id());
         assertEquals(accountAsMine, ChatTab.fromId(accountAsMine.id()));
         assertEquals("", ChatTab.ownerKeyOf(null));

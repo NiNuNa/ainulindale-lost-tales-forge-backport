@@ -21,11 +21,6 @@ public final class LostTalesControlBarAnimation {
         startedNanos = System.nanoTime();
     }
 
-    public static void push(Object screen) {
-        GL11.glPushMatrix();
-        GL11.glTranslatef(0.0F, offsetY(screen), 0.0F);
-    }
-
     public static void pop() {
         GL11.glPopMatrix();
     }
@@ -47,10 +42,6 @@ public final class LostTalesControlBarAnimation {
     public static int fixedMouseY(GuiScreen screen, int logicalMouseY) {
         return Math.round(LostTalesGuiAnimations.forwardMouseY(
                 screen, logicalMouseY) - offsetY(screen));
-    }
-
-    public static int inverseMouseY(Object screen, int mouseY) {
-        return Math.round(mouseY - offsetY(screen));
     }
 
     public static float offsetY(Object screen) {

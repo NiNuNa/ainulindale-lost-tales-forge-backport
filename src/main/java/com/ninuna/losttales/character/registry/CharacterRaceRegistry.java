@@ -1,14 +1,12 @@
 package com.ninuna.losttales.character.registry;
 
 import com.ninuna.losttales.util.LostTalesIdentifiers;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -209,17 +207,6 @@ public final class CharacterRaceRegistry {
 
     private static float sneakingEyeHeight(float bodyHeight) {
         return standingEyeHeight(bodyHeight) - SNEAKING_EYE_HEIGHT_DROP;
-    }
-
-    /** Every race a character may be made as, in the order they are shown. */
-    public static List<String> getSelectableIds() {
-        List<String> ids = new ArrayList<String>();
-        for (CharacterRaceDefinition race : DEFINITIONS.values()) {
-            if (race.isSelectable()) {
-                ids.add(race.getId());
-            }
-        }
-        return Collections.unmodifiableList(ids);
     }
 
     private static void register(Map<String, CharacterRaceDefinition> definitions,

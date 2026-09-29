@@ -112,12 +112,12 @@ public final class SnapLayouts {
         return offered;
     }
 
-    /** As above for the running game: the readable narrowest window, one line tall. */
+    /** As above for the running game: the narrowest window, one line tall. */
     static List<Window.ScreenFill[]> offered(Minecraft minecraft,
                                                  int screenWidth,
                                                  int screenHeight) {
         return offered(screenWidth, screenHeight,
-                WindowPlacement.minBoxWidth(minecraft),
+                WindowPlacement.MIN_BOX_WIDTH,
                 WindowPlacement.minHeight(minecraft));
     }
 

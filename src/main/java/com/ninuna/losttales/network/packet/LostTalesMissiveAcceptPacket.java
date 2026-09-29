@@ -156,7 +156,7 @@ public class LostTalesMissiveAcceptPacket implements IMessage {
         }
         ItemStack stack = player.inventory.getStackInSlot(slot);
         MissiveBoardStateReason refusal =
-                MissiveAcceptance.check(stack, expectedQuestId);
+                MissiveAcceptance.check(player.worldObj, stack, expectedQuestId);
         if (refusal != null) {
             say(player, refusal == MissiveBoardStateReason.GONE
                     ? "chat.losttales.missive.letter_gone"

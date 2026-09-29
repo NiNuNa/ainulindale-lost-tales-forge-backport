@@ -133,6 +133,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
     static final int IDENTITY_ID_TAIL_BYTES = 1 + 16;
     /** The most one line takes on the wire; the history batch reads it too. */
     public static final int MAX_PACKET_BYTES = 2048
+            // Whether the line is an action, and whether its quote is.
+            + 1 + 1
             + ChatMessageValidator.MAX_UTF8_BYTES
             + ChatShowcase.MAX_TOTAL_BYTES
             + ChatReplyReference.MAX_AUTHOR_BYTES
@@ -145,11 +147,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
             + 4 + ChatReplyReference.MAX_LINK_BYTES
             // A server line's own component, and the players it names.
             + 4 + MAX_BODY_BYTES
-            + 1 + ChatNamedPlayer.MAX_PER_LINE * (IDENTITY_ID_TAIL_BYTES
-                    + 4 + ChatNamedPlayer.MAX_ACCOUNT_BYTES
-                    + IDENTITY_ID_TAIL_BYTES
-                    + 4 + ChatNamedPlayer.MAX_IDENTITY_BYTES
-                    + 4 + ChatNamedPlayer.MAX_SKIN_ID_BYTES)
+            + LostTalesChatNamedPlayerCodec.MAX_BYTES
             // The reactions on the line as this reader is shown them.
             + LostTalesChatReactionCodec.MAX_BYTES;
     private static final int MAX_CHANNEL_BYTES = 16;
@@ -171,6 +169,12 @@ public final class LostTalesChatMessagePacket implements IMessage {
     private int titleColor;
     private int nameColor;
     private String message = "";
+    /**
+     * Whether the words are an action: what the speaker did, shown as a
+     * sentence their name opens. Only a player's line or a Discord
+     * member's may be one, never the Server's or the Client's.
+     */
+    private boolean action;
     private long timestampMillis;
     private String skinId = "";
     private List<ChatShowcase> showcases = Collections.emptyList();
@@ -392,6 +396,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
             this.nameColor = buffer.readInt();
             this.message = LostTalesPacketCodec.readUtf8String(
                     buffer, ChatMessageValidator.MAX_UTF8_BYTES);
+            // Whether the words are an action rather than speech.
+            this.action = buffer.readBoolean();
             this.timestampMillis = buffer.readLong();
             this.skinId = LostTalesPacketCodec.readUtf8String(
                     buffer, MAX_SKIN_ID_BYTES);
@@ -492,6 +498,14 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 this.reply = this.reply.withHead(quotedSender,
                         quotedAccountLine, quotedSkin);
             }
+            // Whether the quoted line is an action; only a quote that
+            // exists may say so, and a forward below never does.
+            boolean quotedAction = buffer.readBoolean();
+            if (quotedAction && !this.reply.exists()) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "an action quote of nothing");
+            }
+            this.reply = this.reply.asAction(quotedAction);
             // A forward's link to where its message was said: the quote
             // then names that message and carries none of its words,
             // which are the line's own.
@@ -500,6 +514,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
             if (forwardedFrom.length() > 0) {
                 if (!this.reply.isAnchored()
                         || this.reply.getExcerpt().length() > 0
+                        || this.reply.isAction()
                         || forwardedFrom.charAt(0) != '#') {
                     throw new LostTalesPacketCodec.DecodeException(
                             "invalid chat forward");
@@ -516,31 +531,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
                         "a component on a line that is not the server's");
             }
             this.bodyJson = body;
-            int named = LostTalesPacketCodec.readCount(buffer,
-                    ChatNamedPlayer.MAX_PER_LINE, "named players");
-            List<ChatNamedPlayer> players =
-                    new ArrayList<ChatNamedPlayer>(named);
-            for (int index = 0; index < named; index++) {
-                UUID namedId = readOptionalUuid(buffer);
-                String namedAccount = LostTalesPacketCodec.readUtf8String(
-                        buffer, ChatNamedPlayer.MAX_ACCOUNT_BYTES);
-                UUID namedCharacter = readOptionalUuid(buffer);
-                String namedIdentity = LostTalesPacketCodec.readUtf8String(
-                        buffer, ChatNamedPlayer.MAX_IDENTITY_BYTES);
-                String namedSkin = LostTalesPacketCodec.readUtf8String(
-                        buffer, ChatNamedPlayer.MAX_SKIN_ID_BYTES);
-                ChatNamedPlayer player = new ChatNamedPlayer(namedId,
-                        namedAccount, namedCharacter, namedIdentity,
-                        namedSkin);
-                if (!player.isValid()) {
-                    throw new LostTalesPacketCodec.DecodeException(
-                            "a named player without an account");
-                }
-                players.add(player);
-            }
-            this.namedPlayers = players.isEmpty()
-                    ? Collections.<ChatNamedPlayer>emptyList()
-                    : Collections.unmodifiableList(players);
+            this.namedPlayers = LostTalesChatNamedPlayerCodec.read(buffer);
             // The reactions as this reader is shown them, then the tab a
             // command's answer is filed under.
             this.reactions = LostTalesChatReactionCodec.read(buffer);
@@ -550,6 +541,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
             validate(false);
         } catch (RuntimeException exception) {
             this.malformed = true;
+            this.action = false;
             this.bodyJson = "";
             this.namedPlayers = Collections.emptyList();
             this.reactions = ChatReactionSummary.EMPTY;
@@ -628,6 +620,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
         buffer.writeInt(this.nameColor);
         LostTalesPacketCodec.writeUtf8String(
                 buffer, this.message, ChatMessageValidator.MAX_UTF8_BYTES);
+        buffer.writeBoolean(this.action);
         buffer.writeLong(this.timestampMillis);
         LostTalesPacketCodec.writeUtf8String(
                 buffer, this.skinId, MAX_SKIN_ID_BYTES);
@@ -718,24 +711,13 @@ public final class LostTalesChatMessagePacket implements IMessage {
         buffer.writeBoolean(this.reply.isAccountLine());
         LostTalesPacketCodec.writeUtf8String(buffer, this.reply.getSkinId(),
                 ChatReplyReference.MAX_SKIN_ID_BYTES);
+        buffer.writeBoolean(this.reply.isAction());
         LostTalesPacketCodec.writeUtf8String(buffer,
                 this.reply.getForwardedFrom(),
                 ChatReplyReference.MAX_LINK_BYTES);
         LostTalesPacketCodec.writeUtf8String(buffer, this.bodyJson,
                 MAX_BODY_BYTES);
-        LostTalesPacketCodec.writeCount(buffer, this.namedPlayers.size(),
-                ChatNamedPlayer.MAX_PER_LINE, "named players");
-        for (ChatNamedPlayer player : this.namedPlayers) {
-            writeOptionalUuid(buffer, player.getPlayerId());
-            LostTalesPacketCodec.writeUtf8String(buffer, player.getAccount(),
-                    ChatNamedPlayer.MAX_ACCOUNT_BYTES);
-            writeOptionalUuid(buffer, player.getCharacterId());
-            LostTalesPacketCodec.writeUtf8String(buffer,
-                    player.getIdentityName(),
-                    ChatNamedPlayer.MAX_IDENTITY_BYTES);
-            LostTalesPacketCodec.writeUtf8String(buffer, player.getSkinId(),
-                    ChatNamedPlayer.MAX_SKIN_ID_BYTES);
-        }
+        LostTalesChatNamedPlayerCodec.write(buffer, this.namedPlayers);
         LostTalesChatReactionCodec.write(buffer, this.reactions);
         LostTalesPacketCodec.writeUtf8String(buffer, this.tabId, MAX_TAB_ID_BYTES);
     }
@@ -812,6 +794,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
                         this.bodyJson, MAX_BODY_BYTES)
                 || (this.bodyJson.length() > 0
                         && !isSystemSender(this.senderId))
+                // The Server and the Client say things; they do none.
+                || (this.action && isSystemSender(this.senderId))
                 || !LostTalesPacketCodec.isUtf8WithinLimit(this.tabId,
                         MAX_TAB_ID_BYTES)
                 || !ChatConsoleEvent.isContext(this.tabId)
@@ -913,12 +897,27 @@ public final class LostTalesChatMessagePacket implements IMessage {
      * copy, so every {@code with} form keeps it.
      */
     private LostTalesChatMessagePacket carrying(LostTalesChatMessagePacket copy) {
+        copy.action = this.action;
         copy.bodyJson = this.bodyJson;
         copy.namedPlayers = this.namedPlayers;
         copy.reactions = this.reactions;
         copy.tabId = this.tabId;
         return copy;
     }
+
+    /**
+     * The same line as an action, or as speech. Every copy made from it
+     * keeps what it is, an edit included. A line of the Server's or the
+     * Client's is never an action, whatever it is handed.
+     */
+    public LostTalesChatMessagePacket withAction(boolean action) {
+        LostTalesChatMessagePacket copy = withNameColor(this.nameColor);
+        copy.action = action && !isSystemSender(this.senderId);
+        return copy;
+    }
+
+    /** Whether the words are an action rather than something said. */
+    public boolean isAction() { return this.action; }
 
     /**
      * The same line filed under the tab {@code tabId} names on the

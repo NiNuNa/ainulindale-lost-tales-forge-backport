@@ -45,13 +45,18 @@ public final class LostTalesChatRevisionPacketTest {
     @Test
     public void updateRoundTripsBothWaysRound() {
         ByteBuf edited = Unpooled.buffer();
-        LostTalesChatUpdatePacket.edited(SERVER_ID, "on reflection")
-                .toBytes(edited);
+        com.ninuna.losttales.chat.ChatNamedPlayer bob =
+                new com.ninuna.losttales.chat.ChatNamedPlayer(
+                        java.util.UUID.randomUUID(), "bob", null, "Beren", "");
+        LostTalesChatUpdatePacket.edited(SERVER_ID, "on reflection, @Beren",
+                java.util.Collections.singletonList(bob)).toBytes(edited);
         LostTalesChatUpdatePacket decodedEdit = new LostTalesChatUpdatePacket();
         decodedEdit.fromBytes(edited);
         assertFalse(decodedEdit.isMalformed());
         assertFalse(decodedEdit.isRemoved());
-        assertEquals("on reflection", decodedEdit.getMessage());
+        assertEquals("on reflection, @Beren", decodedEdit.getMessage());
+        assertEquals("an edit names whom its new words name",
+                "Beren", decodedEdit.getNamedPlayers().get(0).getIdentityName());
 
         ByteBuf removed = Unpooled.buffer();
         LostTalesChatUpdatePacket.removed(SERVER_ID).toBytes(removed);

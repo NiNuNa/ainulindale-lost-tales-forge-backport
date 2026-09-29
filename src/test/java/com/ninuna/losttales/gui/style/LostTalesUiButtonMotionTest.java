@@ -72,7 +72,6 @@ public final class LostTalesUiButtonMotionTest {
     public void aButtonStartsWhereItAlreadyIs() {
         assertEquals(0.0D, resting().offsetY(), EPSILON);
         assertEquals(0.0F, resting().turnDegrees(), EPSILON);
-        assertTrue(resting().isSettled());
         assertEquals(0.0F, resting().lit(), EPSILON);
     }
 
@@ -99,7 +98,6 @@ public final class LostTalesUiButtonMotionTest {
         assertTrue("reaches past the mark", furthest < -RISE);
         assertTrue("but never past its own clearing", furthest > -(RISE + 1.0D));
         assertEquals(-RISE, motion.offsetY(), EPSILON);
-        assertTrue(motion.isSettled());
     }
 
     @Test
@@ -109,7 +107,6 @@ public final class LostTalesUiButtonMotionTest {
         motion.advance(pressed, true, true, true);
         motion.advance(pressed + 200L * MILLIS, true, true, true);
         assertEquals(PRESS, motion.offsetY(), EPSILON);
-        assertTrue(motion.isSettled());
     }
 
     @Test
@@ -150,7 +147,6 @@ public final class LostTalesUiButtonMotionTest {
         assertTrue("still on its way down", motion.offsetY() < 0.0D);
         motion.advance(left + 300L * MILLIS, false, false, false);
         assertEquals(0.0D, motion.offsetY(), EPSILON);
-        assertTrue(motion.isSettled());
     }
 
     /** A press is not cut short by the pointer moving off the button. */
@@ -338,7 +334,6 @@ public final class LostTalesUiButtonMotionTest {
             motion.advance(pressed + millis * MILLIS, true, true, true);
         }
         assertEquals(PRESS, motion.offsetY(), EPSILON);
-        assertTrue(motion.isSettled());
     }
 
     /**

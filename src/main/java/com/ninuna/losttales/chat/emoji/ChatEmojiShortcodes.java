@@ -124,11 +124,6 @@ public final class ChatEmojiShortcodes {
         }
     }
 
-    /** Every entry of the bundled list, hexcode to name. */
-    static Map<String, String> names() {
-        return Holder.NAMES;
-    }
-
     /**
      * The list at {@code resource} on the class path, or an empty map
      * when it is missing or unreadable. Never throws: the one warning is

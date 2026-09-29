@@ -639,16 +639,6 @@ public final class LostTalesMapDecorationRenderer {
         result[7] = top + drop;
     }
 
-    /** Carries one map position onto the screen, through the sheet. */
-    private static void project(
-            LOTRGuiMap gui, float mapX, float mapY,
-            float posX, float posY, float zoomScale,
-            float centerX, float centerY, float[] result) {
-        result[0] = (mapX - posX) * zoomScale + centerX;
-        result[1] = (mapY - posY) * zoomScale + centerY;
-        LostTalesLotrMapRotation.rotateAndProject(result, gui);
-    }
-
     private static boolean isOffViewport(
             float[] quad, int viewportXMin, int viewportXMax,
             int viewportYMin, int viewportYMax) {
@@ -937,25 +927,6 @@ public final class LostTalesMapDecorationRenderer {
                 GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D,
                 GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
-    }
-
-    /**
-     * Whether this map pixel is ground of the kind asked for, remembering the
-     * answer.
-     *
-     * <p>The map image is fixed for the session, so this is asked once per
-     * pixel however long the player pans around. It goes through the kind's
-     * own rule: a ship wants a coast and everything else wants a broad stretch
-     * of its own ground, and asking every kind the same question is how ships
-     * ended up moored in the middle of Belegaer.</p>
-     */
-    private static boolean isSite(Scattered kind, int mapX, int mapY) {
-        long key = siteKey(kind.channel, mapX, mapY);
-        int slot = findSlot(key);
-        if (siteKeys[slot] == key) {
-            return siteAnswers[slot];
-        }
-        return remember(slot, key, kind.isSite(mapX, mapY));
     }
 
     /** Whether a hull could sit on this map pixel at all. */

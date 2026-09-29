@@ -125,7 +125,6 @@ public final class LostTalesMapMarkerCatalogWaystoneTest {
                         automaticJson,
                         LostTalesMapMarkerSource.CUSTOM_PRESET);
         assertNotNull(automatic);
-        assertFalse(automatic.hasExplicitY());
         assertEquals(LostTalesMapMarkerDefinition.AUTOMATIC_Y,
                 automatic.getY(), 0.0D);
 
@@ -136,7 +135,6 @@ public final class LostTalesMapMarkerCatalogWaystoneTest {
                         explicitJson,
                         LostTalesMapMarkerSource.CUSTOM_PRESET);
         assertNotNull(explicit);
-        assertTrue(explicit.hasExplicitY());
         assertEquals(93.5D, explicit.getY(), 0.0D);
     }
 

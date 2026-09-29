@@ -38,7 +38,7 @@ public final class PartyTrackingSyncPacketTest {
             assertFalse(decoded.isMalformed());
             assertFalse(decoded.getSnapshot().hasParty());
             assertEquals(characterId,
-                    decoded.getSnapshot().getActiveCharacterId());
+                    decoded.getSnapshot().getActiveIdentityId());
             assertEquals(Collections.singletonList(marker),
                     decoded.getSnapshot().getGoHereMarkers());
         } finally {

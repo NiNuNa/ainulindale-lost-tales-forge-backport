@@ -11,6 +11,7 @@ import com.ninuna.losttales.client.mapmarker.LostTalesLotrWaypointText;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapPage;
 import com.ninuna.losttales.client.window.BarItem;
 import com.ninuna.losttales.client.window.MenuWindow;
+import com.ninuna.losttales.client.window.WindowBar;
 import com.ninuna.losttales.client.window.PageContent;
 import com.ninuna.losttales.client.window.PageRows;
 import com.ninuna.losttales.client.window.PageTab;
@@ -22,12 +23,9 @@ import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowMenus;
 import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WindowScreen;
-import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.client.window.WorldPageReach;
 import com.ninuna.losttales.client.window.WorldPageWatch;
 import com.ninuna.losttales.gui.hud.compass.marker.LostTalesCompassMarker;
-import com.ninuna.losttales.gui.style.LostTalesColors;
-import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerEditableSettings;
@@ -52,21 +50,25 @@ import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.StatCollector;
 import net.minecraft.world.World;
+import org.lwjgl.input.Keyboard;
 
 /**
  * A waystone, a page a window holds (Q10 a): its settings in one
  * scrolling column of Settings' own rows, in four sections — Marker,
  * Location, Rules and Sharing ({@link WaystoneRows}) — and on the bar
- * Destinations and Save. Using a waystone opens it: the server checks the
- * waystone and sends its state as an opening. One waystone is shown at a
- * time; using another turns the page to it, and what was changed on the
- * one before and not saved is let go, which the status line says.
+ * Destinations (D) and Save (S). Using a waystone opens it: the server
+ * checks the waystone and sends its state as an opening. One waystone is
+ * shown at a time; using another turns the page to it, and where the one
+ * shown has changes not saved, a question inside the window asks first
+ * whether they may go (W4 a).
  *
  * <p>Every change stays on the page ({@link WaystoneDraft}) until Save
  * sends it with the revision it was read at, lit only once something
  * changed. The server answers every request with the waystone's state
- * and why; a stale revision brings back what stands now and the page
- * says so. Share and Unshare are sent at once, as before.</p>
+ * and why, which stands over the page's bar (W2 a), as does the line the
+ * server says in the chat while the page is shown; a stale revision
+ * brings back what stands now and the page says so. Share and Unshare are
+ * sent at once.</p>
  *
  * <p>Destinations opens the map in travel mode beside the waystone's tab
  * (Q11 a). The tab closes by itself, fading as tabs close, once the
@@ -85,14 +87,15 @@ public final class WaystonePage extends PageContent
     /** The bar's items: their ids, which the page is told when one is pressed. */
     private static final String DESTINATIONS = "destinations";
     private static final String SAVE = "save";
-    /** Clear room above the rows. */
+    /** The keys the bar's buttons answer to while the page holds the keys. */
+    private static final int DESTINATIONS_KEY = Keyboard.KEY_D;
+    private static final int SAVE_KEY = Keyboard.KEY_S;
+    /** The lang keys of the lines the server says in the chat about a waystone. */
+    private static final String SERVER_LINES = "chat.losttales.waystone.";
+    /** Clear room above and below the rows. */
     private static final int TOP = 2;
-    /** The room the status line takes under the rows. */
-    private static final int STATUS_ROOM = 14;
     /** The widest the column of rows grows, so a name and its value stay near. */
     private static final int MAX_COLUMN_WIDTH = 300;
-    /** Where the status line's words stand in from the column's edge: where the rows' names do. */
-    private static final int STATUS_INSET = 6;
     /** Ticks a request waits for its answer before the page stops waiting: five seconds. */
     private static final int ANSWER_TICKS = 100;
     /** The most names the share field offers at once. */
@@ -119,8 +122,12 @@ public final class WaystonePage extends PageContent
     private int waitedTicks;
     /** The settings the Save on its way sent; null for none. */
     private LostTalesMapMarkerEditableSettings sent;
-    private String status = "";
-    private boolean statusError;
+    /**
+     * Another waystone the player used while the one shown had changes
+     * not saved, waiting for the window to ask whether they may go;
+     * null while nothing waits.
+     */
+    private LostTalesWaystoneStatePacket asking;
     /** The words in the window's well; empty while its search is closed. */
     private String query = "";
 
@@ -173,8 +180,9 @@ public final class WaystonePage extends PageContent
     /**
      * The page turned to the waystone the player used. The same waystone
      * again, its tab still open, keeps what was changed on top of the
-     * newer state; another waystone starts afresh, and the status line
-     * says what was changed on the one before was not saved.
+     * newer state; another waystone starts afresh, once the window has
+     * asked whether the changes to the one shown may go where it has any
+     * not saved.
      */
     private void open(LostTalesWaystoneStatePacket packet) {
         PageTab tab = WindowPages.tab(PAGE_ID);
@@ -185,15 +193,45 @@ public final class WaystonePage extends PageContent
             this.lore = loreOf(packet);
             return;
         }
-        String dropped = tabOpen && this.draft != null
-                && this.draft.isChanged() ? this.state.getName() : null;
+        if (tabOpen && this.draft != null && this.draft.isChanged()) {
+            this.asking = packet;
+            return;
+        }
+        turnTo(packet);
+    }
+
+    /** The page lets the waystone shown go and shows another from its top. */
+    private void turnTo(LostTalesWaystoneStatePacket packet) {
         forget();
         this.state = packet;
         this.draft = new WaystoneDraft(packet.getSettings());
         this.lore = loreOf(packet);
         this.list.toTop();
-        if (dropped != null) {
-            say(word("dropped", dropped), false);
+    }
+
+    /**
+     * Asks, in a question inside the page's window, whether the changes
+     * to the waystone shown may go for the one used since: a yes turns
+     * the page to it, and anything else keeps the page as it is. Asked
+     * once the window stands on the screen.
+     */
+    private void askToDiscard() {
+        WindowScreen screen = WindowScreen.current();
+        PageTab tab = WindowPages.tab(PAGE_ID);
+        if (this.asking == null || screen == null || tab == null
+                || this.state == null) {
+            return;
+        }
+        final LostTalesWaystoneStatePacket next = this.asking;
+        if (screen.ask(tab, word("discard.title"),
+                word("discard", this.state.getName()),
+                word("discard.confirm"), new Runnable() {
+                    @Override
+                    public void run() {
+                        turnTo(next);
+                    }
+                })) {
+            this.asking = null;
         }
     }
 
@@ -219,8 +257,33 @@ public final class WaystonePage extends PageContent
         this.lore = loreOf(packet);
         this.waiting = false;
         this.sent = null;
-        say(StatCollector.translateToLocal(reason.getMessageKey()),
-                reason.isRefusal());
+        String words = StatCollector.translateToLocal(reason.getMessageKey());
+        if (reason.isRefusal()) {
+            sayRefused(words);
+        } else {
+            sayDone(words);
+        }
+    }
+
+    /** A line the server says in the chat about a waystone answers the page's request. */
+    @Override
+    public boolean answersLine(String key) {
+        return key.startsWith(SERVER_LINES);
+    }
+
+    /**
+     * The server's line stands over the bar in the chat's place: done for
+     * a save, a refusal otherwise; either way the request has its answer.
+     */
+    @Override
+    public void answerLine(String key, String words) {
+        this.waiting = false;
+        if (LostTalesWaystoneStateReason.SAVED.getMessageKey().equals(key)) {
+            sayDone(words);
+        } else {
+            this.sent = null;
+            sayRefused(words);
+        }
     }
 
     /** Whether the page shows the waystone a state is about. */
@@ -247,8 +310,8 @@ public final class WaystonePage extends PageContent
         this.sent = null;
         this.shareWithFellowship = false;
         this.shareTarget = "";
-        this.status = "";
-        this.statusError = false;
+        this.asking = null;
+        clearAnswer();
     }
 
     private WaystoneRows newRows() {
@@ -262,22 +325,22 @@ public final class WaystonePage extends PageContent
                         packet.getMarkerId()), this.mc.thePlayer);
     }
 
-    private void say(String words, boolean error) {
-        this.status = words == null ? "" : words;
-        this.statusError = error;
-    }
-
     /* ---- Walking away (Q8 a) ---- */
 
-    /** Once a game tick while the page is in front: the waystone watched, and a request left unanswered let go. */
+    /**
+     * Once a game tick while the page is in front: the waystone watched,
+     * a request left unanswered let go, and another waystone waiting on
+     * its question asked about.
+     */
     @Override
     public void tick() {
         watch();
         if (this.waiting && ++this.waitedTicks >= ANSWER_TICKS) {
             this.waiting = false;
             this.sent = null;
-            say(word("no_answer"), true);
+            sayRefused(word("no_answer"));
         }
+        askToDiscard();
     }
 
     /** Closes the tab where the player no longer stands at the waystone. */
@@ -430,7 +493,7 @@ public final class WaystonePage extends PageContent
                     this.state.getMarkerId(), this.state.getRevision(),
                     settings);
         } catch (IllegalArgumentException invalid) {
-            say(word("invalid_settings"), true);
+            sayRefused(word("invalid_settings"));
             return;
         }
         LostTalesNetworkHandler.CHANNEL.sendToServer(packet);
@@ -457,7 +520,7 @@ public final class WaystonePage extends PageContent
                             this.state.getZ(), this.state.getMarkerId(),
                             this.state.getRevision(), name);
         } catch (IllegalArgumentException invalid) {
-            say(word("invalid_share_target"), true);
+            sayRefused(word("invalid_share_target"));
             return;
         }
         LostTalesNetworkHandler.CHANNEL.sendToServer(packet);
@@ -468,7 +531,7 @@ public final class WaystonePage extends PageContent
     private void beginWaiting() {
         this.waiting = true;
         this.waitedTicks = 0;
-        say(word("saving"), false);
+        sayWorking(word("saving"));
     }
 
     /* ---- Destinations (Q11 a) ---- */
@@ -527,45 +590,16 @@ public final class WaystonePage extends PageContent
         LostTalesUiHitBox column = column(box);
         this.list.draw(minecraft, column, clipX + (column.left - box.left),
                 clipY + (column.top - box.top), pointerX, pointerY, alpha);
-        drawStatus(minecraft, box, column, alpha);
     }
 
-    /**
-     * The line under the rows: what the last request came to, in red for
-     * a refusal; else, on a waystone the player may not edit, why.
-     */
-    private void drawStatus(Minecraft minecraft, LostTalesUiHitBox box,
-                            LostTalesUiHitBox column, int alpha) {
-        String said = this.status;
-        boolean error = this.statusError;
-        if (said.length() == 0 && this.state != null
-                && !this.state.canEdit()) {
-            said = word("read_only");
-            error = false;
-        }
-        if (said.length() == 0) {
-            return;
-        }
-        int left = (int)column.left + STATUS_INSET;
-        int width = (int)column.width - STATUS_INSET * 2;
-        int top = (int)(box.top + box.height) - STATUS_ROOM
-                + LostTalesUiInk.centredStart(STATUS_ROOM,
-                        LostTalesUiInk.CAP_HEIGHT);
-        LostTalesUiInk.drawText(minecraft.fontRenderer,
-                LostTalesSkyrimUiStyle.trimToWidth(minecraft.fontRenderer,
-                        said, Math.max(0, width)), left, top,
-                error ? LostTalesColors.rgb(LostTalesColors.RED)
-                        : WindowStyle.asideRgb(), alpha);
-    }
-
-    /** The column the rows stand in: the page's width up to a limit, centred, above the status line. */
+    /** The column the rows stand in: the page's width up to a limit, centred. */
     private static LostTalesUiHitBox column(LostTalesUiHitBox box) {
         int boxWidth = (int)Math.floor(box.width);
         int width = Math.max(0, Math.min(boxWidth, MAX_COLUMN_WIDTH));
         return new LostTalesUiHitBox(Math.floor(box.left)
                 + LostTalesUiInk.centredStart(boxWidth, width),
                 Math.floor(box.top) + TOP, width,
-                Math.max(0.0D, Math.floor(box.height) - TOP - STATUS_ROOM));
+                Math.max(0.0D, Math.floor(box.height) - 2 * TOP));
     }
 
     /* ---- The pointer ---- */
@@ -596,6 +630,16 @@ public final class WaystonePage extends PageContent
         }
         this.list.scroll(lines);
         return true;
+    }
+
+    /**
+     * The waystone's tab wears its marker's colour, as the map and the
+     * compass draw it; ivory while no waystone is shown.
+     */
+    @Override
+    public int tone() {
+        return this.state == null ? LostTalesUiInk.IVORY
+                : markerRgb(this.state.getSettings().getColorName());
     }
 
     /* ---- The window's strip ---- */
@@ -630,18 +674,48 @@ public final class WaystonePage extends PageContent
         }
         List<BarItem> items = new ArrayList<BarItem>(2);
         items.add(orWhy(BarItem.button(DESTINATIONS, word("destinations"),
-                new ItemStack(Items.map)).tip(word("destinations.tip")),
-                !this.state.hasFastTravel() ? word("why.no_fast_travel")
-                        : !inMiddleEarth() ? word("why.not_middle_earth")
-                        : ""));
-        boolean changed = this.draft.isChanged();
+                new ItemStack(Items.map)).tip(WindowBar.withKey(
+                        word("destinations.tip"), DESTINATIONS_KEY)),
+                whyNoDestinations()));
         items.add(orWhy(BarItem.button(SAVE, word("save"),
-                new ItemStack(Items.paper)).lit(changed)
-                .tip(word("save.tip")),
-                !this.state.canEdit() ? word("read_only")
-                        : this.waiting ? word("why.waiting")
-                        : changed ? "" : word("why.nothing_changed")));
+                new ItemStack(Items.paper)).lit(this.draft.isChanged())
+                .tip(WindowBar.withKey(word("save.tip"), SAVE_KEY)),
+                whyNoSave()));
         return items;
+    }
+
+    /** Why Destinations cannot be taken now; empty while it can. */
+    private String whyNoDestinations() {
+        return !this.state.hasFastTravel() ? word("why.no_fast_travel")
+                : !inMiddleEarth() ? word("why.not_middle_earth") : "";
+    }
+
+    /** Why Save cannot be taken now; empty while it can. */
+    private String whyNoSave() {
+        return !this.state.canEdit() ? word("read_only")
+                : this.waiting ? word("why.waiting")
+                : this.draft.isChanged() ? "" : word("why.nothing_changed");
+    }
+
+    /** D takes Destinations and S Save, as the bar's tips name them, while each can be taken. */
+    @Override
+    public boolean keyTyped(char typedChar, int keyCode) {
+        if (this.state == null || this.draft == null) {
+            return false;
+        }
+        if (keyCode == DESTINATIONS_KEY) {
+            if (whyNoDestinations().length() == 0) {
+                travel();
+            }
+            return true;
+        }
+        if (keyCode == SAVE_KEY) {
+            if (whyNoSave().length() == 0) {
+                save();
+            }
+            return true;
+        }
+        return false;
     }
 
     private static BarItem orWhy(BarItem item, String why) {
@@ -756,10 +830,15 @@ public final class WaystonePage extends PageContent
         /** The marker's own colour, as the map and the compass draw it. */
         @Override
         public int colorRgb(String color) {
-            float[] rgb = LostTalesCompassMarker.parseColor(color);
-            return channel(rgb[0]) << 16 | channel(rgb[1]) << 8
-                    | channel(rgb[2]);
+            return markerRgb(color);
         }
+    }
+
+    /** A marker's colour by its name, as the map and the compass draw it. */
+    private static int markerRgb(String color) {
+        float[] rgb = LostTalesCompassMarker.parseColor(color);
+        return channel(rgb[0]) << 16 | channel(rgb[1]) << 8
+                | channel(rgb[2]);
     }
 
     private static int channel(float share) {

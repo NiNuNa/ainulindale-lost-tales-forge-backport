@@ -8,7 +8,6 @@ import net.minecraft.world.WorldSavedData;
 import net.minecraftforge.common.util.Constants;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -211,10 +210,6 @@ public final class CharacterPlayerStateWorldData extends WorldSavedData {
         return this.readOnlyForNewerVersion;
     }
 
-    public int getUnsupportedDataVersion() {
-        return this.unsupportedDataVersion;
-    }
-
     public boolean isOwnerBlocked(UUID ownerId) {
         return ownerId != null && this.blockedOwners.contains(ownerId);
     }
@@ -255,10 +250,6 @@ public final class CharacterPlayerStateWorldData extends WorldSavedData {
         }
         this.accounts.put(account.getOwnerId(), account);
         markDirty();
-    }
-
-    public Collection<CharacterPlayerStateAccount> getAccounts() {
-        return Collections.unmodifiableCollection(this.accounts.values());
     }
 
     public int getQuarantinedEntryCount() {

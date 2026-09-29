@@ -54,7 +54,7 @@ public final class ChatSmallTextTest {
     @Test
     public void aQuoteRowIsKnownByItsFirstRunAndShrinksFromIt() {
         ChatComponentText row = new ChatComponentText("");
-        row.appendSibling(ChatLayoutMarker.indent(10, 12));
+        row.appendSibling(ChatLayoutMarker.indent(10, 12, -1, -1));
         row.appendSibling(ChatReplyMarker.applyIcon(
                 new ChatComponentText(""), 0x9C807E, 42L));
         row.appendSibling(ChatReplyMarker.apply(

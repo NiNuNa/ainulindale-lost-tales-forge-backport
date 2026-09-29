@@ -1,6 +1,7 @@
 package com.ninuna.losttales.character.deletion;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.character.lore.LoreCharacterRegistry;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.server.CharacterOperationResult;
@@ -14,7 +15,12 @@ import com.ninuna.losttales.character.state.CharacterPlayerStateWorldData;
 import com.ninuna.losttales.character.state.CharacterStateValidationException;
 import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.character.storage.CharacterWorldData;
+import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
+import com.ninuna.losttales.character.sync.DeletedCharacterSummary;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
+import com.ninuna.losttales.character.validation.CharacterNames;
+import com.ninuna.losttales.character.validation.CharacterValidationResult;
+import com.ninuna.losttales.character.validation.CharacterValidator;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.party.server.PartyErrorId;
 import com.ninuna.losttales.party.server.PartyOperationResult;
@@ -24,6 +30,7 @@ import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.world.World;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -31,6 +38,12 @@ import java.util.UUID;
 /**
  * Server-authoritative deletion, restoration, purge, and inactive-generation
  * rollback coordinator.
+ *
+ * <p>A deleted character is kept for the server's retention
+ * ({@code characterDeletionRetentionDays}). Within it the owner restores it
+ * from the foot of the roster; after it the server purges it on its own,
+ * at server start and at each login of the owner, a bounded number at a
+ * time. Administrators restore and purge by command as well.</p>
  */
 public final class CharacterDeletionService {
 
@@ -210,6 +223,9 @@ public final class CharacterDeletionService {
             if (roster.getCharacterAtSlot(character.getSlotIndex()) != null) {
                 return CharacterDeletionMaintenanceResult.SLOT_OCCUPIED;
             }
+            if (nameRefusal(characterData, character) != CharacterErrorId.NONE) {
+                return CharacterDeletionMaintenanceResult.NAME_TAKEN;
+            }
             CharacterPlayerStateWorldData playerStateData =
                     CharacterPlayerStateStorage.get(
                             target.worldObj, target.getUniqueID());
@@ -276,10 +292,22 @@ public final class CharacterDeletionService {
         if (!isValidTarget(target, characterId)) {
             return CharacterDeletionMaintenanceResult.NOT_FOUND;
         }
+        return purge(target.worldObj, target.getUniqueID(), characterId, true);
+    }
+
+    /**
+     * Purges one deleted character past its retention. The stores are
+     * flushed here only with {@code flush}; a batch flushes once at its
+     * end.
+     */
+    private CharacterDeletionMaintenanceResult purge(World world,
+                                                     UUID ownerId,
+                                                     UUID characterId,
+                                                     boolean flush) {
         try {
-            CharacterWorldData characterData = CharacterStorage.get(target.worldObj);
+            CharacterWorldData characterData = CharacterStorage.get(world);
             CharacterDeletionWorldData deletionData =
-                    CharacterDeletionStorage.get(target.worldObj);
+                    CharacterDeletionStorage.get(world);
             if (characterData.isReadOnlyForNewerVersion()
                     || deletionData.isReadOnlyForNewerVersion()) {
                 return CharacterDeletionMaintenanceResult.STORAGE_READ_ONLY;
@@ -287,7 +315,7 @@ public final class CharacterDeletionService {
             CharacterDeletionTombstone tombstone =
                     deletionData.getTombstone(characterId);
             if (tombstone == null
-                    || !target.getUniqueID().equals(tombstone.getOwnerId())) {
+                    || !ownerId.equals(tombstone.getOwnerId())) {
                 return CharacterDeletionMaintenanceResult.NOT_FOUND;
             }
             if (!tombstone.isCommitted()) {
@@ -301,29 +329,291 @@ public final class CharacterDeletionService {
             }
 
             CharacterPlayerStateWorldData playerStateData =
-                    CharacterPlayerStateStorage.get(
-                            target.worldObj, target.getUniqueID());
+                    CharacterPlayerStateStorage.get(world, ownerId);
             if (playerStateData.isReadOnlyForNewerVersion()
-                    || playerStateData.isOwnerBlocked(target.getUniqueID())) {
+                    || playerStateData.isOwnerBlocked(ownerId)) {
                 return CharacterDeletionMaintenanceResult.PLAYER_STATE_UNAVAILABLE;
             }
             CharacterPlayerStateAccount account = playerStateData.getAccount(
-                    target.getUniqueID());
+                    ownerId);
             if (account != null) {
                 account.removeRecord(characterId);
                 playerStateData.saveAccount(account);
             }
             deletionData.removeTombstone(characterId);
-            flushCommitted(target.worldObj, "purge_commit",
-                    target.getUniqueID(), characterId);
+            if (flush) {
+                flushCommitted(world, "purge_commit", ownerId, characterId);
+            }
             FMLLog.info("[%s] Permanently purged tombstoned character %s for owner %s",
-                    LostTalesMetaData.MOD_ID, characterId,
-                    target.getUniqueID());
+                    LostTalesMetaData.MOD_ID, characterId, ownerId);
             return CharacterDeletionMaintenanceResult.SUCCESS;
         } catch (RuntimeException exception) {
-            logFailure("purge", target.getUniqueID(), characterId, exception);
+            logFailure("purge", ownerId, characterId, exception);
             return CharacterDeletionMaintenanceResult.INTERNAL_ERROR;
         }
+    }
+
+    /**
+     * Purges the owner's deleted characters past their retention, at most
+     * {@code limit} of them, soonest due first. Answers how many went.
+     */
+    public synchronized int purgeExpired(World world, UUID ownerId, int limit) {
+        if (world == null || world.isRemote || ownerId == null) {
+            return 0;
+        }
+        try {
+            CharacterDeletionWorldData data = CharacterDeletionStorage.get(world);
+            if (data.isReadOnlyForNewerVersion()) {
+                return 0;
+            }
+            return purgeAll(world, data.getExpired(ownerId,
+                    System.currentTimeMillis(), limit), "login");
+        } catch (RuntimeException exception) {
+            logFailure("purge_expired_owner", ownerId, null, exception);
+            return 0;
+        }
+    }
+
+    /**
+     * Purges every owner's deleted characters past their retention, at most
+     * {@code limit} of them, soonest due first; the rest go at their
+     * owners' logins or the next start. Answers how many went.
+     */
+    public synchronized int purgeExpired(World world, int limit) {
+        if (world == null || world.isRemote) {
+            return 0;
+        }
+        try {
+            CharacterDeletionWorldData data = CharacterDeletionStorage.get(world);
+            if (data.isReadOnlyForNewerVersion()) {
+                return 0;
+            }
+            return purgeAll(world, data.getExpired(null,
+                    System.currentTimeMillis(), limit), "start");
+        } catch (RuntimeException exception) {
+            logFailure("purge_expired", null, null, exception);
+            return 0;
+        }
+    }
+
+    private int purgeAll(World world, List<CharacterDeletionTombstone> due,
+                         String when) {
+        int purged = 0;
+        for (CharacterDeletionTombstone tombstone : due) {
+            if (purge(world, tombstone.getOwnerId(), tombstone.getCharacterId(),
+                    false) == CharacterDeletionMaintenanceResult.SUCCESS) {
+                purged++;
+            }
+        }
+        if (purged > 0) {
+            flushCommitted(world, "purge_expired_" + when, null, null);
+            FMLLog.info("[%s] Purged %d deleted character(s) past their retention at %s",
+                    LostTalesMetaData.MOD_ID, Integer.valueOf(purged), when);
+        }
+        return purged;
+    }
+
+    /**
+     * The owner restoring one of their deleted characters within its
+     * retention, into the first free open slot of their roster. Refused
+     * while its name is now another character's, or reserved.
+     */
+    public synchronized CharacterOperationResult restoreOwn(
+            EntityPlayerMP player, long expectedRosterRevision,
+            UUID characterId) {
+        if (player == null || player.worldObj == null
+                || player.worldObj.isRemote) {
+            return CharacterOperationResult.failure(
+                    CharacterErrorId.INVALID_PLAYER, null);
+        }
+        if (characterId == null) {
+            return CharacterOperationResult.failure(
+                    CharacterErrorId.INVALID_CHARACTER_ID, null);
+        }
+        CharacterValidationResult manage =
+                CharacterValidator.validatePlayerCanManage(player);
+        if (!manage.isValid()) {
+            CharacterErrorId error = manage.getErrorId();
+            if (error == CharacterErrorId.PLAYER_DEAD
+                    || error == CharacterErrorId.PLAYER_SLEEPING) {
+                error = CharacterErrorId.RESTORE_NOT_ALLOWED;
+            }
+            return CharacterOperationResult.failure(error, null);
+        }
+        UUID ownerId = player.getUniqueID();
+        World world = player.worldObj;
+        CharacterRoster roster = null;
+        try {
+            CharacterWorldData characterData = CharacterStorage.get(world);
+            if (characterData.isReadOnlyForNewerVersion()) {
+                return CharacterOperationResult.failure(
+                        CharacterErrorId.STORAGE_READ_ONLY, null);
+            }
+            roster = characterData.getOrCreateRoster(ownerId);
+            CharacterDeletionWorldData deletionData =
+                    CharacterDeletionStorage.get(world);
+            if (deletionData.isReadOnlyForNewerVersion()) {
+                return CharacterOperationResult.failure(
+                        CharacterErrorId.RESTORE_STORAGE_READ_ONLY, roster);
+            }
+            CharacterValidationResult revision =
+                    CharacterValidator.validateExpectedRevision(
+                            roster, expectedRosterRevision);
+            if (!revision.isValid()) {
+                return CharacterOperationResult.failure(
+                        revision.getErrorId(), roster);
+            }
+            CharacterDeletionTombstone tombstone =
+                    deletionData.getTombstone(characterId);
+            if (!isRestorable(tombstone, ownerId,
+                    System.currentTimeMillis())) {
+                return CharacterOperationResult.failure(
+                        CharacterErrorId.RESTORE_NOT_FOUND, roster);
+            }
+            if (characterData.containsCharacter(characterId)) {
+                return CharacterOperationResult.failure(
+                        CharacterErrorId.RESTORE_NOT_FOUND, roster);
+            }
+            RoleplayCharacter stored = tombstone.getCharacterCopy();
+            CharacterErrorId name = nameRefusal(characterData, stored);
+            if (name != CharacterErrorId.NONE) {
+                return CharacterOperationResult.failure(name, roster);
+            }
+            int slot = firstFreeOpenSlot(roster);
+            if (slot < 0 || roster.roleplayCharacterCount()
+                    >= CharacterRoster.MAX_SLOTS) {
+                return CharacterOperationResult.failure(
+                        CharacterErrorId.RESTORE_NO_SLOT, roster);
+            }
+            CharacterPlayerStateWorldData playerStateData =
+                    CharacterPlayerStateStorage.get(world, ownerId);
+            if (playerStateData.isReadOnlyForNewerVersion()
+                    || playerStateData.isOwnerBlocked(ownerId)) {
+                return CharacterOperationResult.failure(
+                        CharacterErrorId.RESTORE_STATE_UNAVAILABLE, roster);
+            }
+            CharacterPlayerStateAccount account =
+                    playerStateData.getAccount(ownerId);
+            CharacterPlayerStateRecord record = account == null ? null
+                    : account.getRecord(characterId);
+            if (record == null || record.getCurrentGeneration()
+                    != tombstone.getStateGeneration()) {
+                return CharacterOperationResult.failure(
+                        CharacterErrorId.RESTORE_STATE_UNAVAILABLE, roster);
+            }
+            CharacterPlayerStateService.getInstance().validateSnapshot(
+                    record.getCurrent());
+
+            RoleplayCharacter character = RoleplayCharacter.builder(stored)
+                    .slot(slot).build();
+            if (!roster.addCharacter(character)) {
+                return CharacterOperationResult.failure(
+                        CharacterErrorId.RESTORE_NO_SLOT, roster);
+            }
+            roster.unlockNextSlotAfter(slot);
+            roster.incrementRevision();
+            characterData.saveRoster(roster);
+            // The roster is published while the tombstone is still
+            // durable: a stop in between leaves a stale tombstone the next
+            // restore clears, never a character lost from both.
+            CharacterDeletionStorage.flush(world);
+            deletionData.removeTombstone(characterId);
+            flushCommitted(world, "restore_own_commit", ownerId, characterId);
+            FMLLog.info("[%s] Owner %s restored deleted character %s into slot %d",
+                    LostTalesMetaData.MOD_ID, ownerId, characterId,
+                    Integer.valueOf(slot));
+            return CharacterOperationResult.success(true, roster, character);
+        } catch (CharacterStateValidationException exception) {
+            logFailure("restore_own_validate_state", ownerId, characterId,
+                    exception);
+            return CharacterOperationResult.failure(
+                    CharacterErrorId.RESTORE_STATE_UNAVAILABLE, roster);
+        } catch (RuntimeException exception) {
+            logFailure("restore_own", ownerId, characterId, exception);
+            return CharacterOperationResult.failure(
+                    CharacterErrorId.INTERNAL_ERROR, roster);
+        }
+    }
+
+    /**
+     * The owner's deleted characters still within their retention, as the
+     * roster's foot lists them: soonest purged first. None while the
+     * journal cannot be read.
+     */
+    public synchronized List<DeletedCharacterSummary> deletedOf(World world,
+                                                               UUID ownerId) {
+        if (world == null || world.isRemote || ownerId == null) {
+            return Collections.emptyList();
+        }
+        try {
+            CharacterDeletionWorldData data = CharacterDeletionStorage.get(world);
+            if (data.isReadOnlyForNewerVersion()) {
+                return Collections.emptyList();
+            }
+            long now = System.currentTimeMillis();
+            List<CharacterDeletionTombstone> kept =
+                    new ArrayList<CharacterDeletionTombstone>();
+            for (CharacterDeletionTombstone tombstone
+                    : data.getTombstones(ownerId)) {
+                if (isRestorable(tombstone, ownerId, now)) {
+                    kept.add(tombstone);
+                }
+            }
+            CharacterDeletionWorldData.sortByPurgeTime(kept);
+            List<DeletedCharacterSummary> deleted =
+                    new ArrayList<DeletedCharacterSummary>();
+            for (CharacterDeletionTombstone tombstone : kept) {
+                if (deleted.size() >= CharacterRosterSnapshot.MAX_DELETED) {
+                    break;
+                }
+                RoleplayCharacter character = tombstone.getCharacterCopy();
+                deleted.add(new DeletedCharacterSummary(
+                        character.getCharacterId(), character.getName(),
+                        character.getRaceId(), character.getSkinId(),
+                        DeletedCharacterSummary.daysLeft(now,
+                                tombstone.getPurgeAfter())));
+            }
+            return deleted;
+        } catch (RuntimeException exception) {
+            logFailure("list_deleted", ownerId, null, exception);
+            return Collections.emptyList();
+        }
+    }
+
+    /** Whether the owner may still restore it: theirs, committed, and within its retention. */
+    static boolean isRestorable(CharacterDeletionTombstone tombstone,
+                                UUID ownerId, long now) {
+        return tombstone != null && ownerId != null
+                && ownerId.equals(tombstone.getOwnerId())
+                && tombstone.isCommitted()
+                && !tombstone.isPurgeAllowed(now);
+    }
+
+    /**
+     * Why a deleted character cannot come back under its name: a lore
+     * character's or a chat voice's now, or another character's on the
+     * server; {@link CharacterErrorId#NONE} when it can.
+     */
+    static CharacterErrorId nameRefusal(CharacterWorldData characterData,
+                                        RoleplayCharacter character) {
+        String name = character.getName();
+        if (LoreCharacterRegistry.getByName(name) != null
+                || CharacterNames.isVoice(name)) {
+            return CharacterErrorId.NAME_RESERVED;
+        }
+        return characterData.isNameTaken(name, character.getCharacterId())
+                ? CharacterErrorId.DUPLICATE_NAME : CharacterErrorId.NONE;
+    }
+
+    /** The first open slot with nothing in it; -1 for none. */
+    static int firstFreeOpenSlot(CharacterRoster roster) {
+        for (int slot = 0; slot < roster.getUnlockedSlotCount()
+                && slot < CharacterRoster.MAX_SLOTS; slot++) {
+            if (roster.getCharacterAtSlot(slot) == null) {
+                return slot;
+            }
+        }
+        return -1;
     }
 
     public synchronized CharacterDeletionMaintenanceResult rollbackInactive(

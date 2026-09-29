@@ -42,7 +42,6 @@ public final class LotrRaceProfileAdapter {
     private Map<String, CharacterRaceGameplayProfile> profiles =
             Collections.emptyMap();
     private boolean initialized;
-    private boolean available;
 
     public static LotrRaceProfileAdapter getInstance() {
         return INSTANCE;
@@ -66,16 +65,8 @@ public final class LotrRaceProfileAdapter {
         return profile == null ? fallback : profile;
     }
 
-    public synchronized boolean isAvailable(World world) {
-        if (world != null) {
-            ensureInitialized(world);
-        }
-        return this.available;
-    }
-
     public synchronized void clear() {
         this.initialized = false;
-        this.available = false;
         this.profiles = Collections.emptyMap();
     }
 
@@ -129,10 +120,8 @@ public final class LotrRaceProfileAdapter {
             }
 
             this.profiles = Collections.unmodifiableMap(resolved);
-            this.available = true;
         } catch (Throwable throwable) {
             this.profiles = Collections.emptyMap();
-            this.available = false;
             FMLLog.severe(
                     "[%s] LOTR-driven race profiles could not be initialized. Vanilla-safe values will be used: %s",
                     LostTalesMetaData.MOD_ID, throwable.toString());

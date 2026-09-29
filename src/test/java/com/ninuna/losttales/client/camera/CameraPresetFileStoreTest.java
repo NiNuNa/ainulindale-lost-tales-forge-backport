@@ -30,9 +30,6 @@ public final class CameraPresetFileStoreTest {
         // The store is handed the client's folder and keeps its presets
         // directly under it.
         File presetDirectory = new File(configDirectory, "camera_presets");
-        assertEquals(presetDirectory.getCanonicalFile(),
-                CameraPresetFileStore.getPresetDirectory()
-                        .getCanonicalFile());
         assertTrue(new File(presetDirectory,
                 "modern_action_rpg.json").isFile());
         assertFalse(new File(presetDirectory,
@@ -49,7 +46,7 @@ public final class CameraPresetFileStoreTest {
             throws Exception {
         File configDirectory = temporaryFolder.newFolder("custom-config");
         CameraPresetFileStore.initialize(configDirectory);
-        File presetDirectory = CameraPresetFileStore.getPresetDirectory();
+        File presetDirectory = new File(configDirectory, "camera_presets");
         String customJson = readBundled("modern_action_rpg.json")
                 .replace("\"id\": \"modern_action_rpg\"",
                         "\"id\": \"my_camera\"")
@@ -74,7 +71,7 @@ public final class CameraPresetFileStoreTest {
         File configDirectory = temporaryFolder.newFolder("edited-config");
         CameraPresetFileStore.initialize(configDirectory);
         File modernFile = new File(
-                CameraPresetFileStore.getPresetDirectory(),
+                new File(configDirectory, "camera_presets"),
                 "modern_action_rpg.json");
         String editedJson = new String(
                 Files.readAllBytes(modernFile.toPath()),
@@ -101,7 +98,7 @@ public final class CameraPresetFileStoreTest {
             throws Exception {
         File configDirectory = temporaryFolder.newFolder("retired-config");
         CameraPresetFileStore.initialize(configDirectory);
-        File retired = new File(CameraPresetFileStore.getPresetDirectory(),
+        File retired = new File(new File(configDirectory, "camera_presets"),
                 "wide_exploration.json");
         String json = readBundled("modern_action_rpg.json")
                 .replace("\"id\": \"modern_action_rpg\"",

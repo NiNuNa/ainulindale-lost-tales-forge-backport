@@ -99,7 +99,6 @@ public final class PlayerAppearanceResolver {
         }
         if (appearance.isAccount()) {
             return new ResolvedPlayerAppearance(
-                    CharacterRaceRegistry.HUMAN,
                     CharacterBodyModelRegistry.LOSTTALES_PLAYER,
                     CharacterSkinLayout.MINECRAFT_64X64,
                     CharacterBodyTypeRegistry.normalizeOrWide(appearance.getBodyTypeId()),
@@ -131,7 +130,7 @@ public final class PlayerAppearanceResolver {
         ResourceLocation texture = skin == null || accountSkin ? null : textureFor(skin);
         CharacterSkinLayout layout = skin == null ? model.getLayout() : skin.getLayout();
         return new ResolvedPlayerAppearance(
-                raceId, model.getId(), layout, bodyTypeId, chestTypeId,
+                model.getId(), layout, bodyTypeId, chestTypeId,
                 race.getRendererScale(), accountSkin, texture);
     }
 
@@ -142,7 +141,6 @@ public final class PlayerAppearanceResolver {
             return null;
         }
         return new ResolvedPlayerAppearance(
-                CharacterRaceRegistry.HUMAN,
                 CharacterBodyModelRegistry.LOSTTALES_PLAYER,
                 CharacterSkinLayout.MINECRAFT_64X64,
                 skin.getBodyTypeId(),

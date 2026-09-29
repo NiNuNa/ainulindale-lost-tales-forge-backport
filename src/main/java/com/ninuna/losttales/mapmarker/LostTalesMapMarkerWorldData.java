@@ -288,10 +288,6 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
         return changed;
     }
 
-    public synchronized int getQuarantinedEntryCount() {
-        return this.quarantinedEntries.size();
-    }
-
     /**
      * Allocates an ID from the range LOTR does not use for normal custom
      * waypoints. The mapping is persistent so native use-count cooldowns stay
@@ -326,13 +322,6 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
         }
         throw new IllegalStateException(
                 "LOTR waystone travel ID range is exhausted");
-    }
-
-    public synchronized int getLotrTravelId(String markerId) {
-        String storedId = resolveStoredMarkerId(markerId);
-        Integer value = storedId == null
-                ? null : this.lotrTravelIds.get(storedId);
-        return value == null ? 0 : value.intValue();
     }
 
     public synchronized LostTalesMapMarkerRecord
@@ -529,9 +518,7 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
         if (normalized.length() == 0) {
             return null;
         }
-        return LostTalesMapMarkerIdentity.create(
-                normalized,
-                LostTalesMapMarkerIdentity.Authority.WORLD_RECORD)
+        return LostTalesMapMarkerIdentity.create(normalized)
                 .getCanonicalKey();
     }
 

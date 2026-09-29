@@ -12,6 +12,15 @@ public final class ChatRoleFixtures {
 
     private ChatRoleFixtures() {}
 
+    /** A mask with every given role set. */
+    public static int maskOf(ChatAccountRole... roles) {
+        int mask = 0;
+        for (ChatAccountRole role : roles) {
+            mask |= role.bit();
+        }
+        return mask;
+    }
+
     /** The team mark and the default operator role, as a fresh server reads them. */
     public static ChatRoleCatalog catalogue() {
         return ChatRoleConfig.parse(new String[] {ChatRoleConfig.DEFAULT_OPERATOR_ENTRY},

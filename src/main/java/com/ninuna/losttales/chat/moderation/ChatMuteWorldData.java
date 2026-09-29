@@ -175,14 +175,6 @@ public final class ChatMuteWorldData extends WorldSavedData {
         return null;
     }
 
-    public synchronized int getMuteCount() {
-        return this.mutesByAccount.size();
-    }
-
-    public synchronized int getQuarantinedEntryCount() {
-        return this.quarantinedEntries.size();
-    }
-
     private void ensureWritable() {
         if (this.readOnlyForNewerVersion) {
             throw new IllegalStateException(

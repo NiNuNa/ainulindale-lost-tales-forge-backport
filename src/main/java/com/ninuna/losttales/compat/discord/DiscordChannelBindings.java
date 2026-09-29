@@ -156,7 +156,8 @@ public final class DiscordChannelBindings {
             return EMPTY;
         }
         for (int index = 0; index < entries.length; index++) {
-            DiscordChannelBinding binding = parseEntry(entries[index], warnings);
+            DiscordChannelBinding binding = parseEntry(entries[index], index + 1,
+                    warnings);
             if (binding != null) {
                 parsed.add(binding);
             }
@@ -164,15 +165,22 @@ public final class DiscordChannelBindings {
         return validated(parsed, botTokenPresent, warnings);
     }
 
-    private static DiscordChannelBinding parseEntry(String entry, Warnings warnings) {
+    /**
+     * One entry, the {@code position}th of the list. A warning about an
+     * entry that cannot be read names it by that position alone and never
+     * repeats its text: a token or a webhook's address pasted into the
+     * wrong place would otherwise reach the log.
+     */
+    private static DiscordChannelBinding parseEntry(String entry, int position,
+                                                    Warnings warnings) {
         String text = entry == null ? "" : entry.trim();
         if (text.length() == 0 || text.startsWith("#")) {
             return null;
         }
         int equals = text.indexOf('=');
         if (equals <= 0) {
-            warn(warnings, "Discord binding '" + describe(text)
-                    + "' has no '=' between the channel and its direction; ignored");
+            warn(warnings, "Discord binding entry " + position
+                    + " has no '=' between the channel and its direction; ignored");
             return null;
         }
         String target = text.substring(0, equals).trim().toLowerCase(Locale.ROOT);
@@ -180,8 +188,8 @@ public final class DiscordChannelBindings {
                 String.valueOf(ENTRY_SEPARATOR));
         ChatCodeNames.Named named = ChatCodeNames.parse(target);
         if (named == null) {
-            warn(warnings, "Discord binding for unknown channel '" + target
-                    + "'; ignored");
+            warn(warnings, "Discord binding entry " + position
+                    + " names no channel the game knows; ignored");
             return null;
         }
         ChatChannel channel = named.channel;
@@ -217,8 +225,8 @@ public final class DiscordChannelBindings {
             } else if (WEBHOOK_KEY.equals(key)) {
                 webhook = value;
             } else {
-                warn(warnings, "Discord binding '" + target + "' has an unknown option '"
-                        + key + "'; ignored that option");
+                warn(warnings, "Discord binding '" + target + "' has an unknown option"
+                        + " in its part " + (index + 1) + "; ignored that option");
             }
         }
         if (discordChannel.length() > 0 && !isSnowflake(discordChannel)) {
@@ -381,11 +389,6 @@ public final class DiscordChannelBindings {
         if (warnings != null) {
             warnings.refuse(message);
         }
-    }
-
-    /** An entry as it may be shown in a log: never past its first '=' value. */
-    private static String describe(String entry) {
-        return entry.length() > 40 ? entry.substring(0, 40) + "..." : entry;
     }
 
     /**

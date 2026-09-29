@@ -28,7 +28,7 @@ public final class CharacterAccountCapeMigrationTest {
     @Test
     public void aRosterWithoutTheKeysWearsTheDefaults() {
         NBTTagCompound root = new NBTTagCompound();
-        CharacterNbtCodec.write(root, Collections.singletonList(new CharacterRoster(OWNER)));
+        CharacterNbtCodec.write(root, Collections.singletonList(new CharacterRoster(OWNER)), Collections.<NBTTagCompound>emptyList());
         NBTTagCompound roster = rosterTag(root);
         roster.removeTag("AccountShowMinecraftCape");
         roster.removeTag("AccountCosmeticCapeId");
@@ -46,7 +46,7 @@ public final class CharacterAccountCapeMigrationTest {
         assertTrue(roster.setAccountCapeSettings(false, CharacterCapeCatalog.TOWER_GUARD));
         assertFalse(roster.setAccountCapeSettings(false, CharacterCapeCatalog.TOWER_GUARD));
         NBTTagCompound root = new NBTTagCompound();
-        CharacterNbtCodec.write(root, Collections.singletonList(roster));
+        CharacterNbtCodec.write(root, Collections.singletonList(roster), Collections.<NBTTagCompound>emptyList());
 
         CharacterRoster read = readRoster(root);
         assertFalse(read.isAccountMinecraftCapeVisible());
@@ -56,7 +56,7 @@ public final class CharacterAccountCapeMigrationTest {
     @Test
     public void anUnknownAccountCapeIsRepairedToNone() {
         NBTTagCompound root = new NBTTagCompound();
-        CharacterNbtCodec.write(root, Collections.singletonList(new CharacterRoster(OWNER)));
+        CharacterNbtCodec.write(root, Collections.singletonList(new CharacterRoster(OWNER)), Collections.<NBTTagCompound>emptyList());
         rosterTag(root).setInteger("AccountCosmeticCapeId", 60000);
 
         CharacterNbtCodec.ReadResult result = CharacterNbtCodec.read(root);

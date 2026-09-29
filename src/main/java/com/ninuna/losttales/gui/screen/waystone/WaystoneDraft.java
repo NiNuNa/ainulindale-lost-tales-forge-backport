@@ -53,11 +53,6 @@ public final class WaystoneDraft {
         reset(base);
     }
 
-    /** The settings it was read from, or last moved onto. */
-    public LostTalesMapMarkerEditableSettings base() {
-        return this.base;
-    }
-
     /** Starts over from {@code settings}: every edit goes. */
     public void reset(LostTalesMapMarkerEditableSettings settings) {
         if (settings == null) {

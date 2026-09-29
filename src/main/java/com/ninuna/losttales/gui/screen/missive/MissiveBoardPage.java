@@ -10,6 +10,7 @@ import com.ninuna.losttales.client.window.PageContent;
 import com.ninuna.losttales.client.window.PageTab;
 import com.ninuna.losttales.client.window.ToolStrip;
 import com.ninuna.losttales.client.window.Window;
+import com.ninuna.losttales.client.window.WindowBar;
 import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WindowScreen;
@@ -50,18 +51,19 @@ import org.lwjgl.opengl.GL11;
  * a list at the left — each its title, and who posted it and how long it
  * has left on the board under that — and the picked notice's letter at
  * the right, the same letter a letter's own page shows
- * ({@link MissiveLetterView}). On the bar: Accept, which starts the
- * notice's quest straight from the board; Take Letter, which takes it
- * down into the inventory; Pin Letter, which puts a letter carried back
- * up — the one letter at once, or one picked from a menu of them where
- * several are carried ({@link MissivePinMenu}) — and how many notices the
- * board posts of how many it holds.
+ * ({@link MissiveLetterView}). On the bar: Accept (A), which starts the
+ * notice's quest straight from the board; Take Letter (T), which takes it
+ * down into the inventory; Pin Letter (P), which puts a letter carried
+ * back up — the one letter at once, or one picked from a menu of them
+ * where several are carried ({@link MissivePinMenu}) — and how many
+ * notices the board posts of how many it holds.
  *
  * <p>Using a board opens it: the server checks the board and sends its
  * notices as an opening. One board is shown at a time; using another
  * turns the page to it. Every request is answered with the board's
- * notices and why, and the page says the answer on its status line. The
- * server sends the notices again whenever the board changes while the
+ * notices and why, which stands over the page's bar (W2 a), as do the
+ * server's lines in the chat about a missive while the page is shown.
+ * The server sends the notices again whenever the board changes while the
  * player stands at it — somebody else's take, pin or accept, a notice
  * posted or taken down — so the list follows the board.</p>
  *
@@ -89,6 +91,10 @@ public final class MissiveBoardPage extends PageContent
     private static final String ACCEPT = "accept";
     private static final String TAKE = "take";
     private static final String PIN = "pin";
+    /** The keys the bar's buttons answer to while the page holds the keys. */
+    private static final int ACCEPT_KEY = Keyboard.KEY_A;
+    private static final int TAKE_KEY = Keyboard.KEY_T;
+    private static final int PIN_KEY = Keyboard.KEY_P;
     /** Ticks a request waits for its answer before the page stops waiting: five seconds. */
     private static final int ANSWER_TICKS = 100;
     /** The wheel moves the list half a notice a line. */
@@ -108,8 +114,12 @@ public final class MissiveBoardPage extends PageContent
     /** Whether a request is on its way, and how long it has waited. */
     private boolean waiting;
     private int waitedTicks;
-    private String status = "";
-    private boolean statusError;
+    /**
+     * Whether the quest has said in the chat which of its requirements an
+     * Accept on its way does not meet, which then stands over the bar in
+     * place of the board's plainer answer.
+     */
+    private boolean requirementSaid;
     /** The words in the window's well; empty while its search is closed. */
     private String query = "";
     private boolean listOut = true;
@@ -187,13 +197,13 @@ public final class MissiveBoardPage extends PageContent
         }
         read(packet);
         this.waiting = false;
-        say("", false);
+        clearAnswer();
     }
 
     /**
-     * The board's notices again: the answer to a request, said on the
-     * status line, or a change somebody else made, followed quietly —
-     * unless it took down the notice being read.
+     * The board's notices again: the answer to a request, said over the
+     * bar, or a change somebody else made, followed quietly — unless it
+     * took down the notice being read.
      */
     private void answer(LostTalesMissiveBoardStatePacket packet) {
         if (!isShown(packet)) {
@@ -208,11 +218,34 @@ public final class MissiveBoardPage extends PageContent
                 pickLetter(this.pinning);
             }
             this.pinning = "";
-            say(StatCollector.translateToLocal(reason.getMessageKey()),
-                    reason.isRefusal());
+            String words = StatCollector.translateToLocal(
+                    reason.getMessageKey());
+            if (!reason.isRefusal()) {
+                sayDone(words);
+            } else if (reason != MissiveBoardStateReason.REQUIREMENTS
+                    || !this.requirementSaid) {
+                sayRefused(words);
+            }
         } else if (reading.length() > 0 && !reading.equals(this.pickedQuestId)) {
-            say(word("said.picked_gone"), false);
+            sayDone(word("said.picked_gone"));
         }
+    }
+
+    /**
+     * The server's lines about a missive, and a quest's about its
+     * requirements, answer the board's requests while the page is shown.
+     */
+    @Override
+    public boolean answersLine(String key) {
+        return MissiveActions.answersRequest(key);
+    }
+
+    /** The line is the request's answer, or the first half of it: it stands over the bar, and the request waits no more. */
+    @Override
+    public void answerLine(String key, String words) {
+        this.requirementSaid |= MissiveActions.saysRequirement(key);
+        this.waiting = false;
+        sayRefused(words);
     }
 
     /** Takes the board's notices, keeping the notice picked where it still stands. */
@@ -239,8 +272,7 @@ public final class MissiveBoardPage extends PageContent
         this.pickedQuestId = "";
         this.pinning = "";
         this.waiting = false;
-        this.status = "";
-        this.statusError = false;
+        clearAnswer();
         this.listScroll = 0;
         this.shownListScroll = 0.0D;
         this.view.toTop();
@@ -294,11 +326,6 @@ public final class MissiveBoardPage extends PageContent
         return world == null ? 0L : world.getTotalWorldTime();
     }
 
-    private void say(String words, boolean error) {
-        this.status = words == null ? "" : words;
-        this.statusError = error;
-    }
-
     /* ---- Walking away (Q8 a) ---- */
 
     /** Once a game tick while the page is in front: the board watched, and a request left unanswered let go. */
@@ -307,7 +334,7 @@ public final class MissiveBoardPage extends PageContent
         watch();
         if (this.waiting && ++this.waitedTicks >= ANSWER_TICKS) {
             this.waiting = false;
-            say(word("said.no_answer"), true);
+            sayRefused(word("said.no_answer"));
         }
     }
 
@@ -418,7 +445,8 @@ public final class MissiveBoardPage extends PageContent
         LostTalesNetworkHandler.CHANNEL.sendToServer(request);
         this.waiting = true;
         this.waitedTicks = 0;
-        say(word("said.waiting"), false);
+        this.requirementSaid = false;
+        sayWorking(word("said.waiting"));
     }
 
     /**
@@ -506,7 +534,6 @@ public final class MissiveBoardPage extends PageContent
                 this.view.draw(minecraft, letter, picked == null ? null
                         : picked.getMissive(), emptyWords(picked), alpha);
             }
-            drawStatus(font, layout, alpha);
         } finally {
             GL11.glPopMatrix();
         }
@@ -613,22 +640,6 @@ public final class MissiveBoardPage extends PageContent
         }
     }
 
-    /** The line under the letter: what the last request came to, in red for a refusal. */
-    private void drawStatus(FontRenderer font, MissiveBoardLayout layout,
-                            int alpha) {
-        LostTalesUiHitBox status = layout.status();
-        if (this.status.length() == 0 || status.width <= 0) {
-            return;
-        }
-        LostTalesUiInk.drawText(font, LostTalesSkyrimUiStyle.trimToWidth(font,
-                        this.status, (int)status.width), (int)status.left,
-                (int)status.top + LostTalesUiInk.centredStart(
-                        MissiveBoardLayout.STATUS_HEIGHT,
-                        LostTalesUiInk.CAP_HEIGHT),
-                this.statusError ? LostTalesColors.rgb(LostTalesColors.RED)
-                        : WindowStyle.asideRgb(), alpha);
-    }
-
     /* ---- The pointer ---- */
 
     /** The row under a point in the window's space; -1 for none. */
@@ -678,10 +689,27 @@ public final class MissiveBoardPage extends PageContent
 
     /* ---- The keys ---- */
 
-    /** The arrows walk the notices, and the page keys turn the letter. */
+    /**
+     * The arrows walk the notices, the page keys turn the letter, and A,
+     * T and P take the bar's Accept, Take Letter and Pin Letter while
+     * each can be taken, as their tips name them.
+     */
     @Override
     public boolean keyTyped(char typedChar, int keyCode) {
-        if (this.state == null || this.width < 0) {
+        if (this.state == null) {
+            return false;
+        }
+        if (keyCode == ACCEPT_KEY || keyCode == TAKE_KEY
+                || keyCode == PIN_KEY) {
+            String why = keyCode == ACCEPT_KEY ? whyNotAccept()
+                    : keyCode == TAKE_KEY ? whyNotTake() : whyNotPin();
+            if (why == null || why.length() == 0) {
+                barPressed(keyCode == ACCEPT_KEY ? ACCEPT
+                        : keyCode == TAKE_KEY ? TAKE : PIN, -1);
+            }
+            return true;
+        }
+        if (this.width < 0) {
             return false;
         }
         if (keyCode == Keyboard.KEY_UP || keyCode == Keyboard.KEY_DOWN) {
@@ -701,6 +729,12 @@ public final class MissiveBoardPage extends PageContent
         if (slot >= 0) {
             pick(slot);
         }
+    }
+
+    /** The board's tab wears tan, the letters' paper. */
+    @Override
+    public int tone() {
+        return LostTalesColors.rgb(LostTalesColors.TAN);
     }
 
     /* ---- The window's strip ---- */
@@ -781,30 +815,45 @@ public final class MissiveBoardPage extends PageContent
         if (this.state == null) {
             return Collections.emptyList();
         }
-        MissiveNotice picked = picked();
-        boolean active = picked != null && picked.isReadable()
-                && LostTalesClientQuestProgressStore.isQuestActive(
-                        picked.getQuestId());
         List<BarItem> items = new ArrayList<BarItem>(4);
         items.add(orWhy(BarItem.button(ACCEPT, word("accept"),
                 LostTalesUiSheet.QUEST, LostTalesUiSheet.QUEST_HOVER)
-                .tip(word("accept.tip")),
-                MissiveActions.whyNotAccept(picked, active, this.waiting)));
+                .tip(WindowBar.withKey(word("accept.tip"), ACCEPT_KEY)),
+                whyNotAccept()));
         items.add(orWhy(BarItem.button(TAKE, word("take"),
-                new ItemStack(Items.paper)).tip(word("take.tip")),
-                MissiveActions.whyNotTake(picked, inventoryFull(),
-                        this.waiting)));
+                new ItemStack(Items.paper)).tip(WindowBar.withKey(
+                        word("take.tip"), TAKE_KEY)),
+                whyNotTake()));
         items.add(orWhy(BarItem.button(PIN, word("pin"),
-                new ItemStack(Items.sign)).tip(word("pin.tip")),
-                MissiveActions.whyNotPin(carriedLetters().size(),
-                        this.state.getNotices().size(),
-                        this.state.getMaxNotices(),
-                        LostTalesTileEntityMissiveBoard.INVENTORY_SIZE,
-                        this.waiting)));
+                new ItemStack(Items.sign)).tip(WindowBar.withKey(
+                        word("pin.tip"), PIN_KEY)),
+                whyNotPin()));
         items.add(BarItem.words(word("available",
                 Integer.valueOf(this.state.getNotices().size()),
                 Integer.valueOf(this.state.getMaxNotices()))));
         return items;
+    }
+
+    /** Why Accept cannot be taken now, as a lang key; empty while it can. */
+    private String whyNotAccept() {
+        MissiveNotice picked = picked();
+        boolean active = picked != null && picked.isReadable()
+                && LostTalesClientQuestProgressStore.isQuestActive(
+                        picked.getQuestId());
+        return MissiveActions.whyNotAccept(picked, active, this.waiting);
+    }
+
+    /** Why Take Letter cannot be taken now, as a lang key; empty while it can. */
+    private String whyNotTake() {
+        return MissiveActions.whyNotTake(picked(), inventoryFull(),
+                this.waiting);
+    }
+
+    /** Why Pin Letter cannot be taken now, as a lang key; empty while it can. */
+    private String whyNotPin() {
+        return MissiveActions.whyNotPin(carriedLetters().size(),
+                this.state.getNotices().size(), this.state.getMaxNotices(),
+                LostTalesTileEntityMissiveBoard.INVENTORY_SIZE, this.waiting);
     }
 
     /** Greyed with the words of {@code whyKey}; as it is for an empty key. */

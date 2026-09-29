@@ -56,6 +56,8 @@ public final class LostTalesSpeechBubbleRenderer {
     private static final int ROW_STRIDE = 10;
     /** Clear air between the name and the words under it. */
     private static final int NAME_GAP = 4;
+    /** The code an action's words are drawn behind: in italics, as the chat sets them. */
+    private static final String ITALIC = "§o";
     private static final int PADDING_X = 3;
     private static final int PADDING_Y = 1;
     /** An emoji's size inline, and the room it takes with its gap. */
@@ -213,6 +215,12 @@ public final class LostTalesSpeechBubbleRenderer {
             if (opacity <= 0.0F) {
                 continue;
             }
+            if (line.action) {
+                // An action is the sentence the chat shows: the name in
+                // its colour opening the words, all in italics.
+                addActionRows(font, rows, speech, line.text, opacity);
+                continue;
+            }
             newest = Math.max(newest, opacity);
             List<?> wrapped = font.listFormattedStringToWidth(line.text,
                     MAX_WIDTH);
@@ -226,12 +234,38 @@ public final class LostTalesSpeechBubbleRenderer {
         }
         // The name over the words, in the very colour the chat signs the
         // line with — a hobbit's green here and in the log both — and
-        // standing clear of them the way LOTR's does.
-        if (!rows.isEmpty() && speech.name.length() > 0) {
+        // standing clear of them the way LOTR's does. An action names
+        // its speaker itself, so a speaker who only acted has none.
+        if (!rows.isEmpty() && speech.name.length() > 0 && newest > 0.0F) {
             rows.add(0, Row.of(font, speech.name, newest, speech.nameColor,
                     NAME_GAP));
         }
         return rows;
+    }
+
+    /**
+     * An action's rows: the sentence the speaker's name opens, wrapped
+     * as the words are and in italics throughout, the name on the first
+     * row in the colour the chat signs it with.
+     */
+    private static void addActionRows(FontRenderer font, List<Row> rows,
+                                      ChatSpeechBubbles.Speech speech,
+                                      String words, float opacity) {
+        String lead = ITALIC + speech.name;
+        List<?> wrapped = font.listFormattedStringToWidth(
+                lead + " " + words, MAX_WIDTH);
+        for (int part = 0; part < wrapped.size(); part++) {
+            String piece = String.valueOf(wrapped.get(part));
+            if (part == 0 && speech.name.length() > 0
+                    && piece.startsWith(lead)) {
+                rows.add(Row.led(font, lead, speech.nameColor,
+                        piece.substring(lead.length()), opacity,
+                        LostTalesUiInk.IVORY));
+            } else {
+                rows.add(Row.of(font, piece, opacity, LostTalesUiInk.IVORY,
+                        0, true));
+            }
+        }
     }
 
     /** The stack, growing upward so its last row stands on the anchor. */
@@ -266,8 +300,10 @@ public final class LostTalesSpeechBubbleRenderer {
     /** One row: its runs of text and its emoji, left to right. */
     private static void drawRow(Minecraft minecraft, FontRenderer font,
                                 Row row, int left, int y, int alpha) {
-        int shadowAlpha = LostTalesUiInk.shadowAlpha(alpha);
         int x = left;
+        if (row.lead.length() > 0) {
+            x += drawRun(font, row.lead, x, y, row.leadRgb, alpha);
+        }
         for (int index = 0; index < row.parts.size(); index++) {
             ChatEmojiParser.Segment part = row.parts.get(index);
             if (part.isEmoji()) {
@@ -276,18 +312,22 @@ public final class LostTalesSpeechBubbleRenderer {
                 x += EMOJI_ADVANCE;
                 continue;
             }
-            String text = part.getText();
-            if (shadowAlpha >= LostTalesUiInk.MIN_VISIBLE_ALPHA) {
-                font.drawString(text,
-                        x + LostTalesUiInk.SHADOW_OFFSET,
-                        y + LostTalesUiInk.SHADOW_OFFSET,
-                        LostTalesUiInk.argb(
-                                LostTalesUiInk.SHADOW, shadowAlpha));
-            }
-            font.drawString(text, x, y,
-                    LostTalesUiInk.argb(row.rgb, alpha));
-            x += font.getStringWidth(text);
+            x += drawRun(font, row.textOf(part), x, y, row.rgb, alpha);
         }
+    }
+
+    /** One run of text over its shadow; answers its width. */
+    private static int drawRun(FontRenderer font, String text, int x, int y,
+                               int rgb, int alpha) {
+        int shadowAlpha = LostTalesUiInk.shadowAlpha(alpha);
+        if (shadowAlpha >= LostTalesUiInk.MIN_VISIBLE_ALPHA) {
+            font.drawString(text,
+                    x + LostTalesUiInk.SHADOW_OFFSET,
+                    y + LostTalesUiInk.SHADOW_OFFSET,
+                    LostTalesUiInk.argb(LostTalesUiInk.SHADOW, shadowAlpha));
+        }
+        font.drawString(text, x, y, LostTalesUiInk.argb(rgb, alpha));
+        return font.getStringWidth(text);
     }
 
     /**
@@ -381,34 +421,71 @@ public final class LostTalesSpeechBubbleRenderer {
         private final int gapBelow;
         /** Whether the row is the typing marks rather than words. */
         private final boolean dots;
+        /** Whether every run of the row is in italics: an action's. */
+        private final boolean italic;
+        /** Text before the parts in a colour of its own: an action's name; empty for none. */
+        private final String lead;
+        private final int leadRgb;
 
         private Row(List<ChatEmojiParser.Segment> parts, int width,
-                    float opacity, int rgb, int gapBelow, boolean dots) {
+                    float opacity, int rgb, int gapBelow, boolean dots,
+                    boolean italic, String lead, int leadRgb) {
             this.parts = parts;
             this.width = width;
             this.opacity = opacity;
             this.rgb = rgb;
             this.gapBelow = gapBelow;
             this.dots = dots;
+            this.italic = italic;
+            this.lead = lead;
+            this.leadRgb = leadRgb;
         }
 
         /** The typing marks as a row of their own width. */
         static Row dots() {
             return new Row(Collections.<ChatEmojiParser.Segment>emptyList(),
                     ChatTypingDots.WIDTH, 1.0F, LostTalesUiInk.IVORY, 0,
-                    true);
+                    true, false, "", 0);
         }
 
         static Row of(FontRenderer font, String text, float opacity,
                       int rgb, int gapBelow) {
+            return of(font, text, opacity, rgb, gapBelow, false);
+        }
+
+        /** As above, every run in italics when {@code italic} says so. */
+        static Row of(FontRenderer font, String text, float opacity,
+                      int rgb, int gapBelow, boolean italic) {
+            return build(font, "", 0, text, opacity, rgb, gapBelow, italic);
+        }
+
+        /**
+         * An action's first row: {@code lead}, the name, in
+         * {@code leadRgb}, then the rest of the row in italics.
+         */
+        static Row led(FontRenderer font, String lead, int leadRgb,
+                       String rest, float opacity, int rgb) {
+            return build(font, lead, leadRgb, rest, opacity, rgb, 0, true);
+        }
+
+        private static Row build(FontRenderer font, String lead, int leadRgb,
+                                 String text, float opacity, int rgb,
+                                 int gapBelow, boolean italic) {
             List<ChatEmojiParser.Segment> parts = ChatEmojiParser.split(text);
-            int width = 0;
+            int width = font.getStringWidth(lead);
             for (int index = 0; index < parts.size(); index++) {
                 ChatEmojiParser.Segment part = parts.get(index);
                 width += part.isEmoji() ? EMOJI_ADVANCE
-                        : font.getStringWidth(part.getText());
+                        : font.getStringWidth(italic ? ITALIC + part.getText()
+                                : part.getText());
             }
-            return new Row(parts, width, opacity, rgb, gapBelow, false);
+            return new Row(parts, width, opacity, rgb, gapBelow, false,
+                    italic, lead, leadRgb);
+        }
+
+        /** A run's text as it is drawn: in italics on an action's row. */
+        String textOf(ChatEmojiParser.Segment part) {
+            return this.italic ? ITALIC + part.getText() : part.getText();
         }
     }
 }

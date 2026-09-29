@@ -83,23 +83,19 @@ public final class ChatChannelSuggester {
         return word == null ? null : "#" + word;
     }
 
-    /** A channel link read out of text: the conversation, where its word ends, where the link ends, and the message it names. */
+    /** A channel link read out of text: the conversation, where the link ends, and the message it names. */
     public static final class Link {
         public final ChatChannel channel;
         /** The faction's id for a link to a faction's chat; empty otherwise. */
         public final String scope;
-        /** The index just past the channel's word. */
-        public final int wordEnd;
         /** The index just past the link: past the message id where one follows. */
         public final int end;
         /** The message the link names, or {@link ChatMessageIds#NONE} for the channel alone. */
         public final long messageId;
 
-        Link(ChatChannel channel, String scope, int wordEnd, int end,
-             long messageId) {
+        Link(ChatChannel channel, String scope, int end, long messageId) {
             this.channel = channel;
             this.scope = scope;
-            this.wordEnd = wordEnd;
             this.end = end;
             this.messageId = messageId;
         }
@@ -129,7 +125,7 @@ public final class ChatChannelSuggester {
                 || (named.channel == ChatChannel.WHISPER && linkEnd == end)) {
             return null;
         }
-        return new Link(named.channel, named.scope, end, linkEnd,
+        return new Link(named.channel, named.scope, linkEnd,
                 linkEnd > end ? Long.parseLong(text.substring(end + 1, linkEnd))
                         : ChatMessageIds.NONE);
     }

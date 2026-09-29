@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.client.window.PointerRegions;
+import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -21,6 +22,20 @@ final class ChatCommandSuggestionBox extends ChatSuggestionBox {
 
     private List<String> candidates = Collections.emptyList();
     private int selectedIndex = -1;
+    /**
+     * A candidate the chat answers itself, and the few words saying what
+     * it does, drawn after it in the chat's aside tone; empty for none.
+     */
+    private String hinted = "";
+    private String hint = "";
+    /** Clear room between a candidate and its hint. */
+    private static final int HINT_GAP = 6;
+
+    /** Gives {@code candidate} a hint when it is shown; an empty hint gives none. */
+    void setHint(String candidate, String hint) {
+        this.hinted = candidate == null ? "" : candidate;
+        this.hint = hint == null ? "" : hint;
+    }
 
     /** Shows a fresh candidate list, nothing highlighted yet. */
     void show(List<String> shown) {
@@ -38,6 +53,14 @@ final class ChatCommandSuggestionBox extends ChatSuggestionBox {
     void clear() {
         this.candidates = Collections.emptyList();
         this.selectedIndex = -1;
+        this.hinted = "";
+        this.hint = "";
+    }
+
+    /** The hint drawn after a candidate; empty for none. */
+    private String hintOf(String candidate) {
+        return this.hint.length() > 0 && this.hinted.equals(candidate)
+                ? this.hint : "";
     }
 
     @Override
@@ -74,9 +97,17 @@ final class ChatCommandSuggestionBox extends ChatSuggestionBox {
                 litRow(hoveredRow, shown));
         for (int row = 0; row < shown; row++) {
             int rowTop = top + PADDING + row * ROW_HEIGHT;
+            String candidate = this.candidates.get(row);
             LostTalesUiInk.drawText(font,
-                    this.candidates.get(row), inputX + PADDING, rowTop + 2,
+                    candidate, inputX + PADDING, rowTop + 2,
                     LostTalesUiInk.IVORY, 255);
+            String note = hintOf(candidate);
+            if (note.length() > 0) {
+                LostTalesUiInk.drawText(font, "§o" + note,
+                        inputX + PADDING + font.getStringWidth(candidate)
+                                + HINT_GAP, rowTop + 2,
+                        WindowStyle.asideRgb(), 255);
+            }
         }
         if (this.candidates.size() > MAX_ROWS) {
             LostTalesUiInk.drawText(font,
@@ -104,8 +135,11 @@ final class ChatCommandSuggestionBox extends ChatSuggestionBox {
         int width = 0;
         int shown = Math.min(this.candidates.size(), MAX_ROWS);
         for (int index = 0; index < shown; index++) {
-            width = Math.max(width,
-                    font.getStringWidth(this.candidates.get(index)));
+            String candidate = this.candidates.get(index);
+            String note = hintOf(candidate);
+            width = Math.max(width, font.getStringWidth(candidate)
+                    + (note.length() == 0 ? 0
+                            : HINT_GAP + font.getStringWidth("§o" + note)));
         }
         if (this.candidates.size() > MAX_ROWS) {
             width = Math.max(width, font.getStringWidth(

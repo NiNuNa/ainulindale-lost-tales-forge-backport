@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.motion;
 
 import com.ninuna.losttales.client.window.BarItem;
 import com.ninuna.losttales.client.window.MenuWindow;
+import com.ninuna.losttales.client.window.PageAnswer;
 import com.ninuna.losttales.client.window.PageContent;
 import com.ninuna.losttales.client.window.PageSearch;
 import com.ninuna.losttales.client.window.PageTab;
@@ -168,10 +169,6 @@ public final class MotionLabPage extends PageContent {
     private long glideNanos;
     private double frameSeconds;
     private Hover hovered;
-    /** What the edit cannot be read for; empty while it reads. */
-    private String problem = "";
-    /** What the last action did; empty for nothing to say. */
-    private String notice = "";
 
     public MotionLabPage() {
         this.editor = new MotionLabEditor(new MotionLabEditor.Words() {
@@ -226,7 +223,7 @@ public final class MotionLabPage extends PageContent {
         this.picked = id;
         this.rowsScroll = 0;
         this.shownRowsScroll = 0.0D;
-        this.notice = "";
+        clearAnswer();
         read();
     }
 
@@ -234,22 +231,30 @@ public final class MotionLabPage extends PageContent {
     private void read() {
         Motion motion = Motions.get(this.picked);
         this.source = motion;
-        this.problem = "";
+        if (lastAnswer().kind() == PageAnswer.Kind.FAULT) {
+            clearAnswer();
+        }
         this.editor.edit(this.picked, MotionCodec.encode(motion));
         this.sample.restart(motion, System.nanoTime());
     }
 
-    /** Plays the edited motion in place of its file's, and its sample from the start. */
+    /**
+     * Plays the edited motion in place of its file's, and its sample from
+     * the start. What the edit cannot be read for stands over the bar
+     * until it can.
+     */
     private void preview() {
         MotionCodec.Result result = this.editor.read();
         Motion motion = result.motions().get(this.picked);
-        this.problem = result.problems().isEmpty() ? ""
-                : result.problems().get(0);
+        if (result.problems().isEmpty()) {
+            clearAnswer();
+        } else {
+            sayFault(result.problems().get(0));
+        }
         if (motion != null) {
             Motions.preview(motion);
             this.source = motion;
         }
-        this.notice = "";
         this.sample.restart(Motions.get(this.picked), System.nanoTime());
     }
 
@@ -521,19 +526,6 @@ public final class MotionLabPage extends PageContent {
                 LostTalesUiInk.IVORY, alpha);
         drawAbout(layout, about, alpha);
         drawSample(layout, motion, alpha, now);
-        LostTalesUiHitBox status = layout.status();
-        String said = this.problem.length() > 0 ? this.problem : this.notice;
-        if (said.length() > 0) {
-            LostTalesUiInk.drawText(this.font,
-                    LostTalesSkyrimUiStyle.trimToWidth(this.font, said,
-                            (int)status.width), (int)status.left,
-                    (int)status.top + LostTalesUiInk.centredStart(
-                            MotionLabLayout.STATUS_HEIGHT,
-                            LostTalesUiInk.CAP_HEIGHT),
-                    this.problem.length() > 0
-                            ? LostTalesColors.rgb(LostTalesColors.RED)
-                            : WindowStyle.asideRgb(), alpha);
-        }
         drawRows(layout, alpha, now);
     }
 
@@ -843,6 +835,11 @@ public final class MotionLabPage extends PageContent {
         }
     }
 
+    @Override
+    public int tone() {
+        return LostTalesColors.rgb(LostTalesColors.MOTION_LAB_TONE);
+    }
+
     /* ---- The window's strip ---- */
 
     @Override
@@ -987,13 +984,17 @@ public final class MotionLabPage extends PageContent {
         } else if (COPY.equals(id)) {
             GuiScreen.setClipboardString(MotionCodec.write(
                     this.editor.read().motions()));
-            this.notice = word("copied");
+            sayDone(word("copied"));
         } else if (RESET.equals(id)) {
             Motions.clearPreview(this.picked);
-            this.notice = Motions.forget(this.picked,
-                    this.mc.getResourceManager()) ? word("was_reset")
-                    : word("not_saved");
+            boolean reset = Motions.forget(this.picked,
+                    this.mc.getResourceManager());
             read();
+            if (reset) {
+                sayDone(word("was_reset"));
+            } else {
+                sayRefused(word("not_saved"));
+            }
         }
     }
 
@@ -1011,7 +1012,11 @@ public final class MotionLabPage extends PageContent {
                 failed = true;
             }
         }
-        this.notice = word(failed ? "not_saved" : "saved");
+        if (failed) {
+            sayRefused(word("not_saved"));
+        } else {
+            sayDone(word("saved"));
+        }
     }
 
     /* ---- Life ---- */

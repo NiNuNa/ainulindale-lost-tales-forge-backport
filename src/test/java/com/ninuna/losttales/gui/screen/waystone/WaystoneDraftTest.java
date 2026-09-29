@@ -75,7 +75,7 @@ public final class WaystoneDraftTest {
                         false, true, false, true,
                         "losttales:glowstone_house", 73,
                         LostTalesMapMarkerVisibility.SHARED);
-        draft.rebase(draft.base(), newer);
+        draft.rebase(bree(), newer);
         assertEquals("the player's edit stays", "Bree West Gate",
                 draft.name());
         assertEquals("what the player left follows", "red", draft.color());

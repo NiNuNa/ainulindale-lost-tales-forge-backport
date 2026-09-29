@@ -47,7 +47,7 @@ final class ProfileSubject {
                 character.getName(), character.getRaceId(),
                 character.getGenderId(), character.getSkinId(),
                 character.getBodyTypeId(), character.getChestTypeId(),
-                character.getStartingFactionId(), character.getAge(), true);
+                character.getFactionId(), character.getAge(), true);
     }
 
     static ProfileSubject account(String accountName) {
@@ -61,7 +61,7 @@ final class ProfileSubject {
                 appearance.getCharacterName(), appearance.getRaceId(),
                 appearance.getGenderId(), appearance.getSkinId(),
                 appearance.getBodyTypeId(), appearance.getChestTypeId(),
-                appearance.getStartingFactionId(), appearance.getAge(), false);
+                appearance.getFactionId(), appearance.getAge(), false);
     }
 
     /** Another person's character known only by its name and head. */

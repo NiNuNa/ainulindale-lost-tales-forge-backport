@@ -55,13 +55,9 @@ public final class ChatInputCompletionTest {
         ChatMentionCandidate self = candidates.get(names.indexOf("Aldric")
                 + candidates.size() - names.size());
         assertEquals(SELF.toString(), self.getKey());
-        assertEquals("Nils", self.getAccountName());
-        assertEquals("Aldric", self.getCharacterName());
-        boolean characterIsAnAlias = false;
-        for (String alias : self.getAliases()) {
-            characterIsAnAlias |= "aldric".equalsIgnoreCase(alias);
-        }
-        assertTrue(characterIsAnAlias);
+        // The account and the character are both names it answers to.
+        assertTrue(self.getAliases().contains("nils"));
+        assertTrue(self.getAliases().contains("aldric"));
     }
 
     @Test
@@ -71,7 +67,7 @@ public final class ChatInputCompletionTest {
                 new HashMap<String, CharacterAppearance>();
         byAccount.put("beren", new CharacterAppearance(beren, "Beren",
                 "Beren Erchamion", "losttales:human", "male", "", true, 0,
-                "", 0, 0, "", ""));
+                "", 0, "", ""));
         List<ChatMentionCandidate> candidates =
                 ChatInputCompletion.mentionCandidatesFor(SELF, "Nils",
                         "Aldric", null, NO_MEMBERS,
@@ -111,9 +107,10 @@ public final class ChatInputCompletionTest {
         UUID aldric = UUID.fromString("00000000-0000-0000-0000-000000000011");
         Map<String, CharacterAppearance> byAccount =
                 new HashMap<String, CharacterAppearance>();
-        byAccount.put("beren", new CharacterAppearance(beren, "Beren",
-                "Beren Erchamion", "losttales:human", "male", "", true, 0,
-                "lotr:gondor", 1, 30, "", "").withCharacterId(erchamion));
+        byAccount.put("beren", new CharacterAppearance(
+                com.ninuna.losttales.character.sync.CharacterAppearanceKind.CHARACTER,
+                beren, erchamion, "Beren", "Beren Erchamion", "losttales:human",
+                "male", "", true, 0, "lotr:gondor", 30, "", ""));
         List<ChatMentionCandidate> candidates =
                 ChatInputCompletion.mentionCandidatesFor(SELF, "Nils",
                         "Aldric", aldric, NO_MEMBERS, Arrays.asList("Beren"),

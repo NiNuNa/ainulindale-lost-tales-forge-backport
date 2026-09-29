@@ -5,7 +5,6 @@ public final class ValidatedCharacterCreation {
 
     private final int slotIndex;
     private final String name;
-    private final String normalizedNameKey;
     private final String raceId;
     private final String genderId;
     private final String skinId;
@@ -18,7 +17,7 @@ public final class ValidatedCharacterCreation {
     private final boolean unconventionalSettings;
 
     public ValidatedCharacterCreation(int slotIndex, String name,
-                                      String normalizedNameKey, String raceId,
+                                      String raceId,
                                       String genderId, String skinId, int age,
                                       String startingFactionId,
                                       String startingWaypointId,
@@ -27,7 +26,6 @@ public final class ValidatedCharacterCreation {
                                       String chestTypeId) {
         this.slotIndex = slotIndex;
         this.name = name;
-        this.normalizedNameKey = normalizedNameKey;
         this.raceId = raceId;
         this.genderId = genderId;
         this.skinId = skinId;
@@ -42,7 +40,6 @@ public final class ValidatedCharacterCreation {
 
     public int getSlotIndex() { return this.slotIndex; }
     public String getName() { return this.name; }
-    public String getNormalizedNameKey() { return this.normalizedNameKey; }
     public String getRaceId() { return this.raceId; }
     public String getGenderId() { return this.genderId; }
     public String getSkinId() { return this.skinId; }

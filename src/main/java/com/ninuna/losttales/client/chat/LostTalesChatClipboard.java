@@ -23,17 +23,6 @@ import net.minecraft.util.IChatComponent;
 final class LostTalesChatClipboard {
     private LostTalesChatClipboard() {}
 
-    /** {@code mouseX}/{@code mouseY} are GUI coordinates, as the screen sees them. */
-    static boolean copy(GuiNewChat chat, Minecraft minecraft,
-                        int mouseX, int mouseY) {
-        String text = messageTextAt(chat, minecraft, mouseX, mouseY);
-        if (text.length() == 0) {
-            return false;
-        }
-        GuiScreen.setClipboardString(text);
-        return true;
-    }
-
     /** Copies text already resolved from a line; empty copies nothing. */
     static boolean copy(String text) {
         if (text == null || text.length() == 0) {

@@ -52,7 +52,7 @@ final class PartyInvitationCoordinator {
 
     PartyInvitationOperationResult invitePlayer(
             EntityPlayerMP player,
-            PartyService.ActiveCharacterContext inviting,
+            PartyService.ActiveIdentityContext inviting,
             PartyWorldData partyData,
             Party party,
             UUID targetOwnerId) {
@@ -61,7 +61,7 @@ final class PartyInvitationCoordinator {
             return PartyInvitationOperationResult.failure(
                     PartyErrorId.INVALID_TARGET, party, null);
         }
-        if (party.isFull()) {
+        if (party.isFull(PartyService.memberLimit())) {
             return PartyInvitationOperationResult.failure(
                     PartyErrorId.PARTY_FULL, party, null);
         }
@@ -82,18 +82,18 @@ final class PartyInvitationCoordinator {
             return PartyInvitationOperationResult.failure(
                     PartyErrorId.TARGET_OFFLINE, party, null);
         }
-        PartyService.ActiveCharacterContext target =
-                this.partyService.resolveActiveCharacter(targetPlayer);
+        PartyService.ActiveIdentityContext target =
+                this.partyService.resolveActiveIdentity(targetPlayer);
         if (!target.isValid()) {
             return PartyInvitationOperationResult.failure(
                     PartyErrorId.INVALID_TARGET, party, null);
         }
-        UUID targetCharacterId = target.gameplayId();
-        if (inviting.gameplayId().equals(targetCharacterId)) {
+        UUID targetIdentityId = target.gameplayId();
+        if (inviting.gameplayId().equals(targetIdentityId)) {
             return PartyInvitationOperationResult.failure(
                     PartyErrorId.CANNOT_INVITE_SELF, party, null);
         }
-        Party targetParty = partyData.getPartyForCharacter(targetCharacterId);
+        Party targetParty = partyData.getPartyForIdentity(targetIdentityId);
         if (targetParty != null) {
             return PartyInvitationOperationResult.failure(
                     PartyErrorId.TARGET_ALREADY_IN_PARTY, party, null);
@@ -103,9 +103,14 @@ final class PartyInvitationCoordinator {
                     PartyErrorId.ACCOUNT_ALREADY_IN_PARTY, party, null);
         }
         if (invitationData.hasInvitationForPartyAndTarget(
-                party.getPartyId(), targetCharacterId)) {
+                party.getPartyId(), targetIdentityId)) {
             return PartyInvitationOperationResult.failure(
                     PartyErrorId.INVITATION_ALREADY_EXISTS, party, null);
+        }
+        if (PartyDeclines.mustWait(player.getUniqueID(), target.ownerId(),
+                System.currentTimeMillis())) {
+            return PartyInvitationOperationResult.failure(
+                    PartyErrorId.RECENTLY_DECLINED, party, null);
         }
         UUID invitationId = createUniqueInvitationId(invitationData);
         if (invitationId == null) {
@@ -138,7 +143,7 @@ final class PartyInvitationCoordinator {
 
     PartyInvitationOperationResult acceptInvitation(
             EntityPlayerMP player,
-            PartyService.ActiveCharacterContext active,
+            PartyService.ActiveIdentityContext active,
             PartyWorldData partyData,
             UUID invitationId) {
         if (invitationId == null) {
@@ -166,7 +171,7 @@ final class PartyInvitationCoordinator {
                     invitation);
         }
         if (!active.gameplayId().equals(
-                invitation.getTargetCharacterId())
+                invitation.getTargetIdentityId())
                 || !player.getUniqueID().equals(invitation.getTargetOwnerId())) {
             return PartyInvitationOperationResult.failure(
                     PartyErrorId.INVITATION_TARGET_MISMATCH,
@@ -188,10 +193,10 @@ final class PartyInvitationCoordinator {
                     invitation);
         }
 
-        Party existingParty = partyData.getPartyForCharacter(
+        Party existingParty = partyData.getPartyForIdentity(
                 active.gameplayId());
         if (existingParty != null) {
-            invitationData.removeInvitationsForTargetCharacter(
+            invitationData.removeInvitationsForTargetIdentity(
                     active.gameplayId());
             return PartyInvitationOperationResult.failure(
                     PartyErrorId.TARGET_ALREADY_IN_PARTY,
@@ -213,7 +218,7 @@ final class PartyInvitationCoordinator {
         }
 
         PartyColor color = party.getFirstAvailableColor();
-        if (color == null || party.isFull()) {
+        if (color == null || party.isFull(PartyService.memberLimit())) {
             invitationData.removeInvitationsForParty(party.getPartyId());
             return PartyInvitationOperationResult.failure(
                     PartyErrorId.PARTY_FULL, true, party, invitation);
@@ -231,9 +236,9 @@ final class PartyInvitationCoordinator {
         }
         try {
             partyData.saveParty(updatedParty);
-            invitationData.removeInvitationsForTargetCharacter(
+            invitationData.removeInvitationsForTargetIdentity(
                     active.gameplayId());
-            if (updatedParty.isFull()) {
+            if (updatedParty.isFull(PartyService.memberLimit())) {
                 invitationData.removeInvitationsForParty(updatedParty.getPartyId());
             }
             return PartyInvitationOperationResult.success(
@@ -248,7 +253,7 @@ final class PartyInvitationCoordinator {
 
     PartyInvitationOperationResult declineInvitation(
             EntityPlayerMP player,
-            PartyService.ActiveCharacterContext active,
+            PartyService.ActiveIdentityContext active,
             UUID invitationId) {
         PartyInvitationWorldData invitationData = getWritableData(player.worldObj);
         if (invitationData == null) {
@@ -261,7 +266,7 @@ final class PartyInvitationCoordinator {
                     PartyErrorId.INVITATION_NOT_FOUND, null, null);
         }
         if (!active.gameplayId().equals(
-                invitation.getTargetCharacterId())
+                invitation.getTargetIdentityId())
                 || !player.getUniqueID().equals(invitation.getTargetOwnerId())) {
             return PartyInvitationOperationResult.failure(
                     PartyErrorId.INVITATION_TARGET_MISMATCH, null, null);
@@ -270,13 +275,16 @@ final class PartyInvitationCoordinator {
         Party party = partyData == null ? null
                 : partyData.getParty(invitation.getPartyId());
         invitationData.removeInvitation(invitationId);
-        if (invitation.isExpired(System.currentTimeMillis())) {
+        long now = System.currentTimeMillis();
+        if (invitation.isExpired(now)) {
             return PartyInvitationOperationResult.failure(
                     PartyErrorId.INVITATION_EXPIRED,
                     true,
                     party,
                     invitation);
         }
+        PartyDeclines.declined(invitation.getInvitingOwnerId(),
+                invitation.getTargetOwnerId(), now);
         return PartyInvitationOperationResult.success(
                 true, party, invitation, null);
     }
@@ -310,7 +318,7 @@ final class PartyInvitationCoordinator {
 
     PartyInvitationState getInvitationState(
             EntityPlayerMP player,
-            PartyService.ActiveCharacterContext active,
+            PartyService.ActiveIdentityContext active,
             PartyWorldData partyData) {
         PartyInvitationWorldData invitationData = getWritableData(player.worldObj);
         if (invitationData == null) {
@@ -323,18 +331,18 @@ final class PartyInvitationCoordinator {
                 active.characterData,
                 System.currentTimeMillis());
 
-        Party party = partyData.getPartyForCharacter(
+        Party party = partyData.getPartyForIdentity(
                 active.gameplayId());
         List<PartyInvitation> outgoing = new ArrayList<PartyInvitation>();
         if (party != null && active.gameplayId().equals(
-                party.getLeaderCharacterId())) {
+                party.getLeaderIdentityId())) {
             outgoing.addAll(invitationData.getInvitationsForParty(
                     party.getPartyId()));
         }
         return PartyInvitationState.success(
                 active.gameplayId(),
                 party,
-                invitationData.getInvitationsForTargetCharacter(
+                invitationData.getInvitationsForTargetIdentity(
                         active.gameplayId()),
                 outgoing);
     }
@@ -360,20 +368,48 @@ final class PartyInvitationCoordinator {
                 }
                 continue;
             }
-            Party party = partyData.getParty(invitation.getPartyId());
-            boolean stale = party == null
-                    || party.isFull()
-                    || !party.containsMember(invitation.getInvitingCharacterId())
-                    || !invitation.getInvitingCharacterId().equals(
-                    party.getLeaderCharacterId())
-                    || partyData.getPartyForCharacter(
-                    invitation.getTargetCharacterId()) != null;
-            if (stale && invitationData.removeInvitation(
+            if (isStale(invitation, partyData)
+                    && invitationData.removeInvitation(
                     invitation.getInvitationId()) != null) {
                 removed++;
             }
         }
         return removed;
+    }
+
+    /** How many invitations {@link #pruneInvalidInvitations} would remove, removing none. */
+    int countInvalidInvitations(
+            PartyWorldData partyData,
+            PartyInvitationWorldData invitationData,
+            CharacterWorldData characterData,
+            long now) {
+        int count = 0;
+        CharacterIndex index = characterData.characterIndex();
+        for (PartyInvitation invitation : invitationData.getInvitations()) {
+            if (invitation.isExpired(now)
+                    || getInvitationCorruptionReason(invitation, index) != null
+                    || isStale(invitation, partyData)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * Whether an invitation no longer stands: its party is gone or full,
+     * the one who sent it no longer leads it, or the invited identity is
+     * in a party now.
+     */
+    private static boolean isStale(PartyInvitation invitation,
+                                   PartyWorldData partyData) {
+        Party party = partyData.getParty(invitation.getPartyId());
+        return party == null
+                || party.isFull(PartyService.memberLimit())
+                || !party.containsMember(invitation.getInvitingIdentityId())
+                || !invitation.getInvitingIdentityId().equals(
+                party.getLeaderIdentityId())
+                || partyData.getPartyForIdentity(
+                invitation.getTargetIdentityId()) != null;
     }
 
     private PartyErrorId validateInvitationForAcceptance(
@@ -384,16 +420,16 @@ final class PartyInvitationCoordinator {
         if (party == null) {
             return PartyErrorId.INVITATION_INVALID;
         }
-        if (party.isFull()) {
+        if (party.isFull(PartyService.memberLimit())) {
             return PartyErrorId.PARTY_FULL;
         }
-        if (!party.containsMember(invitation.getInvitingCharacterId())
-                || !invitation.getInvitingCharacterId().equals(
-                party.getLeaderCharacterId())) {
+        if (!party.containsMember(invitation.getInvitingIdentityId())
+                || !invitation.getInvitingIdentityId().equals(
+                party.getLeaderIdentityId())) {
             return PartyErrorId.INVITATION_INVALID;
         }
-        if (partyData.getPartyForCharacter(
-                invitation.getTargetCharacterId()) != null) {
+        if (partyData.getPartyForIdentity(
+                invitation.getTargetIdentityId()) != null) {
             return PartyErrorId.TARGET_ALREADY_IN_PARTY;
         }
         // Another character of the account may have joined while this
@@ -412,8 +448,8 @@ final class PartyInvitationCoordinator {
     private String getInvitationCorruptionReason(
             PartyInvitation invitation,
             CharacterIndex index) {
-        UUID invitingId = invitation.getInvitingCharacterId();
-        UUID targetId = invitation.getTargetCharacterId();
+        UUID invitingId = invitation.getInvitingIdentityId();
+        UUID targetId = invitation.getTargetIdentityId();
         if (index.isAmbiguous(invitingId)) {
             return "ambiguous_inviting_character_uuid";
         }
@@ -449,8 +485,9 @@ final class PartyInvitationCoordinator {
 
     private Party copyPartyWithAdditionalMember(
             Party party, PartyMember member) {
-        if (party == null || member == null || party.isFull()
-                || party.containsMember(member.getCharacterId())
+        if (party == null || member == null
+                || party.getMemberCount() >= Party.MAX_MEMBERS
+                || party.containsMember(member.getIdentityId())
                 || !party.isColorAvailable(member.getColor(), null)) {
             return null;
         }
@@ -461,8 +498,9 @@ final class PartyInvitationCoordinator {
                 ? Long.MAX_VALUE : party.getRevision() + 1L;
         return new Party(
                 party.getPartyId(),
-                party.getLeaderCharacterId(),
+                party.getLeaderIdentityId(),
                 members,
+                party.getName(),
                 party.getCreatedAt(),
                 nextRevision,
                 party.getDataVersion());

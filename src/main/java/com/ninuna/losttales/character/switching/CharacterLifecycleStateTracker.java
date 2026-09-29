@@ -286,7 +286,6 @@ public final class CharacterLifecycleStateTracker {
                     state.dimensionChanging,
                     state.switching,
                     serverStopping,
-                    state.epoch,
                     state.lastCombatAt,
                     state.transitionUntil,
                     state.stableGroundTicks);
@@ -478,7 +477,6 @@ public final class CharacterLifecycleStateTracker {
         private final boolean dimensionChanging;
         private final boolean switching;
         private final boolean serverStopping;
-        private final long requestEpoch;
         private final long lastCombatAt;
         private final long transitionUntil;
         private final int stableGroundTicks;
@@ -486,7 +484,7 @@ public final class CharacterLifecycleStateTracker {
         private Snapshot(boolean present, boolean ready, boolean loggingOut,
                          boolean respawning, boolean dimensionChanging,
                          boolean switching, boolean serverStopping,
-                         long requestEpoch, long lastCombatAt,
+                         long lastCombatAt,
                          long transitionUntil, int stableGroundTicks) {
             this.present = present;
             this.ready = ready;
@@ -495,7 +493,6 @@ public final class CharacterLifecycleStateTracker {
             this.dimensionChanging = dimensionChanging;
             this.switching = switching;
             this.serverStopping = serverStopping;
-            this.requestEpoch = requestEpoch;
             this.lastCombatAt = lastCombatAt;
             this.transitionUntil = transitionUntil;
             this.stableGroundTicks = stableGroundTicks;
@@ -503,7 +500,7 @@ public final class CharacterLifecycleStateTracker {
 
         private static Snapshot missing(boolean serverStopping) {
             return new Snapshot(false, false, false, false, false,
-                    false, serverStopping, -1L, 0L, 0L, 0);
+                    false, serverStopping, 0L, 0L, 0);
         }
 
         public boolean isPresent() { return this.present; }
@@ -513,7 +510,6 @@ public final class CharacterLifecycleStateTracker {
         public boolean isDimensionChanging() { return this.dimensionChanging; }
         public boolean isSwitching() { return this.switching; }
         public boolean isServerStopping() { return this.serverStopping; }
-        public long getRequestEpoch() { return this.requestEpoch; }
         public long getLastCombatAt() { return this.lastCombatAt; }
         public long getTransitionUntil() { return this.transitionUntil; }
         public int getStableGroundTicks() { return this.stableGroundTicks; }

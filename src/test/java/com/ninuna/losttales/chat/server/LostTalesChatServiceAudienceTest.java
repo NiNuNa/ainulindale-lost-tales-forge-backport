@@ -44,7 +44,7 @@ public final class LostTalesChatServiceAudienceTest {
         ChatHistory.clear();
         ChatMessageIdAllocator.reset();
         ChatRoleCatalog.resetToBuiltIn();
-        ChatChannelGates.resetToDefaults();
+        ChatChannelGates.install(ChatChannelGates.defaults());
     }
 
     @After
@@ -52,7 +52,7 @@ public final class LostTalesChatServiceAudienceTest {
         ChatHistory.clear();
         ChatMessageIdAllocator.reset();
         ChatRoleCatalog.resetToBuiltIn();
-        ChatChannelGates.resetToDefaults();
+        ChatChannelGates.install(ChatChannelGates.defaults());
     }
 
     @Test
@@ -92,10 +92,11 @@ public final class LostTalesChatServiceAudienceTest {
 
     @Test
     public void aPartyLineReachesItsMembersThenWhileTheyAreStillMembers() {
-        Party party = Party.createNew(PARTY_ID, new PartyMember(UUID.randomUUID(), ALICE,
-                "Aldric", 1L, PartyColor.values()[0]), 1L);
-        party.addMember(new PartyMember(UUID.randomUUID(), BOB, "Beren", 2L,
-                PartyColor.values()[1]));
+        PartyMember aldric = new PartyMember(UUID.randomUUID(), ALICE,
+                "Aldric", 1L, PartyColor.values()[0]);
+        Party party = new Party(PARTY_ID, aldric.getIdentityId(), Arrays.asList(aldric,
+                new PartyMember(UUID.randomUUID(), BOB, "Beren", 2L,
+                        PartyColor.values()[1])), 1L, 0L, Party.CURRENT_DATA_VERSION);
         record(ChatChannel.PARTY, party, "", Collections.singletonList(ALICE));
         // Bob was a member but offline when it was said.
         assertEquals(1, replay(BOB, "", 0L, PARTY_ID, EVERY_CHANNEL).size());

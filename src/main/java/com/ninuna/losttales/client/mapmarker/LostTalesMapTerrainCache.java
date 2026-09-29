@@ -397,11 +397,6 @@ public final class LostTalesMapTerrainCache {
             return this.tiles.get(this.lookupKey);
         }
 
-        boolean contains(int dimension, int chunkX, int chunkZ) {
-            this.lookupKey.set(dimension, chunkX, chunkZ);
-            return this.tiles.containsKey(this.lookupKey);
-        }
-
         int copyTo(int dimension, TerrainTile[] destination) {
             if (destination == null || destination.length == 0) {
                 return 0;

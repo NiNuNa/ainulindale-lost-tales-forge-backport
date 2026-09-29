@@ -61,6 +61,6 @@ public final class ChatLayoutMarkerTest {
         assertEquals(0x111111, indent.nameColor);
         assertEquals(0x222222, indent.titleColor);
         assertFalse(ChatLayoutMarker.decode(
-                ChatLayoutMarker.indent(12, 8)).hasColors());
+                ChatLayoutMarker.indent(12, 8, -1, -1)).hasColors());
     }
 }

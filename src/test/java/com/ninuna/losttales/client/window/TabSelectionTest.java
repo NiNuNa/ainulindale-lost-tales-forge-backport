@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.client.chat.TwoWindowLayout;
+import com.ninuna.losttales.client.chat.ChatLayoutViews;
 import com.ninuna.losttales.client.chat.ChatTab;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -131,10 +132,10 @@ public final class TabSelectionTest {
     @Test
     public void marksNameTabsAndOwnNothing() {
         TabSelection.toggle("w2", this.tabs.get(0), this.tabs.get(1));
-        List<ChatChannel> before = ChatTab.channelsOf(this.window);
+        List<ChatChannel> before = ChatLayoutViews.channelsOf(this.window);
         TabSelection.clear();
         // Forgetting the marks changes no channel and no window.
-        assertEquals(before, ChatTab.channelsOf(this.window));
+        assertEquals(before, ChatLayoutViews.channelsOf(this.window));
         assertEquals(2, WindowLayout.windows().size());
     }
 }

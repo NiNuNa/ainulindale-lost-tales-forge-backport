@@ -202,7 +202,7 @@ public final class ChatEmojiShortcodesTest {
         assertTrue(entries > 0);
         assertTrue(entries <= ChatEmojiShortcodes.MAX_ENTRIES);
         assertEquals("every line of the list is read", entries,
-                ChatEmojiShortcodes.names().size());
+                ChatEmojiShortcodes.load(ChatEmojiShortcodes.RESOURCE).size());
         assertTrue("the header names the source",
                 SOURCE_VERSION.matcher(text).find()
                         && text.contains("en/shortcodes/joypixels.json")
@@ -253,7 +253,7 @@ public final class ChatEmojiShortcodesTest {
     public void noOtherEmojiInTheListWearsARegistryName() {
         Map<String, String> byName = new HashMap<String, String>();
         for (Map.Entry<String, String> entry
-                : ChatEmojiShortcodes.names().entrySet()) {
+                : ChatEmojiShortcodes.load(ChatEmojiShortcodes.RESOURCE).entrySet()) {
             byName.put(entry.getValue(), entry.getKey());
             ChatEmoji emoji = ChatEmoji.fromInputName(entry.getValue());
             if (emoji == null || NAME_ELSEWHERE.containsKey(entry.getValue())) {

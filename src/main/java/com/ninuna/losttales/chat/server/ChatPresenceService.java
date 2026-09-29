@@ -236,6 +236,35 @@ public final class ChatPresenceService {
         return shown != null && shown.containsKey(identity);
     }
 
+    /**
+     * Whether the player shows as online to others as the identity they
+     * play: false while they are Invisible, and until their client has
+     * said how they show. What the game keeps quiet, Discord's answers
+     * keep quiet too (Nils, 2026-09-28, D2 a).
+     */
+    public static synchronized boolean showsOnline(EntityPlayerMP player) {
+        if (player == null || player.getUniqueID() == null) {
+            return false;
+        }
+        RoleplayCharacter played = CharacterActiveResolver.get(player);
+        return isShown(player.getUniqueID(), played == null
+                ? ChatPresenceIdentity.ACCOUNT
+                : ChatPresenceIdentity.character(played.getCharacterId()));
+    }
+
+    /** How many players show as online to others ({@link #showsOnline}). */
+    public static synchronized int countShownOnline(Iterable<?> players) {
+        int count = 0;
+        if (players != null) {
+            for (Object player : players) {
+                if (player instanceof EntityPlayerMP && showsOnline((EntityPlayerMP) player)) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
     /** A player who left is offline everywhere, to everyone still here. */
     public static synchronized void forget(UUID account) {
         if (account == null) {

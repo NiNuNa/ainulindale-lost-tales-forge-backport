@@ -51,10 +51,6 @@ public final class ClientPartyMemberStatusCache {
         // Intentionally no destructive action. getMatching performs the gate.
     }
 
-    public static synchronized PartyStatusSnapshot getSnapshot() {
-        return snapshot;
-    }
-
     public static synchronized void clear() {
         snapshot = null;
         receivedAtMillis = 0L;
@@ -65,9 +61,9 @@ public final class ClientPartyMemberStatusCache {
             PartyStateSnapshot partyState) {
         if (status == null || partyState == null
                 || !partyState.isAvailable()
-                || partyState.getActiveCharacterId() == null
-                || !status.getActiveCharacterId().equals(
-                partyState.getActiveCharacterId())) {
+                || partyState.getActiveIdentityId() == null
+                || !status.getActiveIdentityId().equals(
+                partyState.getActiveIdentityId())) {
             return false;
         }
         if (partyState.getParty() == null) {

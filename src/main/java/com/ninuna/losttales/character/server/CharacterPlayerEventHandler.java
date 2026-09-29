@@ -1,5 +1,7 @@
 package com.ninuna.losttales.character.server;
 
+import com.ninuna.losttales.character.deletion.CharacterDeletionService;
+import com.ninuna.losttales.character.state.CharacterLastSeen;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.accessory.player.AccessoryInventorySyncManager;
 import com.ninuna.losttales.accessory.player.AccessoryRecoveryService;
@@ -30,6 +32,9 @@ import net.minecraftforge.event.entity.player.PlayerEvent;
 /** Coordinates character persistence with the legacy Forge player lifecycle. */
 public final class CharacterPlayerEventHandler {
 
+    /** The most of a player's deleted characters purged at one login. */
+    private static final int PURGES_AT_LOGIN = 32;
+
     @SubscribeEvent
     public void onPlayerLoggedIn(PlayerLoggedInEvent event) {
         initializePlayer(event == null ? null : event.player, LifecycleAction.LOGIN);
@@ -41,6 +46,14 @@ public final class CharacterPlayerEventHandler {
             return;
         }
         EntityPlayerMP player = (EntityPlayerMP) event.player;
+        PlayableIdentityResolver.Resolution leaving = PlayableIdentityResolver.resolve(player);
+        if (leaving.isAvailable()) {
+            CharacterLastSeen.saw(player.worldObj, leaving.getCharacter() == null
+                    ? player.getUniqueID() : leaving.getCharacter().getCharacterId());
+        }
+        // The pledge the character leaves with, so its faction answers
+        // while it is away.
+        CharacterPledges.refresh(player);
         CharacterSwitchCoordinator.getInstance().saveActiveStateOnLogout(player);
         AccessoryInventorySyncManager.clearPlayer(player.getUniqueID());
         CharacterAppearanceSyncManager.broadcastRemoval(player.getUniqueID());
@@ -175,10 +188,18 @@ public final class CharacterPlayerEventHandler {
             CharacterOperationResult defaultCharacter = CharacterService
                     .getInstance().ensureDefaultCharacter(serverPlayer);
             if (!defaultCharacter.isSuccessful()) {
-                FMLLog.warning("[%s] Could not make the default character for %s: %s",
+                FMLLog.warning("[%s] Could not make the account character for %s: %s",
                         LostTalesMetaData.MOD_ID, player.getUniqueID(),
                         defaultCharacter.getErrorId().getId());
             }
+            // The pledge the played character comes back with, read before
+            // the roster and the appearance go out below.
+            CharacterPledges.refresh(serverPlayer);
+            // Deleted characters past their retention go before the roster
+            // lists the rest.
+            CharacterDeletionService.getInstance().purgeExpired(
+                    serverPlayer.worldObj, serverPlayer.getUniqueID(),
+                    PURGES_AT_LOGIN);
         }
 
         boolean switchingReady = lifecycleResult == CharacterErrorId.NONE

@@ -37,7 +37,9 @@ public final class LoreCharacterSyncPacketTest {
 
             assertFalse(decoded.isMalformed());
             assertTrue(decoded.getSnapshot().isTransferReadOnly());
-            LoreCharacterSummary value = decoded.getSnapshot().get("gandalf");
+            assertEquals(1, decoded.getSnapshot().getCharacters().size());
+            LoreCharacterSummary value = decoded.getSnapshot().getCharacters().get(0);
+            assertEquals("gandalf", value.getId());
             assertEquals("A wandering wizard.", value.getDescription());
             assertEquals("AccountName", value.getOwnerName());
             assertEquals(CHARACTER_ID, value.getOwnedCharacterId());

@@ -260,9 +260,4 @@ public final class LostTalesUiButtonMotion {
                 - offsetY();
         return (float)(turn * Math.max(-1.5D, Math.min(1.5D, travelling)));
     }
-
-    /** Whether the button is standing still on the pose it holds. */
-    public boolean isSettled() {
-        return this.player.isSettled(this.drawNanos);
-    }
 }

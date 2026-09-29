@@ -24,19 +24,17 @@ public final class CharacterSummary {
     private final boolean showMinecraftCape;
     private final int cosmeticCapeId;
     private final int age;
-    private final String startingFactionId;
-    private final int roleplayLevel;
-    private final long experiencePoints;
-    private final long creationTimestamp;
-    private final int dataVersion;
+    private final String factionId;
 
-    /** A body or chest type the registry does not know takes the sex's default. */
+    /**
+     * A body or chest type the registry does not know takes the sex's
+     * default. The faction is the character's own: its pledge while it
+     * has one, else its starting faction.
+     */
     public CharacterSummary(UUID characterId, int slotIndex, String name,
                             String raceId, String genderId, String skinId,
                             boolean showMinecraftCape, int cosmeticCapeId,
-                            int age, String startingFactionId, int roleplayLevel,
-                            long experiencePoints, long creationTimestamp,
-                            int dataVersion, String bodyTypeId,
+                            int age, String factionId, String bodyTypeId,
                             String chestTypeId) {
         if (characterId == null) {
             throw new IllegalArgumentException("characterId must not be null");
@@ -56,11 +54,7 @@ public final class CharacterSummary {
         this.showMinecraftCape = showMinecraftCape;
         this.cosmeticCapeId = CharacterCapeCatalog.normalizeSelection(cosmeticCapeId);
         this.age = age;
-        this.startingFactionId = startingFactionId == null ? "" : startingFactionId;
-        this.roleplayLevel = Math.max(RoleplayCharacter.INITIAL_ROLEPLAY_LEVEL, roleplayLevel);
-        this.experiencePoints = Math.max(0L, experiencePoints);
-        this.creationTimestamp = Math.max(0L, creationTimestamp);
-        this.dataVersion = Math.max(1, dataVersion);
+        this.factionId = factionId == null ? "" : factionId;
     }
 
     public static CharacterSummary fromCharacter(RoleplayCharacter character) {
@@ -77,19 +71,15 @@ public final class CharacterSummary {
                 character.isMinecraftCapeVisible(),
                 character.getCosmeticCapeId(),
                 character.getAge(),
-                character.getStartingFactionId(),
-                character.getRoleplayLevel(),
-                character.getProgression().getExperiencePoints(),
-                character.getCreationTimestamp(),
-                character.getDataVersion(),
+                character.getFactionId(),
                 character.getBodyTypeId(),
                 character.getChestTypeId()
         );
     }
 
     /**
-     * Whether this is the account's own identity. The slot says so: the
-     * default character is the one outside the nine, which is also what
+     * Whether this is the account character. The slot says so: the
+     * account character is the one outside the nine, which is also what
      * puts it first when the roster is ordered. Nothing else can be
      * stored there — creation and lore claims both refuse the slot, and
      * the codec quarantines a record whose slot and kind disagree — so
@@ -145,23 +135,8 @@ public final class CharacterSummary {
         return this.age;
     }
 
-    public String getStartingFactionId() {
-        return this.startingFactionId;
-    }
-
-    public int getRoleplayLevel() {
-        return this.roleplayLevel;
-    }
-
-    public long getExperiencePoints() {
-        return this.experiencePoints;
-    }
-
-    public long getCreationTimestamp() {
-        return this.creationTimestamp;
-    }
-
-    public int getDataVersion() {
-        return this.dataVersion;
+    /** The character's faction: its pledge while it has one, else its starting faction. */
+    public String getFactionId() {
+        return this.factionId;
     }
 }

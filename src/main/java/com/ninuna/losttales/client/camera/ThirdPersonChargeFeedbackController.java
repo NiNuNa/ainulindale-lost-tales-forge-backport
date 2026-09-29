@@ -102,14 +102,6 @@ public final class ThirdPersonChargeFeedbackController {
         updateRemoteParticles(minecraft);
     }
 
-    public static boolean isActive() {
-        return active;
-    }
-
-    public static int getTier() {
-        return tier;
-    }
-
     public static int getDisplayTier() {
         return tier > 0 ? tier
                 : releaseFlashTicks > 0 ? releaseFlashTier : 0;

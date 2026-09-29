@@ -105,12 +105,6 @@ final class ChatMentionMarker {
         }
     }
 
-    /** The mention's RGB, for the renderer's colour resolution. */
-    static Integer colorOf(IChatComponent component) {
-        Data data = decode(component);
-        return data == null ? null : Integer.valueOf(data.color);
-    }
-
     /**
      * The recorded player as the marker carries them after the account:
      * their id, the character's id (empty for the account), its skin and

@@ -37,7 +37,7 @@ public final class LostTalesChatAccessRolesTest {
     private static LostTalesChatAccessPacket statement(int played,
             int account, Map<UUID, Integer> own,
             LostTalesChatAccessPacket.RoleHolder holder, int radius) {
-        return ChatPacketFixtures.access(false, played)
+        return ChatPacketFixtures.access(played)
                 .holders(holder == null
                         ? Collections.<LostTalesChatAccessPacket.RoleHolder>emptyList()
                         : Collections.singletonList(holder))
@@ -55,7 +55,7 @@ public final class LostTalesChatAccessRolesTest {
 
     @Test
     public void rolesTravelApartByIdentity() {
-        int operator = ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR);
+        int operator = ChatRoleFixtures.maskOf(ChatRoleFixtures.OPERATOR);
         int team = ChatAccountRole.TEAM.bit();
         UUID character = UUID.randomUUID();
         UUID played = UUID.randomUUID();
@@ -80,7 +80,7 @@ public final class LostTalesChatAccessRolesTest {
     /** An account mask claiming roles the played mask lacks keeps only the shared ones. */
     @Test
     public void theAccountsRolesNeverExceedThePlayedOnes() {
-        int operator = ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR);
+        int operator = ChatRoleFixtures.maskOf(ChatRoleFixtures.OPERATOR);
         int team = ChatAccountRole.TEAM.bit();
         LostTalesChatAccessPacket decoded = roundTrip(statement(operator,
                 operator | team, Collections.<UUID, Integer>emptyMap(), null,

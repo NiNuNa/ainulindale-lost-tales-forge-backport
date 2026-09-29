@@ -25,17 +25,12 @@ public final class LostTalesClientQuestProgressStoreTest {
                         "LOTR:WAYPOINT:hobbiton"),
                 "LOTR:WAYPOINT:hobbiton");
 
-        assertEquals(1, LostTalesClientQuestProgressStore
-                .getDiscoveredMarkerIds().size());
         assertTrue(LostTalesClientQuestProgressStore
                 .isMarkerDiscovered("lotr:waypoint:hobbiton"));
-        assertEquals("lotr:waypoint:HOBBITON",
-                LostTalesClientQuestProgressStore
-                        .getPinnedMapMarkerId());
         assertTrue(LostTalesClientQuestProgressStore
                 .isMapMarkerPinned("LOTR:WAYPOINT:hobbiton"));
         assertTrue(LostTalesClientQuestProgressStore
-                .hasPinnedMapMarker());
+                .isMapMarkerPinned("lotr:waypoint:HOBBITON"));
     }
 
     @Test
@@ -46,8 +41,10 @@ public final class LostTalesClientQuestProgressStoreTest {
                 Arrays.asList("losttales:Town", "losttales:town"),
                 "losttales:Town");
 
-        assertEquals(2, LostTalesClientQuestProgressStore
-                .getDiscoveredMarkerIds().size());
+        assertTrue(LostTalesClientQuestProgressStore
+                .isMarkerDiscovered("losttales:Town"));
+        assertTrue(LostTalesClientQuestProgressStore
+                .isMarkerDiscovered("losttales:town"));
         assertTrue(LostTalesClientQuestProgressStore
                 .isMapMarkerPinned("losttales:Town"));
         assertFalse(LostTalesClientQuestProgressStore

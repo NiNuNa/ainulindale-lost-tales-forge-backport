@@ -1065,11 +1065,6 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
                         -excess / SMOOTH_ZOOM_ELASTIC_OVERSHOOT));
     }
 
-    private static boolean hasSmoothZoom(LOTRGuiMap gui) {
-        return gui instanceof LostTalesLotrMapGui
-                && ((LostTalesLotrMapGui)gui).smoothZoomInitialized;
-    }
-
     /**
      * One tick of the zoom's glide toward where the wheel sent it: a
      * share of the way at speed 1, the share compounded at the speed in
@@ -2078,8 +2073,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             return;
         }
         PartyClientRequestManager.setGoHereMarker(
-                ownerId, null, -1L,
-                destination[0], destination[1], destination[2]);
+                ownerId, destination[0], destination[1], destination[2]);
     }
 
     /**
@@ -2114,8 +2108,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             sendGoHereMarker(ownerId, destination);
         } else if (action
                 == LostTalesMapMoveMarkerPrompt.Action.REMOVE) {
-            PartyClientRequestManager.removeGoHereMarker(
-                    ownerId, null, -1L);
+            PartyClientRequestManager.removeGoHereMarker(ownerId);
         }
     }
 
@@ -2136,7 +2129,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
      */
     private UUID personalMarkerOwnerId(PartyStateSnapshot state) {
         UUID characterId = state != null && state.isAvailable()
-                ? state.getActiveCharacterId() : null;
+                ? state.getActiveIdentityId() : null;
         UUID playerId = this.mc == null || this.mc.thePlayer == null
                 ? null : this.mc.thePlayer.getUniqueID();
         return PartyPersonalMarkerOwner.resolve(characterId, playerId);
@@ -2388,7 +2381,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             return;
         }
         PartyClientRequestManager.setGoHereMarker(
-                ownerId, null, -1L, dimensionId, x, z);
+                ownerId, dimensionId, x, z);
     }
 
     /**

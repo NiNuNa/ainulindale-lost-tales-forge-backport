@@ -7,7 +7,6 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public final class DiscordMessageLinksTest {
@@ -82,13 +81,9 @@ public final class DiscordMessageLinksTest {
         assertEquals(1000L, links.messageIdOf("111"));
         assertEquals(1000L, links.messageIdOf("222"));
         assertTrue(links.copiesOf(2000L).isEmpty());
-        // A correction sent through a webhook finds the copy that went
-        // through it, and nothing for a webhook the message never used.
-        assertEquals("222", links.copyThrough(1000L, "hookB").discordId);
-        assertEquals("-# h\n", links.copyThrough(1000L, "hookB").header);
-        assertNull(links.copyThrough(1000L, "hookC"));
-        assertNull(links.copyThrough(1000L, ""));
-        assertNull(links.copyThrough(2000L, "hookA"));
+        // A correction finds the copy it rewrites among the copies by the
+        // webhook each went through, as the bridge's worker does.
+        assertEquals("hookB", copies.get(1).webhookUrl);
         // A copy relinked in its own destination replaces the old one
         // there and leaves the other alone.
         links.link(1000L, "333", "", "channel:5", "hookA");
@@ -140,16 +135,6 @@ public final class DiscordMessageLinksTest {
     }
 
     @Test
-    public void clearingForgetsEverything() {
-        DiscordMessageLinks links = new DiscordMessageLinks();
-        links.link(1000L, "111", "", "", "");
-        links.clear();
-        assertEquals(0, links.size());
-        assertEquals("", firstDiscordIdOf(links, 1000L));
-        assertEquals(ChatMessageIds.NONE, links.messageIdOf("111"));
-    }
-
-    @Test
     public void membersLinesAreFoundByTheChannelTheyWereReadFrom() {
         DiscordMessageLinks links = new DiscordMessageLinks();
         links.link(1000L, "111", "", "channel:5", "");
@@ -174,7 +159,7 @@ public final class DiscordMessageLinksTest {
         links.link(1000L, "", "", "channel:5", "");
         links.snapshot();
         assertEquals(linked, links.revision());
-        links.clear();
+        links.link(2000L, "222", "", "channel:5", "");
         assertTrue(links.revision() != linked);
     }
 
@@ -205,13 +190,13 @@ public final class DiscordMessageLinksTest {
         assertEquals(ChatMessageIds.NONE, links.messageIdOf("112"));
         assertEquals(ChatMessageIds.NONE, links.messageIdOf("333"));
         assertTrue(links.copiesOf(2000L).isEmpty());
+        assertEquals(1, links.copiesOf(1000L).size());
         DiscordMessageLinks.Copy copy = links.copiesOf(1000L).get(0);
+        // A restored copy corrects through no webhook of its own; the
+        // bridge finds one among the bindings of its message's channel.
         assertEquals("", copy.webhookUrl);
         assertEquals("ooc", copy.bindingId);
         assertEquals("-# h\n", copy.header);
-        // A restored copy corrects through no webhook of its own; the
-        // bridge finds one among the bindings of its message's channel.
-        assertNull(links.copyThrough(1000L, "hookA"));
     }
 
     /** The Discord id of a game message's first copy, or empty for none. */

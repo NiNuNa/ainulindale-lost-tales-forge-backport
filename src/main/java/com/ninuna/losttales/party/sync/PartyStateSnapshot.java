@@ -1,5 +1,6 @@
 package com.ninuna.losttales.party.sync;
 
+import com.ninuna.losttales.party.model.Party;
 import com.ninuna.losttales.party.model.PartyInvitation;
 import com.ninuna.losttales.party.server.PartyErrorId;
 import com.ninuna.losttales.party.server.PartyInvitationState;
@@ -11,7 +12,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-/** Complete private party state for one account's active character. */
+/** Complete private party state for the identity one account is playing. */
 public final class PartyStateSnapshot {
 
     public static final int MAX_INCOMING_INVITATIONS = 128;
@@ -21,7 +22,9 @@ public final class PartyStateSnapshot {
     private final UUID ownerId;
     private final long synchronizationSequence;
     private final PartyErrorId stateErrorId;
-    private final UUID activeCharacterId;
+    /** The server's setting for how many members make a party full. */
+    private final int memberLimit;
+    private final UUID activeIdentityId;
     private final PartySnapshot party;
     private final List<PartyInvitationSnapshot> incomingInvitations;
     private final List<PartyInvitationSnapshot> outgoingInvitations;
@@ -33,22 +36,8 @@ public final class PartyStateSnapshot {
     public PartyStateSnapshot(UUID ownerId,
                               long synchronizationSequence,
                               PartyErrorId stateErrorId,
-                              UUID activeCharacterId,
-                              PartySnapshot party,
-                              List<PartyInvitationSnapshot> incomingInvitations,
-                              List<PartyInvitationSnapshot> outgoingInvitations,
-                              boolean incomingTruncated,
-                              boolean outgoingTruncated) {
-        this(ownerId, synchronizationSequence, stateErrorId, activeCharacterId,
-                party, incomingInvitations, outgoingInvitations,
-                incomingTruncated, outgoingTruncated,
-                Collections.<PartyInviteTargetSnapshot>emptyList(), false);
-    }
-
-    public PartyStateSnapshot(UUID ownerId,
-                              long synchronizationSequence,
-                              PartyErrorId stateErrorId,
-                              UUID activeCharacterId,
+                              int memberLimit,
+                              UUID activeIdentityId,
                               PartySnapshot party,
                               List<PartyInvitationSnapshot> incomingInvitations,
                               List<PartyInvitationSnapshot> outgoingInvitations,
@@ -59,14 +48,18 @@ public final class PartyStateSnapshot {
         if (ownerId == null || synchronizationSequence <= 0L) {
             throw new IllegalArgumentException("owner and synchronization sequence are required");
         }
+        if (memberLimit != Party.clampMemberLimit(memberLimit)) {
+            throw new IllegalArgumentException("member limit out of range");
+        }
         PartyErrorId safeError = stateErrorId == null
                 ? PartyErrorId.INTERNAL_ERROR : stateErrorId;
         this.ownerId = ownerId;
         this.synchronizationSequence = synchronizationSequence;
         this.stateErrorId = safeError;
+        this.memberLimit = memberLimit;
 
         if (safeError != PartyErrorId.NONE) {
-            this.activeCharacterId = null;
+            this.activeIdentityId = null;
             this.party = null;
             this.incomingInvitations = Collections.emptyList();
             this.outgoingInvitations = Collections.emptyList();
@@ -76,17 +69,17 @@ public final class PartyStateSnapshot {
             this.inviteTargetsTruncated = false;
             return;
         }
-        if (activeCharacterId == null) {
+        if (activeIdentityId == null) {
             throw new IllegalArgumentException("successful party state requires an active character");
         }
-        if (party != null && !party.containsMember(activeCharacterId)) {
+        if (party != null && !party.containsMember(activeIdentityId)) {
             throw new IllegalArgumentException("active character must belong to the supplied party");
         }
-        this.activeCharacterId = activeCharacterId;
+        this.activeIdentityId = activeIdentityId;
         this.party = party;
-        this.incomingInvitations = filterIncoming(activeCharacterId, incomingInvitations);
+        this.incomingInvitations = filterIncoming(activeIdentityId, incomingInvitations);
         this.outgoingInvitations = filterOutgoing(
-                activeCharacterId, party, outgoingInvitations);
+                activeIdentityId, party, outgoingInvitations);
         if ((incomingTruncated
                 && this.incomingInvitations.size() < MAX_INCOMING_INVITATIONS)
                 || (outgoingTruncated
@@ -97,7 +90,7 @@ public final class PartyStateSnapshot {
         this.incomingTruncated = incomingTruncated;
         this.outgoingTruncated = outgoingTruncated;
         this.inviteTargets = filterInviteTargets(
-                activeCharacterId, party, inviteTargets);
+                activeIdentityId, party, memberLimit, inviteTargets);
         if (inviteTargetsTruncated
                 && this.inviteTargets.size() < MAX_INVITE_TARGETS) {
             throw new IllegalArgumentException(
@@ -108,20 +101,14 @@ public final class PartyStateSnapshot {
 
     public static PartyStateSnapshot fromState(UUID ownerId,
                                                long synchronizationSequence,
-                                               PartyInvitationState state) {
-        return fromState(ownerId, synchronizationSequence, state,
-                Collections.<PartyInviteTargetSnapshot>emptyList(), false);
-    }
-
-    public static PartyStateSnapshot fromState(UUID ownerId,
-                                               long synchronizationSequence,
+                                               int memberLimit,
                                                PartyInvitationState state,
                                                List<PartyInviteTargetSnapshot> inviteTargets,
                                                boolean inviteTargetsTruncated) {
         if (state == null || !state.isSuccessful()) {
             PartyErrorId error = state == null
                     ? PartyErrorId.INTERNAL_ERROR : state.getErrorId();
-            return failure(ownerId, synchronizationSequence, error);
+            return failure(ownerId, synchronizationSequence, memberLimit, error);
         }
         ArrayList<PartyInvitationSnapshot> incoming = convert(
                 state.getIncomingInvitations(), MAX_INCOMING_INVITATIONS);
@@ -131,7 +118,8 @@ public final class PartyStateSnapshot {
                 ownerId,
                 synchronizationSequence,
                 PartyErrorId.NONE,
-                state.getActiveCharacterId(),
+                memberLimit,
+                state.getActiveIdentityId(),
                 state.getParty() == null ? null
                         : PartySnapshot.fromParty(state.getParty()),
                 incoming,
@@ -144,6 +132,7 @@ public final class PartyStateSnapshot {
 
     public static PartyStateSnapshot failure(UUID ownerId,
                                              long synchronizationSequence,
+                                             int memberLimit,
                                              PartyErrorId errorId) {
         if (errorId == null || errorId == PartyErrorId.NONE) {
             errorId = PartyErrorId.INTERNAL_ERROR;
@@ -152,11 +141,14 @@ public final class PartyStateSnapshot {
                 ownerId,
                 synchronizationSequence,
                 errorId,
+                memberLimit,
                 null,
                 null,
                 Collections.<PartyInvitationSnapshot>emptyList(),
                 Collections.<PartyInvitationSnapshot>emptyList(),
                 false,
+                false,
+                Collections.<PartyInviteTargetSnapshot>emptyList(),
                 false);
     }
 
@@ -176,16 +168,23 @@ public final class PartyStateSnapshot {
         return this.stateErrorId == PartyErrorId.NONE;
     }
 
-    public UUID getActiveCharacterId() {
-        return this.activeCharacterId;
+    /** The server's setting for how many members make a party full. */
+    public int getMemberLimit() {
+        return this.memberLimit;
+    }
+
+    /** Whether the player's party has as many members as the setting allows, or more. */
+    public boolean isPartyFull() {
+        return this.party != null
+                && this.party.getMemberCount() >= this.memberLimit;
+    }
+
+    public UUID getActiveIdentityId() {
+        return this.activeIdentityId;
     }
 
     public PartySnapshot getParty() {
         return this.party;
-    }
-
-    public long getPartyRevision() {
-        return this.party == null ? -1L : this.party.getRevision();
     }
 
     public List<PartyInvitationSnapshot> getIncomingInvitations() {
@@ -228,7 +227,7 @@ public final class PartyStateSnapshot {
     }
 
     private static List<PartyInvitationSnapshot> filterIncoming(
-            UUID activeCharacterId,
+            UUID activeIdentityId,
             List<PartyInvitationSnapshot> source) {
         ArrayList<PartyInvitationSnapshot> accepted =
                 new ArrayList<PartyInvitationSnapshot>();
@@ -237,7 +236,7 @@ public final class PartyStateSnapshot {
             for (PartyInvitationSnapshot invitation : source) {
                 if (invitation == null
                         || accepted.size() >= MAX_INCOMING_INVITATIONS
-                        || !activeCharacterId.equals(invitation.getTargetCharacterId())
+                        || !activeIdentityId.equals(invitation.getTargetIdentityId())
                         || !invitationIds.add(invitation.getInvitationId())) {
                     continue;
                 }
@@ -248,10 +247,10 @@ public final class PartyStateSnapshot {
     }
 
     private static List<PartyInvitationSnapshot> filterOutgoing(
-            UUID activeCharacterId,
+            UUID activeIdentityId,
             PartySnapshot party,
             List<PartyInvitationSnapshot> source) {
-        if (party == null || !party.isLeader(activeCharacterId)) {
+        if (party == null || !party.isLeader(activeIdentityId)) {
             return Collections.emptyList();
         }
         ArrayList<PartyInvitationSnapshot> accepted =
@@ -271,26 +270,32 @@ public final class PartyStateSnapshot {
         return Collections.unmodifiableList(accepted);
     }
 
+    /**
+     * The players the leader of a party with room may invite: none already
+     * in the party, and no account one of whose identities is.
+     */
     private static List<PartyInviteTargetSnapshot> filterInviteTargets(
-            UUID activeCharacterId,
+            UUID activeIdentityId,
             PartySnapshot party,
+            int memberLimit,
             List<PartyInviteTargetSnapshot> source) {
-        if (party == null || party.isFull()
-                || !party.isLeader(activeCharacterId)) {
+        if (party == null || party.getMemberCount() >= memberLimit
+                || !party.isLeader(activeIdentityId)) {
             return Collections.emptyList();
         }
         ArrayList<PartyInviteTargetSnapshot> accepted =
                 new ArrayList<PartyInviteTargetSnapshot>();
         Set<UUID> ownerIds = new HashSet<UUID>();
-        Set<UUID> characterIds = new HashSet<UUID>();
+        Set<UUID> identityIds = new HashSet<UUID>();
         if (source != null) {
             for (PartyInviteTargetSnapshot target : source) {
                 if (target == null
                         || accepted.size() >= MAX_INVITE_TARGETS
-                        || activeCharacterId.equals(target.getCharacterId())
-                        || party.containsMember(target.getCharacterId())
+                        || activeIdentityId.equals(target.getIdentityId())
+                        || party.containsMember(target.getIdentityId())
+                        || party.hasMemberOwnedBy(target.getOwnerId())
                         || !ownerIds.add(target.getOwnerId())
-                        || !characterIds.add(target.getCharacterId())) {
+                        || !identityIds.add(target.getIdentityId())) {
                     continue;
                 }
                 accepted.add(target);

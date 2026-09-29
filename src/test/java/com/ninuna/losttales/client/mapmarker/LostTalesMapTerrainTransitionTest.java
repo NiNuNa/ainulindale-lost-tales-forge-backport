@@ -21,15 +21,13 @@ public final class LostTalesMapTerrainTransitionTest {
     }
 
     @Test
-    public void opacitiesAreComplementaryAndMonotonic() {
+    public void terrainOpacityRisesMonotonically() {
         float previous = 0.0F;
         for (float zoom = LostTalesLotrMapGui.SMOOTH_ZOOM_MIN;
              zoom <= LostTalesLotrMapGui.SMOOTH_ZOOM_MAX;
              zoom += 0.01F) {
             float terrain = LostTalesMapTerrainTransition.terrainAlpha(zoom);
-            float map = LostTalesMapTerrainTransition.mapAlpha(zoom);
             assertTrue(terrain >= previous - 0.0001F);
-            assertEquals(1.0F, terrain + map, 0.0001F);
             previous = terrain;
         }
     }
@@ -37,8 +35,6 @@ public final class LostTalesMapTerrainTransitionTest {
     @Test
     public void malformedZoomKeepsTheKnownMapVisible() {
         assertEquals(0.0F, LostTalesMapTerrainTransition.terrainAlpha(
-                Float.NaN), 0.0F);
-        assertEquals(1.0F, LostTalesMapTerrainTransition.mapAlpha(
                 Float.NaN), 0.0F);
         assertFalse(LostTalesMapTerrainTransition.shouldPrepareTerrain(
                 Float.NaN));

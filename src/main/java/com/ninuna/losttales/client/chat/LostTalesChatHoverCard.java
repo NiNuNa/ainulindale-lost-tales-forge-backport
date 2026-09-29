@@ -1,7 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.client.window.WindowStyle;
-import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatPresence;
@@ -204,7 +203,7 @@ final class LostTalesChatHoverCard {
                             ? ChatChannelIcons.npcFaction(target.playerId)
                             : details == null ? ""
                             : ClientCharacterDisplayNames.faction(
-                                    details.getStartingFactionId()));
+                                    details.getFactionId()));
         }
         if (full) {
             addDetail(lines, "gui.losttales.character.race",
@@ -567,6 +566,11 @@ final class LostTalesChatHoverCard {
                     identitySpan = false;
                     continue;
                 }
+                if (ChatLayoutMarker.isSpanEnd(part)) {
+                    // An action's words follow its speaker's name.
+                    identitySpan = false;
+                    continue;
+                }
                 ChatMentionMarker.Data mention =
                         ChatMentionMarker.decode(part);
                 if (mention != null) {
@@ -921,14 +925,6 @@ final class LostTalesChatHoverCard {
         LostTalesUiInk.drawText(font,
                 LostTalesChatVisualStyle.removeColorCodes(text),
                 x, y, color, alpha);
-    }
-
-    /** Whether the point lies between two corners, whichever way round they are given. */
-    static boolean contains(float x, float y, float left, float top,
-                            float right, float bottom) {
-        return LostTalesUiHitBox.contains(x, y, Math.min(left, right),
-                Math.min(top, bottom), Math.abs(right - left),
-                Math.abs(bottom - top));
     }
 
     /**

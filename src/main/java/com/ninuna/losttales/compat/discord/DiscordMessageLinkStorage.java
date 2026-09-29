@@ -113,7 +113,7 @@ final class DiscordMessageLinkStorage {
         } catch (RuntimeException failure) {
             FMLLog.severe("[%s] Discord message links could not be read from the "
                     + "save; the bridge keeps its links in memory only for this "
-                    + "run: %s", LostTalesMetaData.MOD_ID, failure);
+                    + "run: %s", LostTalesMetaData.MOD_ID, DiscordHttp.describe(failure));
         }
     }
 

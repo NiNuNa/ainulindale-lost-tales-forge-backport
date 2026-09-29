@@ -186,12 +186,6 @@ public final class CharacterSkinRegistry {
         return skins.get(index).getId();
     }
 
-    /** True when the identifier names the player's own account skin. */
-    public static boolean isAccountSkin(String skinId) {
-        CharacterSkinDefinition definition = get(skinId);
-        return definition != null && definition.isAccountSkin();
-    }
-
     private static void registerGenderedGroup(
             Map<String, CharacterSkinDefinition> definitions,
             String raceId, String displayGroupId, String resourceBase,

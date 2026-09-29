@@ -27,7 +27,6 @@ public final class ClientPartyStateCache {
 
     private static SyncState state = SyncState.UNKNOWN;
     private static PartyStateSnapshot snapshot;
-    private static PartyOperationFeedback lastOperation;
 
     private ClientPartyStateCache() {}
 
@@ -75,7 +74,6 @@ public final class ClientPartyStateCache {
             markProtocolError(0);
             return;
         }
-        lastOperation = feedback;
         rememberCompleted(feedback);
         if (!feedback.isStateFollows()) {
             PENDING_REQUESTS.remove(Integer.valueOf(feedback.getRequestId()));
@@ -88,16 +86,12 @@ public final class ClientPartyStateCache {
 
     public static synchronized void failLocalRequest(
             int requestId, PartyOperationType operationType) {
-        lastOperation = new PartyOperationFeedback(
+        rememberCompleted(new PartyOperationFeedback(
                 requestId,
                 operationType,
                 false,
-                false,
-                false,
                 PartyErrorId.INTERNAL_ERROR,
-                snapshot == null ? -1L : snapshot.getPartyRevision(),
-                false);
-        rememberCompleted(lastOperation);
+                false));
         PENDING_REQUESTS.remove(Integer.valueOf(requestId));
         if (snapshot == null) {
             state = SyncState.ERROR;
@@ -105,17 +99,13 @@ public final class ClientPartyStateCache {
     }
 
     public static synchronized void markProtocolError(int requestId) {
-        lastOperation = new PartyOperationFeedback(
-                requestId,
-                PartyOperationType.UNKNOWN,
-                false,
-                false,
-                false,
-                PartyErrorId.INTERNAL_ERROR,
-                snapshot == null ? -1L : snapshot.getPartyRevision(),
-                false);
         if (requestId != 0) {
-            rememberCompleted(lastOperation);
+            rememberCompleted(new PartyOperationFeedback(
+                    requestId,
+                    PartyOperationType.UNKNOWN,
+                    false,
+                    PartyErrorId.INTERNAL_ERROR,
+                    false));
             PENDING_REQUESTS.remove(Integer.valueOf(requestId));
         }
         if (snapshot == null) {
@@ -131,39 +121,22 @@ public final class ClientPartyStateCache {
         return snapshot;
     }
 
-    public static synchronized PartyOperationFeedback getLastOperation() {
-        return lastOperation;
-    }
-
     public static synchronized PartyOperationFeedback getOperation(int requestId) {
         return COMPLETED_OPERATIONS.get(Integer.valueOf(requestId));
     }
 
     public static synchronized void clearOperation(int requestId) {
         COMPLETED_OPERATIONS.remove(Integer.valueOf(requestId));
-        if (lastOperation != null && lastOperation.getRequestId() == requestId) {
-            lastOperation = null;
-        }
     }
 
     public static synchronized boolean isRequestPending(int requestId) {
         return PENDING_REQUESTS.containsKey(Integer.valueOf(requestId));
     }
 
-    public static synchronized boolean hasPendingRequest(
-            PartyOperationType operationType) {
-        return PENDING_REQUESTS.containsValue(operationType);
-    }
-
-    public static synchronized void clearLastOperation() {
-        lastOperation = null;
-    }
-
     public static synchronized void clear() {
         PENDING_REQUESTS.clear();
         COMPLETED_OPERATIONS.clear();
         snapshot = null;
-        lastOperation = null;
         state = SyncState.UNKNOWN;
     }
 

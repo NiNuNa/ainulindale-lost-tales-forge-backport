@@ -170,6 +170,9 @@ public final class MotionFilesTest {
         params.put(MotionIds.SCREEN_CONTROL_BAR, new String[] {"delay", "travel"});
         params.put(MotionIds.CHAT_TOOLBAR_SHOW, new String[] {"rest"});
         params.put(MotionIds.MAP_POPUP_OPEN, new String[] {"travel", "start_scale"});
+        params.put(MotionIds.WINDOW_TAB_MARQUEE, new String[] {"speed", "pause"});
+        params.put(MotionIds.WINDOW_NOTICE, new String[] {"hold", "rise"});
+        params.put(MotionIds.WINDOW_ANSWER, new String[] {"hold", "rise"});
         for (Map.Entry<String, String[]> entry : params.entrySet()) {
             for (String name : entry.getValue()) {
                 assertFalse(entry.getKey() + " " + name, Float.isNaN(

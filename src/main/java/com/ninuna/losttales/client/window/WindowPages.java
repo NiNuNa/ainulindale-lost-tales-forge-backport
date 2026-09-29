@@ -9,8 +9,9 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.StatCollector;
 
 /**
- * The pages a window can hold, by code name: the quest journal, the
- * party, the map. A system with a page registers it once as the client
+ * The pages a window can hold, by code name: the journal, the party, the
+ * map, the Characters page, the Motion Lab, and the pages of things in
+ * the world. A system with a page registers it once as the client
  * starts, with the words its tab reads, the item its tab wears, its key
  * and how its content is made; nothing in the window system names a
  * page itself.
@@ -95,6 +96,11 @@ public final class WindowPages {
             return this.content;
         }
 
+        /** Its content if it has been made; null before. */
+        synchronized PageContent madeContent() {
+            return this.content;
+        }
+
         synchronized void forgetContent() {
             this.content = null;
         }
@@ -118,17 +124,9 @@ public final class WindowPages {
     /**
      * Registers a page under {@code id}, a code name as a channel's is:
      * lower-case letters, digits and underscores. A second page under an
-     * id already taken is refused.
-     */
-    public static synchronized void register(String id, String titleKey,
-                                             ItemStack icon, Factory factory) {
-        register(id, titleKey, icon, Window.ScreenFill.NONE, null, factory);
-    }
-
-    /**
-     * As above, for a page whose window fills {@code firstFill} the first
-     * time it opens, and whose {@code key}, when it has one, opens it from
-     * another page and closes it from itself.
+     * id already taken is refused. Its window fills {@code firstFill} the
+     * first time it opens, and its {@code key}, when it has one, opens it
+     * from another page and closes it from itself.
      */
     public static synchronized void register(String id, String titleKey,
                                              ItemStack icon,
@@ -225,6 +223,28 @@ public final class WindowPages {
             }
         }
         return null;
+    }
+
+    /**
+     * Takes a line the server sends in the chat to the page it answers,
+     * by the line's lang key, while that page is shown: its words stand
+     * over the page's bar, and the chat never shows it. Answers whether a
+     * page took it; a page not shown takes nothing, and the line stays in
+     * the chat.
+     */
+    public static boolean claimLine(String key, String words) {
+        if (key == null || key.length() == 0) {
+            return false;
+        }
+        for (Page page : all()) {
+            PageContent content = page.madeContent();
+            if (content != null && content.answersLine(key)
+                    && page.tab().isShown()) {
+                content.answerLine(key, words);
+                return true;
+            }
+        }
+        return false;
     }
 
     /** The content of a page's tab; null for any other tab. */

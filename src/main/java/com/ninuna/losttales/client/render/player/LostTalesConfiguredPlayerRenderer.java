@@ -26,22 +26,14 @@ final class LostTalesConfiguredPlayerRenderer extends RenderPlayer {
     private static final float VANILLA_ARM_PIVOT_Y = 2.0F;
     private static final float VANILLA_ARM_PIVOT_Z = 0.0F;
 
-    private final String modelId;
-    private final String bodyTypeId;
-    private final String chestTypeId;
     private final boolean vanillaArmPivots;
     private final boolean configured;
 
     LostTalesConfiguredPlayerRenderer(CharacterBodyModelDefinition definition,
-                                      String bodyTypeId,
-                                      String chestTypeId,
                                       ModelBiped mainModel,
                                       ModelBiped chestArmorModel,
                                       ModelBiped armorModel) {
         super();
-        this.modelId = definition == null ? "" : definition.getId();
-        this.bodyTypeId = bodyTypeId == null ? "" : bodyTypeId;
-        this.chestTypeId = chestTypeId == null ? "" : chestTypeId;
         this.vanillaArmPivots = definition != null && definition.hasVanillaArmPivots();
         this.mainModel = mainModel;
         this.modelBipedMain = mainModel;
@@ -55,18 +47,6 @@ final class LostTalesConfiguredPlayerRenderer extends RenderPlayer {
 
     boolean isConfigured() {
         return this.configured;
-    }
-
-    String getModelId() {
-        return this.modelId;
-    }
-
-    String getBodyTypeId() {
-        return this.bodyTypeId;
-    }
-
-    String getChestTypeId() {
-        return this.chestTypeId;
     }
 
     ModelBiped getConfiguredModel() {

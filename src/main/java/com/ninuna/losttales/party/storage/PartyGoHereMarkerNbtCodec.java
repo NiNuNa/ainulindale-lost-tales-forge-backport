@@ -95,21 +95,21 @@ public final class PartyGoHereMarkerNbtCodec {
                 repaired = true;
                 continue;
             }
-            UUID ownerCharacterId = markerResult.marker.getOwnerCharacterId();
-            PartyGoHereMarker previous = markers.get(ownerCharacterId);
+            UUID ownerIdentityId = markerResult.marker.getOwnerIdentityId();
+            PartyGoHereMarker previous = markers.get(ownerIdentityId);
             if (previous != null) {
                 PartyGoHereMarker retained = previous.getUpdatedAt()
                         >= markerResult.marker.getUpdatedAt()
                         ? previous : markerResult.marker;
                 PartyGoHereMarker discarded = retained == previous
                         ? markerResult.marker : previous;
-                markers.put(ownerCharacterId, retained);
+                markers.put(ownerIdentityId, retained);
                 quarantinedEntries.add(NbtQuarantine.entry(
                         "duplicate_owner_marker", TAG_MARKER_INDEX, index,
                         writeMarker(discarded)));
                 repaired = true;
             } else {
-                markers.put(ownerCharacterId, markerResult.marker);
+                markers.put(ownerIdentityId, markerResult.marker);
             }
             repaired |= markerResult.repaired;
         }
@@ -125,7 +125,7 @@ public final class PartyGoHereMarkerNbtCodec {
                 NbtTags.writeUuid(entry, TAG_PARTY_UUID, marker.getPartyId());
             }
             NbtTags.writeUuid(entry, TAG_OWNER_CHARACTER_UUID,
-                    marker.getOwnerCharacterId());
+                    marker.getOwnerIdentityId());
             entry.setInteger(TAG_DIMENSION_ID, marker.getDimensionId());
         }
         return entry;
@@ -137,7 +137,7 @@ public final class PartyGoHereMarkerNbtCodec {
         if (marker.getPartyId() != null) {
             NbtTags.writeUuid(tag, TAG_PARTY_UUID, marker.getPartyId());
         }
-        NbtTags.writeUuid(tag, TAG_OWNER_CHARACTER_UUID, marker.getOwnerCharacterId());
+        NbtTags.writeUuid(tag, TAG_OWNER_CHARACTER_UUID, marker.getOwnerIdentityId());
         tag.setInteger(TAG_DIMENSION_ID, marker.getDimensionId());
         tag.setDouble(TAG_X, marker.getX());
         tag.setDouble(TAG_Y, marker.getY());
@@ -157,8 +157,8 @@ public final class PartyGoHereMarkerNbtCodec {
         }
         // A marker without a party is its character's own.
         UUID partyId = NbtTags.readUuid(source, TAG_PARTY_UUID);
-        UUID ownerCharacterId = NbtTags.readUuid(source, TAG_OWNER_CHARACTER_UUID);
-        if (ownerCharacterId == null) {
+        UUID ownerIdentityId = NbtTags.readUuid(source, TAG_OWNER_CHARACTER_UUID);
+        if (ownerIdentityId == null) {
             return MarkerReadResult.failed("missing_required_identity");
         }
         if (!source.hasKey(TAG_DIMENSION_ID, Constants.NBT.TAG_INT)
@@ -172,7 +172,7 @@ public final class PartyGoHereMarkerNbtCodec {
         try {
             return MarkerReadResult.success(new PartyGoHereMarker(
                     partyId,
-                    ownerCharacterId,
+                    ownerIdentityId,
                     source.getInteger(TAG_DIMENSION_ID),
                     source.getDouble(TAG_X),
                     source.getDouble(TAG_Y),
@@ -189,8 +189,8 @@ public final class PartyGoHereMarkerNbtCodec {
                 @Override
                 public int compare(PartyGoHereMarker left,
                                    PartyGoHereMarker right) {
-                    return left.getOwnerCharacterId().toString().compareTo(
-                            right.getOwnerCharacterId().toString());
+                    return left.getOwnerIdentityId().toString().compareTo(
+                            right.getOwnerIdentityId().toString());
                 }
             };
 

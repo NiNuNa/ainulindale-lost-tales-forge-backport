@@ -64,11 +64,6 @@ public final class PageRows {
         this.menu.setRows(rows);
     }
 
-    /** The rows it holds, top first. */
-    public List<MenuWindow.Entry> rows() {
-        return this.menu.entries();
-    }
-
     /** Back at the top with no row lit: the page turned to something else. */
     public void toTop() {
         this.menu.restart();

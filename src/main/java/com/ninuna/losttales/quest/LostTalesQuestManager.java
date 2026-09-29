@@ -41,16 +41,11 @@ public final class LostTalesQuestManager {
     }
 
     /**
-     * Registers, persists, and starts a server-authored runtime quest.
-     *
-     * Generated missives use locked start mode so clients cannot start them directly
-     * from the journal or from forged item NBT. This method is intended for trusted
-     * server-side acceptance paths, such as a validated missive board slot.
+     * Registers, keeps with the player and starts a quest the server made, a
+     * missive's. Only called once the server trusts the missive: a letter
+     * carrying the world's seal ({@code MissiveSeals}). Its locked start mode
+     * keeps every other path from starting it.
      */
-    public static StartResult startGeneratedQuest(EntityPlayer player, LostTalesQuestDefinition quest) {
-        return startGeneratedQuest(player, quest, 0L);
-    }
-
     public static StartResult startGeneratedQuest(EntityPlayer player, LostTalesQuestDefinition quest, long timeLimitTicks) {
         if (quest == null || quest.getId() == null || quest.getId().length() == 0) {
             return StartResult.UNKNOWN_QUEST;
@@ -60,8 +55,11 @@ public final class LostTalesQuestManager {
             sendQuestChat(player, "chat.losttales.quest.no_data");
             return StartResult.NO_PLAYER_DATA;
         }
+        if (!LostTalesQuestRegistry.registerRuntimeQuest(quest)) {
+            sendQuestChat(player, "chat.losttales.quest.unknown", quest.getId());
+            return StartResult.UNKNOWN_QUEST;
+        }
         data.rememberDynamicQuestDefinition(quest);
-        LostTalesQuestRegistry.registerRuntimeQuest(quest);
         return startQuestInternal(player, quest.getId(), LostTalesQuestStartSource.COMMAND, Math.max(0L, timeLimitTicks));
     }
 
@@ -413,11 +411,6 @@ public final class LostTalesQuestManager {
         return changed;
     }
 
-    public static String getPinnedQuestId(EntityPlayer player) {
-        LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
-        return data == null ? "" : data.getPinnedQuestId();
-    }
-
     public static Set<String> getPinnedQuestIds(EntityPlayer player) {
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
         return data == null ? Collections.<String>emptySet() : data.getPinnedQuestIds();
@@ -638,10 +631,6 @@ public final class LostTalesQuestManager {
     public static Set<String> getCompletedQuestIds(EntityPlayer player) {
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
         return data == null ? Collections.<String>emptySet() : data.getCompletedQuestIds();
-    }
-
-    public static void handleEntityKilled(EntityPlayerMP player, Entity victim) {
-        handleEntityKilled(player, victim, false);
     }
 
     public static void handleEntityKilled(EntityPlayerMP player, Entity victim,

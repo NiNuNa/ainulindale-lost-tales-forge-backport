@@ -54,6 +54,8 @@ import com.ninuna.losttales.network.packet.character.CharacterProfileUpdateReque
 import com.ninuna.losttales.network.packet.character.CharacterCreateRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterCreationCatalogSyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterDeleteRequestPacket;
+import com.ninuna.losttales.network.packet.character.CharacterLookUpdateRequestPacket;
+import com.ninuna.losttales.network.packet.character.CharacterRestoreRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterOperationResultPacket;
 import com.ninuna.losttales.network.packet.character.CharacterRosterRequestPacket;
 import com.ninuna.losttales.network.packet.character.CharacterRosterSyncPacket;
@@ -162,5 +164,7 @@ public final class LostTalesNetworkHandler {
         CHANNEL.registerMessage(CharacterProfilePacket.Handler.class, CharacterProfilePacket.class, 67, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesMissiveBoardStatePacket.Handler.class, LostTalesMissiveBoardStatePacket.class, 68, Side.CLIENT);
         CHANNEL.registerMessage(LostTalesMissiveBoardRequestPacket.Handler.class, LostTalesMissiveBoardRequestPacket.class, 69, Side.SERVER);
+        CHANNEL.registerMessage(CharacterLookUpdateRequestPacket.Handler.class, CharacterLookUpdateRequestPacket.class, 70, Side.SERVER);
+        CHANNEL.registerMessage(CharacterRestoreRequestPacket.Handler.class, CharacterRestoreRequestPacket.class, 71, Side.SERVER);
     }
 }

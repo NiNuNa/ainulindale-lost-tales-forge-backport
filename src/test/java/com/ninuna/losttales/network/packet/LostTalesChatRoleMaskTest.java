@@ -32,7 +32,7 @@ public final class LostTalesChatRoleMaskTest {
 
     @Test
     public void roleMaskRoundTripsAndDefaultsToNone() {
-        int roles = ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR,
+        int roles = ChatRoleFixtures.maskOf(ChatRoleFixtures.OPERATOR,
                 ChatAccountRole.TEAM);
         LostTalesChatMessagePacket tagged = ChatPacketFixtures.line(
                 ChatChannel.OOC, "Steve", "Steve", "hello").roles(roles).build();
@@ -69,12 +69,12 @@ public final class LostTalesChatRoleMaskTest {
         java.util.List<ChatAccountRole> custom = new java.util.ArrayList<ChatAccountRole>();
         for (int index = 0; index < 8; index++) {
             custom.add(ChatAccountRole.custom("role" + index, "Role " + index, "",
-                    0, true, 20 + index, null));
+                    0, true, 20 + index, null, null, null));
         }
         ChatRoleCatalog.install(ChatRoleCatalog.of(custom, null, null));
         ChatAccountRole ninth = ChatAccountRole.byId("role7");
         assertEquals(1 << 8, ninth.bit());
-        int roles = ChatAccountRole.maskOf(ninth, ChatRoleFixtures.OPERATOR);
+        int roles = ChatRoleFixtures.maskOf(ninth, ChatRoleFixtures.OPERATOR);
         ByteBuf buffer = Unpooled.buffer();
         ChatPacketFixtures.line(ChatChannel.OOC, "Steve", "Steve", "hello")
                 .roles(roles).build().toBytes(buffer);
@@ -97,7 +97,7 @@ public final class LostTalesChatRoleMaskTest {
      */
     @Test
     public void aRoleThisSideDoesNotKnowYetStillDecodes() {
-        int roles = ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR);
+        int roles = ChatRoleFixtures.maskOf(ChatRoleFixtures.OPERATOR);
         LostTalesChatMessagePacket roled = ChatPacketFixtures.line(
                 ChatChannel.OOC, "Steve", "Steve", "hello").roles(roles).build();
         ByteBuf buffer = Unpooled.buffer();
@@ -120,7 +120,7 @@ public final class LostTalesChatRoleMaskTest {
         java.util.List<LostTalesChatMessagePacket> lines =
                 new java.util.ArrayList<LostTalesChatMessagePacket>();
         lines.add(ChatPacketFixtures.line(ChatChannel.OOC, "Steve", "Steve", "hello")
-                .roles(ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR)).build());
+                .roles(ChatRoleFixtures.maskOf(ChatRoleFixtures.OPERATOR)).build());
         lines.add(ChatPacketFixtures.line(ChatChannel.GLOBAL, "Alex", "Alex", "hi").at(2L).build());
         ByteBuf buffer = Unpooled.buffer();
         new LostTalesChatHistorySyncPacket(lines, 3L).toBytes(buffer);
@@ -136,7 +136,7 @@ public final class LostTalesChatRoleMaskTest {
     public void aPayloadEndingBeforeTheMaskIsMalformed() {
         LostTalesChatMessagePacket roled = ChatPacketFixtures.line(
                 ChatChannel.OOC, "Steve", "Steve", "hello")
-                .roles(ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR)).build();
+                .roles(ChatRoleFixtures.maskOf(ChatRoleFixtures.OPERATOR)).build();
         ByteBuf buffer = Unpooled.buffer();
         roled.toBytes(buffer);
         LostTalesChatMessagePacket decoded = new LostTalesChatMessagePacket();

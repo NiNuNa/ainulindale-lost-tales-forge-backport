@@ -6,6 +6,7 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.ProtocolException;
 import java.net.Socket;
 import java.net.URI;
 import java.nio.charset.Charset;
@@ -20,14 +21,19 @@ import javax.net.ssl.SSLSocketFactory;
  * One WebSocket connection over TLS, opened with the HTTP upgrade
  * handshake and spoken in text frames: what the Gateway is. Reading
  * blocks for the next text message, answering pings and reassembling
- * fragments on the way, and returns null once the server has closed.
- * Writes are serialised so a heartbeat from another thread never lands
- * inside a frame.
+ * fragments on the way, and returns null once the server has closed. A
+ * frame or message the protocol forbids fails the connection with the
+ * protocol-error close code. Writes are serialised so a heartbeat from
+ * another thread never lands inside a frame.
  */
 public final class DiscordWebSocket {
 
     private static final int CONNECT_TIMEOUT_MILLIS = 10000;
     private static final int READ_TIMEOUT_MILLIS = 90000;
+    /** The longest header line the upgrade's answer may have. */
+    static final int MAX_HANDSHAKE_LINE_BYTES = 8192;
+    /** The most header lines the upgrade's answer may have, far more than it needs. */
+    static final int MAX_HANDSHAKE_HEADERS = 64;
     private static final Charset UTF_8 = Charset.forName("UTF-8");
     private static final Random RANDOM = new SecureRandom();
 
@@ -93,8 +99,12 @@ public final class DiscordWebSocket {
         }
     }
 
-    /** Reads the status line and headers; refuses anything but a matching 101. */
-    private static void readHandshakeReply(DataInputStream in, String expectedAccept)
+    /**
+     * Reads the status line and headers; refuses anything but a matching
+     * 101, and an answer of more than {@link #MAX_HANDSHAKE_HEADERS}
+     * header lines.
+     */
+    static void readHandshakeReply(DataInputStream in, String expectedAccept)
             throws IOException {
         String status = readLine(in);
         if (status == null || !status.startsWith("HTTP/1.1 101")) {
@@ -102,7 +112,12 @@ public final class DiscordWebSocket {
         }
         String accept = null;
         String line;
+        int headers = 0;
         while ((line = readLine(in)) != null && line.length() > 0) {
+            if (++headers > MAX_HANDSHAKE_HEADERS) {
+                throw new IOException("websocket upgrade answered with more than "
+                        + MAX_HANDSHAKE_HEADERS + " header lines");
+            }
             int colon = line.indexOf(':');
             if (colon > 0 && "sec-websocket-accept".equals(
                     line.substring(0, colon).trim().toLowerCase(Locale.ROOT))) {
@@ -126,7 +141,7 @@ public final class DiscordWebSocket {
             }
             line.write(value);
             previous = value;
-            if (line.size() > 8192) {
+            if (line.size() > MAX_HANDSHAKE_LINE_BYTES) {
                 throw new IOException("handshake header line too long");
             }
         }
@@ -136,50 +151,44 @@ public final class DiscordWebSocket {
     /**
      * The next text message, or null once the server has closed the
      * connection (the close code is then {@link #getCloseCode()}).
-     * Pings are answered here; fragments are joined.
+     * Pings are answered here; fragments are joined. A frame or message
+     * the protocol forbids closes the connection with
+     * {@link DiscordWebSocketFrames#CLOSE_PROTOCOL_ERROR} and throws.
      */
     public String readText() throws IOException {
-        ByteArrayOutputStream fragments = null;
-        while (true) {
-            DiscordWebSocketFrames.Frame frame = DiscordWebSocketFrames.read(this.in);
-            if (frame.opcode == DiscordWebSocketFrames.OPCODE_CLOSE) {
-                this.closeCode = frame.closeCode();
-                try {
-                    write(DiscordWebSocketFrames.encodeClose(1000, RANDOM));
-                } catch (IOException ignored) {
-                    // The server is gone either way.
+        DiscordWebSocketFrames.Messages messages = new DiscordWebSocketFrames.Messages();
+        try {
+            while (true) {
+                DiscordWebSocketFrames.Frame frame = DiscordWebSocketFrames.read(this.in);
+                if (frame.opcode == DiscordWebSocketFrames.OPCODE_CLOSE) {
+                    this.closeCode = frame.closeCode();
+                    try {
+                        write(DiscordWebSocketFrames.encodeClose(1000, RANDOM));
+                    } catch (IOException ignored) {
+                        // The server is gone either way.
+                    }
+                    close();
+                    return null;
                 }
-                close();
-                return null;
+                if (frame.opcode == DiscordWebSocketFrames.OPCODE_PING) {
+                    write(DiscordWebSocketFrames.encode(
+                            DiscordWebSocketFrames.OPCODE_PONG, frame.payload, RANDOM));
+                    continue;
+                }
+                String text = messages.accept(frame);
+                if (text != null) {
+                    return text;
+                }
             }
-            if (frame.opcode == DiscordWebSocketFrames.OPCODE_PING) {
-                write(DiscordWebSocketFrames.encode(
-                        DiscordWebSocketFrames.OPCODE_PONG, frame.payload, RANDOM));
-                continue;
+        } catch (ProtocolException violation) {
+            try {
+                write(DiscordWebSocketFrames.encodeClose(
+                        DiscordWebSocketFrames.CLOSE_PROTOCOL_ERROR, RANDOM));
+            } catch (IOException ignored) {
+                // The connection is dropped either way.
             }
-            if (frame.isControl()) {
-                continue;
-            }
-            if (frame.opcode == DiscordWebSocketFrames.OPCODE_TEXT && frame.fin) {
-                return frame.text();
-            }
-            if (frame.opcode == DiscordWebSocketFrames.OPCODE_BINARY && frame.fin) {
-                // The Gateway is asked for JSON; a binary frame is not one of ours.
-                continue;
-            }
-            if (fragments == null) {
-                fragments = new ByteArrayOutputStream();
-            }
-            if (fragments.size() + frame.payload.length
-                    > DiscordWebSocketFrames.MAX_PAYLOAD_BYTES) {
-                throw new IOException("fragmented message too large");
-            }
-            fragments.write(frame.payload, 0, frame.payload.length);
-            if (frame.fin) {
-                String text = new String(fragments.toByteArray(), UTF_8);
-                fragments = null;
-                return text;
-            }
+            close();
+            throw violation;
         }
     }
 

@@ -73,9 +73,8 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                 int cosmeticCapeId = buffer.readUnsignedShort();
                 String accountName = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_NAME_BYTES);
-                String startingFactionId = LostTalesPacketCodec.readUtf8String(
+                String factionId = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-                int roleplayLevel = buffer.readInt();
                 int age = buffer.readInt();
                 String bodyTypeId = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
@@ -95,7 +94,7 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                     throw new CharacterPacketCodec.DecodeException(
                             "invalid cosmetic cape ID");
                 }
-                if (roleplayLevel < 0 || age < 0) {
+                if (age < 0) {
                     throw new CharacterPacketCodec.DecodeException(
                             "invalid appearance details");
                 }
@@ -108,7 +107,7 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
                 decoded.add(new CharacterAppearance(kind,
                         playerId, characterId, accountName, characterName, raceId,
                         genderId, skinId, showMinecraftCape, cosmeticCapeId,
-                        startingFactionId, roleplayLevel, age, bodyTypeId, chestTypeId));
+                        factionId, age, bodyTypeId, chestTypeId));
             }
             LostTalesPacketCodec.requireFinished(buffer);
             this.appearances = Collections.unmodifiableList(decoded);
@@ -146,12 +145,11 @@ public final class CharacterAppearanceSyncPacket implements IMessage {
             LostTalesPacketCodec.writeUtf8String(
                     buffer, appearance.getAccountName(),
                     CharacterPacketCodec.MAX_NAME_BYTES);
-            // For the chat player card: starting faction, level and age
-            // are public character identity.
+            // For the chat player card: the faction and the age are
+            // public character identity.
             LostTalesPacketCodec.writeUtf8String(
-                    buffer, appearance.getStartingFactionId(),
+                    buffer, appearance.getFactionId(),
                     CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-            buffer.writeInt(appearance.getRoleplayLevel());
             buffer.writeInt(appearance.getAge());
             // The arm width, which other clients need to pick the body the
             // character is drawn with, and the chest type.

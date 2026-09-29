@@ -170,11 +170,6 @@ public final class CharacterProfile {
         return new CharacterProfile(this.sections, this.facts, glances);
     }
 
-    /** Whether the character says nothing at all about itself. */
-    public boolean isEmpty() {
-        return equals(EMPTY);
-    }
-
     @Override
     public boolean equals(Object other) {
         if (!(other instanceof CharacterProfile)) {

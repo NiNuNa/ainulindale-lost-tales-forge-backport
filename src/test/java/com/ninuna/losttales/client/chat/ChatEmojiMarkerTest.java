@@ -65,7 +65,7 @@ public final class ChatEmojiMarkerTest {
         boolean originalEmojis = LostTalesConfig.enableChatEmojis;
         LostTalesConfig.enableChatEmojis = true;
         try {
-            IChatComponent message = LostTalesChatPresentation.build(
+            IChatComponent message = build(
                     packet("Hi :smile: there :joy:"));
             List<ChatEmoji> markers = new ArrayList<ChatEmoji>();
             ChatHeadMarker.Data head = null;
@@ -95,7 +95,7 @@ public final class ChatEmojiMarkerTest {
         boolean originalEmojis = LostTalesConfig.enableChatEmojis;
         LostTalesConfig.enableChatEmojis = false;
         try {
-            IChatComponent message = LostTalesChatPresentation.build(
+            IChatComponent message = build(
                     packet("Hi :smile:"));
             StringBuilder plainText = new StringBuilder();
             for (Object value : message) {
@@ -113,5 +113,11 @@ public final class ChatEmojiMarkerTest {
         return ChatPacketFixtures.line(ChatChannel.GLOBAL, "Arathorn", "RangerOfTheNorth", message)
                 .title("Ranger").colors(0x55AA55, 0x336633).at(123456789L)
                 .skin("losttales:human_ranger_male_2").build();
+    }
+
+    /** The line as the chat shows it, filed where its packet says. */
+    private static IChatComponent build(LostTalesChatMessagePacket packet) {
+        return LostTalesChatPresentation.build(packet,
+                LostTalesChatPresentation.fileUnder(packet), new int[0], false);
     }
 }

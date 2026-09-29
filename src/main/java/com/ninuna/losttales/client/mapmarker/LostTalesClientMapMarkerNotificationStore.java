@@ -4,7 +4,6 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
-import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.Random;
 import java.util.Set;
@@ -53,34 +52,6 @@ public final class LostTalesClientMapMarkerNotificationStore {
         lastAreaNoticeTimeMs = now;
         INSIDE_AREA_MARKERS.add(normalizedId);
         playDiscoveryChime();
-    }
-
-    /**
-     * Compare incoming discovered IDs with the current client cache and show a
-     * first-discovery banner for newly discovered markers that opted in.
-     */
-    public static synchronized void notifyForIncomingSync(Collection<String> newDiscoveredMarkerIds) {
-        if (newDiscoveredMarkerIds == null || newDiscoveredMarkerIds.isEmpty()) {
-            return;
-        }
-
-        Minecraft minecraft = Minecraft.getMinecraft();
-        EntityPlayer player = minecraft == null ? null : minecraft.thePlayer;
-        int dimension = minecraft == null || minecraft.theWorld == null ? Integer.MIN_VALUE : minecraft.theWorld.provider.dimensionId;
-        Set<String> oldDiscovered = LostTalesClientQuestProgressStore.getDiscoveredMarkerIds();
-        for (String markerIdRaw : newDiscoveredMarkerIds) {
-            String markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(markerIdRaw);
-            if (markerId.length() == 0 || oldDiscovered.contains(markerId)) {
-                continue;
-            }
-
-            LostTalesMapMarkerData marker = LostTalesClientMapMarkerStore.getSharedMarker(markerId);
-            if (marker == null || !marker.isDiscoverable() || !isPlayerInsideDiscoveryRadius(player, marker, dimension)) {
-                continue;
-            }
-
-            showDiscovery(marker.getId(), marker.getName());
-        }
     }
 
     /** Called from the HUD render pass; cheap enough for the small marker lists used here. */
@@ -155,21 +126,6 @@ public final class LostTalesClientMapMarkerNotificationStore {
         return notice != null && notice.markerId.equals(markerId);
     }
 
-
-    private static boolean isPlayerInsideDiscoveryRadius(EntityPlayer player, LostTalesMapMarkerData marker, int dimension) {
-        if (player == null || marker == null || marker.getDimensionId() != dimension) {
-            return false;
-        }
-        double radius = Math.max(1.0D, marker.getDiscoveryRadius());
-        double dx = player.posX - marker.getX();
-        Minecraft minecraft = Minecraft.getMinecraft();
-        double markerY = marker.getEffectiveY(
-                minecraft == null ? null : minecraft.theWorld,
-                player.posY);
-        double dy = player.posY - markerY;
-        double dz = player.posZ - marker.getZ();
-        return dx * dx + dy * dy + dz * dz <= radius * radius;
-    }
 
     private static boolean isAreaMarkerEligible(LostTalesMapMarkerData marker, int dimension) {
         if (marker == null || marker.getId() == null || marker.getId().length() == 0 || marker.getDimensionId() != dimension) {

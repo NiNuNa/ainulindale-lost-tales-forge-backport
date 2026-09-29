@@ -11,9 +11,7 @@ public final class LostTalesMapInputTrackerTest {
         LostTalesMapInputTracker tracker = new LostTalesMapInputTracker();
         tracker.press(100, 60);
 
-        assertTrue(tracker.isPressActive());
         assertTrue(tracker.releaseAsClick(100, 60));
-        assertFalse(tracker.isPressActive());
     }
 
     @Test
@@ -53,7 +51,6 @@ public final class LostTalesMapInputTrackerTest {
         tracker.press(100, 60);
         tracker.clear();
 
-        assertFalse(tracker.isPressActive());
         assertFalse(tracker.releaseAsClick(100, 60));
     }
 }

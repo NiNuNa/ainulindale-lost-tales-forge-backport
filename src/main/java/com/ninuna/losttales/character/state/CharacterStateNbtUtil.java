@@ -29,8 +29,4 @@ public final class CharacterStateNbtUtil {
     public static float clamp(float value, float minimum, float maximum) {
         return Math.max(minimum, Math.min(maximum, value));
     }
-
-    public static int clamp(int value, int minimum, int maximum) {
-        return Math.max(minimum, Math.min(maximum, value));
-    }
 }

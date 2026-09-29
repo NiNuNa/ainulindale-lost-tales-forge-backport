@@ -2,7 +2,7 @@ package com.ninuna.losttales.party.model;
 
 import java.util.UUID;
 
-/** One persistent, server-owned personal marker for a roleplaying character. */
+/** One persistent, server-owned go-here marker, filed under the identity that placed it. */
 public final class PartyGoHereMarker {
 
     public static final int CURRENT_DATA_VERSION = 2;
@@ -10,7 +10,7 @@ public final class PartyGoHereMarker {
     public static final double MAX_VERTICAL_COORDINATE = 4096.0D;
 
     private final UUID partyId;
-    private final UUID ownerCharacterId;
+    private final UUID ownerIdentityId;
     private final int dimensionId;
     private final double x;
     private final double y;
@@ -18,20 +18,20 @@ public final class PartyGoHereMarker {
     private final long updatedAt;
 
     public PartyGoHereMarker(UUID partyId,
-                             UUID ownerCharacterId,
+                             UUID ownerIdentityId,
                              int dimensionId,
                              double x,
                              double y,
                              double z,
                              long updatedAt) {
-        if (ownerCharacterId == null) {
-            throw new IllegalArgumentException("ownerCharacterId must not be null");
+        if (ownerIdentityId == null) {
+            throw new IllegalArgumentException("ownerIdentityId must not be null");
         }
         if (!isValidCoordinates(x, y, z)) {
             throw new IllegalArgumentException("marker coordinates are invalid");
         }
         this.partyId = partyId;
-        this.ownerCharacterId = ownerCharacterId;
+        this.ownerIdentityId = ownerIdentityId;
         this.dimensionId = dimensionId;
         this.x = x;
         this.y = y;
@@ -43,8 +43,8 @@ public final class PartyGoHereMarker {
         return this.partyId;
     }
 
-    public UUID getOwnerCharacterId() {
-        return this.ownerCharacterId;
+    public UUID getOwnerIdentityId() {
+        return this.ownerIdentityId;
     }
 
     public int getDimensionId() {

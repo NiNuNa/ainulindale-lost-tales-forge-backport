@@ -7,8 +7,9 @@ import java.util.List;
 import net.minecraft.client.Minecraft;
 
 /**
- * What a page holds: the quest journal, the party, the map. A page is a
- * tab a window holds beside its other tabs; while it is the tab in front
+ * What a page holds: the journal, the map, a waystone, any tab that is
+ * not a conversation. A page is a tab a window holds beside its other
+ * tabs; while it is the tab in front
  * the window shows the page between its tool strip and its input bar
  * instead of a conversation's lines and member list. The window owns the
  * frame, the row, the strip, the bar, the surface and the place; the page
@@ -26,8 +27,61 @@ import net.minecraft.client.Minecraft;
  * <p>Every box handed in is in whole GUI pixels, the window having moved
  * the matrix by whatever fraction of a pixel it stands on; the pointer is
  * in the same space, or NaN while it is not on the page.</p>
+ *
+ * <p>What the page answers the player — an action saved, refused, on its
+ * way — stands over its bar ({@link PageAnswer}), drawn the same for
+ * every page, and never goes to the chat. A line the server sends in the
+ * chat to answer one of the page's actions stands there too while the
+ * page is shown ({@link #answersLine}); otherwise it stays in the
+ * chat.</p>
  */
 public abstract class PageContent {
+    private final PageAnswer answer = new PageAnswer();
+
+    /** What the page answered last, standing over its bar. */
+    public final PageAnswer lastAnswer() {
+        return this.answer;
+    }
+
+    /** An action done: {@code words} stand over the bar a moment, in ivory. */
+    protected final void sayDone(String words) {
+        this.answer.say(words, PageAnswer.Kind.DONE, System.nanoTime());
+    }
+
+    /** An action turned down: its reason stands over the bar a moment, in red. */
+    protected final void sayRefused(String words) {
+        this.answer.say(words, PageAnswer.Kind.REFUSED, System.nanoTime());
+    }
+
+    /** An action on its way: {@code words} stand over the bar until the answer takes their place. */
+    protected final void sayWorking(String words) {
+        this.answer.say(words, PageAnswer.Kind.WORKING, System.nanoTime());
+    }
+
+    /** A refusal that stands while its cause does: {@code words} stay over the bar, in red, until the page says something else. */
+    protected final void sayFault(String words) {
+        this.answer.say(words, PageAnswer.Kind.FAULT, System.nanoTime());
+    }
+
+    /** Takes the page's answer back at once. */
+    protected final void clearAnswer() {
+        this.answer.clear();
+    }
+
+    /**
+     * Whether a line the server sends in the chat is this page's answer
+     * to one of its actions, by the line's lang key: while the page is
+     * shown it stands over the page's bar instead ({@link #answerLine}),
+     * and otherwise it goes to the chat.
+     */
+    public boolean answersLine(String key) {
+        return false;
+    }
+
+    /** A line the server sent that answers the page, in its words: said over the bar as a refusal unless the page knows better. */
+    public void answerLine(String key, String words) {
+        sayRefused(words);
+    }
     /**
      * One row a page puts in its tab's menu; the chosen one is marked, and
      * one that cannot be taken now is greyed and says why.

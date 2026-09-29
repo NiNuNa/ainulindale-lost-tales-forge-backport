@@ -83,11 +83,6 @@ public final class LostTalesClientQuestMarkerHelper {
         return markers;
     }
 
-    public static boolean isActiveQuestMarker(String markerId) {
-        return getActiveQuestMarkerLabel(
-                collectActiveQuestMarkerLabels(), markerId) != null;
-    }
-
     public static String getActiveQuestMarkerLabel(
             Map<String, String> labels, String markerId) {
         String key = LostTalesQuestMarkerHelper.markerCanonicalKey(markerId);
@@ -181,10 +176,6 @@ public final class LostTalesClientQuestMarkerHelper {
             this.x = x;
             this.y = y;
             this.z = z;
-        }
-
-        public String getId() {
-            return id;
         }
 
         public String getLabel() {

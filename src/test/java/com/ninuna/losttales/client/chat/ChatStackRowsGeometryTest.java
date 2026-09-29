@@ -29,11 +29,11 @@ public final class ChatStackRowsGeometryTest {
     public void aBlankRowIsTwoThirdsOfALine() {
         assertEquals(8, GAP);
         assertEquals(12, LINE);
-        assertEquals(GAP, ChatStackRows.heightOf(
+        assertEquals(GAP, heightOf(
                 new ChatLine(0, ChatWindowLines.SPACER, 0)));
-        assertEquals(LINE, ChatStackRows.heightOf(
+        assertEquals(LINE, heightOf(
                 new ChatLine(0, new ChatComponentText("x"), 1)));
-        assertEquals(LINE, ChatStackRows.heightOf(null));
+        assertEquals(LINE, heightOf(null));
     }
 
     /** Newest first: message, blank, message, message, blank, message. */
@@ -174,7 +174,7 @@ public final class ChatStackRowsGeometryTest {
      */
     private static int ruleBottom(ChatStackRows rows) {
         return rows.dividerLineBottom() + LINE
-                - LostTalesChatOverlayRenderer.DIVIDER_RULE_OFFSET - 1;
+                - (WindowStyle.ROW_TEXT_TOP + WindowStyle.centredBoxTop(1)) - 1;
     }
 
     @Test
@@ -240,10 +240,10 @@ public final class ChatStackRowsGeometryTest {
         List<ChatLine> lines = lines(false, true, false);
         ChatStackRows rows = new ChatStackRows();
         rows.reset(lines, -1);
-        assertTrue(rows.describes(lines, 3, -1));
-        assertFalse(rows.describes(lines, 3, 0));
-        assertFalse(rows.describes(lines, 4, -1));
-        assertFalse(rows.describes(new ArrayList<ChatLine>(lines), 3, -1));
+        assertTrue(rows.describes(lines, 3, -1, true));
+        assertFalse(rows.describes(lines, 3, 0, true));
+        assertFalse(rows.describes(lines, 4, -1, true));
+        assertFalse(rows.describes(new ArrayList<ChatLine>(lines), 3, -1, true));
     }
 
     private static List<ChatLine> lines(boolean... spacers) {
@@ -254,5 +254,12 @@ public final class ChatStackRowsGeometryTest {
                     : new ChatLine(0, new ChatComponentText("x"), index + 1));
         }
         return lines;
+    }
+
+    /** A line's row height in the open window, as the rows lay it out. */
+    private static int heightOf(ChatLine line) {
+        ChatStackRows rows = new ChatStackRows();
+        rows.reset(java.util.Collections.singletonList(line), -1, true);
+        return rows.height(0);
     }
 }

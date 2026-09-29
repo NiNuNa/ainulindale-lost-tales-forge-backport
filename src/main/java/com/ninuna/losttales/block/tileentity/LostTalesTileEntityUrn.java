@@ -141,25 +141,8 @@ public class LostTalesTileEntityUrn extends TileEntity implements IInventory, IA
         this.markDirtyAndSync();
     }
 
-    public float getRotation() {
-        return this.rotation;
-    }
-
     public float getRenderRotation(int metadata) {
         return this.hasStoredRotation ? this.rotation : LostTalesBlockRotationHelper.getDirectionalMetadataRotation(metadata);
-    }
-
-    public boolean hasStoredRotation() {
-        return this.hasStoredRotation;
-    }
-
-    public boolean isEmpty() {
-        for (int slot = 0; slot < this.inventory.length; slot++) {
-            if (this.inventory[slot] != null && this.inventory[slot].stackSize > 0) {
-                return false;
-            }
-        }
-        return true;
     }
 
     private void markDirtyAndSync() {

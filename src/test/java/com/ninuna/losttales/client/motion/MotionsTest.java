@@ -116,7 +116,7 @@ public final class MotionsTest {
         Motions.initialize(clientFolder);
         try {
             assertFalse(Motions.isSaved(MotionIds.UI_BUTTON_LIT));
-            assertTrue(Motions.save(Motions.bundled(MotionIds.UI_BUTTON_LIT),
+            assertTrue(Motions.save(Motions.get(MotionIds.UI_BUTTON_LIT),
                     null));
             assertTrue(Motions.isSaved(MotionIds.UI_BUTTON_LIT));
             assertFalse(Motions.isSaved(MotionIds.UI_BUTTON_LIFT));
@@ -132,6 +132,6 @@ public final class MotionsTest {
     public void theModsOwnMotionsAreInForce() {
         assertTrue(Motions.ids().contains(MotionIds.UI_BUTTON_LIFT));
         assertEquals("ui", Motions.family(MotionIds.UI_BUTTON_LIFT));
-        assertTrue(Motions.bundled(MotionIds.CHAT_LINE_HOVER) != null);
+        assertTrue(Motions.ids().contains(MotionIds.CHAT_LINE_HOVER));
     }
 }

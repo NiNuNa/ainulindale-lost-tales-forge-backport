@@ -106,10 +106,6 @@ public final class LostTalesClientQuestProgressStore {
         return questId == null ? null : QUEST_HISTORY.get(questId);
     }
 
-    public static synchronized Set<String> getDiscoveredMarkerIds() {
-        return Collections.unmodifiableSet(new LinkedHashSet<String>(DISCOVERED_MARKERS));
-    }
-
     public static synchronized LostTalesQuestProgress getActiveQuest(String questId) {
         LostTalesQuestProgress progress = ACTIVE_QUESTS.get(questId);
         return progress == null ? null : progress.copy();
@@ -124,27 +120,8 @@ public final class LostTalesClientQuestProgressStore {
         return entry != null && entry.isCompleted();
     }
 
-    public static synchronized boolean isQuestFailed(String questId) {
-        LostTalesQuestHistoryEntry entry = getQuestHistoryEntry(questId);
-        return entry != null && entry.isFailed();
-    }
-
     public static synchronized boolean isMarkerDiscovered(String markerId) {
         return findDiscoveredMarkerId(markerId) != null;
-    }
-
-    public static synchronized String getPinnedQuestId() {
-        for (String questId : PINNED_QUESTS) {
-            if (ACTIVE_QUESTS.containsKey(questId)) {
-                return questId;
-            }
-        }
-        return "";
-    }
-
-    public static synchronized Set<String> getPinnedQuestIds() {
-        return Collections.unmodifiableSet(
-                new LinkedHashSet<String>(PINNED_QUESTS));
     }
 
     public static synchronized boolean isQuestPinned(String questId) {
@@ -168,16 +145,8 @@ public final class LostTalesClientQuestProgressStore {
         return Collections.unmodifiableCollection(copy);
     }
 
-    public static synchronized String getPinnedMapMarkerId() {
-        return pinnedMapMarkerId == null ? "" : pinnedMapMarkerId;
-    }
-
     public static synchronized boolean isMapMarkerPinned(String markerId) {
         return sameMarkerIdentity(markerId, pinnedMapMarkerId);
-    }
-
-    public static synchronized boolean hasPinnedMapMarker() {
-        return findDiscoveredMarkerId(pinnedMapMarkerId) != null;
     }
 
     public static synchronized boolean hasReceivedSync() {

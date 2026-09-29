@@ -1,7 +1,6 @@
 package com.ninuna.losttales.world.waystone;
 
 import com.ninuna.losttales.util.LostTalesLog;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -45,13 +44,5 @@ public final class LostTalesWaystoneStructureRegistry {
             String id) {
         initialize();
         return id == null ? null : PLACERS.get(id.trim().toLowerCase());
-    }
-
-    public static synchronized Map<String, LostTalesWaystoneStructurePlacer>
-    snapshot() {
-        initialize();
-        return Collections.unmodifiableMap(
-                new LinkedHashMap<String, LostTalesWaystoneStructurePlacer>(
-                        PLACERS));
     }
 }

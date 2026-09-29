@@ -39,7 +39,7 @@ public final class ChatReactionMarkerTest {
 
     @Test
     public void aKnownEmojisChipIsNamedAsBefore() {
-        IChatComponent chip = ChatReactionMarker.create(ChatEmoji.SMILE, 3,
+        IChatComponent chip = ChatReactionMarker.create(ChatEmoji.SMILE.getName(), 3,
                 true, MESSAGE, 6);
         ChatReactionMarker.Data data = ChatReactionMarker.decode(chip);
         assertNotNull(data);
@@ -84,7 +84,7 @@ public final class ChatReactionMarkerTest {
         assertNull(ChatInteractions.genuineClick(button));
         // A chip is not the button.
         assertFalse(ChatReactionMarker.isAddButton(ChatReactionMarker.create(
-                ChatEmoji.SMILE, 1, false, MESSAGE, 6)));
+                ChatEmoji.SMILE.getName(), 1, false, MESSAGE, 6)));
         // Nor is a button aimed at a message the server never named.
         assertFalse(ChatReactionMarker.isAddButton(
                 ChatReactionMarker.addButton(-4L)));

@@ -13,13 +13,11 @@ public final class CameraRenderFrame {
     private final double distance;
     private final double shoulderOffset;
     private final double verticalOffset;
-    private final double verticalFov;
 
     public CameraRenderFrame(
             double pivotX, double pivotY, double pivotZ,
             double yaw, double pitch, double distance,
-            double shoulderOffset, double verticalOffset,
-            double verticalFov) {
+            double shoulderOffset, double verticalOffset) {
         CameraMath.requireFinite("pivotX", pivotX);
         CameraMath.requireFinite("pivotY", pivotY);
         CameraMath.requireFinite("pivotZ", pivotZ);
@@ -28,14 +26,9 @@ public final class CameraRenderFrame {
         CameraMath.requireNonNegativeFinite("distance", distance);
         CameraMath.requireFinite("shoulderOffset", shoulderOffset);
         CameraMath.requireFinite("verticalOffset", verticalOffset);
-        CameraMath.requireFinite("verticalFov", verticalFov);
         if (pitch < -90.0D || pitch > 90.0D) {
             throw new IllegalArgumentException(
                     "pitch must be between -90 and 90 degrees");
-        }
-        if (verticalFov <= 1.0D || verticalFov >= 179.0D) {
-            throw new IllegalArgumentException(
-                    "verticalFov must be between 1 and 179 degrees");
         }
         this.pivotX = pivotX;
         this.pivotY = pivotY;
@@ -45,7 +38,6 @@ public final class CameraRenderFrame {
         this.distance = distance;
         this.shoulderOffset = shoulderOffset;
         this.verticalOffset = verticalOffset;
-        this.verticalFov = verticalFov;
     }
 
     public double getPivotX() {
@@ -58,30 +50,6 @@ public final class CameraRenderFrame {
 
     public double getPivotZ() {
         return pivotZ;
-    }
-
-    public double getYaw() {
-        return yaw;
-    }
-
-    public double getPitch() {
-        return pitch;
-    }
-
-    public double getDistance() {
-        return distance;
-    }
-
-    public double getShoulderOffset() {
-        return shoulderOffset;
-    }
-
-    public double getVerticalOffset() {
-        return verticalOffset;
-    }
-
-    public double getVerticalFov() {
-        return verticalFov;
     }
 
     public double getForwardX() {

@@ -49,11 +49,6 @@ public final class PageSearch {
         return this.words.isEmpty();
     }
 
-    /** The words that must all appear, lower case. */
-    public List<String> words() {
-        return this.words;
-    }
-
     /**
      * Whether everything an entry says answers the search. The parts are
      * joined with a space between them, so a word never matches across

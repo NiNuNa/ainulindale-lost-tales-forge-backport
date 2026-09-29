@@ -47,7 +47,7 @@ public final class ChatRoleMentionTest {
         assertEquals("", ChatAccountRole.NONE.getNameKey());
         // Wearing it is untouched: it still colours a name.
         assertEquals(ChatAccountRole.TEAM, ChatAccountRole.primary(
-                ChatAccountRole.maskOf(ChatAccountRole.TEAM)));
+                ChatRoleFixtures.maskOf(ChatAccountRole.TEAM)));
     }
 
     @Test
@@ -70,7 +70,7 @@ public final class ChatRoleMentionTest {
         ChatMentionCandidate operator = ChatMentionCandidate.role(
                 "role:operator", "Operator", 0xA94B54);
         ChatMentionCandidate player = ChatMentionCandidate.player(
-                "key", "Opal", "Opal", "", "", Collections.<String>emptyList());
+                "key", "Opal", "", "", Collections.<String>emptyList());
         List<ChatMentionCandidate> matches = ChatNameSuggester.matches(
                 "op", Arrays.asList(operator, player), 8);
         assertEquals(2, matches.size());

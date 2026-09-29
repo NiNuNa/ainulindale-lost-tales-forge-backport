@@ -222,24 +222,6 @@ final class DiscordMessageLinks {
     }
 
     /**
-     * The copy of a game message that went through {@code webhookUrl},
-     * or null: what an edit or a removal sent through that webhook
-     * corrects.
-     */
-    synchronized Copy copyThrough(long messageId, String webhookUrl) {
-        List<Copy> copies = this.copiesByMessage.get(Long.valueOf(messageId));
-        if (copies == null || webhookUrl == null || webhookUrl.length() == 0) {
-            return null;
-        }
-        for (Copy copy : copies) {
-            if (copy.webhookUrl.equals(webhookUrl)) {
-                return copy;
-            }
-        }
-        return null;
-    }
-
-    /**
      * Every Discord copy of a game message, in the order they were
      * made; empty for a message not known. A snapshot: safe to walk
      * while posts go on being linked.
@@ -259,13 +241,6 @@ final class DiscordMessageLinks {
                 : this.messageIdByDiscord.get(discordId);
         return messageId == null ? ChatMessageIds.NONE
                 : messageId.longValue();
-    }
-
-    /** Forgets everything. */
-    synchronized void clear() {
-        this.copiesByMessage.clear();
-        this.messageIdByDiscord.clear();
-        this.revision++;
     }
 
     /** Moves on with every change; the save writes when it differs from what it wrote last. */

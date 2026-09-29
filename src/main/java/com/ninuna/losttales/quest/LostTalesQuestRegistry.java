@@ -61,8 +61,8 @@ public final class LostTalesQuestRegistry {
 
     public static synchronized LostTalesQuestDefinition getQuest(String questId) {
         ensureLoaded();
-        LostTalesQuestDefinition runtimeQuest = RUNTIME_QUESTS_BY_ID.get(questId);
-        return runtimeQuest == null ? STATIC_QUESTS_BY_ID.get(questId) : runtimeQuest;
+        LostTalesQuestDefinition fileQuest = STATIC_QUESTS_BY_ID.get(questId);
+        return fileQuest != null ? fileQuest : RUNTIME_QUESTS_BY_ID.get(questId);
     }
 
     public static synchronized Collection<LostTalesQuestDefinition> getQuests() {
@@ -71,15 +71,14 @@ public final class LostTalesQuestRegistry {
     }
 
     /**
-     * Registers or replaces a runtime-authored quest definition.
-     *
-     * Runtime quests are kept in memory and are intended for generated systems such
-     * as missives. The owning system must also persist the definition, usually in
-     * player or tile-entity NBT, then re-register it after load.
+     * Registers or replaces a quest made while the game runs, a missive's.
+     * It never takes an id a quest file uses: such a quest is refused, so
+     * nothing made in the game can stand in for a written quest. The owning
+     * system keeps the definition itself and registers it again after a load.
      */
     public static synchronized boolean registerRuntimeQuest(LostTalesQuestDefinition quest) {
         ensureLoaded();
-        if (quest == null || quest.getId() == null || quest.getId().length() == 0) {
+        if (!mayRegisterRuntime(quest)) {
             return false;
         }
         RUNTIME_QUESTS_BY_ID.put(quest.getId(), quest);
@@ -94,7 +93,7 @@ public final class LostTalesQuestRegistry {
         }
         int registered = 0;
         for (LostTalesQuestDefinition quest : quests) {
-            if (quest != null && quest.getId() != null && quest.getId().length() > 0) {
+            if (mayRegisterRuntime(quest)) {
                 RUNTIME_QUESTS_BY_ID.put(quest.getId(), quest);
                 registered++;
             }
@@ -103,6 +102,11 @@ public final class LostTalesQuestRegistry {
             rebuildSortedQuests();
         }
         return registered;
+    }
+
+    private static boolean mayRegisterRuntime(LostTalesQuestDefinition quest) {
+        return quest != null && quest.getId() != null && quest.getId().length() > 0
+                && !STATIC_QUESTS_BY_ID.containsKey(quest.getId());
     }
 
     public static synchronized void clearRuntimeQuests() {

@@ -50,7 +50,7 @@ public final class LostTalesChatIdentityPacketTest {
                 for (boolean narrating : new boolean[] {false, true}) {
                     String leader = party == null ? "" : "Aldric";
                     ByteBuf wire = Unpooled.buffer();
-                    new LostTalesChatIdentitySyncPacket(id, party, 0xABCDEF, leader,
+                    new LostTalesChatIdentitySyncPacket(id, party, 0xABCDEF, leader, "",
                             narrating).toBytes(wire);
                     LostTalesChatIdentitySyncPacket decoded =
                             new LostTalesChatIdentitySyncPacket();
@@ -75,14 +75,14 @@ public final class LostTalesChatIdentityPacketTest {
             overlong.append('a');
         }
         try {
-            new LostTalesChatIdentitySyncPacket(CHARACTER, PARTY, 0, overlong.toString(),
+            new LostTalesChatIdentitySyncPacket(CHARACTER, PARTY, 0, overlong.toString(), "",
                     false);
             fail("an overlong leader name was accepted");
         } catch (IllegalArgumentException expected) {
             // The bound holds locally too.
         }
         ByteBuf wire = Unpooled.buffer();
-        new LostTalesChatIdentitySyncPacket(CHARACTER, PARTY, 0, "Aldric", false)
+        new LostTalesChatIdentitySyncPacket(CHARACTER, PARTY, 0, "Aldric", "", false)
                 .toBytes(wire);
         // The fields before the name, then a length past the limit and
         // that many bytes: a well-formed frame the bound still refuses.
@@ -97,7 +97,7 @@ public final class LostTalesChatIdentityPacketTest {
     @Test
     public void partialInvalidAndTrailingMembershipDataNeverApply() {
         ByteBuf wire = Unpooled.buffer();
-        new LostTalesChatIdentitySyncPacket(CHARACTER, PARTY, 0x123456, "Aldric", true)
+        new LostTalesChatIdentitySyncPacket(CHARACTER, PARTY, 0x123456, "Aldric", "", true)
                 .toBytes(wire);
         for (int length = 0; length < wire.readableBytes(); length++) {
             assertBadMembership(wire.copy(0, length));
@@ -109,7 +109,7 @@ public final class LostTalesChatIdentityPacketTest {
         assertBadMembership(wire.copy().setByte(wire.readableBytes() - 1, 2));
         assertBadMembership(wire.copy().writeByte(0));
         ByteBuf account = Unpooled.buffer();
-        new LostTalesChatIdentitySyncPacket(null, null, 0, "", false).toBytes(account);
+        new LostTalesChatIdentitySyncPacket(null, null, 0, "", "", false).toBytes(account);
         assertBadMembership(account.writeByte(0));
     }
 

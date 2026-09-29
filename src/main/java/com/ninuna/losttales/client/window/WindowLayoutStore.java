@@ -27,10 +27,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *
  * <pre>
  * window w1 locked=false x=0.00 y=0.00 active=client_console tabs=client_console,operator
- * window w2 locked=true x=62.50 y=100.00 height=180.40 width=326 fill=full active=global tabs=global,ooc,page:journal link=w1:above
+ * window w2 locked=true x=62.50 y=100.00 height=180.40 width=326 fill=full active=global tabs=global,ooc,page:journal
  * sub emoji from=br dx=0.00 dy=0.00 w=120 h=160
  * sub tab from=tl dx=12.00 dy=40.00
  * place page:party x=40.00 y=60.00 height=292.00 width=366 fill=full
+ * tips seen=3
  * </pre>
  */
 public final class WindowLayoutStore {
@@ -114,6 +115,7 @@ public final class WindowLayoutStore {
             }
             WindowLayout.reset();
             SubWindowPlaces.load(null);
+            FirstTips.load(0);
         }
         WindowLayout.setChangeListener(new Runnable() {
             @Override
@@ -168,6 +170,7 @@ public final class WindowLayoutStore {
                 new LinkedHashMap<SubWindowKind, SubWindowPlaces.Placement>();
         Map<String, WindowLayout.Place> places =
                 new LinkedHashMap<String, WindowLayout.Place>();
+        int tipsSeen = 0;
         for (String raw : lines) {
             String line = raw == null ? "" : raw.trim();
             if (line.length() == 0 || line.startsWith("#")) {
@@ -184,6 +187,8 @@ public final class WindowLayoutStore {
                 if (place != null) {
                     places.put(parts[1], place);
                 }
+            } else if (FirstTips.read(parts) >= 0) {
+                tipsSeen = FirstTips.read(parts);
             } else if (parts.length >= 2 && "sub".equals(parts[0])) {
                 SubWindowKind kind = SubWindowKind.fromId(parts[1]);
                 SubWindowPlaces.Placement placement = parseSubWindow(parts);
@@ -201,6 +206,7 @@ public final class WindowLayoutStore {
         WindowLayout.load(specs);
         SubWindowPlaces.load(placed);
         WindowLayout.loadPlaces(places);
+        FirstTips.load(tipsSeen);
         for (Part part : PARTS) {
             part.loaded();
         }
@@ -294,8 +300,6 @@ public final class WindowLayoutStore {
         boolean locked = false;
         double offsetX = 0.0D;
         double offsetY = 0.0D;
-        String linkTarget = null;
-        Window.LinkSide linkSide = Window.LinkSide.BELOW;
         // No size of its own: the window follows the game's settings.
         double height = 0.0D;
         int width = 0;
@@ -314,16 +318,6 @@ public final class WindowLayoutStore {
                     if (parsed != null) {
                         tabs.add(parsed);
                     }
-                }
-            } else if ("link".equals(key)) {
-                int colon = value.indexOf(':');
-                String target = colon < 0 ? value : value.substring(0, colon);
-                if (WindowLayout.isWindowId(target)) {
-                    linkTarget = target;
-                    linkSide = colon >= 0
-                            ? Window.LinkSide.fromId(
-                                    value.substring(colon + 1))
-                            : Window.LinkSide.BELOW;
                 }
             } else if ("active".equals(key)) {
                 active = WindowTab.fromId(value);
@@ -348,8 +342,7 @@ public final class WindowLayoutStore {
             }
         }
         return new WindowLayout.WindowSpec(id, tabs, active, locked,
-                offsetX, offsetY, linkTarget, linkSide, height, width,
-                fill);
+                offsetX, offsetY, height, width, fill);
     }
 
     /** A number written in the file; zero for anything unreadable. */
@@ -403,10 +396,6 @@ public final class WindowLayoutStore {
             if (spec.activeTab != null) {
                 line.append(" active=").append(spec.activeTab.id());
             }
-            if (spec.linkTarget != null) {
-                line.append(" link=").append(spec.linkTarget)
-                        .append(':').append(spec.linkSide.id());
-            }
             line.append(" tabs=");
             for (int index = 0; index < spec.tabs.size(); index++) {
                 if (index > 0) {
@@ -436,6 +425,9 @@ public final class WindowLayoutStore {
                     + " width=" + place.width
                     + (place.fill != Window.ScreenFill.NONE
                             ? " fill=" + place.fill.id() : ""));
+        }
+        if (FirstTips.seen() > 0) {
+            lines.add(FirstTips.describe());
         }
         for (Part part : PARTS) {
             part.describe(lines);

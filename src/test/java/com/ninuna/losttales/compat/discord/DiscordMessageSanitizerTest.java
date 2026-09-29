@@ -112,6 +112,66 @@ public final class DiscordMessageSanitizerTest {
         assertEquals("plain", DiscordMessageSanitizer.outbound("plain"));
     }
 
+    /**
+     * What Discord would draw and the game does not is broken by an
+     * invisible space, so a post reads on Discord as its line read in the
+     * game and no link hides where it leads; the marks both sides read
+     * alike cross unchanged.
+     */
+    @Test
+    public void markupOnlyDiscordDrawsIsBroken() {
+        char b = DiscordMentions.BREAK;
+        assertEquals("[free gift]" + b + "(https://evil.example/login)",
+                DiscordMessageSanitizer.breakDiscordOnlyMarkup(
+                        "[free gift](https://evil.example/login)"));
+        assertEquals("a [b [c]]" + b + "(<https://x.example>) d",
+                DiscordMessageSanitizer.breakDiscordOnlyMarkup(
+                        "a [b [c]](<https://x.example>) d"));
+        assertEquals("even in code: `[a]" + b + "(b)`",
+                DiscordMessageSanitizer.breakDiscordOnlyMarkup("even in code: `[a](b)`"));
+        // Headings, subtext and quotes at a line's start.
+        assertEquals(b + "# Title", DiscordMessageSanitizer.breakDiscordOnlyMarkup("# Title"));
+        assertEquals(b + "## Two", DiscordMessageSanitizer.breakDiscordOnlyMarkup("## Two"));
+        assertEquals(b + "### Three",
+                DiscordMessageSanitizer.breakDiscordOnlyMarkup("### Three"));
+        assertEquals(b + "-# small", DiscordMessageSanitizer.breakDiscordOnlyMarkup("-# small"));
+        assertEquals(b + "> quoted", DiscordMessageSanitizer.breakDiscordOnlyMarkup("> quoted"));
+        assertEquals(b + ">>> the rest",
+                DiscordMessageSanitizer.breakDiscordOnlyMarkup(">>> the rest"));
+        // List markers where Discord would draw a list, and only there.
+        assertEquals(b + "- item", DiscordMessageSanitizer.breakDiscordOnlyMarkup("- item"));
+        assertEquals(b + "* item", DiscordMessageSanitizer.breakDiscordOnlyMarkup("* item"));
+        assertEquals(b + "+ item", DiscordMessageSanitizer.breakDiscordOnlyMarkup("+ item"));
+        assertEquals(b + "12. item", DiscordMessageSanitizer.breakDiscordOnlyMarkup("12. item"));
+        // After a line break and after leading spaces too.
+        assertEquals("first\n" + b + "# Title\n  " + b + "- nested",
+                DiscordMessageSanitizer.breakDiscordOnlyMarkup("first\n# Title\n  - nested"));
+        // A no-break space counts as a space on either side of a mark.
+        assertEquals(" " + b + "# Title",
+                DiscordMessageSanitizer.breakDiscordOnlyMarkup(" # Title"));
+        // What Discord draws no differently is left as it is.
+        for (String same : new String[] {
+                "#### four", "#ooc/12 and #hashtag", "-5 degrees", "3.14 is pi",
+                ">_<", "a # b > c - d 1. e * f", "*italic* first", "**bold** first",
+                "**b** *i* __u__ ~~s~~ ||sp|| `c`", "[just brackets] (and parentheses)"}) {
+            assertEquals(same, DiscordMessageSanitizer.breakDiscordOnlyMarkup(same));
+        }
+        assertEquals("", DiscordMessageSanitizer.breakDiscordOnlyMarkup(""));
+        assertEquals("", DiscordMessageSanitizer.breakDiscordOnlyMarkup(null));
+    }
+
+    /**
+     * A player's line can never pass for the bridge's own reply header:
+     * its subtext mark is broken, so it reads at full size as typed.
+     */
+    @Test
+    public void aLineCannotImitateTheBridgesReplyHeader() {
+        String header = DiscordMessageSanitizer.replyHeader("Aldric", "hi", false, "");
+        String typed = header.substring(0, header.length() - 1);
+        assertEquals(DiscordMentions.BREAK + typed,
+                DiscordMessageSanitizer.breakDiscordOnlyMarkup(typed));
+    }
+
     /** A forward says where its message was said, by the channel's code name alone, and who said it. */
     @Test
     public void aForwardHeaderNamesItsPlaceAndItsAuthor() {
@@ -126,24 +186,39 @@ public final class DiscordMessageSanitizerTest {
         assertEquals("-# ↩ [**Aldric** — meet me at the gate](https://discord"
                 + ".com/channels/9/8/30)\n",
                 DiscordMessageSanitizer.replyHeader("Aldric",
-                        "meet me at the gate",
+                        "meet me at the gate", false,
                         "https://discord.com/channels/9/8/30"));
         assertEquals("-# ↩ **Aldric** — meet me at the gate\n",
                 DiscordMessageSanitizer.replyHeader("Aldric",
-                        "meet me at the gate", ""));
+                        "meet me at the gate", false, ""));
         // A quote with markdown in it reads as the text it is, brackets
         // included, so it cannot break out of the masked link.
         assertEquals("-# ↩ [**x\\_y** — a \\[b\\]\\(c\\) \\*d\\*](url)\n",
                 DiscordMessageSanitizer.replyHeader("x_y",
-                        "a [b](c) *d*", "url"));
+                        "a [b](c) *d*", false, "url"));
         // An emoji in the quote goes as the emoji Discord renders.
         assertEquals("-# ↩ **Aldric** — hi 😳\n",
                 DiscordMessageSanitizer.replyHeader("Aldric",
-                        "hi :flushed:", null));
+                        "hi :flushed:", false, null));
         assertEquals("-# ↩ **Aldric**\n",
-                DiscordMessageSanitizer.replyHeader("Aldric", "", ""));
+                DiscordMessageSanitizer.replyHeader("Aldric", "", false, ""));
     }
 
+
+    /** An action posts in italics under the speaker's name, and quotes in italics too (C2). */
+    @Test
+    public void actionsPostInItalics() {
+        assertEquals("*draws his sword.*",
+                DiscordMessageSanitizer.outboundAction("draws his sword."));
+        assertEquals("*waves 😳*", DiscordMessageSanitizer.outboundAction(" waves :flushed: "));
+        assertEquals("", DiscordMessageSanitizer.outboundAction("  "));
+        assertEquals("a last backslash cannot open the closing mark",
+                "*leans on the wall\\\\*", DiscordMessageSanitizer.outboundAction(
+                        "leans on the wall\\"));
+        assertEquals("-# ↩ **Aldric** *draws his sword.*\n",
+                DiscordMessageSanitizer.replyHeader("Aldric", "draws his sword.",
+                        true, ""));
+    }
 
     @Test
     public void markdownEscapingCoversTheLinkBrackets() {
@@ -178,5 +253,37 @@ public final class DiscordMessageSanitizerTest {
         String kept = DiscordMessageSanitizer.inboundName(name.toString());
         assertEquals(21, kept.length());
         assertEquals(63, kept.getBytes("UTF-8").length);
+    }
+
+    @Test
+    public void filesStickersAndForwardsArriveInWords() {
+        String link = "https://discord.com/channels/1/2/3";
+        assertEquals("look *[Sticker: Wave]* *map.png* " + link,
+                DiscordMessageSanitizer.inboundWithAttachments("look", "",
+                        java.util.Collections.singletonList("Wave"),
+                        java.util.Collections.singletonList("map.png"), link));
+        assertEquals("*[Forwarded]* the gate is open",
+                DiscordMessageSanitizer.inboundWithAttachments("", "the gate is open",
+                        java.util.Collections.<String>emptyList(),
+                        java.util.Collections.<String>emptyList(), link));
+        // No file, no link; a name loses every mark it could smuggle in.
+        assertEquals("*evillink.png*",
+                DiscordMessageSanitizer.inboundWithAttachments("",
+                        "", java.util.Collections.<String>emptyList(),
+                        java.util.Collections.singletonList("**evil**[link].png"), null));
+    }
+
+    @Test
+    public void theWordsGiveWayBeforeTheFilesDo() {
+        StringBuilder long_ = new StringBuilder();
+        for (int index = 0; index < 400; index++) {
+            long_.append('a');
+        }
+        String text = DiscordMessageSanitizer.inboundWithAttachments(long_.toString(), "",
+                java.util.Collections.<String>emptyList(),
+                java.util.Collections.singletonList("map.png"),
+                "https://discord.com/channels/1/2/3");
+        assertTrue(text.length() <= com.ninuna.losttales.chat.ChatMessageValidator.MAX_CHARACTERS);
+        assertTrue(text.endsWith("*map.png* https://discord.com/channels/1/2/3"));
     }
 }

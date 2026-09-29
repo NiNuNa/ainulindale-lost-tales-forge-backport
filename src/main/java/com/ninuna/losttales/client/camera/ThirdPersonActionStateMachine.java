@@ -7,30 +7,6 @@ final class ThirdPersonActionStateMachine {
     private int combatHoldTicks;
 
     ThirdPersonGameplayState update(
-            boolean swinging, boolean aiming, boolean hurt,
-            boolean combatItemHeld,
-            boolean combatProfileWithWeaponHeld,
-            int configuredAttackCommitmentTicks,
-            int configuredCombatHoldTicks) {
-        return update(swinging, aiming, aiming, hurt,
-                combatItemHeld, combatProfileWithWeaponHeld,
-                configuredAttackCommitmentTicks,
-                configuredCombatHoldTicks);
-    }
-
-    ThirdPersonGameplayState update(
-            boolean swinging, boolean aiming, boolean faceAim,
-            boolean hurt, boolean combatItemHeld,
-            boolean combatProfileWithWeaponHeld,
-            int configuredAttackCommitmentTicks,
-            int configuredCombatHoldTicks) {
-        return update(swinging, aiming, faceAim, false, hurt,
-                combatItemHeld, combatProfileWithWeaponHeld,
-                configuredAttackCommitmentTicks,
-                configuredCombatHoldTicks);
-    }
-
-    ThirdPersonGameplayState update(
             boolean swinging, boolean aiming, boolean faceAim,
             boolean forceCombat, boolean hurt, boolean combatItemHeld,
             boolean combatProfileWithWeaponHeld,

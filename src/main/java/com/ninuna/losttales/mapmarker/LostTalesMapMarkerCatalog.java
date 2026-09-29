@@ -102,11 +102,6 @@ public final class LostTalesMapMarkerCatalog {
         return marker.getId() + " (" + marker.getName() + ")";
     }
 
-    public static boolean isHiddenUntilDiscovered(String markerId) {
-        LostTalesMapMarkerDefinition marker = getMarker(markerId);
-        return marker != null && marker.isHiddenUntilDiscovered();
-    }
-
     public static boolean isVisibleByDefault(String markerId) {
         LostTalesMapMarkerDefinition marker = getMarker(markerId);
         // This method describes discovery secrecy only. Region visibility is

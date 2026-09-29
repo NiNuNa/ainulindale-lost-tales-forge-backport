@@ -133,10 +133,6 @@ final class LostTalesMapWaypointPrompt {
         this.noteField.setText(note == null ? "" : note);
     }
 
-    boolean isEditing() {
-        return this.editing;
-    }
-
     String getName() {
         return this.nameField.getText() == null
                 ? "" : this.nameField.getText().trim();

@@ -47,6 +47,7 @@ import com.ninuna.losttales.gui.screen.character.creator.CreatorList;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorNote;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorSlider;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorStepper;
+import com.ninuna.losttales.gui.screen.character.creator.CreatorTextArea;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorTextControl;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorTileGrid;
 import com.ninuna.losttales.gui.screen.character.creator.CreatorToggle;
@@ -123,6 +124,8 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
     private static final float FIGURE_HEIGHT_BLOCKS = 2.0F;
     /** The face drawn when there is no account to build a body for. */
     private static final int FACE_FALLBACK_SIZE = 64;
+    /** The lines the History's box shows at once. */
+    private static final int HISTORY_LINES = 4;
     /** Lights the character in a world; a key of this screen's, not a control of the game's. */
     private static final int LIGHT_KEY = Keyboard.KEY_L;
 
@@ -172,7 +175,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
     private CreatorControl focusedControl;
     private CreatorControl pressedControl;
     private CreatorTextControl nameControl;
-    private CreatorTextControl historyControl;
+    private CreatorTextArea historyControl;
     private int scroll;
     private int contentHeight;
 
@@ -196,8 +199,6 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
     private int dragWindowY;
 
     private int pendingRequestId;
-    /** The choices of the creation waiting on the server, kept as the template once it is made. */
-    private CharacterTemplate pendingTemplate;
 
     /** The look the player's body was last given as a preview; unset when none is worn. */
 
@@ -512,9 +513,7 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         CharacterOperationFeedback feedback =
                 ClientCharacterRosterCache.getOperation(this.pendingRequestId);
         int completedRequest = this.pendingRequestId;
-        CharacterTemplate template = this.pendingTemplate;
         this.pendingRequestId = 0;
-        this.pendingTemplate = null;
         if (feedback == null) {
             return;
         }
@@ -523,12 +522,8 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
             setStatus(ClientCharacterDisplayNames.error(feedback.getErrorId()), true);
             return;
         }
-        // What this account starts as on the next world it joins: the
-        // choices of a character the server made, never of one it refused.
-        if (template != null) {
-            CharacterTemplateStore.save(LostTalesClientAccount.templateId(),
-                    template);
-        }
+        // A character made in a world stays that world's: only the
+        // character room writes the account character's look.
         setStatus(ClientCharacterDisplayNames.operationSuccess("create"), false);
         // The new character is on the roster; the player is still whoever
         // they were playing, and picks it from the roster when they want to.
@@ -710,10 +705,12 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
         }, I18n.format("gui.losttales.character.creator.age.oldest")));
         this.controls.add(new CreatorNote(this.context,
                 I18n.format("gui.losttales.character.creator.age.hint")));
-        this.historyControl = new CreatorTextControl(this.context,
+        // A box of several lines, as Edit Profile's, so the History
+        // keeps its paragraphs.
+        this.historyControl = new CreatorTextArea(this.context,
                 I18n.format("gui.losttales.character.profile.history"),
                 this.draftHistory, CharacterProfile.MAX_SECTION_LENGTH,
-                true);
+                HISTORY_LINES);
         this.controls.add(this.historyControl);
         this.controls.add(new CreatorNote(this.context,
                 I18n.format("gui.losttales.character.profile.history.hint")));
@@ -1752,14 +1749,13 @@ public final class LostTalesCharacterCreationGui extends GuiScreen
                 this.showMinecraftCape, selectedCapeId());
         setStatus(I18n.format("gui.losttales.character.creating"), false);
         this.pendingRequestId = ClientCharacterNetwork.createCharacter(request);
-        this.pendingTemplate = CharacterTemplate.of(request);
     }
 
     /**
-     * Writes the form as the account's template. Nothing is sent and
-     * nothing is validated beyond a name worth keeping: which of these
-     * choices a particular server offers is that server's to say, and is
-     * asked when the form is opened against it.
+     * Writes the form as the account character's look, in the character
+     * room. Nothing is sent and nothing is validated beyond a name worth
+     * keeping: which of these choices a particular server offers is that
+     * server's to say, and is asked when a world first reads it.
      */
     private void saveTemplate() {
         String normalizedName = CharacterValidator.normalizeName(this.draftName);

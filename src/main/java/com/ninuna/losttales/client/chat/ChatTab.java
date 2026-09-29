@@ -44,8 +44,7 @@ public final class ChatTab extends WindowTab {
     /** The rows of a conversation's menu behind the tool strip's cog. */
     private static final String MENU_MARK_READ = "mark_read";
     private static final String MENU_JUMP_UNREAD = "jump_unread";
-    private static final String MENU_MUTE = "mute";
-    private static final String MENU_PINGS = "pings";
+    private static final String MENU_NOTIFY = "notify";
     private static final String MENU_HIDE = "hide";
     /** The timestamp area's button: the person, for the heads the area holds. */
     private static final ToolStrip.Panel AREA_PANEL = new ToolStrip.Panel(
@@ -138,24 +137,6 @@ public final class ChatTab extends WindowTab {
         return window == null ? null : from(window.getActiveTab());
     }
 
-    /** The channel of the conversation in front of a window, or null. */
-    public static ChatChannel frontChannelOf(Window window) {
-        ChatTab front = frontOf(window);
-        return front == null ? null : front.getChannel();
-    }
-
-    /** The channels of a window's conversations, in row order; whispers as WHISPER. */
-    public static java.util.List<ChatChannel> channelsOf(Window window) {
-        java.util.List<ChatChannel> result = new java.util.ArrayList<ChatChannel>();
-        for (WindowTab tab : window.getTabs()) {
-            ChatTab conversation = from(tab);
-            if (conversation != null) {
-                result.add(conversation.getChannel());
-            }
-        }
-        return result;
-    }
-
     /**
      * The tab whose lines are shown while this one is on screen. A
      * channel that is one conversation is its own; a scoped channel's
@@ -213,11 +194,6 @@ public final class ChatTab extends WindowTab {
         return new ChatTab(channel, "", "", scopeKey, false);
     }
 
-    /** The row entry for whispers with an account's own identity; null for no name. */
-    public static ChatTab whisper(String partner) {
-        return whisper(partner, "");
-    }
-
     /**
      * The row entry for whispers with one identity of an account: the
      * person as they were speaking, kept apart from their other
@@ -273,10 +249,6 @@ public final class ChatTab extends WindowTab {
      * more than one conversation.
      */
     public String getOwnerKey() { return this.ownerKey; }
-    /** Whether the conversation is with the account rather than a character. */
-    public boolean isAccountConversation() {
-        return this.identityKey.equals(this.partnerKey);
-    }
     public boolean isWhisper() { return this.channel == ChatChannel.WHISPER; }
     /** Whether the partner is an NPC rather than a player. */
     public boolean isNpc() { return this.npc; }
@@ -426,7 +398,7 @@ public final class ChatTab extends WindowTab {
                 && ClientChatChannelState.getDraft(this).length() > 0;
     }
 
-    /** Its lines kept out of the closed feed. */
+    /** Nothing of it reaches the player: its notification choice is Nothing. */
     @Override
     public boolean isMuted() {
         return ChatLayout.isMuted(this);
@@ -484,9 +456,17 @@ public final class ChatTab extends WindowTab {
      * A messenger's channel menu. While the tab holds anything unread:
      * Mark as Read, the counters and the divider gone at once, and Jump to
      * First Unread, the tab brought forward and its history taken to where
-     * the unread run begins. Then Mute Channel (out of the feed), Mute
-     * Mentions (cue silent) and Hide Channel (stays closed when messaged).
+     * the unread run begins. Then Notifications, the conversation's
+     * choice (Everything, Only Mentions or Nothing) stepped on with a
+     * click and back with a right-click, and Hide Channel (stays closed
+     * when messaged).
      */
+    /** A conversation always has its Notifications and Hide rows. */
+    @Override
+    public boolean hasMenuRows() {
+        return true;
+    }
+
     @Override
     public List<MenuWindow.Entry> menuRows() {
         List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>(5);
@@ -498,12 +478,9 @@ public final class ChatTab extends WindowTab {
             rows.add(menuRow(MENU_JUMP_UNREAD,
                     "gui.losttales.chat.tab.jump_unread"));
         }
-        rows.add(menuRow(MENU_MUTE, ChatLayout.isMuted(this)
-                ? "gui.losttales.chat.tab.unmute"
-                : "gui.losttales.chat.tab.mute"));
-        rows.add(menuRow(MENU_PINGS, ChatLayout.isPingsMuted(this)
-                ? "gui.losttales.chat.tab.unmute_mentions"
-                : "gui.losttales.chat.tab.mute_mentions"));
+        rows.add(menuRow(MENU_NOTIFY, "gui.losttales.chat.tab.notify")
+                .withValue(StatCollector.translateToLocal(
+                        ChatLayout.notification(this).labelKey())));
         rows.add(menuRow(MENU_HIDE, ChatLayout.isHidden(this)
                 ? "gui.losttales.chat.tab.unhide"
                 : "gui.losttales.chat.tab.hide"));
@@ -514,15 +491,20 @@ public final class ChatTab extends WindowTab {
         return new MenuWindow.Entry(id, StatCollector.translateToLocal(labelKey));
     }
 
-    /** The switches stay; reading and jumping are done with the menu. */
     @Override
     public boolean takeMenuRow(String id) {
-        if (MENU_MUTE.equals(id)) {
-            ChatLayout.setMuted(this, !ChatLayout.isMuted(this));
-            return true;
-        }
-        if (MENU_PINGS.equals(id)) {
-            ChatLayout.setPingsMuted(this, !ChatLayout.isPingsMuted(this));
+        return takeMenuRow(id, false);
+    }
+
+    /**
+     * The choice and the switch stay; reading and jumping are done with
+     * the menu. The choice steps on with a click and back with a
+     * right-click; every other row takes either press alike.
+     */
+    @Override
+    public boolean takeMenuRow(String id, boolean back) {
+        if (MENU_NOTIFY.equals(id)) {
+            ChatLayout.stepNotification(this, back);
             return true;
         }
         if (MENU_HIDE.equals(id)) {

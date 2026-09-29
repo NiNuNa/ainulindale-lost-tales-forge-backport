@@ -322,8 +322,4 @@ public final class LostTalesGuiRegionBlur {
         this.width = -1;
         this.height = -1;
     }
-
-    private static double clamp01(double value) {
-        return Math.max(0.0D, Math.min(1.0D, value));
-    }
 }

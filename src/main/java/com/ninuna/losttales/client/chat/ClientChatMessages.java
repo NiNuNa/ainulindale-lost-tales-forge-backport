@@ -121,11 +121,6 @@ final class ClientChatMessages {
         ENTRIES.clear();
     }
 
-    /** Test and diagnostics hook: messages that could be rebuilt. */
-    static synchronized int size() {
-        return ENTRIES.size();
-    }
-
     /** One message, and everything drawing it again needs. */
     static final class Remembered {
         final LostTalesChatMessagePacket packet;

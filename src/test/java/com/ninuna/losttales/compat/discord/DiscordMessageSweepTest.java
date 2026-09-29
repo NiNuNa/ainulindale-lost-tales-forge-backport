@@ -20,7 +20,7 @@ public final class DiscordMessageSweepTest {
                                                String editedTimestamp) {
         return new DiscordJson.Message(id, "1", "User", false, content,
                 Collections.<String, String>emptyMap(), "",
-                editedTimestamp, "", "");
+                editedTimestamp, "", "", "", null, null, "");
     }
 
     @Test
@@ -80,6 +80,26 @@ public final class DiscordMessageSweepTest {
                 Collections.<DiscordJson.Message>emptyList());
         assertEquals(Arrays.asList("100", "200"), changes.deletedIds);
         assertTrue(sweep.isEmpty());
+    }
+
+    /**
+     * A page that could not be read says nothing: bad JSON on a good
+     * status must never read as a channel emptied.
+     */
+    @Test
+    public void aPageThatCouldNotBeReadChangesNothing() {
+        DiscordMessageSweep sweep = new DiscordMessageSweep();
+        sweep.track(message("100", "first", ""));
+        sweep.track(message("200", "second", ""));
+        DiscordMessageSweep.Changes changes = sweep.apply(
+                DiscordJson.parseMessages("{\"not\":\"a page\"}"));
+        assertTrue(changes.deletedIds.isEmpty());
+        assertTrue(changes.edited.isEmpty());
+        assertEquals("every watch stays", 2, sweep.size());
+        // The next page that can be read is compared as ever.
+        assertEquals(Arrays.asList("200"), sweep.apply(Arrays.asList(
+                message("100", "first", ""),
+                message("300", "newer", ""))).deletedIds);
     }
 
     @Test

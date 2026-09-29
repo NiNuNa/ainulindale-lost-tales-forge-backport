@@ -184,9 +184,9 @@ public final class ChatRunBackdropsTest {
         root.appendSibling(new ChatComponentText("hi "));
         root.appendSibling(mention("Nils"));
         // "hi " and "@Nils" are 48 pixels bare, 52 with the backdrop.
-        List<IChatComponent> bare = ChatLineWrapper.wrap(sixEach, root, 52);
+        List<IChatComponent> bare = ChatLineWrapper.wrap(sixEach, root, 52, false, 1.0F, 1.0F, 1.0F, null);
         assertEquals(1, bare.size());
-        List<IChatComponent> tight = ChatLineWrapper.wrap(sixEach, root, 50);
+        List<IChatComponent> tight = ChatLineWrapper.wrap(sixEach, root, 50, false, 1.0F, 1.0F, 1.0F, null);
         assertEquals(2, tight.size());
         assertTrue(ChatLineWrapper.partWidth(sixEach, mention("Nils"))
                 == sixEach.width("@Nils") + 2 * PAD);

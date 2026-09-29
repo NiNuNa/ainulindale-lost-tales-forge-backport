@@ -16,10 +16,8 @@ import java.util.Set;
  * in front of which, and where a page's window last stood. A tab lives
  * in at most one window. Every window is equal: one that loses its last
  * tab disappears, and the layout with no windows left at all is a valid
- * state. A window dropped against another's edge <em>links</em> to it
- * and from then on keeps that gap as the other grows, shrinks or moves;
- * a link is one window's, and dragging the linked window away breaks
- * it.
+ * state. Windows stand on their own: one dragged against another's edge
+ * lines up with it and stays where it was put.
  *
  * <p>What the tabs stand for is their systems' business: the chat keeps
  * its channels' preferences and the windows a new player starts with in
@@ -155,8 +153,7 @@ public final class WindowLayout {
      * Brings a page forward: in the window holding its tab, the tab put in
      * front there and the window raised; else in a window of its own,
      * where the page's window last stood, or cascaded from the front
-     * window at a page's size. Null when no window can open for it: every
-     * window the layout may have is out.
+     * window at a page's size. Null for no page.
      */
     public static synchronized Window showPage(PageTab page) {
         if (page == null) {
@@ -278,9 +275,9 @@ public final class WindowLayout {
 
     /**
      * Closes a whole window: every tab it holds leaves it and the window
-     * itself goes, windows stuck to it letting go. What stands behind the
-     * tabs is untouched, and closing the last window is allowed. A
-     * locked window is refused, as its individual tabs are.
+     * itself goes. What stands behind the tabs is untouched, and closing
+     * the last window is allowed. A locked window is refused, as its
+     * individual tabs are.
      */
     public static synchronized boolean closeWindow(String windowId) {
         Window window = window(windowId);
@@ -302,36 +299,69 @@ public final class WindowLayout {
 
     /**
      * Takes every tab the filter picks out of its window, a window left
-     * empty going with it, and answers the tabs taken. The listener is
-     * not told; the caller writes the change when it is done.
+     * empty going with it, and answers the tabs taken. A page's tab
+     * remembers where its window stood, as one closed by hand does, and a
+     * front tab taken hands the front to its neighbour
+     * ({@link #successor}). The listener is not told; the caller writes
+     * the change when it is done.
      */
     public static synchronized List<WindowTab> removeTabs(TabFilter filter) {
         List<WindowTab> removed = new ArrayList<WindowTab>();
         Iterator<Window> iterator = WINDOWS.iterator();
         while (iterator.hasNext()) {
             Window window = iterator.next();
-            Iterator<WindowTab> tabs = window.tabs().iterator();
-            while (tabs.hasNext()) {
-                WindowTab tab = tabs.next();
+            WindowTab active = window.getActiveTab();
+            int activeIndex = window.tabs().indexOf(active);
+            int before = 0;
+            List<WindowTab> taken = new ArrayList<WindowTab>();
+            for (int index = 0; index < window.tabs().size(); index++) {
+                WindowTab tab = window.tabs().get(index);
                 if (filter.matches(tab)) {
-                    tabs.remove();
-                    removed.add(tab);
-                }
-            }
-            if (window.tabs().isEmpty()) {
-                iterator.remove();
-                for (Window other : WINDOWS) {
-                    if (window.getId().equals(other.getLinkTarget())) {
-                        other.setLink(null, false);
+                    taken.add(tab);
+                    if (index < activeIndex) {
+                        before++;
                     }
                 }
             }
-            if (window.getActiveTab() == null
-                    || !window.tabs().contains(window.getActiveTab())) {
-                window.setActiveTab(null);
+            if (taken.isEmpty()) {
+                continue;
+            }
+            rememberPlaces(window, taken);
+            window.tabs().removeAll(taken);
+            removed.addAll(taken);
+            if (window.tabs().isEmpty()) {
+                iterator.remove();
+            } else if (taken.contains(active)) {
+                window.setActiveTab(successor(window.tabs(),
+                        activeIndex - before));
             }
         }
         return removed;
+    }
+
+    /**
+     * The tab that comes forward when the one in front at {@code index}
+     * leaves a row that holds {@code tabs} without it, as a browser's
+     * tabs do: the tab that stood to its right, else the one to its
+     * left, a tab that cannot be shown now passed over while one that
+     * can stands further along. Null for an empty row.
+     */
+    static WindowTab successor(List<WindowTab> tabs, int index) {
+        if (tabs.isEmpty()) {
+            return null;
+        }
+        int from = Math.max(0, Math.min(index, tabs.size()));
+        for (int right = from; right < tabs.size(); right++) {
+            if (tabs.get(right).isAvailable()) {
+                return tabs.get(right);
+            }
+        }
+        for (int left = from - 1; left >= 0; left--) {
+            if (tabs.get(left).isAvailable()) {
+                return tabs.get(left);
+            }
+        }
+        return tabs.get(Math.min(from, tabs.size() - 1));
     }
 
     /**
@@ -339,11 +369,8 @@ public final class WindowLayout {
      * console answering a command — belongs in. The window it is asked
      * for takes it when that window is unlocked and has room for it;
      * otherwise the most recently used window that does, front of the
-     * stack first; then, while the layout has room for another, a new
-     * window cascaded from the one asked for, or from the front window.
-     * With no room for another, the front-most unlocked window takes it
-     * anyway, since losing the tab would be worse than crowding a row,
-     * and a layout of locked windows alone hands it to the first.
+     * stack first; otherwise a new window cascaded from the one asked
+     * for, or from the front window, since there is no limit on windows.
      *
      * <p>Null once every window has been closed: a tab never opens the
      * windows back up by itself. The player decides when a window comes
@@ -521,11 +548,13 @@ public final class WindowLayout {
         if (!hasRoomFor(target, moved)) {
             return false;
         }
+        int activeIndex = list.indexOf(active);
+        int before = countBefore(moved, source, activeIndex);
         list.removeAll(moved);
         if (list.isEmpty()) {
             dropWindow(source);
         } else if (active != null && moved.contains(active)) {
-            source.setActiveTab(null);
+            source.setActiveTab(successor(list, activeIndex - before));
         }
         int to = Math.max(0, Math.min(target.tabs().size(), index));
         target.tabs().addAll(to, moved);
@@ -594,9 +623,12 @@ public final class WindowLayout {
             return source;
         }
         WindowTab active = source.getActiveTab();
+        int activeIndex = source.tabs().indexOf(active);
+        int before = countBefore(moved, source, activeIndex);
         source.tabs().removeAll(moved);
         if (active != null && moved.contains(active)) {
-            source.setActiveTab(null);
+            source.setActiveTab(successor(source.tabs(),
+                    activeIndex - before));
         }
         Window window = newWindow();
         Place place = moved.size() == 1 && moved.get(0) instanceof PageTab
@@ -634,16 +666,37 @@ public final class WindowLayout {
         return true;
     }
 
+    /**
+     * Takes one tab out of its window; a window left empty goes, and a
+     * tab that was in front hands the front to its neighbour
+     * ({@link #successor}).
+     */
     private static void removeTab(Window window, WindowTab tab) {
         rememberPlaces(window, Collections.singletonList(tab));
+        int index = window.tabs().indexOf(tab);
         window.tabs().remove(tab);
         if (window.tabs().isEmpty()) {
             dropWindow(window);
             return;
         }
         if (tab.equals(window.getActiveTab())) {
-            window.setActiveTab(null);
+            window.setActiveTab(successor(window.tabs(), index));
         }
+    }
+
+    /**
+     * How many of {@code moved} stand before {@code index} in the
+     * window's row, read before they leave it.
+     */
+    private static int countBefore(List<WindowTab> moved, Window window,
+                                   int index) {
+        int count = 0;
+        for (int at = 0; at < index && at < window.tabs().size(); at++) {
+            if (moved.contains(window.tabs().get(at))) {
+                count++;
+            }
+        }
+        return count;
     }
 
     /* ---- The layout file ---- */
@@ -652,8 +705,8 @@ public final class WindowLayout {
      * Rebuilds the windows from a loaded description, recovering from
      * anything stale: unknown tabs and duplicate windows are ignored, a
      * tab listed twice keeps its first place, a tab its kind does not
-     * keep in the layout is left out, empty windows and windows past the
-     * cap are dropped, and percents are clamped. Whatever the systems
+     * keep in the layout is left out, empty windows are dropped, and
+     * percents are clamped. Whatever the systems
      * then add for tabs the file placed nowhere is theirs to do. The
      * listener is not notified; the caller decides whether a repaired
      * layout is written back.
@@ -699,19 +752,6 @@ public final class WindowLayout {
                 window.setOwnWidth(clampWindowWidth(spec.width));
                 window.setActiveTab(spec.activeTab);
                 WINDOWS.add(window);
-                if (spec.linkTarget != null) {
-                    window.setLink(spec.linkTarget, spec.linkSide);
-                }
-            }
-        }
-        // A link needs its target; two windows never hold each other.
-        for (Window window : WINDOWS) {
-            Window target = window.isLinked()
-                    ? window(window.getLinkTarget()) : null;
-            if (target == null || target == window) {
-                window.setLink(null, Window.LinkSide.BELOW);
-            } else if (window.getId().equals(target.getLinkTarget())) {
-                target.setLink(null, Window.LinkSide.BELOW);
             }
         }
     }
@@ -737,8 +777,7 @@ public final class WindowLayout {
             result.add(new WindowSpec(window.getId(), tabs,
                     active != null && active.isKeptInLayout() ? active : null,
                     window.isLocked(), window.getOffsetX(),
-                    window.getOffsetY(), window.getLinkTarget(),
-                    window.getLinkSide(), window.getOwnHeight(),
+                    window.getOffsetY(), window.getOwnHeight(),
                     window.getOwnWidth(), window.getFill()));
         }
         return result;
@@ -752,9 +791,6 @@ public final class WindowLayout {
         final boolean locked;
         final double offsetX;
         final double offsetY;
-        final String linkTarget;
-        /** Which side of its target it is stuck to. */
-        final Window.LinkSide linkSide;
         /** The window's own height in GUI pixels; 0 follows the game's settings. */
         final double height;
         /** The window's own width in GUI pixels; 0 follows the game's settings. */
@@ -764,8 +800,7 @@ public final class WindowLayout {
 
         public WindowSpec(String id, List<? extends WindowTab> tabs,
                           WindowTab activeTab, boolean locked,
-                          double offsetX, double offsetY, String linkTarget,
-                          Window.LinkSide linkSide, double height,
+                          double offsetX, double offsetY, double height,
                           int width, Window.ScreenFill fill) {
             this.id = id;
             List<WindowTab> kept = new ArrayList<WindowTab>();
@@ -781,9 +816,6 @@ public final class WindowLayout {
             this.locked = locked;
             this.offsetX = offsetX;
             this.offsetY = offsetY;
-            this.linkTarget = linkTarget;
-            this.linkSide = linkSide == null
-                    ? Window.LinkSide.BELOW : linkSide;
             this.height = clampWindowHeight(height);
             this.width = clampWindowWidth(width);
             this.fill = fill == null ? Window.ScreenFill.NONE : fill;
@@ -932,15 +964,6 @@ public final class WindowLayout {
         return null;
     }
 
-    /** Open tabs across every window; zero once they are all closed. */
-    public static synchronized int openTabCount() {
-        int count = 0;
-        for (int index = 0; index < WINDOWS.size(); index++) {
-            count += WINDOWS.get(index).tabs().size();
-        }
-        return count;
-    }
-
     /**
      * Windows most recently brought to the front first, then the ones
      * never raised in layout order: the order a tab that opens by
@@ -1058,115 +1081,6 @@ public final class WindowLayout {
         return Math.max(MIN_WINDOW_SIZE, Math.min(MAX_WINDOW_SIZE, height));
     }
 
-    /**
-     * Links a window to another it sits directly above or below. A
-     * window linked the other way round to this one lets go first, so
-     * two windows never hold each other.
-     */
-    public static synchronized boolean link(String windowId, String targetId,
-                                            boolean above) {
-        return link(windowId, targetId, above
-                ? Window.LinkSide.ABOVE : Window.LinkSide.BELOW);
-    }
-
-    /**
-     * Sticks a window to one side of another. A window stuck the other
-     * way round to this one lets go first, so two windows never hold
-     * each other, and a chain never closes on itself.
-     */
-    public static synchronized boolean link(String windowId, String targetId,
-                                            Window.LinkSide side) {
-        Window window = window(windowId);
-        Window target = window(targetId);
-        if (window == null || target == null || window == target
-                || side == null) {
-            return false;
-        }
-        if (windowId.equals(target.getLinkTarget())) {
-            target.setLink(null, Window.LinkSide.BELOW);
-        }
-        window.setLink(targetId, side);
-        changed();
-        return true;
-    }
-
-    /**
-     * Every window stuck to this one, however many hops away and in
-     * whichever direction the sticking runs, the window itself included.
-     * A stuck group moves as one piece, so a drag carries all of them.
-     */
-    public static synchronized List<Window> linkedGroup(
-            Window window) {
-        List<Window> group = new ArrayList<Window>();
-        if (window == null) {
-            return group;
-        }
-        group.add(window);
-        for (int pass = 0; pass < WINDOWS.size(); pass++) {
-            boolean grew = false;
-            for (Window candidate : WINDOWS) {
-                if (group.contains(candidate)) {
-                    continue;
-                }
-                for (int index = 0; index < group.size(); index++) {
-                    Window member = group.get(index);
-                    if (candidate.getId().equals(member.getLinkTarget())
-                            || member.getId().equals(
-                                    candidate.getLinkTarget())) {
-                        group.add(candidate);
-                        grew = true;
-                        break;
-                    }
-                }
-            }
-            if (!grew) {
-                break;
-            }
-        }
-        return group;
-    }
-
-    /**
-     * The window at the head of a stuck chain — the one whose stored
-     * position the others are placed from. A window that is stuck to
-     * nothing is its own root, and a chain that somehow closed on itself
-     * stops short of the window it started from.
-     */
-    public static synchronized Window linkRoot(Window window) {
-        Window root = window;
-        for (int step = 0; step < WINDOWS.size() && root != null
-                && root.isLinked(); step++) {
-            Window target = window(root.getLinkTarget());
-            if (target == null || target == window) {
-                break;
-            }
-            root = target;
-        }
-        return root == null ? window : root;
-    }
-
-    public static synchronized boolean unlink(String windowId) {
-        Window window = window(windowId);
-        if (window == null || !window.isLinked()) {
-            return false;
-        }
-        window.setLink(null, false);
-        changed();
-        return true;
-    }
-
-    /** Windows linked to the given one, which follow it when it moves. */
-    public static synchronized List<Window> linkedTo(String windowId) {
-        List<Window> result = new ArrayList<Window>();
-        for (int index = 0; index < WINDOWS.size(); index++) {
-            if (windowId != null
-                    && windowId.equals(WINDOWS.get(index).getLinkTarget())) {
-                result.add(WINDOWS.get(index));
-            }
-        }
-        return result;
-    }
-
     /** Writes the current state through the listener, if any. */
     public static synchronized void persist() {
         changed();
@@ -1248,17 +1162,9 @@ public final class WindowLayout {
         return new Window(ID_PREFIX + nextWindowNumber++);
     }
 
-    /** Takes an emptied window out of the layout; its holders let go. */
+    /** Takes an emptied window out of the layout. */
     private static void dropWindow(Window window) {
-        Iterator<Window> iterator = WINDOWS.iterator();
-        while (iterator.hasNext()) {
-            Window other = iterator.next();
-            if (other == window) {
-                iterator.remove();
-            } else if (window.getId().equals(other.getLinkTarget())) {
-                other.setLink(null, false);
-            }
-        }
+        WINDOWS.remove(window);
     }
 
     private static void changed() {
@@ -1286,17 +1192,10 @@ public final class WindowLayout {
         }
     }
 
-    static double clampPercent(double value) {
-        if (Double.isNaN(value) || Double.isInfinite(value)) {
-            return 0.0D;
-        }
-        return Math.max(0.0D, Math.min(100.0D, value));
-    }
-
     /**
-     * A window's percent: between the margins as {@link #clampPercent},
-     * and past them by up to the window's own size either way, which is
-     * how far a window may hang off the screen
+     * A window's percent: between the margins, 0 to 100, and past them
+     * by up to the window's own size either way, which is how far a
+     * window may hang off the screen
      * ({@link WindowPlacement#position}). A safety bound; where a
      * window really stops is the screen's hold on it.
      */

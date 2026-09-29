@@ -11,6 +11,7 @@ import com.ninuna.losttales.client.character.ClientCharacterRaceAttributes;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.client.window.WindowStyle;
+import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
@@ -115,7 +116,9 @@ final class CharacterProfileColumn {
             facts.add(ClientCharacterDisplayNames.race(raceId));
         }
         if (account) {
-            facts.add(I18n.format("gui.losttales.character.account_faction_none"));
+            // The account belongs to no faction until it pledges.
+            facts.add(ClientCharacterDisplayNames.faction(
+                    LotrCharacterAdapter.UNALIGNED_FACTION_ID));
         } else if (subject.factionId.length() > 0) {
             facts.add(ClientCharacterDisplayNames.faction(subject.factionId));
         }

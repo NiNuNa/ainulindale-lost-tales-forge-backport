@@ -1194,8 +1194,9 @@ public final class LostTalesChatPacketTest {
         LostTalesPacketCodec.writeUtf8String(probe, scopeValue, 128);
         // Behind the scope, for a line quoting nothing: the empty quote
         // of a line nobody named (author, words, colour), then the
-        // quote's head, a forward's link, a server line's component and
-        // its named players, every one of them empty.
+        // quote's head and whether it quotes an action, a forward's
+        // link, a server line's component and its named players, every
+        // one of them empty.
         LostTalesPacketCodec.writeUtf8String(probe, "", 256);
         LostTalesPacketCodec.writeUtf8String(probe, "", 297);
         probe.writeInt(0);
@@ -1204,6 +1205,7 @@ public final class LostTalesChatPacketTest {
         probe.writeLong(0L);
         probe.writeBoolean(false);
         LostTalesPacketCodec.writeUtf8String(probe, "", 128);
+        probe.writeBoolean(false);
         LostTalesPacketCodec.writeUtf8String(probe, "", 128);
         LostTalesPacketCodec.writeUtf8String(probe, "", 8192);
         probe.writeInt(0);

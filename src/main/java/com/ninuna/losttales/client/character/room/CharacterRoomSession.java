@@ -27,7 +27,7 @@ import java.util.UUID;
  * menu. The pause menu is that menu here, so every way out of the room
  * is one that cleans up after it.</p>
  *
- * <p>The room world made its own default character from the template
+ * <p>The room world made its own account character from the template
  * as it stood when the world began. What the creator saves during the
  * visit is worn from then on as a preview on the player's own body, so
  * the character in the room is the one that was just saved; the world's

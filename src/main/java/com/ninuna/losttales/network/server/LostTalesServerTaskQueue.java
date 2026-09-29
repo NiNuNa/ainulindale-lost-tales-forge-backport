@@ -21,16 +21,21 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Network handlers enqueue only immutable request data and the sender UUID.
  * The currently connected EntityPlayerMP is resolved on the server tick so a
  * queued request never executes against a stale entity object after reconnect,
- * respawn, or logout.
+ * respawn, or logout. Each player holds at most {@link #MAX_QUEUED_PER_PLAYER}
+ * places in it, so no one or two players can fill it and have everybody
+ * else's requests dropped.
  */
 public final class LostTalesServerTaskQueue {
 
     private static final int MAX_QUEUED_TASKS = 1024;
     private static final int MAX_TASKS_PER_TICK = 128;
+    static final int MAX_QUEUED_PER_PLAYER = 64;
     private static final Queue<QueuedPlayerTask> TASKS =
             new ConcurrentLinkedQueue<QueuedPlayerTask>();
     private static final AtomicInteger QUEUED_TASK_COUNT = new AtomicInteger();
     private static final Object LIFECYCLE_LOCK = new Object();
+    /** How many places each player holds in the queue; guarded by the lifecycle lock. */
+    private static final Map<UUID, Integer> QUEUED_PER_PLAYER = new HashMap<UUID, Integer>();
     private static volatile boolean acceptingTasks;
 
     public interface PlayerTask {
@@ -42,9 +47,13 @@ public final class LostTalesServerTaskQueue {
             return false;
         }
         synchronized (LIFECYCLE_LOCK) {
-            if (!acceptingTasks || QUEUED_TASK_COUNT.get() >= MAX_QUEUED_TASKS) {
+            Integer held = QUEUED_PER_PLAYER.get(ownerId);
+            int mine = held == null ? 0 : held.intValue();
+            if (!acceptingTasks || QUEUED_TASK_COUNT.get() >= MAX_QUEUED_TASKS
+                    || mine >= MAX_QUEUED_PER_PLAYER) {
                 return false;
             }
+            QUEUED_PER_PLAYER.put(ownerId, Integer.valueOf(mine + 1));
             QUEUED_TASK_COUNT.incrementAndGet();
             TASKS.add(new QueuedPlayerTask(ownerId, taskName, task));
             return true;
@@ -66,6 +75,7 @@ public final class LostTalesServerTaskQueue {
         QueuedPlayerTask queuedTask;
         while (processed < MAX_TASKS_PER_TICK && (queuedTask = TASKS.poll()) != null) {
             decrementQueuedTaskCount();
+            release(queuedTask.ownerId);
             if (!queuedTask.cancelled) {
                 EntityPlayerMP player = connectedPlayers.get(queuedTask.ownerId);
                 if (player != null && player.worldObj != null && !player.worldObj.isRemote) {
@@ -95,14 +105,11 @@ public final class LostTalesServerTaskQueue {
         }
     }
 
-    public static int getQueuedTaskCount() {
-        return QUEUED_TASK_COUNT.get();
-    }
-
     public static void startAccepting() {
         synchronized (LIFECYCLE_LOCK) {
             TASKS.clear();
             QUEUED_TASK_COUNT.set(0);
+            QUEUED_PER_PLAYER.clear();
             acceptingTasks = true;
         }
     }
@@ -112,13 +119,19 @@ public final class LostTalesServerTaskQueue {
             acceptingTasks = false;
             TASKS.clear();
             QUEUED_TASK_COUNT.set(0);
+            QUEUED_PER_PLAYER.clear();
         }
     }
 
-    public static void clear() {
+    /** The player gives back the place a task of theirs held. */
+    private static void release(UUID ownerId) {
         synchronized (LIFECYCLE_LOCK) {
-            TASKS.clear();
-            QUEUED_TASK_COUNT.set(0);
+            Integer held = QUEUED_PER_PLAYER.get(ownerId);
+            if (held == null || held.intValue() <= 1) {
+                QUEUED_PER_PLAYER.remove(ownerId);
+            } else {
+                QUEUED_PER_PLAYER.put(ownerId, Integer.valueOf(held.intValue() - 1));
+            }
         }
     }
 

@@ -61,7 +61,7 @@ public final class PartySyncManager {
         InviteTargetCollection inviteTargets = collectInviteTargets(
                 player, state);
         PartyStateSnapshot snapshot = PartyStateSnapshot.fromState(
-                ownerId, sequence, state,
+                ownerId, sequence, PartyService.memberLimit(), state,
                 inviteTargets.targets, inviteTargets.truncated);
         LostTalesNetworkHandler.CHANNEL.sendTo(
                 new PartyStateSyncPacket(requestId, snapshot), player);
@@ -128,7 +128,7 @@ public final class PartySyncManager {
         Party party;
         try {
             party = PartyService.getInstance()
-                    .getPartyForActiveCharacter(player);
+                    .getPartyForActiveIdentity(player);
         } catch (Throwable ignored) {
             return AudienceSnapshot.empty();
         }
@@ -158,7 +158,7 @@ public final class PartySyncManager {
         try {
             PartyWorldData data = PartyStorage.get(world);
             return AudienceSnapshot.fromParty(
-                    data.getPartyForCharacter(characterId));
+                    data.getPartyForIdentity(characterId));
         } catch (Throwable ignored) {
             return AudienceSnapshot.empty();
         }
@@ -173,7 +173,7 @@ public final class PartySyncManager {
         }
         try {
             PartyWorldData partyData = PartyStorage.get(world);
-            Party party = partyData.getPartyForCharacter(characterId);
+            Party party = partyData.getPartyForIdentity(characterId);
             PartyInvitationWorldData invitationData =
                     PartyInvitationStorage.get(world);
             if (party != null) {
@@ -184,8 +184,8 @@ public final class PartySyncManager {
                 }
             }
             for (PartyInvitation invitation : invitationData.getInvitations()) {
-                if (characterId.equals(invitation.getInvitingCharacterId())
-                        || characterId.equals(invitation.getTargetCharacterId())) {
+                if (characterId.equals(invitation.getInvitingIdentityId())
+                        || characterId.equals(invitation.getTargetIdentityId())) {
                     result.addInvitation(invitation);
                 }
             }
@@ -278,6 +278,20 @@ public final class PartySyncManager {
         }
     }
 
+    /** Sends every online player their party state, after a repair changed what they may see. */
+    public static void sendStateToEveryone() {
+        MinecraftServer server = MinecraftServer.getServer();
+        if (server == null || server.getConfigurationManager() == null) {
+            return;
+        }
+        for (Object value : new ArrayList<Object>(
+                server.getConfigurationManager().playerEntityList)) {
+            if (value instanceof EntityPlayerMP) {
+                sendState((EntityPlayerMP) value, UNSOLICITED_REQUEST_ID);
+            }
+        }
+    }
+
     public static void clearPlayer(UUID ownerId) {
         if (ownerId != null) {
             SEQUENCES.remove(ownerId);
@@ -307,14 +321,19 @@ public final class PartySyncManager {
         return next;
     }
 
+    /**
+     * The online players the leader of a party with room may invite: none
+     * in a party, none invited already, and no account one of whose
+     * identities is in this party, since the server refuses those.
+     */
     private static InviteTargetCollection collectInviteTargets(
             EntityPlayerMP receiver, PartyInvitationState state) {
         if (!LostTalesServerPlayers.isServerPlayer(receiver) || state == null
                 || !state.isSuccessful() || state.getParty() == null
-                || state.getActiveCharacterId() == null
-                || !state.getActiveCharacterId().equals(
-                state.getParty().getLeaderCharacterId())
-                || state.getParty().isFull()) {
+                || state.getActiveIdentityId() == null
+                || !state.getActiveIdentityId().equals(
+                state.getParty().getLeaderIdentityId())
+                || state.getParty().isFull(PartyService.memberLimit())) {
             return InviteTargetCollection.empty();
         }
 
@@ -337,7 +356,7 @@ public final class PartySyncManager {
         Set<UUID> alreadyInvitedCharacters = new HashSet<UUID>();
         for (PartyInvitation invitation : state.getOutgoingInvitations()) {
             if (invitation != null) {
-                alreadyInvitedCharacters.add(invitation.getTargetCharacterId());
+                alreadyInvitedCharacters.add(invitation.getTargetIdentityId());
             }
         }
 
@@ -353,14 +372,15 @@ public final class PartySyncManager {
                     || receiver.getUniqueID().equals(targetOwnerId)) {
                 continue;
             }
-            PartyService.ActiveCharacterContext target =
-                    PartyService.getInstance().resolveActiveCharacter(targetPlayer);
+            PartyService.ActiveIdentityContext target =
+                    PartyService.getInstance().resolveActiveIdentity(targetPlayer);
             if (!target.isValid()) {
                 continue;
             }
             UUID targetId = target.gameplayId();
-            if (state.getActiveCharacterId().equals(targetId)
-                    || partyData.getPartyForCharacter(targetId) != null
+            if (state.getActiveIdentityId().equals(targetId)
+                    || partyData.getPartyForIdentity(targetId) != null
+                    || state.getParty().hasMemberOwnedBy(target.ownerId())
                     || alreadyInvitedCharacters.contains(targetId)) {
                 continue;
             }

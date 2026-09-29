@@ -66,7 +66,7 @@ final class LostTalesLotrRoadLabelRenderer {
         }
         try {
             return new Prepared(
-                    gui, minecraft, minecraft.fontRenderer,
+                    gui, minecraft.fontRenderer,
                     posXField.getFloat(gui), posYField.getFloat(gui),
                     zoomScaleField.getFloat(gui),
                     zoomExpField.getFloat(gui),
@@ -154,7 +154,6 @@ final class LostTalesLotrRoadLabelRenderer {
 
     static final class Prepared {
         private final LOTRGuiMap gui;
-        private final Minecraft minecraft;
         private final FontRenderer font;
         private final float posX;
         private final float posY;
@@ -168,12 +167,11 @@ final class LostTalesLotrRoadLabelRenderer {
         private final int mapYMax;
 
         private Prepared(
-                LOTRGuiMap gui, Minecraft minecraft, FontRenderer font,
+                LOTRGuiMap gui, FontRenderer font,
                 float posX, float posY, float zoomScale, float zoomExp,
                 int mapWidth, int mapHeight,
                 int mapXMin, int mapXMax, int mapYMin, int mapYMax) {
             this.gui = gui;
-            this.minecraft = minecraft;
             this.font = font;
             this.posX = posX;
             this.posY = posY;

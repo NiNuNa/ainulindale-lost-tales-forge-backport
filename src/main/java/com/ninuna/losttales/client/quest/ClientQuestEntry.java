@@ -104,10 +104,6 @@ public final class ClientQuestEntry {
         return this.journalText;
     }
 
-    public Status getStatus() {
-        return this.status;
-    }
-
     public boolean isActive() {
         return this.status == Status.ACTIVE;
     }

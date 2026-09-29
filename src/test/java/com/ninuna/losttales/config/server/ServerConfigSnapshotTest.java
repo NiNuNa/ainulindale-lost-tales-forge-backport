@@ -38,7 +38,8 @@ public final class ServerConfigSnapshotTest {
     @Test
     public void everyServerKeyIsListedWithItsShapeAndTheClientsAreNot() {
         List<ServerConfigEntry> entries = ServerConfigSnapshot.fromConfiguration(sample(),
-                ServerConfigSnapshot.CLIENT_CATEGORIES, ServerConfigSnapshot.SECRET_KEYS);
+                ServerConfigSnapshot.CLIENT_CATEGORIES, Collections.<String>emptySet(),
+                ServerConfigSnapshot.SECRET_KEYS);
         assertNull(ServerConfigSnapshot.find(entries, "client", "showHud"));
         ServerConfigEntry poll = ServerConfigSnapshot.find(entries, "discord", "pollIntervalSeconds");
         assertNotNull(poll);
@@ -68,7 +69,8 @@ public final class ServerConfigSnapshotTest {
         Configuration config = sample();
         config.getCategory("discord").get("botToken").set("hunter2");
         List<ServerConfigEntry> entries = ServerConfigSnapshot.fromConfiguration(config,
-                ServerConfigSnapshot.CLIENT_CATEGORIES, ServerConfigSnapshot.SECRET_KEYS);
+                ServerConfigSnapshot.CLIENT_CATEGORIES, Collections.<String>emptySet(),
+                ServerConfigSnapshot.SECRET_KEYS);
         ServerConfigEntry token = ServerConfigSnapshot.find(entries, "discord", "botToken");
         assertTrue(token.isSecret());
         assertEquals("", token.getValue());
@@ -76,7 +78,8 @@ public final class ServerConfigSnapshotTest {
         // Without the secret set the value would travel.
         ServerConfigEntry shown = ServerConfigSnapshot.find(
                 ServerConfigSnapshot.fromConfiguration(config,
-                        ServerConfigSnapshot.CLIENT_CATEGORIES, new HashSet<String>()),
+                        ServerConfigSnapshot.CLIENT_CATEGORIES, Collections.<String>emptySet(),
+                        new HashSet<String>()),
                 "discord", "botToken");
         assertFalse(shown.isSecret());
         assertEquals("hunter2", shown.getValue());
@@ -85,7 +88,8 @@ public final class ServerConfigSnapshotTest {
     @Test
     public void theSnapshotBecomesAnEditableConfigurationOfTheSameShape() {
         List<ServerConfigEntry> entries = ServerConfigSnapshot.fromConfiguration(sample(),
-                ServerConfigSnapshot.CLIENT_CATEGORIES, ServerConfigSnapshot.SECRET_KEYS);
+                ServerConfigSnapshot.CLIENT_CATEGORIES, Collections.<String>emptySet(),
+                ServerConfigSnapshot.SECRET_KEYS);
         Configuration edited = ServerConfigSnapshot.toConfiguration(entries);
         assertFalse(edited.hasCategory("client"));
         Property poll = edited.getCategory("discord").get("pollIntervalSeconds");
@@ -101,7 +105,8 @@ public final class ServerConfigSnapshotTest {
         assertEquals(2, style.getValidValues().length);
         // A round trip of the edited configuration reads the same entries.
         List<ServerConfigEntry> again = ServerConfigSnapshot.fromConfiguration(edited,
-                ServerConfigSnapshot.CLIENT_CATEGORIES, ServerConfigSnapshot.SECRET_KEYS);
+                ServerConfigSnapshot.CLIENT_CATEGORIES, Collections.<String>emptySet(),
+                ServerConfigSnapshot.SECRET_KEYS);
         assertEquals(entries.size(), again.size());
         for (int index = 0; index < entries.size(); index++) {
             assertEquals(entries.get(index).qualifiedName(), again.get(index).qualifiedName());

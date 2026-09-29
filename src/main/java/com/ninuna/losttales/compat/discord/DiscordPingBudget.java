@@ -8,12 +8,14 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * How many Discord members each player may ping through the bridge: at
- * most {@link #MOST_PINGS} in any {@link #WINDOW_MILLIS}. A line past the
- * budget still posts, and its mentions still read as names; it only pings
- * nobody. The chat's own rate limit holds how often a player speaks; this
- * holds how many people on Discord they can call on while they do.
- * Static state, forgotten with the bridge's session.
+ * How many pings each player may make on Discord through the bridge: at
+ * most {@link #MOST_PINGS} in any {@link #WINDOW_MILLIS}. Every ping a
+ * post really makes counts, so a member pinged in three linked channels
+ * is three pings, and a post that pings nobody costs nothing. A post past
+ * the budget still goes, and its mentions still read as names; it only
+ * pings nobody. The chat's own rate limit holds how often a player
+ * speaks; this holds how many calls on people on Discord they can make
+ * while they do. Forgotten with the bridge's session.
  */
 final class DiscordPingBudget {
     static final int MOST_PINGS = 10;
@@ -24,15 +26,31 @@ final class DiscordPingBudget {
     private final Map<UUID, Deque<Long>> spent = new HashMap<UUID, Deque<Long>>();
 
     /**
-     * Whether {@code sender} may ping {@code pings} more members now, and
-     * if so, spends them: all or none.
+     * Whether {@code sender} may make {@code pings} more pings now. Asking
+     * spends nothing; {@link #spend} counts the pings once they are made.
      */
-    synchronized boolean spend(UUID sender, int pings, long now) {
+    synchronized boolean allows(UUID sender, int pings, long now) {
         if (pings <= 0) {
             return true;
         }
         if (sender == null || pings > MOST_PINGS) {
             return false;
+        }
+        Deque<Long> times = this.spent.get(sender);
+        if (times == null) {
+            return true;
+        }
+        dropExpired(times, now);
+        return times.size() + pings <= MOST_PINGS;
+    }
+
+    /**
+     * Counts {@code pings} pings {@code sender} made now. Only the newest
+     * {@link #MOST_PINGS} are kept, which is all the budget looks at.
+     */
+    synchronized void spend(UUID sender, int pings, long now) {
+        if (sender == null || pings <= 0) {
+            return;
         }
         Deque<Long> times = this.spent.get(sender);
         if (times == null) {
@@ -42,16 +60,20 @@ final class DiscordPingBudget {
             times = new ArrayDeque<Long>();
             this.spent.put(sender, times);
         }
+        dropExpired(times, now);
+        for (int index = 0; index < Math.min(pings, MOST_PINGS); index++) {
+            times.addLast(Long.valueOf(now));
+        }
+        while (times.size() > MOST_PINGS) {
+            times.pollFirst();
+        }
+    }
+
+    /** Forgets the pings that have run out of the window. */
+    private static void dropExpired(Deque<Long> times, long now) {
         while (!times.isEmpty() && now - times.peekFirst().longValue() >= WINDOW_MILLIS) {
             times.pollFirst();
         }
-        if (times.size() + pings > MOST_PINGS) {
-            return false;
-        }
-        for (int index = 0; index < pings; index++) {
-            times.addLast(Long.valueOf(now));
-        }
-        return true;
     }
 
     synchronized void clear() {

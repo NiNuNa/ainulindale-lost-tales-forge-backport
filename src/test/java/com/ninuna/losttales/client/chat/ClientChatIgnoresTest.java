@@ -16,6 +16,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public final class ClientChatIgnoresTest {
+    private static final UUID ACCOUNT =
+            UUID.fromString("a0000000-0000-0000-0000-00000000000a");
 
     private static final UUID ACCOUNT_A =
             UUID.fromString("00000000-0000-0000-0000-00000000000a");
@@ -34,20 +36,20 @@ public final class ClientChatIgnoresTest {
     @Test
     public void ignoresPersistAcrossAReload() throws Exception {
         File configDir = temporaryFolder.newFolder();
-        ClientChatIgnores.initialize(configDir);
+        ClientChatIgnores.initialize(configDir, ACCOUNT);
         assertTrue(ClientChatIgnores.ignore(ACCOUNT_A, "Aldric"));
         assertTrue(ClientChatIgnores.isIgnored(ACCOUNT_A));
         assertTrue(ClientChatIgnores.isIgnoredName("aldric"));
         assertFalse(ClientChatIgnores.isIgnored(ACCOUNT_B));
 
-        ClientChatIgnores.initialize(configDir);
+        ClientChatIgnores.initialize(configDir, ACCOUNT);
         assertTrue(ClientChatIgnores.isIgnored(ACCOUNT_A));
         assertTrue(ClientChatIgnores.isIgnoredName("ALDRIC"));
         assertEquals(1, ClientChatIgnores.count());
 
         assertTrue(ClientChatIgnores.unignore(ACCOUNT_A));
         assertFalse(ClientChatIgnores.unignore(ACCOUNT_A));
-        ClientChatIgnores.initialize(configDir);
+        ClientChatIgnores.initialize(configDir, ACCOUNT);
         assertFalse(ClientChatIgnores.isIgnored(ACCOUNT_A));
         assertEquals(0, ClientChatIgnores.count());
     }
@@ -60,7 +62,7 @@ public final class ClientChatIgnoresTest {
     @Test
     public void aCharacterIsIgnoredOnItsOwn() throws Exception {
         File configDir = temporaryFolder.newFolder();
-        ClientChatIgnores.initialize(configDir);
+        ClientChatIgnores.initialize(configDir, ACCOUNT);
         assertTrue(ClientChatIgnores.ignoreIdentity(ACCOUNT_A, "Aldric the Bold"));
         assertTrue(ClientChatIgnores.isIgnoredIdentity(ACCOUNT_A, "aldric the bold"));
         assertFalse(ClientChatIgnores.isIgnoredIdentity(ACCOUNT_A, "Aldric"));
@@ -70,7 +72,7 @@ public final class ClientChatIgnoresTest {
         assertFalse(ClientChatIgnores.isIgnoredName("Aldric the Bold"));
         assertEquals(1, ClientChatIgnores.count());
 
-        ClientChatIgnores.initialize(configDir);
+        ClientChatIgnores.initialize(configDir, ACCOUNT);
         assertTrue(ClientChatIgnores.isIgnoredIdentity(ACCOUNT_A, "Aldric the Bold"));
         assertTrue(ClientChatIgnores.isIgnoredIdentityName("aldric the bold"));
         assertEquals(1, ClientChatIgnores.count());
@@ -78,7 +80,7 @@ public final class ClientChatIgnoresTest {
         assertTrue(ClientChatIgnores.unignoreIdentity(ACCOUNT_A, "Aldric the Bold"));
         assertFalse(ClientChatIgnores.unignoreIdentity(ACCOUNT_A, "Aldric the Bold"));
         assertFalse(ClientChatIgnores.isIgnoredIdentityName("aldric the bold"));
-        ClientChatIgnores.initialize(configDir);
+        ClientChatIgnores.initialize(configDir, ACCOUNT);
         assertEquals(0, ClientChatIgnores.count());
         assertFalse(ClientChatIgnores.ignoreIdentity(null, "x"));
         assertFalse(ClientChatIgnores.ignoreIdentity(ACCOUNT_A, "  "));
@@ -87,7 +89,7 @@ public final class ClientChatIgnoresTest {
     @Test
     public void learnedNamesLastTheSessionAndAccountNamesLastForever()
             throws Exception {
-        ClientChatIgnores.initialize(temporaryFolder.newFolder());
+        ClientChatIgnores.initialize(temporaryFolder.newFolder(), ACCOUNT);
         assertTrue(ClientChatIgnores.ignore(ACCOUNT_A, "Aldric"));
         // A name is only learned for accounts actually ignored.
         ClientChatIgnores.rememberName(ACCOUNT_B, "Beren");
@@ -109,7 +111,7 @@ public final class ClientChatIgnoresTest {
     @Test
     public void malformedLinesAreDroppedAndTheCapHolds() throws Exception {
         File configDir = temporaryFolder.newFolder();
-        File file = new File(configDir, ClientChatIgnores.FILE_PATH);
+        File file = new File(new File(configDir, ClientChatIgnores.FOLDER), ACCOUNT + ".txt");
         assertTrue(file.getParentFile().mkdirs());
         Writer writer = new OutputStreamWriter(new FileOutputStream(file),
                 Charset.forName("UTF-8"));
@@ -121,7 +123,7 @@ public final class ClientChatIgnoresTest {
         } finally {
             writer.close();
         }
-        ClientChatIgnores.initialize(configDir);
+        ClientChatIgnores.initialize(configDir, ACCOUNT);
         assertEquals(2, ClientChatIgnores.count());
         assertTrue(ClientChatIgnores.isIgnored(ACCOUNT_A));
         assertTrue(ClientChatIgnores.isIgnored(ACCOUNT_B));
@@ -134,5 +136,18 @@ public final class ClientChatIgnoresTest {
         assertFalse(ClientChatIgnores.ignore(new UUID(2L, 1L), "OneTooMany"));
         // Re-ignoring an already ignored account is never a capacity question.
         assertTrue(ClientChatIgnores.ignore(ACCOUNT_A, "Aldric"));
+    }
+
+    @Test
+    public void eachAccountKeepsItsOwnIgnores() throws Exception {
+        File configDir = temporaryFolder.newFolder();
+        UUID stranger = UUID.fromString("b0000000-0000-0000-0000-00000000000b");
+        ClientChatIgnores.initialize(configDir, ACCOUNT);
+        ClientChatIgnores.ignore(stranger, "Stranger");
+        ClientChatIgnores.initialize(configDir,
+                UUID.fromString("c0000000-0000-0000-0000-00000000000c"));
+        assertFalse(ClientChatIgnores.isIgnored(stranger));
+        ClientChatIgnores.initialize(configDir, ACCOUNT);
+        assertTrue(ClientChatIgnores.isIgnored(stranger));
     }
 }

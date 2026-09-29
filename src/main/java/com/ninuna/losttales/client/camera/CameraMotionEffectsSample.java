@@ -2,11 +2,6 @@ package com.ninuna.losttales.client.camera;
 
 /** Per-frame player state consumed by situational camera motion. */
 public final class CameraMotionEffectsSample {
-    public static final CameraMotionEffectsSample NONE =
-            new CameraMotionEffectsSample(
-                    false, true, false, false,
-                    false, 0, 0.0D, 0.0D);
-
     private final boolean airborne;
     private final boolean onGround;
     private final boolean riding;

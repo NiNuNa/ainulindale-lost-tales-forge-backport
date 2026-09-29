@@ -114,8 +114,4 @@ public final class PointerRegions {
         }
         return false;
     }
-
-    int count() {
-        return this.count;
-    }
 }

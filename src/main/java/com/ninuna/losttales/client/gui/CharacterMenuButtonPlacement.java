@@ -26,14 +26,6 @@ public final class CharacterMenuButtonPlacement {
     public static final int WIDTH = 24;
     /** Between the button and the column of menu buttons it sits beside. */
     public static final int GAP = MainMenuButtonLayout.GAP;
-    /**
-     * The height the vanilla menu's own spacing gives the button: its
-     * buttons are twenty tall and twenty-four apart, so the top of
-     * Singleplayer to the bottom of Multiplayer is forty-four. LOTR moves
-     * the column but keeps the spacing, and the real height is measured
-     * from the buttons; this is what to size a figure against.
-     */
-    public static final int VANILLA_HEIGHT = 44;
 
     /** Clear of the screen edge, the same margin vanilla leaves. */
     private static final int SCREEN_MARGIN = 2;

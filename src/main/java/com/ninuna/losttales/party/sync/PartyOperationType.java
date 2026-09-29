@@ -15,6 +15,7 @@ public enum PartyOperationType {
     CANCEL_INVITATION(10, "cancel_invitation"),
     SET_GO_HERE_MARKER(11, "set_go_here_marker"),
     REMOVE_GO_HERE_MARKER(12, "remove_go_here_marker"),
+    RENAME(13, "rename"),
     UNKNOWN(255, "unknown");
 
     private final int networkId;
@@ -39,6 +40,7 @@ public enum PartyOperationType {
                 || this == DISBAND
                 || this == TRANSFER_LEADERSHIP
                 || this == SET_COLOR
+                || this == RENAME
                 || this == INVITE_PLAYER
                 || this == CANCEL_INVITATION;
     }
@@ -54,6 +56,11 @@ public enum PartyOperationType {
 
     public boolean requiresColor() {
         return this == SET_COLOR;
+    }
+
+    /** Only a rename carries a name. */
+    public boolean requiresName() {
+        return this == RENAME;
     }
 
     public static PartyOperationType fromNetworkId(int networkId) {

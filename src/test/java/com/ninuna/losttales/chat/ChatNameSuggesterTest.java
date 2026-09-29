@@ -17,7 +17,7 @@ public final class ChatNameSuggesterTest {
                     Arrays.asList("Steve123", "Aragorn")),
             new ChatMentionCandidate("uuid-2", "Grey_Wanderer",
                     Arrays.asList("Grey_Wanderer", "Gandalf")),
-            ChatMentionCandidate.single("account:padda", "Padda"),
+            new ChatMentionCandidate("account:padda", "Padda", null),
             null);
     /** The same players shaped for a role-play (character) channel. */
     private static final List<ChatMentionCandidate> ROLEPLAY = Arrays.asList(
@@ -25,7 +25,7 @@ public final class ChatNameSuggesterTest {
                     Arrays.asList("Steve123", "Aragorn")),
             new ChatMentionCandidate("uuid-2", "Gandalf",
                     Arrays.asList("Grey_Wanderer", "Gandalf")),
-            ChatMentionCandidate.single("account:padda", "Padda"));
+            new ChatMentionCandidate("account:padda", "Padda", null));
 
     @Test
     public void plainTextCommandsAndAddressesProduceNoQuery() {
@@ -122,6 +122,6 @@ public final class ChatNameSuggesterTest {
                 candidate.getAliases());
         assertTrue(candidate.matches("STE".toLowerCase()));
         assertFalse(candidate.matches("gimli"));
-        assertFalse(ChatMentionCandidate.single("k", "  ").isUsable());
+        assertFalse(new ChatMentionCandidate("k", "  ", null).isUsable());
     }
 }

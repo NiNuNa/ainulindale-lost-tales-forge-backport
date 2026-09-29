@@ -31,14 +31,6 @@ public final class CameraProfile {
         this.motion = motion;
     }
 
-    public CameraPose createTargetPose(
-            double positionX, double positionY, double positionZ,
-            double yaw, double pitch) {
-        return new CameraPose(
-                positionX, positionY, positionZ, yaw, pitch, distance,
-                shoulderOffset, verticalOffset, fovOffset);
-    }
-
     public CameraProfileId getId() {
         return id;
     }

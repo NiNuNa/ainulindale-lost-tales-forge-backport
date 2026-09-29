@@ -34,6 +34,7 @@ import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.MotionTransition;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -92,6 +93,11 @@ public final class QuestJournalPage extends PageContent {
     private static final String CLEAR = "clear";
     /** The key that tracks the quest being read, as the tip names it. */
     private static final int TRACK_KEY = Keyboard.KEY_SPACE;
+    /** The lang keys of the server's word on tracking a quest, which answers Track. */
+    private static final List<String> TRACKING_LINES = Arrays.asList(
+            "chat.losttales.quest.note.tracking",
+            "chat.losttales.quest.note.untracked",
+            "chat.losttales.quest.note.untracked_all");
 
     private final Minecraft mc = Minecraft.getMinecraft();
     private FontRenderer fontRendererObj;
@@ -290,6 +296,20 @@ public final class QuestJournalPage extends PageContent {
     @Override
     public int tone() {
         return LostTalesColors.rgb(LostTalesColors.TAN);
+    }
+
+    /**
+     * The server's word on tracking a quest answers the journal's Track
+     * while the journal is shown: it stands over the bar, not in the chat.
+     */
+    @Override
+    public boolean answersLine(String key) {
+        return TRACKING_LINES.contains(key);
+    }
+
+    @Override
+    public void answerLine(String key, String words) {
+        sayDone(words);
     }
 
     @Override
@@ -1364,17 +1384,6 @@ public final class QuestJournalPage extends PageContent {
             height += row.height;
         }
         return height;
-    }
-
-    private int getQuestRowY(List<QuestListRow> rows, int questIndex, int startY) {
-        int y = startY;
-        for (QuestListRow row : rows) {
-            if (!row.category && row.questIndex == questIndex) {
-                return y;
-            }
-            y += row.height;
-        }
-        return Integer.MIN_VALUE;
     }
 
     private int getQuestCategoryStartY(List<QuestListRow> rows, int questIndex) {

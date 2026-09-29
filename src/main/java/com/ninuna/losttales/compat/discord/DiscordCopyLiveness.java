@@ -10,9 +10,11 @@ import java.util.List;
 /**
  * Whether a Discord copy of a game message is live right now: the one
  * rule every action on a copy asks, on whichever thread it runs. A copy
- * is live while the message's game channel — for the Faction channel,
- * its faction — is bound, by a binding in force now, to the Discord
- * channel the copy is in, in the direction the action crosses:
+ * is live while the message's game channel is open to the bridge, as
+ * {@link DiscordBridgePolicy} decides for a new line, and — for the
+ * Faction channel, its faction — is bound, by a binding in force now, to
+ * the Discord channel the copy is in, in the direction the action
+ * crosses:
  *
  * <ul>
  * <li>To Discord — the bot's reaction put on or taken off, a webhook
@@ -27,7 +29,8 @@ import java.util.List;
  * A binding that only reads carries nothing to Discord: the bot never
  * reacts in its channel and no game line links into it. A copy that is
  * not live is left alone on both sides and its link is kept, so binding
- * the pair again brings everything back. Bindings are matched by their
+ * the pair again, or lifting a read gate on the channel, brings
+ * everything back. Bindings are matched by their
  * game channel and their Discord channel, never by id: an id's ordinal
  * moves when the config is reordered. A Discord member's own line is a
  * copy in the channel it was read from. The server's announcements are
@@ -85,13 +88,14 @@ final class DiscordCopyLiveness {
      * copy is in {@code discordChannelId}; a copy whose channel was never
      * learnt is known by {@code webhookUrl}, the webhook it went through,
      * which only an action to Discord can go by. False for a message of
-     * no known channel.
+     * no known channel, and for one whose channel is closed to the bridge.
      */
     static boolean isLive(DiscordChannelBindings bindings, ChatChannel channel,
                           String factionScope, String discordChannelId,
                           String webhookUrl, Crossing crossing,
                           Webhooks webhooks) {
-        if (bindings == null || channel == null || crossing == null) {
+        if (bindings == null || channel == null || crossing == null
+                || !DiscordBridgePolicy.isOpenToTheBridge(channel)) {
             return false;
         }
         String copyChannel = discordChannelId == null ? "" : discordChannelId;
@@ -239,13 +243,15 @@ final class DiscordCopyLiveness {
      * its webhook; a copy brought back from the save does not, and uses
      * the webhook of such a binding that Discord says posts into the
      * copy's channel. A Discord member's own line was made by no webhook.
+     * Nothing goes through while the channel is closed to the bridge.
      */
     static String correctionWebhook(DiscordChannelBindings bindings,
                                     ChatChannel channel, String factionScope,
                                     DiscordMessageLinks.Copy copy,
                                     Webhooks webhooks) {
         if (bindings == null || channel == null || copy == null
-                || (copy.bindingId.length() == 0 && copy.webhookUrl.length() == 0)) {
+                || (copy.bindingId.length() == 0 && copy.webhookUrl.length() == 0)
+                || !DiscordBridgePolicy.isOpenToTheBridge(channel)) {
             return "";
         }
         String copyChannel = channelIdOf(copy.destination);

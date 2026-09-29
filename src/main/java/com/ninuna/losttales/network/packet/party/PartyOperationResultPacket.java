@@ -125,19 +125,12 @@ public final class PartyOperationResultPacket implements IMessage {
                 this.requestId,
                 this.operationType,
                 this.successful,
-                this.changed,
-                this.partyDisbanded,
                 this.errorId,
-                this.partyRevision,
                 this.stateFollows);
     }
 
     public int getRequestId() {
         return this.requestId;
-    }
-
-    public PartyOperationType getOperationType() {
-        return this.operationType;
     }
 
     public boolean isMalformed() {

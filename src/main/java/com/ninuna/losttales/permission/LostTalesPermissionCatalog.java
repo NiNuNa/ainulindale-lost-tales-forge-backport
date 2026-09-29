@@ -36,25 +36,20 @@ public final class LostTalesPermissionCatalog {
 
     /** The capability ids each permission reaches, by permission id. */
     private final Map<String, Set<String>> capabilityIds;
-    private final Map<String, String> descriptions;
 
-    private LostTalesPermissionCatalog(Map<String, Set<String>> capabilityIds,
-                                       Map<String, String> descriptions) {
+    private LostTalesPermissionCatalog(Map<String, Set<String>> capabilityIds) {
         Map<String, Set<String>> copied = new LinkedHashMap<String, Set<String>>();
         for (Map.Entry<String, Set<String>> entry : capabilityIds.entrySet()) {
             copied.put(entry.getKey(), Collections.unmodifiableSet(
                     new LinkedHashSet<String>(entry.getValue())));
         }
         this.capabilityIds = Collections.unmodifiableMap(copied);
-        this.descriptions = Collections.unmodifiableMap(
-                new LinkedHashMap<String, String>(descriptions));
     }
 
     /** No permission defined: every grant is read as a capability id. */
     public static LostTalesPermissionCatalog empty() {
         return new LostTalesPermissionCatalog(
-                Collections.<String, Set<String>>emptyMap(),
-                Collections.<String, String>emptyMap());
+                Collections.<String, Set<String>>emptyMap());
     }
 
     /**
@@ -63,8 +58,7 @@ public final class LostTalesPermissionCatalog {
      * reaches nothing, since a name with nothing behind it must never
      * read as a name with everything behind it.
      */
-    public static LostTalesPermissionCatalog of(Map<String, Set<String>> capabilityIds,
-                                                Map<String, String> descriptions) {
+    public static LostTalesPermissionCatalog of(Map<String, Set<String>> capabilityIds) {
         Map<String, Set<String>> byId = new LinkedHashMap<String, Set<String>>();
         if (capabilityIds != null) {
             for (Map.Entry<String, Set<String>> entry : capabilityIds.entrySet()) {
@@ -75,17 +69,7 @@ public final class LostTalesPermissionCatalog {
                 }
             }
         }
-        Map<String, String> texts = new LinkedHashMap<String, String>();
-        if (descriptions != null) {
-            for (Map.Entry<String, String> entry : descriptions.entrySet()) {
-                if (entry.getKey() != null && byId.containsKey(
-                        entry.getKey().trim().toLowerCase(Locale.ROOT))) {
-                    texts.put(entry.getKey().trim().toLowerCase(Locale.ROOT),
-                            entry.getValue() == null ? "" : entry.getValue());
-                }
-            }
-        }
-        return new LostTalesPermissionCatalog(byId, texts);
+        return new LostTalesPermissionCatalog(byId);
     }
 
     public static LostTalesPermissionCatalog current() {
@@ -94,10 +78,6 @@ public final class LostTalesPermissionCatalog {
 
     public static void install(LostTalesPermissionCatalog catalog) {
         current = catalog == null ? empty() : catalog;
-    }
-
-    public static void resetToEmpty() {
-        current = empty();
     }
 
     /** Every permission id defined, in the order the file lists them. */
@@ -110,20 +90,6 @@ public final class LostTalesPermissionCatalog {
     public boolean isDefined(String permissionId) {
         return permissionId != null && this.capabilityIds.containsKey(
                 permissionId.trim().toLowerCase(Locale.ROOT));
-    }
-
-    /** What the file says the permission is for; empty when it says nothing. */
-    public String descriptionOf(String permissionId) {
-        String text = permissionId == null ? null
-                : this.descriptions.get(permissionId.trim().toLowerCase(Locale.ROOT));
-        return text == null ? "" : text;
-    }
-
-    /** The capability ids the permission names; empty for one that is not defined. */
-    public Set<String> capabilityIdsOf(String permissionId) {
-        Set<String> ids = permissionId == null ? null
-                : this.capabilityIds.get(permissionId.trim().toLowerCase(Locale.ROOT));
-        return ids == null ? Collections.<String>emptySet() : ids;
     }
 
     /**

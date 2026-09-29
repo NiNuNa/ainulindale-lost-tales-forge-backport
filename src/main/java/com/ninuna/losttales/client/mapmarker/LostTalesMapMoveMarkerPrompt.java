@@ -35,10 +35,6 @@ final class LostTalesMapMoveMarkerPrompt {
         this.hasDestination = hasDestination;
     }
 
-    boolean hasDestination() {
-        return this.hasDestination;
-    }
-
     void render(int screenWidth, int screenHeight,
                 int mouseX, int mouseY) {
         Minecraft minecraft = Minecraft.getMinecraft();

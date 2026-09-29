@@ -26,7 +26,7 @@ public final class LostTalesChatHoverCardTest {
     @Test
     public void theCardListsEveryRoleByDisplayPriority() {
         ChatAccountRole moderator = ChatAccountRole.custom("moderator", "Moderator",
-                "", 0xA94B54, true, 20, null);
+                "", 0xA94B54, true, 20, null, null, null);
         ChatRoleCatalog.install(ChatRoleCatalog.of(
                 java.util.Arrays.asList(ChatRoleFixtures.OPERATOR, moderator), null, null));
         int held = ChatRoleCatalog.current().byId("moderator").bit()
@@ -39,14 +39,6 @@ public final class LostTalesChatHoverCardTest {
                 ChatRoleFixtures.OPERATOR.bit()));
         assertEquals("", LostTalesChatHoverCard.roleNames(0));
     }
-    @Test
-    public void hitBoundsHandleScaledAnimatedGeometry() {
-        assertTrue(LostTalesChatHoverCard.contains(
-                31.0F, 42.0F, 20.0F, 40.0F, 44.0F, 49.0F));
-        assertFalse(LostTalesChatHoverCard.contains(
-                44.0F, 42.0F, 20.0F, 40.0F, 44.0F, 49.0F));
-    }
-
     @Test
     public void cardFlipsAndClampsAtScreenEdges() {
         assertEquals(38,

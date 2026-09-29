@@ -43,10 +43,6 @@ final class LostTalesMapInputTracker {
         return click;
     }
 
-    boolean isPressActive() {
-        return this.pressActive;
-    }
-
     /** Abandons the press without letting it complete as a click. */
     void cancelPress() {
         this.pressActive = false;

@@ -30,10 +30,6 @@ public enum CharacterCreatorCategory {
         this.shot = shot;
     }
 
-    public String getId() {
-        return this.id;
-    }
-
     /** The language key of the tab's name. */
     public String getLabelKey() {
         return KEY_PREFIX + this.id;

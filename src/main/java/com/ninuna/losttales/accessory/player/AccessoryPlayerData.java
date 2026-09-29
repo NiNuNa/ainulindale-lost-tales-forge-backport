@@ -73,11 +73,6 @@ public final class AccessoryPlayerData implements IExtendedEntityProperties {
         return this.inventory;
     }
 
-    public NBTTagCompound getRejectedEntry() {
-        return this.rejectedEntries.isEmpty() ? null
-                : (NBTTagCompound)this.rejectedEntries.get(0).copy();
-    }
-
     public List<NBTTagCompound> getRejectedEntries() {
         ArrayList<NBTTagCompound> copy =
                 new ArrayList<NBTTagCompound>(this.rejectedEntries.size());
@@ -90,11 +85,6 @@ public final class AccessoryPlayerData implements IExtendedEntityProperties {
     public boolean hasRejectedEntry() {
         return !this.rejectedEntries.isEmpty()
                 || this.serverRejectedEntryPresent;
-    }
-
-    /** Replaces or removes the first entry after a partial recovery attempt. */
-    public void replaceRejectedEntry(ItemStack stack) {
-        replaceRejectedEntry(0, stack);
     }
 
     public void replaceRejectedEntry(int index, ItemStack stack) {

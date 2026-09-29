@@ -58,7 +58,6 @@ public final class LostTalesMapCursor {
      * interface at every resolution and GUI scale, and its pixels line up with
      * everything else drawn on the map.
      */
-    static final int SPRITE_WIDTH = 8;
     static final int SPRITE_HEIGHT = 10;
     /** Where each pose's artwork sits in the strip, and how wide it is. */
     private static final int ARROW_WIDTH = 8;
@@ -221,10 +220,6 @@ public final class LostTalesMapCursor {
     private static boolean isInsideActiveClient() {
         return Display.isCreated() && Mouse.isCreated()
                 && !Mouse.isGrabbed() && Mouse.isInsideWindow();
-    }
-
-    static boolean isHeld() {
-        return held;
     }
 
     /** As below: the hand when the thing under the pointer answers to a click. */

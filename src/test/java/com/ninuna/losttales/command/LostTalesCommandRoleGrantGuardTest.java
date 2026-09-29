@@ -22,7 +22,8 @@ public final class LostTalesCommandRoleGrantGuardTest {
     @After
     public void tearDown() {
         ChatRoleCatalog.resetToBuiltIn();
-        com.ninuna.losttales.permission.LostTalesPermissionCatalog.resetToEmpty();
+        com.ninuna.losttales.permission.LostTalesPermissionCatalog.install(
+                com.ninuna.losttales.permission.LostTalesPermissionCatalog.empty());
     }
 
     private static ChatAccountRole granting(LostTalesCapability... capabilities) {
@@ -31,14 +32,14 @@ public final class LostTalesCommandRoleGrantGuardTest {
             grants.add(capability.getId());
         }
         return ChatAccountRole.custom("moderator", "Moderator", "",
-                0xA94B54, true, 15, null, grants);
+                0xA94B54, true, 15, null, grants, null);
     }
 
     /** A role granting a configured permission is refused the same way. */
     private static ChatAccountRole grantingPermission(String permissionId) {
         return ChatAccountRole.custom("moderator", "Moderator", "",
                 0xA94B54, true, 15, null,
-                new LinkedHashSet<String>(Arrays.asList(permissionId)));
+                new LinkedHashSet<String>(Arrays.asList(permissionId)), null);
     }
 
     /** An operator holds every capability by level, so nothing is withheld from them. */
@@ -87,7 +88,7 @@ public final class LostTalesCommandRoleGrantGuardTest {
         assertNull(LostTalesCommandRole.withheldGrant(
                 FakeCommandSender.player("Someone"),
                 ChatAccountRole.custom("herald", "Herald", "", 0x112233,
-                        true, 30, null, null)));
+                        true, 30, null, null, null)));
     }
 
     /**

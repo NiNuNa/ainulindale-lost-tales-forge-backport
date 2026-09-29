@@ -46,7 +46,7 @@ public final class CharacterSwitchRecoveryReconciler {
                 throw new IllegalStateException(
                         "Unhandled character switch recovery action " + action);
         }
-        return new Result(action, true,
+        return new Result(true,
                 action == Action.REQUIRE_MANUAL_RECOVERY
                         ? CharacterErrorId.SWITCH_RECOVERY_REQUIRED
                         : CharacterErrorId.NONE);
@@ -138,21 +138,14 @@ public final class CharacterSwitchRecoveryReconciler {
 
     public static final class Result {
         private static final Result NO_JOURNAL = new Result(
-                Action.NO_JOURNAL, false, CharacterErrorId.NONE);
+                false, CharacterErrorId.NONE);
 
-        private final Action action;
         private final boolean changed;
         private final CharacterErrorId errorId;
 
-        private Result(Action action, boolean changed,
-                       CharacterErrorId errorId) {
-            this.action = action;
+        private Result(boolean changed, CharacterErrorId errorId) {
             this.changed = changed;
             this.errorId = errorId;
-        }
-
-        public Action getAction() {
-            return this.action;
         }
 
         public boolean isChanged() {

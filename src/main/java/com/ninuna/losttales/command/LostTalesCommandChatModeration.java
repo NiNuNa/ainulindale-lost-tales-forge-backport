@@ -8,6 +8,7 @@ import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.permission.LostTalesCapability;
+import com.ninuna.losttales.permission.LostTalesPermissions;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
 import java.util.List;
 import java.util.UUID;
@@ -102,6 +103,17 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
                     + "have written, or discord:<their Discord id>.");
             return;
         }
+        if (target != null && target == sender) {
+            send(sender, EnumChatFormatting.RED + "You cannot mute yourself.");
+            return;
+        }
+        String withheld = target == null ? null : withheldPower(sender, target);
+        if (withheld != null) {
+            send(sender, EnumChatFormatting.RED + "You cannot mute "
+                    + target.getCommandSenderName() + ": they hold " + withheld
+                    + ", which you do not.");
+            return;
+        }
         long now = System.currentTimeMillis();
         int reasonFrom = 2;
         long expiresAt = ChatMuteEntry.EXPIRES_NEVER;
@@ -133,6 +145,24 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
                         : " for " + ChatMuteDurations.formatRemaining(
                                 expiresAt - now))
                 + (reason.length() > 0 ? ": " + reason : "") + ".");
+    }
+
+    /**
+     * The first capability {@code target} holds that {@code sender} does
+     * not, or null when they hold nothing more. A mute silences someone
+     * who could otherwise lift it or overrule the one who set it, so only
+     * someone who can do all they can may mute them, as a role is only
+     * handed on by someone who could do all it allows. The server console
+     * and an operator hold everything.
+     */
+    static String withheldPower(ICommandSender sender, EntityPlayerMP target) {
+        for (LostTalesCapability capability : LostTalesCapability.all()) {
+            if (LostTalesPermissions.has(target, capability)
+                    && !LostTalesPermissions.has(sender, capability)) {
+                return capability.getId();
+            }
+        }
+        return null;
     }
 
     private void unmute(ICommandSender sender, ChatMuteWorldData mutes,

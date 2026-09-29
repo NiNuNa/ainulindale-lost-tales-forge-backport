@@ -5,10 +5,16 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import org.junit.Test;
 
 public final class LostTalesMapSearchPromptTest {
+    /** The name each test entry was made with. */
+    private static final Map<LostTalesMapSearchPrompt.Entry, String> NAMES =
+            new IdentityHashMap<LostTalesMapSearchPrompt.Entry, String>();
+
     @Test
     public void anEmptyQueryOffersEverything() {
         List<LostTalesMapSearchPrompt.Entry> entries =
@@ -58,7 +64,7 @@ public final class LostTalesMapSearchPromptTest {
             List<LostTalesMapSearchPrompt.Entry> entries) {
         ArrayList<String> names = new ArrayList<String>();
         for (LostTalesMapSearchPrompt.Entry entry : entries) {
-            names.add(entry.getName());
+            names.add(NAMES.get(entry));
         }
         return names;
     }
@@ -72,7 +78,10 @@ public final class LostTalesMapSearchPromptTest {
         ArrayList<LostTalesMapSearchPrompt.Entry> entries =
                 new ArrayList<LostTalesMapSearchPrompt.Entry>();
         for (String name : sorted) {
-            entries.add(new LostTalesMapSearchPrompt.Entry(null, name));
+            LostTalesMapSearchPrompt.Entry entry =
+                    new LostTalesMapSearchPrompt.Entry(null, name);
+            NAMES.put(entry, name);
+            entries.add(entry);
         }
         return entries;
     }

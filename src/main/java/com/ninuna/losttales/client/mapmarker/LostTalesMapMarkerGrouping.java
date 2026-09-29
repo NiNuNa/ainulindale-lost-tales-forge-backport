@@ -109,10 +109,6 @@ final class LostTalesMapMarkerGrouping {
             return UNKNOWN;
         }
 
-        boolean isGroupingEligible() {
-            return this.groupingEligible;
-        }
-
         boolean canGroupWith(GroupingCategory other) {
             return other != null && this.groupingEligible
                     && other.groupingEligible && this == other;
@@ -639,14 +635,6 @@ final class LostTalesMapMarkerGrouping {
             this.bottom = Math.max(top, bottom);
         }
 
-        String getId() {
-            return this.id;
-        }
-
-        int getRelevanceRank() {
-            return this.relevanceRank;
-        }
-
         GroupingCategory getGroupingCategory() {
             return this.category;
         }
@@ -657,10 +645,6 @@ final class LostTalesMapMarkerGrouping {
 
         float getTop() {
             return this.top;
-        }
-
-        boolean isGroupingEligible() {
-            return this.category.isGroupingEligible();
         }
 
         boolean canGroupWith(Entry other) {

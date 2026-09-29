@@ -3,7 +3,6 @@ package com.ninuna.losttales.chat.emoji;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 
 public final class ChatEmoticonConverterTest {
@@ -53,16 +52,15 @@ public final class ChatEmoticonConverterTest {
 
     @Test
     public void everyMappedEmoticonResolvesDeterministically() {
-        assertSame(ChatEmoji.SLIGHT_SMILE,
-                ChatEmoticonConverter.emojiFor(":)"));
-        assertSame(ChatEmoji.SLIGHT_SMILE,
-                ChatEmoticonConverter.emojiFor(":-)"));
-        assertSame(ChatEmoji.CUTESY, ChatEmoticonConverter.emojiFor(":3"));
-        assertSame(ChatEmoji.LAUGHING, ChatEmoticonConverter.emojiFor("xD"));
-        assertSame(ChatEmoji.FEARFUL, ChatEmoticonConverter.emojiFor("D:"));
-        assertSame(ChatEmoji.SOB, ChatEmoticonConverter.emojiFor(":'("));
-        assertNull(ChatEmoticonConverter.emojiFor(";)"));
-        assertNull(ChatEmoticonConverter.emojiFor(":/"));
-        assertNull(ChatEmoticonConverter.emojiFor(null));
+        assertEquals(ChatEmoji.SLIGHT_SMILE.getShortcode(),
+                ChatEmoticonConverter.convert(":)"));
+        assertEquals(ChatEmoji.SLIGHT_SMILE.getShortcode(),
+                ChatEmoticonConverter.convert(":-)"));
+        assertEquals(ChatEmoji.CUTESY.getShortcode(), ChatEmoticonConverter.convert(":3"));
+        assertEquals(ChatEmoji.LAUGHING.getShortcode(), ChatEmoticonConverter.convert("xD"));
+        assertEquals(ChatEmoji.FEARFUL.getShortcode(), ChatEmoticonConverter.convert("D:"));
+        assertEquals(ChatEmoji.SOB.getShortcode(), ChatEmoticonConverter.convert(":'("));
+        assertEquals(";)", ChatEmoticonConverter.convert(";)"));
+        assertEquals(":/", ChatEmoticonConverter.convert(":/"));
     }
 }

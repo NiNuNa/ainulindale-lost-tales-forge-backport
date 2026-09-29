@@ -14,6 +14,8 @@ public final class CharacterSubWindows {
     public static final SubWindowKind LORE = kind("lore");
     /** A character's profile and age, under tabs of its own. */
     public static final SubWindowKind PROFILE_EDIT = kind("profile_edit");
+    /** A character's look: its skin, arm width and chest. */
+    public static final SubWindowKind LOOK_EDIT = kind("look_edit");
 
     private CharacterSubWindows() {}
 

@@ -14,36 +14,29 @@ public final class PartyTrackingSnapshot {
 
     private final UUID ownerId;
     private final long synchronizationSequence;
-    private final UUID activeCharacterId;
+    private final UUID activeIdentityId;
     private final UUID partyId;
     private final long partyRevision;
     private final List<PartyTrackedMemberSnapshot> trackedMembers;
     private final List<PartyGoHereMarkerSnapshot> goHereMarkers;
 
-    public static PartyTrackingSnapshot noParty(UUID ownerId,
-                                                long sequence,
-                                                UUID activeCharacterId) {
-        return noParty(ownerId, sequence, activeCharacterId,
-                Collections.<PartyGoHereMarkerSnapshot>emptyList());
-    }
-
     public static PartyTrackingSnapshot noParty(
-            UUID ownerId, long sequence, UUID activeCharacterId,
+            UUID ownerId, long sequence, UUID activeIdentityId,
             List<PartyGoHereMarkerSnapshot> goHereMarkers) {
         return new PartyTrackingSnapshot(ownerId, sequence,
-                activeCharacterId, null, -1L,
+                activeIdentityId, null, -1L,
                 Collections.<PartyTrackedMemberSnapshot>emptyList(),
                 goHereMarkers);
     }
 
     public PartyTrackingSnapshot(UUID ownerId,
                                  long synchronizationSequence,
-                                 UUID activeCharacterId,
+                                 UUID activeIdentityId,
                                  UUID partyId,
                                  long partyRevision,
                                  List<PartyTrackedMemberSnapshot> trackedMembers,
                                  List<PartyGoHereMarkerSnapshot> goHereMarkers) {
-        if (ownerId == null || activeCharacterId == null) {
+        if (ownerId == null || activeIdentityId == null) {
             throw new IllegalArgumentException(
                     "owner and active character identities are required");
         }
@@ -65,14 +58,14 @@ public final class PartyTrackingSnapshot {
         }
         if (!hasParty && (safeMarkers.size() > 1
                 || (!safeMarkers.isEmpty()
-                && !activeCharacterId.equals(
-                safeMarkers.get(0).getOwnerCharacterId())))) {
+                && !activeIdentityId.equals(
+                safeMarkers.get(0).getOwnerIdentityId())))) {
             throw new IllegalArgumentException(
                     "partyless snapshot may contain only its active character marker");
         }
         this.ownerId = ownerId;
         this.synchronizationSequence = synchronizationSequence;
-        this.activeCharacterId = activeCharacterId;
+        this.activeIdentityId = activeIdentityId;
         this.partyId = partyId;
         this.partyRevision = partyRevision;
         this.trackedMembers = safeMembers;
@@ -87,8 +80,8 @@ public final class PartyTrackingSnapshot {
         return this.synchronizationSequence;
     }
 
-    public UUID getActiveCharacterId() {
-        return this.activeCharacterId;
+    public UUID getActiveIdentityId() {
+        return this.activeIdentityId;
     }
 
     public boolean hasParty() {
@@ -114,7 +107,7 @@ public final class PartyTrackingSnapshot {
     public boolean hasSameContent(PartyTrackingSnapshot other) {
         return other != null
                 && this.ownerId.equals(other.ownerId)
-                && this.activeCharacterId.equals(other.activeCharacterId)
+                && this.activeIdentityId.equals(other.activeIdentityId)
                 && equalNullable(this.partyId, other.partyId)
                 && this.partyRevision == other.partyRevision
                 && this.trackedMembers.equals(other.trackedMembers)
@@ -128,7 +121,7 @@ public final class PartyTrackingSnapshot {
         Set<UUID> identities = new HashSet<UUID>();
         if (source != null) {
             for (PartyTrackedMemberSnapshot member : source) {
-                if (member == null || !identities.add(member.getCharacterId())) {
+                if (member == null || !identities.add(member.getIdentityId())) {
                     throw new IllegalArgumentException(
                             "tracked member identities must be unique");
                 }
@@ -149,7 +142,7 @@ public final class PartyTrackingSnapshot {
         if (source != null) {
             for (PartyGoHereMarkerSnapshot marker : source) {
                 if (marker == null
-                        || !identities.add(marker.getOwnerCharacterId())) {
+                        || !identities.add(marker.getOwnerIdentityId())) {
                     throw new IllegalArgumentException(
                             "marker owner identities must be unique");
                 }

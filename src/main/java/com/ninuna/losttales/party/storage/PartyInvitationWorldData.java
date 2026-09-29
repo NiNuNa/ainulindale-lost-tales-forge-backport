@@ -86,10 +86,6 @@ public final class PartyInvitationWorldData extends WorldSavedData {
         return this.readOnlyForNewerVersion;
     }
 
-    public synchronized int getUnsupportedDataVersion() {
-        return this.unsupportedDataVersion;
-    }
-
     public synchronized PartyInvitation getInvitation(UUID invitationId) {
         return invitationId == null ? null : this.invitations.get(invitationId);
     }
@@ -99,8 +95,8 @@ public final class PartyInvitationWorldData extends WorldSavedData {
     }
 
     public synchronized boolean hasInvitationForPartyAndTarget(
-            UUID partyId, UUID targetCharacterId) {
-        if (partyId == null || targetCharacterId == null) {
+            UUID partyId, UUID targetIdentityId) {
+        if (partyId == null || targetIdentityId == null) {
             return false;
         }
         LinkedHashSet<UUID> invitationIds =
@@ -111,8 +107,8 @@ public final class PartyInvitationWorldData extends WorldSavedData {
         for (UUID invitationId : invitationIds) {
             PartyInvitation invitation = this.invitations.get(invitationId);
             if (invitation != null
-                    && targetCharacterId.equals(
-                    invitation.getTargetCharacterId())) {
+                    && targetIdentityId.equals(
+                    invitation.getTargetIdentityId())) {
                 return true;
             }
         }
@@ -124,9 +120,9 @@ public final class PartyInvitationWorldData extends WorldSavedData {
         return getByIds(this.invitationIdsByParty.get(partyId));
     }
 
-    public synchronized List<PartyInvitation> getInvitationsForTargetCharacter(
-            UUID characterId) {
-        return getByIds(this.invitationIdsByTargetCharacter.get(characterId));
+    public synchronized List<PartyInvitation> getInvitationsForTargetIdentity(
+            UUID identityId) {
+        return getByIds(this.invitationIdsByTargetCharacter.get(identityId));
     }
 
     public synchronized Collection<PartyInvitation> getInvitations() {
@@ -151,7 +147,7 @@ public final class PartyInvitationWorldData extends WorldSavedData {
         }
         if (hasInvitationForPartyAndTarget(
                 invitation.getPartyId(),
-                invitation.getTargetCharacterId())) {
+                invitation.getTargetIdentityId())) {
             if (existing != null) {
                 addToIndexes(existing);
             }
@@ -180,27 +176,27 @@ public final class PartyInvitationWorldData extends WorldSavedData {
         return removeByIds(copyIds(this.invitationIdsByParty.get(partyId)));
     }
 
-    public synchronized int removeInvitationsForTargetCharacter(
-            UUID characterId) {
+    public synchronized int removeInvitationsForTargetIdentity(
+            UUID identityId) {
         ensureWritable();
         return removeByIds(copyIds(
-                this.invitationIdsByTargetCharacter.get(characterId)));
+                this.invitationIdsByTargetCharacter.get(identityId)));
     }
 
-    public synchronized int removeInvitationsInvolvingCharacter(
-            UUID characterId) {
+    public synchronized int removeInvitationsInvolvingIdentity(
+            UUID identityId) {
         ensureWritable();
-        if (characterId == null) {
+        if (identityId == null) {
             return 0;
         }
         LinkedHashSet<UUID> toRemove = new LinkedHashSet<UUID>();
         LinkedHashSet<UUID> targeted =
-                this.invitationIdsByTargetCharacter.get(characterId);
+                this.invitationIdsByTargetCharacter.get(identityId);
         if (targeted != null) {
             toRemove.addAll(targeted);
         }
         for (PartyInvitation invitation : this.invitations.values()) {
-            if (characterId.equals(invitation.getInvitingCharacterId())) {
+            if (identityId.equals(invitation.getInvitingIdentityId())) {
                 toRemove.add(invitation.getInvitationId());
             }
         }
@@ -228,22 +224,12 @@ public final class PartyInvitationWorldData extends WorldSavedData {
                                 : invitation.getInvitationId(),
                         invitation == null ? null : invitation.getPartyId(),
                         invitation == null ? null
-                                : invitation.getTargetCharacterId()));
+                                : invitation.getTargetIdentityId()));
         markDirty();
     }
 
     public synchronized int getQuarantinedEntryCount() {
         return this.quarantinedEntries.size();
-    }
-
-    public synchronized List<NBTTagCompound> getQuarantinedEntriesCopy() {
-        ArrayList<NBTTagCompound> copies = new ArrayList<NBTTagCompound>();
-        for (NBTTagCompound entry : this.quarantinedEntries) {
-            if (entry != null) {
-                copies.add((NBTTagCompound) entry.copy());
-            }
-        }
-        return Collections.unmodifiableList(copies);
     }
 
     private boolean rebuildIndexesAndRepairDuplicates() {
@@ -259,7 +245,7 @@ public final class PartyInvitationWorldData extends WorldSavedData {
         for (PartyInvitation invitation : ordered) {
             PartyTargetKey key = new PartyTargetKey(
                     invitation.getPartyId(),
-                    invitation.getTargetCharacterId());
+                    invitation.getTargetIdentityId());
             if (!seenPairs.add(key)) {
                 duplicateIds.add(invitation.getInvitationId());
                 this.quarantinedEntries.add(
@@ -267,7 +253,7 @@ public final class PartyInvitationWorldData extends WorldSavedData {
                                 "duplicate_party_target_invitation",
                                 invitation.getInvitationId(),
                                 invitation.getPartyId(),
-                                invitation.getTargetCharacterId()));
+                                invitation.getTargetIdentityId()));
                 continue;
             }
             addToIndexes(invitation);
@@ -314,7 +300,7 @@ public final class PartyInvitationWorldData extends WorldSavedData {
         addIndex(this.invitationIdsByParty,
                 invitation.getPartyId(), invitation.getInvitationId());
         addIndex(this.invitationIdsByTargetCharacter,
-                invitation.getTargetCharacterId(),
+                invitation.getTargetIdentityId(),
                 invitation.getInvitationId());
     }
 
@@ -322,7 +308,7 @@ public final class PartyInvitationWorldData extends WorldSavedData {
         removeIndex(this.invitationIdsByParty,
                 invitation.getPartyId(), invitation.getInvitationId());
         removeIndex(this.invitationIdsByTargetCharacter,
-                invitation.getTargetCharacterId(),
+                invitation.getTargetIdentityId(),
                 invitation.getInvitationId());
     }
 
@@ -393,11 +379,11 @@ public final class PartyInvitationWorldData extends WorldSavedData {
 
     private static final class PartyTargetKey {
         private final UUID partyId;
-        private final UUID targetCharacterId;
+        private final UUID targetIdentityId;
 
-        private PartyTargetKey(UUID partyId, UUID targetCharacterId) {
+        private PartyTargetKey(UUID partyId, UUID targetIdentityId) {
             this.partyId = partyId;
-            this.targetCharacterId = targetCharacterId;
+            this.targetIdentityId = targetIdentityId;
         }
 
         @Override
@@ -410,13 +396,13 @@ public final class PartyInvitationWorldData extends WorldSavedData {
             }
             PartyTargetKey other = (PartyTargetKey) object;
             return this.partyId.equals(other.partyId)
-                    && this.targetCharacterId.equals(other.targetCharacterId);
+                    && this.targetIdentityId.equals(other.targetIdentityId);
         }
 
         @Override
         public int hashCode() {
             return 31 * this.partyId.hashCode()
-                    + this.targetCharacterId.hashCode();
+                    + this.targetIdentityId.hashCode();
         }
     }
 }

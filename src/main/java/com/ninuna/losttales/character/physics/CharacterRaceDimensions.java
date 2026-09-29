@@ -16,14 +16,12 @@ import com.ninuna.losttales.util.LostTalesIdentifiers;
 public final class CharacterRaceDimensions {
 
     private static final float MINIMUM_PHYSICAL_SIZE = 0.1F;
-    private static final float DEFAULT_MODEL_SCALE = 1.0F;
 
     private final String raceId;
     private final float width;
     private final float height;
     private final float standingEyeHeight;
     private final float sneakingEyeHeight;
-    private final float modelScale;
     private final boolean lotrDerived;
 
     private CharacterRaceDimensions(
@@ -32,14 +30,12 @@ public final class CharacterRaceDimensions {
             float height,
             float standingEyeHeight,
             float sneakingEyeHeight,
-            float modelScale,
             boolean lotrDerived) {
         this.raceId = LostTalesIdentifiers.normalize(raceId);
         this.width = width;
         this.height = height;
         this.standingEyeHeight = standingEyeHeight;
         this.sneakingEyeHeight = sneakingEyeHeight;
-        this.modelScale = modelScale;
         this.lotrDerived = lotrDerived;
     }
 
@@ -73,60 +69,13 @@ public final class CharacterRaceDimensions {
                 standingEyeHeight,
                 standingEyeHeight);
 
-        float modelScale = definition == null
-                ? DEFAULT_MODEL_SCALE
-                : positiveOr(definition.getRendererScale(), DEFAULT_MODEL_SCALE);
-
         return new CharacterRaceDimensions(
                 canonicalRaceId,
                 width,
                 height,
                 standingEyeHeight,
                 sneakingEyeHeight,
-                modelScale,
                 profile.isLotrDerived());
-    }
-
-    /**
-     * Reconstructs a snapshot from locally synchronized entity data. Invalid
-     * transient values fall back to the already validated supplied snapshot.
-     */
-    static CharacterRaceDimensions fromEntityData(
-            String raceId,
-            float width,
-            float height,
-            float standingEyeHeight,
-            float sneakingEyeHeight,
-            boolean lotrDerived,
-            CharacterRaceDimensions fallback) {
-        if (fallback == null) {
-            throw new IllegalArgumentException("fallback must not be null");
-        }
-
-        String canonicalRaceId = LostTalesIdentifiers.normalize(raceId);
-        float safeWidth = positiveOr(width, fallback.getWidth());
-        float safeHeight = positiveOr(height, fallback.getHeight());
-        float safeStandingEyeHeight = clampEyeHeight(
-                standingEyeHeight, safeHeight,
-                Math.min(fallback.getStandingEyeHeight(), safeHeight));
-        float safeSneakingEyeHeight = clampEyeHeight(
-                sneakingEyeHeight, safeStandingEyeHeight,
-                Math.min(fallback.getSneakingEyeHeight(), safeStandingEyeHeight));
-
-        CharacterRaceDefinition definition =
-                CharacterRaceRegistry.get(canonicalRaceId);
-        float modelScale = definition == null
-                ? fallback.getModelScale()
-                : positiveOr(definition.getRendererScale(), fallback.getModelScale());
-
-        return new CharacterRaceDimensions(
-                canonicalRaceId,
-                safeWidth,
-                safeHeight,
-                safeStandingEyeHeight,
-                safeSneakingEyeHeight,
-                modelScale,
-                lotrDerived);
     }
 
     public String getRaceId() {
@@ -170,11 +119,6 @@ public final class CharacterRaceDimensions {
      */
     public float getItemDropEyeReferenceHeight(boolean sneaking) {
         return getEyeHeight(sneaking);
-    }
-
-    /** Common renderer scale metadata; no client-only class is referenced. */
-    public float getModelScale() {
-        return this.modelScale;
     }
 
     public boolean isLotrDerived() {

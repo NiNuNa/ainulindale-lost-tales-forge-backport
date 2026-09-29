@@ -428,6 +428,8 @@ public final class LostTalesMapMarkerGroupingTest {
                 icon("losttales:y", "Y", 40, 9.0F, 0.0F),
                 icon("losttales:z", "Z", 30, 11.0F, 0.0F),
                 icon("losttales:a", "A", 35, 400.0F, 0.0F));
+        List<String> ids = Arrays.asList(
+                "losttales:x", "losttales:y", "losttales:z", "losttales:a");
         LostTalesMapMarkerGrouping.Result result =
                 LostTalesMapMarkerGrouping.group(entries, fresh());
 
@@ -437,11 +439,11 @@ public final class LostTalesMapMarkerGroupingTest {
         List<Integer> order = LostTalesMapMarkerGrouping.groupsBottomToTop(
                 entries, result.getGroups());
         assertEquals("the stack must not sink below A", "losttales:a",
-                leaderIdOf(entries, result, order.get(0)));
+                leaderIdOf(ids, result, order.get(0)));
         assertEquals("losttales:z",
-                leaderIdOf(entries, result, order.get(1)));
+                leaderIdOf(ids, result, order.get(1)));
         assertEquals("losttales:x",
-                leaderIdOf(entries, result, order.get(2)));
+                leaderIdOf(ids, result, order.get(2)));
     }
 
     @Test
@@ -470,12 +472,10 @@ public final class LostTalesMapMarkerGroupingTest {
                 Integer.valueOf(2), Integer.valueOf(3))));
     }
 
-    private static String leaderIdOf(
-            List<LostTalesMapMarkerGrouping.Entry> entries,
+    private static String leaderIdOf(List<String> ids,
             LostTalesMapMarkerGrouping.Result result, Integer orderIndex) {
-        return entries.get(result.getGroups()
-                .get(orderIndex.intValue()).getRepresentativeIndex())
-                .getId();
+        return ids.get(result.getGroups()
+                .get(orderIndex.intValue()).getRepresentativeIndex());
     }
 
     @Test
@@ -881,7 +881,7 @@ public final class LostTalesMapMarkerGroupingTest {
                 // Stacked at the same point: two markers merge only when
                 // they share a category and that category groups at all.
                 int expected = first == second
-                        && first.isGroupingEligible() ? 1 : 2;
+                        && first.canGroupWith(first) ? 1 : 2;
                 assertEquals(first + " with " + second, expected,
                         group(fresh(),
                                 icon("losttales:a", "A", 10, first,
@@ -898,14 +898,14 @@ public final class LostTalesMapMarkerGroupingTest {
         // A player's own waypoints and quest objectives each mean something
         // different even when they sit on the same spot, so they never
         // collapse into a stack. Waystones are ordinary map furniture and do.
-        assertFalse(LostTalesMapMarkerGrouping.GroupingCategory
-                .PERSONAL_WAYPOINT.isGroupingEligible());
-        assertFalse(LostTalesMapMarkerGrouping.GroupingCategory
-                .SHARED_WAYPOINT.isGroupingEligible());
-        assertFalse(LostTalesMapMarkerGrouping.GroupingCategory
-                .QUEST.isGroupingEligible());
-        assertTrue(LostTalesMapMarkerGrouping.GroupingCategory
-                .PLAYER_WAYSTONE.isGroupingEligible());
+        assertFalse(selfGrouping(
+                LostTalesMapMarkerGrouping.GroupingCategory.PERSONAL_WAYPOINT));
+        assertFalse(selfGrouping(
+                LostTalesMapMarkerGrouping.GroupingCategory.SHARED_WAYPOINT));
+        assertFalse(selfGrouping(
+                LostTalesMapMarkerGrouping.GroupingCategory.QUEST));
+        assertTrue(selfGrouping(
+                LostTalesMapMarkerGrouping.GroupingCategory.PLAYER_WAYSTONE));
     }
 
 
@@ -944,9 +944,9 @@ public final class LostTalesMapMarkerGroupingTest {
         assertEquals(UNKNOWN,
                 LostTalesMapMarkerGrouping.GroupingCategory
                         .forLegendCategory("not_a_legend_category"));
-        assertFalse(QUEST.isGroupingEligible());
-        assertFalse(UNKNOWN.isGroupingEligible());
-        assertTrue(LOCATION.isGroupingEligible());
+        assertFalse(QUEST.canGroupWith(QUEST));
+        assertFalse(UNKNOWN.canGroupWith(UNKNOWN));
+        assertTrue(LOCATION.canGroupWith(LOCATION));
     }
 
     @Test
@@ -1155,7 +1155,7 @@ public final class LostTalesMapMarkerGroupingTest {
             Map<String, String> previous = membership;
             LostTalesMapMarkerGrouping.Result result =
                     LostTalesMapMarkerGrouping.group(
-                            contracted(field, scale), previous);
+                            crowdedField(scale), previous);
             membership = result.getMembership();
             for (LostTalesMapMarkerGrouping.Group group
                     : result.getGroups()) {
@@ -1186,29 +1186,6 @@ public final class LostTalesMapMarkerGroupingTest {
             }
         }
         return null;
-    }
-
-    /** The same field seen at a lower zoom, contracted about the origin. */
-    private static List<LostTalesMapMarkerGrouping.Entry> contracted(
-            List<LostTalesMapMarkerGrouping.Entry> field, float scale) {
-        List<LostTalesMapMarkerGrouping.Entry> scaled =
-                new ArrayList<LostTalesMapMarkerGrouping.Entry>(
-                        field.size());
-        for (LostTalesMapMarkerGrouping.Entry entry : field) {
-            scaled.add(new LostTalesMapMarkerGrouping.Entry(
-                    entry.getId(), entry.getId(),
-                    entry.getRelevanceRank(),
-                    entry.getGroupingCategory(),
-                    (entry.getLeft() + ICON_HALF_EXTENT) * scale
-                            - ICON_HALF_EXTENT,
-                    (entry.getTop() + ICON_HALF_EXTENT) * scale
-                            - ICON_HALF_EXTENT,
-                    (entry.getLeft() + ICON_HALF_EXTENT) * scale
-                            + ICON_HALF_EXTENT + 1.0F,
-                    (entry.getTop() + ICON_HALF_EXTENT) * scale
-                            + ICON_HALF_EXTENT + 1.0F));
-        }
-        return scaled;
     }
 
     @Test
@@ -1263,16 +1240,27 @@ public final class LostTalesMapMarkerGroupingTest {
 
     /** Overlapping markers of several categories at mixed relevance. */
     private static List<LostTalesMapMarkerGrouping.Entry> crowdedField() {
+        return crowdedField(1.0F);
+    }
+
+    /** The crowded field seen at a lower zoom, contracted about the origin. */
+    private static List<LostTalesMapMarkerGrouping.Entry> crowdedField(
+            float s) {
         return Arrays.asList(
                 icon("losttales:town", "Town", 50, LOCATION, 0.0F, 0.0F),
-                icon("losttales:camp", "Camp", 45, LOCATION, 5.0F, 2.0F),
-                icon("losttales:cave", "Cave", 40, LOCATION, 9.0F, 0.0F),
-                icon("losttales:fort", "Fort", 35, LOCATION, 14.0F, 3.0F),
-                icon("losttales:quest", "Quest", 60, QUEST, 4.0F, 1.0F),
+                icon("losttales:camp", "Camp", 45, LOCATION, 5.0F * s,
+                        2.0F * s),
+                icon("losttales:cave", "Cave", 40, LOCATION, 9.0F * s, 0.0F),
+                icon("losttales:fort", "Fort", 35, LOCATION, 14.0F * s,
+                        3.0F * s),
+                icon("losttales:quest", "Quest", 60, QUEST, 4.0F * s,
+                        1.0F * s),
                 icon("losttales:gohere", "Go Here", 30, PARTY,
-                        6.0F, 1.0F),
-                icon("losttales:party2", "Rally", 25, PARTY, 8.0F, 2.0F),
-                icon("losttales:far", "Far", 20, LOCATION, 90.0F, 90.0F));
+                        6.0F * s, 1.0F * s),
+                icon("losttales:party2", "Rally", 25, PARTY, 8.0F * s,
+                        2.0F * s),
+                icon("losttales:far", "Far", 20, LOCATION, 90.0F * s,
+                        90.0F * s));
     }
 
     @Test
@@ -1640,6 +1628,12 @@ public final class LostTalesMapMarkerGroupingTest {
                         centerX, ICON_HALF_EXTENT),
                 LostTalesMapMarkerRenderedGeometry.artBottom(
                         centerY, ICON_HALF_EXTENT));
+    }
+
+    /** Whether a category stacks at all: two of its markers may share a stack. */
+    private static boolean selfGrouping(
+            LostTalesMapMarkerGrouping.GroupingCategory category) {
+        return category.canGroupWith(category);
     }
 
     private static String describe(

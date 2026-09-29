@@ -8,7 +8,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import lotr.common.LOTRDimension;
 import net.minecraft.client.resources.IResourceManager;
 
@@ -51,10 +50,6 @@ public final class LostTalesClientMapMarkerStore {
 
     public static List<LostTalesMapMarkerData> getDecorativeMarkers() {
         return decorativeMarkers;
-    }
-
-    public static Set<String> getSharedMarkerIds() {
-        return INDEX.getPersistentSnapshot().getMarkerIds();
     }
 
     public static LostTalesMapMarkerData getSharedMarker(String markerId) {

@@ -61,10 +61,6 @@ public final class LostTalesUiTextArea {
         this.scroll = 0;
     }
 
-    public boolean isFocused() {
-        return this.focused;
-    }
-
     public void setFocused(boolean on) {
         if (on && !this.focused) {
             this.caretNanos = System.nanoTime();

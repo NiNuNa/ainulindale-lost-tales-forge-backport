@@ -1,6 +1,7 @@
 package com.ninuna.losttales.character.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.character.deletion.CharacterDeletionService;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
@@ -39,9 +40,9 @@ public final class CharacterNetworkRequestHandler {
     }
 
     /**
-     * Takes the account's template onto this world's default character.
-     * The world decides whether it still has a reading to spend, and
-     * every field is checked against this server's own content.
+     * Takes the account character's look onto this world's account
+     * character. The world decides whether it still has a reading to
+     * spend, and every field is checked against this server's own content.
      */
     public static void handleTemplateAdoptRequest(
             final EntityPlayerMP player, final int requestId,
@@ -55,27 +56,22 @@ public final class CharacterNetworkRequestHandler {
     }
 
     /**
-     * Plays as the named character, or as the account when {@code selectAccount}
-     * is set. The target is built from the live player, never from the wire.
+     * Plays as the named character of the player's own roster. The owner is
+     * the live player, never the wire.
      */
     public static void handleSelectRequest(final EntityPlayerMP player, final int requestId,
                                            final long expectedRosterRevision,
-                                           final UUID characterId,
-                                           final boolean selectAccount) {
+                                           final UUID characterId) {
         execute(player, requestId, CharacterOperationType.SELECT, new Operation() {
             @Override
             public CharacterOperationResult run() {
-                PlayableIdentity target;
-                if (selectAccount) {
-                    target = PlayableIdentity.account(player.getUniqueID());
-                } else if (characterId == null) {
+                if (characterId == null) {
                     return CharacterOperationResult.failure(
                             CharacterErrorId.INVALID_CHARACTER_ID, null);
-                } else {
-                    target = PlayableIdentity.character(player.getUniqueID(), characterId);
                 }
                 return CharacterService.getInstance().selectIdentity(
-                        player, requestId, expectedRosterRevision, target);
+                        player, requestId, expectedRosterRevision,
+                        PlayableIdentity.character(player.getUniqueID(), characterId));
             }
         });
     }
@@ -130,6 +126,40 @@ public final class CharacterNetworkRequestHandler {
                                 characterId,
                                 profile,
                                 age);
+                    }
+                });
+    }
+
+    /** Changes one character's look: its skin, arm width and chest. */
+    public static void handleLookUpdateRequest(final EntityPlayerMP player,
+                                               final int requestId,
+                                               final long expectedRosterRevision,
+                                               final UUID characterId,
+                                               final String skinId,
+                                               final String bodyTypeId,
+                                               final String chestTypeId) {
+        execute(player, requestId, CharacterOperationType.LOOK_UPDATE,
+                new Operation() {
+                    @Override
+                    public CharacterOperationResult run() {
+                        return CharacterService.getInstance().updateLook(
+                                player, expectedRosterRevision, characterId,
+                                skinId, bodyTypeId, chestTypeId);
+                    }
+                });
+    }
+
+    /** Brings back one of the player's own deleted characters. */
+    public static void handleRestoreRequest(final EntityPlayerMP player,
+                                            final int requestId,
+                                            final long expectedRosterRevision,
+                                            final UUID characterId) {
+        execute(player, requestId, CharacterOperationType.RESTORE,
+                new Operation() {
+                    @Override
+                    public CharacterOperationResult run() {
+                        return CharacterDeletionService.getInstance().restoreOwn(
+                                player, expectedRosterRevision, characterId);
                     }
                 });
     }
@@ -257,12 +287,14 @@ public final class CharacterNetworkRequestHandler {
 
     /**
      * Whether the race's gameplay and the party state are brought up to
-     * date after an operation. A cape, a description and an age touch
-     * neither.
+     * date after an operation. A cape, a profile, a look and a restored
+     * character that is not played touch neither.
      */
     private static boolean touchesGameplay(CharacterOperationType operationType) {
         return operationType != CharacterOperationType.CAPE_UPDATE
-                && operationType != CharacterOperationType.PROFILE_UPDATE;
+                && operationType != CharacterOperationType.PROFILE_UPDATE
+                && operationType != CharacterOperationType.LOOK_UPDATE
+                && operationType != CharacterOperationType.RESTORE;
     }
 
     private interface Operation {

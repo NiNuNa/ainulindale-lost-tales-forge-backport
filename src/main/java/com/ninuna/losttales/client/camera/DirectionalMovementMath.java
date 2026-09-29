@@ -35,14 +35,6 @@ public final class DirectionalMovementMath {
     }
 
     public static float resolveHeadTrackingYaw(
-            float bodyYaw, float viewYaw, float trackingAngle) {
-        return resolveHeadTrackingYaw(
-                bodyYaw, viewYaw, trackingAngle,
-                isReverseHeadTracking(bodyYaw, viewYaw, trackingAngle)
-                        ? 1.0F : 0.0F);
-    }
-
-    public static float resolveHeadTrackingYaw(
             float bodyYaw, float viewYaw, float trackingAngle,
             float reverseBlend) {
         if (!Float.isFinite(bodyYaw) || !Float.isFinite(viewYaw)
@@ -65,17 +57,6 @@ public final class DirectionalMovementMath {
         return wrapDegrees(bodyYaw + blendedDifference);
     }
 
-    public static boolean isReverseHeadTracking(
-            float bodyYaw, float viewYaw, float trackingAngle) {
-        if (!Float.isFinite(bodyYaw) || !Float.isFinite(viewYaw)
-                || !Float.isFinite(trackingAngle)
-                || trackingAngle < 0.0F || trackingAngle > 120.0F) {
-            throw new IllegalArgumentException(
-                    "head tracking angles must be finite and the limit must be between zero and one hundred twenty degrees");
-        }
-        return Math.abs(wrapDegrees(viewYaw - bodyYaw)) > trackingAngle;
-    }
-
     public static boolean updateReverseHeadTracking(
             boolean reverseTracking, float bodyYaw, float viewYaw,
             float trackingAngle, float hysteresisAngle) {
@@ -96,12 +77,6 @@ public final class DirectionalMovementMath {
         return reverseTracking
                 ? difference > exitAngle
                 : difference >= enterAngle;
-    }
-
-    public static float resolveHeadTrackingPitch(
-            float viewPitch, boolean reverseTracking) {
-        return resolveHeadTrackingPitch(
-                viewPitch, reverseTracking ? 1.0F : 0.0F);
     }
 
     public static float resolveHeadTrackingPitch(

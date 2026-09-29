@@ -20,6 +20,22 @@
     "duration": 240,
     "curve": "ease_in_out"
   },
+  "window.tab.lift": {
+    "about": "A carried tab rising its pixel off the row, and settling back once it is put down.",
+    "duration": 50,
+    "curve": "linear"
+  },
+  "window.tab.glow": {
+    "about": "The glow a tab put down gives once in its colour, on its own surface and the tool strip's, fading out in this many milliseconds.",
+    "duration": 450,
+    "curve": "linear"
+  },
+  "window.tab.marquee": {
+    "about": "A name cut short read whole under a resting pointer: after this many milliseconds it slides speed pixels a second until its end shows, rests pause milliseconds there, slides back, and rests again.",
+    "duration": 500,
+    "curve": "linear",
+    "params": { "speed": 20, "pause": 800 }
+  },
   "window.snap.assist": {
     "about": "The snap assist's panes coming and going.",
     "duration": 180,
@@ -77,5 +93,12 @@
     "curve": "ease_out",
     "off": { "duration": 250, "curve": "ease_in" },
     "params": { "hold": 1600, "rise": 3 }
+  },
+  "window.answer": {
+    "about": "A page's answer over its bar, saved or refused: fading in as it rises its last pixels, standing hold milliseconds while it is read, then fading out where it stands. One that waits for the server stands until the answer comes.",
+    "duration": 100,
+    "curve": "ease_out",
+    "off": { "duration": 250, "curve": "ease_in" },
+    "params": { "hold": 3000, "rise": 3 }
   }
 }

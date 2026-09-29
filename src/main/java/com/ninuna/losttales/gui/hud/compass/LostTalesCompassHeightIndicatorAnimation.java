@@ -152,7 +152,7 @@ final class LostTalesCompassHeightIndicatorAnimation {
 
         return new Pose(entranceOffset + idleOffset + flowOffset
                         + exitOffset,
-                scaleX, scaleY, brightness, alpha, flowEmphasis);
+                scaleX, scaleY, brightness, alpha);
     }
 
     /**
@@ -179,7 +179,7 @@ final class LostTalesCompassHeightIndicatorAnimation {
 
     /** A chevron with nothing moving: settled, between two pulses. */
     static Pose stillPose() {
-        return new Pose(0.0F, 1.0F, 1.0F, 0.82F, 1.0F, 0.0F);
+        return new Pose(0.0F, 1.0F, 1.0F, 0.82F, 1.0F);
     }
 
     private static long elapsed(long earlier, long later) {
@@ -216,16 +216,14 @@ final class LostTalesCompassHeightIndicatorAnimation {
         private final float scaleY;
         private final float brightness;
         private final float alpha;
-        private final float flowEmphasis;
 
         private Pose(float offsetY, float scaleX, float scaleY,
-                     float brightness, float alpha, float flowEmphasis) {
+                     float brightness, float alpha) {
             this.offsetY = offsetY;
             this.scaleX = scaleX;
             this.scaleY = scaleY;
             this.brightness = brightness;
             this.alpha = alpha;
-            this.flowEmphasis = flowEmphasis;
         }
 
         float getOffsetY() {
@@ -246,10 +244,6 @@ final class LostTalesCompassHeightIndicatorAnimation {
 
         float getAlpha() {
             return this.alpha;
-        }
-
-        float getFlowEmphasis() {
-            return this.flowEmphasis;
         }
     }
 }

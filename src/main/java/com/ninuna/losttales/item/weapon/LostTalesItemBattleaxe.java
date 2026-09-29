@@ -34,8 +34,4 @@ public class LostTalesItemBattleaxe extends LOTRItemBattleaxe {
     public void addInformation(ItemStack itemStack, EntityPlayer player, List list, boolean advancedTooltips) {
         LostTalesClientUtil.addItemInformation(list, itemStack, this.material, this.credits, player, this.itemType);
     }
-
-    public ELostTalesItem.Type getItemType() {
-        return itemType;
-    }
 }

@@ -8,7 +8,6 @@ import com.ninuna.losttales.client.party.PartyClientRequestManager;
 import com.ninuna.losttales.client.window.BarItem;
 import com.ninuna.losttales.client.window.PageContent;
 import com.ninuna.losttales.client.window.PageSearch;
-import com.ninuna.losttales.client.window.WindowBar;
 import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WindowStyle;
@@ -18,6 +17,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiClip;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
+import com.ninuna.losttales.party.model.Party;
 import com.ninuna.losttales.party.model.PartyColor;
 import com.ninuna.losttales.party.server.PartyErrorId;
 import com.ninuna.losttales.party.sync.PartyInvitationSnapshot;
@@ -42,17 +42,21 @@ import org.lwjgl.opengl.GL11;
 
 /**
  * The party, a page a window holds (U5 a): one list, as a member list is,
- * with its members under a heading, then the invitations to the player
- * and those the party sent. The window holds the rest: the search in its
- * tool strip's well narrows the list, the colour the player wears in the
- * party is chosen behind its cog, and its input bar holds the invite
- * field, whose list offers who can be invited, then what can be done
- * about the row picked, the go-here marker, and Leave (Disband for the
- * leader) last in red.
+ * with its members under a heading (the party's name, when the leader gave
+ * it one), then the invitations to the player and those the party sent.
+ * The window holds the rest: the search in its tool strip's well narrows
+ * the list, the colour the player wears in the party is chosen behind its
+ * cog, and its input bar holds the invite field, whose list offers who can
+ * be invited, the leader's Name Party, then what can be done about the row
+ * picked, the go-here marker, and Leave (Disband for the leader) last in
+ * red.
  *
  * <p>It draws only synchronized snapshots and never changes the party on
- * its own; every action is checked again by the server. An action that
- * cannot be undone asks first, in a question inside the window.</p>
+ * its own; every action is checked again by the server. The state comes
+ * by itself: the server sends it whenever it changes, and the page asks
+ * for it when it comes on screen, when the invite field opens, and every
+ * few seconds while the server has not answered. An action that cannot be
+ * undone asks first, in a question inside the window.</p>
  */
 public final class PartyPage extends PageContent {
     /** The code name the page is registered and remembered under. */
@@ -67,6 +71,8 @@ public final class PartyPage extends PageContent {
     private static final int NAME_X = CHIP + 5;
     /** The longest name the invite field takes. */
     private static final int MAX_NAME = 32;
+    /** Ticks between asks while the server has not answered with the state. */
+    private static final int RETRY_TICKS = 100;
 
     /** The bar's items: their ids, which the page is told when one is pressed. */
     private static final String INVITE = "invite";
@@ -79,7 +85,8 @@ public final class PartyPage extends PageContent {
     private static final String GO_HERE = "go_here";
     private static final String LEAVE = "leave";
     private static final String DISBAND = "disband";
-    private static final String REFRESH = "refresh";
+    private static final String NAME = "name";
+    private static final String NAME_FIELD = "name_field";
 
     /** What a row of the list is. */
     private enum Kind { HEADING, NOTE, MEMBER, INCOMING, OUTGOING }
@@ -90,10 +97,11 @@ public final class PartyPage extends PageContent {
     private int height = -1;
 
     private int pendingRequestId;
-    private boolean initialRequestSent;
-    private String statusMessage = "";
-    private boolean statusError;
-    private UUID knownActiveCharacterId;
+    /** The page's last ask for the state; 0 before it has asked. */
+    private int stateRequestId;
+    /** Ticks since the page last asked, while the state is not there. */
+    private int ticksSinceAsked;
+    private UUID knownActiveIdentityId;
 
     /** The row picked: what kind, and whose id; null for none. */
     private Kind pickedKind;
@@ -109,6 +117,10 @@ public final class PartyPage extends PageContent {
     private boolean inviteFocused;
     /** Which of the players the field offers is chosen. */
     private int offered;
+    /** The name field, which stands in the invite field's place while the leader names the party. */
+    private GuiTextField nameField;
+    private boolean naming;
+    private boolean nameFocused;
 
     /** One row of the list, as drawn and as hit. */
     private static final class Row {
@@ -129,7 +141,7 @@ public final class PartyPage extends PageContent {
 
         UUID id() {
             if (this.member != null) {
-                return this.member.getCharacterId();
+                return this.member.getIdentityId();
             }
             return this.invitation == null ? null
                     : this.invitation.getInvitationId();
@@ -158,10 +170,16 @@ public final class PartyPage extends PageContent {
         PartySnapshot party = snapshot.getParty();
         if (party == null) {
             addNote(rows, I18n.format("gui.losttales.party.no_party")
-                    + " " + I18n.format("gui.losttales.party.no_party_detail"));
+                    + " " + I18n.format("gui.losttales.party.no_party_detail",
+                            Integer.valueOf(snapshot.getMemberLimit())));
         } else {
-            rows.add(heading(I18n.format("gui.losttales.party.heading.members",
-                    Integer.valueOf(party.getMemberCount()))));
+            Integer count = Integer.valueOf(party.getMemberCount());
+            Integer limit = Integer.valueOf(snapshot.getMemberLimit());
+            rows.add(heading(party.getName().length() == 0
+                    ? I18n.format("gui.losttales.party.heading.members",
+                            count, limit)
+                    : I18n.format("gui.losttales.party.heading.named",
+                            party.getName(), count, limit)));
             for (PartyMemberSnapshot member : party.getMembers()) {
                 if (search.matches(member.getCharacterName())) {
                     rows.add(new Row(Kind.MEMBER, member.getCharacterName(),
@@ -233,9 +251,9 @@ public final class PartyPage extends PageContent {
         return total;
     }
 
-    /** The room the list has: the page less its margins and the status line. */
+    /** The room the list has: the page less its margins. */
     private int listHeight() {
-        return Math.max(ROW_HEIGHT, this.height - 2 * MARGIN - NOTE_LINE);
+        return Math.max(ROW_HEIGHT, this.height - 2 * MARGIN);
     }
 
     /* ---- Life ---- */
@@ -247,9 +265,36 @@ public final class PartyPage extends PageContent {
         }
         handlePendingOperation();
         synchronizeSelection();
+        if (getSnapshot() == null) {
+            this.ticksSinceAsked++;
+            if (this.ticksSinceAsked >= RETRY_TICKS) {
+                askForState();
+            }
+        }
         if (this.inviteField != null) {
             this.inviteField.updateCursorCounter();
         }
+        if (this.nameField != null) {
+            this.nameField.updateCursorCounter();
+        }
+    }
+
+    /** The page on screen asks for the state, so what it shows is fresh. */
+    @Override
+    public void shown() {
+        if (this.width >= 0) {
+            askForState();
+        }
+    }
+
+    /** Asks the server for the state, unless the page's last ask is still out. */
+    private void askForState() {
+        if (this.stateRequestId != 0
+                && ClientPartyStateCache.isRequestPending(this.stateRequestId)) {
+            return;
+        }
+        this.ticksSinceAsked = 0;
+        this.stateRequestId = PartyClientRequestManager.requestState();
     }
 
     private void handlePendingOperation() {
@@ -265,14 +310,12 @@ public final class PartyPage extends PageContent {
             return;
         }
         ClientPartyStateCache.clearOperation(completedRequestId);
+        // The answer stands on the page, over its bar (W2).
         if (feedback.isSuccessful()) {
-            this.statusMessage = ClientPartyDisplayNames.operationSuccess(
-                    feedback.getOperationType());
-            this.statusError = false;
+            sayDone(ClientPartyDisplayNames.operationSuccess(
+                    feedback.getOperationType()));
         } else {
-            this.statusMessage = ClientPartyDisplayNames.error(
-                    feedback.getErrorId());
-            this.statusError = true;
+            sayRefused(ClientPartyDisplayNames.error(feedback.getErrorId()));
         }
     }
 
@@ -283,12 +326,12 @@ public final class PartyPage extends PageContent {
      */
     private void synchronizeSelection() {
         PartyStateSnapshot snapshot = getSnapshot();
-        UUID active = snapshot == null ? null : snapshot.getActiveCharacterId();
-        if (active != null && !active.equals(this.knownActiveCharacterId)) {
-            this.knownActiveCharacterId = active;
+        UUID active = snapshot == null ? null : snapshot.getActiveIdentityId();
+        if (active != null && !active.equals(this.knownActiveIdentityId)) {
+            this.knownActiveIdentityId = active;
             this.pickedKind = null;
             this.scroll = 0;
-            this.statusMessage = "";
+            clearAnswer();
         }
         if (snapshot == null) {
             return;
@@ -327,8 +370,7 @@ public final class PartyPage extends PageContent {
     private void beginRequest(int requestId, boolean showWorkingStatus) {
         this.pendingRequestId = requestId;
         if (showWorkingStatus) {
-            this.statusMessage = I18n.format("gui.losttales.party.working");
-            this.statusError = false;
+            sayWorking(I18n.format("gui.losttales.party.working"));
         }
     }
 
@@ -346,9 +388,8 @@ public final class PartyPage extends PageContent {
         this.font = minecraft.fontRenderer;
         this.width = (int)Math.floor(box.width);
         this.height = (int)Math.floor(box.height);
-        if (!this.initialRequestSent && this.pendingRequestId == 0) {
-            this.initialRequestSent = true;
-            beginRequest(PartyClientRequestManager.requestState(), false);
+        if (this.stateRequestId == 0) {
+            askForState();
         }
         int mouseX = pageX(box, pointerX);
         int mouseY = pageY(box, pointerY);
@@ -393,23 +434,21 @@ public final class PartyPage extends PageContent {
         } finally {
             LostTalesUiClip.end(clipped);
         }
-        if (this.statusMessage.length() > 0) {
-            LostTalesUiInk.drawText(this.font,
-                    this.font.trimStringToWidth(this.statusMessage,
-                            this.width - 2 * MARGIN),
-                    MARGIN, this.height - MARGIN - NOTE_LINE + 2,
-                    this.statusError ? LostTalesColors.rgb(LostTalesColors.RED)
-                            : WindowStyle.asideRgb(), 0xFF);
-        }
     }
 
+    /**
+     * What the page says while it has no state: the server's reason and
+     * that it asks again, or that the state is on its way.
+     */
     private static String unavailableMessage(PartyStateSnapshot snapshot) {
         if (snapshot != null) {
-            return ClientPartyDisplayNames.error(snapshot.getStateErrorId());
+            return ClientPartyDisplayNames.error(snapshot.getStateErrorId())
+                    + " " + I18n.format("gui.losttales.party.asking_again");
         }
         return ClientPartyStateCache.getState()
                 == ClientPartyStateCache.SyncState.ERROR
                 ? ClientPartyDisplayNames.error(PartyErrorId.INTERNAL_ERROR)
+                        + " " + I18n.format("gui.losttales.party.asking_again")
                 : I18n.format("gui.losttales.party.loading");
     }
 
@@ -492,11 +531,11 @@ public final class PartyPage extends PageContent {
         if (row.kind == Kind.MEMBER) {
             List<String> words = new ArrayList<String>(2);
             PartySnapshot party = snapshot.getParty();
-            if (party != null && party.isLeader(row.member.getCharacterId())) {
+            if (party != null && party.isLeader(row.member.getIdentityId())) {
                 words.add(I18n.format("gui.losttales.party.leader"));
             }
-            if (row.member.getCharacterId().equals(
-                    snapshot.getActiveCharacterId())) {
+            if (row.member.getIdentityId().equals(
+                    snapshot.getActiveIdentityId())) {
                 words.add(I18n.format("gui.losttales.party.you"));
             }
             StringBuilder aside = new StringBuilder();
@@ -584,10 +623,10 @@ public final class PartyPage extends PageContent {
 
     /* ---- The keys ---- */
 
-    /** While the invite field is typed in it keeps every key, the pages' keys among them. */
+    /** While a field of the bar is typed in it keeps every key, the pages' keys among them. */
     @Override
     public boolean holdsKeys() {
-        return this.inviteFocused;
+        return this.inviteFocused || this.nameFocused;
     }
 
     @Override
@@ -600,20 +639,20 @@ public final class PartyPage extends PageContent {
     /**
      * The invite field's keys while it is typed in: the arrows walk the
      * players it offers, Tab writes the chosen one's name, Return invites
-     * them, Escape leaves the field. Otherwise the arrows walk the list's
-     * rows and R asks the server again.
+     * them, Escape leaves the field. The name field's: Return saves the
+     * name, Escape goes back to the invite field. Otherwise the arrows walk
+     * the list's rows.
      */
     @Override
     public boolean keyTyped(char typedChar, int keyCode) {
         if (this.width < 0) {
             return false;
         }
+        if (this.nameFocused && this.nameField != null) {
+            return typeInName(typedChar, keyCode);
+        }
         if (this.inviteFocused && this.inviteField != null) {
             return typeInField(typedChar, keyCode);
-        }
-        if (keyCode == Keyboard.KEY_R && this.pendingRequestId == 0) {
-            beginRequest(PartyClientRequestManager.requestState(), false);
-            return true;
         }
         if (keyCode == Keyboard.KEY_UP || keyCode == Keyboard.KEY_DOWN) {
             walkRows(keyCode == Keyboard.KEY_UP ? -1 : 1);
@@ -661,6 +700,51 @@ public final class PartyPage extends PageContent {
         return true;
     }
 
+    private boolean typeInName(char typedChar, int keyCode) {
+        if (keyCode == Keyboard.KEY_ESCAPE) {
+            stopNaming();
+            return true;
+        }
+        if (keyCode == Keyboard.KEY_RETURN
+                || keyCode == Keyboard.KEY_NUMPADENTER) {
+            saveName();
+            return true;
+        }
+        this.nameField.textboxKeyTyped(typedChar, keyCode);
+        return true;
+    }
+
+    /** Sends the name typed, as the party stood when the leader typed it, and goes back to the invite field. */
+    private void saveName() {
+        PartyStateSnapshot snapshot = getSnapshot();
+        PartySnapshot party = snapshot == null ? null : snapshot.getParty();
+        if (party == null || this.pendingRequestId != 0) {
+            return;
+        }
+        beginRequest(PartyClientRequestManager.renameParty(
+                snapshot.getActiveIdentityId(), party.getPartyId(),
+                party.getRevision(), this.nameField.getText().trim()), true);
+        stopNaming();
+    }
+
+    /** The name field takes the invite field's place, filled with the party's name. */
+    private void startNaming(PartySnapshot party) {
+        releaseField();
+        this.naming = true;
+        this.nameFocused = true;
+        this.nameField.setText(party.getName());
+        this.nameField.setFocused(true);
+        this.nameField.setCursorPositionEnd();
+    }
+
+    private void stopNaming() {
+        this.naming = false;
+        this.nameFocused = false;
+        if (this.nameField != null) {
+            this.nameField.setFocused(false);
+        }
+    }
+
     /** Moves the pick to the row before or after it among those shown. */
     private void walkRows(int step) {
         List<Row> rows = rows(getSnapshot());
@@ -684,6 +768,10 @@ public final class PartyPage extends PageContent {
         this.inviteFocused = false;
         if (this.inviteField != null) {
             this.inviteField.setFocused(false);
+        }
+        this.nameFocused = false;
+        if (this.nameField != null) {
+            this.nameField.setFocused(false);
         }
     }
 
@@ -717,7 +805,7 @@ public final class PartyPage extends PageContent {
             String why = party == null
                     ? I18n.format("gui.losttales.party.no_party")
                     : isColorInUseByAnother(party,
-                            snapshot.getActiveCharacterId(), colour)
+                            snapshot.getActiveIdentityId(), colour)
                     ? I18n.format("gui.losttales.party.colour.taken") : "";
             choices.add(new Choice(colour.name(),
                     ClientPartyDisplayNames.color(colour),
@@ -736,9 +824,9 @@ public final class PartyPage extends PageContent {
         for (PartyColor colour : PartyColor.values()) {
             if (colour.name().equals(id)
                     && !isColorInUseByAnother(party,
-                            snapshot.getActiveCharacterId(), colour)) {
+                            snapshot.getActiveIdentityId(), colour)) {
                 beginRequest(PartyClientRequestManager.setColor(
-                        snapshot.getActiveCharacterId(), party.getPartyId(),
+                        snapshot.getActiveIdentityId(), party.getPartyId(),
                         party.getRevision(), colour), true);
             }
         }
@@ -787,40 +875,46 @@ public final class PartyPage extends PageContent {
     /* ---- The window's bar ---- */
 
     /**
-     * The invite field, then what can be done about the row picked, the
-     * go-here marker, and Leave (Disband for the leader) last in red; with
-     * no party, Create Party in the field's place. While the server is
-     * not answering, Refresh alone.
+     * The invite field (the name field while the leader names the party),
+     * the leader's Name Party, then what can be done about the row picked,
+     * the go-here marker, and Leave (Disband for the leader) last in red;
+     * with no party, Create Party in the field's place. Bare while the
+     * page has no state.
      */
     @Override
     public List<BarItem> barItems() {
         PartyStateSnapshot snapshot = getSnapshot();
-        List<BarItem> items = new ArrayList<BarItem>(6);
-        if (snapshot == null || !snapshot.isAvailable()) {
-            String refresh = I18n.format("gui.losttales.party.refresh");
-            BarItem item = BarItem.button(REFRESH, refresh,
-                    new ItemStack(Items.clock))
-                    .tip(WindowBar.withKey(refresh, Keyboard.KEY_R));
-            items.add(isPending() ? item.unavailable(
-                    I18n.format("gui.losttales.party.working")) : item);
+        List<BarItem> items = new ArrayList<BarItem>(7);
+        if (snapshot == null) {
             return items;
         }
         PartySnapshot party = snapshot.getParty();
-        UUID active = snapshot.getActiveCharacterId();
+        UUID active = snapshot.getActiveIdentityId();
         boolean leader = party != null && party.isLeader(active);
         String busy = isPending() ? I18n.format("gui.losttales.party.working")
                 : "";
+        if (!leader && this.naming) {
+            stopNaming();
+        }
         if (party == null) {
             String create = I18n.format("gui.losttales.party.create");
             items.add(orBusy(BarItem.button(CREATE, create,
                     LostTalesUiSheet.PLUS, LostTalesUiSheet.PLUS_HOVER)
                     .tip(create), busy));
+        } else if (this.naming) {
+            items.add(nameItem());
         } else {
             items.add(inviteItem(snapshot, party, leader));
         }
+        if (leader) {
+            String name = I18n.format("gui.losttales.party.name");
+            items.add(orBusy(BarItem.button(NAME, name,
+                    LostTalesUiSheet.DRAFT, LostTalesUiSheet.DRAFT_HOVER)
+                    .tip(name).lit(this.naming), busy));
+        }
         Row picked = picked(rows(snapshot));
         if (picked != null && picked.kind == Kind.MEMBER
-                && !picked.member.getCharacterId().equals(active)) {
+                && !picked.member.getIdentityId().equals(active)) {
             String notLeader = leader ? busy
                     : I18n.format("gui.losttales.party.error.not_leader");
             String makeLeader = I18n.format("gui.losttales.party.make_leader");
@@ -882,7 +976,9 @@ public final class PartyPage extends PageContent {
         }
         String why = !leader
                 ? I18n.format("gui.losttales.party.leader_invites_only")
-                : party.isFull() ? I18n.format("gui.losttales.party.full")
+                : snapshot.isPartyFull() ? I18n.format(
+                        "gui.losttales.party.full",
+                        Integer.valueOf(snapshot.getMemberLimit()))
                 : snapshot.getInviteTargets().isEmpty()
                         ? I18n.format("gui.losttales.party.invite.nobody") : "";
         BarItem field = BarItem.field(INVITE, this.inviteField,
@@ -904,6 +1000,21 @@ public final class PartyPage extends PageContent {
         }
         return field.offers(names, names.isEmpty() ? -1
                 : Math.min(this.offered, names.size() - 1));
+    }
+
+    /** The name field, made the first time the leader names the party. */
+    private BarItem nameItem() {
+        if (this.nameField == null) {
+            WindowScreen screen = WindowScreen.current();
+            if (screen == null) {
+                return BarItem.words("");
+            }
+            this.nameField = screen.makeField();
+            this.nameField.setMaxStringLength(Party.MAX_NAME_LENGTH);
+            this.nameField.setEnableBackgroundDrawing(false);
+        }
+        return BarItem.field(NAME_FIELD, this.nameField,
+                I18n.format("gui.losttales.party.name.hint"));
     }
 
     /** The players the field offers: those who can be invited whose names hold what is typed. */
@@ -931,11 +1042,6 @@ public final class PartyPage extends PageContent {
     @Override
     public void barPressed(String id, int offer) {
         PartyStateSnapshot snapshot = getSnapshot();
-        if (REFRESH.equals(id)) {
-            this.statusMessage = "";
-            beginRequest(PartyClientRequestManager.requestState(), false);
-            return;
-        }
         if (snapshot == null || this.pendingRequestId != 0) {
             return;
         }
@@ -945,13 +1051,33 @@ public final class PartyPage extends PageContent {
                 invite(targets.get(offer));
                 return;
             }
+            // Who is online changes while nothing about the party does.
+            if (!this.inviteFocused) {
+                askForState();
+            }
             this.inviteFocused = true;
             this.inviteField.setFocused(true);
             this.offered = 0;
             return;
         }
         PartySnapshot party = snapshot.getParty();
-        UUID active = snapshot.getActiveCharacterId();
+        if (NAME_FIELD.equals(id) && this.nameField != null) {
+            this.nameFocused = true;
+            this.nameField.setFocused(true);
+            return;
+        }
+        if (NAME.equals(id) && party != null) {
+            if (this.naming) {
+                stopNaming();
+            } else {
+                nameItem();
+                if (this.nameField != null) {
+                    startNaming(party);
+                }
+            }
+            return;
+        }
+        UUID active = snapshot.getActiveIdentityId();
         if (CREATE.equals(id)) {
             beginRequest(PartyClientRequestManager.createParty(active), true);
             return;
@@ -976,10 +1102,8 @@ public final class PartyPage extends PageContent {
         }
         if (GO_HERE.equals(id)) {
             beginRequest(ClientPartyTrackingCache.hasLocalGoHereMarker(snapshot)
-                    ? PartyClientRequestManager.removeGoHereMarker(active,
-                            party.getPartyId(), party.getRevision())
-                    : PartyClientRequestManager.setGoHereMarker(active,
-                            party.getPartyId(), party.getRevision()), true);
+                    ? PartyClientRequestManager.removeGoHereMarker(active)
+                    : PartyClientRequestManager.setGoHereMarker(active), true);
         } else if (LEAVE.equals(id) || DISBAND.equals(id)) {
             askAndDo(LEAVE.equals(id) ? "leave" : "disband", "",
                     LEAVE.equals(id) ? "gui.losttales.party.leave"
@@ -991,7 +1115,7 @@ public final class PartyPage extends PageContent {
                     picked.member.getCharacterName(),
                     MAKE_LEADER.equals(id) ? "gui.losttales.party.make_leader"
                             : "gui.losttales.party.remove", id, party, active,
-                    picked.member.getCharacterId());
+                    picked.member.getIdentityId());
         }
     }
 
@@ -1043,7 +1167,7 @@ public final class PartyPage extends PageContent {
             return;
         }
         beginRequest(PartyClientRequestManager.invitePlayer(
-                snapshot.getActiveCharacterId(), party.getPartyId(),
+                snapshot.getActiveIdentityId(), party.getPartyId(),
                 party.getRevision(), target.getOwnerId()), true);
         this.inviteField.setText("");
         this.offered = 0;
@@ -1060,17 +1184,17 @@ public final class PartyPage extends PageContent {
     private static PartyMemberSnapshot ownMember(PartyStateSnapshot snapshot) {
         PartySnapshot party = snapshot == null ? null : snapshot.getParty();
         return party == null ? null
-                : party.getMember(snapshot.getActiveCharacterId());
+                : party.getMember(snapshot.getActiveIdentityId());
     }
 
     private static boolean isColorInUseByAnother(
-            PartySnapshot party, UUID localCharacterId, PartyColor color) {
+            PartySnapshot party, UUID localIdentityId, PartyColor color) {
         if (party == null || color == null) {
             return false;
         }
         for (PartyMemberSnapshot member : party.getMembers()) {
             if (member.getColor() == color
-                    && !member.getCharacterId().equals(localCharacterId)) {
+                    && !member.getIdentityId().equals(localIdentityId)) {
                 return true;
             }
         }

@@ -12,7 +12,6 @@ public final class LoreCharacterDefinition {
     /** The age of a lore character whose file gives none. */
     public static final int DEFAULT_AGE = 18;
 
-    private final int dataVersion;
     private final String id;
     private final String name;
     private final String description;
@@ -20,21 +19,16 @@ public final class LoreCharacterDefinition {
     private final Appearance appearance;
     private final CharacterProfile profile;
 
-    public LoreCharacterDefinition(int dataVersion, String id, String name,
+    public LoreCharacterDefinition(String id, String name,
                                    String description, int age,
                                    Appearance appearance,
                                    CharacterProfile profile) {
-        this.dataVersion = dataVersion;
         this.id = id == null ? "" : id;
         this.name = name == null ? "" : name;
         this.description = description == null ? "" : description;
         this.age = age;
         this.appearance = appearance;
         this.profile = profile == null ? CharacterProfile.EMPTY : profile;
-    }
-
-    public int getDataVersion() {
-        return this.dataVersion;
     }
 
     public String getId() {

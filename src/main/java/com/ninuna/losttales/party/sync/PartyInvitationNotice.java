@@ -10,7 +10,7 @@ import net.minecraft.util.IChatComponent;
  * The Server line that tells a player they are invited to a party, with
  * Accept and Decline to click. Each answer carries the invitation's id in
  * its click event; the client reads it back and answers as the Party
- * screen does, and the server checks the invitation is theirs, so a
+ * page does, and the server checks the invitation is theirs, so a
  * forged answer does nothing.
  */
 public final class PartyInvitationNotice {
@@ -38,6 +38,25 @@ public final class PartyInvitationNotice {
     public static boolean isNotice(IChatComponent line) {
         return line instanceof ChatComponentTranslation
                 && KEY.equals(((ChatComponentTranslation)line).getKey());
+    }
+
+    /** The invitation an invitation line answers, read off its Accept; null for any other line. */
+    public static UUID invitationIdOf(IChatComponent line) {
+        if (!isNotice(line)) {
+            return null;
+        }
+        for (Object argument : ((ChatComponentTranslation) line).getFormatArgs()) {
+            if (argument instanceof IChatComponent) {
+                IChatComponent part = (IChatComponent) argument;
+                ClickEvent click = part.getChatStyle() == null ? null
+                        : part.getChatStyle().getChatClickEvent();
+                Answer answer = click == null ? null : parse(click.getValue());
+                if (answer != null) {
+                    return answer.invitationId;
+                }
+            }
+        }
+        return null;
     }
 
     private static IChatComponent answer(boolean accept, UUID invitationId) {

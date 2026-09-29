@@ -2,6 +2,7 @@ package com.ninuna.losttales.compat.discord.gateway;
 
 import com.google.gson.JsonObject;
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.compat.discord.DiscordHttp;
 import cpw.mods.fml.common.FMLLog;
 
 import java.io.IOException;
@@ -27,7 +28,7 @@ public final class DiscordGatewayClient extends Thread {
         /** The gateway URL, from Discord; empty on failure. */
         String fetchGatewayUrl() throws IOException;
 
-        void onReady(JsonObject ready, String sessionId);
+        void onReady(JsonObject ready);
 
         void onEvent(String name, JsonObject data);
 
@@ -72,16 +73,6 @@ public final class DiscordGatewayClient extends Thread {
         this.jobRunner.setDaemon(true);
     }
 
-    /** Whether a session is up and events are flowing. */
-    public boolean isConnected() {
-        return this.connected && !this.fatal;
-    }
-
-    /** Whether Discord refused the session for good this run. */
-    public boolean isFatal() {
-        return this.fatal;
-    }
-
     /** Whether the bot hears who is in its servers and what they are doing. */
     public boolean followsMembers() {
         return (this.protocol.getIntents() & DiscordGatewayProtocol.MEMBER_INTENTS)
@@ -101,7 +92,8 @@ public final class DiscordGatewayClient extends Thread {
             opened.sendText(DiscordGatewayProtocol.requestMembersPayload(guildId));
             return true;
         } catch (IOException failure) {
-            note("Could not ask Discord for a server's members: " + failure.getMessage());
+            note("Could not ask Discord for a server's members: "
+                    + DiscordHttp.describe(failure));
             return false;
         }
     }
@@ -141,9 +133,9 @@ public final class DiscordGatewayClient extends Thread {
                 }
                 resumed = session(url);
             } catch (IOException failure) {
-                note("Discord gateway link failed: " + failure.getMessage());
+                note("Discord gateway link failed: " + DiscordHttp.describe(failure));
             } catch (RuntimeException failure) {
-                note("Discord gateway link failed: " + failure);
+                note("Discord gateway link failed: " + DiscordHttp.describe(failure));
             } finally {
                 stopHeartbeat();
                 closeSocket();
@@ -209,7 +201,7 @@ public final class DiscordGatewayClient extends Thread {
                 this.backoffMillis = MIN_BACKOFF_MILLIS;
                 this.connected = true;
                 this.listener.onConnected();
-                this.listener.onReady(action.data, this.protocol.getSessionId());
+                this.listener.onReady(action.data);
                 return true;
             case EVENT:
                 if ("RESUMED".equals(action.name)) {
@@ -334,7 +326,9 @@ public final class DiscordGatewayClient extends Thread {
                 try {
                     job.run();
                 } catch (RuntimeException failure) {
-                    note("A Discord gateway job failed: " + failure);
+                    // A job's failure can carry a webhook's or a slash
+                    // command's address, whose token is blanked here.
+                    note("A Discord gateway job failed: " + DiscordHttp.describe(failure));
                 }
             } catch (InterruptedException interrupted) {
                 return;

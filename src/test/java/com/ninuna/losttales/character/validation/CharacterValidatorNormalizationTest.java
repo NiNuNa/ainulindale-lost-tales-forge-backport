@@ -32,14 +32,12 @@ public final class CharacterValidatorNormalizationTest {
     }
 
     @Test
-    public void textIsComposedToNfcAndTheKeyIsLowercased() {
+    public void textIsComposedToNfc() {
         // e + combining acute becomes the precomposed letter.
-        String decomposed = "Féanor";
-        assertEquals("Féanor", CharacterValidator.normalizeName(decomposed));
-        assertEquals("Féanor",
+        String decomposed = "Fe\u0301anor";
+        assertEquals("F\u00e9anor", CharacterValidator.normalizeName(decomposed));
+        assertEquals("F\u00e9anor",
                 CharacterValidator.normalizeSection(decomposed));
-        assertEquals("féanor", CharacterValidator.normalizeNameKey(
-                " FÉANOR "));
     }
 
     @Test

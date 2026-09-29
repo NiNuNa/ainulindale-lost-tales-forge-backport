@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatMessageIds;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.gui.ChatLine;
@@ -54,7 +55,7 @@ public final class ChatScrollHoldTest {
     public void arrivingMessagesDoNotMoveThePageBeingRead() {
         ChatTab tab = ChatTab.of(ChatChannel.GLOBAL);
         List<ChatLine> lines = history(10, 9, 8, 7, 6, 5, 4, 3, 2, 1);
-        ClientChatChannelViews.scroll(tab, 4, lines.size(), 3.0D);
+        scroll(tab, 4, lines.size(), 3.0D);
         // The hold is taken on the line at the view's edge: row 4, which
         // is the line with id 6.
         ClientChatChannelViews.holdPosition(tab, frameOver(lines, -1));
@@ -88,7 +89,7 @@ public final class ChatScrollHoldTest {
     public void anUnreadDividerOpeningARowDoesNotMoveThePage() {
         ChatTab tab = ChatTab.of(ChatChannel.OOC);
         List<ChatLine> lines = history(10, 9, 8, 7, 6, 5, 4, 3, 2, 1);
-        ClientChatChannelViews.scroll(tab, 5, lines.size(), 3.0D);
+        scroll(tab, 5, lines.size(), 3.0D);
         ClientChatChannelViews.holdPosition(tab, frameOver(lines, -1));
         assertEquals(5.0D,
                 ClientChatChannelViews.getScroll(tab, lines.size(), 3.0D),
@@ -141,7 +142,7 @@ public final class ChatScrollHoldTest {
     public void reWrappingTheHistoryDoesNotMoveThePage() {
         ChatTab tab = ChatTab.of(ChatChannel.GLOBAL);
         List<ChatLine> lines = history(10, 9, 8, 7, 6, 5, 4, 3, 2, 1);
-        ClientChatChannelViews.scroll(tab, 4, lines.size(), 3.0D);
+        scroll(tab, 4, lines.size(), 3.0D);
         ClientChatChannelViews.holdPosition(tab, frameOver(lines, -1));
         // The window is made narrower: every message below the held one
         // wraps onto a second row, so the list is longer and the held
@@ -166,7 +167,7 @@ public final class ChatScrollHoldTest {
         ChatFrame frame = frameOver(lines, -1);
         // Three lines of room: the ceiling is seven rows up.
         frame.room = 3 * LostTalesChatOverlayRenderer.LINE_HEIGHT;
-        ClientChatChannelViews.scroll(tab, 7, lines.size(), 3.0D);
+        scroll(tab, 7, lines.size(), 3.0D);
         ClientChatChannelViews.holdPosition(tab, frame);
         assertEquals(7.0D,
                 ClientChatChannelViews.getScroll(tab, lines.size(), 3.0D),
@@ -193,11 +194,11 @@ public final class ChatScrollHoldTest {
     public void scrollingAgainTakesAFreshHold() {
         ChatTab tab = ChatTab.of(ChatChannel.GLOBAL);
         List<ChatLine> lines = history(10, 9, 8, 7, 6, 5, 4, 3, 2, 1);
-        ClientChatChannelViews.scroll(tab, 4, lines.size(), 3.0D);
+        scroll(tab, 4, lines.size(), 3.0D);
         ClientChatChannelViews.holdPosition(tab, frameOver(lines, -1));
         // The player turns the wheel: the view is theirs to move, and
         // the hold it had is replaced rather than undoing the turn.
-        ClientChatChannelViews.scroll(tab, 2, lines.size(), 3.0D);
+        scroll(tab, 2, lines.size(), 3.0D);
         ClientChatChannelViews.holdPosition(tab, frameOver(lines, -1));
         assertEquals(6.0D,
                 ClientChatChannelViews.getScroll(tab, lines.size(), 3.0D),
@@ -212,12 +213,12 @@ public final class ChatScrollHoldTest {
 
         // Resting on the newest message, an arrival is not waiting: it
         // is simply the next line, and the stack is pushed along.
-        ClientChatChannelViews.record(11, tab, tab, false);
+        ClientChatChannelViews.record(11, tab, tab, false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
         assertEquals(0, ClientChatChannelViews.waitingBelow(tab));
 
-        ClientChatChannelViews.scroll(tab, 4, lines.size(), 3.0D);
-        ClientChatChannelViews.record(12, tab, tab, false);
-        ClientChatChannelViews.record(13, tab, tab, false);
+        scroll(tab, 4, lines.size(), 3.0D);
+        ClientChatChannelViews.record(12, tab, tab, false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
+        ClientChatChannelViews.record(13, tab, tab, false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
         assertEquals("two arrived behind the page being read",
                 2, ClientChatChannelViews.waitingBelow(tab));
         // The first of them opened the divider that marks the place.
@@ -234,10 +235,10 @@ public final class ChatScrollHoldTest {
     public void scrollingBackDownClearsWhatWasWaiting() {
         ChatTab tab = ChatTab.of(ChatChannel.GLOBAL);
         List<ChatLine> lines = history(10, 9, 8, 7, 6, 5, 4, 3, 2, 1);
-        ClientChatChannelViews.scroll(tab, 4, lines.size(), 3.0D);
-        ClientChatChannelViews.record(11, tab, tab, false);
+        scroll(tab, 4, lines.size(), 3.0D);
+        ClientChatChannelViews.record(11, tab, tab, false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
         assertEquals(1, ClientChatChannelViews.waitingBelow(tab));
-        ClientChatChannelViews.scroll(tab, -100, lines.size(), 3.0D);
+        scroll(tab, -100, lines.size(), 3.0D);
         // The hold is let go the frame the view reaches the newest line.
         ClientChatChannelViews.holdPosition(tab, frameOver(lines, -1));
         assertEquals(0, ClientChatChannelViews.waitingBelow(tab));
@@ -247,7 +248,7 @@ public final class ChatScrollHoldTest {
     public void aHeldMessageTrimmedAwayLeavesTheViewWhereItIs() {
         ChatTab tab = ChatTab.of(ChatChannel.GLOBAL);
         List<ChatLine> lines = history(10, 9, 8, 7, 6, 5, 4, 3, 2, 1);
-        ClientChatChannelViews.scroll(tab, 8, lines.size(), 3.0D);
+        scroll(tab, 8, lines.size(), 3.0D);
         ClientChatChannelViews.holdPosition(tab, frameOver(lines, -1));
         // The history trims past the held line; the view keeps the
         // offset it had and takes hold of whatever is at its edge now.
@@ -256,5 +257,11 @@ public final class ChatScrollHoldTest {
         assertEquals(3.0D,
                 ClientChatChannelViews.getScroll(tab, trimmed.size(), 3.0D),
                 0.0001D);
+    }
+
+    /** Scrolls a view by whole lines the way the wheel does: from where it stands. */
+    private static void scroll(ChatTab tab, int lines, int totalLines, double roomLines) {
+        double current = ClientChatChannelViews.getScroll(tab, totalLines, roomLines);
+        ClientChatChannelViews.scrollTo(tab, current + lines, totalLines, roomLines);
     }
 }

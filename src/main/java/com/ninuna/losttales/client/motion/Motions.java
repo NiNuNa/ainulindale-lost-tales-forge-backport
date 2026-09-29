@@ -60,7 +60,6 @@ public final class Motions {
     private static final Set<String> REPORTED = new HashSet<String>();
     private static volatile Map<String, Motion> current;
     private static volatile Map<String, String> familyOf;
-    private static volatile Map<String, Motion> bundled;
     /** Motions played in place of their files' while the Motion Lab tunes them. */
     private static volatile Map<String, Motion> previews =
             Collections.emptyMap();
@@ -312,12 +311,6 @@ public final class Motions {
         return family == null ? "" : family;
     }
 
-    /** The motion as the mod's own file writes it, before any pack or saved tuning. */
-    public static Motion bundled(String id) {
-        motions();
-        return bundled.get(id);
-    }
-
     /**
      * How long a beat of the motion's leading part takes, as a beat that
      * fades or changes in place ({@link #beatNanos}): {@link Motion#ON}
@@ -424,13 +417,11 @@ public final class Motions {
     private static void load(IResourceManager manager) {
         Map<String, Motion> motions = new LinkedHashMap<String, Motion>();
         Map<String, String> families = new LinkedHashMap<String, String>();
-        Map<String, Motion> own = new LinkedHashMap<String, Motion>();
         Set<String> saved = new HashSet<String>();
         for (String family : FAMILIES) {
             String name = family + ".json";
             MotionCodec.Result base = read(classpathText(family), "the mod's "
                     + name);
-            own.putAll(base.motions());
             merge(motions, families, family, base);
             if (manager != null) {
                 String packed = packText(manager, family);
@@ -448,7 +439,6 @@ public final class Motions {
             }
         }
         savedIds = Collections.unmodifiableSet(saved);
-        bundled = Collections.unmodifiableMap(own);
         familyOf = Collections.unmodifiableMap(families);
         current = Collections.unmodifiableMap(motions);
     }

@@ -366,10 +366,6 @@ final class LostTalesMapSearchPrompt {
             this.name = name == null ? "" : name;
         }
 
-        String getName() {
-            return this.name;
-        }
-
         LostTalesMapMarkerData getMarker() {
             return this.marker;
         }

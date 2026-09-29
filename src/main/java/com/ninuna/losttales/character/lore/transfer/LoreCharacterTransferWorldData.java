@@ -32,7 +32,6 @@ public final class LoreCharacterTransferWorldData extends WorldSavedData {
     private final Map<String, LoreCharacterTransferRecord> transactions =
             new LinkedHashMap<String, LoreCharacterTransferRecord>();
     private boolean readOnly;
-    private int unsupportedDataVersion = -1;
     private String readOnlyReason = "";
     private NBTTagCompound preservedData;
 
@@ -48,17 +47,17 @@ public final class LoreCharacterTransferWorldData extends WorldSavedData {
             return;
         }
         if (!compound.hasKey("DataVersion", Constants.NBT.TAG_INT)) {
-            fail(compound, -1, "missing_data_version");
+            fail(compound, "missing_data_version");
             return;
         }
         int version = compound.getInteger("DataVersion");
         if (version != CURRENT_DATA_VERSION) {
-            fail(compound, version, "unsupported_data_version");
+            fail(compound, "unsupported_data_version");
             return;
         }
         if (!compound.hasKey("Vault", Constants.NBT.TAG_LIST)
                 || !compound.hasKey("Transactions", Constants.NBT.TAG_LIST)) {
-            fail(compound, version, "missing_lists");
+            fail(compound, "missing_lists");
             return;
         }
         NBTTagList vaultList = compound.getTagList(
@@ -67,7 +66,7 @@ public final class LoreCharacterTransferWorldData extends WorldSavedData {
                 "Transactions", Constants.NBT.TAG_COMPOUND);
         if (vaultList.tagCount() > MAX_ENTRIES
                 || transactionList.tagCount() > MAX_ENTRIES) {
-            fail(compound, version, "entry_limit_exceeded");
+            fail(compound, "entry_limit_exceeded");
             return;
         }
         try {
@@ -95,7 +94,7 @@ public final class LoreCharacterTransferWorldData extends WorldSavedData {
                 }
             }
         } catch (RuntimeException exception) {
-            fail(compound, version, "malformed_entry");
+            fail(compound, "malformed_entry");
         }
     }
 
@@ -119,9 +118,6 @@ public final class LoreCharacterTransferWorldData extends WorldSavedData {
     }
 
     public synchronized boolean isReadOnly() { return this.readOnly; }
-    public synchronized int getUnsupportedDataVersion() {
-        return this.unsupportedDataVersion;
-    }
     public synchronized String getReadOnlyReason() { return this.readOnlyReason; }
     public synchronized LoreCharacterVaultEntry getVaultEntry(String loreId) {
         return this.vault.get(LostTalesIdentifiers.normalize(loreId));
@@ -294,13 +290,13 @@ public final class LoreCharacterTransferWorldData extends WorldSavedData {
 
     private void reset() {
         this.vault.clear(); this.transactions.clear(); this.readOnly = false;
-        this.unsupportedDataVersion = -1; this.readOnlyReason = "";
+        this.readOnlyReason = "";
         this.preservedData = null;
     }
 
-    private void fail(NBTTagCompound source, int version, String reason) {
+    private void fail(NBTTagCompound source, String reason) {
         this.vault.clear(); this.transactions.clear(); this.readOnly = true;
-        this.unsupportedDataVersion = version; this.readOnlyReason = reason;
+        this.readOnlyReason = reason;
         this.preservedData = source == null ? new NBTTagCompound()
                 : (NBTTagCompound)source.copy();
     }

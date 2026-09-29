@@ -23,7 +23,6 @@ final class TabMenus {
     private static final String ENTRY_OPEN_PREFIX = "open:";
     /** Marks a row a page found: this, the page's id, a colon, and the row's own id. */
     private static final String ENTRY_FIND_PREFIX = "find:";
-    private static final String ENTRY_WINDOW_UNSTICK = "window_unstick";
     private static final String ENTRY_WINDOW_RESET = "window_reset";
     /** The window menu's last row, which opens Settings beside it. */
     private static final String ENTRY_SETTINGS = "settings";
@@ -60,10 +59,26 @@ final class TabMenus {
      * accident.
      */
     void showTabMenu(WindowTab tab, SubWindowAnchor anchor, boolean toggle) {
-        if (tab != null) {
+        if (tab != null && hasRows(tab)) {
             this.menus.show(SubWindowKind.TAB, tab,
                     WindowMenus.hangingFrom(anchor), toggle);
         }
+    }
+
+    /**
+     * Whether a tab's menu holds anything: the tab's own rows, or a
+     * window of its own for it. The cog of one that holds nothing stays,
+     * greyed, and no menu opens for it.
+     */
+    static boolean hasRows(WindowTab tab) {
+        return tab.hasMenuRows() || offersDetach(tab);
+    }
+
+    /** Whether the tab's menu offers it a window of its own: its window is unlocked and holds another tab. */
+    static boolean offersDetach(WindowTab tab) {
+        Window window = WindowLayout.windowOf(tab);
+        return window != null && !window.isLocked()
+                && window.getTabs().size() > 1;
     }
 
     /**
@@ -71,8 +86,7 @@ final class TabMenus {
      * a switch, as the dots are — or under a right-click on the strip: the
      * settings a window has that nothing else on the row offers. Locking
      * and closing are not among them, since the padlock and the cross
-     * stand beside the dots. Unsticking is offered while the window is
-     * stuck to a neighbour, and Reset Size puts it back to its tab's own
+     * stand beside the dots. Reset Size puts it back to its tab's own
      * shape. A locked window offers no dots, and one locked while the menu
      * stands closes it. Its last row opens Settings beside it.
      */
@@ -278,9 +292,7 @@ final class TabMenus {
                     new ArrayList<MenuWindow.Entry>(tab.menuRows());
             // A layout action the row may have no room for: a window of
             // its own, offered whenever the layout would allow it.
-            Window window = WindowLayout.windowOf(tab);
-            if (window != null && !window.isLocked()
-                    && window.getTabs().size() > 1) {
+            if (offersDetach(tab)) {
                 rows.add(new MenuWindow.Entry(ENTRY_DETACH,
                         StatCollector.translateToLocal(
                                 "gui.losttales.window.tab.detach")));
@@ -297,7 +309,7 @@ final class TabMenus {
                 TabMenus.this.screen.detachTab(tab);
                 return false;
             }
-            return tab.takeMenuRow(entry.id);
+            return tab.takeMenuRow(entry.id, back);
         }
     }
 
@@ -314,13 +326,8 @@ final class TabMenus {
         public void rebuild(MenuWindow menu) {
             Window window = WindowLayout.window((String)menu.about());
             menu.setTitle(windowTitle(window), LostTalesUiSheet.MORE);
-            List<MenuWindow.Entry> entries = new ArrayList<MenuWindow.Entry>(3);
+            List<MenuWindow.Entry> entries = new ArrayList<MenuWindow.Entry>(2);
             if (window != null) {
-                if (window.isLinked()) {
-                    entries.add(new MenuWindow.Entry(ENTRY_WINDOW_UNSTICK,
-                            StatCollector.translateToLocal(
-                                    "gui.losttales.window.menu.unstick")));
-                }
                 entries.add(new MenuWindow.Entry(ENTRY_WINDOW_RESET,
                         StatCollector.translateToLocal(
                                 "gui.losttales.window.menu.reset_size")));
@@ -349,9 +356,7 @@ final class TabMenus {
             if (window == null) {
                 return false;
             }
-            if (ENTRY_WINDOW_UNSTICK.equals(entry.id)) {
-                WindowLayout.unlink(window.getId());
-            } else if (ENTRY_WINDOW_RESET.equals(entry.id)) {
+            if (ENTRY_WINDOW_RESET.equals(entry.id)) {
                 resetSize(window);
             }
             return false;

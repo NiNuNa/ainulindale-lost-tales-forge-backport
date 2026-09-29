@@ -1,6 +1,5 @@
 package com.ninuna.losttales.client.render.player;
 
-import com.ninuna.losttales.client.gui.CharacterMenuButtonPlacement;
 import net.minecraft.client.model.ModelBiped;
 import org.junit.Test;
 
@@ -13,6 +12,7 @@ import static org.junit.Assert.assertTrue;
  * render and needs a screen; the scale is arithmetic.
  */
 public final class LostTalesCharacterFigureRendererTest {
+    private static final int VANILLA_BUTTON_HEIGHT = 44;
 
     /** Sixteen texels to a block, so a scale must be a multiple of it. */
     private static final int TEXELS_PER_BLOCK = 16;
@@ -64,14 +64,18 @@ public final class LostTalesCharacterFigureRendererTest {
         assertTrue("vanilla still defaults this to true", model.isChild);
     }
 
-    /** The menu's own button, at the height vanilla's spacing gives it. */
+    /**
+     * The menu's own button, at the height vanilla's spacing gives it:
+     * buttons twenty tall and twenty-four apart, so the top of
+     * Singleplayer to the bottom of Multiplayer is forty-four.
+     */
     @Test
     public void theMenuButtonHoldsAFigureOfMoreThanOnePixelPerTexel() {
         int scale = LostTalesCharacterFigureRenderer.scaleFor(
-                CharacterMenuButtonPlacement.VANILLA_HEIGHT - 6);
+                VANILLA_BUTTON_HEIGHT - 6);
         assertTrue("the button is too short to be worth a figure",
                 scale >= TEXELS_PER_BLOCK);
         assertTrue(LostTalesCharacterFigureRenderer.height(scale)
-                <= CharacterMenuButtonPlacement.VANILLA_HEIGHT);
+                <= VANILLA_BUTTON_HEIGHT);
     }
 }

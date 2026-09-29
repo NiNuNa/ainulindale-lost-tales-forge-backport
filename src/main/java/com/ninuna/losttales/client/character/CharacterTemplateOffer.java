@@ -14,7 +14,7 @@ import java.util.UUID;
  *
  * <p>A world says, in the roster it sends, whether it has read the
  * account's template yet. It has not on the login where it makes the
- * default character, and it has on every login after. The offer is made
+ * account character, and it has on every login after. The offer is made
  * once per session and never repeated: the server decides whether the
  * reading is still there to spend, and a second offer would only be
  * answered with the same "nothing to do".</p>
@@ -41,7 +41,7 @@ public final class CharacterTemplateOffer {
     /** Called with every roster the server sends. */
     public static synchronized void onRoster(CharacterRosterSnapshot snapshot) {
         if (snapshot == null || snapshot.isTemplateTaken()
-                // A roster with no default character yet has nothing to
+                // A roster with no account character yet has nothing to
                 // take the template onto: the login sequence sends one
                 // before it makes the character, and the one offer this
                 // session makes must not be spent on it.

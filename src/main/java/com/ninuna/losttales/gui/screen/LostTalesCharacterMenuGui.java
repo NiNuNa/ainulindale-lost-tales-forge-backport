@@ -26,7 +26,10 @@ import net.minecraft.client.resources.I18n;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 
-/** Skyrim-style radial character menu. */
+/**
+ * Skyrim-style radial character menu: Characters up, Quests left, Chat
+ * right, the Map down. Every word it shows comes from the lang file.
+ */
 public class LostTalesCharacterMenuGui extends GuiScreen
         implements LostTalesPointerInteractable {
     private static final int BUTTON_SETTINGS = 42100;
@@ -64,14 +67,20 @@ public class LostTalesCharacterMenuGui extends GuiScreen
         this.hoveredOption = optionAt(mouseX, mouseY);
 
         LostTalesSkyrimUiStyle.drawScreenShade(this.width, this.height);
-        LostTalesSkyrimUiStyle.drawCenteredHeader(this.fontRendererObj, "Character Menu", getHoveredSubtitle(), this.width, 12);
+        LostTalesSkyrimUiStyle.drawCenteredHeader(this.fontRendererObj,
+                I18n.format("gui.losttales.character_menu.title"),
+                getHoveredSubtitle(), this.width, 12);
 
         drawHoverSector(centerX, centerY);
         drawRadialFrame(centerX, centerY, radius);
-        drawRadialOption("PROFILE", OPTION_PROFILE, centerX, centerY - radius, centerX, centerY - 18);
-        drawRadialOption("QUESTS", OPTION_QUESTS, centerX - radius, centerY, centerX - 22, centerY);
-        drawRadialOption("CHAT", OPTION_CHAT, centerX + radius, centerY, centerX + 22, centerY);
-        drawRadialOption("MAP", OPTION_MAP, centerX, centerY + radius, centerX, centerY + 22);
+        drawRadialOption(I18n.format("gui.losttales.character_menu.characters"),
+                OPTION_PROFILE, centerX, centerY - radius, centerX, centerY - 18);
+        drawRadialOption(I18n.format("gui.losttales.character_menu.quests"),
+                OPTION_QUESTS, centerX - radius, centerY, centerX - 22, centerY);
+        drawRadialOption(I18n.format("gui.losttales.character_menu.chat"),
+                OPTION_CHAT, centerX + radius, centerY, centerX + 22, centerY);
+        drawRadialOption(I18n.format("gui.losttales.character_menu.map"),
+                OPTION_MAP, centerX, centerY + radius, centerX, centerY + 22);
         drawCenterOrnament(centerX, centerY);
         drawControlBar();
         LostTalesControlBarAnimation.pushFixed(this);
@@ -191,15 +200,15 @@ public class LostTalesCharacterMenuGui extends GuiScreen
     private String getHoveredSubtitle() {
         switch (this.hoveredOption) {
             case OPTION_PROFILE:
-                return "Character Info";
+                return I18n.format("gui.losttales.character_menu.characters.subtitle");
             case OPTION_QUESTS:
-                return "Quest Journal";
+                return I18n.format("gui.losttales.character_menu.quests.subtitle");
             case OPTION_CHAT:
-                return "Chat";
+                return I18n.format("gui.losttales.character_menu.chat.subtitle");
             case OPTION_MAP:
-                return "Middle-earth Map";
+                return I18n.format("gui.losttales.character_menu.map.subtitle");
             default:
-                return "Choose a path";
+                return I18n.format("gui.losttales.character_menu.subtitle");
         }
     }
 
@@ -211,13 +220,15 @@ public class LostTalesCharacterMenuGui extends GuiScreen
         hints.add(Hint.keyCluster(this.mc, this.fontRendererObj,
                 new int[] {Keyboard.KEY_UP, Keyboard.KEY_RIGHT,
                         Keyboard.KEY_DOWN, Keyboard.KEY_LEFT},
-                "Hover or", "Select"));
+                I18n.format("gui.losttales.character_menu.hint.hover"),
+                I18n.format("gui.losttales.character_menu.hint.select")));
         hints.add(Hint.binding(this.mc, this.fontRendererObj,
                 LostTalesKeyBindings.getQuestJournalKeyBinding(),
-                "Quest Journal"));
+                I18n.format("gui.losttales.character_menu.quests.subtitle")));
         hints.add(Hint.alternative(this.mc, this.fontRendererObj,
                 LostTalesKeyBindings.getCharacterMenuKeyBinding(),
-                Keyboard.KEY_ESCAPE, "Close"));
+                Keyboard.KEY_ESCAPE,
+                I18n.format("gui.losttales.character_menu.hint.close")));
         LostTalesControlBar.render(this, this.mc, this.fontRendererObj,
                 this.width, this.height, hints, hints.size(), 116,
                 Collections.<String>emptyList(), true);

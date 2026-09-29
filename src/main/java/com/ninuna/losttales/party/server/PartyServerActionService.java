@@ -16,10 +16,6 @@ public final class PartyServerActionService {
 
     private PartyServerActionService() {}
 
-    public static PartyInvitationState getState(EntityPlayerMP player) {
-        return PartyService.getInstance().getInvitationState(player);
-    }
-
     public static PartyOperationResult createParty(EntityPlayerMP player) {
         return PartyService.getInstance().createParty(player);
     }
@@ -32,9 +28,9 @@ public final class PartyServerActionService {
 
     public static PartyOperationResult removeMember(EntityPlayerMP player,
                                                      long expectedPartyRevision,
-                                                     UUID targetCharacterId) {
+                                                     UUID targetIdentityId) {
         return PartyService.getInstance().removeMember(
-                player, expectedPartyRevision, targetCharacterId);
+                player, expectedPartyRevision, targetIdentityId);
     }
 
     public static PartyOperationResult disbandParty(EntityPlayerMP player,
@@ -46,9 +42,9 @@ public final class PartyServerActionService {
     public static PartyOperationResult transferLeadership(
             EntityPlayerMP player,
             long expectedPartyRevision,
-            UUID targetCharacterId) {
+            UUID targetIdentityId) {
         return PartyService.getInstance().transferLeadership(
-                player, expectedPartyRevision, targetCharacterId);
+                player, expectedPartyRevision, targetIdentityId);
     }
 
     public static PartyOperationResult setMemberColor(
@@ -59,23 +55,28 @@ public final class PartyServerActionService {
                 player, expectedPartyRevision, color);
     }
 
-    public static PartyOperationResult setGoHereMarker(
+    public static PartyOperationResult renameParty(
             EntityPlayerMP player,
             long expectedPartyRevision,
+            String name) {
+        return PartyService.getInstance().renameParty(
+                player, expectedPartyRevision, name);
+    }
+
+    public static PartyOperationResult setGoHereMarker(
+            EntityPlayerMP player,
             boolean hasMarkerPosition,
             int markerDimensionId,
             double markerX,
             double markerZ) {
         return PartyService.getInstance().setGoHereMarker(
-                player, expectedPartyRevision, hasMarkerPosition,
-                markerDimensionId, markerX, markerZ);
+                player, hasMarkerPosition, markerDimensionId,
+                markerX, markerZ);
     }
 
     public static PartyOperationResult removeGoHereMarker(
-            EntityPlayerMP player,
-            long expectedPartyRevision) {
-        return PartyService.getInstance().removeGoHereMarker(
-                player, expectedPartyRevision);
+            EntityPlayerMP player) {
+        return PartyService.getInstance().removeGoHereMarker(player);
     }
 
     public static PartyInvitationOperationResult invitePlayer(

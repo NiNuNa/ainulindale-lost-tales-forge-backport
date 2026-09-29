@@ -3,7 +3,6 @@ package com.ninuna.losttales.network.packet;
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerEditableSettings;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRecord;
-import com.ninuna.losttales.mapmarker.LostTalesMapMarkerRelevance;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerVisibility;
 import com.ninuna.losttales.mapmarker.LostTalesWaystoneStateReason;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
@@ -209,50 +208,8 @@ public final class LostTalesWaystoneStatePacket implements IMessage {
         return this.settings;
     }
     public String getName() { return this.settings.getName(); }
-    public String getIconName() { return this.settings.getIconName(); }
-    public String getColor() { return this.settings.getColorName(); }
-    public String getCategoryName() {
-        return this.settings.getCategoryName();
-    }
-    public String getDescription() {
-        return this.settings.getDescription();
-    }
     public boolean hasFastTravel() {
         return this.settings.hasFastTravel();
-    }
-    public int getMarkerDimensionId() {
-        return this.settings.getDimensionId();
-    }
-    public double getMarkerX() { return this.settings.getX(); }
-    public double getMarkerY() { return this.settings.getY(); }
-    public double getMarkerZ() { return this.settings.getZ(); }
-    public double getCompassFadeInRadius() {
-        return this.settings.getCompassFadeInRadius();
-    }
-    public double getDiscoveryRadius() {
-        return this.settings.getDiscoveryRadius();
-    }
-    public LostTalesMapMarkerVisibility getVisibility() {
-        return this.settings.getVisibility();
-    }
-    public boolean isHiddenUntilDiscovered() {
-        return this.settings.isHiddenUntilDiscovered();
-    }
-    public boolean isDiscoverable() {
-        return this.settings.isDiscoverable();
-    }
-    public boolean requiresRegionUnlock() {
-        return this.settings.requiresRegionUnlock();
-    }
-    public boolean hasWaystone() {
-        return this.settings.hasWaystone();
-    }
-    public String getWaystoneStructureType() {
-        return this.settings.getWaystoneStructureType();
-    }
-    public int getPriority() { return this.settings.getPriority(); }
-    public LostTalesMapMarkerRelevance getRelevance() {
-        return this.settings.getRelevance();
     }
     public int getSharedPlayerCount() {
         return this.sharedPlayerCount;

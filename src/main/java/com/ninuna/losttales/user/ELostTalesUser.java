@@ -1,9 +1,7 @@
 package com.ninuna.losttales.user;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -39,24 +37,18 @@ public enum ELostTalesUser {
     private static final Map<UUID, ELostTalesUser> BY_UUID = index();
 
     private final String name;
-    private final String uuid;
     private final UUID uniqueId;
     private final ELostTalesUserRecognition recognition;
 
     ELostTalesUser(String name, String uuid,
                    ELostTalesUserRecognition recognition) {
         this.name = name;
-        this.uuid = uuid;
         this.uniqueId = parse(uuid);
         this.recognition = recognition;
     }
 
     public String getName() {
         return name;
-    }
-
-    public String getUuid() {
-        return uuid;
     }
 
     /** The account id, or null for {@link #NULL} and a malformed constant. */
@@ -68,29 +60,10 @@ public enum ELostTalesUser {
         return recognition;
     }
 
-    /** False only for {@link #NULL}. */
-    public boolean isRecognized() {
-        return this != NULL;
-    }
-
     /** The recognized user with that account id, or {@link #NULL}. */
     public static ELostTalesUser byUniqueId(UUID uniqueId) {
         ELostTalesUser user = uniqueId == null ? null : BY_UUID.get(uniqueId);
         return user == null ? NULL : user;
-    }
-
-    /**
-     * Every recognized user of one kind, in declaration order; the list a
-     * credits screen or a roster print reads. Never contains {@link #NULL}.
-     */
-    public static List<ELostTalesUser> recognizedAs(ELostTalesUserRecognition recognition) {
-        List<ELostTalesUser> users = new ArrayList<ELostTalesUser>();
-        for (ELostTalesUser user : values()) {
-            if (user.isRecognized() && user.recognition == recognition) {
-                users.add(user);
-            }
-        }
-        return Collections.unmodifiableList(users);
     }
 
     private static Map<UUID, ELostTalesUser> index() {

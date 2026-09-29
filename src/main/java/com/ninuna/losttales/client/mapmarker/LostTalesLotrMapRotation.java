@@ -51,8 +51,6 @@ public final class LostTalesLotrMapRotation {
                     / RESISTANCE_RATE + RESISTANCE_GRADIENT_FLOOR;
     /** Strict visual bounds while the player pulls beyond the normal limit. */
     static final float MAX_VISUAL_LEAN = resistanceShare(MAX_INPUT);
-    static final float MAX_VISUAL_DEGREES =
-            MAX_DEGREES * MAX_VISUAL_LEAN;
     /** Time constant for an untouched overshoot to return to its normal limit. */
     static final float OVERSHOOT_RETURN_SECONDS = 0.12F;
     private static final float OVERSHOOT_RETURN_EPSILON = 0.0005F;
@@ -126,13 +124,6 @@ public final class LostTalesLotrMapRotation {
     public static boolean isSupported() {
         return Boolean.getBoolean(LostTalesClassTransformer
                 .LOTR_MAP_ROTATION_ACTIVE_PROPERTY);
-    }
-
-    static float clampDegrees(float degrees) {
-        if (Float.isNaN(degrees)) {
-            return 0.0F;
-        }
-        return Math.max(-MAX_DEGREES, Math.min(MAX_DEGREES, degrees));
     }
 
     /**
@@ -599,49 +590,6 @@ public final class LostTalesLotrMapRotation {
     }
 
     /**
-     * Turns a point onto the sheet without laying the sheet down.
-     *
-     * <p>The half-way space, and the only place a shape lying <em>on</em> the
-     * map can be laid out: the map's own turn has been applied, so the sheet's
-     * axes are the screen's, but the lean has not, so a length along the sheet
-     * is still just a length. Offsets are measured here and
-     * {@link #leanOnly} then carries the result the rest of the way.</p>
-     */
-    static void rotateOnly(float[] point, LOTRGuiMap gui) {
-        if (point == null || point.length < 2 || unrotatedDepth > 0) {
-            return;
-        }
-        try {
-            float degrees = degreesOf(gui);
-            if (degrees == 0.0F || !ensureReflection()) {
-                return;
-            }
-            rotateAbout(point, centerX(), centerY(), degrees);
-        } catch (Throwable ignored) {
-            // A point that cannot be turned is left where it was found.
-        }
-    }
-
-    /** Lays the sheet down under a point already turned onto it. */
-    static float leanOnly(float[] point, LOTRGuiMap gui) {
-        if (point == null || point.length < 2 || unrotatedDepth > 0) {
-            return 1.0F;
-        }
-        try {
-            float lean = leanOf(gui);
-            if (lean <= 0.0F || !ensureReflection()) {
-                return 1.0F;
-            }
-            float centerX = centerX();
-            float centerY = centerY();
-            applyLean(point, centerX, centerY, leanScaleY(lean));
-            return 1.0F;
-        } catch (Throwable ignored) {
-            return 1.0F;
-        }
-    }
-
-    /**
      * The point the map turns about: exactly the one LOTR projects through.
      *
      * <p>Its own conversion adds {@code mapXMin + mapWidth / 2} in integer
@@ -650,8 +598,7 @@ public final class LostTalesLotrMapRotation {
      * beneath it, which reads as the map shivering as it turns.</p>
      *
      * <p>Private on purpose: it reads fields this class resolves lazily, so
-     * callers outside it go through {@link #readCenter(float[])}, which makes
-     * sure they have been resolved first.</p>
+     * only code here that has made sure of them first calls it.</p>
      */
     private static float centerX() throws IllegalAccessException {
         return mapXMinField.getInt(null) + mapWidthField.getInt(null) / 2;
@@ -659,23 +606,6 @@ public final class LostTalesLotrMapRotation {
 
     private static float centerY() throws IllegalAccessException {
         return mapYMinField.getInt(null) + mapHeightField.getInt(null) / 2;
-    }
-
-    /**
-     * Writes the turn centre into {@code result}, or leaves it untouched and
-     * returns false when the map camera cannot be read.
-     */
-    static boolean readCenter(float[] result) {
-        if (result == null || result.length < 2 || !ensureReflection()) {
-            return false;
-        }
-        try {
-            result[0] = centerX();
-            result[1] = centerY();
-            return true;
-        } catch (IllegalAccessException exception) {
-            return false;
-        }
     }
 
     /**

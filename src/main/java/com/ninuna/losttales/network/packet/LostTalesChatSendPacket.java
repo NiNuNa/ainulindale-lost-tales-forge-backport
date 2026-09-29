@@ -1,8 +1,10 @@
 package com.ninuna.losttales.network.packet;
 
+import com.ninuna.losttales.chat.ChatAction;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
+import com.ninuna.losttales.chat.ChatFormattingCodes;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.chat.share.ChatShareKind;
@@ -36,7 +38,8 @@ public final class LostTalesChatSendPacket implements IMessage {
     /** Speak as one of the sender's own roster characters. */
     public static final int IDENTITY_CHARACTER = 2;
 
-    private static final int MAX_PACKET_BYTES = 1308
+    // The fixed fields, the action flag among them.
+    private static final int MAX_PACKET_BYTES = 1309
             + ChatMessageValidator.MAX_UTF8_BYTES
             + ChatShareTokenParser.MAX_TOKENS
             * (ChatShareReference.MAX_MARKER_ID_BYTES + 8);
@@ -47,23 +50,25 @@ public final class LostTalesChatSendPacket implements IMessage {
     /**
      * Whose line an unnamed quote is, as far as the sender can say: a
      * line of somebody the server cannot vouch for, which is quoted
-     * without a head.
+     * without a head. A line of the Server or the Client that the server
+     * holds no record of is one too.
      */
     public static final int QUOTE_OTHER = 0;
     /**
-     * A line of the sender's own — the echo of a command they ran, say —
+     * A line of the sender's own (the echo of a command they ran, say),
      * which the server draws with the head it signs the sender with, and
      * only when the quote names an identity of theirs.
      */
     public static final int QUOTE_OWN = 1;
-    /**
-     * A line of the Server or of the Client itself, which wears the
-     * console mark: a mark that claims no more than the name beside it.
-     */
-    public static final int QUOTE_SYSTEM = 2;
 
     private String channelId = "";
     private String message = "";
+    /**
+     * Whether the words are an action ({@code /me}) rather than
+     * something said: a request the server honours only in an
+     * in-character channel, with the words checked as a message's are.
+     */
+    private boolean action;
     private List<ChatShareReference> references = Collections.emptyList();
     /** Account name a whisper is for; empty for every other channel. */
     private String target = "";
@@ -117,9 +122,9 @@ public final class LostTalesChatSendPacket implements IMessage {
     private String quoteAuthor = "";
     private String quoteExcerpt = "";
     /**
-     * Whose that line is ({@link #QUOTE_OTHER}, {@link #QUOTE_OWN} or
-     * {@link #QUOTE_SYSTEM}): a claim the server checks against what it
-     * knows before it draws any head for it. Only with a quote.
+     * Whose that line is ({@link #QUOTE_OTHER} or {@link #QUOTE_OWN}): a
+     * claim the server checks against what it knows before it draws any
+     * head for it. Only with a quote.
      */
     private int quoteSource = QUOTE_OTHER;
     /**
@@ -166,6 +171,23 @@ public final class LostTalesChatSendPacket implements IMessage {
                                    UUID targetCharacterId,
                                    String quoteAuthor, String quoteExcerpt,
                                    int quoteSource) {
+        this(channel, message, references, target, identityKind,
+                identityCharacterId, replyToMessageId, targetIdentity,
+                echoNonce, targetCharacterId, quoteAuthor, quoteExcerpt,
+                quoteSource, false);
+    }
+
+    /** As above; {@code action} sends the words as an action. */
+    public LostTalesChatSendPacket(ChatChannel channel, String message,
+                                   List<ChatShareReference> references,
+                                   String target, int identityKind,
+                                   UUID identityCharacterId,
+                                   long replyToMessageId,
+                                   String targetIdentity, long echoNonce,
+                                   UUID targetCharacterId,
+                                   String quoteAuthor, String quoteExcerpt,
+                                   int quoteSource, boolean action) {
+        this.action = action;
         this.quoteAuthor = quoteAuthor == null ? "" : quoteAuthor.trim();
         this.quoteExcerpt = quoteExcerpt == null ? "" : quoteExcerpt.trim();
         this.quoteSource = this.quoteAuthor.length() == 0 ? QUOTE_OTHER
@@ -199,6 +221,8 @@ public final class LostTalesChatSendPacket implements IMessage {
                     buffer, MAX_CHANNEL_BYTES);
             this.message = LostTalesPacketCodec.readUtf8String(
                     buffer, ChatMessageValidator.MAX_UTF8_BYTES);
+            // Whether the words are an action rather than speech.
+            this.action = buffer.readBoolean();
             int count = buffer.readUnsignedByte();
             if (count > ChatShareTokenParser.MAX_TOKENS) {
                 throw new LostTalesPacketCodec.DecodeException(
@@ -256,6 +280,7 @@ public final class LostTalesChatSendPacket implements IMessage {
             validate();
         } catch (RuntimeException exception) {
             this.malformed = true;
+            this.action = false;
             this.quoteAuthor = "";
             this.quoteExcerpt = "";
             this.quoteSource = QUOTE_OTHER;
@@ -279,6 +304,7 @@ public final class LostTalesChatSendPacket implements IMessage {
                 buffer, this.channelId, MAX_CHANNEL_BYTES);
         LostTalesPacketCodec.writeUtf8String(
                 buffer, this.message, ChatMessageValidator.MAX_UTF8_BYTES);
+        buffer.writeBoolean(this.action);
         buffer.writeByte(this.references.size());
         for (ChatShareReference reference : this.references) {
             buffer.writeByte(reference.getKind().getCode());
@@ -322,24 +348,22 @@ public final class LostTalesChatSendPacket implements IMessage {
 
     /**
      * Whose line an unnamed quote is, from the head the quote wears on
-     * the sender's own screen: a line of the Server's or the Client's,
-     * one of the sender's own, or somebody else's — an NPC included,
-     * whose portrait means nothing to anyone else.
+     * the sender's own screen: one of the sender's own, or anybody
+     * else's (the Server, the Client, an NPC).
      */
     public static int quoteSourceOf(ChatReplyReference reply, UUID sender) {
         if (reply == null || !reply.hasHead() || reply.isNpcLine()) {
             return QUOTE_OTHER;
         }
-        if (LostTalesChatMessagePacket.isSystemSender(reply.getSenderId())) {
-            return QUOTE_SYSTEM;
-        }
         return reply.getSenderId().equals(sender) ? QUOTE_OWN : QUOTE_OTHER;
     }
 
     private void validate() {
-        if (this.quoteSource < QUOTE_OTHER || this.quoteSource > QUOTE_SYSTEM
+        if (this.quoteSource < QUOTE_OTHER || this.quoteSource > QUOTE_OWN
                 || (this.quoteSource != QUOTE_OTHER
                         && this.quoteAuthor.length() == 0)
+                || ChatFormattingCodes.hasCodeOrControl(this.quoteAuthor)
+                || ChatFormattingCodes.hasCodeOrControl(this.quoteExcerpt)
                 || this.replyToMessageId != ChatMessageIds.NONE
                 && !ChatMessageIds.isServerId(this.replyToMessageId)
                 // A quote of an unnamed line and a message id are two
@@ -375,6 +399,9 @@ public final class LostTalesChatSendPacket implements IMessage {
                 || (this.forwardOf == ChatMessageIds.NONE
                         ? !ChatMessageValidator.isValid(this.message)
                         : !isBareForward())
+                // An action is words like a message's; an empty one is
+                // no action at all.
+                || (this.action && !ChatAction.isValid(this.message))
                 || this.references.size() > ChatShareTokenParser.MAX_TOKENS) {
             throw new IllegalArgumentException("invalid chat request");
         }
@@ -387,20 +414,23 @@ public final class LostTalesChatSendPacket implements IMessage {
 
     /**
      * A forward names a message of the server's and nothing else of its
-     * own: no words, no shares, no reply, no quote and no echo, since the
-     * line it becomes is the server's to build.
+     * own: no words, no shares, no reply, no quote, no echo and no
+     * action, since the line it becomes is the server's to build.
      */
     private boolean isBareForward() {
         return ChatMessageIds.isServerId(this.forwardOf)
                 && this.message.length() == 0 && this.references.isEmpty()
                 && this.replyToMessageId == ChatMessageIds.NONE
-                && this.quoteAuthor.length() == 0 && this.echoNonce == 0L;
+                && this.quoteAuthor.length() == 0 && this.echoNonce == 0L
+                && !this.action;
     }
 
     public ChatChannel getChannel() {
         return ChatChannel.fromId(this.channelId);
     }
     public String getMessage() { return this.message; }
+    /** Whether the words are an action ({@code /me}) rather than speech. */
+    public boolean isAction() { return this.action; }
     /** References in token order; may be shorter than the token list. */
     public List<ChatShareReference> getReferences() { return this.references; }
     /** The whisper's account name; empty otherwise. */

@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Persistent one-marker-per-character party marker store. */
+/** Persistent go-here marker store: one marker per identity. */
 public final class PartyGoHereMarkerWorldData extends WorldSavedData {
 
     public static final String DATA_NAME = "losttales_party_go_here_markers";
@@ -75,13 +75,9 @@ public final class PartyGoHereMarkerWorldData extends WorldSavedData {
         return this.readOnlyForNewerVersion;
     }
 
-    public synchronized int getUnsupportedDataVersion() {
-        return this.unsupportedDataVersion;
-    }
-
-    public synchronized PartyGoHereMarker getMarker(UUID ownerCharacterId) {
-        return ownerCharacterId == null ? null
-                : this.markersByOwnerCharacter.get(ownerCharacterId);
+    public synchronized PartyGoHereMarker getMarker(UUID ownerIdentityId) {
+        return ownerIdentityId == null ? null
+                : this.markersByOwnerCharacter.get(ownerIdentityId);
     }
 
     public synchronized Collection<PartyGoHereMarker> getMarkers() {
@@ -96,7 +92,7 @@ public final class PartyGoHereMarkerWorldData extends WorldSavedData {
             throw new IllegalArgumentException("marker must not be null");
         }
         PartyGoHereMarker previous = this.markersByOwnerCharacter.put(
-                marker.getOwnerCharacterId(), marker);
+                marker.getOwnerIdentityId(), marker);
         boolean changed = !sameMarker(previous, marker);
         if (changed) {
             markDirty();
@@ -105,10 +101,10 @@ public final class PartyGoHereMarkerWorldData extends WorldSavedData {
     }
 
     public synchronized PartyGoHereMarker removeMarker(
-            UUID ownerCharacterId) {
+            UUID ownerIdentityId) {
         ensureWritable();
-        PartyGoHereMarker removed = ownerCharacterId == null ? null
-                : this.markersByOwnerCharacter.remove(ownerCharacterId);
+        PartyGoHereMarker removed = ownerIdentityId == null ? null
+                : this.markersByOwnerCharacter.remove(ownerIdentityId);
         if (removed != null) {
             markDirty();
         }
@@ -145,8 +141,8 @@ public final class PartyGoHereMarkerWorldData extends WorldSavedData {
             return false;
         }
         return equalNullable(left.getPartyId(), right.getPartyId())
-                && left.getOwnerCharacterId().equals(
-                right.getOwnerCharacterId())
+                && left.getOwnerIdentityId().equals(
+                right.getOwnerIdentityId())
                 && left.getDimensionId() == right.getDimensionId()
                 && Double.doubleToLongBits(left.getX())
                 == Double.doubleToLongBits(right.getX())

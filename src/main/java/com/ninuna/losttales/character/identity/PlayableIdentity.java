@@ -119,10 +119,6 @@ public final class PlayableIdentity {
         return this.characterId == null;
     }
 
-    public boolean matchesGameplayId(UUID id) {
-        return id != null && id.equals(getGameplayId());
-    }
-
     @Override
     public boolean equals(Object other) {
         if (this == other) {

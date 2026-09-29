@@ -12,7 +12,7 @@ public final class ChatMuteDurations {
 
     /** Nothing parsed: the token is not a duration. */
     public static final long NOT_A_DURATION = -1L;
-    /** Longest expressible mute; anything above reads as permanent. */
+    /** The longest mute a duration sets: a year; anything longer is cut to it. */
     public static final long MAX_MILLIS = 365L * 24L * 60L * 60L * 1000L;
 
     private ChatMuteDurations() {}

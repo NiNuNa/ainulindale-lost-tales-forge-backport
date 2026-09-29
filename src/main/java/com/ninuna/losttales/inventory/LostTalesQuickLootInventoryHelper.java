@@ -2,6 +2,7 @@ package com.ninuna.losttales.inventory;
 
 import com.ninuna.losttales.block.custom.LostTalesBlockUrnTall;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityUrn;
+import com.ninuna.losttales.compat.lotr.LotrContainerProtection;
 import java.lang.reflect.Method;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockChest;
@@ -10,6 +11,8 @@ import net.minecraft.inventory.IInventory;
 import net.minecraft.inventory.InventoryLargeChest;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.tileentity.TileEntityChest;
+import net.minecraft.util.MovingObjectPosition;
+import net.minecraft.util.Vec3;
 import net.minecraft.world.World;
 
 /**
@@ -46,7 +49,9 @@ public final class LostTalesQuickLootInventoryHelper {
 
         Block block = world.getBlock(x, y, z);
         if (block instanceof BlockChest) {
-            Method vanillaResolver = getVanillaChestResolver();
+            // Vanilla's resolver reads the four neighbours, which would load an unloaded chunk.
+            Method vanillaResolver = world.checkChunksExist(x - 1, y, z - 1, x + 1, y, z + 1)
+                    ? getVanillaChestResolver() : null;
             if (vanillaResolver != null) {
                 IInventory chest = resolveVanillaChest((BlockChest) block, vanillaResolver, world, x, y, z);
                 return chest == null ? null : new InventoryAccess(x, y, z, chest, false);
@@ -67,19 +72,66 @@ public final class LostTalesQuickLootInventoryHelper {
         return new InventoryAccess(x, y, z, inventory, isSealed(inventory));
     }
 
-    public static boolean isUsableBy(EntityPlayer player, InventoryAccess access) {
-        if (player == null || access == null || player.worldObj == null) {
-            return false;
+    /**
+     * The container at x, y, z as the server lets this player see it: within
+     * reach and in sight before any block entity is read, usable by them, and
+     * open to them under LOTR's banner protection. Null otherwise.
+     */
+    public static InventoryAccess resolveFor(EntityPlayer player, int x, int y, int z) {
+        if (player == null || player.worldObj == null || player.worldObj.isRemote) {
+            return null;
         }
-        if (!player.worldObj.blockExists(access.x, access.y, access.z)) {
-            return false;
+        World world = player.worldObj;
+        if (!world.blockExists(x, y, z) || !isWithinReach(player, x, y, z)
+                || !isInSight(player, world, x, y, z)) {
+            return null;
         }
-        double dx = player.posX - ((double) access.x + 0.5D);
-        double dy = player.posY - ((double) access.y + 0.5D);
-        double dz = player.posZ - ((double) access.z + 0.5D);
-        return dx * dx + dy * dy + dz * dz <= MAX_INTERACTION_DISTANCE_SQ
-                && access.inventory != null
-                && access.inventory.isUseableByPlayer(player);
+        InventoryAccess access = resolve(world, x, y, z);
+        if (access == null || !access.inventory.isUseableByPlayer(player)
+                || !LotrContainerProtection.mayOpen(player, world, access.x, access.y, access.z)) {
+            return null;
+        }
+        return access;
+    }
+
+    private static boolean isWithinReach(EntityPlayer player, int x, int y, int z) {
+        double dx = player.posX - ((double) x + 0.5D);
+        double dy = player.posY - ((double) y + 0.5D);
+        double dz = player.posZ - ((double) z + 0.5D);
+        return dx * dx + dy * dy + dz * dz <= MAX_INTERACTION_DISTANCE_SQ;
+    }
+
+    /**
+     * Whether nothing solid stands between the player's eyes and the block:
+     * a ray to its middle, or to a point inside one of the faces turned toward
+     * the player, meets the block itself (or the other half of a double chest
+     * or a tall urn) or nothing at all before it ends inside the block.
+     */
+    private static boolean isInSight(EntityPlayer player, World world, int x, int y, int z) {
+        double eyeX = player.posX;
+        double eyeY = player.posY + (double) player.getEyeHeight();
+        double eyeZ = player.posZ;
+        Block target = world.getBlock(x, y, z);
+        double[][] points = {
+                { 0.5D, 0.5D, 0.5D },
+                { eyeX < x + 0.5D ? 0.25D : 0.75D, 0.5D, 0.5D },
+                { 0.5D, eyeY < y + 0.5D ? 0.25D : 0.75D, 0.5D },
+                { 0.5D, 0.5D, eyeZ < z + 0.5D ? 0.25D : 0.75D }
+        };
+        for (double[] point : points) {
+            MovingObjectPosition hit = world.func_147447_a(
+                    Vec3.createVectorHelper(eyeX, eyeY, eyeZ),
+                    Vec3.createVectorHelper(x + point[0], y + point[1], z + point[2]),
+                    false, true, false);
+            if (hit == null || hit.typeOfHit != MovingObjectPosition.MovingObjectType.BLOCK) {
+                return true;
+            }
+            int distance = Math.abs(hit.blockX - x) + Math.abs(hit.blockY - y) + Math.abs(hit.blockZ - z);
+            if (distance == 0 || (distance == 1 && world.getBlock(hit.blockX, hit.blockY, hit.blockZ) == target)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static boolean isSealed(IInventory inventory) {

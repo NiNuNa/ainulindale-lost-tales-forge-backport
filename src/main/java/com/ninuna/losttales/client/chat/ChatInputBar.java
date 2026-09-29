@@ -290,14 +290,6 @@ public final class ChatInputBar {
                 frame.boxRight - frame.boxLeft);
     }
 
-    int left() {
-        return this.left;
-    }
-
-    int top() {
-        return this.top;
-    }
-
     /** The fractional remainder the bar group is drawn shifted by. */
     float fractionX() {
         return this.fractionX;
@@ -614,13 +606,11 @@ public final class ChatInputBar {
         List<int[]> holes = new ArrayList<int[]>();
         holes.add(new int[] {fit.frameLeft, frameTop, fit.frameRight,
                 frameTop + LostTalesUiFramedButton.HEIGHT, 1});
-        if (hasCharacterButton(fit.channel)) {
-            int characterLeft = characterButtonLeft(fit);
-            int characterTop = characterButtonTop();
-            holes.add(new int[] {characterLeft, characterTop,
-                    characterLeft + CHARACTER_BUTTON_SIZE,
-                    characterTop + CHARACTER_BUTTON_SIZE, 1});
-        }
+        int characterLeft = characterButtonLeft(fit);
+        int characterTop = characterButtonTop();
+        holes.add(new int[] {characterLeft, characterTop,
+                characterLeft + CHARACTER_BUTTON_SIZE,
+                characterTop + CHARACTER_BUTTON_SIZE, 1});
         holes.add(new int[] {line.wellLeft, wellTop, line.wellRight,
                 wellBottom, 0});
         WindowBar.fillWithHoles(this.left, this.top + 1, barRight, barBottom,
@@ -678,9 +668,7 @@ public final class ChatInputBar {
             drawBarSurface(frame, fit, line, barRight);
             drawHint(line, draft, tab);
             drawDraft(line, draft);
-            if (hasCharacterButton(tab)) {
-                drawCharacterButton(tab, this.restingMotion);
-            }
+            drawCharacterButton(tab, this.restingMotion);
             drawIndicatorFrame(fit, 0.0F, false);
             int toggleLeft = toolbarToggleLeft(barRight);
             this.toolbarToggle.drawSettled(ChatLayout.isToolbarCollapsed(),
@@ -981,11 +969,9 @@ public final class ChatInputBar {
     /** {@link #indicatorFit} for the bar of a window whose front tab is {@code channel}. */
     private IndicatorFit indicatorFit(int barRight, ChatTab channel) {
         int frameLeft = indicatorLeft();
-        // What stands between the indicator and the field: the
-        // character button, a button gap past the frame, where the tab
-        // has one.
-        int trailing = hasCharacterButton(channel)
-                ? BUTTON_GAP + CHARACTER_BUTTON_SIZE : 0;
+        // What stands between the indicator and the field: the head
+        // button, a button gap past the frame. Every bar wears it.
+        int trailing = BUTTON_GAP + CHARACTER_BUTTON_SIZE;
         int iconLeft = frameLeft + LostTalesUiFramedButton.WIDE_INSET;
         boolean icon = ChatChannelIcons.iconOf(channel) != null;
         int iconRight = icon ? iconLeft + TabIcons.SIZE : iconLeft;
@@ -1065,8 +1051,7 @@ public final class ChatInputBar {
      * button answers on its frame and nowhere else.
      */
     boolean isInsideCharacterButton(double mouseX, double mouseY) {
-        return hasCharacterButton(ClientChatChannelState.getSelected())
-                && LostTalesUiHitBox.contains(mouseX, mouseY, characterButtonLeft(),
+        return LostTalesUiHitBox.contains(mouseX, mouseY, characterButtonLeft(),
                 characterButtonTop(), CHARACTER_BUTTON_SIZE,
                 CHARACTER_BUTTON_SIZE);
     }
@@ -1083,9 +1068,6 @@ public final class ChatInputBar {
     void drawCharacterSelectionButton(double mouseX, double mouseY,
                                       boolean menuOpen) {
         ChatTab tab = ClientChatChannelState.getSelected();
-        if (!hasCharacterButton(tab)) {
-            return;
-        }
         boolean hovered = isInsideCharacterButton(mouseX, mouseY);
         this.characterMotion.advance(System.nanoTime(), hovered || menuOpen,
                 hovered, hovered && Mouse.isButtonDown(0));
@@ -1093,17 +1075,6 @@ public final class ChatInputBar {
         this.regions.add(characterButtonLeft(), characterButtonTop(),
                 characterButtonRight(),
                 characterButtonTop() + CHARACTER_BUTTON_SIZE);
-    }
-
-    /**
-     * Whether the bar of a window whose front tab is {@code tab} wears
-     * the head button. Every bar does: on a roleplaying channel it
-     * chooses the chat identity as well as the status, and on an account
-     * channel — which always speaks as the account — it is the player's
-     * own head and their status alone.
-     */
-    static boolean hasCharacterButton(ChatTab tab) {
-        return true;
     }
 
     /**

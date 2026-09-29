@@ -61,7 +61,7 @@ public class InspectionCameraMathTest {
 
     @Test
     public void thePivotDropsFromTheEyeToTheMiddleOfTheBody() {
-        assertEquals(1.62D - 0.9D, InspectionCameraMath.pivotDropBelowEye(1.8D, 1.62D),
+        assertEquals(1.62D - 0.9D, InspectionCameraMath.pivotDropBelowEye(1.8D, 1.62D, 0.5D),
                 EPSILON);
         // Looking at the head rather than the middle: the point rises to the
         // eye and above it.
@@ -69,8 +69,8 @@ public class InspectionCameraMathTest {
                 EPSILON);
         assertTrue(InspectionCameraMath.pivotDropBelowEye(1.8D, 1.62D, 1.0D) < 0.0D);
         // A hobbit's eye is lower and its body shorter; the drop shrinks with it.
-        assertTrue(InspectionCameraMath.pivotDropBelowEye(1.2D, 1.05D)
-                < InspectionCameraMath.pivotDropBelowEye(1.8D, 1.62D));
+        assertTrue(InspectionCameraMath.pivotDropBelowEye(1.2D, 1.05D, 0.5D)
+                < InspectionCameraMath.pivotDropBelowEye(1.8D, 1.62D, 0.5D));
     }
 
     @Test

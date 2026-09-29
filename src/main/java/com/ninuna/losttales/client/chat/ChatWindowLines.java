@@ -1,10 +1,8 @@
 package com.ninuna.losttales.client.chat;
 
-import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowPlacement;
 import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
-import cpw.mods.fml.common.FMLLog;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -78,7 +76,6 @@ public final class ChatWindowLines {
     private static final Field CHAT_LINES = resolveChatLines();
     private static final Map<String, Cached> CACHE =
             new HashMap<String, Cached>();
-    private static boolean unavailableLogged;
     /**
      * Bumped whenever the history is changed in place rather than added
      * to. The signature below notices messages arriving and leaving by
@@ -709,16 +706,6 @@ public final class ChatWindowLines {
         return null;
     }
 
-    public static void logUnavailableOnce() {
-        if (unavailableLogged) {
-            return;
-        }
-        unavailableLogged = true;
-        FMLLog.warning("[%s] The chat's unwrapped history could not be "
-                + "read; every window keeps the game's own chat width",
-                LostTalesMetaData.MOD_ID);
-    }
-
     /** One view's laid-out lines and what they were laid out for. */
     private static final class Cached {
         private final int wrapWidth;
@@ -795,8 +782,12 @@ public final class ChatWindowLines {
                     new ArrayList<ChatLine>(messages.size());
             for (int index = 0; index < messages.size(); index++) {
                 ChatLine message = messages.get(index);
+                // A line addressed to the player passes where only such
+                // lines of its conversation do.
                 if (message != null && filter.accepts(
                         ClientChatChannelViews.tabOf(
+                                message.getChatLineID()),
+                        LostTalesChatPresentation.isPingedLine(
                                 message.getChatLineID()))) {
                     visible.add(message);
                 }

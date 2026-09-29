@@ -90,7 +90,7 @@ public final class LoreCharacterDefinitionJsonParser {
             CharacterProfile profile = parseProfile(object.get("profile"),
                     description);
             return new ParseResult(
-                    new LoreCharacterDefinition(dataVersion, id, name,
+                    new LoreCharacterDefinition(id, name,
                             description, age, appearance, profile), errors);
         } catch (RuntimeException e) {
             errors.add(source + ": " + safeMessage(e));

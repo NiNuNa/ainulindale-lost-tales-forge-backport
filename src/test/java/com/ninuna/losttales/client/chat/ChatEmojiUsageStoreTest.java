@@ -7,6 +7,7 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.Charset;
 import java.util.List;
+import java.util.UUID;
 import org.junit.After;
 import org.junit.Rule;
 import org.junit.Test;
@@ -18,6 +19,9 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 public final class ChatEmojiUsageStoreTest {
+    private static final UUID ACCOUNT =
+            UUID.fromString("a0000000-0000-0000-0000-00000000000a");
+
     @Rule
     public final TemporaryFolder temporaryFolder = new TemporaryFolder();
 
@@ -40,12 +44,12 @@ public final class ChatEmojiUsageStoreTest {
     @Test
     public void favoritesToggleAndPersistAcrossReloads() {
         File configDir = temporaryFolder.getRoot();
-        ChatEmojiUsageStore.initialize(configDir);
+        ChatEmojiUsageStore.initialize(configDir, ACCOUNT);
         ChatEmojiUsageStore.toggleFavorite(ChatEmoji.SOB);
         ChatEmojiUsageStore.toggleFavorite(ChatEmoji.SMILE);
         assertTrue(ChatEmojiUsageStore.isFavorite(ChatEmoji.SOB));
 
-        ChatEmojiUsageStore.initialize(configDir);
+        ChatEmojiUsageStore.initialize(configDir, ACCOUNT);
         List<ChatEmoji> favorites = ChatEmojiUsageStore.getFavorites();
         assertEquals(2, favorites.size());
         // Registry order keeps the grid stable regardless of toggle order.
@@ -53,14 +57,14 @@ public final class ChatEmojiUsageStoreTest {
         assertSame(ChatEmoji.SOB, favorites.get(1));
 
         ChatEmojiUsageStore.toggleFavorite(ChatEmoji.SOB);
-        ChatEmojiUsageStore.initialize(configDir);
+        ChatEmojiUsageStore.initialize(configDir, ACCOUNT);
         assertFalse(ChatEmojiUsageStore.isFavorite(ChatEmoji.SOB));
         assertTrue(ChatEmojiUsageStore.isFavorite(ChatEmoji.SMILE));
     }
 
     @Test
     public void frequentlyUsedOrdersByCountThenRegistryOrder() {
-        ChatEmojiUsageStore.initialize(temporaryFolder.getRoot());
+        ChatEmojiUsageStore.initialize(temporaryFolder.getRoot(), ACCOUNT);
         ChatEmojiUsageStore.recordUse(ChatEmoji.JOY);
         ChatEmojiUsageStore.recordUse(ChatEmoji.JOY);
         ChatEmojiUsageStore.recordUse(ChatEmoji.JOY);
@@ -76,7 +80,7 @@ public final class ChatEmojiUsageStoreTest {
         assertEquals(1, ChatEmojiUsageStore.getFrequentlyUsed(1).size());
         assertTrue(ChatEmojiUsageStore.getFrequentlyUsed(0).isEmpty());
 
-        ChatEmojiUsageStore.initialize(temporaryFolder.getRoot());
+        ChatEmojiUsageStore.initialize(temporaryFolder.getRoot(), ACCOUNT);
         assertEquals(3,
                 ChatEmojiUsageStore.getFrequentlyUsed(6).size());
     }
@@ -84,7 +88,7 @@ public final class ChatEmojiUsageStoreTest {
     @Test
     public void malformedAndUnknownFileLinesAreIgnored() throws Exception {
         File configDir = temporaryFolder.getRoot();
-        File file = new File(configDir, ChatEmojiUsageStore.FILE_PATH);
+        File file = new File(new File(configDir, ChatEmojiUsageStore.FOLDER), ACCOUNT + ".txt");
         assertTrue(file.getParentFile().mkdirs());
         Writer writer = new OutputStreamWriter(
                 new FileOutputStream(file), Charset.forName("UTF-8"));
@@ -101,7 +105,7 @@ public final class ChatEmojiUsageStoreTest {
             writer.close();
         }
 
-        ChatEmojiUsageStore.initialize(configDir);
+        ChatEmojiUsageStore.initialize(configDir, ACCOUNT);
         assertTrue(ChatEmojiUsageStore.isFavorite(ChatEmoji.JOY));
         assertEquals(1, ChatEmojiUsageStore.getFavorites().size());
         List<ChatEmoji> frequent = ChatEmojiUsageStore.getFrequentlyUsed(6);

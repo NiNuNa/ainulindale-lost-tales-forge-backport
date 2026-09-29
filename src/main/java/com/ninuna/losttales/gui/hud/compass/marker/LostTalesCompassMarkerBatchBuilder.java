@@ -93,7 +93,7 @@ public final class LostTalesCompassMarkerBatchBuilder {
 
             if (alpha <= 0.0F) continue;
 
-            renderItems.add(new LostTalesCompassMarkerRenderItem(marker, px, alpha, distSq, dy, fadeInAlpha));
+            renderItems.add(new LostTalesCompassMarkerRenderItem(marker, px, alpha, distSq));
 
             if (isFocusCandidate(marker)) {
                 boolean insideGreenFocusZone = centerDistPx <= LostTalesCompassHudRenderer.MAP_MARKER_BEGIN_CENTER_FOCUS_OFFSET;

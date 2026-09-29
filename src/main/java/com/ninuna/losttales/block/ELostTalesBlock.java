@@ -49,16 +49,6 @@ public enum ELostTalesBlock {
     //  Blocks - Miscellaneous.
     MISSIVE_BOARD(new LostTalesBlockMissiveBoard().setBlockName("missive_board").setCreativeTab(ELostTalesCreativeTabs.BLOCKS_DECORATION.getCreativeTab()));
 
-
-    /**
-     * Deprecated source-level aliases kept so older internal/add-on code that still
-     * references the old amphora/loutrophoros enum names can be migrated gradually.
-     *
-     * The old ancient urn variants were intentionally removed from the registry.
-     */
-    @Deprecated public static final ELostTalesBlock AMPHORA = URN_AMPHORA;
-    @Deprecated public static final ELostTalesBlock LOUTROPHOROS = URN_LOUTROPHOROS;
-
     private final Block block;
 
     ELostTalesBlock(Block block) {

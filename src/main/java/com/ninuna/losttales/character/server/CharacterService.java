@@ -5,6 +5,7 @@ import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.deletion.CharacterDeletionService;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
+import com.ninuna.losttales.character.lore.LoreCharacterRegistry;
 import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipStorage;
 import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipWorldData;
 import com.ninuna.losttales.character.model.CharacterKind;
@@ -20,6 +21,7 @@ import com.ninuna.losttales.character.storage.CharacterWorldData;
 import com.ninuna.losttales.character.validation.CharacterAppearanceValidationResult;
 import com.ninuna.losttales.character.validation.CharacterCreationValidationResult;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
+import com.ninuna.losttales.character.validation.CharacterNames;
 import com.ninuna.losttales.character.validation.CharacterValidationResult;
 import com.ninuna.losttales.character.validation.CharacterValidator;
 import com.ninuna.losttales.character.validation.ValidatedCharacterAppearance;
@@ -34,12 +36,17 @@ import java.util.UUID;
  * Single authoritative entry point for roleplaying character mutations.
  *
  * Callers must invoke this service on the logical server thread. Public
- * mutation methods are synchronized as a defensive atomicity boundary; later
- * packet handlers must still schedule work onto the server thread first.
+ * mutation methods are synchronized as a defensive atomicity boundary;
+ * packet handlers schedule their work onto the server thread first.
  */
 public final class CharacterService {
 
     private static final int UUID_GENERATION_ATTEMPTS = 8;
+    /**
+     * What follows an account's name when that name is a lore character's
+     * or one of the chat's voices, which no character may take.
+     */
+    private static final String RESERVED_NAME_SUFFIX = " the Wanderer";
 
     private final CharacterFactionResolver factionResolver;
     private final CharacterCapeEligibilityPolicy capeEligibilityPolicy;
@@ -87,8 +94,8 @@ public final class CharacterService {
     }
 
     /**
-     * Makes the account's own identity if this world has not made it yet,
-     * and plays as it when nothing else is being played.
+     * Makes the account character if this world has not made it yet, and
+     * plays as it when nothing else is being played.
      *
      * <p>The record carries the account's own UUID as its character id.
      * That is what keeps a world that already existed working: party
@@ -124,7 +131,7 @@ public final class CharacterService {
             // Some other roster already holds a character under this id.
             // Minting a second would make the id ambiguous and cost both
             // of them their party membership and their markers.
-            FMLLog.warning("[%s] Not making a default character for %s: "
+            FMLLog.warning("[%s] Not making an account character for %s: "
                             + "a character already exists under that id",
                     LostTalesMetaData.MOD_ID, ownerId);
             return CharacterOperationResult.failure(
@@ -143,7 +150,7 @@ public final class CharacterService {
         }
         roster.incrementRevision();
         data.saveRoster(roster);
-        FMLLog.info("[%s] Made the default character for %s in slot %d",
+        FMLLog.info("[%s] Made the account character for %s in slot %d",
                 LostTalesMetaData.MOD_ID, ownerId,
                 Integer.valueOf(CharacterRoster.DEFAULT_SLOT_INDEX));
         return CharacterOperationResult.success(true, roster, defaultCharacter);
@@ -162,10 +169,11 @@ public final class CharacterService {
         if (name == null || name.length() == 0) {
             // A record with no name is one the codec would skip, so the
             // identity would vanish on the next load.
-            FMLLog.warning("[%s] Cannot name the default character for %s",
+            FMLLog.warning("[%s] Cannot name the account character for %s",
                     LostTalesMetaData.MOD_ID, ownerId);
             return null;
         }
+        name = accountCharacterName(name);
         String raceId = CharacterRaceRegistry.HUMAN;
         String genderId = CharacterRaceRegistry.normalizeGenderForRace(
                 raceId, CharacterGenderRegistry.MALE);
@@ -195,6 +203,19 @@ public final class CharacterService {
                 .build();
     }
 
+    /**
+     * The account character's name from the account's: the account's own,
+     * unless a lore character or one of the chat's voices goes by it; then
+     * the account's name with a word more, so the lore name stays that
+     * figure's alone.
+     */
+    static String accountCharacterName(String accountName) {
+        String name = accountName == null ? "" : accountName;
+        return LoreCharacterRegistry.getByName(name) != null
+                || CharacterNames.isVoice(name)
+                ? name + RESERVED_NAME_SUFFIX : name;
+    }
+
     public synchronized CharacterOperationResult createCharacter(
             EntityPlayerMP player, CharacterCreationRequest request) {
         CharacterValidationResult playerValidation = validateServerPlayer(player);
@@ -222,6 +243,9 @@ public final class CharacterService {
         }
 
         ValidatedCharacterCreation creation = validation.getCreation();
+        if (nameTakenElsewhere(data, player.getUniqueID(), creation.getName())) {
+            return CharacterOperationResult.failure(CharacterErrorId.DUPLICATE_NAME, roster);
+        }
         RoleplayCharacter character = createUniqueCharacter(
                 data, player.getUniqueID(), creation);
         if (character == null) {
@@ -248,13 +272,6 @@ public final class CharacterService {
         return CharacterOperationResult.success(true, roster, character);
     }
 
-    public CharacterOperationResult selectCharacter(
-            EntityPlayerMP player, int requestId,
-            long expectedRosterRevision, UUID characterId) {
-        return CharacterSwitchCoordinator.getInstance().selectCharacter(
-                player, requestId, expectedRosterRevision, characterId);
-    }
-
     /** Plays as the given identity: one of the roster's characters, or the account itself. */
     public CharacterOperationResult selectIdentity(
             EntityPlayerMP player, int requestId,
@@ -266,7 +283,7 @@ public final class CharacterService {
 
     /**
      * The account asked for as the character that is the account. Once a
-     * world has made the default character, the bare account identity and
+     * world has made the account character, the bare account identity and
      * that character are the same person — the same gameplay id, the same
      * saved state — so a request for one is answered with the other and
      * the roster never shows a player two rows for one identity.
@@ -297,22 +314,21 @@ public final class CharacterService {
     }
 
     /**
-     * Takes the account's template onto this world's default character,
-     * once.
+     * Takes the account character's look onto this world's account
+     * character, once.
      *
-     * <p>A world reads a template on the login where its default
-     * character exists and has not been read for yet, and never again:
-     * from then on the character is this world's. The reading is spent
-     * even when the account offered nothing, so a template written later
-     * is for the next world rather than this one.</p>
+     * <p>A world reads the look on the login where its account character
+     * exists and has not been read for yet, and never again: from then on
+     * the character is this world's. The reading is spent even when the
+     * account offered nothing, so a look saved later is for the next world
+     * rather than this one.</p>
      *
      * <p>Everything in the request is checked against this server's own
      * content exactly as a character somebody is making is checked. The
-     * character's id, slot, faction, level, progression and creation time
-     * are not the template's to say and are left as they were — which is
-     * what keeps the account's items, statistics, alignment and party
-     * membership where they are, all of them filed under the id this
-     * record already has.</p>
+     * character's id, slot, faction and creation time are not the look's
+     * to say and are left as they were — which is what keeps the account's
+     * items, statistics, alignment and party membership where they are,
+     * all of them filed under the id this record already has.</p>
      */
     public synchronized CharacterOperationResult adoptTemplate(
             EntityPlayerMP player, CharacterTemplateAdoption adoption) {
@@ -338,7 +354,7 @@ public final class CharacterService {
         // offer names no character and no slot, so there is nothing a
         // revision protects, and the roster is re-read and re-checked
         // here anyway. The login sequence itself moves the revision —
-        // the roster exists before its default character does — and an
+        // the roster exists before its account character does — and an
         // offer made against the earlier snapshot must still be taken.
         RoleplayCharacter current = roster.getDefaultCharacter();
         if (current == null || roster.isTemplateTaken()) {
@@ -362,6 +378,10 @@ public final class CharacterService {
                         adoption.getAge());
         if (!appearance.isValid()) {
             return refuseTemplate(data, roster, appearance.getErrorId());
+        }
+        if (nameTakenElsewhere(data, player.getUniqueID(),
+                appearance.getAppearance().getName())) {
+            return refuseTemplate(data, roster, CharacterErrorId.DUPLICATE_NAME);
         }
         CharacterValidationResult cape = this.capeEligibilityPolicy.validate(
                 player, current, adoption.getCosmeticCapeId());
@@ -388,17 +408,37 @@ public final class CharacterService {
         roster.markTemplateTaken();
         roster.incrementRevision();
         data.saveRoster(roster);
-        FMLLog.info("[%s] The default character for %s took the account template",
+        FMLLog.info("[%s] The account character for %s took the account character's look",
                 LostTalesMetaData.MOD_ID, player.getUniqueID());
         return CharacterOperationResult.success(true, roster, adopted);
     }
 
     /**
-     * A template this server does not accept. The world's one reading is
-     * spent all the same: the default character stays as it is, to be
-     * edited in the world, and a template fixed later is for the next
-     * world. The refusal goes back with the roster so the client can say
-     * why.
+     * Whether a character of another account already goes by the name.
+     * Names are unique on the server, so a whisper by name reaches the one
+     * person it names (Nils, 2026-09-28, C6 b); a roster's own names are the
+     * validator's to check.
+     */
+    private static boolean nameTakenElsewhere(CharacterWorldData data,
+                                              UUID ownerId, String name) {
+        for (CharacterRoster other : data.getRosters()) {
+            if (other == null || ownerId.equals(other.getOwnerId())) {
+                continue;
+            }
+            for (RoleplayCharacter character : other.getCharacters()) {
+                if (character != null && CharacterNames.same(name, character.getName())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * A look this server does not accept. The world's one reading is
+     * spent all the same: the account character stays as it is, and a look
+     * fixed later is for the next world. The refusal goes back with the
+     * roster so the client can say why.
      */
     private static CharacterOperationResult refuseTemplate(
             CharacterWorldData data, CharacterRoster roster, CharacterErrorId errorId) {
@@ -442,6 +482,12 @@ public final class CharacterService {
         if (!referenceValidation.isValid()) {
             return CharacterOperationResult.failure(
                     referenceValidation.getErrorId(), roster);
+        }
+        // The account's own capes are worn only until the world makes the
+        // account character; from then on the character's are.
+        if (characterId == null && roster.getDefaultCharacter() != null) {
+            return CharacterOperationResult.failure(
+                    CharacterErrorId.INVALID_CHARACTER_ID, roster);
         }
         if (!CharacterCapeCatalog.isValidSelection(cosmeticCapeId)) {
             return CharacterOperationResult.failure(CharacterErrorId.INVALID_CAPE, roster);
@@ -536,6 +582,75 @@ public final class CharacterService {
         return CharacterOperationResult.success(true, roster, updated);
     }
 
+    /**
+     * A character's look — its skin, arm width and chest — which its player
+     * may change at any time, as Save in Change Look sends it; name, race,
+     * sex and faction stay. A lore character keeps the look its story
+     * gives it.
+     */
+    public synchronized CharacterOperationResult updateLook(
+            EntityPlayerMP player, long expectedRosterRevision, UUID characterId,
+            String skinId, String bodyTypeId, String chestTypeId) {
+        CharacterValidationResult playerValidation = validateServerPlayer(player);
+        if (!playerValidation.isValid()) {
+            return CharacterOperationResult.failure(playerValidation.getErrorId(), null);
+        }
+        CharacterValidationResult managementValidation =
+                CharacterValidator.validatePlayerCanManage(player);
+        if (!managementValidation.isValid()) {
+            CharacterErrorId error = managementValidation.getErrorId();
+            if (error == CharacterErrorId.PLAYER_DEAD
+                    || error == CharacterErrorId.PLAYER_SLEEPING) {
+                error = CharacterErrorId.LOOK_UPDATE_NOT_ALLOWED;
+            }
+            return CharacterOperationResult.failure(error, null);
+        }
+
+        CharacterWorldData data = getData(player);
+        if (data == null) {
+            return CharacterOperationResult.failure(CharacterErrorId.INTERNAL_ERROR, null);
+        }
+        if (data.isReadOnlyForNewerVersion()) {
+            return CharacterOperationResult.failure(CharacterErrorId.STORAGE_READ_ONLY, null);
+        }
+        CharacterRoster roster = data.getOrCreateRoster(player.getUniqueID());
+        CharacterValidationResult reference = CharacterValidator.validateCharacterReference(
+                roster, characterId, expectedRosterRevision);
+        if (!reference.isValid()) {
+            return CharacterOperationResult.failure(reference.getErrorId(), roster);
+        }
+        CharacterErrorId lore = refuseLoreCharacter(player, characterId,
+                CharacterErrorId.LORE_CHARACTER_KEEPS_LOOK);
+        if (lore != CharacterErrorId.NONE) {
+            return CharacterOperationResult.failure(lore, roster);
+        }
+        RoleplayCharacter current = roster.getCharacter(characterId);
+        CharacterAppearanceValidationResult validation =
+                CharacterValidator.validateLook(current, skinId, bodyTypeId,
+                        chestTypeId);
+        if (!validation.isValid()) {
+            return CharacterOperationResult.failure(validation.getErrorId(),
+                    roster);
+        }
+        ValidatedCharacterAppearance look = validation.getAppearance();
+        if (look.getSkinId().equals(current.getSkinId())
+                && look.getBodyTypeId().equals(current.getBodyTypeId())
+                && look.getChestTypeId().equals(current.getChestTypeId())) {
+            return CharacterOperationResult.success(false, roster, current);
+        }
+        RoleplayCharacter updated = RoleplayCharacter.builder(current)
+                .skin(look.getSkinId())
+                .bodyType(look.getBodyTypeId())
+                .chestType(look.getChestTypeId())
+                .build();
+        if (!roster.replaceCharacter(updated)) {
+            return CharacterOperationResult.failure(CharacterErrorId.INTERNAL_ERROR, roster);
+        }
+        roster.incrementRevision();
+        data.saveRoster(roster);
+        return CharacterOperationResult.success(true, roster, updated);
+    }
+
     public synchronized CharacterOperationResult deleteCharacter(
             EntityPlayerMP player, long expectedRosterRevision, UUID characterId) {
         CharacterValidationResult playerValidation = validateServerPlayer(player);
@@ -573,10 +688,10 @@ public final class CharacterService {
         }
 
         RoleplayCharacter character = roster.getCharacter(characterId);
-        // The account's own identity is always there. Deleting it would
-        // leave the account with nothing to fall back to, and the state
-        // filed under its id — its party membership, its markers, its
-        // saved player state — with nothing to belong to.
+        // The account character is always there. Deleting it would leave
+        // the account with nothing to fall back to, and the state filed
+        // under its id — its party membership, its markers, its saved
+        // player state — with nothing to belong to.
         if (character != null && character.isDefault()) {
             return CharacterOperationResult.failure(
                     CharacterErrorId.DELETE_DEFAULT_CHARACTER, roster);

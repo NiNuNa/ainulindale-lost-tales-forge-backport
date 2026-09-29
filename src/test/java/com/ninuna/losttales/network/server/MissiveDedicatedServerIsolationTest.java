@@ -13,6 +13,9 @@ import com.ninuna.losttales.quest.missive.MissiveBoardService;
 import com.ninuna.losttales.quest.missive.MissiveBoardStateReason;
 import com.ninuna.losttales.quest.missive.MissiveBoardWatches;
 import com.ninuna.losttales.quest.missive.MissiveNotice;
+import com.ninuna.losttales.quest.missive.MissiveSeal;
+import com.ninuna.losttales.quest.missive.MissiveSealWorldData;
+import com.ninuna.losttales.quest.missive.MissiveSeals;
 import org.junit.Test;
 
 /**
@@ -34,6 +37,9 @@ public final class MissiveDedicatedServerIsolationTest {
                 MissiveBoardStateReason.class,
                 MissiveBoardWatches.class,
                 MissiveNotice.class,
+                MissiveSeal.class,
+                MissiveSeals.class,
+                MissiveSealWorldData.class,
                 LostTalesMissiveCodec.class,
                 LostTalesMissiveAcceptPacket.class,
                 LostTalesMissiveAcceptPacket.Handler.class,

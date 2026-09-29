@@ -25,8 +25,9 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Where an account's default-character template is kept: one file per
- * Minecraft account under {@code config/losttales/client/templates/}.
+ * Where the account character's look is kept: one file per Minecraft
+ * account under {@code config/losttales/client/templates/}. Only the
+ * character room writes it.
  *
  * <p>Per account rather than per installation, so a machine two people
  * share keeps a template each and one person with two accounts keeps one
@@ -35,7 +36,9 @@ import java.util.UUID;
  *
  * <p>A line is {@code key=value}; anything else is skipped, and a key
  * this build does not know is kept as it was so a file written by a later
- * one is not thinned out by an earlier one. Nothing here is validated
+ * one is not thinned out by an earlier one. A value keeps its line breaks
+ * as {@code \n} and its backslashes as {@code \\}, so a History keeps
+ * its paragraphs and never reads back as another entry. Nothing here is validated
  * beyond its length: a template is what the creation form opens with, and
  * every server decides for itself what it will accept.</p>
  */
@@ -175,8 +178,13 @@ public final class CharacterTemplateStore {
                 }
                 String key = line.substring(0, separator).trim()
                         .toLowerCase(Locale.ROOT);
-                String value = line.substring(separator + 1).trim();
-                if (key.length() == 0 || value.length() > MAX_VALUE_LENGTH) {
+                String stored = line.substring(separator + 1).trim();
+                if (key.length() == 0
+                        || stored.length() > MAX_VALUE_LENGTH * 2) {
+                    continue;
+                }
+                String value = unescape(stored);
+                if (value.length() > MAX_VALUE_LENGTH) {
                     continue;
                 }
                 values.put(key, value);
@@ -244,8 +252,47 @@ public final class CharacterTemplateStore {
         if (stored.length() > MAX_VALUE_LENGTH) {
             stored = stored.substring(0, MAX_VALUE_LENGTH);
         }
-        // A newline in a value would read back as another entry.
-        return key + "=" + stored.replace('\n', ' ').replace('\r', ' ');
+        return key + "=" + escape(stored);
+    }
+
+    /** A value on one line: each line break as {@code \n}, each backslash doubled. */
+    static String escape(String value) {
+        StringBuilder escaped = new StringBuilder(value.length() + 8);
+        String text = value.replace("\r\n", "\n").replace('\r', '\n');
+        for (int index = 0; index < text.length(); index++) {
+            char character = text.charAt(index);
+            if (character == '\\') {
+                escaped.append("\\\\");
+            } else if (character == '\n') {
+                escaped.append("\\n");
+            } else {
+                escaped.append(character);
+            }
+        }
+        return escaped.toString();
+    }
+
+    /** A stored value as it was saved; a lone backslash stays as it is. */
+    static String unescape(String stored) {
+        StringBuilder value = new StringBuilder(stored.length());
+        for (int index = 0; index < stored.length(); index++) {
+            char character = stored.charAt(index);
+            if (character == '\\' && index + 1 < stored.length()) {
+                char next = stored.charAt(index + 1);
+                if (next == 'n') {
+                    value.append('\n');
+                    index++;
+                    continue;
+                }
+                if (next == '\\') {
+                    value.append('\\');
+                    index++;
+                    continue;
+                }
+            }
+            value.append(character);
+        }
+        return value.toString();
     }
 
     private static int parseNonNegative(String value) {

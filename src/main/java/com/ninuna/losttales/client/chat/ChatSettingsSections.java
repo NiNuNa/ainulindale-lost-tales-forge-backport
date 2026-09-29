@@ -20,8 +20,9 @@ import net.minecraft.util.StatCollector;
 
 /**
  * The chat's sections of Settings, after the windows' own: its Look,
- * Messages, Mentions, Typing and Closed Feed, every channel's switches,
- * everyone ignored, and every shortcut the chat has. Every Settings has
+ * Messages, Mentions, Typing and Closed Feed, every conversation's
+ * notification choice and Hide, everyone ignored, and every shortcut the
+ * chat has. Every Settings has
  * them, a screen's without a world too.
  */
 public final class ChatSettingsSections {
@@ -46,9 +47,8 @@ public final class ChatSettingsSections {
             });
         }
     };
-    /** A channel's switches: the switch, then the tab's id. */
-    private static final String CHANNEL_MUTE_PREFIX = "channel:mute:";
-    private static final String CHANNEL_PINGS_PREFIX = "channel:pings:";
+    /** A conversation's rows: the choice or the switch, then the tab's id. */
+    private static final String CHANNEL_NOTIFY_PREFIX = "channel:notify:";
     private static final String CHANNEL_HIDE_PREFIX = "channel:hide:";
     /** An ignore's row: an account's by its id, an identity's by its id and name. */
     private static final String IGNORED_ACCOUNT_PREFIX = "ignored:account:";
@@ -515,10 +515,11 @@ public final class ChatSettingsSections {
 
     /**
      * Every channel the player can see, in the order the chat shows
-     * them, then every whisper standing in a window, each under its name
-     * and icon with its three switches: the same ones its tab's menu has.
-     * The whisper channel itself has no tab, only its conversations, so
-     * the order the chat shows leaves it out.
+     * them, then every whisper and NPC conversation standing in a
+     * window, each under its name and icon with its notification choice
+     * and its Hide switch: the same rows its tab's menu has. The whisper
+     * channel itself has no tab, only its conversations, so the order
+     * the chat shows leaves it out.
      */
     static final class ChannelsSection extends Settings.Section {
         @Override
@@ -537,7 +538,7 @@ public final class ChatSettingsSections {
             for (Window window : WindowLayout.windows()) {
                 for (WindowTab each : window.getTabs()) {
                     ChatTab tab = ChatTab.from(each);
-                    if (tab != null && tab.isWhisper() && !tab.isNpc()) {
+                    if (tab != null && tab.isWhisper()) {
                         addChannel(rows, tab);
                     }
                 }
@@ -550,36 +551,29 @@ public final class ChatSettingsSections {
             rows.add(MenuWindow.Entry.group(
                     ClientChatChannelState.displayName(tab), tab,
                     ClientChatChannelState.displayColor(tab)));
-            rows.add(new MenuWindow.Entry(CHANNEL_MUTE_PREFIX + tab.id(),
+            rows.add(new MenuWindow.Entry(CHANNEL_NOTIFY_PREFIX + tab.id(),
                     StatCollector.translateToLocal(
-                            "gui.losttales.chat.settings.channel.mute"))
-                    .withValue(Settings.onOff(ChatLayout.isMuted(tab))));
-            rows.add(new MenuWindow.Entry(CHANNEL_PINGS_PREFIX + tab.id(),
-                    StatCollector.translateToLocal(
-                            "gui.losttales.chat.settings.channel.pings"))
-                    .withValue(Settings.onOff(ChatLayout.isPingsMuted(tab))));
+                            "gui.losttales.chat.settings.channel.notify"))
+                    .withValue(StatCollector.translateToLocal(
+                            ChatLayout.notification(tab).labelKey())));
             rows.add(new MenuWindow.Entry(CHANNEL_HIDE_PREFIX + tab.id(),
                     StatCollector.translateToLocal(
                             "gui.losttales.chat.settings.channel.hide"))
                     .withValue(Settings.onOff(ChatLayout.isHidden(tab))));
         }
 
-        /** A switch flips on a click; a right-click leaves it. */
+        /**
+         * The choice steps on with a click and back with a right-click;
+         * the switch flips on a click and a right-click leaves it.
+         */
         @Override
         public boolean take(MenuWindow.Entry entry, boolean back) {
             String id = entry.id;
             ChatTab tab;
-            if (id.startsWith(CHANNEL_MUTE_PREFIX)) {
-                tab = ChatTab.fromId(id.substring(CHANNEL_MUTE_PREFIX.length()));
-                if (tab != null && !back) {
-                    ChatLayout.setMuted(tab, !ChatLayout.isMuted(tab));
-                }
-                return true;
-            }
-            if (id.startsWith(CHANNEL_PINGS_PREFIX)) {
-                tab = ChatTab.fromId(id.substring(CHANNEL_PINGS_PREFIX.length()));
-                if (tab != null && !back) {
-                    ChatLayout.setPingsMuted(tab, !ChatLayout.isPingsMuted(tab));
+            if (id.startsWith(CHANNEL_NOTIFY_PREFIX)) {
+                tab = ChatTab.fromId(id.substring(CHANNEL_NOTIFY_PREFIX.length()));
+                if (tab != null) {
+                    ChatLayout.stepNotification(tab, back);
                 }
                 return true;
             }

@@ -18,8 +18,6 @@ public final class ChatConsoleEvent {
         COMMAND,
         /** A mute, an unmute, a message taken back by a moderator. */
         MODERATION,
-        /** A role made, changed, deleted, given or taken. */
-        ROLES,
         /** A server setting changed live. */
         CONFIG,
         /** The server itself: started or stopped, a bridge came up. */

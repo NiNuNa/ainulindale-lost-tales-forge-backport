@@ -1,7 +1,5 @@
 package com.ninuna.losttales.mapmarker;
 
-import net.minecraft.world.World;
-
 /** Server-safe metadata for bundled/static map markers. */
 public final class LostTalesMapMarkerDefinition {
     public static final String CATEGORY_DEFAULT = "Map Marker";
@@ -133,22 +131,6 @@ public final class LostTalesMapMarkerDefinition {
 
     public double getY() {
         return y;
-    }
-
-    public boolean hasExplicitY() {
-        return !LostTalesMapMarkerHeightResolver.isAutomatic(this.y);
-    }
-
-    public double getEffectiveY(World world) {
-        return LostTalesMapMarkerHeightResolver.resolve(
-                world, this.dimensionId,
-                this.x, this.y, this.z);
-    }
-
-    public double getEffectiveY(World world, double fallbackY) {
-        return LostTalesMapMarkerHeightResolver.resolveOr(
-                world, this.dimensionId,
-                this.x, this.y, this.z, fallbackY);
     }
 
     public double getZ() {

@@ -1,6 +1,8 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMessageValidator;
+import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.emoji.ChatEmoticonConverter;
 import com.ninuna.losttales.config.LostTalesConfig;
@@ -9,13 +11,18 @@ import java.util.Locale;
 /**
  * The rules about the text in the chat's input field that need no
  * screen: what is a command, what is one of the chat's own whisper
- * verbs, where the message limit is, and what a typed shortcode or an
- * outgoing message becomes. Pure functions over strings, so the screen
- * asks them and tests pin them.
+ * verbs or its action verb, where the message limit is, and what a
+ * typed shortcode or an outgoing message becomes. Pure functions over
+ * strings, so the screen asks them and tests pin them.
  */
 final class ChatInputRules {
     /** The verbs the chat answers itself rather than sending as commands. */
     private static final String[] WHISPER_VERBS = {"/msg", "/tell", "/w"};
+    /**
+     * The chat's own verb for an action in an in-character channel; out
+     * of character it is the game's own command.
+     */
+    static final String ACTION_VERB = "/me";
 
     private ChatInputRules() {}
 
@@ -31,6 +38,43 @@ final class ChatInputRules {
      */
     static boolean isServerCommand(String text) {
         return isCommand(text) && !isWhisperCommand(text);
+    }
+
+    /**
+     * As above for text typed in {@code channel}: an action typed in an
+     * in-character channel is the chat's own too.
+     */
+    static boolean isServerCommand(String text, ChatChannel channel) {
+        return isServerCommand(text) && !isAction(text, channel);
+    }
+
+    /** {@code /me}, whatever follows; the verb alone as well. */
+    static boolean isActionCommand(String text) {
+        if (text == null) {
+            return false;
+        }
+        String verb = text.trim().split("\\s+", 2)[0].toLowerCase(Locale.ROOT);
+        return ACTION_VERB.equals(verb);
+    }
+
+    /**
+     * Whether text typed in {@code channel} is an action line: {@code /me}
+     * in an in-character channel. Anywhere else {@code /me} is the
+     * game's own command.
+     */
+    static boolean isAction(String text, ChatChannel channel) {
+        return isActionCommand(text)
+                && ChatRolePresentation.isInCharacter(channel);
+    }
+
+    /**
+     * The words an action sends: what follows the verb, trimmed; empty
+     * when nothing does.
+     */
+    static String actionWords(String command) {
+        String[] parts = (command == null ? "" : command.trim())
+                .split("\\s+", 2);
+        return parts.length < 2 ? "" : parts[1].trim();
     }
 
     /** {@code /msg}, {@code /tell} and {@code /w}, whatever follows. */

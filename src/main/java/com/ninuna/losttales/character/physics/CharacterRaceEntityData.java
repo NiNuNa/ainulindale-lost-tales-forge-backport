@@ -37,27 +37,6 @@ public final class CharacterRaceEntityData {
         data.setBoolean(TAG_LOTR_DERIVED, dimensions.isLotrDerived());
     }
 
-    public static CharacterRaceDimensions read(
-            Entity entity, CharacterRaceDimensions fallback) {
-        if (entity == null || fallback == null) {
-            return fallback;
-        }
-        String raceId = getRaceId(entity);
-        if (raceId.length() == 0) {
-            return fallback;
-        }
-
-        NBTTagCompound data = entity.getEntityData();
-        return CharacterRaceDimensions.fromEntityData(
-                raceId,
-                data.getFloat(TAG_WIDTH),
-                data.getFloat(TAG_HEIGHT),
-                data.getFloat(TAG_STANDING_EYE_HEIGHT),
-                data.getFloat(TAG_SNEAKING_EYE_HEIGHT),
-                data.getBoolean(TAG_LOTR_DERIVED),
-                fallback);
-    }
-
     public static String getRaceId(Entity entity) {
         return entity == null ? "" : entity.getEntityData().getString(TAG_RACE);
     }
@@ -76,10 +55,5 @@ public final class CharacterRaceEntityData {
         }
         float value = entity.getEntityData().getFloat(TAG_SNEAKING_EYE_HEIGHT);
         return value > 0.0F ? value : getStandingEyeHeight(entity, fallback);
-    }
-
-    public static boolean isLotrDerived(Entity entity) {
-        return entity != null
-                && entity.getEntityData().getBoolean(TAG_LOTR_DERIVED);
     }
 }

@@ -1,6 +1,7 @@
 package com.ninuna.losttales.character.server;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.character.deletion.CharacterDeletionService;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.sync.CharacterCreationCatalog;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
@@ -61,7 +62,10 @@ public final class CharacterSyncManager {
                     LostTalesMetaData.MOD_ID, roster.getOwnerId(), player.getUniqueID());
             return false;
         }
-        CharacterRosterSnapshot snapshot = CharacterRosterSnapshot.fromRoster(roster);
+        // The deleted characters the owner may still restore go with it.
+        CharacterRosterSnapshot snapshot = CharacterRosterSnapshot.fromRoster(
+                roster, CharacterDeletionService.getInstance().deletedOf(
+                        player.worldObj, roster.getOwnerId()));
         LostTalesNetworkHandler.CHANNEL.sendTo(
                 new CharacterRosterSyncPacket(requestId, snapshot), player);
         sendCreationCatalog(player);

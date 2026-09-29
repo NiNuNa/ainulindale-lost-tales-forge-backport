@@ -36,7 +36,7 @@ public final class DiscordGatewayProtocolTest {
         assertEquals(TOKEN, identify.getAsJsonObject("d").get("token").getAsString());
         assertEquals(DiscordGatewayProtocol.INTENTS,
                 identify.getAsJsonObject("d").get("intents").getAsInt());
-        assertEquals(34305, DiscordGatewayProtocol.INTENTS);
+        assertEquals(36353, DiscordGatewayProtocol.INTENTS);
     }
 
     /**
@@ -48,11 +48,11 @@ public final class DiscordGatewayProtocolTest {
         DiscordGatewayProtocol protocol = new DiscordGatewayProtocol(TOKEN,
                 DiscordGatewayProtocol.INTENTS | DiscordGatewayProtocol.MEMBER_INTENTS);
         JsonObject identify = json(protocol.identifyPayload()).getAsJsonObject("d");
-        assertEquals(34305 | 2 | 256, identify.get("intents").getAsInt());
+        assertEquals(36353 | 2 | 256, identify.get("intents").getAsInt());
         assertEquals(250, identify.get("large_threshold").getAsInt());
         protocol.dropIntents(DiscordGatewayProtocol.MEMBER_INTENTS);
         identify = json(protocol.identifyPayload()).getAsJsonObject("d");
-        assertEquals(34305, identify.get("intents").getAsInt());
+        assertEquals(36353, identify.get("intents").getAsInt());
         assertFalse(identify.has("large_threshold"));
     }
 
@@ -78,8 +78,6 @@ public final class DiscordGatewayProtocolTest {
                         + "\"guilds\":[{\"id\":\"g1\"},{\"id\":\"g2\"}]}}");
         assertEquals(1, ready.size());
         assertEquals(DiscordGatewayProtocol.Action.Type.READY, ready.get(0).type);
-        assertEquals("abc", protocol.getSessionId());
-        assertEquals(1L, protocol.getSequence());
         assertTrue(protocol.canResume());
         assertEquals("wss://resume.example", protocol.getResumeGatewayUrl());
         assertEquals("42", DiscordGatewayProtocol.applicationId(ready.get(0).data));
@@ -91,7 +89,6 @@ public final class DiscordGatewayProtocolTest {
         assertEquals(DiscordGatewayProtocol.Action.Type.EVENT, event.get(0).type);
         assertEquals("MESSAGE_CREATE", event.get(0).name);
         assertEquals("m1", event.get(0).data.get("id").getAsString());
-        assertEquals(2L, protocol.getSequence());
 
         // The next hello resumes instead of identifying.
         protocol.onConnected();
@@ -101,6 +98,30 @@ public final class DiscordGatewayProtocolTest {
         assertEquals(6, resume.get("op").getAsInt());
         assertEquals("abc", resume.getAsJsonObject("d").get("session_id").getAsString());
         assertEquals(2, resume.getAsJsonObject("d").get("seq").getAsInt());
+    }
+
+    /** Whatever interval a HELLO names, the beat stays within sane bounds. */
+    @Test
+    public void theHeartbeatIntervalIsHeldBetweenASecondAndAMinute() {
+        assertEquals(DiscordGatewayProtocol.MAX_HEARTBEAT_MILLIS, intervalOf(
+                "{\"op\":10,\"d\":{\"heartbeat_interval\":2000000000}}"));
+        assertEquals(DiscordGatewayProtocol.MIN_HEARTBEAT_MILLIS, intervalOf(
+                "{\"op\":10,\"d\":{\"heartbeat_interval\":0}}"));
+        assertEquals(DiscordGatewayProtocol.MIN_HEARTBEAT_MILLIS, intervalOf(
+                "{\"op\":10,\"d\":{\"heartbeat_interval\":-5}}"));
+        assertEquals(DiscordGatewayProtocol.DEFAULT_HEARTBEAT_MILLIS, intervalOf(
+                "{\"op\":10,\"d\":{\"heartbeat_interval\":\"soon\"}}"));
+        assertEquals(DiscordGatewayProtocol.DEFAULT_HEARTBEAT_MILLIS, intervalOf(
+                "{\"op\":10}"));
+        assertEquals(60000L, DiscordGatewayProtocol.MAX_HEARTBEAT_MILLIS);
+    }
+
+    private static long intervalOf(String hello) {
+        DiscordGatewayProtocol protocol = new DiscordGatewayProtocol(TOKEN, 0);
+        protocol.onConnected();
+        List<DiscordGatewayProtocol.Action> actions = protocol.onPayload(hello);
+        assertEquals(DiscordGatewayProtocol.Action.Type.HEARTBEAT_EVERY, actions.get(0).type);
+        return actions.get(0).intervalMillis;
     }
 
     @Test

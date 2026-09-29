@@ -934,21 +934,6 @@ final class LostTalesLotrMapAtmosphere {
                 width, height, variant, weather, visibility);
     }
 
-    /**
-     * Whether a cloud's broad footprint touches land.
-     *
-     * <p>Concentric samples retain small islands and allow a cloud centred
-     * just offshore to overhang the coast, while eliminating the unbroken
-     * lattice over open ocean. Sampling the current drifted position lets the
-     * bank move naturally without leaving a permanent coastline-shaped
-     * mask.</p>
-     */
-    static boolean cloudFootprintTouchesLand(
-            LostTalesMapDecorationPlacement.GroundSampler land,
-            int mapX, int mapY, int margin) {
-        return cloudLandWeight(land, mapX, mapY, margin) > 0.0F;
-    }
-
     /** Starts a cheap direct-mapped cache shared by every weather pass. */
     private static void beginCloudLandCacheFrame() {
         cloudLandCacheFrame++;

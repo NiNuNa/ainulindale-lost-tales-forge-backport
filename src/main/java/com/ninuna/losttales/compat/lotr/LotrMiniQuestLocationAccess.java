@@ -25,11 +25,6 @@ public final class LotrMiniQuestLocationAccess {
 
     private LotrMiniQuestLocationAccess() {}
 
-    /** Whether a quest's dimension can be read at all. */
-    public static boolean isAvailable() {
-        return LAST_LOCATION != null;
-    }
-
     /** Where the quest was last seen, or null for a quest with no place. */
     public static Location lastLocation(LOTRMiniQuest quest) {
         if (quest == null || LAST_LOCATION == null) {

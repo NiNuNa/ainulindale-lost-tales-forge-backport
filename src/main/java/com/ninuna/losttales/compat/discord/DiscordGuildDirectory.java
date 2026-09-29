@@ -154,15 +154,15 @@ final class DiscordGuildDirectory {
         }
     }
 
+    /** The id of the server a channel is in; empty when not known. */
+    String guildIdOfChannel(String channelId) {
+        String guildId = channelId == null ? null : this.channelGuilds.get(channelId);
+        return guildId == null ? "" : guildId;
+    }
+
     /** The name of the server a channel is in; empty when not known. */
     String guildNameOfChannel(String channelId) {
         String guildId = channelId == null ? null : this.channelGuilds.get(channelId);
-        String name = guildId == null ? null : this.guildNames.get(guildId);
-        return name == null ? "" : name;
-    }
-
-    /** A server's name; empty when not known. */
-    String guildName(String guildId) {
         String name = guildId == null ? null : this.guildNames.get(guildId);
         return name == null ? "" : name;
     }

@@ -115,32 +115,46 @@ public final class TabRowTest {
     @Test
     public void marqueeWaitsThenSlidesOutRestsAndSlidesBack() {
         int overflow = 40;
-        double delay = TabRow.MARQUEE_START_DELAY_SECONDS;
-        double speed = TabRow.MARQUEE_SPEED_PX_PER_SECOND;
-        double pause = TabRow.MARQUEE_END_PAUSE_SECONDS;
+        double delay = 0.5D;
+        double speed = 20.0D;
+        double pause = 0.8D;
         double slide = overflow / speed;
-        assertEquals(0.0D, TabRow.marqueeOffset(0.0D, overflow), EPSILON);
-        assertEquals(0.0D, TabRow.marqueeOffset(delay * 0.8D, overflow), EPSILON);
+        assertEquals(0.0D, marquee(0.0D, overflow), EPSILON);
+        assertEquals(0.0D, marquee(delay * 0.8D, overflow), EPSILON);
         // Half a second in: half a second's worth of sliding.
-        assertEquals(0.5D * speed,
-                TabRow.marqueeOffset(delay + 0.5D, overflow), EPSILON);
+        assertEquals(0.5D * speed, marquee(delay + 0.5D, overflow), EPSILON);
         // At the end of the slide and through the rest: the whole overflow.
-        assertEquals(overflow,
-                TabRow.marqueeOffset(delay + slide, overflow), EPSILON);
-        assertEquals(overflow,
-                TabRow.marqueeOffset(delay + slide + pause * 0.5D, overflow),
+        assertEquals(overflow, marquee(delay + slide, overflow), EPSILON);
+        assertEquals(overflow, marquee(delay + slide + pause * 0.5D, overflow),
                 EPSILON);
         // Halfway back.
         assertEquals(overflow / 2.0D,
-                TabRow.marqueeOffset(delay + slide + pause + slide / 2.0D,
-                        overflow), EPSILON);
+                marquee(delay + slide + pause + slide / 2.0D, overflow),
+                EPSILON);
         // Home, resting, and round again.
         double cycle = 2.0D * (slide + pause);
-        assertEquals(0.0D,
-                TabRow.marqueeOffset(delay + cycle - pause * 0.5D, overflow),
+        assertEquals(0.0D, marquee(delay + cycle - pause * 0.5D, overflow),
                 EPSILON);
-        assertEquals(0.5D * speed,
-                TabRow.marqueeOffset(delay + cycle + 0.5D, overflow), EPSILON);
+        assertEquals(0.5D * speed, marquee(delay + cycle + 0.5D, overflow),
+                EPSILON);
+    }
+
+    /** Under reduced motion the slides are jumps: the end shows whole, then the start. */
+    @Test
+    public void aReducedMarqueeJumpsBetweenItsEnds() {
+        int overflow = 40;
+        double pause = 0.8D;
+        assertEquals(0.0D, TabRow.marqueeOffset(0.4D, overflow, 0.5D,
+                Double.POSITIVE_INFINITY, pause), EPSILON);
+        assertEquals(overflow, TabRow.marqueeOffset(0.6D, overflow, 0.5D,
+                Double.POSITIVE_INFINITY, pause), EPSILON);
+        assertEquals(0.0D, TabRow.marqueeOffset(0.5D + pause + 0.1D,
+                overflow, 0.5D, Double.POSITIVE_INFINITY, pause), EPSILON);
+    }
+
+    /** The marquee as the motion file ships it: half a second's wait, twenty pixels a second, a rest of 0.8 s. */
+    private static double marquee(double elapsed, int overflow) {
+        return TabRow.marqueeOffset(elapsed, overflow, 0.5D, 20.0D, 0.8D);
     }
 
     @Test
@@ -378,7 +392,7 @@ public final class TabRowTest {
         TabRow.glide(relaid, halfway, 1.0D / 3.0D);
         relaid.setOut();
         assertEquals(relaid.leftExact, relaid.fromLeft, EPSILON);
-        assertEquals(0.0F, relaid.leg.value(), 0.0F);
+        assertEquals(0.0F, relaid.leg.clamped(), 0.0F);
     }
 
     /** A tab's pings are the count tile; past nine it shows the plus. */
@@ -397,7 +411,7 @@ public final class TabRowTest {
                                             double toLeft, double toWidth) {
         TabRow.Tab tab = new TabRow.Tab(
                 ChatTab.of(com.ninuna.losttales.chat.ChatChannel.GLOBAL), 0, false,
-                "Global", 30, 30, false, 0, (int)toWidth, -1, -1, false);
+                "Global", 30, false, 0, (int)toWidth, -1, -1, false);
         tab.standAt(fromLeft, fromWidth, 1.0D / 3.0D);
         tab.toLeft = toLeft;
         tab.exactWidth = toWidth;

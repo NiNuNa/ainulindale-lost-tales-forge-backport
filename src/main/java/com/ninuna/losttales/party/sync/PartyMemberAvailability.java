@@ -1,6 +1,6 @@
 package com.ninuna.losttales.party.sync;
 
-/** Server-authoritative runtime availability of one party character. */
+/** Server-authoritative runtime availability of one party member. */
 public enum PartyMemberAvailability {
     OFFLINE(0),
     INACTIVE_CHARACTER(1),

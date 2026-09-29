@@ -138,11 +138,6 @@ public final class ChatStackRows {
                 && this.messageHeight == messageRowHeight(chatOpen);
     }
 
-    /** As above for the open window's sizes. */
-    public boolean describes(List<ChatLine> lines, int size, int dividerIndex) {
-        return describes(lines, size, dividerIndex, true);
-    }
-
     /**
      * The height a line's row takes: {@link #SPACER_HEIGHT} for a blank
      * row, between two runs or beside a day's rule, a message's reaction
@@ -154,11 +149,6 @@ public final class ChatStackRows {
      * smaller. A whole line for anything else, a line of another mod's
      * included.
      */
-    static int heightOf(ChatLine line) {
-        return heightOf(line, reactionRowHeight(), speakerRowHeight(true),
-                quoteRowHeight(true), messageRowHeight(true));
-    }
-
     private static int heightOf(ChatLine line, int reactionHeight,
                                 int speakerHeight, int quoteHeight,
                                 int messageHeight) {

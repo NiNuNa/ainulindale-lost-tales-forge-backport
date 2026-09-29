@@ -122,7 +122,7 @@ public final class PartyInvitationNbtCodec {
     public static NBTTagCompound createQuarantineEntry(String reason,
                                                         UUID invitationId,
                                                         UUID partyId,
-                                                        UUID targetCharacterId) {
+                                                        UUID targetIdentityId) {
         NBTTagCompound entry = new NBTTagCompound();
         entry.setString(TAG_REASON, reason == null ? "unknown" : reason);
         if (invitationId != null) {
@@ -131,8 +131,8 @@ public final class PartyInvitationNbtCodec {
         if (partyId != null) {
             NbtTags.writeUuid(entry, TAG_PARTY_UUID, partyId);
         }
-        if (targetCharacterId != null) {
-            NbtTags.writeUuid(entry, TAG_TARGET_CHARACTER_UUID, targetCharacterId);
+        if (targetIdentityId != null) {
+            NbtTags.writeUuid(entry, TAG_TARGET_CHARACTER_UUID, targetIdentityId);
         }
         return entry;
     }
@@ -143,12 +143,12 @@ public final class PartyInvitationNbtCodec {
         NbtTags.writeUuid(tag, TAG_INVITATION_UUID, invitation.getInvitationId());
         NbtTags.writeUuid(tag, TAG_PARTY_UUID, invitation.getPartyId());
         NbtTags.writeUuid(tag, TAG_INVITING_CHARACTER_UUID,
-                invitation.getInvitingCharacterId());
+                invitation.getInvitingIdentityId());
         NbtTags.writeUuid(tag, TAG_INVITING_OWNER_UUID, invitation.getInvitingOwnerId());
         tag.setString(TAG_INVITING_CHARACTER_NAME,
                 invitation.getInvitingCharacterName());
         NbtTags.writeUuid(tag, TAG_TARGET_CHARACTER_UUID,
-                invitation.getTargetCharacterId());
+                invitation.getTargetIdentityId());
         NbtTags.writeUuid(tag, TAG_TARGET_OWNER_UUID, invitation.getTargetOwnerId());
         tag.setString(TAG_TARGET_CHARACTER_NAME,
                 invitation.getTargetCharacterName());
@@ -169,16 +169,16 @@ public final class PartyInvitationNbtCodec {
 
         UUID invitationId = NbtTags.readUuid(source, TAG_INVITATION_UUID);
         UUID partyId = NbtTags.readUuid(source, TAG_PARTY_UUID);
-        UUID invitingCharacterId = NbtTags.readUuid(source, TAG_INVITING_CHARACTER_UUID);
+        UUID invitingIdentityId = NbtTags.readUuid(source, TAG_INVITING_CHARACTER_UUID);
         UUID invitingOwnerId = NbtTags.readUuid(source, TAG_INVITING_OWNER_UUID);
-        UUID targetCharacterId = NbtTags.readUuid(source, TAG_TARGET_CHARACTER_UUID);
+        UUID targetIdentityId = NbtTags.readUuid(source, TAG_TARGET_CHARACTER_UUID);
         UUID targetOwnerId = NbtTags.readUuid(source, TAG_TARGET_OWNER_UUID);
         if (invitationId == null || partyId == null
-                || invitingCharacterId == null || invitingOwnerId == null
-                || targetCharacterId == null || targetOwnerId == null) {
+                || invitingIdentityId == null || invitingOwnerId == null
+                || targetIdentityId == null || targetOwnerId == null) {
             return InvitationReadResult.failed("missing_required_identity");
         }
-        if (invitingCharacterId.equals(targetCharacterId)) {
+        if (invitingIdentityId.equals(targetIdentityId)) {
             return InvitationReadResult.failed("self_invitation");
         }
         if (!source.hasKey(TAG_CREATED_AT, Constants.NBT.TAG_LONG)
@@ -198,10 +198,10 @@ public final class PartyInvitationNbtCodec {
             PartyInvitation invitation = new PartyInvitation(
                     invitationId,
                     partyId,
-                    invitingCharacterId,
+                    invitingIdentityId,
                     invitingOwnerId,
                     invitingName,
-                    targetCharacterId,
+                    targetIdentityId,
                     targetOwnerId,
                     targetName,
                     createdAt,

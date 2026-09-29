@@ -7,7 +7,6 @@ import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
 import com.ninuna.losttales.util.LostTalesUtil;
 import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.registry.LanguageRegistry;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Locale;
@@ -52,16 +51,6 @@ public final class LostTalesMapMarkerWaypointRegistry {
     public static synchronized LOTRWaypoint.Region getRegionForMarker(String markerId) {
         initAndRegisterWaypoints();
         return REGIONS_BY_MARKER_ID.get(LostTalesQuestMarkerHelper.normalizeMarkerId(markerId));
-    }
-
-    public static synchronized LOTRWaypoint getWaypointForMarker(String markerId) {
-        initAndRegisterWaypoints();
-        return WAYPOINTS_BY_MARKER_ID.get(LostTalesQuestMarkerHelper.normalizeMarkerId(markerId));
-    }
-
-    public static synchronized Map<String, LOTRWaypoint> getRegisteredWaypoints() {
-        initAndRegisterWaypoints();
-        return Collections.unmodifiableMap(new LinkedHashMap<String, LOTRWaypoint>(WAYPOINTS_BY_MARKER_ID));
     }
 
     /** Resolves the bundled Lost Tales definition that owns a LOTR waypoint. */

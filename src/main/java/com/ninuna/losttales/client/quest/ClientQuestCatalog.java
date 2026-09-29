@@ -100,19 +100,6 @@ public final class ClientQuestCatalog {
         return Collections.unmodifiableList(entries);
     }
 
-    public static ClientQuestEntry find(Minecraft minecraft,
-            String reference) {
-        if (reference == null || reference.length() == 0) {
-            return null;
-        }
-        for (ClientQuestEntry entry : getEntries(minecraft)) {
-            if (reference.equals(entry.getReference())) {
-                return entry;
-            }
-        }
-        return null;
-    }
-
     private static ClientQuestEntry createLostTalesEntry(Minecraft minecraft,
             LostTalesQuestDefinition quest) {
         if (quest == null || quest.getId() == null) {

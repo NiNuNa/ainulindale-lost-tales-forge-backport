@@ -1,6 +1,5 @@
 package com.ninuna.losttales.client.chat;
 
-import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.client.window.PageTab;
 import com.ninuna.losttales.client.window.TabSelection;
 import com.ninuna.losttales.client.window.Window;
@@ -166,10 +165,6 @@ public final class ChatTabActions {
         }
     }
 
-    public void selectChannel(ChatChannel channel) {
-        selectChannel(ChatTab.of(channel));
-    }
-
     /**
      * Makes a tab the one being typed into. A reply, and an edit, belong
      * to the tab they were started in; moving away from that tab
@@ -289,20 +284,5 @@ public final class ChatTabActions {
             TabSelection.clear();
             syncSelection();
         }
-    }
-
-    /**
-     * Brings a tab that is already open to the front of its own window
-     * and moves the input there: what picking an open row in the search
-     * panel does.
-     */
-    void jumpToTab(ChatTab tab) {
-        Window window = tab == null ? null
-                : WindowLayout.windowOf(tab);
-        if (window == null) {
-            return;
-        }
-        WindowLayout.raise(window.getId());
-        selectChannel(tab);
     }
 }

@@ -61,9 +61,7 @@ public final class DiscordJsonTest {
                 + "\"username\":\"frodo\",\"global_name\":null}]},"
                 + "{\"id\":\"20\",\"content\":\"relayed\",\"author\":"
                 + "{\"id\":\"2\",\"username\":\"hook\",\"bot\":true}},"
-                + "{\"id\":\"10\",\"content\":\"first\"},"
-                + "\"not a message\","
-                + "{\"content\":\"no id\"}"
+                + "{\"id\":\"10\",\"content\":\"first\"}"
                 + "]";
         List<DiscordJson.Message> messages = DiscordJson.parseMessages(json);
         assertEquals(3, messages.size());
@@ -83,12 +81,23 @@ public final class DiscordJsonTest {
         assertEquals("frodo", latest.mentionNames.get("7"));
     }
 
+    /**
+     * A page that cannot be read is no page at all, never an empty one:
+     * an empty page says every watched message was deleted.
+     */
     @Test
-    public void anythingElseParsesToNothing() {
-        assertTrue(DiscordJson.parseMessages(null).isEmpty());
-        assertTrue(DiscordJson.parseMessages("").isEmpty());
-        assertTrue(DiscordJson.parseMessages("{\"message\":\"401\"}").isEmpty());
-        assertTrue(DiscordJson.parseMessages("not json at all").isEmpty());
+    public void aPageThatCannotBeReadIsNoPage() {
+        assertNull(DiscordJson.parseMessages(null));
+        assertNull(DiscordJson.parseMessages(""));
+        assertNull(DiscordJson.parseMessages("{\"message\":\"401\"}"));
+        assertNull(DiscordJson.parseMessages("not json at all"));
+        assertNull(DiscordJson.parseMessages("[{\"id\":\"10\",\"content\":\"cut off"));
+        assertNull("one entry that is no message spoils the page",
+                DiscordJson.parseMessages("[{\"id\":\"10\"},\"not a message\"]"));
+        assertNull(DiscordJson.parseMessages("[{\"id\":\"10\"},{\"content\":\"no id\"}]"));
+        // Discord's own empty array is a channel with nothing in it.
+        assertNotNull(DiscordJson.parseMessages("[]"));
+        assertTrue(DiscordJson.parseMessages("[]").isEmpty());
     }
 
     @Test
@@ -383,5 +392,49 @@ public final class DiscordJsonTest {
         assertEquals(0L, DiscordJson.retryAfterMillis("{}"));
         assertEquals(0L, DiscordJson.retryAfterMillis("garbage"));
         assertEquals(0L, DiscordJson.retryAfterMillis(null));
+        assertEquals(0L, DiscordJson.retryAfterMillis("{\"retry_after\":-3}"));
+    }
+
+    /** A body's pause is held to the same minute as a header's. */
+    @Test
+    public void aHugeRateLimitWaitIsClampedToAMinute() {
+        assertEquals(DiscordRateLimit.MAX_RESET_MILLIS,
+                DiscordJson.retryAfterMillis("{\"retry_after\":3600}"));
+        assertEquals(DiscordRateLimit.MAX_RESET_MILLIS,
+                DiscordJson.retryAfterMillis("{\"retry_after\":1e300}"));
+        assertEquals(60000L, DiscordRateLimit.MAX_RESET_MILLIS);
+        assertEquals(59999L, DiscordJson.retryAfterMillis("{\"retry_after\":59.999}"));
+    }
+
+    @Test
+    public void aMessageNamesItsFilesStickersAndForwardedWords() {
+        com.google.gson.JsonObject object = new com.google.gson.JsonParser().parse(
+                "{\"id\":\"9\",\"channel_id\":\"2\",\"guild_id\":\"1\",\"content\":\"\","
+                + "\"attachments\":[{\"filename\":\"a.png\"},{\"filename\":\"b.png\"},"
+                + "{\"filename\":\"c.png\"},{\"filename\":\"d.png\"}],"
+                + "\"sticker_items\":[{\"name\":\"Wave\"}],"
+                + "\"message_reference\":{\"type\":1,\"message_id\":\"5\"},"
+                + "\"message_snapshots\":[{\"message\":{\"content\":\"hello\"}}]}")
+                .getAsJsonObject();
+        DiscordJson.Message message = DiscordJson.parseMessage(object);
+        assertEquals("1", message.guildId);
+        assertEquals(DiscordJson.MAX_FILES, message.fileNames.size());
+        assertEquals("Wave", message.stickerNames.get(0));
+        assertEquals("hello", message.forwardedContent);
+        assertEquals("a forward is no reply", "", message.referencedMessageId);
+    }
+
+    @Test
+    public void aTypingMemberIsNamedAsTheServerShowsThem() {
+        com.google.gson.JsonObject object = new com.google.gson.JsonParser().parse(
+                "{\"channel_id\":\"2\",\"user_id\":\"7\",\"member\":{\"nick\":\"Ann\","
+                + "\"user\":{\"id\":\"7\",\"username\":\"ann_1\"}}}").getAsJsonObject();
+        DiscordJson.Typing typing = DiscordJson.parseTyping(object);
+        assertEquals("2", typing.channelId);
+        assertEquals("7", typing.userId);
+        assertEquals("Ann", typing.name);
+        assertEquals(false, typing.bot);
+        assertEquals(null, DiscordJson.parseTyping(new com.google.gson.JsonParser()
+                .parse("{\"channel_id\":\"2\"}").getAsJsonObject()));
     }
 }

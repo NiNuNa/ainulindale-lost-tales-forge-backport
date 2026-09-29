@@ -12,9 +12,8 @@ import net.minecraft.client.gui.Gui;
  *
  * <p>Its shadow lands on the column of the glyph the caret stands
  * before, so a field draws {@link #drawShadow} before its text and
- * {@link #drawBar} after it; where no glyph follows, {@link #draw} does
- * both. Only the field that holds the keys draws one: the screen that
- * owns the fields decides which that is.</p>
+ * {@link #drawBar} after it. Only the field that holds the keys draws
+ * one: the screen that owns the fields decides which that is.</p>
  */
 public final class LostTalesUiCaret {
     /** The caret's width, wherever it stands. */
@@ -41,12 +40,6 @@ public final class LostTalesUiCaret {
     public static boolean isLit(long sinceNanos, long nowNanos) {
         long elapsed = (nowNanos - sinceNanos) / 1000000L;
         return elapsed < 0L || elapsed % (2L * LIT_MILLIS) < LIT_MILLIS;
-    }
-
-    /** The caret and its shadow, where no glyph stands after it. */
-    public static void draw(int x, int top, int height, int alpha) {
-        drawShadow(x, top, height, alpha);
-        drawBar(x, top, height, alpha);
     }
 
     /** The bar: ivory, {@code height} rows from {@code top}. */

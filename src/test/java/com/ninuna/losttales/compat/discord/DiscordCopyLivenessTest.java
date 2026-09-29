@@ -1,6 +1,7 @@
 package com.ninuna.losttales.compat.discord;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatChannelGates;
 import com.ninuna.losttales.chat.ChatCodeNames;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import java.util.Arrays;
@@ -37,6 +38,7 @@ public final class DiscordCopyLivenessTest {
     @After
     public void forgetFactions() {
         ChatCodeNames.installFactions(Collections.<String>emptyList());
+        ChatChannelGates.install(ChatChannelGates.defaults());
     }
     private static final String HOOK_A = "https://discord.com/api/webhooks/1/a";
     private static final String HOOK_B = "https://discord.com/api/webhooks/2/b";
@@ -219,6 +221,61 @@ public final class DiscordCopyLivenessTest {
                 "111", "5"));
         assertTrue(live(before, ChatChannel.OOC, "", links.copiesOf(MESSAGE).get(0),
                 TO, hooks));
+    }
+
+    /**
+     * A gate that closes a bound channel to every reader stops what is
+     * done to its lines already bridged as it stops a new line: no edit,
+     * deletion or reaction crosses either way while the gate stands, and
+     * lifting it brings everything back, the links kept all along. A gate
+     * that only asks for a role leaves the channel linked (D1 b).
+     */
+    @Test
+    public void aClosedChannelsCopiesAreLeftAloneBothWays() {
+        DiscordChannelBindings bindings = bound(
+                "ooc=BIDIRECTIONAL;channel=5;webhook=" + HOOK_A);
+        Hooks hooks = new Hooks().posting(HOOK_A, "5");
+        DiscordMessageLinks links = new DiscordMessageLinks();
+        links.link(MESSAGE, "111", "", "channel:5", "");
+        links.link(OTHER, "222", "", "channel:5", HOOK_A, "ooc");
+        Said said = new Said().put(MESSAGE, ChatChannel.OOC, "")
+                .put(OTHER, ChatChannel.OOC, "");
+        DiscordMessageLinks.Copy posted = links.copiesOf(OTHER).get(0);
+        assertEquals(MESSAGE, DiscordCopyLiveness.inboundTarget(links, bindings, said,
+                "111", "5"));
+        assertEquals(HOOK_A, DiscordCopyLiveness.correctionWebhook(bindings,
+                ChatChannel.OOC, "", posted, hooks));
+
+        Map<ChatChannel, ChatChannelGates.Gate> gates =
+                new HashMap<ChatChannel, ChatChannelGates.Gate>();
+        gates.put(ChatChannel.OOC, new ChatChannelGates.Gate(
+                Collections.singleton("mod"), Collections.<String>emptySet()));
+        ChatChannelGates.install(ChatChannelGates.of(gates));
+        assertEquals("a role to read leaves the link standing", MESSAGE,
+                DiscordCopyLiveness.inboundTarget(links, bindings, said, "111", "5"));
+
+        gates.put(ChatChannel.OOC, new ChatChannelGates.Gate(
+                Collections.<String>emptySet(), Collections.<String>emptySet(),
+                true, false));
+        ChatChannelGates.install(ChatChannelGates.of(gates));
+
+        assertFalse(live(bindings, ChatChannel.OOC, "", posted, TO, hooks));
+        assertFalse(live(bindings, ChatChannel.OOC, "", posted, FROM, hooks));
+        assertEquals("no edit or deletion goes out", "",
+                DiscordCopyLiveness.correctionWebhook(bindings, ChatChannel.OOC, "",
+                        posted, hooks));
+        assertTrue("no reaction goes out", DiscordCopyLiveness.liveCopies(links,
+                bindings, OTHER, ChatChannel.OOC, "", TO, hooks).isEmpty());
+        assertEquals("no edit, deletion or reaction comes in", ChatMessageIds.NONE,
+                DiscordCopyLiveness.inboundTarget(links, bindings, said, "111", "5"));
+        assertEquals(ChatMessageIds.NONE, DiscordCopyLiveness.quotedBy(links, bindings,
+                said, "111", "5"));
+
+        ChatChannelGates.install(ChatChannelGates.defaults());
+        assertEquals(MESSAGE, DiscordCopyLiveness.inboundTarget(links, bindings, said,
+                "111", "5"));
+        assertEquals(HOOK_A, DiscordCopyLiveness.correctionWebhook(bindings,
+                ChatChannel.OOC, "", posted, hooks));
     }
 
     @Test

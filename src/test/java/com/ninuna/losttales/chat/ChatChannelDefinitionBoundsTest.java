@@ -39,7 +39,7 @@ public final class ChatChannelDefinitionBoundsTest {
     @After
     public void tearDown() {
         ChatChannel.resetToBuiltIn();
-        ChatChannelGates.resetToDefaults();
+        ChatChannelGates.install(ChatChannelGates.defaults());
     }
 
     @Test

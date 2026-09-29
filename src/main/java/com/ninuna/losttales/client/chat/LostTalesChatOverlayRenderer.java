@@ -107,16 +107,6 @@ public final class LostTalesChatOverlayRenderer {
      */
     static final int TEXT_OFFSET = LINE_HEIGHT - WindowStyle.ROW_TEXT_TOP;
     /**
-     * Where a divider's rule stands below its row's top edge at the
-     * words' own size: on the middle row of the capitals a message's
-     * text would have in the row, so the date written on the rule is
-     * centred on it exactly. In an even row that is half a pixel above
-     * the row's middle, as the capitals are, with the odd clear row below
-     * the rule. Drawn as small text, the rule runs on the middle row of
-     * the small capitals, which are centred on these.
-     */
-    static final int DIVIDER_RULE_OFFSET = WindowStyle.ROW_TEXT_TOP + LostTalesUiInk.CAP_HEIGHT / 2;
-    /**
      * Where a head sits against the text it stands beside: centred on the
      * capitals by the row's rule ({@link #centredBoxTop}), on whole
      * pixels — a head is pixel art at one texel to one pixel. Eight rows
@@ -441,8 +431,9 @@ public final class LostTalesChatOverlayRenderer {
     }
 
     /**
-     * The closed-chat feed: every unmuted channel's lines, open or
-     * closed, as one fading stack at the feed's own position, with the
+     * The closed-chat feed: the lines each conversation's notification
+     * choice lets through, its tab open or closed, as one fading stack
+     * at the feed's own position, with the
      * channel prefixes that tell the channels apart. The feed lays its
      * own lines out, at the game's chat width, because a run here is
      * broken by whatever the feed itself shows between two of a
@@ -459,8 +450,11 @@ public final class LostTalesChatOverlayRenderer {
             ChatFrame.of(windows.get(index)).drawn = false;
         }
         ChatFrame frame = ChatFrame.feed();
+        // Every line of a conversation whose choice is Everything, and a
+        // line addressed to the player of one whose choice is Only
+        // Mentions; typing shows for the first alone.
         List<ChatTab> feedTabs = ChatLayout.feedTabs();
-        ChatLineFilter filter = ChatLineFilter.of(feedTabs);
+        ChatLineFilter filter = ChatLayout.feedFilter();
         // Someone typing into a conversation the feed carries raises
         // the lines a row, and the typing row comes up under them.
         float typingShare = ChatFeedTyping.advance(
@@ -475,7 +469,7 @@ public final class LostTalesChatOverlayRenderer {
         // The frame is captured and blurred only while the feed has a
         // line or its typing row on screen; the rest of the time
         // gameplay pays nothing for the feed's blur.
-        if (LostTalesConfig.enableChatBackgroundBlur
+        if (LostTalesConfig.windowBackgroundBlur
                 && LostTalesConfig.enableGuiBackgroundBlur
                 && (typingShare > 0.0F || !lines.isEmpty()
                         && lines.get(0) != null
@@ -645,8 +639,7 @@ public final class LostTalesChatOverlayRenderer {
                     int band = bands.find(mouseX, mouseY);
                     if (band >= 0) {
                         return new Band(frame, lines, bands.viewIndexOf(band),
-                                bands.localX(band, mouseX), bands.topOf(band),
-                                bands.bottomOf(band), bands.scale(),
+                                bands.localX(band, mouseX),
                                 mouseX < bands.leftOf(band));
                     }
                 }
@@ -763,8 +756,7 @@ public final class LostTalesChatOverlayRenderer {
                     }
                     IChatComponent part = partAt(row, head);
                     return part == null ? null : new Hit(part, row, head,
-                            new Band(frame, lines, at, 0.0F, mouseY, mouseY,
-                                    frame.bands.scale(), true), 0, 0);
+                            new Band(frame, lines, at, 0.0F, true), 0, 0);
                 }
             }
             if (frame.contains(mouseX, mouseY)) {
@@ -831,9 +823,6 @@ public final class LostTalesChatOverlayRenderer {
         final int viewIndex;
         /** Pointer x in the line's own unscaled text space. */
         final float localX;
-        final float top;
-        final float bottom;
-        final float scale;
         /**
          * Whether the pointer stands in the window's timestamp area,
          * left of where the row's text starts: the row is lit there, but
@@ -842,15 +831,11 @@ public final class LostTalesChatOverlayRenderer {
         final boolean inArea;
 
         private Band(ChatFrame frame, List<ChatLine> lines,
-                     int viewIndex, float localX, float top, float bottom,
-                     float scale, boolean inArea) {
+                     int viewIndex, float localX, boolean inArea) {
             this.frame = frame;
             this.lines = lines;
             this.viewIndex = viewIndex;
             this.localX = localX;
-            this.top = top;
-            this.bottom = bottom;
-            this.scale = scale;
             this.inArea = inArea;
         }
     }
@@ -3707,22 +3692,6 @@ public final class LostTalesChatOverlayRenderer {
         drawChatBackdrop(curveLeft, left, right, top, right, bottom, alpha,
                 backdropRgb, GL11.GL_ONE_MINUS_SRC_ALPHA,
                 BACKDROP_FADE_WEIGHTS);
-    }
-
-    /**
-     * As above with the framebuffer's own share weighted by
-     * {@code destinationFactor} — {@code GL_ONE} adds the band to what
-     * is there, or, under a reversed blend equation, takes it away — and
-     * the opacity profile {@code weights}, sampled evenly from the
-     * curve's left edge to the band's right, one more sample than the
-     * steps it is drawn in. The framebuffer's alpha is left as it is.
-     */
-    private static void drawChatBackdrop(
-            float curveLeft, float left, float top, float right,
-            float bottom, int alpha, int backdropRgb,
-            int destinationFactor, float[] weights) {
-        drawChatBackdrop(curveLeft, left, right, top, right, bottom, alpha,
-                backdropRgb, destinationFactor, weights);
     }
 
     /**

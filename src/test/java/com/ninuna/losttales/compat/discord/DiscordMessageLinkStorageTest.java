@@ -82,7 +82,6 @@ public final class DiscordMessageLinkStorageTest {
         // whatever the live map does afterwards.
         data.detach();
         assertTrue(data.isDirty());
-        live.clear();
         live.link(3000L, "333", "", "channel:5", "");
         NBTTagCompound last = new NBTTagCompound();
         data.writeToNBT(last);

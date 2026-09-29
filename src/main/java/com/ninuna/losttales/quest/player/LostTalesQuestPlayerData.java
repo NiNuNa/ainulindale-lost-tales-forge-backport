@@ -58,9 +58,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     private final Map<String, LostTalesQuestDefinition> dynamicQuestDefinitions = new LinkedHashMap<String, LostTalesQuestDefinition>();
     private final Set<String> pinnedQuestIds = new LinkedHashSet<String>();
     private String pinnedMapMarkerId = "";
-    private EntityPlayer player;
     private boolean readOnlyForNewerVersion;
-    private int unsupportedDataVersion = -1;
     private NBTBase preservedReadOnlyData;
 
     public static LostTalesQuestPlayerData get(EntityPlayer player) {
@@ -75,7 +73,6 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
 
         LostTalesQuestPlayerData data = new LostTalesQuestPlayerData();
         player.registerExtendedProperties(PROPERTY_ID, data);
-        data.player = player;
         return data;
     }
 
@@ -199,14 +196,13 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         this.pinnedQuestIds.clear();
         this.pinnedMapMarkerId = "";
         this.readOnlyForNewerVersion = false;
-        this.unsupportedDataVersion = -1;
         this.preservedReadOnlyData = null;
 
         if (compound == null || !compound.hasKey(PROPERTY_ID)) {
             return;
         }
         if (!compound.hasKey(PROPERTY_ID, Constants.NBT.TAG_COMPOUND)) {
-            enterReadOnlyMode(compound.getTag(PROPERTY_ID), -1,
+            enterReadOnlyMode(compound.getTag(PROPERTY_ID),
                     "Quest data property is malformed and will be preserved without modification",
                     logWarnings);
             return;
@@ -217,7 +213,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 Constants.NBT.TAG_INT)
                 ? originalData.getInteger(TAG_DATA_VERSION) : -1;
         if (storedVersion != CURRENT_DATA_VERSION) {
-            enterReadOnlyMode(originalData, storedVersion,
+            enterReadOnlyMode(originalData,
                     "Quest data uses unsupported version " + storedVersion
                             + " and will be preserved without modification",
                     logWarnings);
@@ -226,7 +222,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
 
         NBTTagCompound data = (NBTTagCompound)originalData.copy();
         if (!isStructurallyReasonable(data)) {
-            enterReadOnlyMode(originalData, -1,
+            enterReadOnlyMode(originalData,
                     "Quest data exceeds structural safety limits and will "
                             + "be preserved without modification",
                     logWarnings);
@@ -309,31 +305,20 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
 
     @Override
     public void init(Entity entity, World world) {
-        if (entity instanceof EntityPlayer) {
-            this.player = (EntityPlayer) entity;
-        }
-    }
-
-    public EntityPlayer getPlayer() {
-        return this.player;
+        // The data needs nothing from the player it is attached to.
     }
 
     public boolean isReadOnlyForNewerVersion() {
         return this.readOnlyForNewerVersion;
     }
 
-    public int getUnsupportedDataVersion() {
-        return this.unsupportedDataVersion;
-    }
-
     private boolean isWritable() {
         return !this.readOnlyForNewerVersion;
     }
 
-    private void enterReadOnlyMode(NBTBase preservedData, int unsupportedVersion,
+    private void enterReadOnlyMode(NBTBase preservedData,
                                    String message, boolean logWarning) {
         this.readOnlyForNewerVersion = true;
-        this.unsupportedDataVersion = unsupportedVersion;
         this.preservedReadOnlyData = preservedData == null ? null : preservedData.copy();
         if (logWarning) {
             FMLLog.warning("[%s] %s", LostTalesMetaData.MOD_ID, message);
@@ -469,15 +454,6 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         return entry != null && entry.isCompleted();
     }
 
-    public boolean isQuestFailed(String questId) {
-        LostTalesQuestHistoryEntry entry = getQuestHistoryEntry(questId);
-        return entry != null && entry.isFailed();
-    }
-
-    public void startQuest(String questId, String firstStageId) {
-        startQuest(questId, firstStageId, 0L, 0L);
-    }
-
     public void startQuest(String questId, String firstStageId, long acceptedWorldTime, long deadlineWorldTime) {
         if (!isWritable()) {
             return;
@@ -487,15 +463,6 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         }
         this.questHistory.remove(questId);
         this.activeQuests.put(questId, new LostTalesQuestProgress(questId, 0, firstStageId, null, acceptedWorldTime, deadlineWorldTime));
-    }
-
-    public String getPinnedQuestId() {
-        for (String questId : this.pinnedQuestIds) {
-            if (questId != null && questId.length() > 0 && this.activeQuests.containsKey(questId)) {
-                return questId;
-            }
-        }
-        return "";
     }
 
     public Set<String> getPinnedQuestIds() {
@@ -633,11 +600,6 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         return this.pinnedQuestIds.add(questReference);
     }
 
-    public boolean isQuestReferencePinned(String questReference) {
-        return questReference != null
-                && this.pinnedQuestIds.contains(questReference);
-    }
-
     public boolean unpinQuestId(String questId) {
         if (!isWritable()) {
             return false;
@@ -769,14 +731,12 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         this.pinnedQuestIds.clear();
         this.pinnedMapMarkerId = "";
         this.readOnlyForNewerVersion = false;
-        this.unsupportedDataVersion = -1;
         this.preservedReadOnlyData = null;
         if (oldData == null) {
             return;
         }
         if (oldData.readOnlyForNewerVersion) {
             this.readOnlyForNewerVersion = true;
-            this.unsupportedDataVersion = oldData.unsupportedDataVersion;
             this.preservedReadOnlyData = oldData.preservedReadOnlyData == null
                     ? null
                     : oldData.preservedReadOnlyData.copy();

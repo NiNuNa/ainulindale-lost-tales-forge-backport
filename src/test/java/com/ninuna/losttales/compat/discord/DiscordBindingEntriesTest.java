@@ -6,7 +6,6 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -57,8 +56,8 @@ public final class DiscordBindingEntriesTest {
         assertEquals(Arrays.asList(HOOK_ALL),
                 DiscordBindingEntries.webhooksRemoved(ENTRIES, byChannel));
         assertTrue(DiscordBindingEntries.webhooksRemoved(ENTRIES, byKey).isEmpty());
-        assertTrue(DiscordBindingEntries.contains(ENTRIES, "ooc"));
-        assertFalse(DiscordBindingEntries.contains(ENTRIES, "party"));
+        assertEquals("a key no entry names leaves the list whole", Arrays.asList(ENTRIES),
+                DiscordBindingEntries.removeKey(ENTRIES, "party"));
     }
 
     @Test

@@ -30,7 +30,7 @@ public final class LostTalesPermissionsTest {
     @After
     public void tearDown() {
         ChatRoleCatalog.resetToBuiltIn();
-        LostTalesPermissionCatalog.resetToEmpty();
+        LostTalesPermissionCatalog.install(LostTalesPermissionCatalog.empty());
     }
 
     private static Set<String> grants(String... ids) {
@@ -39,7 +39,7 @@ public final class LostTalesPermissionsTest {
 
     private static ChatAccountRole role(String id, int rank, String... granted) {
         return ChatAccountRole.custom(id, id, "", 0xA94B54, true, rank, null,
-                grants(granted));
+                grants(granted), null);
     }
 
     @Test
@@ -50,7 +50,6 @@ public final class LostTalesPermissionsTest {
                     capability.getId().toUpperCase(java.util.Locale.ROOT)));
             assertTrue(capability.getRequiredOpLevel() >= 1
                     && capability.getRequiredOpLevel() <= 4);
-            assertTrue(capability.getDescription().length() > 0);
         }
         assertNull(LostTalesCapability.byId("nothing.at.all"));
         assertNull(LostTalesCapability.byId(null));
@@ -60,11 +59,11 @@ public final class LostTalesPermissionsTest {
     @Test
     public void aCapabilityMayBeRegisteredAndIsNeverRedefined() {
         LostTalesCapability first = LostTalesCapability.register(
-                "test.registry.open", 2, "something a test does");
+                "test.registry.open", 2);
         assertEquals(first, LostTalesCapability.byId("test.registry.open"));
         assertTrue(LostTalesCapability.all().contains(first));
         LostTalesCapability again = LostTalesCapability.register(
-                "test.registry.open", 4, "a different description");
+                "test.registry.open", 4);
         assertEquals("the same capability answers, unchanged", first, again);
         assertEquals(2, again.getRequiredOpLevel());
     }
@@ -86,7 +85,7 @@ public final class LostTalesPermissionsTest {
     public void aPermissionExpandsToTheCapabilitiesItNames() {
         LostTalesPermissionCatalog permissions = ChatRoleConfig.parsePermissions(
                 new String[] {"keeper=capability:chat.moderate;"
-                        + "capability:chat.server_console.read;desc:Keeps the peace."},
+                        + "capability:chat.server_console.read"},
                 ChatRoleConfig.SILENT);
         ChatRoleCatalog catalog = ChatRoleCatalog.of(
                 Arrays.asList(role("moderator", 15, "keeper")), null, null);
@@ -98,7 +97,6 @@ public final class LostTalesPermissionsTest {
         assertFalse("nothing the permission does not name",
                 LostTalesPermissions.isGranted(bit,
                         LostTalesCapability.SERVER_CONFIG, catalog, permissions));
-        assertEquals("Keeps the peace.", permissions.descriptionOf("keeper"));
     }
 
     /**

@@ -20,25 +20,6 @@ public final class LostTalesQuestMarkerHelper {
         return ids;
     }
 
-    public static List<String> collectQuestMarkerIds(Iterable<LostTalesQuestDefinition> quests) {
-        ArrayList<String> ids = new ArrayList<String>();
-        if (quests == null) {
-            return ids;
-        }
-
-        for (LostTalesQuestDefinition quest : quests) {
-            if (quest == null) {
-                continue;
-            }
-            for (String markerId : collectQuestMarkerIds(quest)) {
-                if (!ids.contains(markerId)) {
-                    ids.add(markerId);
-                }
-            }
-        }
-        return ids;
-    }
-
 
     public static List<String> collectStaticQuestMarkerIds(LostTalesQuestDefinition quest) {
         ArrayList<String> ids = new ArrayList<String>();
@@ -108,9 +89,7 @@ public final class LostTalesQuestMarkerHelper {
         if (normalized.length() == 0) {
             return "";
         }
-        return LostTalesMapMarkerIdentity.create(
-                normalized,
-                LostTalesMapMarkerIdentity.Authority.QUEST_PLAYER)
+        return LostTalesMapMarkerIdentity.create(normalized)
                 .getCanonicalKey();
     }
 }

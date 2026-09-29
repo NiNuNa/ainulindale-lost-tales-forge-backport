@@ -16,11 +16,9 @@ import static org.junit.Assert.assertTrue;
  */
 public final class ChatInputMentionsTest {
     private static final ChatMentionCandidate ALDRIC = ChatMentionCandidate.player(
-            "1", "Aldric", "nils", "Aldric", "1", "",
-            Arrays.asList("nils", "Aldric"));
+            "1", "Aldric", "1", "", Arrays.asList("nils", "Aldric"));
     private static final ChatMentionCandidate ALDRIC_OF_BREE =
-            ChatMentionCandidate.player("2", "Aldric of Bree", "rw",
-                    "Aldric of Bree", "2", "",
+            ChatMentionCandidate.player("2", "Aldric of Bree", "2", "",
                     Arrays.asList("rw", "Aldric of Bree"));
     private static final ChatMentionCandidate OPERATOR =
             ChatMentionCandidate.role("role:operator", "Operator", 0xA94B54);

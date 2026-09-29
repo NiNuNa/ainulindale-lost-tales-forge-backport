@@ -119,11 +119,11 @@ public final class MotionLabEditorTest {
                 "{\"duration\": 200, \"curve\": \"ease_out\"}");
         MotionLabEditor.Row back = row(editor, "row.off_duration");
         assertEquals("200", back.value());
-        assertFalse(editor.working().has("off"));
+        assertFalse(written(editor, "test.fade").has("off"));
         back.step(-1, false);
         assertEquals("190", back.value());
         assertEquals("200", row(editor, "row.duration").value());
-        JsonObject off = editor.working().getAsJsonObject("off");
+        JsonObject off = written(editor, "test.fade").getAsJsonObject("off");
         assertNotNull(off);
         assertEquals("ease_out", off.get("curve").getAsString());
     }
@@ -172,7 +172,7 @@ public final class MotionLabEditorTest {
         row(editor, "row.to").step(-1, false);
         assertEquals(1, this.changes);
         assertEquals("row.to_code", row(editor, "row.to").value());
-        assertFalse(editor.working().getAsJsonObject("parts")
+        assertFalse(written(editor, "test.parts").getAsJsonObject("parts")
                 .getAsJsonObject("first").getAsJsonObject("beats")
                 .getAsJsonObject("on").has("to"));
     }
@@ -203,5 +203,10 @@ public final class MotionLabEditorTest {
         editor.edit("test.other", new JsonParser().parse(json)
                 .getAsJsonObject());
         assertEquals("on", row(editor, "row.beat").value());
+    }
+
+    /** The edited motion as the lab's Copy writes it. */
+    private static JsonObject written(MotionLabEditor editor, String id) {
+        return MotionCodec.encode(editor.read().motions().get(id));
     }
 }

@@ -17,51 +17,11 @@ public final class ThirdPersonCameraController {
     private static String contextKey;
     private static long lastUpdateNanos;
     private static double lastDeltaSeconds;
-    private static double renderedFov = 70.0D;
     private static CameraRenderFrame renderFrame;
     private static double manualZoomOffset = Double.NaN;
     private static double lastProfileDistance = Double.NaN;
 
     private ThirdPersonCameraController() {}
-
-    public static synchronized void activate(CameraPose initialPose) {
-        STATE.reset(initialPose);
-        COLLISION.reset();
-        MOTION.reset(initialPose);
-        EFFECTS.reset(CameraMotionEffectsSample.NONE);
-        contextKey = null;
-        lastUpdateNanos = 0L;
-        lastDeltaSeconds = 0.0D;
-        active = true;
-    }
-
-    public static synchronized CameraPose update(
-            String newContextKey, CameraPose targetPose,
-            CameraSmoothing smoothing, long updateNanos) {
-        return update(newContextKey, targetPose, smoothing,
-                CameraMotionProfile.NONE, 0.0D, updateNanos);
-    }
-
-    public static synchronized CameraPose update(
-            String newContextKey, CameraPose targetPose,
-            CameraSmoothing smoothing, CameraMotionProfile motion,
-            double motionMultiplier, long updateNanos) {
-        return update(newContextKey, targetPose, smoothing, motion,
-                motionMultiplier, Double.NaN, Double.NaN,
-                CameraMotionEffectsSample.NONE,
-                CameraMotionEffectsSettings.NONE, updateNanos);
-    }
-
-    public static synchronized CameraPose update(
-            String newContextKey, CameraPose targetPose,
-            CameraSmoothing smoothing, CameraMotionProfile motion,
-            double motionMultiplier, double stridePhase,
-            double strideIntensity, long updateNanos) {
-        return update(newContextKey, targetPose, smoothing, motion,
-                motionMultiplier, stridePhase, strideIntensity,
-                CameraMotionEffectsSample.NONE,
-                CameraMotionEffectsSettings.NONE, updateNanos);
-    }
 
     public static synchronized CameraPose update(
             String newContextKey, CameraPose targetPose,
@@ -115,22 +75,6 @@ public final class ThirdPersonCameraController {
         return current;
     }
 
-    public static synchronized void setTarget(CameraPose targetPose) {
-        if (!active) {
-            throw new IllegalStateException("third-person camera is inactive");
-        }
-        STATE.setTarget(targetPose);
-    }
-
-    public static synchronized CameraPose advance(
-            CameraSmoothing smoothing, double deltaSeconds) {
-        if (!active) {
-            throw new IllegalStateException("third-person camera is inactive");
-        }
-        lastDeltaSeconds = CameraMath.sanitizeDeltaSeconds(deltaSeconds);
-        return STATE.advance(smoothing, lastDeltaSeconds);
-    }
-
     public static synchronized double constrainDistance(
             double desiredDistance, double allowedDistance,
             double releaseRate) {
@@ -140,22 +84,6 @@ public final class ThirdPersonCameraController {
         return COLLISION.update(
                 desiredDistance, allowedDistance,
                 releaseRate, lastDeltaSeconds);
-    }
-
-    public static synchronized void recordRenderedFov(double verticalFov) {
-        if (verticalFov > 1.0D && verticalFov < 179.0D
-                && !Double.isNaN(verticalFov)
-                && !Double.isInfinite(verticalFov)) {
-            renderedFov = verticalFov;
-        }
-    }
-
-    public static synchronized void recordRenderFrame(
-            double pivotX, double pivotY, double pivotZ,
-            double yaw, double pitch, double actualDistance) {
-        prepareRenderFrame(
-                pivotX, pivotY, pivotZ,
-                yaw, pitch, actualDistance);
     }
 
     public static synchronized CameraRenderTransform prepareRenderFrame(
@@ -170,7 +98,7 @@ public final class ThirdPersonCameraController {
         }
         CameraRenderTransform transform = CameraRenderTransform.resolve(
                 pivotX, pivotY, pivotZ, yaw, pitch,
-                actualDistance, pose, combinedMotion(), renderedFov);
+                actualDistance, pose, combinedMotion());
         renderFrame = transform.getFrame();
         return transform;
     }
@@ -212,14 +140,6 @@ public final class ThirdPersonCameraController {
         return true;
     }
 
-    static synchronized double getManualZoomOffset() {
-        return manualZoomOffset;
-    }
-
-    public static synchronized boolean isActive() {
-        return active;
-    }
-
     public static synchronized CameraPose getCurrentPose() {
         return active ? STATE.getCurrent() : null;
     }
@@ -235,20 +155,12 @@ public final class ThirdPersonCameraController {
         }
     }
 
-    public static synchronized boolean isRightShoulder() {
-        return rightShoulder;
-    }
-
     public static synchronized double getShoulderSign() {
         return rightShoulder ? 1.0D : -1.0D;
     }
 
     public static synchronized void toggleShoulder() {
         rightShoulder = !rightShoulder;
-    }
-
-    public static synchronized void setRightShoulder(boolean useRightShoulder) {
-        rightShoulder = useRightShoulder;
     }
 
     public static synchronized float resolveViewYaw(
@@ -273,15 +185,8 @@ public final class ThirdPersonCameraController {
         contextKey = null;
         lastUpdateNanos = 0L;
         lastDeltaSeconds = 0.0D;
-        renderedFov = 70.0D;
         renderFrame = null;
         lastProfileDistance = Double.NaN;
-    }
-
-    public static synchronized void reset() {
-        deactivate();
-        rightShoulder = true;
-        manualZoomOffset = Double.NaN;
     }
 
     public static synchronized void reset(boolean useRightShoulder) {

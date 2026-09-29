@@ -38,7 +38,7 @@ public final class PartyTrackingSyncPacket implements IMessage {
         try {
             UUID ownerId = LostTalesPacketCodec.readUuid(buffer);
             long sequence = buffer.readLong();
-            UUID activeCharacterId = LostTalesPacketCodec.readUuid(buffer);
+            UUID activeIdentityId = LostTalesPacketCodec.readUuid(buffer);
             if (sequence <= 0L) {
                 throw new PartyPacketCodec.DecodeException(
                         "invalid party tracking sequence");
@@ -63,8 +63,8 @@ public final class PartyTrackingSyncPacket implements IMessage {
                 }
                 Set<UUID> memberIds = new HashSet<UUID>();
                 for (int index = 0; index < memberCount; index++) {
-                    UUID characterId = LostTalesPacketCodec.readUuid(buffer);
-                    if (!memberIds.add(characterId)) {
+                    UUID identityId = LostTalesPacketCodec.readUuid(buffer);
+                    if (!memberIds.add(identityId)) {
                         throw new PartyPacketCodec.DecodeException(
                                 "duplicate tracked member identity");
                     }
@@ -77,7 +77,7 @@ public final class PartyTrackingSyncPacket implements IMessage {
                                 "invalid tracked member color");
                     }
                     members.add(new PartyTrackedMemberSnapshot(
-                            characterId,
+                            identityId,
                             name,
                             color,
                             buffer.readInt(),
@@ -96,8 +96,8 @@ public final class PartyTrackingSyncPacket implements IMessage {
                     new ArrayList<PartyGoHereMarkerSnapshot>(markerCount);
             Set<UUID> markerOwners = new HashSet<UUID>();
             for (int index = 0; index < markerCount; index++) {
-                UUID characterId = LostTalesPacketCodec.readUuid(buffer);
-                if (!markerOwners.add(characterId)) {
+                UUID identityId = LostTalesPacketCodec.readUuid(buffer);
+                if (!markerOwners.add(identityId)) {
                     throw new PartyPacketCodec.DecodeException(
                             "duplicate marker owner identity");
                 }
@@ -110,7 +110,7 @@ public final class PartyTrackingSyncPacket implements IMessage {
                             "invalid marker owner color");
                 }
                 markers.add(new PartyGoHereMarkerSnapshot(
-                        characterId,
+                        identityId,
                         name,
                         color,
                         buffer.readInt(),
@@ -122,10 +122,10 @@ public final class PartyTrackingSyncPacket implements IMessage {
             LostTalesPacketCodec.requireFinished(buffer);
             this.snapshot = hasParty
                     ? new PartyTrackingSnapshot(
-                    ownerId, sequence, activeCharacterId,
+                    ownerId, sequence, activeIdentityId,
                     partyId, partyRevision, members, markers)
                     : PartyTrackingSnapshot.noParty(
-                    ownerId, sequence, activeCharacterId, markers);
+                    ownerId, sequence, activeIdentityId, markers);
         } catch (RuntimeException exception) {
             this.snapshot = null;
             this.malformed = true;
@@ -140,7 +140,7 @@ public final class PartyTrackingSyncPacket implements IMessage {
         LostTalesPacketCodec.writeUuid(buffer, this.snapshot.getOwnerId());
         buffer.writeLong(this.snapshot.getSynchronizationSequence());
         LostTalesPacketCodec.writeUuid(
-                buffer, this.snapshot.getActiveCharacterId());
+                buffer, this.snapshot.getActiveIdentityId());
         buffer.writeBoolean(this.snapshot.hasParty());
         if (this.snapshot.hasParty()) {
             LostTalesPacketCodec.writeUuid(buffer, this.snapshot.getPartyId());
@@ -148,7 +148,7 @@ public final class PartyTrackingSyncPacket implements IMessage {
             buffer.writeByte(this.snapshot.getTrackedMembers().size());
             for (PartyTrackedMemberSnapshot member
                     : this.snapshot.getTrackedMembers()) {
-                LostTalesPacketCodec.writeUuid(buffer, member.getCharacterId());
+                LostTalesPacketCodec.writeUuid(buffer, member.getIdentityId());
                 LostTalesPacketCodec.writeUtf8String(buffer,
                         member.getCharacterName(),
                         PartyPacketCodec.MAX_NAME_BYTES);
@@ -163,7 +163,7 @@ public final class PartyTrackingSyncPacket implements IMessage {
         for (PartyGoHereMarkerSnapshot marker
                 : this.snapshot.getGoHereMarkers()) {
             LostTalesPacketCodec.writeUuid(
-                    buffer, marker.getOwnerCharacterId());
+                    buffer, marker.getOwnerIdentityId());
             LostTalesPacketCodec.writeUtf8String(buffer,
                     marker.getOwnerCharacterName(),
                     PartyPacketCodec.MAX_NAME_BYTES);

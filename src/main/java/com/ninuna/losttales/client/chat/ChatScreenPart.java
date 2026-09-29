@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
+import com.ninuna.losttales.chat.ChatAction;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatDeliveryMark;
 import com.ninuna.losttales.chat.ChatMessageIds;
@@ -15,6 +16,7 @@ import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.input.LostTalesKeyPress;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
 import com.ninuna.losttales.client.quest.ClientQuestCatalog;
+import com.ninuna.losttales.client.window.FirstTips;
 import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.PageTab;
 import com.ninuna.losttales.client.window.ScreenPart;
@@ -343,6 +345,19 @@ public final class ChatScreenPart extends ScreenPart {
         return this.bar.activeFrame() != null;
     }
 
+    /** The head button on the live bar, where a new player's tip about it points. */
+    @Override
+    public LostTalesUiHitBox tipTarget(String tip) {
+        if (!FirstTips.Tip.HEAD.id.equals(tip) || !hasField()) {
+            return null;
+        }
+        return new LostTalesUiHitBox(this.bar.characterButtonLeft()
+                + this.bar.fractionX(), this.bar.characterButtonTop()
+                + this.bar.fractionY() + this.bar.entranceOffset(),
+                ChatInputBar.CHARACTER_BUTTON_SIZE,
+                ChatInputBar.CHARACTER_BUTTON_SIZE);
+    }
+
 
     /**
      * Writes {@code token} into the field being typed in as a word of its
@@ -503,32 +518,9 @@ public final class ChatScreenPart extends ScreenPart {
     @Override
     public boolean keyTyped(LostTalesKeyPress press) {
         int keyCode = press.key;
-        // Ctrl+Tab walks every window's tabs, Ctrl+Left/Right the
-        // selected window's, and Ctrl+W closes the selected one: none of
-        // them clashes with autocomplete, so all work with text in the
-        // field (drafts belong to their tabs).
-        if (press.isCommand(Keyboard.KEY_TAB)) {
-            this.tabActions.selectChannel(
-                    ClientChatChannelState.cycleAll(press.shift));
-            return true;
-        }
-        if (press.isCommand(Keyboard.KEY_RIGHT)) {
-            this.tabActions.selectChannel(ClientChatChannelState.cycle());
-            return true;
-        }
-        if (press.isCommand(Keyboard.KEY_LEFT)) {
-            this.tabActions.selectChannel(ClientChatChannelState.cycleBack());
-            return true;
-        }
-        // Ctrl+1 to Ctrl+8 pick the selected window's tabs by place and
-        // Ctrl+9 its last, as a browser's do; the digits are the main
-        // row's, which sit together in the keyboard's own numbering.
-        if (press.command && keyCode >= Keyboard.KEY_1
-                && keyCode <= Keyboard.KEY_9) {
-            this.tabActions.selectChannel(ClientChatChannelState.selectOrdinal(
-                    keyCode - Keyboard.KEY_1 + 1));
-            return true;
-        }
+        // Ctrl+W closes the tab being typed in, text in the field or not
+        // (drafts belong to their tabs); the tab keys that walk the tabs
+        // are the screen's.
         if (press.isCommand(Keyboard.KEY_W)) {
             // The page in front of the keys is the tab Ctrl+W means.
             if (this.screen.focusedPage() != null) {
@@ -1382,6 +1374,18 @@ public final class ChatScreenPart extends ScreenPart {
         // The tab the line was typed in, taken before a whisper command
         // moves the selection to the conversation it opens.
         ChatTab tab = ClientChatChannelState.getSelected();
+        if (tab != null && ChatInputRules.isAction(message, tab.getChannel())) {
+            // /me in an in-character tab is an action line in that tab,
+            // recalled like anything else typed there.
+            String words = ChatInputRules.actionWords(message);
+            if (words.length() == 0 || !ChatAction.isValid(words)
+                    || !ClientChatChannelState.canSend(tab)) {
+                return true;
+            }
+            ClientChatChannelState.recordSent(tab, message);
+            this.outbox.sendAction(tab, words);
+            return true;
+        }
         if (ChatInputRules.isCommand(message)) {
             // A command is recalled from the tab it was typed in, like
             // anything else typed there, and goes to the server as the
@@ -1528,7 +1532,8 @@ public final class ChatScreenPart extends ScreenPart {
             // Taken before the send: a whisper verb moves the selection
             // to the conversation it opens.
             ChatTab typedIn = ClientChatChannelState.getSelected();
-            if (ChatInputRules.isServerCommand(text)) {
+            if (ChatInputRules.isServerCommand(text,
+                    typedIn == null ? null : typedIn.getChannel())) {
                 sendCommand(text);
             } else {
                 send(text);
@@ -1631,7 +1636,19 @@ public final class ChatScreenPart extends ScreenPart {
      */
     private boolean refuseUnsendableMessage() {
         String message = this.inputField.getText().trim();
-        if (message.length() == 0 || ChatInputRules.isCommand(message)) {
+        ChatTab selected = ClientChatChannelState.getSelected();
+        if (selected != null
+                && ChatInputRules.isAction(message, selected.getChannel())) {
+            // An action is a message: the same refusals, said before the
+            // field is emptied, and one of its own for no words at all.
+            message = ChatInputRules.actionWords(message);
+            if (message.length() == 0) {
+                showNotice(StatCollector.translateToLocal(
+                        "gui.losttales.chat.action.empty"));
+                return true;
+            }
+        } else if (message.length() == 0
+                || ChatInputRules.isCommand(message)) {
             return false;
         }
         if (!ClientChatChannelState.canSend(
@@ -2419,7 +2436,9 @@ public final class ChatScreenPart extends ScreenPart {
             // out as the message it is.
             String value = event.getValue() == null ? ""
                     : event.getValue().trim();
-            if (ChatInputRules.isServerCommand(value)) {
+            ChatTab typedIn = ClientChatChannelState.getSelected();
+            if (ChatInputRules.isServerCommand(value,
+                    typedIn == null ? null : typedIn.getChannel())) {
                 sendCommand(value);
             } else if (value.length() > 0) {
                 send(value);

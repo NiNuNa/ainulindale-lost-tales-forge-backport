@@ -353,16 +353,6 @@ public class LostTalesQuestSyncPacket implements IMessage {
         return Collections.unmodifiableList(copy);
     }
 
-    public Set<String> getCompletedQuestIds() {
-        LinkedHashSet<String> completed = new LinkedHashSet<String>();
-        for (LostTalesQuestHistoryEntry entry : this.questHistory) {
-            if (entry.isCompleted()) {
-                completed.add(entry.getQuestId());
-            }
-        }
-        return Collections.unmodifiableSet(completed);
-    }
-
     public List<LostTalesQuestHistoryEntry> getQuestHistory() {
         return Collections.unmodifiableList(
                 new ArrayList<LostTalesQuestHistoryEntry>(

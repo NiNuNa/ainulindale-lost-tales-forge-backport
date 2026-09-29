@@ -90,7 +90,7 @@ final class ClientChatSignature {
                 : roster.getCharacter(identity.characterId);
         return summary == null ? ivory
                 : LotrFactionColors.forFactionId(
-                        summary.getStartingFactionId(), ivory);
+                        summary.getFactionId(), ivory);
     }
 
     /** The identity fields a locally built line is signed with. */

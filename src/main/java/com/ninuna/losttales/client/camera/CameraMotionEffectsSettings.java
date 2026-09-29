@@ -2,11 +2,6 @@ package com.ninuna.losttales.client.camera;
 
 /** User-facing multipliers for situational camera motion. */
 public final class CameraMotionEffectsSettings {
-    public static final CameraMotionEffectsSettings NONE =
-            new CameraMotionEffectsSettings(
-                    0.0D, 0.0D, 0.0D, 0.0D,
-                    0.0D, 0.0D, 0.0D);
-
     private final double airborneMultiplier;
     private final double landingMultiplier;
     private final double ridingMultiplier;

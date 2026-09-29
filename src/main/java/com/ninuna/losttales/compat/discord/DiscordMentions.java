@@ -10,10 +10,12 @@ import java.util.Set;
 
 /**
  * What a game line's mentions become on Discord. A player cannot write a
- * Discord mention themselves: every mention or channel code typed into a
- * line — {@code <@id>}, {@code <@!id>}, {@code <@&id>}, {@code <#id>},
- * {@code @everyone}, {@code @here} — is broken with a zero-width space,
- * so Discord shows it as the text it is and pings nobody. A mention the
+ * Discord mention themselves: every mention, channel or command code
+ * typed into a line — {@code <@id>}, {@code <@!id>}, {@code <@&id>},
+ * {@code <#id>}, {@code </name:id>}, {@code @everyone}, {@code @here} —
+ * is broken with a zero-width space, so Discord shows it as the text it
+ * is and pings nobody, and so is the markup only Discord would draw
+ * ({@link DiscordMessageSanitizer#breakDiscordOnlyMarkup}). A mention the
  * server resolved to a Discord member becomes that member's own mention
  * where they can see the channel the post goes to, at most
  * {@link #MOST_PINGS} a post, and pings them; never a role,
@@ -42,15 +44,16 @@ final class DiscordMentions {
     private DiscordMentions() {}
 
     /**
-     * The post for a line's {@code text}: every code a player could type
-     * broken, and each Discord member of {@code named} whose id is in
-     * {@code visible} — who can see the channel the post goes to —
-     * written as their own mention, the first {@link #MOST_PINGS} of
-     * them; everyone else it names stays plain text.
+     * The post for a line's {@code text}: the markup only Discord would
+     * draw and every code a player could type broken, and each Discord
+     * member of {@code named} whose id is in {@code visible} — who can
+     * see the channel the post goes to — written as their own mention,
+     * the first {@link #MOST_PINGS} of them; everyone else it names stays
+     * plain text.
      */
     static Post rewrite(String text, List<ChatNamedPlayer> named,
                         Set<String> visible) {
-        String line = text == null ? "" : text;
+        String line = DiscordMessageSanitizer.breakDiscordOnlyMarkup(text);
         List<ChatNamedPlayer> members = discordMembers(named, visible);
         List<String> pinged = new ArrayList<String>();
         if (members.isEmpty()) {
@@ -82,8 +85,9 @@ final class DiscordMentions {
 
     /**
      * The text with every Discord code a player could type broken: a
-     * zero-width space after the {@code <} of a mention or channel code,
-     * and after the {@code @} of {@code @everyone} and {@code @here}.
+     * zero-width space after the {@code <} of a mention, channel or
+     * command code, and after the {@code @} of {@code @everyone} and
+     * {@code @here}.
      */
     static String defused(String text) {
         if (text == null) {
@@ -93,7 +97,8 @@ final class DiscordMentions {
         for (int index = 0; index < text.length(); index++) {
             char character = text.charAt(index);
             char next = index + 1 < text.length() ? text.charAt(index + 1) : 0;
-            boolean breaks = (character == '<' && (next == '@' || next == '#'))
+            boolean breaks = (character == '<'
+                    && (next == '@' || next == '#' || next == '/'))
                     || (character == '@' && (text.regionMatches(true,
                             index + 1, "everyone", 0, 8)
                             || text.regionMatches(true, index + 1, "here", 0, 4)));

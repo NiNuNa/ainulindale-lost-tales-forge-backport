@@ -33,7 +33,7 @@ import com.ninuna.losttales.client.character.ClientCharacterProfileCache;
 import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
-import com.ninuna.losttales.client.window.WindowPages;
+import com.ninuna.losttales.client.window.WindowSession;
 import com.ninuna.losttales.client.chat.ChatSpeechBubbles;
 import com.ninuna.losttales.client.chat.LostTalesSpeechBubbleRenderer;
 import com.ninuna.losttales.client.chat.ClientChatChannelState;
@@ -129,7 +129,6 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.world.WorldEvent;
 import com.ninuna.losttales.client.chat.ChatPartyInvitationAnswers;
-import com.ninuna.losttales.client.window.SubWindowPlaces;
 
 public class LostTalesClientEventHandler implements IResourceManagerReloadListener {
 
@@ -164,10 +163,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     }
 
     private static void clearSessionState() {
-        // A page that stands for a thing in this world (a waystone) goes
-        // before every page lets its content go.
-        WindowPages.closeWorldPages();
-        WindowPages.forgetContents();
+        WindowSession.clear();
         LostTalesClientQuestProgressStore.clear();
         LostTalesClientQuestNotificationStore.clear();
         LostTalesClientQuestDefinitionStore.clearDynamicQuestDefinitions();
@@ -200,7 +196,6 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         ClientLoreCharacterCache.clear();
         ClientPartyStateCache.clear();
         ChatPartyInvitationAnswers.clear();
-        SubWindowPlaces.forgetOpen();
         ClientPartyMemberStatusCache.clear();
         ClientPartyTrackingCache.clear();
         // Words over a head belong to the world they were spoken in.

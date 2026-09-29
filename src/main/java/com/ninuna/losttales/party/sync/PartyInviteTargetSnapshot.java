@@ -4,24 +4,24 @@ import java.util.UUID;
 
 /**
  * Minimal client-safe projection of one currently online account whose active
- * role-playing character may be invited by the receiving party leader.
+ * identity may be invited by the receiving party leader.
  */
 public final class PartyInviteTargetSnapshot {
 
     private final UUID ownerId;
-    private final UUID characterId;
+    private final UUID identityId;
     private final String playerName;
     private final String characterName;
 
     public PartyInviteTargetSnapshot(UUID ownerId,
-                                     UUID characterId,
+                                     UUID identityId,
                                      String playerName,
                                      String characterName) {
-        if (ownerId == null || characterId == null) {
+        if (ownerId == null || identityId == null) {
             throw new IllegalArgumentException("invite target identities must not be null");
         }
         this.ownerId = ownerId;
-        this.characterId = characterId;
+        this.identityId = identityId;
         this.playerName = normalizeName(playerName);
         this.characterName = normalizeName(characterName);
     }
@@ -30,8 +30,8 @@ public final class PartyInviteTargetSnapshot {
         return this.ownerId;
     }
 
-    public UUID getCharacterId() {
-        return this.characterId;
+    public UUID getIdentityId() {
+        return this.identityId;
     }
 
     public String getPlayerName() {

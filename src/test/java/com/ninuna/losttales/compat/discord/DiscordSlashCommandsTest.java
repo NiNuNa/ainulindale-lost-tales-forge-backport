@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -65,6 +66,31 @@ public final class DiscordSlashCommandsTest {
         // Markdown in a name stays inert.
         assertEquals("Nobody online is called **\\*\\*Bob\\*\\***.",
                 DiscordSlashCommands.who(PLAYERS, "**Bob**"));
+    }
+
+    /**
+     * Discord takes no answer past two thousand characters, and an option
+     * may be longer than that before its markdown is escaped.
+     */
+    @Test
+    public void everyAnswerFitsDiscordsTwoThousandCharacters() {
+        StringBuilder name = new StringBuilder();
+        for (int index = 0; index < 3000; index++) {
+            name.append('*');
+        }
+        String answer = DiscordSlashCommands.who(PLAYERS, name.toString());
+        assertTrue(answer.length() + " characters", answer.length() <= 2000);
+        assertTrue(answer.endsWith("..."));
+        StringBuilder emoji = new StringBuilder();
+        for (int index = 0; index < 1500; index++) {
+            emoji.append("😄");
+        }
+        String cut = DiscordSlashCommands.bound(emoji.toString());
+        assertTrue(cut.length() <= 2000);
+        assertFalse("never half an emoji", Character.isHighSurrogate(
+                cut.charAt(cut.length() - 4)));
+        assertEquals("short", DiscordSlashCommands.bound("short"));
+        assertEquals("", DiscordSlashCommands.bound(null));
     }
 
     @Test

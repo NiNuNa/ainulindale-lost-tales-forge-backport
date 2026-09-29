@@ -5,7 +5,6 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * What was sent from each tab, for the Up and Down arrows to walk back
@@ -97,19 +96,6 @@ final class ChatSentHistory {
         this.pending = "";
     }
 
-    boolean isBrowsing() {
-        return this.browsing != null;
-    }
-
-    void forget(ChatTab tab) {
-        if (tab != null) {
-            this.entries.remove(tab);
-            if (tab.equals(this.browsing)) {
-                endBrowse();
-            }
-        }
-    }
-
     /** Drops every conversation tab's history: what leaving a server does. */
     void forgetConversations() {
         Iterator<ChatTab> tabs = this.entries.keySet().iterator();
@@ -133,20 +119,5 @@ final class ChatSentHistory {
         ArrayList<String> lines = tab == null ? null : this.entries.get(tab);
         return lines == null ? Collections.<String>emptyList()
                 : Collections.unmodifiableList(lines);
-    }
-
-    /** Test hook: tabs remembered, oldest first. */
-    List<ChatTab> tabs() {
-        return new ArrayList<ChatTab>(this.entries.keySet());
-    }
-
-    /** Test hook: the pending line a walk will give back. */
-    String pending() {
-        return this.pending;
-    }
-
-    /** Test hook. */
-    Map<ChatTab, ArrayList<String>> view() {
-        return Collections.unmodifiableMap(this.entries);
     }
 }

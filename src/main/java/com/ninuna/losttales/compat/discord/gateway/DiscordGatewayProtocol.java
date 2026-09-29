@@ -11,8 +11,9 @@ import java.util.List;
 
 /**
  * The Gateway's conversation, without the socket: what each payload the
- * server sends means, what to send back, and what to remember — the
- * heartbeat interval, the sequence, the session and where to resume it.
+ * server sends means, what to send back, how often to beat, held within
+ * bounds, and what to remember: the sequence, the session and where to
+ * resume it.
  * A connection hands every text it reads here and carries out the
  * actions it gets back; a heartbeat tick asks {@link #onHeartbeatDue()}.
  * Nothing here blocks or connects, so the whole exchange can be replayed
@@ -30,11 +31,12 @@ public final class DiscordGatewayProtocol {
     public static final int OP_HELLO = 10;
     public static final int OP_HEARTBEAT_ACK = 11;
     /**
-     * GUILDS, GUILD_MESSAGES, GUILD_MESSAGE_REACTIONS and MESSAGE_CONTENT:
-     * what reading bound channels and the reactions on them needs. Only
-     * MESSAGE_CONTENT is privileged.
+     * GUILDS, GUILD_MESSAGES, GUILD_MESSAGE_REACTIONS, GUILD_MESSAGE_TYPING
+     * and MESSAGE_CONTENT: what reading bound channels, the reactions on
+     * them and who is typing there needs. Only MESSAGE_CONTENT is
+     * privileged.
      */
-    public static final int INTENTS = 1 | (1 << 9) | (1 << 10) | (1 << 15);
+    public static final int INTENTS = 1 | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 15);
     /**
      * GUILD_MEMBERS and GUILD_PRESENCES: who is in a server and what
      * they are doing, which the member lists need. Both are privileged,
@@ -48,6 +50,16 @@ public final class DiscordGatewayProtocol {
      * asked for ({@link #requestMembersPayload}).
      */
     public static final int LARGE_THRESHOLD = 250;
+    /** The heartbeat interval a HELLO without one stands for; Discord's usual. */
+    static final long DEFAULT_HEARTBEAT_MILLIS = 41250L;
+    /** The shortest heartbeat interval taken from a HELLO. */
+    static final long MIN_HEARTBEAT_MILLIS = 1000L;
+    /**
+     * The longest heartbeat interval taken from a HELLO. Beating sooner
+     * than Discord asks is allowed, and an acknowledgement at least this
+     * often keeps a quiet connection inside its socket's read timeout.
+     */
+    static final long MAX_HEARTBEAT_MILLIS = 60000L;
 
     /** What the connection is to do with a payload. */
     public static final class Action {
@@ -107,7 +119,6 @@ public final class DiscordGatewayProtocol {
     private long sequence = -1L;
     private String sessionId = "";
     private String resumeGatewayUrl = "";
-    private long heartbeatIntervalMillis;
     private boolean heartbeatAcknowledged = true;
 
     public DiscordGatewayProtocol(String token, int intents) {
@@ -123,18 +134,6 @@ public final class DiscordGatewayProtocol {
     /** Where to connect next: the resume URL of a session, else empty. */
     public String getResumeGatewayUrl() {
         return canResume() ? this.resumeGatewayUrl : "";
-    }
-
-    public long getSequence() {
-        return this.sequence;
-    }
-
-    public String getSessionId() {
-        return this.sessionId;
-    }
-
-    public long getHeartbeatIntervalMillis() {
-        return this.heartbeatIntervalMillis;
     }
 
     /** The intents the next identify asks for. */
@@ -181,10 +180,12 @@ public final class DiscordGatewayProtocol {
         switch (op) {
             case OP_HELLO:
                 JsonObject hello = object(payload, "d");
-                this.heartbeatIntervalMillis = hello == null ? 41250L
-                        : integer(hello, "heartbeat_interval", 41250);
+                long interval = hello == null ? DEFAULT_HEARTBEAT_MILLIS
+                        : integer(hello, "heartbeat_interval",
+                                (int)DEFAULT_HEARTBEAT_MILLIS);
                 this.heartbeatAcknowledged = true;
-                actions.add(Action.heartbeatEvery(this.heartbeatIntervalMillis));
+                actions.add(Action.heartbeatEvery(Math.max(MIN_HEARTBEAT_MILLIS,
+                        Math.min(MAX_HEARTBEAT_MILLIS, interval))));
                 actions.add(Action.send(canResume() ? resumePayload() : identifyPayload()));
                 break;
             case OP_HEARTBEAT:

@@ -436,12 +436,6 @@ final class LostTalesLotrSmoothMapRenderer {
         }
     }
 
-    /** Stable seamless cloudy grain assembled without a source texture. */
-    static int proceduralNoisePixel(int x, int y) {
-        return proceduralNoisePixel(
-                x, y, NOISE_TILE_SIZE, NOISE_TILE_SIZE);
-    }
-
     private static int proceduralNoisePixel(
             int x, int y, int width, int height) {
         float value = periodicValueNoise(x, y, width, height, 64, 11)

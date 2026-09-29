@@ -56,10 +56,6 @@ public final class MotionPlayer {
         this.motionId = motionId;
     }
 
-    public String motionId() {
-        return this.motionId;
-    }
-
     /**
      * Sets every part down in {@code pose} at once, playing nothing: how
      * a thing is shown the first time, in the state it is already in.
@@ -172,12 +168,6 @@ public final class MotionPlayer {
     public String pose(String part) {
         PartState state = this.parts.get(part);
         return state == null ? null : state.pose;
-    }
-
-    /** The beat a part is playing, or null while it rests. */
-    public String beat(String part) {
-        PartState state = this.parts.get(part);
-        return state == null ? null : state.beat;
     }
 
     /** Whether every part has arrived, the first item of each. */

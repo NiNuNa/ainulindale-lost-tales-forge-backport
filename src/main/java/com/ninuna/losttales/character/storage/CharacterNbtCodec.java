@@ -2,7 +2,6 @@ package com.ninuna.losttales.character.storage;
 
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.model.CharacterProfile;
-import com.ninuna.losttales.character.model.CharacterProgression;
 import com.ninuna.losttales.character.model.CharacterKind;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
@@ -44,8 +43,6 @@ public final class CharacterNbtCodec {
     private static final String TAG_CHARACTER_INDEX = "CharacterIndex";
     private static final String TAG_ORIGINAL_DATA = "OriginalData";
     private static final String TAG_CHARACTERS = "Characters";
-    private static final String TAG_PROGRESSION = "Progression";
-    private static final String TAG_EXTENSION_DATA = "ExtensionData";
 
     private static final String TAG_OWNER_UUID = "OwnerUUID";
     private static final String TAG_CHARACTER_UUID = "CharacterUUID";
@@ -85,18 +82,14 @@ public final class CharacterNbtCodec {
     private static final String TAG_STARTING_FACTION_ID = "StartingFactionId";
     private static final String TAG_STARTING_WAYPOINT_ID = "StartingWaypointId";
     private static final String TAG_UNCONVENTIONAL_SETTINGS = "UnconventionalSettings";
-    private static final String TAG_ROLEPLAY_LEVEL = "RoleplayLevel";
+    private static final String TAG_PLEDGED_FACTION_ID = "PledgedFactionId";
     private static final String TAG_CREATION_TIMESTAMP = "CreationTimestamp";
-    private static final String TAG_EXPERIENCE_POINTS = "ExperiencePoints";
+    private static final String TAG_FACTION_SINCE = "FactionSince";
 
     private static final int MAX_REASONABLE_AGE = 100000;
     private static final int MAX_STABLE_IDENTIFIER_LENGTH = 64;
 
     private CharacterNbtCodec() {}
-
-    public static void write(NBTTagCompound output, Collection<CharacterRoster> rosters) {
-        write(output, rosters, Collections.<NBTTagCompound>emptyList());
-    }
 
     /**
      * Encodes one detached character record for recovery-oriented stores.
@@ -121,7 +114,7 @@ public final class CharacterNbtCodec {
                     "character data and expected owner must not be null");
         }
         CharacterReadResult result = readCharacter(
-                source, expectedOwnerId, -1, -1);
+                source, expectedOwnerId, -1);
         if (result.unsupportedVersion >= 0) {
             throw new IllegalArgumentException(
                     "unsupported character data version "
@@ -281,9 +274,9 @@ public final class CharacterNbtCodec {
         tag.setString(TAG_STARTING_WAYPOINT_ID, character.getStartingWaypointId());
         tag.setBoolean(TAG_UNCONVENTIONAL_SETTINGS,
                 character.hasUnconventionalSettings());
-        tag.setInteger(TAG_ROLEPLAY_LEVEL, character.getRoleplayLevel());
+        tag.setString(TAG_PLEDGED_FACTION_ID, character.getPledgedFactionId());
         tag.setLong(TAG_CREATION_TIMESTAMP, character.getCreationTimestamp());
-        tag.setTag(TAG_PROGRESSION, writeProgression(character.getProgression()));
+        tag.setLong(TAG_FACTION_SINCE, character.getFactionSince());
         return tag;
     }
 
@@ -446,17 +439,6 @@ public final class CharacterNbtCodec {
         return value.length() > limit * 2 ? "" : value;
     }
 
-    private static NBTTagCompound writeProgression(CharacterProgression progression) {
-        CharacterProgression safeProgression = progression == null
-                ? new CharacterProgression()
-                : progression;
-        NBTTagCompound tag = new NBTTagCompound();
-        tag.setInteger(TAG_DATA_VERSION, CharacterProgression.CURRENT_DATA_VERSION);
-        tag.setLong(TAG_EXPERIENCE_POINTS, safeProgression.getExperiencePoints());
-        tag.setTag(TAG_EXTENSION_DATA, safeProgression.getExtensionDataCopy());
-        return tag;
-    }
-
     private static RosterReadResult readRoster(NBTTagCompound source, int rosterIndex) {
         if (source == null) {
             LostTalesLog.warning("Skipping malformed roster at index %d", Integer.valueOf(rosterIndex));
@@ -510,8 +492,7 @@ public final class CharacterNbtCodec {
                 ownerId,
                 unlockedSlotCount,
                 activeCharacterId,
-                revision,
-                CharacterRoster.CURRENT_DATA_VERSION
+                revision
         );
         // The account cape keys are newer than the roster layout: a roster
         // without them wears the defaults, and an unknown cape id is
@@ -539,12 +520,11 @@ public final class CharacterNbtCodec {
         NBTTagList characterList = tag.getTagList(TAG_CHARACTERS, Constants.NBT.TAG_COMPOUND);
         for (int i = 0; i < characterList.tagCount(); i++) {
             NBTTagCompound rawCharacter = characterList.getCompoundTagAt(i);
-            CharacterReadResult characterResult = readCharacter(rawCharacter, ownerId, rosterIndex, i);
+            CharacterReadResult characterResult = readCharacter(rawCharacter, ownerId, i);
             if (characterResult.unsupportedVersion >= 0) {
                 return RosterReadResult.unsupported(characterResult.unsupportedVersion);
             }
             repaired |= characterResult.repaired;
-            quarantinedEntries.addAll(characterResult.quarantinedEntries);
             RoleplayCharacter character = characterResult.character;
             if (character == null) {
                 quarantinedEntries.add(createQuarantineEntry(
@@ -583,7 +563,7 @@ public final class CharacterNbtCodec {
     }
 
     private static CharacterReadResult readCharacter(NBTTagCompound source, UUID rosterOwnerId,
-                                                       int rosterIndex, int characterIndex) {
+                                                       int characterIndex) {
         if (source == null) {
             LostTalesLog.warning("Skipping malformed character at index %d for owner %s",
                     Integer.valueOf(characterIndex), rosterOwnerId);
@@ -599,7 +579,6 @@ public final class CharacterNbtCodec {
 
         NBTTagCompound tag = (NBTTagCompound) source.copy();
         boolean repaired = false;
-        ArrayList<NBTTagCompound> quarantinedEntries = new ArrayList<NBTTagCompound>();
         UUID characterId = NbtTags.readUuid(tag, TAG_CHARACTER_UUID);
         if (characterId == null) {
             LostTalesLog.warning("Skipping character at index %d for owner %s because its UUID is missing or invalid",
@@ -798,19 +777,24 @@ public final class CharacterNbtCodec {
             LostTalesLog.warning("Clamping unreasonable age for character %s owned by %s", characterId, rosterOwnerId);
         }
 
-        boolean hasRoleplayLevel = tag.hasKey(TAG_ROLEPLAY_LEVEL, Constants.NBT.TAG_INT);
-        int roleplayLevel = hasRoleplayLevel
-                ? tag.getInteger(TAG_ROLEPLAY_LEVEL)
-                : RoleplayCharacter.INITIAL_ROLEPLAY_LEVEL;
-        if (!hasRoleplayLevel) {
+        // The pledge LOTR last reported for the character; a record
+        // without one, or with one that is no faction id, has none.
+        boolean hasPledgedFaction = tag.hasKey(
+                TAG_PLEDGED_FACTION_ID, Constants.NBT.TAG_STRING);
+        String storedPledgedFactionId = hasPledgedFaction
+                ? tag.getString(TAG_PLEDGED_FACTION_ID) : "";
+        String pledgedFactionId = LotrCharacterAdapter.normalizeFactionId(
+                storedPledgedFactionId);
+        if (pledgedFactionId.length() > MAX_STABLE_IDENTIFIER_LENGTH) {
+            pledgedFactionId = "";
+        }
+        if (!hasPledgedFaction
+                || !pledgedFactionId.equals(storedPledgedFactionId)) {
             repaired = true;
-            LostTalesLog.warning("Repairing missing roleplay level for character %s owned by %s",
-                    characterId, rosterOwnerId);
-        } else if (roleplayLevel < RoleplayCharacter.INITIAL_ROLEPLAY_LEVEL) {
-            roleplayLevel = RoleplayCharacter.INITIAL_ROLEPLAY_LEVEL;
-            repaired = true;
-            LostTalesLog.warning("Repairing invalid roleplay level for character %s owned by %s",
-                    characterId, rosterOwnerId);
+            if (storedPledgedFactionId.length() > 0) {
+                LostTalesLog.warning("Clearing malformed pledged faction for character %s owned by %s",
+                        characterId, rosterOwnerId);
+            }
         }
 
         boolean hasCreationTimestamp = tag.hasKey(TAG_CREATION_TIMESTAMP, Constants.NBT.TAG_LONG);
@@ -827,30 +811,22 @@ public final class CharacterNbtCodec {
                     characterId, rosterOwnerId);
         }
 
-        boolean progressionTagPresent = tag.hasKey(TAG_PROGRESSION);
-        boolean progressionCompoundPresent = tag.hasKey(TAG_PROGRESSION, Constants.NBT.TAG_COMPOUND);
-        ProgressionReadResult progressionResult = readProgression(
-                tag.getCompoundTag(TAG_PROGRESSION), characterId, rosterOwnerId,
-                progressionCompoundPresent);
-        if (progressionResult.unsupportedVersion >= 0) {
-            return CharacterReadResult.unsupported(progressionResult.unsupportedVersion);
-        }
-        repaired |= progressionResult.repaired;
-        if ((progressionTagPresent && !progressionCompoundPresent)
-                || progressionResult.replacedMalformedData) {
-            quarantinedEntries.add(createQuarantineEntry(
-                    "character", "malformed_progression_replaced", rosterIndex, characterIndex,
-                    rosterOwnerId, characterId, source));
+        // When the faction took effect: never before the character was
+        // made, and a record without it counts from its making.
+        long factionSince = tag.hasKey(TAG_FACTION_SINCE, Constants.NBT.TAG_LONG)
+                ? tag.getLong(TAG_FACTION_SINCE) : 0L;
+        if (factionSince < creationTimestamp) {
+            factionSince = creationTimestamp;
+            repaired = true;
         }
 
         RoleplayCharacter character = RoleplayCharacter
                 .builder(characterId, characterOwnerId)
                 .slot(slotIndex).name(name).race(raceId).gender(genderId)
                 .skin(skinId).age(age).startingFaction(startingFactionId)
-                .roleplayLevel(roleplayLevel)
-                .progression(progressionResult.progression)
+                .pledgedFaction(pledgedFactionId)
+                .factionSince(factionSince)
                 .createdAt(creationTimestamp)
-                .dataVersion(RoleplayCharacter.CURRENT_DATA_VERSION)
                 .minecraftCapeVisible(showMinecraftCape)
                 .cosmeticCape(cosmeticCapeId)
                 .startingWaypoint(startingWaypointId)
@@ -860,53 +836,7 @@ public final class CharacterNbtCodec {
                 .chestType(chestTypeId)
                 .kind(kind)
                 .build();
-        return CharacterReadResult.success(character, repaired, quarantinedEntries);
-    }
-
-    private static ProgressionReadResult readProgression(NBTTagCompound source, UUID characterId,
-                                                          UUID ownerId, boolean wasPresent) {
-        if (!wasPresent) {
-            LostTalesLog.warning("Creating missing progression container for character %s owned by %s",
-                    characterId, ownerId);
-            return ProgressionReadResult.success(new CharacterProgression(), true, false);
-        }
-
-        int version = versionOf(source);
-        if (version != CharacterProgression.CURRENT_DATA_VERSION) {
-            LostTalesLog.warning("Progression data for character %s owned by %s uses unsupported version %d",
-                    characterId, ownerId, Integer.valueOf(version));
-            return ProgressionReadResult.unsupported(version);
-        }
-
-        NBTTagCompound tag = (NBTTagCompound) source.copy();
-        boolean repaired = false;
-        long experiencePoints = tag.hasKey(TAG_EXPERIENCE_POINTS, Constants.NBT.TAG_LONG)
-                ? tag.getLong(TAG_EXPERIENCE_POINTS)
-                : 0L;
-        if (experiencePoints < 0L) {
-            experiencePoints = 0L;
-            repaired = true;
-            LostTalesLog.warning("Repairing negative experience for character %s owned by %s", characterId, ownerId);
-        }
-
-        boolean extensionTagPresent = tag.hasKey(TAG_EXTENSION_DATA);
-        boolean hasExtensionData = tag.hasKey(TAG_EXTENSION_DATA, Constants.NBT.TAG_COMPOUND);
-        boolean replacedMalformedData = extensionTagPresent && !hasExtensionData;
-        NBTTagCompound extensionData = hasExtensionData
-                ? tag.getCompoundTag(TAG_EXTENSION_DATA)
-                : new NBTTagCompound();
-        if (!hasExtensionData) {
-            repaired = true;
-            LostTalesLog.warning("Repairing missing or malformed progression extension "
-                            + "data for character %s owned by %s",
-                    characterId, ownerId);
-        }
-        CharacterProgression progression = new CharacterProgression(
-                CharacterProgression.CURRENT_DATA_VERSION,
-                experiencePoints,
-                extensionData
-        );
-        return ProgressionReadResult.success(progression, repaired, replacedMalformedData);
+        return CharacterReadResult.success(character, repaired);
     }
 
     private static NBTTagCompound createQuarantineEntry(String entryType, String reason,
@@ -983,14 +913,6 @@ public final class CharacterNbtCodec {
             return new ReadResult(rosters, repaired, false, -1, null, quarantinedEntries);
         }
 
-        public static ReadResult success(Map<UUID, CharacterRoster> rosters, boolean repaired) {
-            return success(rosters, repaired, Collections.<NBTTagCompound>emptyList());
-        }
-
-        public static ReadResult empty(boolean repaired) {
-            return success(new LinkedHashMap<UUID, CharacterRoster>(), repaired);
-        }
-
         public static ReadResult unsupported(NBTTagCompound originalData, int unsupportedVersion) {
             NBTTagCompound copy = originalData == null
                     ? new NBTTagCompound()
@@ -1065,57 +987,26 @@ public final class CharacterNbtCodec {
         private final boolean repaired;
         private final int unsupportedVersion;
         private final String failureReason;
-        private final List<NBTTagCompound> quarantinedEntries;
 
         private CharacterReadResult(RoleplayCharacter character, boolean repaired,
-                                    int unsupportedVersion, String failureReason,
-                                    Collection<NBTTagCompound> quarantinedEntries) {
+                                    int unsupportedVersion, String failureReason) {
             this.character = character;
             this.repaired = repaired;
             this.unsupportedVersion = unsupportedVersion;
             this.failureReason = failureReason;
-            this.quarantinedEntries = copyQuarantineEntries(quarantinedEntries);
         }
 
-        private static CharacterReadResult success(RoleplayCharacter character, boolean repaired,
-                                                   Collection<NBTTagCompound> quarantinedEntries) {
-            return new CharacterReadResult(character, repaired, -1, null, quarantinedEntries);
+        private static CharacterReadResult success(RoleplayCharacter character,
+                                                   boolean repaired) {
+            return new CharacterReadResult(character, repaired, -1, null);
         }
 
         private static CharacterReadResult failed(boolean repaired, String reason) {
-            return new CharacterReadResult(null, repaired, -1, reason,
-                    Collections.<NBTTagCompound>emptyList());
+            return new CharacterReadResult(null, repaired, -1, reason);
         }
 
         private static CharacterReadResult unsupported(int version) {
-            return new CharacterReadResult(null, false, version, null,
-                    Collections.<NBTTagCompound>emptyList());
-        }
-    }
-
-    private static final class ProgressionReadResult {
-        private final CharacterProgression progression;
-        private final boolean repaired;
-        private final int unsupportedVersion;
-        private final boolean replacedMalformedData;
-
-        private ProgressionReadResult(CharacterProgression progression, boolean repaired,
-                                      int unsupportedVersion, boolean replacedMalformedData) {
-            this.progression = progression;
-            this.repaired = repaired;
-            this.unsupportedVersion = unsupportedVersion;
-            this.replacedMalformedData = replacedMalformedData;
-        }
-
-        private static ProgressionReadResult success(CharacterProgression progression,
-                                                     boolean repaired,
-                                                     boolean replacedMalformedData) {
-            return new ProgressionReadResult(progression, repaired, -1,
-                    replacedMalformedData);
-        }
-
-        private static ProgressionReadResult unsupported(int version) {
-            return new ProgressionReadResult(null, false, version, false);
+            return new CharacterReadResult(null, false, version, null);
         }
     }
 }

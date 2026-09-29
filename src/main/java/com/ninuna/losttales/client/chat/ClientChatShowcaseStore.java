@@ -115,7 +115,6 @@ public final class ClientChatShowcaseStore {
     static final class Quest {
         final long messageId;
         final int tokenIndex;
-        final String reference;
         final String title;
         final String category;
         final String objective;
@@ -125,7 +124,6 @@ public final class ClientChatShowcaseStore {
         Quest(ChatShowcase showcase, long messageId) {
             this.messageId = messageId;
             this.tokenIndex = showcase.getTokenIndex();
-            this.reference = showcase.getQuestReference();
             this.title = showcase.getQuestTitle();
             this.category = showcase.getQuestCategory();
             this.objective = showcase.getQuestObjective();

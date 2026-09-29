@@ -100,11 +100,6 @@ public final class CameraPresetFileStore {
         return presets.keySet().toArray(new String[presets.size()]);
     }
 
-    public static File getPresetDirectory() {
-        File directory = presetDirectory;
-        return directory == null ? null : directory.getAbsoluteFile();
-    }
-
     public static String normalizeId(String id) {
         if (id == null) {
             return CameraPresetId.MODERN_ACTION_RPG.getConfigValue();

@@ -84,8 +84,9 @@ public final class MotionTransitionTest {
              nanos += 10L * MILLIS) {
             fine.advance(nanos, true);
         }
-        coarse.advance(120L * MILLIS, true);
-        assertEquals(coarse.value(), fine.value(), 0.0001F);
+        // Advancing again to the same time only reads the value.
+        assertEquals(coarse.advance(120L * MILLIS, true),
+                fine.advance(120L * MILLIS, true), 0.0001F);
     }
 
     @Test
@@ -180,8 +181,7 @@ public final class MotionTransitionTest {
         transition.advance(1L, true);
         boolean passed = false;
         for (long nanos = MILLIS; nanos <= 200L * MILLIS; nanos += MILLIS) {
-            transition.advance(nanos, true);
-            passed |= transition.value() > 1.0F;
+            passed |= transition.advance(nanos, true) > 1.0F;
             assertTrue(transition.clamped() >= 0.0F);
             assertTrue(transition.clamped() <= 1.0F);
         }

@@ -6,6 +6,7 @@ import com.ninuna.losttales.character.server.CharacterActiveResolver;
 import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMessageIds;
+import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatIdentitySyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
@@ -91,9 +92,9 @@ public final class ChatIdentitySelection {
                 && LostTalesPermissions.has(player, LostTalesCapability.CHAT_NARRATE);
     }
 
-    /** Whether a message's explicit identity still matches the selection. */
-    static boolean matches(EntityPlayerMP player, int kind, UUID requested) {
-        RoleplayCharacter selected = character(player);
+    /** Whether a message's explicit identity still matches who speaks in {@code channel}. */
+    static boolean matches(EntityPlayerMP player, ChatChannel channel, int kind, UUID requested) {
+        RoleplayCharacter selected = speakerFor(player, channel);
         UUID selectedId = selected == null ? null : selected.getCharacterId();
         return matches(selectedId, kind, requested);
     }
@@ -124,16 +125,33 @@ public final class ChatIdentitySelection {
         return character == null ? "" : character.getCharacterId().toString();
     }
 
-    public static UUID identityId(EntityPlayerMP player) {
-        RoleplayCharacter character = character(player);
-        return character == null ? player.getUniqueID() : character.getCharacterId();
+    /** The character the player plays, or null for the account playing as itself. */
+    public static RoleplayCharacter played(EntityPlayerMP player) {
+        return CharacterActiveResolver.get(player);
     }
 
-    public static Party party(EntityPlayerMP player) { return partyFor(player, identityId(player)); }
+    /** The identity the player plays: the character's id, or the account's own. */
+    public static UUID playedId(EntityPlayerMP player) {
+        RoleplayCharacter played = played(player);
+        return played == null ? player.getUniqueID() : played.getCharacterId();
+    }
 
-    static Party partyFor(EntityPlayerMP player, UUID identityId) {
+    /**
+     * Who the player speaks as in {@code channel}: the character they play
+     * where the channel says so ({@link ChatRolePresentation#speaksAsPlayedCharacter}),
+     * else the chat identity.
+     */
+    public static RoleplayCharacter speakerFor(EntityPlayerMP player, ChatChannel channel) {
+        return ChatRolePresentation.speaksAsPlayedCharacter(channel)
+                ? played(player) : character(player);
+    }
+
+    /** The party the player travels with: the played character's (Nils, 2026-09-28, P1 a). */
+    public static Party party(EntityPlayerMP player) { return partyFor(player, playedId(player)); }
+
+    private static Party partyFor(EntityPlayerMP player, UUID identityId) {
         try {
-            Party party = PartyStorage.get(player.worldObj).getPartyForCharacter(identityId);
+            Party party = PartyStorage.get(player.worldObj).getPartyForIdentity(identityId);
             PartyMember member = party == null ? null : party.getMember(identityId);
             return member != null && player.getUniqueID().equals(member.getOwnerId()) ? party : null;
         } catch (RuntimeException failure) {
@@ -157,26 +175,27 @@ public final class ChatIdentitySelection {
     public static void sendState(EntityPlayerMP player) {
         RoleplayCharacter character = character(player);
         Party party = party(player);
-        PartyMember member = party == null ? null : party.getMember(identityId(player));
+        PartyMember member = party == null ? null : party.getMember(playedId(player));
         int color = member == null ? ChatChannel.PARTY.getDisplayColor() : member.getColor().getRgb();
         UUID id = character == null ? null : character.getCharacterId();
         UUID partyId = party == null ? null : party.getPartyId();
         String leader = leaderName(party);
-        LAST_STATE.put(player.getUniqueID(), signature(player, id, partyId, color, leader));
+        String name = party == null ? "" : party.getName();
+        LAST_STATE.put(player.getUniqueID(), signature(player, id, partyId, color, leader, name));
         LostTalesNetworkHandler.CHANNEL.sendTo(
-                new LostTalesChatIdentitySyncPacket(id, partyId, color, leader,
+                new LostTalesChatIdentitySyncPacket(id, partyId, color, leader, name,
                         isNarrating(player)), player);
     }
 
-    /** The leader's character name, which names the party's tab; empty without a party. */
+    /** The leader's character name, which names an unnamed party's tab; empty without a party. */
     static String leaderName(Party party) {
         PartyMember leader = party == null ? null : party.getLeader();
         return leader == null || leader.getCharacterName() == null ? "" : leader.getCharacterName();
     }
 
     private static String signature(EntityPlayerMP player, UUID id, UUID partyId, int color,
-                                    String leader) {
-        return id + ":" + partyId + ":" + color + ":" + leader + ":" + isNarrating(player)
+                                    String leader, String name) {
+        return id + ":" + partyId + ":" + color + ":" + leader + ":" + name + ":" + isNarrating(player)
                 + ":" + roles(player) + ":"
                 + ChatChannelPolicy.factionOf(character(player));
     }
@@ -193,11 +212,11 @@ public final class ChatIdentitySelection {
             EntityPlayerMP player = (EntityPlayerMP)value;
             RoleplayCharacter character = character(player);
             Party party = party(player);
-            PartyMember member = party == null ? null : party.getMember(identityId(player));
+            PartyMember member = party == null ? null : party.getMember(playedId(player));
             String state = signature(player, character == null ? null : character.getCharacterId(),
                     party == null ? null : party.getPartyId(), member == null
                             ? ChatChannel.PARTY.getDisplayColor() : member.getColor().getRgb(),
-                    leaderName(party));
+                    leaderName(party), party == null ? "" : party.getName());
             if (!state.equals(LAST_STATE.get(player.getUniqueID()))) {
                 LostTalesChatService.sendAccess(player);
             }

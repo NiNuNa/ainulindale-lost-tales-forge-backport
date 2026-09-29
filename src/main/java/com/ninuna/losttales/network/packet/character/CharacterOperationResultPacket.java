@@ -112,9 +112,7 @@ public final class CharacterOperationResultPacket implements IMessage {
                 this.requestId,
                 this.operationType,
                 this.successful,
-                this.changed,
                 this.errorId,
-                this.rosterRevision,
                 this.retryAfterMillis,
                 this.rosterFollows
         );
@@ -128,28 +126,8 @@ public final class CharacterOperationResultPacket implements IMessage {
         return this.operationType;
     }
 
-    public boolean isSuccessful() {
-        return this.successful;
-    }
-
-    public boolean wasChanged() {
-        return this.changed;
-    }
-
     public CharacterErrorId getErrorId() {
         return this.errorId;
-    }
-
-    public long getRosterRevision() {
-        return this.rosterRevision;
-    }
-
-    public long getRetryAfterMillis() {
-        return this.retryAfterMillis;
-    }
-
-    public boolean isRosterFollows() {
-        return this.rosterFollows;
     }
 
     public boolean isMalformed() {

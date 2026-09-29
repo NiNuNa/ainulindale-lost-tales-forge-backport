@@ -25,7 +25,6 @@ import org.lwjgl.opengl.GL11;
  */
 @SideOnly(Side.CLIENT)
 public final class LostTalesLotrMapLayout {
-    private static final int BOTTOM_STATUS_MARGIN = 4;
     /** LOTR's own operator teleport hint, shown by the control strip instead. */
     private static final String TELEPORT_SUBTITLE_KEY = "lotr.gui.map.tp";
     private static final int INACTIVE_BOTTOM_TEXT = Integer.MIN_VALUE;
@@ -557,14 +556,6 @@ public final class LostTalesLotrMapLayout {
             markReflectionFailed(exception);
             return false;
         }
-    }
-
-    static int resolveStatusY(
-            LOTRGuiMap gui, int nativeMapYMax, int panelHeight) {
-        if (!isFullscreenLayoutActive(gui)) {
-            return nativeMapYMax + 10;
-        }
-        return Math.max(0, gui.height - panelHeight - BOTTOM_STATUS_MARGIN);
     }
 
     private static int calculateBottomTextMapYMax(LOTRGuiMap gui) {

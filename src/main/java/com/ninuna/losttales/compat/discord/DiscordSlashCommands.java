@@ -5,6 +5,7 @@ import com.google.gson.JsonObject;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.identity.PlayableIdentityResolver;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
+import com.ninuna.losttales.chat.server.ChatPresenceService;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
@@ -129,14 +130,23 @@ public final class DiscordSlashCommands {
                 : "Discord could not be reached. Ask for a new code.";
     }
 
-    /** The link stands, and which way lines cross it. */
-    public static String linked(String gameChannel, DiscordBridgeDirection direction) {
+    /**
+     * The link stands, and which way lines cross it; for a channel only
+     * some players read in the game, that everyone who can see this
+     * Discord channel reads it here.
+     */
+    public static String linked(String gameChannel, DiscordBridgeDirection direction,
+                                boolean limitedInGame) {
         String crossing = direction == DiscordBridgeDirection.GAME_TO_DISCORD
                 ? "Lines from the game come here."
                 : direction == DiscordBridgeDirection.DISCORD_TO_GAME
                         ? "Messages here go to the game."
                         : "Messages cross both ways.";
-        return bound("Linked to **" + escape(gameChannel) + "**. " + crossing);
+        String readers = limitedInGame
+                ? " Only some players read **" + escape(gameChannel) + "** in the game;"
+                        + " here, everyone who can see this channel reads it."
+                : "";
+        return bound("Linked to **" + escape(gameChannel) + "**. " + crossing + readers);
     }
 
     /** The link is gone. */
@@ -186,7 +196,7 @@ public final class DiscordSlashCommands {
             }
         });
         StringBuilder text = new StringBuilder("**").append(sorted.size())
-                .append(sorted.size() == 1 ? " online:** " : " online:** ");
+                .append(" online:** ");
         for (int index = 0; index < sorted.size(); index++) {
             if (index > 0) {
                 text.append(", ");
@@ -213,7 +223,9 @@ public final class DiscordSlashCommands {
                 return describe(player);
             }
         }
-        return "Nobody online is called **" + escape(query) + "**.";
+        // The name is the asker's own words, as long as Discord lets an
+        // option be, and escaping can double it.
+        return bound("Nobody online is called **" + escape(query) + "**.");
     }
 
     private static String describe(Player player) {
@@ -284,7 +296,8 @@ public final class DiscordSlashCommands {
         @SuppressWarnings("unchecked")
         List<EntityPlayerMP> online = server.getConfigurationManager().playerEntityList;
         for (EntityPlayerMP player : online) {
-            if (player == null) {
+            // An Invisible player is nobody Discord is told of.
+            if (player == null || !ChatPresenceService.showsOnline(player)) {
                 continue;
             }
             PlayableIdentityResolver.Resolution resolution =
@@ -296,7 +309,7 @@ public final class DiscordSlashCommands {
                 continue;
             }
             String faction = LotrCharacterAdapter.getInstance()
-                    .getFactionDisplayName(character.getStartingFactionId());
+                    .getFactionDisplayName(character.getFactionId());
             players.add(new Player(player.getCommandSenderName(), character.getName(),
                     raceName(character.getRaceId()), faction == null ? "" : faction));
         }
@@ -317,8 +330,22 @@ public final class DiscordSlashCommands {
         return DiscordMessageSanitizer.escapeMarkdown(text == null ? "" : text);
     }
 
-    private static String bound(String text) {
-        return text.length() <= MAX_CONTENT_LENGTH ? text
-                : text.substring(0, MAX_CONTENT_LENGTH - 3) + "...";
+    /**
+     * An answer cut to Discord's {@link #MAX_CONTENT_LENGTH} characters,
+     * never inside a surrogate pair. Every answer the bridge sends goes
+     * through here.
+     */
+    static String bound(String text) {
+        if (text == null) {
+            return "";
+        }
+        if (text.length() <= MAX_CONTENT_LENGTH) {
+            return text;
+        }
+        int end = MAX_CONTENT_LENGTH - 3;
+        if (Character.isHighSurrogate(text.charAt(end - 1))) {
+            end--;
+        }
+        return text.substring(0, end) + "...";
     }
 }

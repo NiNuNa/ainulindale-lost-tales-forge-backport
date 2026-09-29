@@ -47,9 +47,14 @@ public final class LostTalesMissiveGenerator {
 
     private LostTalesMissiveGenerator() {}
 
+    /** A new notice for a board, sealed by the world. */
     public static ItemStack createRandomMissiveLetter(World world, String boardKey, long worldTime, int sequence, Random random) {
         LostTalesMissiveData missive = createRandomMissive(world, boardKey, worldTime, sequence, random);
-        return createMissiveLetter(missive);
+        ItemStack letter = createMissiveLetter(missive);
+        if (letter != null) {
+            MissiveSeals.seal(world, letter);
+        }
+        return letter;
     }
 
     public static ItemStack createMissiveLetter(LostTalesMissiveData missive) {

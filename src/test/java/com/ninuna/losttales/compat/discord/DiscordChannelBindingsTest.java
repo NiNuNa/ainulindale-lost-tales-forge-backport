@@ -271,7 +271,7 @@ public final class DiscordChannelBindingsTest {
         }, false, warnings);
         assertEquals(1, warnings.messages.size());
         assertTrue(warnings.messages.get(0), warnings.messages.get(0).contains(
-                "unknown channel 'faction'"));
+                "entry 1 names no channel the game knows"));
         assertNull(bindings.byId("faction"));
         assertEquals(Arrays.asList("gondor", "gondor#2"),
                 idsOf(bindings.forGame(ChatChannel.FACTION, "LOTR:Gondor")));
@@ -321,6 +321,33 @@ public final class DiscordChannelBindingsTest {
                 bindings.byId("ooc").getDirection());
         assertEquals(8, warnings.messages.size());
         assertTrue(warnings.refusals.isEmpty());
+    }
+
+    /**
+     * An entry that cannot be read is named by its place in the list and
+     * never repeated: a token or a webhook's address pasted in the wrong
+     * place must not reach the log, not even its first characters.
+     */
+    @Test
+    public void anEntryThatCannotBeReadIsNamedByItsPlaceAlone() {
+        Collected warnings = new Collected();
+        DiscordChannelBindings.parse(new String[] {
+                "ooc=GAME_TO_DISCORD;webhook=" + WEBHOOK,
+                "https://discord.com/api/webhooks/1/sEcReT-token",
+                "MTIzNDU2Nzg5.sEcReT.bot-token=",
+                "https://discord.com/api/webhooks/2/sEcReT?wait=true",
+                "ooc=GAME_TO_DISCORD;webhook=" + WEBHOOK
+                        + "-b;https://discord.com/api/webhooks/3/sEcReT?x=1",
+        }, true, warnings);
+        assertEquals(4, warnings.messages.size());
+        for (String message : warnings.messages) {
+            assertFalse(message, message.contains("sEcReT"));
+            assertFalse(message, message.contains("MTIz"));
+        }
+        assertTrue(warnings.messages.get(0), warnings.messages.get(0).contains("entry 2"));
+        assertTrue(warnings.messages.get(1), warnings.messages.get(1).contains("entry 3"));
+        assertTrue(warnings.messages.get(2), warnings.messages.get(2).contains("entry 4"));
+        assertTrue(warnings.messages.get(3), warnings.messages.get(3).contains("part 3"));
     }
 
     @Test

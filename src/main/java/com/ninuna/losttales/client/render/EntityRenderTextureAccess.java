@@ -18,10 +18,6 @@ public final class EntityRenderTextureAccess {
 
     private EntityRenderTextureAccess() {}
 
-    public static boolean isAvailable() {
-        return GET_ENTITY_TEXTURE != null;
-    }
-
     /** The texture the entity currently renders with, or null. */
     public static ResourceLocation resolveEntityTexture(Entity entity) {
         if (GET_ENTITY_TEXTURE == null || entity == null) {

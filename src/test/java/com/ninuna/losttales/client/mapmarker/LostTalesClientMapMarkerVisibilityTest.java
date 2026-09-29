@@ -27,8 +27,6 @@ public final class LostTalesClientMapMarkerVisibilityTest {
         assertTrue(LostTalesClientMapMarkerVisibility
                 .isRegionRequirementMet(marker));
         assertTrue(LostTalesClientMapMarkerVisibility
-                .isNonDiscoverableVisible(marker));
-        assertTrue(LostTalesClientMapMarkerVisibility
                 .isMapVisible(marker));
     }
 

@@ -80,7 +80,7 @@ public final class ChatChannelIconsTest {
                     ChatChannelIcons.iconOf(ChatTab.of(channel)));
         }
         assertEquals(ChatEmoji.BLUSH,
-                ChatChannelIcons.iconOf(ChatTab.whisper("Bilbo")));
+                ChatChannelIcons.iconOf(ChatTab.whisper("Bilbo", "")));
         assertEquals(ChatEmoji.GRINNING,
                 ChatChannelIcons.iconOf(ChatTab.npc("Bilbo")));
         assertNull(ChatChannelIcons.iconOf((ChatTab)null));

@@ -3,15 +3,20 @@ package com.ninuna.losttales.party.model;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 
 /**
- * Server-validated party indicator colors in deterministic assignment
- * order. Each carries the palette entry it is drawn in, so the HUD, the
- * chat and the party screens show one member in one colour.
+ * The colours party members wear, one each, in the order a joining member
+ * is given the first one free: as many as a party can hold members. Each
+ * carries the palette entry it is drawn in, so the HUD, the chat and the
+ * Party page show one member in one colour.
  */
 public enum PartyColor {
     GREEN(0, "green", LostTalesColors.MEADOW_GREEN),
     YELLOW(1, "yellow", LostTalesColors.HONEY),
     PURPLE(2, "purple", LostTalesColors.ORCHID),
-    BLUE(3, "blue", LostTalesColors.SEAFOAM);
+    BLUE(3, "blue", LostTalesColors.SEAFOAM),
+    ORANGE(4, "orange", LostTalesColors.APRICOT),
+    RED(5, "red", LostTalesColors.SALMON),
+    TEAL(6, "teal", LostTalesColors.TEAL),
+    ROSE(7, "rose", LostTalesColors.ROSE_BEIGE);
 
     private final int networkId;
     private final String id;
@@ -26,6 +31,11 @@ public enum PartyColor {
     /** What this colour is drawn in, without an alpha of its own. */
     public int getRgb() {
         return this.rgb;
+    }
+
+    /** The colour as the compass and the map read a colour's name: #RRGGBB. */
+    public String getTint() {
+        return String.format("#%06X", Integer.valueOf(this.rgb));
     }
 
     public int getNetworkId() {

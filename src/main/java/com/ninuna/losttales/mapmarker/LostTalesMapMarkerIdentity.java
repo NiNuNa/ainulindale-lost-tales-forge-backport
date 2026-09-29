@@ -10,49 +10,23 @@ import java.util.Locale;
  * LOTR's registry.
  */
 public final class LostTalesMapMarkerIdentity {
-    public enum Authority {
-        WORLD_RECORD,
-        QUEST_PLAYER,
-        PARTY_CHARACTER
-    }
-
-    private final String markerId;
     private final String canonicalKey;
-    private final Authority authority;
 
-    private LostTalesMapMarkerIdentity(
-            String markerId, String canonicalKey,
-            Authority authority) {
-        this.markerId = markerId;
+    private LostTalesMapMarkerIdentity(String canonicalKey) {
         this.canonicalKey = canonicalKey;
-        this.authority = authority;
     }
 
-    public static LostTalesMapMarkerIdentity create(
-            String markerId, Authority authority) {
+    public static LostTalesMapMarkerIdentity create(String markerId) {
         String normalized = markerId == null ? "" : markerId.trim();
         if (normalized.length() == 0) {
             throw new IllegalArgumentException(
                     "marker identity requires a non-empty ID");
         }
-        if (authority == null) {
-            throw new IllegalArgumentException(
-                    "marker identity requires an authority");
-        }
-        return new LostTalesMapMarkerIdentity(
-                normalized, canonicalize(normalized), authority);
-    }
-
-    public String getMarkerId() {
-        return this.markerId;
+        return new LostTalesMapMarkerIdentity(canonicalize(normalized));
     }
 
     public String getCanonicalKey() {
         return this.canonicalKey;
-    }
-
-    public Authority getAuthority() {
-        return this.authority;
     }
 
     public boolean isSameLogicalMarker(

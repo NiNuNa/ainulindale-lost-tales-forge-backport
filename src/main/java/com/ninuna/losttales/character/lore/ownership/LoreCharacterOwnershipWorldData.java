@@ -50,7 +50,6 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
     private final List<NBTTagCompound> quarantinedEntries =
             new ArrayList<NBTTagCompound>();
     private boolean readOnly;
-    private int unsupportedDataVersion = -1;
     private String readOnlyReason = "";
     private NBTTagCompound preservedData;
 
@@ -70,21 +69,21 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
             return;
         }
         if (!compound.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)) {
-            failReadOnly(compound, -1, "missing_data_version", compound);
+            failReadOnly(compound, "missing_data_version", compound);
             return;
         }
         int version = compound.getInteger(TAG_DATA_VERSION);
         if (version != CURRENT_DATA_VERSION) {
-            failReadOnly(compound, version, "unsupported_data_version", compound);
+            failReadOnly(compound, "unsupported_data_version", compound);
             return;
         }
         if (!compound.hasKey(TAG_RECORDS, Constants.NBT.TAG_LIST)) {
-            failReadOnly(compound, version, "missing_or_invalid_records", compound);
+            failReadOnly(compound, "missing_or_invalid_records", compound);
             return;
         }
         if (compound.hasKey(TAG_QUARANTINE)
                 && !compound.hasKey(TAG_QUARANTINE, Constants.NBT.TAG_LIST)) {
-            failReadOnly(compound, version, "invalid_quarantine", compound);
+            failReadOnly(compound, "invalid_quarantine", compound);
             return;
         }
         if (compound.hasKey(TAG_QUARANTINE, Constants.NBT.TAG_LIST)) {
@@ -99,7 +98,7 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
         NBTTagList records = compound.getTagList(
                 TAG_RECORDS, Constants.NBT.TAG_COMPOUND);
         if (records.tagCount() > MAX_RECORDS) {
-            failReadOnly(compound, version, "record_limit_exceeded", compound);
+            failReadOnly(compound, "record_limit_exceeded", compound);
             return;
         }
         for (int index = 0; index < records.tagCount(); index++) {
@@ -108,20 +107,17 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
             try {
                 record = readRecord(raw);
             } catch (RuntimeException exception) {
-                failReadOnly(compound, version,
-                        "malformed_record_" + index, raw);
+                failReadOnly(compound, "malformed_record_" + index, raw);
                 LostTalesLog.warning("Lore-character ownership record %d is malformed; storage is read-only: %s",
                         Integer.valueOf(index), exception.toString());
                 return;
             }
             if (this.recordsByLoreId.containsKey(record.getLoreCharacterId())) {
-                failReadOnly(compound, version,
-                        "duplicate_lore_character_id", raw);
+                failReadOnly(compound, "duplicate_lore_character_id", raw);
                 return;
             }
             if (this.recordsByCharacterId.containsKey(record.getCharacterId())) {
-                failReadOnly(compound, version,
-                        "duplicate_character_uuid", raw);
+                failReadOnly(compound, "duplicate_character_uuid", raw);
                 return;
             }
             this.recordsByLoreId.put(record.getLoreCharacterId(), record);
@@ -165,10 +161,6 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
         return this.readOnly;
     }
 
-    public synchronized int getUnsupportedDataVersion() {
-        return this.unsupportedDataVersion;
-    }
-
     public synchronized String getReadOnlyReason() {
         return this.readOnlyReason;
     }
@@ -196,18 +188,6 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
         return this.recordsByLoreId.size();
     }
 
-    public synchronized int getQuarantinedEntryCount() {
-        return this.quarantinedEntries.size();
-    }
-
-    public synchronized List<NBTTagCompound> getQuarantinedEntriesCopy() {
-        List<NBTTagCompound> result = new ArrayList<NBTTagCompound>();
-        for (NBTTagCompound entry : this.quarantinedEntries) {
-            result.add((NBTTagCompound) entry.copy());
-        }
-        return Collections.unmodifiableList(result);
-    }
-
     /**
      * Atomically claims an identity when the caller has the current revision.
      * Revision zero represents an identity which has never been claimed.
@@ -219,34 +199,26 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
             long expectedRevision,
             long timestamp) {
         if (this.readOnly) {
-            return result(LoreCharacterOwnershipResult.Status.STORAGE_READ_ONLY,
-                    getRecord(loreCharacterId));
+            return result(LoreCharacterOwnershipResult.Status.STORAGE_READ_ONLY);
         }
         String normalizedLoreId =
                 LostTalesIdentifiers.normalize(
                         loreCharacterId);
         if (!LoreCharacterOwnershipRecord.isValidIdentifier(normalizedLoreId)
                 || ownerId == null || expectedRevision < 0L) {
-            return result(LoreCharacterOwnershipResult.Status.INVALID_REQUEST,
-                    getRecord(normalizedLoreId));
+            return result(LoreCharacterOwnershipResult.Status.INVALID_REQUEST);
         }
-        LoreCharacterRegistry.ensureLoaded();
-        if (!LoreCharacterRegistry.getLoadErrors().isEmpty()) {
-            return result(
-                    LoreCharacterOwnershipResult.Status.DEFINITION_REGISTRY_INVALID,
-                    getRecord(normalizedLoreId));
-        }
+        // A file that could not be read is skipped and logged as the
+        // registry loads; the others are claimed as ever.
         LoreCharacterDefinition definition =
                 LoreCharacterRegistry.get(normalizedLoreId);
         if (definition == null) {
             return result(
-                    LoreCharacterOwnershipResult.Status.UNKNOWN_LORE_CHARACTER,
-                    getRecord(normalizedLoreId));
+                    LoreCharacterOwnershipResult.Status.UNKNOWN_LORE_CHARACTER);
         }
         if (!definition.hasAppearance()) {
             return result(
-                    LoreCharacterOwnershipResult.Status.APPEARANCE_NOT_CONFIGURED,
-                    getRecord(normalizedLoreId));
+                    LoreCharacterOwnershipResult.Status.APPEARANCE_NOT_CONFIGURED);
         }
 
         LoreCharacterOwnershipRecord existing =
@@ -254,30 +226,26 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
         if (existing != null && existing.isClaimed()) {
             return result(ownerId.equals(existing.getOwnerId())
                             ? LoreCharacterOwnershipResult.Status.ALREADY_OWNED_BY_REQUESTER
-                            : LoreCharacterOwnershipResult.Status.ALREADY_CLAIMED,
-                    existing);
+                            : LoreCharacterOwnershipResult.Status.ALREADY_CLAIMED);
         }
         long actualRevision = existing == null ? 0L : existing.getRevision();
         if (expectedRevision != actualRevision) {
-            return result(LoreCharacterOwnershipResult.Status.STALE_REVISION,
-                    existing);
+            return result(LoreCharacterOwnershipResult.Status.STALE_REVISION);
         }
 
         LoreCharacterOwnershipRecord claimed;
         if (existing == null) {
             if (proposedCharacterId == null) {
                 return result(
-                        LoreCharacterOwnershipResult.Status.INVALID_REQUEST, null);
+                        LoreCharacterOwnershipResult.Status.INVALID_REQUEST);
             }
             if (this.recordsByCharacterId.containsKey(proposedCharacterId)) {
                 return result(
-                        LoreCharacterOwnershipResult.Status.CHARACTER_ID_CONFLICT,
-                        null);
+                        LoreCharacterOwnershipResult.Status.CHARACTER_ID_CONFLICT);
             }
             if (this.recordsByLoreId.size() >= MAX_RECORDS) {
                 return result(
-                        LoreCharacterOwnershipResult.Status.RECORD_LIMIT_REACHED,
-                        null);
+                        LoreCharacterOwnershipResult.Status.RECORD_LIMIT_REACHED);
             }
             claimed = LoreCharacterOwnershipRecord.firstClaim(
                     normalizedLoreId, proposedCharacterId,
@@ -289,7 +257,7 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
         this.recordsByLoreId.put(normalizedLoreId, claimed);
         this.recordsByCharacterId.put(claimed.getCharacterId(), claimed);
         markDirty();
-        return result(LoreCharacterOwnershipResult.Status.CLAIMED, claimed);
+        return result(LoreCharacterOwnershipResult.Status.CLAIMED);
     }
 
     /** Atomically releases an identity only for its current owner/revision. */
@@ -299,33 +267,28 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
             long expectedRevision,
             long timestamp) {
         if (this.readOnly) {
-            return result(LoreCharacterOwnershipResult.Status.STORAGE_READ_ONLY,
-                    getRecord(loreCharacterId));
+            return result(LoreCharacterOwnershipResult.Status.STORAGE_READ_ONLY);
         }
         String normalizedLoreId =
                 LostTalesIdentifiers.normalize(
                         loreCharacterId);
         if (!LoreCharacterOwnershipRecord.isValidIdentifier(normalizedLoreId)
                 || ownerId == null || expectedRevision < 0L) {
-            return result(LoreCharacterOwnershipResult.Status.INVALID_REQUEST,
-                    getRecord(normalizedLoreId));
+            return result(LoreCharacterOwnershipResult.Status.INVALID_REQUEST);
         }
         LoreCharacterOwnershipRecord existing =
                 this.recordsByLoreId.get(normalizedLoreId);
         if (existing == null) {
-            return result(LoreCharacterOwnershipResult.Status.NOT_CLAIMED, null);
+            return result(LoreCharacterOwnershipResult.Status.NOT_CLAIMED);
         }
         if (!existing.isClaimed()) {
-            return result(LoreCharacterOwnershipResult.Status.ALREADY_RELEASED,
-                    existing);
+            return result(LoreCharacterOwnershipResult.Status.ALREADY_RELEASED);
         }
         if (!ownerId.equals(existing.getOwnerId())) {
-            return result(LoreCharacterOwnershipResult.Status.NOT_OWNER,
-                    existing);
+            return result(LoreCharacterOwnershipResult.Status.NOT_OWNER);
         }
         if (expectedRevision != existing.getRevision()) {
-            return result(LoreCharacterOwnershipResult.Status.STALE_REVISION,
-                    existing);
+            return result(LoreCharacterOwnershipResult.Status.STALE_REVISION);
         }
 
         LoreCharacterOwnershipRecord released =
@@ -333,13 +296,12 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
         this.recordsByLoreId.put(normalizedLoreId, released);
         this.recordsByCharacterId.put(released.getCharacterId(), released);
         markDirty();
-        return result(LoreCharacterOwnershipResult.Status.RELEASED, released);
+        return result(LoreCharacterOwnershipResult.Status.RELEASED);
     }
 
     private static LoreCharacterOwnershipResult result(
-            LoreCharacterOwnershipResult.Status status,
-            LoreCharacterOwnershipRecord record) {
-        return LoreCharacterOwnershipResult.of(status, record);
+            LoreCharacterOwnershipResult.Status status) {
+        return LoreCharacterOwnershipResult.of(status);
     }
 
     private static NBTTagCompound writeRecord(
@@ -387,17 +349,15 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
         this.recordsByCharacterId.clear();
         this.quarantinedEntries.clear();
         this.readOnly = false;
-        this.unsupportedDataVersion = -1;
         this.readOnlyReason = "";
         this.preservedData = null;
     }
 
-    private void failReadOnly(NBTTagCompound source, int version,
-                              String reason, NBTTagCompound malformedEntry) {
+    private void failReadOnly(NBTTagCompound source, String reason,
+                              NBTTagCompound malformedEntry) {
         this.recordsByLoreId.clear();
         this.recordsByCharacterId.clear();
         this.readOnly = true;
-        this.unsupportedDataVersion = version;
         this.readOnlyReason = reason == null ? "unknown" : reason;
         this.preservedData = source == null
                 ? new NBTTagCompound() : (NBTTagCompound) source.copy();

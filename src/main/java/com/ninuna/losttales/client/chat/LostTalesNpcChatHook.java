@@ -11,6 +11,7 @@ import lotr.common.fac.LOTRFaction;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
 import net.minecraft.util.ResourceLocation;
@@ -136,7 +137,9 @@ public final class LostTalesNpcChatHook {
      * once the talk is over.
      *
      * <p>{@code nameColor} is the colour their name is written in, and
-     * {@code faction} what stands under it; either may be empty.</p>
+     * {@code faction} what stands under it; either may be empty. With
+     * the NPC chat styling off, the words come as LOTR's own NPC lines
+     * do: {@code <Name> words}, with no bubble and no tab.</p>
      */
     public static void sayToPlayer(EntityLivingBase speaker, String speech,
                                    int nameColor, String faction) {
@@ -149,6 +152,14 @@ public final class LostTalesNpcChatHook {
             plain = plain == null ? "" : plain.trim();
             String name = speaker.getCommandSenderName();
             if (name == null || name.length() == 0 || plain.length() == 0) {
+                return;
+            }
+            if (!LostTalesConfig.enableNpcChatStyling) {
+                EntityPlayer player = Minecraft.getMinecraft().thePlayer;
+                if (player != null) {
+                    player.addChatMessage(new ChatComponentText(
+                            "<" + name + "> " + plain));
+                }
                 return;
             }
             ChatSpeechBubbles.receiveNpc(speaker.getUniqueID(), name,

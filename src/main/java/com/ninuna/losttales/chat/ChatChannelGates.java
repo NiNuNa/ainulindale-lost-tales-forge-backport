@@ -11,8 +11,9 @@ import java.util.Set;
  * side with no roles named is open to everyone the channel's own access
  * already admits. Every gate comes from the config — the server's file
  * is seeded with the Operator channel asking for the operator role on
- * both sides, and no channel is gated by anything but what the file
- * says. A side that named a role the catalogue does not have is
+ * both sides — and an operators' channel the file has no entry for
+ * reads as operators only ({@code ChatChannelPolicy.staffOnly}). A side
+ * that named a role the catalogue does not have is
  * <em>closed</em>: a misspelt role must not open a staff channel to
  * everyone. The server keeps the gates in force and checks them on
  * every send and delivery; a client only receives the answer for
@@ -90,10 +91,6 @@ public final class ChatChannelGates {
         current = gates == null ? defaults() : gates;
     }
 
-    public static void resetToDefaults() {
-        current = defaults();
-    }
-
     /** No gate at all: what stands before a config is read. */
     public static ChatChannelGates defaults() {
         return of(Collections.<ChatChannel, Gate>emptyMap());
@@ -155,33 +152,5 @@ public final class ChatChannelGates {
             }
         }
         return false;
-    }
-
-    /** The config entry a channel's gate is written as; null when open. */
-    public static String format(ChatChannel channel, Gate gate) {
-        if (!gate.asksAnything()) {
-            return null;
-        }
-        return channel.getId() + "=read:" + join(gate.readRoles, gate.readClosed)
-                + ";send:" + join(gate.sendRoles, gate.sendClosed);
-    }
-
-    private static String join(Set<String> ids, boolean closed) {
-        if (closed) {
-            return "none";
-        }
-        if (ids.isEmpty()) {
-            return "any";
-        }
-        java.util.List<String> sorted = new java.util.ArrayList<String>(ids);
-        Collections.sort(sorted);
-        StringBuilder joined = new StringBuilder();
-        for (String id : sorted) {
-            if (joined.length() > 0) {
-                joined.append(',');
-            }
-            joined.append(id);
-        }
-        return joined.toString();
     }
 }

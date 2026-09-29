@@ -11,47 +11,34 @@ import static org.junit.Assert.assertTrue;
 public final class LostTalesMapMarkerRenderedGeometryTest {
     @Test
     public void iconBoundsIncludeTheRenderedShadow() {
-        Object gui = new Object();
-        LostTalesMapMarkerRenderedGeometry.Frame frame = frame(
-                gui, 2.25F, 3, 1);
+        LostTalesMapMarkerRenderedGeometry.Frame frame = frame(1);
         LostTalesMapMarkerRenderedGeometry.RenderedObject object =
-                frame.beginObject("losttales:a", 0, 1);
-        frame.addMember(object, 0, "losttales:a",
-                100.0F, 50.0F, 100.0F, 50.0F,
+                frame.beginObject(0);
+        frame.addMember(object, 0, 100.0F, 50.0F,
                 6.5F, 6.5F, 6.5F, 1.0F, 1.0F, 1.0F,
                 0.0F, 0.0F);
         frame.finishObject(object);
 
-        assertSame(gui, frame.getGuiIdentity());
-        assertEquals(2.25F, frame.getZoomExp(), 0.0F);
-        assertEquals(3, frame.getGuiScale());
         assertBounds(object.getVisibleBounds(),
                 93.5F, 43.5F, 107.5F, 57.5F);
-        assertEquals(14.0F,
-                object.getVisibleBounds().getWidth(), 0.0F);
-        assertEquals(14.0F,
-                object.getVisibleBounds().getHeight(), 0.0F);
         assertBounds(object.getInteractionBounds(),
                 92.5F, 42.5F, 108.5F, 58.5F);
     }
 
     @Test
     public void clusterBoundsContainTheCompleteFan() {
-        LostTalesMapMarkerRenderedGeometry.Frame frame = frame(
-                new Object(), -2.0F, 2, 3);
+        LostTalesMapMarkerRenderedGeometry.Frame frame = frame(3);
         LostTalesMapMarkerRenderedGeometry.RenderedObject object =
-                frame.beginObject("losttales:a", 0, 3);
-        add(frame, object, 0, "losttales:a",
+                frame.beginObject(0);
+        add(frame, object, 0,
                 100.0F, 50.0F, 0.0F, 0.0F, 1.0F);
-        add(frame, object, 1, "losttales:b",
+        add(frame, object, 1,
                 96.0F, 48.0F, -4.0F, -2.0F, 0.72F);
-        add(frame, object, 2, "losttales:c",
+        add(frame, object, 2,
                 104.0F, 48.0F, 4.0F, -2.0F, 0.72F);
         frame.finishObject(object);
 
-        assertTrue(object.isCluster());
-        assertEquals(3, object.getRepresentedMemberCount());
-        assertEquals(3, object.getVisibleMemberCount());
+        assertEquals(3, visibleCount(object));
         assertBounds(object.getVisibleBounds(),
                 89.5F, 41.5F, 111.5F, 57.5F);
         assertBounds(object.getInteractionBounds(),
@@ -66,33 +53,29 @@ public final class LostTalesMapMarkerRenderedGeometryTest {
 
     @Test
     public void hiddenCondensedMembersDoNotExpandVisibleBounds() {
-        LostTalesMapMarkerRenderedGeometry.Frame frame = frame(
-                new Object(), -3.0F, 1, 3);
+        LostTalesMapMarkerRenderedGeometry.Frame frame = frame(3);
         LostTalesMapMarkerRenderedGeometry.RenderedObject object =
-                frame.beginObject("losttales:a", 0, 3);
-        add(frame, object, 0, "losttales:a",
+                frame.beginObject(0);
+        add(frame, object, 0,
                 10.0F, 10.0F, 0.0F, 0.0F, 1.0F);
-        add(frame, object, 1, "losttales:b",
+        add(frame, object, 1,
                 6.0F, 8.0F, -4.0F, -2.0F, 0.72F);
-        add(frame, object, 2, "losttales:hidden",
+        add(frame, object, 2,
                 500.0F, 500.0F, 0.0F, 0.0F, 0.0F);
         frame.finishObject(object);
 
-        assertEquals(3, object.getRepresentedMemberCount());
-        assertEquals(2, object.getVisibleMemberCount());
+        assertEquals(2, visibleCount(object));
         assertBounds(object.getVisibleBounds(),
                 -0.5F, 1.5F, 17.5F, 17.5F);
         assertFalse(frame.getMemberForCandidate(2).isVisible());
     }
 
     @Test
-    public void memberLayoutRecordsFanAndAnimationOffsets() {
-        LostTalesMapMarkerRenderedGeometry.Frame frame = frame(
-                new Object(), 1.0F, 2, 1);
+    public void memberLayoutRecordsTheFanOffset() {
+        LostTalesMapMarkerRenderedGeometry.Frame frame = frame(1);
         LostTalesMapMarkerRenderedGeometry.RenderedObject object =
-                frame.beginObject("losttales:a", 0, 1);
-        frame.addMember(object, 0, "losttales:a",
-                30.0F, 40.0F, 24.0F, 37.0F,
+                frame.beginObject(0);
+        frame.addMember(object, 0, 24.0F, 37.0F,
                 7.5F, 7.5F, 7.5F, 15.0F / 13.0F,
                 0.4F, 0.6F, -4.0F, -2.0F);
         frame.finishObject(object);
@@ -101,9 +84,8 @@ public final class LostTalesMapMarkerRenderedGeometryTest {
 
         assertEquals(24.0F, member.getCenterX(), 0.0F);
         assertEquals(37.0F, member.getCenterY(), 0.0F);
-        assertEquals(7.5F, member.getArtHalfWidth(), 0.0F);
-        assertEquals(7.5F, member.getArtAbove(), 0.0F);
-        assertEquals(7.5F, member.getArtBelow(), 0.0F);
+        assertBounds(member.getVisibleBounds(),
+                16.5F, 29.5F, 32.5F, 45.5F);
         assertEquals(15.0F / 13.0F,
                 member.getVisualScale(), 0.0F);
         assertEquals(0.4F,
@@ -111,17 +93,14 @@ public final class LostTalesMapMarkerRenderedGeometryTest {
         assertEquals(0.6F, member.getRenderAlpha(), 0.0F);
         assertEquals(-4.0F, member.getFanOffsetX(), 0.0F);
         assertEquals(-2.0F, member.getFanOffsetY(), 0.0F);
-        assertEquals(-6.0F, member.getAnimationOffsetX(), 0.0F);
-        assertEquals(-3.0F, member.getAnimationOffsetY(), 0.0F);
     }
 
     @Test
     public void interactionUsesTheCompleteVisibleObjectWithSmallPadding() {
-        LostTalesMapMarkerRenderedGeometry.Frame frame = frame(
-                new Object(), 0.0F, 1, 1);
+        LostTalesMapMarkerRenderedGeometry.Frame frame = frame(1);
         LostTalesMapMarkerRenderedGeometry.RenderedObject object =
-                frame.beginObject("losttales:a", 0, 1);
-        add(frame, object, 0, "losttales:a",
+                frame.beginObject(0);
+        add(frame, object, 0,
                 10.0F, 10.0F, 0.0F, 0.0F, 1.0F);
         frame.finishObject(object);
 
@@ -136,15 +115,14 @@ public final class LostTalesMapMarkerRenderedGeometryTest {
 
     @Test
     public void theWholeFanIsOneTarget() {
-        LostTalesMapMarkerRenderedGeometry.Frame frame = frame(
-                new Object(), 0.0F, 1, 3);
+        LostTalesMapMarkerRenderedGeometry.Frame frame = frame(3);
         LostTalesMapMarkerRenderedGeometry.RenderedObject object =
-                frame.beginObject("losttales:a", 0, 3);
-        add(frame, object, 0, "losttales:a",
+                frame.beginObject(0);
+        add(frame, object, 0,
                 100.0F, 50.0F, 0.0F, 0.0F, 1.0F);
-        add(frame, object, 1, "losttales:b",
+        add(frame, object, 1,
                 96.0F, 48.0F, -4.0F, -2.0F, 0.5F);
-        add(frame, object, 2, "losttales:c",
+        add(frame, object, 2,
                 104.0F, 48.0F, 4.0F, -2.0F, 0.5F);
         frame.finishObject(object);
 
@@ -158,14 +136,13 @@ public final class LostTalesMapMarkerRenderedGeometryTest {
 
     @Test
     public void aMemberOnItsWayOutStopsWideningTheStack() {
-        LostTalesMapMarkerRenderedGeometry.Frame frame = frame(
-                new Object(), 0.0F, 1, 2);
+        LostTalesMapMarkerRenderedGeometry.Frame frame = frame(2);
         LostTalesMapMarkerRenderedGeometry.RenderedObject object =
-                frame.beginObject("losttales:a", 0, 2);
-        add(frame, object, 0, "losttales:a",
+                frame.beginObject(0);
+        add(frame, object, 0,
                 0.0F, 0.0F, 0.0F, 0.0F, 1.0F);
         // Most of the way to its own position, far from the leader.
-        add(frame, object, 1, "losttales:b",
+        add(frame, object, 1,
                 100.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.9F);
         frame.finishObject(object);
 
@@ -221,15 +198,14 @@ public final class LostTalesMapMarkerRenderedGeometryTest {
 
     @Test
     public void statusAnchorSitsBelowTheFanWithoutTouchingIt() {
-        LostTalesMapMarkerRenderedGeometry.Frame frame = frame(
-                new Object(), 1.0F, 2, 3);
+        LostTalesMapMarkerRenderedGeometry.Frame frame = frame(3);
         LostTalesMapMarkerRenderedGeometry.RenderedObject object =
-                frame.beginObject("losttales:a", 0, 5);
-        add(frame, object, 0, "losttales:a",
+                frame.beginObject(0);
+        add(frame, object, 0,
                 100.0F, 50.0F, 0.0F, 0.0F, 1.0F);
-        add(frame, object, 1, "losttales:b",
+        add(frame, object, 1,
                 96.0F, 48.0F, -4.0F, -2.0F, 0.72F);
-        add(frame, object, 2, "losttales:c",
+        add(frame, object, 2,
                 104.0F, 48.0F, 4.0F, -2.0F, 0.72F);
         frame.finishObject(object);
 
@@ -247,15 +223,14 @@ public final class LostTalesMapMarkerRenderedGeometryTest {
 
     @Test
     public void bothLabelsSitTheSameDistanceOutsideTheArtwork() {
-        LostTalesMapMarkerRenderedGeometry.Frame frame = frame(
-                new Object(), 1.0F, 2, 3);
+        LostTalesMapMarkerRenderedGeometry.Frame frame = frame(3);
         LostTalesMapMarkerRenderedGeometry.RenderedObject object =
-                frame.beginObject("losttales:a", 0, 5);
-        add(frame, object, 0, "losttales:a",
+                frame.beginObject(0);
+        add(frame, object, 0,
                 100.0F, 50.0F, 0.0F, 0.0F, 1.0F);
-        add(frame, object, 1, "losttales:b",
+        add(frame, object, 1,
                 96.0F, 48.0F, -4.0F, -2.0F, 0.72F);
-        add(frame, object, 2, "losttales:c",
+        add(frame, object, 2,
                 104.0F, 48.0F, 4.0F, -2.0F, 0.72F);
         frame.finishObject(object);
 
@@ -270,13 +245,12 @@ public final class LostTalesMapMarkerRenderedGeometryTest {
 
     @Test
     public void aLoneMarkerOwnsThePointerOverItsOwnArtworkOnly() {
-        LostTalesMapMarkerRenderedGeometry.Frame frame = frame(
-                new Object(), 1.0F, 2, 2);
+        LostTalesMapMarkerRenderedGeometry.Frame frame = frame(2);
         LostTalesMapMarkerRenderedGeometry.RenderedObject object =
-                frame.beginObject("losttales:a", 0, 2);
-        add(frame, object, 0, "losttales:a",
+                frame.beginObject(0);
+        add(frame, object, 0,
                 100.0F, 50.0F, 0.0F, 0.0F, 1.0F);
-        add(frame, object, 1, "losttales:b",
+        add(frame, object, 1,
                 120.0F, 50.0F, 20.0F, 0.0F, 1.0F);
         frame.finishObject(object);
 
@@ -293,34 +267,46 @@ public final class LostTalesMapMarkerRenderedGeometryTest {
 
     @Test
     public void frameReusesGeometryRecordsAfterWarmup() {
-        LostTalesMapMarkerRenderedGeometry.Frame frame = frame(
-                new Object(), 0.0F, 1, 1);
+        LostTalesMapMarkerRenderedGeometry.Frame frame = frame(1);
         LostTalesMapMarkerRenderedGeometry.RenderedObject first =
-                frame.beginObject("losttales:a", 0, 1);
-        add(frame, first, 0, "losttales:a",
+                frame.beginObject(0);
+        add(frame, first, 0,
                 0.0F, 0.0F, 0.0F, 0.0F, 1.0F);
         frame.finishObject(first);
         LostTalesMapMarkerRenderedGeometry.Member firstMember =
                 frame.getMemberForCandidate(0);
 
-        frame.begin(new Object(), 1.0F, 2, 1);
+        frame.begin(1);
         LostTalesMapMarkerRenderedGeometry.RenderedObject second =
-                frame.beginObject("losttales:b", 0, 1);
-        add(frame, second, 0, "losttales:b",
+                frame.beginObject(0);
+        add(frame, second, 0,
                 20.0F, 30.0F, 0.0F, 0.0F, 1.0F);
         frame.finishObject(second);
 
         assertSame(first, second);
         assertSame(firstMember, frame.getMemberForCandidate(0));
-        assertEquals("losttales:b", second.getIdentity());
+        assertEquals(20.0F, frame.getMemberForCandidate(0).getCenterX(),
+                0.0F);
     }
 
     private static LostTalesMapMarkerRenderedGeometry.Frame frame(
-            Object gui, float zoom, int guiScale, int candidates) {
+            int candidates) {
         LostTalesMapMarkerRenderedGeometry.Frame frame =
                 new LostTalesMapMarkerRenderedGeometry.Frame();
-        frame.begin(gui, zoom, guiScale, candidates);
+        frame.begin(candidates);
         return frame;
+    }
+
+    private static int visibleCount(
+            LostTalesMapMarkerRenderedGeometry.RenderedObject object) {
+        int count = 0;
+        for (LostTalesMapMarkerRenderedGeometry.Member member
+                : object.getMembers()) {
+            if (member.isVisible()) {
+                count++;
+            }
+        }
+        return count;
     }
 
     /**
@@ -331,22 +317,20 @@ public final class LostTalesMapMarkerRenderedGeometryTest {
     private static void add(
             LostTalesMapMarkerRenderedGeometry.Frame frame,
             LostTalesMapMarkerRenderedGeometry.RenderedObject object,
-            int candidateIndex, String id,
+            int candidateIndex,
             float centerX, float centerY,
             float fanX, float fanY, float alpha) {
-        add(frame, object, candidateIndex, id, centerX, centerY,
+        add(frame, object, candidateIndex, centerX, centerY,
                 fanX, fanY, alpha, candidateIndex == 0 ? 1.0F : 0.0F);
     }
 
     private static void add(
             LostTalesMapMarkerRenderedGeometry.Frame frame,
             LostTalesMapMarkerRenderedGeometry.RenderedObject object,
-            int candidateIndex, String id,
+            int candidateIndex,
             float centerX, float centerY,
             float fanX, float fanY, float alpha, float visibility) {
-        frame.addMember(object, candidateIndex, id,
-                centerX - fanX, centerY - fanY,
-                centerX, centerY,
+        frame.addMember(object, candidateIndex, centerX, centerY,
                 6.5F, 6.5F, 6.5F, 1.0F, visibility, alpha,
                 fanX, fanY);
     }

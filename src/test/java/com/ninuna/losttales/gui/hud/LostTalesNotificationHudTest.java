@@ -24,7 +24,6 @@ public final class LostTalesNotificationHudTest {
         LostTalesNotificationHud.beginFrame();
         LostTalesNotificationHud.claim(854, 480, 30);
         LostTalesNotificationHud.beginFrame();
-        assertEquals(0, LostTalesNotificationHud.claimedThisFrame());
         assertEquals(LostTalesNotificationHud.placement(854, 480).y,
                 LostTalesNotificationHud.claim(854, 480, 12));
     }

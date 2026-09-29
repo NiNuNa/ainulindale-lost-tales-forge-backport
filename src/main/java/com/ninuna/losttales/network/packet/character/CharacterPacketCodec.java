@@ -1,6 +1,7 @@
 package com.ninuna.losttales.network.packet.character;
 
 import com.ninuna.losttales.character.model.CharacterProfile;
+import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.network.packet.LostTalesPacketCodec;
 import io.netty.buffer.ByteBuf;
 
@@ -29,7 +30,8 @@ final class CharacterPacketCodec {
             CharacterProfile.MAX_GLANCE_LINE_LENGTH * 4;
     static final int MAX_IDENTIFIER_BYTES = 128;
     static final int MAX_ERROR_ID_BYTES = 64;
-    static final int MAX_CHARACTERS = 9;
+    /** A full roster: the nine slots and the account character besides them. */
+    static final int MAX_CHARACTERS = CharacterRoster.MAX_SLOTS + 1;
 
     private CharacterPacketCodec() {}
 

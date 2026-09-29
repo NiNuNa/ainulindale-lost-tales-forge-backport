@@ -1,7 +1,7 @@
 package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.chat.ChatChannel;
-import com.ninuna.losttales.client.chat.ChatLayout;
+import com.ninuna.losttales.client.chat.ChatTab;
 import com.ninuna.losttales.client.chat.TwoWindowLayout;
 import java.util.List;
 import org.junit.After;
@@ -9,7 +9,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -68,7 +67,7 @@ public final class WindowResizeTest {
 
     @Test
     public void heightIsWrittenAndReadBack() {
-        ChatLayout.detach(ChatChannel.PARTY, 40.0D, 20.0D);
+        WindowLayout.detach(ChatTab.of(ChatChannel.PARTY), 40.0D, 20.0D);
         WindowLayout.setWindowHeight("w3", 214.25D, true);
         List<String> lines = WindowLayoutStore.describe();
         boolean found = false;
@@ -121,7 +120,7 @@ public final class WindowResizeTest {
                 WindowLayout.clampWindowWidth(99999));
         assertEquals(320, WindowLayout.clampWindowWidth(320));
 
-        ChatLayout.detach(ChatChannel.PARTY, 40.0D, 20.0D);
+        WindowLayout.detach(ChatTab.of(ChatChannel.PARTY), 40.0D, 20.0D);
         assertTrue(WindowLayout.setWindowWidth("w3", 420, true));
         assertEquals(420, WindowLayout.window("w3").getOwnWidth());
         // Its neighbours are untouched: widths are not shared.
@@ -156,60 +155,5 @@ public final class WindowResizeTest {
         assertEquals(0, WindowLayout.window("w1").getOwnWidth());
         assertEquals(WindowLayout.MIN_WINDOW_SIZE,
                 WindowLayout.window("w2").getOwnWidth());
-    }
-
-    /** A window sticks to any of four sides, and the file remembers which. */
-    @Test
-    public void windowsStickToAnySideAndAreReadBack() {
-        ChatLayout.detach(ChatChannel.PARTY, 40.0D, 20.0D);
-        assertTrue(WindowLayout.link("w3", "w2",
-                Window.LinkSide.RIGHT));
-        assertEquals(Window.LinkSide.RIGHT,
-                WindowLayout.window("w3").getLinkSide());
-        assertFalse(WindowLayout.window("w3").isLinkedAbove());
-        assertTrue(WindowLayout.window("w3").isLinked());
-
-        List<String> lines = WindowLayoutStore.describe();
-        boolean found = false;
-        for (String line : lines) {
-            if (line.startsWith("window w3 ")) {
-                found = line.contains(" link=w2:right ");
-            }
-        }
-        assertTrue("w3 did not record which side it is stuck to", found);
-        TwoWindowLayout.reset();
-        WindowLayoutStore.load(lines);
-        assertEquals(Window.LinkSide.RIGHT,
-                WindowLayout.window("w3").getLinkSide());
-    }
-
-    /** A file written before sides existed still reads as above or below. */
-    @Test
-    public void olderFilesKeepTheirTopAndBottomLinks() {
-        WindowLayoutStore.load(java.util.Arrays.asList(
-                "window w1 locked=false x=0.00 y=0.00 active=global tabs=global",
-                "window w2 locked=false x=0.00 y=50.00 link=w1:above "
-                        + "active=ooc tabs=ooc",
-                "window w3 locked=false x=0.00 y=90.00 link=w1:below "
-                        + "active=party tabs=party"));
-        assertEquals(Window.LinkSide.ABOVE,
-                WindowLayout.window("w2").getLinkSide());
-        assertEquals(Window.LinkSide.BELOW,
-                WindowLayout.window("w3").getLinkSide());
-    }
-
-    /** Dragging any of a stuck pair moves the pair: the chain has one root. */
-    @Test
-    public void aStuckChainHasOneRoot() {
-        ChatLayout.detach(ChatChannel.PARTY, 40.0D, 20.0D);
-        WindowLayout.link("w3", "w2", Window.LinkSide.RIGHT);
-        assertEquals(WindowLayout.window("w2"),
-                WindowLayout.linkRoot(WindowLayout.window("w3")));
-        assertEquals(WindowLayout.window("w2"),
-                WindowLayout.linkRoot(WindowLayout.window("w2")));
-        // A window sticking to one that sticks back never loops.
-        WindowLayout.link("w2", "w3", Window.LinkSide.LEFT);
-        assertNotNull(WindowLayout.linkRoot(
-                WindowLayout.window("w3")));
     }
 }

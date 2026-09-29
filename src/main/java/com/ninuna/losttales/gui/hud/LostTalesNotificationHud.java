@@ -76,9 +76,4 @@ public final class LostTalesNotificationHud {
     static int stripTop(int slotTop, int claimedBefore) {
         return slotTop + claimedBefore;
     }
-
-    /** Pixels claimed so far this frame; what the next strip starts under. */
-    static int claimedThisFrame() {
-        return claimed;
-    }
 }

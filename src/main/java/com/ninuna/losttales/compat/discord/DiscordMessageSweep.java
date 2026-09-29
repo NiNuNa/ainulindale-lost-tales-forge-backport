@@ -95,13 +95,15 @@ final class DiscordMessageSweep {
      * Compares the newest page, oldest first as
      * {@link DiscordJson#parseMessages} answers it, with what was
      * relayed. An empty page is a channel with no messages left in it:
-     * everything watched has been deleted.
+     * everything watched has been deleted. A null page is one that could
+     * not be read, which says nothing: no change is reported and every
+     * watch stays as it was.
      */
     Changes apply(List<DiscordJson.Message> page) {
         List<DiscordJson.Message> edited =
                 new ArrayList<DiscordJson.Message>();
         List<String> deletedIds = new ArrayList<String>();
-        if (this.tracked.isEmpty()) {
+        if (page == null || this.tracked.isEmpty()) {
             return new Changes(edited, deletedIds);
         }
         Map<String, DiscordJson.Message> byId =

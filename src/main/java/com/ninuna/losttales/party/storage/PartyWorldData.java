@@ -15,13 +15,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Persistent server-authoritative party collection and character membership index. */
+/** Persistent server-authoritative parties, and which party each member identity is in. */
 public final class PartyWorldData extends WorldSavedData {
 
     public static final String DATA_NAME = "losttales_parties";
 
     private final Map<UUID, Party> parties = new LinkedHashMap<UUID, Party>();
-    private final Map<UUID, UUID> partyIdByCharacterId = new LinkedHashMap<UUID, UUID>();
+    private final Map<UUID, UUID> partyIdByIdentityId = new LinkedHashMap<UUID, UUID>();
     private final List<NBTTagCompound> quarantinedEntries = new ArrayList<NBTTagCompound>();
     private boolean readOnlyForNewerVersion;
     private int unsupportedDataVersion = -1;
@@ -39,7 +39,7 @@ public final class PartyWorldData extends WorldSavedData {
     @Override
     public synchronized void readFromNBT(NBTTagCompound compound) {
         this.parties.clear();
-        this.partyIdByCharacterId.clear();
+        this.partyIdByIdentityId.clear();
         this.quarantinedEntries.clear();
         this.readOnlyForNewerVersion = false;
         this.unsupportedDataVersion = -1;
@@ -74,17 +74,13 @@ public final class PartyWorldData extends WorldSavedData {
         return this.readOnlyForNewerVersion;
     }
 
-    public synchronized int getUnsupportedDataVersion() {
-        return this.unsupportedDataVersion;
-    }
-
     public synchronized Party getParty(UUID partyId) {
         return partyId == null ? null : this.parties.get(partyId);
     }
 
-    public synchronized Party getPartyForCharacter(UUID characterId) {
-        UUID partyId = characterId == null
-                ? null : this.partyIdByCharacterId.get(characterId);
+    public synchronized Party getPartyForIdentity(UUID identityId) {
+        UUID partyId = identityId == null
+                ? null : this.partyIdByIdentityId.get(identityId);
         return partyId == null ? null : this.parties.get(partyId);
     }
 
@@ -106,19 +102,19 @@ public final class PartyWorldData extends WorldSavedData {
         validateParty(party);
 
         for (PartyMember member : party.getMembers()) {
-            UUID existingPartyId = this.partyIdByCharacterId.get(member.getCharacterId());
+            UUID existingPartyId = this.partyIdByIdentityId.get(member.getIdentityId());
             if (existingPartyId != null && !existingPartyId.equals(party.getPartyId())) {
                 throw new IllegalStateException(
                         "Character already belongs to another party: "
-                                + member.getCharacterId());
+                                + member.getIdentityId());
             }
         }
 
         removeIndexEntriesForParty(party.getPartyId());
         this.parties.put(party.getPartyId(), party);
         for (PartyMember member : party.getMembers()) {
-            this.partyIdByCharacterId.put(
-                    member.getCharacterId(), party.getPartyId());
+            this.partyIdByIdentityId.put(
+                    member.getIdentityId(), party.getPartyId());
         }
         markDirty();
     }
@@ -133,25 +129,15 @@ public final class PartyWorldData extends WorldSavedData {
         return removed;
     }
 
-    public synchronized void quarantine(String reason, UUID partyId, UUID characterId) {
+    public synchronized void quarantine(String reason, UUID partyId, UUID identityId) {
         ensureWritable();
         this.quarantinedEntries.add(
-                PartyNbtCodec.createQuarantineEntry(reason, partyId, characterId));
+                PartyNbtCodec.createQuarantineEntry(reason, partyId, identityId));
         markDirty();
     }
 
     public synchronized int getQuarantinedEntryCount() {
         return this.quarantinedEntries.size();
-    }
-
-    public synchronized List<NBTTagCompound> getQuarantinedEntriesCopy() {
-        ArrayList<NBTTagCompound> copies = new ArrayList<NBTTagCompound>();
-        for (NBTTagCompound entry : this.quarantinedEntries) {
-            if (entry != null) {
-                copies.add((NBTTagCompound) entry.copy());
-            }
-        }
-        return Collections.unmodifiableList(copies);
     }
 
     public synchronized boolean areCharacterReferencesValidated() {
@@ -168,17 +154,17 @@ public final class PartyWorldData extends WorldSavedData {
         for (Party party : this.parties.values()) {
             ArrayList<UUID> duplicateMemberIds = new ArrayList<UUID>();
             for (PartyMember member : party.getMembers()) {
-                UUID existingPartyId = this.partyIdByCharacterId.get(member.getCharacterId());
+                UUID existingPartyId = this.partyIdByIdentityId.get(member.getIdentityId());
                 if (existingPartyId != null && !existingPartyId.equals(party.getPartyId())) {
-                    duplicateMemberIds.add(member.getCharacterId());
+                    duplicateMemberIds.add(member.getIdentityId());
                     this.quarantinedEntries.add(PartyNbtCodec.createQuarantineEntry(
                             "character_in_multiple_parties",
-                            party.getPartyId(), member.getCharacterId()));
+                            party.getPartyId(), member.getIdentityId()));
                     repaired = true;
                     continue;
                 }
-                this.partyIdByCharacterId.put(
-                        member.getCharacterId(), party.getPartyId());
+                this.partyIdByIdentityId.put(
+                        member.getIdentityId(), party.getPartyId());
             }
             for (UUID duplicateMemberId : duplicateMemberIds) {
                 party.removeMember(duplicateMemberId);
@@ -208,7 +194,7 @@ public final class PartyWorldData extends WorldSavedData {
             throw new IllegalArgumentException("party leader must be a member");
         }
         for (PartyMember member : party.getMembers()) {
-            if (!party.isColorAvailable(member.getColor(), member.getCharacterId())) {
+            if (!party.isColorAvailable(member.getColor(), member.getIdentityId())) {
                 throw new IllegalArgumentException("party member colors must be unique");
             }
         }
@@ -216,7 +202,7 @@ public final class PartyWorldData extends WorldSavedData {
 
     private void removeIndexEntriesForParty(UUID partyId) {
         Iterator<Map.Entry<UUID, UUID>> iterator =
-                this.partyIdByCharacterId.entrySet().iterator();
+                this.partyIdByIdentityId.entrySet().iterator();
         while (iterator.hasNext()) {
             Map.Entry<UUID, UUID> entry = iterator.next();
             if (partyId.equals(entry.getValue())) {

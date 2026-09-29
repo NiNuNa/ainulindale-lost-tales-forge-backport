@@ -60,10 +60,6 @@ public final class LostTalesInputIconRenderer {
                 LostTalesInputBinding.getType(keyBinding), keyCode, scale);
     }
 
-    public static int measureMouseWheel(Minecraft minecraft, float scale) {
-        return measureInput(minecraft, Type.MOUSE_WHEEL, 0, scale);
-    }
-
     public static int measureInput(
             Minecraft minecraft, Type type, int keyCode, float scale) {
         if (minecraft == null || scale <= 0.0F) {

@@ -99,13 +99,13 @@ public final class DirectionalMovementMathTest {
     public void reverseTrackingCorrectsPitchWithoutChangingInput() {
         assertEquals(-30.0F,
                 DirectionalMovementMath.resolveHeadTrackingPitch(
-                        30.0F, true), 0.0F);
+                        30.0F, 1.0F), 0.0F);
         assertEquals(30.0F,
                 DirectionalMovementMath.resolveHeadTrackingPitch(
-                        -30.0F, true), 0.0F);
+                        -30.0F, 1.0F), 0.0F);
         assertEquals(-30.0F,
                 DirectionalMovementMath.resolveHeadTrackingPitch(
-                        -30.0F, false), 0.0F);
+                        -30.0F, 0.0F), 0.0F);
         assertEquals(0.0F,
                 DirectionalMovementMath.resolveHeadTrackingPitch(
                         30.0F, 0.5F), 0.0F);

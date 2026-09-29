@@ -36,8 +36,8 @@ public final class ChatPacketFixtures {
     }
 
     /** An access statement; see {@link Access} for what it carries unless told. */
-    public static Access access(boolean operatorAccess, int roleMask) {
-        return new Access(operatorAccess, roleMask);
+    public static Access access(int roleMask) {
+        return new Access(roleMask);
     }
 
     /** A typing notice that speaks as the channel's default identity. */
@@ -179,6 +179,7 @@ public final class ChatPacketFixtures {
         private long echoNonce;
         private String quoteAuthor = "";
         private String quoteExcerpt = "";
+        private boolean action;
 
         private Send(ChatChannel channel, String message) {
             this.channel = channel;
@@ -227,13 +228,19 @@ public final class ChatPacketFixtures {
             return this;
         }
 
+        /** The words as an action ({@code /me}). */
+        public Send action() {
+            this.action = true;
+            return this;
+        }
+
         public LostTalesChatSendPacket build() {
             return new LostTalesChatSendPacket(this.channel, this.message,
                     this.references, this.target, this.identityKind,
                     this.identityCharacterId, this.replyToMessageId,
                     this.targetIdentity, this.echoNonce, this.targetCharacterId,
                     this.quoteAuthor, this.quoteExcerpt,
-                    LostTalesChatSendPacket.QUOTE_OTHER);
+                    LostTalesChatSendPacket.QUOTE_OTHER, this.action);
         }
     }
 
@@ -245,7 +252,6 @@ public final class ChatPacketFixtures {
      * no profanity words of the server's own.
      */
     public static final class Access {
-        private final boolean operatorAccess;
         private final int roleMask;
         private List<LostTalesChatAccessPacket.RoleHolder> holders =
                 Collections.<LostTalesChatAccessPacket.RoleHolder>emptyList();
@@ -259,8 +265,7 @@ public final class ChatPacketFixtures {
                 Collections.<UUID, Integer>emptyMap();
         private int proximityRadius;
 
-        private Access(boolean operatorAccess, int roleMask) {
-            this.operatorAccess = operatorAccess;
+        private Access(int roleMask) {
             this.roleMask = roleMask;
             this.accountRoleMask = roleMask;
         }
@@ -305,7 +310,7 @@ public final class ChatPacketFixtures {
         }
 
         public LostTalesChatAccessPacket build() {
-            return new LostTalesChatAccessPacket(this.operatorAccess,
+            return new LostTalesChatAccessPacket(
                     this.roleMask, this.holders,
                     Collections.<UUID>emptyList(),
                     this.catalog != null ? this.catalog

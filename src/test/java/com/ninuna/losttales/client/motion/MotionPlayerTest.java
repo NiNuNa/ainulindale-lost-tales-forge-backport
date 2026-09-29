@@ -2,7 +2,6 @@ package com.ninuna.losttales.client.motion;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import com.ninuna.losttales.config.LostTalesConfig;
@@ -118,10 +117,11 @@ public final class MotionPlayerTest {
     public void thePartsOfAMotionPlayTogether() {
         MotionPlayer player = new MotionPlayer(SLIDE);
         player.settle(Motion.REST);
-        player.play(Motion.OFF, 0L);
-        // "row" has no off beat and carries on resting.
-        assertNull(player.beat("row"));
-        assertEquals(Motion.OFF, player.beat("box"));
+        player.play(Motion.ON, 0L);
+        player.play(Motion.OFF, 200L * MILLIS);
+        // "row" has no off beat and stays where the on beat left it.
+        assertEquals(Motion.ON, player.pose("row"));
+        assertEquals(Motion.REST, player.pose("box"));
     }
 
     @Test

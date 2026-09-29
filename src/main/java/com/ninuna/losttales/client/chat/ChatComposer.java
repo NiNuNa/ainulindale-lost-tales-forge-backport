@@ -115,6 +115,14 @@ final class ChatComposer {
                                 this.replyToName, this.replyToExcerpt, color)
                         : ChatReplyReference.unanchored(this.replyToName,
                                 this.replyToExcerpt, color);
+        // An action answered is quoted as the sentence it is, as the
+        // server quotes it.
+        ClientChatMessages.Remembered answered =
+                this.replyToMessageId == ChatMessageIds.NONE ? null
+                        : ClientChatMessages.get(this.replyToMessageId);
+        if (answered != null && answered.packet.isAction()) {
+            reference = reference.asAction(true);
+        }
         if (head == null || head.senderId == null) {
             return reference;
         }

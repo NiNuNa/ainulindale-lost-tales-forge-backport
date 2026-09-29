@@ -387,6 +387,26 @@ final class ChatInputCompletion implements ChatInputField.MentionSource {
                 this.completionCandidates.add(candidate);
             }
         }
+        // In an in-character tab /me is the chat's own action verb: it is
+        // offered, with a word on what it does, wherever the verb being
+        // typed could become it.
+        String actionHint = "";
+        String typed = this.field.getText().substring(0,
+                this.field.getCursorPosition());
+        if (ChatInputRules.isAction(ChatInputRules.ACTION_VERB,
+                        owner.getChannel())
+                && typed.indexOf(' ') < 0
+                && ChatInputRules.ACTION_VERB.startsWith(
+                        typed.toLowerCase(Locale.ROOT))) {
+            if (!this.completionCandidates.contains(
+                    ChatInputRules.ACTION_VERB)) {
+                this.completionCandidates.add(ChatInputRules.ACTION_VERB);
+            }
+            actionHint = StatCollector.translateToLocal(
+                    "gui.losttales.chat.command.action_hint");
+        }
+        this.commandSuggestions.setHint(ChatInputRules.ACTION_VERB,
+                actionHint);
         // Vanilla's shape: the prefix is the server candidates' alone.
         String word = this.field.getText().substring(
                 this.field.func_146197_a(-1,
@@ -869,8 +889,8 @@ final class ChatInputCompletion implements ChatInputField.MentionSource {
             String accountId, String characterId) {
         String display = character == null
                 || character.trim().length() == 0 ? account : character;
-        return ChatMentionCandidate.player(key, display, account, character,
-                accountId, characterId, Arrays.asList(account, character));
+        return ChatMentionCandidate.player(key, display, accountId,
+                characterId, Arrays.asList(account, character));
     }
 
     static boolean sameCandidates(List<ChatMentionCandidate> left,

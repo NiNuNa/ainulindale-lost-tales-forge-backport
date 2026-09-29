@@ -6,7 +6,6 @@ import org.junit.Test;
 import java.util.Arrays;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -28,7 +27,6 @@ public final class ChatSentHistoryTest {
         assertEquals("second", history.step(GLOBAL, 1, "first"));
         assertEquals("the draft comes back past the newest line",
                 "draft", history.step(GLOBAL, 1, "second"));
-        assertFalse(history.isBrowsing());
         assertNull("nothing lies below the draft", history.step(GLOBAL, 1, "draft"));
     }
 
@@ -39,7 +37,6 @@ public final class ChatSentHistoryTest {
         history.record(GLOBAL, "one");
         assertEquals("one", history.step(GLOBAL, -1, "typing"));
         history.record(GLOBAL, "two");
-        assertFalse(history.isBrowsing());
         assertEquals(Arrays.asList("one", "two"), history.entries(GLOBAL));
         assertEquals("two", history.step(GLOBAL, -1, ""));
     }
@@ -95,26 +92,25 @@ public final class ChatSentHistoryTest {
         ChatSentHistory history = new ChatSentHistory();
         history.record(GLOBAL, "kept");
         for (int index = 0; index < ChatSentHistory.MAX_TABS - 1; index++) {
-            history.record(ChatTab.whisper("Partner" + index), "hi");
+            history.record(ChatTab.whisper("Partner" + index, ""), "hi");
         }
         // Writing to Global again makes it the most recent tab.
         history.record(GLOBAL, "again");
-        history.record(ChatTab.whisper("Newest"), "hi");
-        assertEquals(ChatSentHistory.MAX_TABS, history.tabs().size());
+        history.record(ChatTab.whisper("Newest", ""), "hi");
         assertEquals(Arrays.asList("kept", "again"), history.entries(GLOBAL));
         assertTrue("the oldest whisper made room",
-                history.entries(ChatTab.whisper("Partner0")).isEmpty());
+                history.entries(ChatTab.whisper("Partner0", "")).isEmpty());
     }
 
     @Test
     public void conversationsAreForgottenTogether() {
         ChatSentHistory history = new ChatSentHistory();
         history.record(GLOBAL, "kept");
-        history.record(ChatTab.whisper("Bilbo"), "gone");
+        history.record(ChatTab.whisper("Bilbo", ""), "gone");
         history.record(ChatTab.npc("Gandalf"), "gone too");
         history.forgetConversations();
         assertEquals(Arrays.asList("kept"), history.entries(GLOBAL));
-        assertTrue(history.entries(ChatTab.whisper("Bilbo")).isEmpty());
+        assertTrue(history.entries(ChatTab.whisper("Bilbo", "")).isEmpty());
         assertTrue(history.entries(ChatTab.npc("Gandalf")).isEmpty());
     }
 
@@ -125,7 +121,5 @@ public final class ChatSentHistoryTest {
         assertEquals("a", history.step(GLOBAL, -1, "pending"));
         history.clear();
         assertTrue(history.entries(GLOBAL).isEmpty());
-        assertFalse(history.isBrowsing());
-        assertEquals("", history.pending());
     }
 }

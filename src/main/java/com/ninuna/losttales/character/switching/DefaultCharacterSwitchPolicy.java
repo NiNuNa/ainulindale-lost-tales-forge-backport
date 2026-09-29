@@ -8,7 +8,7 @@ import com.ninuna.losttales.event.LostTalesMobAggroEventHandler;
 import com.ninuna.losttales.util.LostTalesMath;
 import net.minecraft.entity.player.EntityPlayerMP;
 
-/** Conservative default policy; individual checks can later become providers. */
+/** Every check a switch must pass, each refusal with its reason. */
 public final class DefaultCharacterSwitchPolicy implements CharacterSwitchPolicy {
 
     @Override

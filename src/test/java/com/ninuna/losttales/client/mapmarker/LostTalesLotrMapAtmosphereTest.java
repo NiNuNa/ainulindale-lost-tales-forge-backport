@@ -453,14 +453,14 @@ public final class LostTalesLotrMapAtmosphereTest {
                     }
                 };
 
-        assertTrue(LostTalesLotrMapAtmosphere.cloudFootprintTouchesLand(
-                island, 0, 0, 30));
+        assertTrue(LostTalesLotrMapAtmosphere.cloudLandWeight(
+                island, 0, 0, 30) > 0.0F);
         assertTrue("a coastal cloud may overhang open water",
-                LostTalesLotrMapAtmosphere.cloudFootprintTouchesLand(
-                        island, 33, 0, 30));
+                LostTalesLotrMapAtmosphere.cloudLandWeight(
+                        island, 33, 0, 30) > 0.0F);
         assertTrue("open-ocean clouds must be rejected",
-                !LostTalesLotrMapAtmosphere.cloudFootprintTouchesLand(
-                        island, 80, 80, 30));
+                LostTalesLotrMapAtmosphere.cloudLandWeight(
+                        island, 80, 80, 30) <= 0.0F);
         float near = LostTalesLotrMapAtmosphere.cloudLandWeight(
                 island, 6, 0, 30);
         float middle = LostTalesLotrMapAtmosphere.cloudLandWeight(

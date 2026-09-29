@@ -47,8 +47,7 @@ public final class CameraMotionStateTest {
         state.reset(pose(0.0D, 64.0D, 0.0D, 0.0D));
 
         CameraMotionOffset offset = state.update(
-                pose(0.20D, 64.0D, 0.0D, 8.0D),
-                profile, 1.0D, 0.05D);
+                pose(0.20D, 64.0D, 0.0D, 8.0D), profile, 1.0D, 0.05D, Double.NaN, Double.NaN);
 
         assertTrue(Math.abs(offset.getSide())
                 <= profile.getSideSway() + profile.getTurnSway()
@@ -189,12 +188,10 @@ public final class CameraMotionStateTest {
     public void teleportClearsProceduralMotionInsteadOfSweeping() {
         CameraMotionState state = new CameraMotionState();
         state.reset(pose(0.0D, 64.0D, 0.0D, 0.0D));
-        state.update(pose(0.2D, 64.0D, 0.0D, 4.0D),
-                profile(), 1.0D, 0.05D);
+        state.update(pose(0.2D, 64.0D, 0.0D, 4.0D), profile(), 1.0D, 0.05D, Double.NaN, Double.NaN);
 
         CameraMotionOffset offset = state.update(
-                pose(100.0D, 70.0D, 100.0D, 90.0D),
-                profile(), 1.0D, 0.05D);
+                pose(100.0D, 70.0D, 100.0D, 90.0D), profile(), 1.0D, 0.05D, Double.NaN, Double.NaN);
 
         assertEquals(0.0D, offset.getSide(), EPSILON);
         assertEquals(0.0D, offset.getVertical(), EPSILON);

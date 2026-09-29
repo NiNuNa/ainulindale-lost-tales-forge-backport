@@ -49,7 +49,8 @@ public final class ChatPagesTest {
     public static void registerPage() {
         if (WindowPages.byId(PAGE) == null) {
             WindowPages.register(PAGE, "gui.test.page",
-                    new ItemStack(Items.book), new WindowPages.Factory() {
+                    new ItemStack(Items.book), Window.ScreenFill.NONE, null,
+                    new WindowPages.Factory() {
                         @Override
                         public PageContent create() {
                             return new EmptyPage();
@@ -151,7 +152,7 @@ public final class ChatPagesTest {
     @Test
     public void aConversationCoveredByAPageStaysTheLastUsed() {
         ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
-        ChatTab friend = ChatTab.whisper("friend");
+        ChatTab friend = ChatTab.whisper("friend", "");
         WindowLayout.openInNewWindow(friend);
         Window window = WindowLayout.windowOf(global);
         ClientChatChannelState.select(global);
@@ -175,7 +176,7 @@ public final class ChatPagesTest {
 
     @Test
     public void beforeAnyPickTheChatKeyBringsTheTopWindowsConversation() {
-        ChatTab friend = ChatTab.whisper("friend");
+        ChatTab friend = ChatTab.whisper("friend", "");
         WindowLayout.openInNewWindow(friend);
         ClientChatChannelState.clear();
         assertEquals("the top window's, as the layout left it", friend,
@@ -194,7 +195,7 @@ public final class ChatPagesTest {
     @Test
     public void aPageOpensAWindowHoweverManyStand() {
         for (int index = 0; index < 12; index++) {
-            WindowLayout.openInNewWindow(ChatTab.whisper("friend" + index));
+            WindowLayout.openInNewWindow(ChatTab.whisper("friend" + index, ""));
         }
         assertNotNull(WindowLayout.showPage(WindowPages.tab(PAGE)));
     }
@@ -235,6 +236,66 @@ public final class ChatPagesTest {
                 WindowFrame.visibleTabs(window).contains(page));
     }
 
+    /**
+     * Closing the conversation typed in brings forward the tab to its
+     * right, a page here, and the input waits in the window's other
+     * conversation (W6 a).
+     */
+    @Test
+    public void closingTheConversationTypedInBringsTheTabToItsRightForward() {
+        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
+        ChatTab ooc = ChatTab.of(ChatChannel.OOC);
+        Window window = WindowLayout.windowOf(global);
+        PageTab page = WindowPages.tab(PAGE);
+        WindowLayout.openTab(page, window.getId());
+        WindowLayout.moveTab(page, window.getId(), 1);
+        assertEquals(Arrays.<WindowTab>asList(global, page, ooc),
+                window.getTabs());
+        ClientChatChannelState.select(global);
+        WindowLayout.setActiveTab(global);
+        assertTrue(ClientChatChannelState.close(global));
+        assertEquals("the tab to its right", page, window.getActiveTab());
+        assertEquals(ooc, ClientChatChannelState.getSelected());
+    }
+
+    /**
+     * A page taken out of its window by itself — a world page walked
+     * away from, even out of a locked window — remembers where its
+     * window stood, as a page closed by hand does.
+     */
+    @Test
+    public void aPageTakenOutByItselfRemembersWhereItsWindowStood() {
+        final PageTab page = WindowPages.tab(PAGE);
+        Window window = WindowLayout.showPage(page);
+        WindowLayout.setPosition(window.getId(), 25.0D, 35.0D, false);
+        WindowLayout.setLocked(window.getId(), true);
+        WindowLayout.removeTabs(new WindowLayout.TabFilter() {
+            @Override
+            public boolean matches(WindowTab tab) {
+                return page.equals(tab);
+            }
+        });
+        assertNull(WindowLayout.windowOf(page));
+        List<String> described = WindowLayoutStore.describe();
+        assertTrue(described.toString(), described.contains("place page:"
+                + PAGE + " x=25.00 y=35.00 height=292.00 width=366"));
+    }
+
+    /**
+     * A line the server says to answer a page's action stands over the
+     * page's bar only while the page is shown; with no screen open it
+     * stays in the chat, and the page says nothing (W2 a).
+     */
+    @Test
+    public void aLineForAPageNotShownStaysInTheChat() {
+        PageTab page = WindowPages.tab(PAGE);
+        WindowLayout.showPage(page);
+        assertFalse(page.isShown());
+        assertFalse(WindowPages.claimLine("chat.test.page.saved", "Saved."));
+        assertEquals("", page.content().lastAnswer().words());
+        assertFalse(WindowPages.claimLine("chat.other.line", "Hello."));
+    }
+
     @Test
     public void aPageKeyNamesItsPageAndNoKeyNamesNone() {
         assertSame(WindowPages.tab(FILLING),
@@ -257,11 +318,16 @@ public final class ChatPagesTest {
         }
     }
 
-    /** A page with nothing on it but its tone. */
+    /** A page with nothing on it but its tone, and the lines it answers. */
     private static final class EmptyPage extends PageContent {
         @Override
         public int tone() {
             return TONE;
+        }
+
+        @Override
+        public boolean answersLine(String key) {
+            return key.startsWith("chat.test.page.");
         }
 
         @Override

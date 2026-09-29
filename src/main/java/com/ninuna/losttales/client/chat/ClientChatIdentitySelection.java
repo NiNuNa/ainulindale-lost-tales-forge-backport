@@ -10,10 +10,10 @@ import net.minecraft.client.Minecraft;
 
 /**
  * Synchronizes the shared chat selection with the server and holds what
- * the server says of the selected identity's party: its id, the colour
- * the identity wears in it, and its leader's name, which names the
- * Party tab. An answer for another identity than the one selected now
- * is a late one and is ignored.
+ * the server says of the party of the character played: its id, the
+ * colour worn in it, its leader's name and its own, which name the Party
+ * tab. An answer for another identity than the one selected now is a
+ * late one and is ignored.
  */
 public final class ClientChatIdentitySelection {
     private static String requestedKey;
@@ -22,6 +22,7 @@ public final class ClientChatIdentitySelection {
     private static String partyKey = "";
     private static int partyColor;
     private static String partyLeader = "";
+    private static String partyName = "";
     private static long requestedAt;
 
     private ClientChatIdentitySelection() {}
@@ -54,10 +55,11 @@ public final class ClientChatIdentitySelection {
         partyKey = ChatTab.ownerKeyOf(packet.getPartyId());
         partyColor = packet.getPartyColor();
         partyLeader = packet.getPartyLeader();
+        partyName = packet.getPartyName();
         ClientChatIdentities.confirmNarrating(packet.isNarrating());
     }
 
-    /** The selected identity's party, as the server confirmed it; empty for none. */
+    /** The party of the character played, as the server confirmed it; empty for none. */
     static String partyKey() {
         return ClientChatIdentities.viewIdentityKey().equals(confirmedKey) ? partyKey : "";
     }
@@ -71,6 +73,11 @@ public final class ClientChatIdentitySelection {
         return partyKey().length() == 0 ? "" : partyLeader;
     }
 
+    /** The name the leader gave that party; empty when it has none, or without one. */
+    static String partyName() {
+        return partyKey().length() == 0 ? "" : partyName;
+    }
+
     public static void clear() {
         requestedKey = null;
         requestedNarrating = false;
@@ -78,6 +85,7 @@ public final class ClientChatIdentitySelection {
         partyKey = "";
         partyColor = 0;
         partyLeader = "";
+        partyName = "";
         requestedAt = 0L;
     }
 }

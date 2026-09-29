@@ -49,10 +49,6 @@ final class LostTalesMapFastTravelPrompt {
         this.hasAlternatives = hasAlternatives;
     }
 
-    String getDestinationName() {
-        return this.destinationName;
-    }
-
     boolean isTravelOffered() {
         return this.blockedReasonKey == null;
     }

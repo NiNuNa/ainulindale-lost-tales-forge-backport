@@ -37,8 +37,6 @@ public final class LostTalesMapMarkerEditableSettingsTest {
         assertEquals("City", updated.getCategoryName());
         assertEquals("Updated description",
                 updated.getDescription());
-        assertEquals("",
-                updated.getLotrWaypointId());
         assertEquals(4.0D, updated.getX(), 0.0D);
         assertEquals(70.0D, updated.getY(), 0.0D);
         assertEquals(320.0D,
@@ -47,8 +45,6 @@ public final class LostTalesMapMarkerEditableSettingsTest {
         assertTrue(updated.hasWaystone());
         assertEquals("losttales:glowstone_house",
                 updated.getWaystoneStructureType());
-        assertEquals(LostTalesMapMarkerRelevance.VERY_HIGH,
-                settings.getRelevance());
         assertEquals(LostTalesMapMarkerRelevance.VERY_HIGH.getRank(),
                 updated.getPriority());
         assertEquals(original.getRevision() + 1L,

@@ -90,15 +90,15 @@ public final class ChatPresenceMarkTest {
                         }
                     }
                     assertEquals(mark + " at " + x + "," + y, nearInk,
-                            cut.cuts(x, y));
+                            CornerCuts.cuts(cut, x, y));
                 }
             }
         }
         // The two pixels off the mark's rounded top-left corner stay.
-        assertFalse(cut.cuts(markX, markY - 1));
-        assertFalse(cut.cuts(markX - 1, markY));
-        assertTrue(cut.cuts(markX + 1, markY - 1));
-        assertTrue(cut.cuts(markX - 1, markY + 1));
+        assertFalse(CornerCuts.cuts(cut, markX, markY - 1));
+        assertFalse(CornerCuts.cuts(cut, markX - 1, markY));
+        assertTrue(CornerCuts.cuts(cut, markX + 1, markY - 1));
+        assertTrue(CornerCuts.cuts(cut, markX - 1, markY + 1));
     }
 
     /** The first inked column of a cell's row; the cell's width for a clear row. */
@@ -128,16 +128,6 @@ public final class ChatPresenceMarkTest {
         } finally {
             stream.close();
         }
-    }
-
-    /** The head and its mark are one icon, and are laid out as one. */
-    @Test
-    public void theIconIsTheHeadAndTheMarkTogether() {
-        assertEquals(ChatInlineIcons.HEAD_SLOT_WIDTH
-                        + LostTalesUiCornerMark.OVERHANG_X,
-                ChatInlineIcons.PRESENCE_HEAD_SLOT_WIDTH);
-        assertTrue(ChatInlineIcons.PRESENCE_HEAD_SLOT_WIDTH
-                > ChatInlineIcons.HEAD_SLOT_WIDTH);
     }
 
     /**

@@ -10,6 +10,8 @@ public enum CharacterOperationType {
     LORE_CLAIM(5, "lore_claim"),
     LORE_RELEASE(6, "lore_release"),
     PROFILE_UPDATE(7, "profile_update"),
+    LOOK_UPDATE(8, "look_update"),
+    RESTORE(9, "restore"),
     UNKNOWN(255, "unknown");
 
     private final int networkId;

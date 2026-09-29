@@ -35,7 +35,6 @@ public final class CharacterChestTypeMigrationTest {
         RoleplayCharacter loaded = CharacterNbtCodec.readCharacterRecord(record, OWNER);
 
         assertNotNull(loaded);
-        assertEquals(RoleplayCharacter.CURRENT_DATA_VERSION, loaded.getDataVersion());
         assertEquals(CharacterChestTypeRegistry.ROUNDED_MEDIUM, loaded.getChestTypeId());
         assertEquals(CharacterBodyTypeRegistry.SLIM, loaded.getBodyTypeId());
     }

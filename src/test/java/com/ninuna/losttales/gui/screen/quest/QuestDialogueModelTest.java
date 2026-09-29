@@ -4,9 +4,7 @@ import java.util.Arrays;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
 
 /**
  * A conversation about a quest: what is said, what may be said back, and
@@ -36,16 +34,13 @@ public final class QuestDialogueModelTest {
         assertEquals("Four sticks would do it.", model.getSaid());
         assertEquals("I'll do it.",
                 model.labelOf(QuestDialogueModel.Reply.ACCEPT));
-        assertEquals(QuestDialogueModel.Mood.OFFER, model.getMood());
     }
 
     @Test
     public void askingForMoreSaysTheFurtherLineAndIsNotOfferedTwice() {
         QuestDialogueModel model = offer("Any dry stick will do.");
-        assertFalse(model.isToldMore());
         QuestDialogueModel told = model.told();
 
-        assertTrue(told.isToldMore());
         assertEquals("Any dry stick will do.", told.getSaid());
         assertEquals(Arrays.asList(QuestDialogueModel.Reply.ACCEPT,
                         QuestDialogueModel.Reply.DECLINE),
@@ -95,15 +90,6 @@ public final class QuestDialogueModelTest {
     }
 
     @Test
-    public void onlyAskingForMoreKeepsTheConversationOpen() {
-        assertFalse(QuestDialogueModel.ends(QuestDialogueModel.Reply.MORE));
-        assertTrue(QuestDialogueModel.ends(QuestDialogueModel.Reply.ACCEPT));
-        assertTrue(QuestDialogueModel.ends(QuestDialogueModel.Reply.DECLINE));
-        assertTrue(QuestDialogueModel.ends(QuestDialogueModel.Reply.HAND_OVER));
-        assertTrue(QuestDialogueModel.ends(QuestDialogueModel.Reply.LEAVE));
-    }
-
-    @Test
     public void whatTheScreenShowsIsWhatItWasGiven() {
         QuestDialogueModel model = offer("more");
         assertEquals("Nia", model.getSpeaker());
@@ -115,7 +101,6 @@ public final class QuestDialogueModelTest {
                 null, null, null, null, null);
         assertEquals("", bare.getSpeaker());
         assertEquals("", bare.getSaid());
-        assertEquals(QuestDialogueModel.Mood.OFFER, bare.getMood());
         assertEquals("", bare.labelOf(null));
     }
 }

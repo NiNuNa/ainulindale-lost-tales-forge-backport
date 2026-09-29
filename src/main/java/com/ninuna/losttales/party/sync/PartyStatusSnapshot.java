@@ -14,25 +14,25 @@ public final class PartyStatusSnapshot {
 
     private final UUID ownerId;
     private final long synchronizationSequence;
-    private final UUID activeCharacterId;
+    private final UUID activeIdentityId;
     private final UUID partyId;
     private final long partyRevision;
     private final List<PartyMemberStatusSnapshot> memberStatuses;
 
     public PartyStatusSnapshot(UUID ownerId,
                                long synchronizationSequence,
-                               UUID activeCharacterId,
+                               UUID activeIdentityId,
                                UUID partyId,
                                long partyRevision,
                                List<PartyMemberStatusSnapshot> memberStatuses) {
         if (ownerId == null || synchronizationSequence <= 0L
-                || activeCharacterId == null) {
+                || activeIdentityId == null) {
             throw new IllegalArgumentException(
                     "owner, active character, and sequence are required");
         }
         this.ownerId = ownerId;
         this.synchronizationSequence = synchronizationSequence;
-        this.activeCharacterId = activeCharacterId;
+        this.activeIdentityId = activeIdentityId;
 
         if (partyId == null) {
             if (partyRevision != -1L
@@ -51,18 +51,18 @@ public final class PartyStatusSnapshot {
 
         ArrayList<PartyMemberStatusSnapshot> accepted =
                 new ArrayList<PartyMemberStatusSnapshot>();
-        Set<UUID> characterIds = new HashSet<UUID>();
+        Set<UUID> identityIds = new HashSet<UUID>();
         if (memberStatuses != null) {
             for (PartyMemberStatusSnapshot status : memberStatuses) {
                 if (status == null || accepted.size() >= Party.MAX_MEMBERS
-                        || !characterIds.add(status.getCharacterId())) {
+                        || !identityIds.add(status.getIdentityId())) {
                     continue;
                 }
                 accepted.add(status);
             }
         }
         if (accepted.isEmpty()
-                || !characterIds.contains(activeCharacterId)) {
+                || !identityIds.contains(activeIdentityId)) {
             throw new IllegalArgumentException(
                     "party status must include the active character");
         }
@@ -73,8 +73,8 @@ public final class PartyStatusSnapshot {
 
     public static PartyStatusSnapshot noParty(UUID ownerId,
                                               long sequence,
-                                              UUID activeCharacterId) {
-        return new PartyStatusSnapshot(ownerId, sequence, activeCharacterId,
+                                              UUID activeIdentityId) {
+        return new PartyStatusSnapshot(ownerId, sequence, activeIdentityId,
                 null, -1L,
                 Collections.<PartyMemberStatusSnapshot>emptyList());
     }
@@ -87,8 +87,8 @@ public final class PartyStatusSnapshot {
         return this.synchronizationSequence;
     }
 
-    public UUID getActiveCharacterId() {
-        return this.activeCharacterId;
+    public UUID getActiveIdentityId() {
+        return this.activeIdentityId;
     }
 
     public UUID getPartyId() {
@@ -107,12 +107,12 @@ public final class PartyStatusSnapshot {
         return this.memberStatuses;
     }
 
-    public PartyMemberStatusSnapshot getMemberStatus(UUID characterId) {
-        if (characterId == null) {
+    public PartyMemberStatusSnapshot getMemberStatus(UUID identityId) {
+        if (identityId == null) {
             return null;
         }
         for (PartyMemberStatusSnapshot status : this.memberStatuses) {
-            if (characterId.equals(status.getCharacterId())) {
+            if (identityId.equals(status.getIdentityId())) {
                 return status;
             }
         }
@@ -123,7 +123,7 @@ public final class PartyStatusSnapshot {
     public boolean hasSameContent(PartyStatusSnapshot other) {
         if (other == null
                 || !this.ownerId.equals(other.ownerId)
-                || !this.activeCharacterId.equals(other.activeCharacterId)
+                || !this.activeIdentityId.equals(other.activeIdentityId)
                 || !equal(this.partyId, other.partyId)
                 || this.partyRevision != other.partyRevision
                 || this.memberStatuses.size()

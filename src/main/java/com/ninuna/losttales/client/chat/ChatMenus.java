@@ -1011,7 +1011,7 @@ final class ChatMenus {
         /** The field, the name and the rows, for the tab typed in now. */
         @Override
         public void rebuild(MenuWindow menu) {
-            boolean statusOnly = !ClientChatIdentities.speaksInCharacter(
+            boolean statusOnly = !ClientChatIdentities.picksIdentity(
                     ClientChatChannelState.getSelected());
             if (statusOnly && menu.hasField()) {
                 menu.closeField();

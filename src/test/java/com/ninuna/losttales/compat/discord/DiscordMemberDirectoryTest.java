@@ -136,6 +136,20 @@ public class DiscordMemberDirectoryTest {
                 DiscordMemberDirectory.MAX_RETRY_MILLIS));
     }
 
+    /** An ask the bridge was too busy to send is made again a moment later, once. */
+    @Test
+    public void anAskNotSentIsMadeAgainInAMoment() {
+        this.directory.onEvent("GUILD_CREATE", guild("[]", "[]", "[]", 900, true), 0L);
+        this.directory.askAgainLater(GUILD, 1000L);
+        this.directory.askAgainLater(GUILD, 3000L);
+        assertTrue(this.directory.dueRequests(5999L).isEmpty());
+        assertEquals(Collections.singletonList(GUILD), this.directory.dueRequests(
+                1000L + DiscordMemberDirectory.ASK_AGAIN_MILLIS));
+        this.directory.askAgainLater("404", 0L);
+        assertTrue("a server not known is not asked for",
+                this.directory.dueRequests(Long.MAX_VALUE).isEmpty());
+    }
+
     /** Discord's own permission rules, in its order. */
     @Test
     public void whoCanSeeFollowsDiscordsRules() {

@@ -12,7 +12,6 @@ import org.junit.Test;
 import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -56,7 +55,6 @@ public final class PlayerAppearanceResolverTest {
         assertNotNull(resolved);
         assertEquals(CharacterBodyModelRegistry.LOTR_HUMAN, resolved.getModelId());
         assertEquals(CharacterSkinLayout.LOTR_64X64, resolved.getLayout());
-        assertTrue(resolved.hasChest());
         assertEquals(CharacterChestTypeRegistry.ROUNDED_MEDIUM, resolved.getChestTypeId());
         assertEquals("lotr:human|lotr_64x64|losttales:rounded_medium|losttales:slim",
                 resolved.getRendererKey());
@@ -70,7 +68,7 @@ public final class PlayerAppearanceResolverTest {
                 PLAYER, unchosen(CharacterRaceRegistry.HUMAN,
                         CharacterGenderRegistry.MALE, "losttales:human_bree_male_0"));
         assertNotNull(resolved);
-        assertFalse(resolved.hasChest());
+        assertEquals(CharacterChestTypeRegistry.NONE, resolved.getChestTypeId());
         assertEquals("lotr:human|lotr_64x64|losttales:none|losttales:wide",
                 resolved.getRendererKey());
 
@@ -90,7 +88,7 @@ public final class PlayerAppearanceResolverTest {
         assertNotNull(resolved);
         assertEquals(CharacterBodyModelRegistry.LOTR_ORC, resolved.getModelId());
         assertEquals(CharacterSkinLayout.LOTR_64X32, resolved.getLayout());
-        assertFalse(resolved.hasChest());
+        assertEquals(CharacterChestTypeRegistry.NONE, resolved.getChestTypeId());
         assertEquals("losttales:wide", resolved.getBodyTypeId());
         assertEquals(CharacterRaceRegistry.get(CharacterRaceRegistry.ORC).getRendererScale(),
                 resolved.getRendererScale(), 0.0F);
@@ -99,7 +97,6 @@ public final class PlayerAppearanceResolverTest {
                 PLAYER, unchosen(CharacterRaceRegistry.HALF_TROLL,
                         CharacterGenderRegistry.FEMALE, ""));
         assertNotNull(troll);
-        assertEquals(CharacterRaceRegistry.HALF_TROLL, troll.getRaceId());
         // No chest for a unisex body; the arm width still follows the record.
         assertEquals("lotr:half_troll|lotr_64x64|losttales:none|losttales:slim",
                 troll.getRendererKey());
@@ -129,7 +126,7 @@ public final class PlayerAppearanceResolverTest {
         assertEquals("losttales:slim", resolved.getBodyTypeId());
         assertTrue(resolved.usesAccountSkin());
         assertNull(resolved.getTexture());
-        assertFalse(resolved.hasChest());
+        assertEquals(CharacterChestTypeRegistry.NONE, resolved.getChestTypeId());
         assertEquals("losttales:player|minecraft_64x64|losttales:none|losttales:slim",
                 resolved.getRendererKey());
 
@@ -151,13 +148,12 @@ public final class PlayerAppearanceResolverTest {
                 PLAYER, CharacterAppearance.forAccount(PLAYER, "Steve",
                         "losttales:slim", true, 0));
         assertNotNull(resolved);
-        assertEquals(CharacterRaceRegistry.HUMAN, resolved.getRaceId());
         assertEquals(CharacterBodyModelRegistry.LOSTTALES_PLAYER, resolved.getModelId());
         assertEquals(CharacterSkinLayout.MINECRAFT_64X64, resolved.getLayout());
         assertEquals("losttales:slim", resolved.getBodyTypeId());
         assertTrue(resolved.usesAccountSkin());
         assertNull(resolved.getTexture());
-        assertFalse(resolved.hasChest());
+        assertEquals(CharacterChestTypeRegistry.NONE, resolved.getChestTypeId());
         assertEquals(1.0F, resolved.getRendererScale(), 0.0F);
     }
 
@@ -170,7 +166,7 @@ public final class PlayerAppearanceResolverTest {
         assertEquals(CharacterBodyModelRegistry.LOTR_ELF, elf.getModelId());
         assertEquals(CharacterSkinLayout.MINECRAFT_64X64, elf.getLayout());
         assertTrue(elf.usesAccountSkin());
-        assertTrue(elf.hasChest());
+        assertEquals(CharacterChestTypeRegistry.ROUNDED_MEDIUM, elf.getChestTypeId());
         assertEquals("lotr:elf|minecraft_64x64|losttales:rounded_medium|losttales:slim",
                 elf.getRendererKey());
 

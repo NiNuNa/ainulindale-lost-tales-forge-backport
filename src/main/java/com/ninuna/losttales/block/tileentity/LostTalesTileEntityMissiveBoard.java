@@ -207,34 +207,8 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInve
         this.markDirtyAndSync();
     }
 
-    public long getLastGenerationWorldTime() {
-        return this.lastGenerationWorldTime;
-    }
-
-    public long getNextGenerationWorldTime() {
-        return this.nextGenerationWorldTime;
-    }
-
-    public long getGenerationIntervalTicks() {
-        return this.generationIntervalTicks;
-    }
-
-    public void setGenerationIntervalTicks(long generationIntervalTicks) {
-        this.generationIntervalTicks = generationIntervalTicks > 0L ? generationIntervalTicks : getConfiguredGenerationIntervalTicks();
-        this.markDirtyAndSync();
-    }
-
-    public int getMinAvailableMissives() {
-        return this.minAvailableMissives;
-    }
-
     public int getMaxAvailableMissives() {
         return this.maxAvailableMissives;
-    }
-
-    public void setMissiveRange(int minAvailableMissives, int maxAvailableMissives) {
-        this.applyMissiveRange(minAvailableMissives, maxAvailableMissives);
-        this.markDirtyAndSync();
     }
 
     private void applyConfiguredDefaults() {

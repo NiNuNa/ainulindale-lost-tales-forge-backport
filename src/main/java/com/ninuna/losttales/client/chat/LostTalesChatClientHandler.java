@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatSystemLineClassifier;
+import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.config.LostTalesConfig;
 import cpw.mods.fml.common.FMLCommonHandler;
@@ -85,6 +86,15 @@ public final class LostTalesChatClientHandler {
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void routeSystemLine(ClientChatReceivedEvent event) {
         if (event == null || event.isCanceled() || event.message == null) {
+            return;
+        }
+        // A server's answer to a page's action stands over that page's
+        // bar while the page is shown; the chat keeps to conversation.
+        if (event.message instanceof ChatComponentTranslation
+                && WindowPages.claimLine(
+                        ((ChatComponentTranslation)event.message).getKey(),
+                        event.message.getUnformattedText())) {
+            event.setCanceled(true);
             return;
         }
         if (!LostTalesConfig.showQuestChatFeedback

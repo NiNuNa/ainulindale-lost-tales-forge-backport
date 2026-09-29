@@ -311,7 +311,7 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
 
     /**
      * {@code create <id> [option ...]} and {@code edit <id> <option ...>}
-     * take the options of a config entry ({@code name:Text color:RRGGBB
+     * take the options of a config entry ({@code name:Text colour:RRGGBB
      * mention:true rank:15 op:1 faction:GONDOR@gondor.knight
      * grant:chat.moderate icon:emoji:bee desc:Text}), space-separated;
      * an edit keeps
@@ -322,7 +322,7 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
         if (args.length < 2 || (!create && args.length < 3)) {
             LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY + "/losttales role "
                     + (create ? "create" : "edit") + " <id> [name:<text>] "
-                    + "[color:<RRGGBB>] [mention:<true|false>] [rank:<n>] [op:<level>] "
+                    + "[colour:<RRGGBB>] [mention:<true|false>] [rank:<n>] [op:<level>] "
                     + "[faction:<FACTION>@<rank>] [grant:<capability>] "
                     + "[icon:<emoji:name|item:id>] [desc:<text>]");
             return;
@@ -537,7 +537,7 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
         LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY
                 + "/losttales role unassign <role> <player|character>");
         LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY
-                + "/losttales role create <id> [name:<text>] [color:<RRGGBB>] "
+                + "/losttales role create <id> [name:<text>] [colour:<RRGGBB>] "
                 + "[mention:<true|false>] [rank:<n>] [op:<level>] [faction:<FACTION>@<rank>] "
                 + "[grant:<capability>] [icon:<emoji:name|item:id>] [desc:<text>]");
         LostTalesCommandConfig.send(sender, EnumChatFormatting.GRAY

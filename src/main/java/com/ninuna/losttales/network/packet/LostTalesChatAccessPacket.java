@@ -29,8 +29,7 @@ import java.util.UUID;
  * a client draws from the server's word alone. Sent on login and again
  * whenever something in it changes or a refused message makes it worth
  * saying again; the server still checks on every request regardless.
- * Every fact here is presentation: the Operator channel's send gate, the
- * role mask this player holds (what lets a client notice {@code @Operator}
+ * Every fact here is presentation: the role mask this player holds (what lets a client notice {@code @Operator}
  * was addressed to it), the <em>role roster</em> of every online account
  * holding a role with its mask (account names and role marks are public
  * on the tab list, so nothing here widens what a client can learn), the
@@ -115,7 +114,6 @@ public final class LostTalesChatAccessPacket implements IMessage {
         return Collections.unmodifiableList(ids);
     }
 
-    private boolean operatorAccess;
     private int roleMask;
     private List<RoleHolder> roleHolders = Collections.emptyList();
     /**
@@ -183,7 +181,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
     public LostTalesChatAccessPacket() {}
 
     /** The whole statement, see the class comment. */
-    public LostTalesChatAccessPacket(boolean operatorAccess, int roleMask,
+    public LostTalesChatAccessPacket(int roleMask,
                                      List<RoleHolder> roleHolders,
                                      List<UUID> mutedSenders,
                                      List<ChatAccountRole> catalog,
@@ -220,7 +218,6 @@ public final class LostTalesChatAccessPacket implements IMessage {
             }
         }
         this.capabilities = Collections.unmodifiableList(held);
-        this.operatorAccess = operatorAccess;
         this.canModerate = canModerate;
         this.canEditServerConfig = canEditServerConfig;
         this.roleMask = roleMask;
@@ -314,7 +311,6 @@ public final class LostTalesChatAccessPacket implements IMessage {
                 throw new LostTalesPacketCodec.DecodeException(
                         "invalid chat access packet size");
             }
-            this.operatorAccess = buffer.readBoolean();
             int roleMask = buffer.readInt();
             int holderCount = buffer.readUnsignedShort();
             if (holderCount > MAX_HOLDERS) {
@@ -514,7 +510,6 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.discordStatuses = statuses;
         } catch (RuntimeException exception) {
             this.malformed = true;
-            this.operatorAccess = false;
             this.roleMask = 0;
             this.roleHolders = Collections.emptyList();
             this.mutedSenders = Collections.emptyList();
@@ -621,7 +616,6 @@ public final class LostTalesChatAccessPacket implements IMessage {
 
     @Override
     public void toBytes(ByteBuf buffer) {
-        buffer.writeBoolean(this.operatorAccess);
         buffer.writeInt(this.roleMask);
         buffer.writeShort(this.roleHolders.size());
         for (RoleHolder holder : this.roleHolders) {
@@ -761,7 +755,6 @@ public final class LostTalesChatAccessPacket implements IMessage {
                 && key.matches("[a-z0-9_]+");
     }
 
-    public boolean hasOperatorAccess() { return this.operatorAccess; }
     /** The roles the server says this player holds, as a bit set. */
     public int getRoleMask() { return this.roleMask; }
     /** Every online account holding a role, as the server states it. */

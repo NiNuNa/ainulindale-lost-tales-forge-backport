@@ -7,7 +7,6 @@ import org.junit.Test;
 import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -26,8 +25,6 @@ public final class PlayableIdentityTest {
         assertNull(account.getCharacterId());
         assertEquals(OWNER, account.getGameplayId());
         assertEquals(OWNER, account.getOwnerId());
-        assertTrue(account.matchesGameplayId(OWNER));
-        assertFalse(account.matchesGameplayId(CHARACTER));
     }
 
 

@@ -20,7 +20,6 @@ import java.util.UUID;
 public final class CharacterIndex {
 
     private final Map<UUID, RoleplayCharacter> characters;
-    private final Map<UUID, CharacterRoster> rostersByCharacter;
     private final Set<UUID> ambiguousCharacterIds;
     /**
      * The players who own a roster. A personal marker may be filed under
@@ -30,18 +29,15 @@ public final class CharacterIndex {
     private final Set<UUID> rosterOwnerIds;
 
     private CharacterIndex(Map<UUID, RoleplayCharacter> characters,
-                           Map<UUID, CharacterRoster> rostersByCharacter,
                            Set<UUID> ambiguousCharacterIds,
                            Set<UUID> rosterOwnerIds) {
         this.characters = Collections.unmodifiableMap(characters);
-        this.rostersByCharacter = Collections.unmodifiableMap(rostersByCharacter);
         this.ambiguousCharacterIds = Collections.unmodifiableSet(ambiguousCharacterIds);
         this.rosterOwnerIds = Collections.unmodifiableSet(rosterOwnerIds);
     }
 
     static CharacterIndex build(Collection<CharacterRoster> rosters) {
         Map<UUID, RoleplayCharacter> characters = new HashMap<UUID, RoleplayCharacter>();
-        Map<UUID, CharacterRoster> rostersByCharacter = new HashMap<UUID, CharacterRoster>();
         Set<UUID> ambiguous = new HashSet<UUID>();
         Set<UUID> rosterOwners = new HashSet<UUID>();
         for (CharacterRoster roster : rosters) {
@@ -58,25 +54,18 @@ public final class CharacterIndex {
                 }
                 if (characters.containsKey(characterId)) {
                     characters.remove(characterId);
-                    rostersByCharacter.remove(characterId);
                     ambiguous.add(characterId);
                 } else {
                     characters.put(characterId, character);
-                    rostersByCharacter.put(characterId, roster);
                 }
             }
         }
-        return new CharacterIndex(characters, rostersByCharacter, ambiguous, rosterOwners);
+        return new CharacterIndex(characters, ambiguous, rosterOwners);
     }
 
     /** The character with this id, or null when there is none or more than one. */
     public RoleplayCharacter find(UUID characterId) {
         return characterId == null ? null : this.characters.get(characterId);
-    }
-
-    /** The roster holding the character, or null as {@link #find}. */
-    public CharacterRoster rosterOf(UUID characterId) {
-        return characterId == null ? null : this.rostersByCharacter.get(characterId);
     }
 
     /** Whether the id is held by more than one roster. */

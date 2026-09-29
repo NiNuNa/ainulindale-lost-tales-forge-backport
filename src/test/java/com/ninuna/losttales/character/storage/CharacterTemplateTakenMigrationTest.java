@@ -28,7 +28,7 @@ public final class CharacterTemplateTakenMigrationTest {
         NBTTagCompound root = new NBTTagCompound();
         CharacterRoster roster = new CharacterRoster(OWNER);
         assertTrue(roster.markTemplateTaken());
-        CharacterNbtCodec.write(root, Collections.singletonList(roster));
+        CharacterNbtCodec.write(root, Collections.singletonList(roster), Collections.<NBTTagCompound>emptyList());
         rosterTag(root).removeTag("TemplateTaken");
 
         assertFalse(readRoster(root).isTemplateTaken());
@@ -42,7 +42,7 @@ public final class CharacterTemplateTakenMigrationTest {
         // Taking it twice is not a second reading.
         assertFalse(roster.markTemplateTaken());
         NBTTagCompound root = new NBTTagCompound();
-        CharacterNbtCodec.write(root, Collections.singletonList(roster));
+        CharacterNbtCodec.write(root, Collections.singletonList(roster), Collections.<NBTTagCompound>emptyList());
 
         assertTrue(readRoster(root).isTemplateTaken());
     }
@@ -51,7 +51,7 @@ public final class CharacterTemplateTakenMigrationTest {
     public void anUntakenTemplateSurvivesTheRoundTrip() {
         NBTTagCompound root = new NBTTagCompound();
         CharacterNbtCodec.write(root,
-                Collections.singletonList(new CharacterRoster(OWNER)));
+                Collections.singletonList(new CharacterRoster(OWNER)), Collections.<NBTTagCompound>emptyList());
 
         assertFalse(readRoster(root).isTemplateTaken());
     }

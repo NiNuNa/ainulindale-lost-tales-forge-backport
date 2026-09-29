@@ -89,7 +89,7 @@ public final class ChatStackRowsTest {
         int lines = 30;
         int rows = lines + 1;
         double room = 10.0D;
-        ClientChatChannelViews.scroll(tab, 1000, rows, room);
+        scroll(tab, 1000, rows, room);
         double ceiling = ClientChatChannelViews.getScroll(tab, rows, room);
         // The topmost row is the oldest line, pushed up by the divider.
         int topRow = LostTalesChatOverlayRenderer.rowOfLine(lines - 1, 0);
@@ -103,4 +103,9 @@ public final class ChatStackRowsTest {
         assertTrue(lineCeiling + room - 1 < topRow);
     }
 
+    /** Scrolls a view by whole lines the way the wheel does: from where it stands. */
+    private static void scroll(ChatTab tab, int lines, int totalLines, double roomLines) {
+        double current = ClientChatChannelViews.getScroll(tab, totalLines, roomLines);
+        ClientChatChannelViews.scrollTo(tab, current + lines, totalLines, roomLines);
+    }
 }

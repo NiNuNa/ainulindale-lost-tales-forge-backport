@@ -70,10 +70,10 @@ public final class ClientChatTypingStateTest {
                 3L + ClientChatTypingState.TTL_NANOS).isEmpty());
         // Whisper typists are filed under the partner's tab, by name,
         // case-insensitively like the tab itself.
-        ClientChatTypingState.apply(ChatTab.whisper("bilbo"), "Bilbo",
+        ClientChatTypingState.apply(ChatTab.whisper("bilbo", ""), "Bilbo",
                 true, 0L);
         assertEquals(Collections.singletonList("Bilbo"),
-                ClientChatTypingState.namesTyping(ChatTab.whisper("Bilbo"),
+                ClientChatTypingState.namesTyping(ChatTab.whisper("Bilbo", ""),
                         1L));
         ClientChatTypingState.clear();
         assertTrue(ClientChatTypingState.namesTyping(party, 1L).isEmpty());

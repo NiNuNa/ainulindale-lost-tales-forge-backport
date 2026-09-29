@@ -20,7 +20,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Public-API-only adapter for the first character-owned LOTR progression slice.
+ * Public-API-only adapter for the LOTR progression each character keeps of
+ * its own.
  *
  * <p>The allowlist is deliberately narrower than LOTRPlayerData.save(). Apply
  * starts with the live account blob and overlays only these keys, preserving

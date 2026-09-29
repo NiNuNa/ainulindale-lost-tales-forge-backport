@@ -4,7 +4,6 @@ package com.ninuna.losttales.client.camera;
 public final class CameraPresetDefinition {
     public static final int CURRENT_DATA_VERSION = 1;
 
-    private final int dataVersion;
     private final String id;
     private final String name;
     private final CameraPreset preset;
@@ -20,14 +19,9 @@ public final class CameraPresetDefinition {
             throw new IllegalArgumentException(
                     "id, name, and preset are required");
         }
-        this.dataVersion = dataVersion;
         this.id = id;
         this.name = name;
         this.preset = preset;
-    }
-
-    public int getDataVersion() {
-        return dataVersion;
     }
 
     public String getId() {

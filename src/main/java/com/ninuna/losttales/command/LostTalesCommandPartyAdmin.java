@@ -1,7 +1,9 @@
 package com.ninuna.losttales.command;
 
 import com.ninuna.losttales.event.LostTalesMobAggroEventHandler;
+import com.ninuna.losttales.party.server.PartyIntegrityReport;
 import com.ninuna.losttales.party.server.PartyService;
+import com.ninuna.losttales.party.server.PartySyncManager;
 import com.ninuna.losttales.party.storage.PartyGoHereMarkerStorage;
 import com.ninuna.losttales.party.storage.PartyGoHereMarkerWorldData;
 import com.ninuna.losttales.party.storage.PartyInvitationStorage;
@@ -16,7 +18,12 @@ import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 
-/** Operator-only diagnostics and conservative repair hooks for party state. */
+/**
+ * The party stores for an operator: status counts them, validate says what
+ * no longer stands without changing anything, repair removes it (members,
+ * stale invitations, go-here markers), clearcombat forgets the combat
+ * markers.
+ */
 public final class LostTalesCommandPartyAdmin extends LostTalesCommandBase {
 
     public LostTalesCommandPartyAdmin() {
@@ -48,18 +55,28 @@ public final class LostTalesCommandPartyAdmin extends LostTalesCommandBase {
         if ("status".equalsIgnoreCase(action) || "dump".equalsIgnoreCase(action)) {
             reportStatus(sender, world);
         } else if ("validate".equalsIgnoreCase(action)) {
-            boolean valid = PartyService.getInstance().ensureIntegrity(world);
-            send(sender, (valid ? EnumChatFormatting.GREEN : EnumChatFormatting.RED)
-                    + "Party integrity validation " + (valid ? "completed." : "failed closed; inspect read-only/newer-version data."));
+            PartyIntegrityReport report =
+                    PartyService.getInstance().inspectIntegrity(world);
+            if (report == null) {
+                send(sender, EnumChatFormatting.RED + "Party stores cannot be checked: one is unavailable or read-only.");
+            } else if (report.isClean()) {
+                send(sender, EnumChatFormatting.GREEN + "Party stores are sound; nothing to repair.");
+            } else {
+                send(sender, EnumChatFormatting.GOLD + "Repair would remove " + describe(report)
+                        + ". Run /losttales party repair to remove them.");
+            }
             reportStatus(sender, world);
         } else if ("repair".equalsIgnoreCase(action)) {
-            boolean valid = PartyService.getInstance().ensureIntegrity(world);
-            int removed = valid ? PartyService.getInstance().pruneInvalidInvitations(world) : -1;
-            if (!valid || removed < 0) {
-                send(sender, EnumChatFormatting.RED + "Party repair refused because one or more stores are unavailable or read-only.");
+            PartyIntegrityReport report =
+                    PartyService.getInstance().repairIntegrity(world);
+            if (report == null) {
+                send(sender, EnumChatFormatting.RED + "Party repair refused: a store is unavailable or read-only.");
             } else {
-                send(sender, EnumChatFormatting.GREEN + "Party repair completed; removed " + removed
-                        + " stale invitation/marker reference(s). Structural party repairs are quarantined by the existing loader.");
+                send(sender, EnumChatFormatting.GREEN + "Party repair removed " + describe(report)
+                        + ". Removed members are kept in the quarantine.");
+                if (!report.isClean()) {
+                    PartySyncManager.sendStateToEveryone();
+                }
             }
             reportStatus(sender, world);
         } else if ("clearcombat".equalsIgnoreCase(action)) {
@@ -68,6 +85,12 @@ public final class LostTalesCommandPartyAdmin extends LostTalesCommandBase {
         } else {
             sendUsage(sender);
         }
+    }
+
+    private static String describe(PartyIntegrityReport report) {
+        return report.getMembers() + " member(s), "
+                + report.getInvitations() + " invitation(s) and "
+                + report.getMarkers() + " go-here marker(s)";
     }
 
     private void reportStatus(ICommandSender sender, World world) {

@@ -16,9 +16,10 @@ public final class ChatFormattingCodes {
     private ChatFormattingCodes() {}
 
     /**
-     * Removes every section-sign code — a team colour on a name, a
-     * coloured item name in a death message — from text the server
-     * built, leaving the words. Server-safe, unlike
+     * Removes every section sign, with the code letter after it, from text
+     * the server built (a team colour on a name, a coloured item name in a
+     * death message), leaving the words. A lone section sign goes too, so no
+     * run of them can put a code back together. Server-safe, unlike
      * {@code EnumChatFormatting.getTextWithoutFormattingCodes}, which is
      * client-only in 1.7.10.
      */
@@ -32,14 +33,29 @@ public final class ChatFormattingCodes {
         StringBuilder stripped = new StringBuilder(text.length());
         for (int index = 0; index < text.length(); index++) {
             char character = text.charAt(index);
-            if (character == SECTION_SIGN && index + 1 < text.length()
-                    && isFormattingCode(text.charAt(index + 1))) {
-                index++;
+            if (character == SECTION_SIGN) {
+                if (index + 1 < text.length() && isFormattingCode(text.charAt(index + 1))) {
+                    index++;
+                }
                 continue;
             }
             stripped.append(character);
         }
         return stripped.toString();
+    }
+
+    /** Whether the text holds a section sign or a control character, which no player's words may. */
+    public static boolean hasCodeOrControl(String text) {
+        if (text == null) {
+            return false;
+        }
+        for (int index = 0; index < text.length(); index++) {
+            char character = text.charAt(index);
+            if (character == SECTION_SIGN || character < 32 || character == 127) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isFormattingCode(char character) {

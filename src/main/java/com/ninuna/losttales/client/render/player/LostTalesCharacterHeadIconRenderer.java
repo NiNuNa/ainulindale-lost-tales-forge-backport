@@ -93,22 +93,6 @@ public final class LostTalesCharacterHeadIconRenderer {
 
     private LostTalesCharacterHeadIconRenderer() {}
 
-    /**
-     * Draws only a synchronized, configured roleplaying-character head.
-     * Returns false so callers can retain their native account-skin fallback.
-     */
-    public static boolean drawRoleplayHead(Minecraft minecraft,
-                                           UUID ownerId,
-                                           float x,
-                                           float y,
-                                           float size,
-                                           float brightness,
-                                           float alpha) {
-        ResolvedHead head = resolveConfiguredHead(ownerId);
-        return head != null && drawResolvedHead(
-                minecraft, head, x, y, size, brightness, alpha);
-    }
-
     /** Draws a roleplaying head, falling back to the account skin if needed. */
     public static boolean drawHead(Minecraft minecraft,
                                    UUID ownerId,
@@ -150,16 +134,6 @@ public final class LostTalesCharacterHeadIconRenderer {
         return drawResolvedHead(minecraft,
                 resolveAccountHead(minecraft, ownerId),
                 x, y, size, brightness, alpha);
-    }
-
-    /** Draws only the Minecraft account skin under a full colour tint. */
-    public static boolean drawTintedAccountHead(
-            Minecraft minecraft, UUID ownerId,
-            float x, float y, float size,
-            float red, float green, float blue, float alpha) {
-        return drawResolvedHead(minecraft,
-                resolveAccountHead(minecraft, ownerId),
-                x, y, size, red, green, blue, alpha);
     }
 
     /** Account-skin shadow without enlarging the outer layer. */

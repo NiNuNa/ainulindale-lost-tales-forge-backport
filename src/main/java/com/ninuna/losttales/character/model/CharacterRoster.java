@@ -15,8 +15,8 @@ import java.util.UUID;
  * Persistent roster owned by one Minecraft account UUID.
  *
  * Mutating methods enforce structural invariants but do not implement gameplay
- * permissions or creation rules. Those belong in the server-side character
- * service introduced in the next implementation stage.
+ * permissions or creation rules; those are the server-side character
+ * service's ({@code CharacterService}).
  */
 public class CharacterRoster {
 
@@ -24,10 +24,10 @@ public class CharacterRoster {
     public static final int MAX_SLOTS = 9;
     public static final int INITIAL_UNLOCKED_SLOTS = 1;
     /**
-     * The slot the account's own identity sits in. It is not one of the
-     * nine a player fills: the default character is always there, is
-     * shown before them, and does not spend a slot they could otherwise
-     * make someone in. Sorting by slot puts it first for that reason.
+     * The slot the account character sits in. It is not one of the nine a
+     * player fills: the account character is always there, is shown
+     * before them, and does not spend a slot they could otherwise make
+     * someone in. Sorting by slot puts it first for that reason.
      */
     public static final int DEFAULT_SLOT_INDEX = -1;
 
@@ -38,18 +38,17 @@ public class CharacterRoster {
     private int unlockedSlotCount;
     private UUID activeCharacterId;
     private long revision;
-    private int dataVersion;
     /** The cape the account wears when played as itself. */
     private boolean accountShowMinecraftCape = RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE;
     private int accountCosmeticCapeId = RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID;
     private boolean templateTaken;
 
     public CharacterRoster(UUID ownerId) {
-        this(ownerId, INITIAL_UNLOCKED_SLOTS, null, 0L, CURRENT_DATA_VERSION);
+        this(ownerId, INITIAL_UNLOCKED_SLOTS, null, 0L);
     }
 
     public CharacterRoster(UUID ownerId, int unlockedSlotCount, UUID activeCharacterId,
-                           long revision, int dataVersion) {
+                           long revision) {
         if (ownerId == null) {
             throw new IllegalArgumentException("ownerId must not be null");
         }
@@ -57,7 +56,6 @@ public class CharacterRoster {
         this.unlockedSlotCount = clampUnlockedSlotCount(unlockedSlotCount);
         this.activeCharacterId = activeCharacterId;
         this.revision = Math.max(0L, revision);
-        this.dataVersion = dataVersion <= 0 ? CURRENT_DATA_VERSION : dataVersion;
     }
 
     public UUID getOwnerId() {
@@ -128,22 +126,18 @@ public class CharacterRoster {
         return this.revision;
     }
 
-    public int getDataVersion() {
-        return this.dataVersion;
-    }
-
     /**
-     * Whether this world has taken the account's template.
+     * Whether this world has taken the account character's look.
      *
-     * <p>An account keeps a template on its own installation: who it
-     * wants its default character to start as. A world reads it once, on
-     * the login where it makes that character, and never again — from
-     * then on the character is this world's, and what the player does to
-     * the template elsewhere is about the next world, not this one.</p>
+     * <p>An account keeps the account character's look on its own
+     * installation, written in the character room. A world reads it once,
+     * on the login where it makes the account character, and never again —
+     * from then on the character is this world's, and what the player
+     * does to the look elsewhere is about the next world, not this one.</p>
      *
      * <p>False for a roster that carries no answer, so such a world takes
-     * the template the next time the player joins: the same one reading,
-     * one login later.</p>
+     * the look the next time the player joins: the same one reading, one
+     * login later.</p>
      */
     public boolean isTemplateTaken() {
         return this.templateTaken;
@@ -179,20 +173,16 @@ public class CharacterRoster {
         return changed;
     }
 
-    public int getCharacterCount() {
-        return this.charactersById.size();
-    }
-
     public RoleplayCharacter getCharacter(UUID characterId) {
         return characterId == null ? null : this.charactersById.get(characterId);
     }
 
-    /** The account's own identity, or null before the world has made it. */
+    /** The account character, or null before the world has made it. */
     public RoleplayCharacter getDefaultCharacter() {
         return this.charactersBySlot.get(Integer.valueOf(DEFAULT_SLOT_INDEX));
     }
 
-    /** How many of the nine slots are filled; the default is not one. */
+    /** How many of the nine slots are filled; the account character's is not one. */
     public int roleplayCharacterCount() {
         int count = 0;
         for (RoleplayCharacter character : this.charactersById.values()) {
@@ -256,7 +246,7 @@ public class CharacterRoster {
         if (this.charactersBySlot.containsKey(Integer.valueOf(character.getSlotIndex()))) {
             return false;
         }
-        // The default character is not one of the nine: it is counted
+        // The account character is not one of the nine: it is counted
         // neither against them nor by the slot it unlocks below.
         if (!character.isDefault() && roleplayCharacterCount() >= MAX_SLOTS) {
             return false;
@@ -285,7 +275,7 @@ public class CharacterRoster {
 
     /**
      * Whether a slot index names a place a character can be stored. The
-     * default character's slot is one of them, which is why this is not
+     * account character's slot is one of them, which is why this is not
      * the test for a slot something may be created in.
      */
     public static boolean isValidSlotIndex(int slotIndex) {
@@ -295,7 +285,7 @@ public class CharacterRoster {
 
     /**
      * Whether a slot index names a place a player may put a character
-     * they are making or claiming. The default character's slot is not
+     * they are making or claiming. The account character's slot is not
      * one: only the server mints that record, and a request naming it
      * would otherwise be answered by whether it happened to be empty.
      */

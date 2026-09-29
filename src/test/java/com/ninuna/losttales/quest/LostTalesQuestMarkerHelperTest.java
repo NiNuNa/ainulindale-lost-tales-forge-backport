@@ -8,11 +8,10 @@ import static org.junit.Assert.assertEquals;
 public final class LostTalesQuestMarkerHelperTest {
 
     @Test
-    public void aMarkerIdIsKeyedAsAPlayersQuestMarker() {
+    public void aMarkerIdIsKeyedAsItsMarkerIdentity() {
         String key = LostTalesQuestMarkerHelper.markerCanonicalKey(" bree_gate ");
 
-        assertEquals(LostTalesMapMarkerIdentity.create("bree_gate",
-                LostTalesMapMarkerIdentity.Authority.QUEST_PLAYER)
+        assertEquals(LostTalesMapMarkerIdentity.create("bree_gate")
                 .getCanonicalKey(), key);
         assertEquals(key, LostTalesQuestMarkerHelper.markerCanonicalKey("bree_gate"));
     }

@@ -68,16 +68,6 @@ final class MotionLabEditor {
         rebuild();
     }
 
-    /** The motion edited; null before one is. */
-    String id() {
-        return this.id;
-    }
-
-    /** The motion as it is edited, as its file would write it. */
-    JsonObject working() {
-        return this.working;
-    }
-
     /** The edited motion read back as a file of its own would be. */
     MotionCodec.Result read() {
         JsonObject wrapper = new JsonObject();

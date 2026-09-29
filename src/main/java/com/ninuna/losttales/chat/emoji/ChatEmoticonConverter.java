@@ -58,11 +58,6 @@ public final class ChatEmoticonConverter {
 
     private ChatEmoticonConverter() {}
 
-    /** The emoji a whole token stands for, or null. */
-    public static ChatEmoji emojiFor(String token) {
-        return token == null ? null : BY_EMOTICON.get(token);
-    }
-
     /**
      * The message with every whole-token emoticon replaced by its
      * canonical shortcode; commands and everything else are returned

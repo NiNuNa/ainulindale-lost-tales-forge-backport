@@ -110,12 +110,6 @@ public final class LostTalesThirdPersonConfig {
         readOptions(new Configuration(loadedConfigFile), true);
     }
 
-    public static void reload() {
-        if (loadedConfigFile != null) {
-            readOptions(new Configuration(loadedConfigFile), true);
-        }
-    }
-
     /**
      * Writes every camera option as its field holds it now to the file,
      * each in its shipped definition; nothing before the first load.

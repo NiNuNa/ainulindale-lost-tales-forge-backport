@@ -64,11 +64,6 @@ public final class TabMark {
         return !this.unread;
     }
 
-    /** How many pings the tile counts; zero for the sphere and for nothing. */
-    public int pingCount() {
-        return this.pings;
-    }
-
     /**
      * What the mark shows: the tile's figure for its count — one to nine,
      * or the plus past nine — or the white sphere.

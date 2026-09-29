@@ -56,9 +56,9 @@ public final class LoreCharacterOwnershipWorldDataTest {
                 released.getStatus());
         assertEquals(LoreCharacterOwnershipResult.Status.CLAIMED,
                 reclaimed.getStatus());
-        assertEquals(3L, reclaimed.getRecord().getRevision());
-        assertEquals(characterId, reclaimed.getRecord().getCharacterId());
-        assertEquals(secondOwner, reclaimed.getRecord().getOwnerId());
+        assertEquals(3L, data.getRecord(GANDALF).getRevision());
+        assertEquals(characterId, data.getRecord(GANDALF).getCharacterId());
+        assertEquals(secondOwner, data.getRecord(GANDALF).getOwnerId());
         assertEquals(1, data.getRecordCount());
     }
 
@@ -136,6 +136,33 @@ public final class LoreCharacterOwnershipWorldDataTest {
         assertEquals(0, data.getRecordCount());
     }
 
+    /**
+     * One file that cannot be read is skipped and logged as the registry
+     * loads; every other figure is claimed as ever.
+     */
+    @Test
+    public void oneBrokenFileLeavesTheOthersClaimable() throws Exception {
+        File configRoot = this.temporaryFolder.newFolder("broken_config");
+        File directory = new File(
+                configRoot, LoreCharacterRegistry.EXTERNAL_DIRECTORY);
+        assertTrue(directory.mkdirs());
+        Writer writer = new OutputStreamWriter(new FileOutputStream(
+                new File(directory, "broken.json")), StandardCharsets.UTF_8);
+        try {
+            writer.write("{ this is not a lore character");
+        } finally {
+            writer.close();
+        }
+        LoreCharacterRegistry.load(configRoot);
+        assertFalse(LoreCharacterRegistry.getLoadErrors().isEmpty());
+
+        LoreCharacterOwnershipResult claimed = createData().tryClaim(GANDALF,
+                uuid("f2000000-0000-0000-0000-00000000002f"),
+                UUID.randomUUID(), 0L, 100L);
+        assertEquals(LoreCharacterOwnershipResult.Status.CLAIMED,
+                claimed.getStatus());
+    }
+
     private File createIncompleteDefinition() throws Exception {
         File configRoot = this.temporaryFolder.newFolder("incomplete_config");
         File directory = new File(
@@ -198,7 +225,6 @@ public final class LoreCharacterOwnershipWorldDataTest {
         assertEquals("duplicate_lore_character_id",
                 restored.getReadOnlyReason());
         assertEquals(0, restored.getRecordCount());
-        assertEquals(1, restored.getQuarantinedEntryCount());
         assertEquals(LoreCharacterOwnershipResult.Status.STORAGE_READ_ONLY,
                 restored.tryClaim(GANDALF, owner,
                         UUID.randomUUID(), 0L, 200L).getStatus());
@@ -237,7 +263,6 @@ public final class LoreCharacterOwnershipWorldDataTest {
         restored.readFromNBT(future);
 
         assertTrue(restored.isReadOnly());
-        assertEquals(99, restored.getUnsupportedDataVersion());
         assertEquals("unsupported_data_version", restored.getReadOnlyReason());
         NBTTagCompound written = new NBTTagCompound();
         restored.writeToNBT(written);

@@ -81,7 +81,7 @@ public final class ChatConsoleStreamTest {
                 "started", "global", null, null).getContext());
         assertEquals("", ChatConsoleFixtures.command(1L, 1L, "a", "/x", "global\nooc").getContext());
         assertEquals("", ChatConsoleFixtures.command(1L, 1L, "a", "/x", null).getContext());
-        assertEquals(ChatConsoleEvent.Kind.WARNING, ChatConsoleEvent.Kind.fromOrdinal(5));
+        assertEquals(ChatConsoleEvent.Kind.WARNING, ChatConsoleEvent.Kind.fromOrdinal(4));
         assertEquals(null, ChatConsoleEvent.Kind.fromOrdinal(99));
         assertEquals(null, ChatConsoleEvent.Severity.fromOrdinal(-1));
     }

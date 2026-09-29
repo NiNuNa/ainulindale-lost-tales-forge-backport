@@ -73,6 +73,22 @@ final class ChatGroupRuns {
                                       long timestampMillis,
                                       boolean groupable,
                                       IChatComponent groupedLine) {
+        remember(chatLineId, tab, senderId, identityName, accountLine,
+                timestampMillis, groupable, false, groupedLine);
+    }
+
+    /**
+     * As above; a message that {@code standsAlone} — an action, whose
+     * sentence names its speaker — opens no run either, so the message
+     * after it keeps its own header.
+     */
+    static synchronized void remember(int chatLineId, ChatTab tab,
+                                      UUID senderId, String identityName,
+                                      boolean accountLine,
+                                      long timestampMillis,
+                                      boolean groupable,
+                                      boolean standsAlone,
+                                      IChatComponent groupedLine) {
         if (tab == null || senderId == null || identityName == null
                 || groupedLine == null) {
             return;
@@ -84,7 +100,7 @@ final class ChatGroupRuns {
         // filed under the other.
         ENTRIES.put(Integer.valueOf(chatLineId), new Entry(ChatTab.viewed(tab),
                 senderId, identityName, accountLine, timestampMillis,
-                groupable, groupedLine));
+                groupable && !standsAlone, standsAlone, groupedLine));
         while (ENTRIES.size() > ClientChatChannelViews.maxTrackedLines()) {
             Iterator<Integer> oldest = ENTRIES.keySet().iterator();
             oldest.next();
@@ -107,7 +123,8 @@ final class ChatGroupRuns {
         }
         ENTRIES.put(Integer.valueOf(chatLineId), new Entry(entry.tab,
                 entry.senderId, entry.identityName, entry.accountLine,
-                entry.timestampMillis, entry.groupable, groupedLine));
+                entry.timestampMillis, entry.groupable, entry.standsAlone,
+                groupedLine));
     }
 
     /**
@@ -130,17 +147,11 @@ final class ChatGroupRuns {
      * followed over this sequence alone, oldest first: a message the
      * view leaves out never breaks a run in it, however it reads in the
      * feed or in another window. For a view that keeps its messages — a
-     * window — a run holds while the sender keeps talking.
-     */
-    static synchronized boolean[] continuationsOf(int[] lineIdsNewestFirst) {
-        return walk(lineIdsNewestFirst, Long.MAX_VALUE, null);
-    }
-
-    /**
-     * As {@link #continuationsOf(int[])}, with every message
-     * {@code opensRun} marks opening a run of its own whatever stands
-     * before it: in a window, each day's first message, which stands
-     * under the day's rule. The run after it is measured from it.
+     * window — a run holds while the sender keeps talking. Every message
+     * {@code opensRun} marks (null for none) opens a run of its own
+     * whatever stands before it: in a window, each day's first message,
+     * which stands under the day's rule. The run after it is measured
+     * from it.
      */
     static synchronized boolean[] continuationsOf(int[] lineIdsNewestFirst,
                                                   boolean[] opensRun) {
@@ -181,7 +192,8 @@ final class ChatGroupRuns {
                     && entry.timestampMillis - previous.timestampMillis
                             <= previousSpanMillis;
             if (!grouped[index]) {
-                runHead = entry;
+                // A message standing alone opens no run for the next.
+                runHead = entry != null && entry.standsAlone ? null : entry;
             }
             previous = entry;
         }
@@ -218,13 +230,17 @@ final class ChatGroupRuns {
         final long timestampMillis;
         /** Whether this message may ever be shown without its header. */
         final boolean groupable;
+        /** Whether this message neither joins a run nor opens one. */
+        final boolean standsAlone;
         /** The line without its repeated header; a view picks between the two. */
         final IChatComponent groupedLine;
 
         private Entry(ChatTab tab, UUID senderId, String identityName,
                       boolean accountLine, long timestampMillis,
-                      boolean groupable, IChatComponent groupedLine) {
+                      boolean groupable, boolean standsAlone,
+                      IChatComponent groupedLine) {
             this.groupable = groupable;
+            this.standsAlone = standsAlone;
             this.tab = tab;
             this.senderId = senderId;
             this.identityName = identityName;

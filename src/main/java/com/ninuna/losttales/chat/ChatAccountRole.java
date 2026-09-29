@@ -97,31 +97,10 @@ public final class ChatAccountRole {
                 this.sources, this.grants, this.icon);
     }
 
-    /** The same role with another look; what an edit of a built-in changes. */
-    public ChatAccountRole withLook(String name, String description, int color,
-                                    boolean mentionable, int rank) {
-        return new ChatAccountRole(this.id, this.bitIndex, this.nameKey, name, description,
-                color, mentionable, this.locked, rank, this.sources, this.grants,
-                this.icon);
-    }
-
-    /** A config-defined role that grants nothing, before the catalogue gives it a bit. */
-    public static ChatAccountRole custom(String id, String name, String description,
-                                         int color, boolean mentionable, int rank,
-                                         List<ChatRoleSource> sources) {
-        return custom(id, name, description, color, mentionable, rank, sources, null);
-    }
-
-    /** A config-defined role with its grants, before the catalogue gives it a bit. */
-    public static ChatAccountRole custom(String id, String name, String description,
-                                         int color, boolean mentionable, int rank,
-                                         List<ChatRoleSource> sources,
-                                         Set<String> grants) {
-        return custom(id, name, description, color, mentionable, rank, sources,
-                grants, null);
-    }
-
-    /** As above, wearing {@code icon} over its members; null for none chosen. */
+    /**
+     * A config-defined role with its grants, before the catalogue gives it
+     * a bit, wearing {@code icon} over its members; null for none chosen.
+     */
     public static ChatAccountRole custom(String id, String name, String description,
                                          int color, boolean mentionable, int rank,
                                          List<ChatRoleSource> sources,
@@ -269,19 +248,6 @@ public final class ChatAccountRole {
             }
         }
         return roles;
-    }
-
-    /** A mask with every given role set; nulls and {@link #NONE} add nothing. */
-    public static int maskOf(ChatAccountRole... roles) {
-        int mask = 0;
-        if (roles != null) {
-            for (ChatAccountRole role : roles) {
-                if (role != null) {
-                    mask |= role.bit();
-                }
-            }
-        }
-        return mask;
     }
 
     /**

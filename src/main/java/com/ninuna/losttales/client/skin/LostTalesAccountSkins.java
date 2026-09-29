@@ -44,14 +44,12 @@ public final class LostTalesAccountSkins {
     public static final class AccountSkin {
         private final ResourceLocation texture;
         private final String bodyTypeId;
-        private final boolean fromAccount;
         private final boolean awaitingProfile;
 
-        AccountSkin(ResourceLocation texture, String bodyTypeId, boolean fromAccount,
+        AccountSkin(ResourceLocation texture, String bodyTypeId,
                     boolean awaitingProfile) {
             this.texture = texture;
             this.bodyTypeId = bodyTypeId;
-            this.fromAccount = fromAccount;
             this.awaitingProfile = awaitingProfile;
         }
 
@@ -61,16 +59,6 @@ public final class LostTalesAccountSkins {
 
         public String getBodyTypeId() {
             return this.bodyTypeId;
-        }
-
-        /** False when the player has no account skin and wears the default. */
-        public boolean isFromAccount() {
-            return this.fromAccount;
-        }
-
-        /** True while the default stands in for a profile not yet fetched. */
-        public boolean isAwaitingProfile() {
-            return this.awaitingProfile;
         }
     }
 
@@ -159,7 +147,7 @@ public final class LostTalesAccountSkins {
         return new AccountSkin(location,
                 profile.isSlim() ? CharacterBodyTypeRegistry.SLIM
                         : CharacterBodyTypeRegistry.WIDE,
-                true, false);
+                false);
     }
 
     /**
@@ -194,7 +182,7 @@ public final class LostTalesAccountSkins {
                         + "override %s (%s)", LostTalesMetaData.MOD_ID, path, bodyTypeId);
             }
         }
-        return new AccountSkin(OVERRIDE_TEXTURE, bodyTypeId, true, false);
+        return new AccountSkin(OVERRIDE_TEXTURE, bodyTypeId, false);
     }
 
     private static BufferedImage readOverride(File file) {
@@ -221,14 +209,14 @@ public final class LostTalesAccountSkins {
             // The vanilla default is 64x32; the model samples it wrongly but
             // the player is still drawn rather than missing.
             return new AccountSkin(VANILLA_DEFAULT_SKIN,
-                    CharacterBodyTypeRegistry.WIDE, false, awaitingProfile);
+                    CharacterBodyTypeRegistry.WIDE, awaitingProfile);
         }
         if (!defaultRegistered) {
             defaultRegistered = true;
             minecraft.getTextureManager().loadTexture(DEFAULT_TEXTURE,
                     new AccountSkinTexture(image, null, "default skin"));
         }
-        return new AccountSkin(DEFAULT_TEXTURE, CharacterBodyTypeRegistry.WIDE, false,
+        return new AccountSkin(DEFAULT_TEXTURE, CharacterBodyTypeRegistry.WIDE,
                 awaitingProfile);
     }
 

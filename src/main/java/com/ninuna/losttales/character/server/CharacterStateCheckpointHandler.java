@@ -1,5 +1,6 @@
 package com.ninuna.losttales.character.server;
 
+import com.ninuna.losttales.character.deletion.CharacterDeletionService;
 import com.ninuna.losttales.character.switching.CharacterSwitchCoordinator;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.util.LostTalesMath;
@@ -14,8 +15,16 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-/** Spreads periodic durable character checkpoints across server ticks. */
+/**
+ * Spreads periodic durable character checkpoints across server ticks. Each
+ * checkpoint also keeps the played character's LOTR pledge on its record.
+ * The first tick after the server starts purges the deleted characters
+ * past their retention, a bounded number of them.
+ */
 public final class CharacterStateCheckpointHandler {
+
+    /** The most deleted characters purged as the server starts; the rest go at their owners' logins. */
+    private static final int PURGES_AT_START = 64;
 
     private static final ArrayDeque<UUID> PENDING = new ArrayDeque<UUID>();
     private static final Set<UUID> QUEUED = new HashSet<UUID>();
@@ -42,6 +51,8 @@ public final class CharacterStateCheckpointHandler {
                 (long) LostTalesConfig.characterStateCheckpointIntervalSeconds
                         * 20L);
         if (nextScheduleAt <= 0L) {
+            CharacterDeletionService.getInstance().purgeExpired(
+                    server.worldServerForDimension(0), PURGES_AT_START);
             nextScheduleAt = LostTalesMath.saturatingAdd(serverTicks, interval);
         } else if (serverTicks >= nextScheduleAt) {
             enqueueOnlinePlayers(server.getConfigurationManager().playerEntityList);
@@ -58,6 +69,7 @@ public final class CharacterStateCheckpointHandler {
             if (player != null) {
                 CharacterSwitchCoordinator.getInstance()
                         .checkpointActiveState(player);
+                CharacterPledges.refreshAndSync(player);
             }
         }
     }

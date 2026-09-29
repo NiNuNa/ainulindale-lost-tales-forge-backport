@@ -2,7 +2,6 @@ package com.ninuna.losttales.character.registry;
 
 import com.ninuna.losttales.util.LostTalesIdentifiers;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -25,10 +24,6 @@ public final class CharacterGenderRegistry {
 
     public static boolean contains(String id) {
         return IDENTIFIERS.contains(LostTalesIdentifiers.normalize(id));
-    }
-
-    public static Collection<String> getAll() {
-        return IDENTIFIERS;
     }
 
     /**

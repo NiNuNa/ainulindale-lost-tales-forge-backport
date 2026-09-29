@@ -3,7 +3,6 @@ package com.ninuna.losttales.item.material;
 import com.ninuna.losttales.faction.ELostTalesFaction;
 import lotr.common.LOTRMod;
 import lotr.common.fac.LOTRFaction;
-import net.minecraft.block.material.Material;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
 
@@ -52,19 +51,5 @@ public enum ELostTalesItemMaterial {
 
     public LOTRFaction getFaction() {
         return faction;
-    }
-
-    public enum BlockMaterial {
-        ;
-
-        private final Material material;
-
-        BlockMaterial(Material material) {
-            this.material = material;
-        }
-        
-        public Material getMaterial() {
-            return material;
-        }
     }
 }

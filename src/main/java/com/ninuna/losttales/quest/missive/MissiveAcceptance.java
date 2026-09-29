@@ -6,6 +6,7 @@ import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestManager;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
+import net.minecraft.world.World;
 
 /**
  * How the server reads a missive letter a page names and starts its
@@ -37,17 +38,18 @@ public final class MissiveAcceptance {
     }
 
     /**
-     * Why the letter in a slot cannot be accepted as the page named it —
-     * no letter, a letter that cannot be read, another letter than the
-     * one read — or null where it can.
+     * Why the letter in a slot cannot be accepted as the page named it:
+     * no letter, a letter that cannot be read or does not carry this
+     * world's seal, another letter than the one read. Null where it can.
      */
-    public static MissiveBoardStateReason check(ItemStack stack,
+    public static MissiveBoardStateReason check(World world, ItemStack stack,
                                                 String expectedQuestId) {
         if (!isLetter(stack)) {
             return MissiveBoardStateReason.GONE;
         }
         LostTalesMissiveData missive = LostTalesMissiveNbt.readFromItemStack(stack);
-        if (missive == null || !missive.isValid()) {
+        if (missive == null || !missive.isValid()
+                || !MissiveSeals.isGenuine(world, stack)) {
             return MissiveBoardStateReason.DAMAGED;
         }
         String expected = expectedQuestId == null ? "" : expectedQuestId.trim();

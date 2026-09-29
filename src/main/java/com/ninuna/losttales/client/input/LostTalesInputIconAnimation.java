@@ -40,10 +40,6 @@ final class LostTalesInputIconAnimation {
     private Pose lastBasePose;
     private Pose releaseFromPose;
 
-    int frame(boolean pressed, long nowNanos) {
-        return pose(pressed, nowNanos, Keyboard.KEY_NONE).getFrame();
-    }
-
     Pose pose(boolean pressed, long nowNanos, int keyCode) {
         if (!Motions.flourishes()) {
             resetTransitions();

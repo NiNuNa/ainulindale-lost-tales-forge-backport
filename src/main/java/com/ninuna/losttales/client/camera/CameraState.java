@@ -13,10 +13,6 @@ public final class CameraState {
         return current;
     }
 
-    public CameraPose getTarget() {
-        return target;
-    }
-
     public void reset(CameraPose pose) {
         if (pose == null) {
             throw new IllegalArgumentException("pose is required");

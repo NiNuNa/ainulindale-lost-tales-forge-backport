@@ -192,7 +192,6 @@ public final class ThirdPersonCameraHooks {
                     30.0D, Math.min(110.0D,
                     vanillaFov + pose.getFovOffset()));
         }
-        ThirdPersonCameraController.recordRenderedFov(resolvedFov);
         return resolvedFov;
     }
 

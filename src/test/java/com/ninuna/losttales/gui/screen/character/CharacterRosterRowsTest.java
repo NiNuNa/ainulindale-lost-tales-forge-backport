@@ -4,8 +4,10 @@ import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
+import com.ninuna.losttales.character.sync.DeletedCharacterSummary;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.junit.Test;
@@ -80,7 +82,7 @@ public final class CharacterRosterRowsTest {
         CharacterRosterRows.Row played = CharacterRosterRows.played(snapshot,
                 rows);
         assertEquals(0, played.slot);
-        assertSame(played, CharacterRosterRows.atSlot(rows, 0));
+        assertSame(played, CharacterRosterRows.atKey(rows, played.key()));
     }
 
     @Test
@@ -105,10 +107,10 @@ public final class CharacterRosterRowsTest {
     private static CharacterRosterSnapshot snapshot(int unlocked, UUID active,
                                                     CharacterSummary... characters) {
         return new CharacterRosterSnapshot(OWNER, unlocked, active, 1L,
-                RoleplayCharacter.CURRENT_DATA_VERSION,
                 Arrays.asList(characters),
                 RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true);
+                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true,
+                Collections.<DeletedCharacterSummary>emptyList());
     }
 
     private static CharacterSummary summary(UUID id, int slot, String name) {
@@ -116,7 +118,6 @@ public final class CharacterRosterRowsTest {
                 "losttales:male", "losttales:account_skin",
                 RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
                 RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, 30,
-                "lotr:gondor", 1, 0L, 1L,
-                RoleplayCharacter.CURRENT_DATA_VERSION, "", "");
+                "lotr:gondor", "", "");
     }
 }

@@ -1,7 +1,6 @@
 package com.ninuna.losttales.chat;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -305,12 +304,5 @@ public final class ChatMarkdown {
         public boolean isPlain() {
             return this.style == PLAIN;
         }
-    }
-
-    /** A message with no markup at all, as one plain run. */
-    public static List<Span> plain(String message) {
-        return message == null || message.length() == 0
-                ? Collections.<Span>emptyList()
-                : Collections.singletonList(new Span(message, Span.PLAIN));
     }
 }

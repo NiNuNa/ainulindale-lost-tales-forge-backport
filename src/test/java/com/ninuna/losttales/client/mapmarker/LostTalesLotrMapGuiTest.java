@@ -204,8 +204,6 @@ public final class LostTalesLotrMapGuiTest {
             assertEquals(480, field("mapYMax").getInt(null));
             assertEquals(854, field("mapWidth").getInt(null));
             assertEquals(480, field("mapHeight").getInt(null));
-            assertEquals(456, LostTalesLotrMapLayout.resolveStatusY(
-                    gui, 480, 20));
 
             field("isConquestGrid").setBoolean(gui, true);
             field("mapXMin").setInt(null, 227);
@@ -219,8 +217,6 @@ public final class LostTalesLotrMapGuiTest {
             assertEquals(627, field("mapXMax").getInt(null));
             assertEquals(104, field("mapYMin").getInt(null));
             assertEquals(344, field("mapYMax").getInt(null));
-            assertEquals(354, LostTalesLotrMapLayout.resolveStatusY(
-                    gui, 344, 20));
         } finally {
             if (previous == null) {
                 System.clearProperty(property);

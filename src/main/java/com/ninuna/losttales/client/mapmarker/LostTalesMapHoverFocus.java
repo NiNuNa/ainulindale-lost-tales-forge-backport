@@ -41,10 +41,6 @@ final class LostTalesMapHoverFocus {
         this.pendingSinceNanos = 0L;
     }
 
-    String getActiveKey() {
-        return this.activeKey;
-    }
-
     private static long elapsed(long now, long since) {
         long elapsed = now - since;
         return elapsed < 0L ? Long.MAX_VALUE : elapsed;

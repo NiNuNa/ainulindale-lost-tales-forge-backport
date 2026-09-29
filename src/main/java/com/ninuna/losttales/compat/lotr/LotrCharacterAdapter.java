@@ -15,6 +15,7 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.world.World;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -55,6 +56,11 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
     private boolean initialized;
     private boolean available;
     private String unavailableReason = "not_initialized";
+    /** The allowed and denied starting factions the catalogue was built with. */
+    private String[] builtAllowed;
+    private String[] builtDenied;
+    /** Whether an unreadable pledge has been logged; it is said once. */
+    private volatile boolean pledgeWarned;
 
     public static LotrCharacterAdapter getInstance() {
         return INSTANCE;
@@ -64,13 +70,17 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
      * Builds a canonical faction catalogue directly from LOTRFaction.values().
      * No enum-name round trip is required, so factions registered by compatible
      * add-ons are not discarded merely because LOTRFaction.forName does not know
-     * about the extension's code-name convention.
+     * about the extension's code-name convention. Which factions are playable
+     * follows the server's allowed and denied starting factions; the
+     * catalogue is built again when those change.
      */
     public synchronized void initialize() {
         if (this.initialized) {
             return;
         }
         this.initialized = true;
+        this.builtAllowed = copyOf(LostTalesConfig.allowedStartingFactionIds);
+        this.builtDenied = copyOf(LostTalesConfig.deniedStartingFactionIds);
         this.resolved.clear();
         this.factionsById.clear();
         this.unresolved.clear();
@@ -308,8 +318,7 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
             int x = waypoint.getXCoord();
             int z = waypoint.getZCoord();
             int y = waypoint.getYCoord(targetWorld, x, z);
-            return new LotrStartingWaypointLocation(
-                    dimensionId, x + 0.5D, y, z + 0.5D);
+            return new LotrStartingWaypointLocation(x + 0.5D, y, z + 0.5D);
         } catch (LinkageError error) {
             markUnavailable("incompatible_lotr_waypoint_api", error);
             throw new IllegalStateException(
@@ -415,6 +424,40 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
         }
     }
 
+    /**
+     * The faction LOTR says the player is pledged to, as a faction id:
+     * empty for no pledge, null when LOTR's player data cannot be read.
+     */
+    public String getPledgedFactionId(EntityPlayerMP player) {
+        if (player == null || player.worldObj == null
+                || player.worldObj.isRemote) {
+            return null;
+        }
+        try {
+            LOTRPlayerData data = LOTRLevelData.getData(player);
+            if (data == null) {
+                return null;
+            }
+            LOTRFaction pledge = data.getPledgeFaction();
+            return pledge == null ? "" : canonicalId(pledge);
+        } catch (LinkageError error) {
+            warnPledgeOnce(error);
+            return null;
+        } catch (RuntimeException exception) {
+            warnPledgeOnce(exception);
+            return null;
+        }
+    }
+
+    private void warnPledgeOnce(Throwable cause) {
+        if (!this.pledgeWarned) {
+            this.pledgeWarned = true;
+            FMLLog.warning("[%s] A character's LOTR pledge could not be read; "
+                            + "characters keep the faction last read: %s",
+                    LostTalesMetaData.MOD_ID, cause.toString());
+        }
+    }
+
     public static String normalizeFactionId(String factionId) {
         if (factionId == null) {
             return "";
@@ -448,10 +491,21 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
         return normalized;
     }
 
+    /** Builds the catalogue on first use, and again once the allowed or denied factions changed. */
     private void ensureInitialized() {
+        if (this.initialized && !Arrays.equals(this.builtAllowed,
+                LostTalesConfig.allowedStartingFactionIds)
+                || this.initialized && !Arrays.equals(this.builtDenied,
+                LostTalesConfig.deniedStartingFactionIds)) {
+            this.initialized = false;
+        }
         if (!this.initialized) {
             initialize();
         }
+    }
+
+    private static String[] copyOf(String[] values) {
+        return values == null ? null : values.clone();
     }
 
     private LOTRFaction findFaction(String normalizedId) {

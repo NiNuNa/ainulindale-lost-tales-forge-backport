@@ -60,13 +60,6 @@ public abstract class LostTalesUtil {
         return EnumHelper.addEnum(LOTRAchievement.Category.class, enumName, classArr, args);
     }
 
-    public static LOTRAchievement.Category addAchievementCategory(String enumName, LOTRBiome biome) {
-        Class<?>[] classArr = {LOTRBiome.class};
-        Object[] args = {biome};
-
-        return EnumHelper.addEnum(LOTRAchievement.Category.class, enumName, classArr, args);
-    }
-
     public static void setFactionAchievementCategory (LOTRFaction faction, LOTRAchievement.Category category) {
         ReflectionHelper.setPrivateValue (LOTRFaction.class, faction, category, "achieveCategory");
     }
@@ -86,29 +79,10 @@ public abstract class LostTalesUtil {
         findAndInvokeMethod(new Object[]{name, routePoints}, LOTRRoads.class, null, "registerRoad", String.class, Object[].class);
     }
 
-    public static void addDisplayOnlyRoad(String name, Object... routePoints) {
-        findAndInvokeMethod(new Object[]{name, routePoints}, LOTRRoads.class, null, "registerDisplayOnlyRoad", String.class, Object[].class);
-    }
-
-    public static void setWorldGenMapImage (ResourceLocation res) {
-        BufferedImage img = getImage(getInputStream(res));
-        setWorldGenMapImage(img, null, null);
-    }
-
-    public static void setWorldGenMapImageWithOverlay(ResourceLocation baseMap, ResourceLocation overlayMap, LOTRBiome overlayBiome) {
-        BufferedImage baseImage = getImage(getInputStream(baseMap));
-        BufferedImage overlayImage = getImage(getInputStream(overlayMap));
-        setWorldGenMapImage(baseImage, overlayImage, null, null, overlayBiome);
-    }
-
     public static void setWorldGenMapImageWithOverlayBiomes(ResourceLocation baseMap, ResourceLocation overlayMap, int[] overlayRgbColors, LOTRBiome[] overlayBiomes, LOTRBiome fallbackOverlayBiome) {
         BufferedImage baseImage = getImage(getInputStream(baseMap));
         BufferedImage overlayImage = getImage(getInputStream(overlayMap));
         setWorldGenMapImage(baseImage, overlayImage, overlayRgbColors, overlayBiomes, fallbackOverlayBiome);
-    }
-
-    private static void setWorldGenMapImage(BufferedImage baseImage, BufferedImage overlayImage, LOTRBiome overlayBiome) {
-        setWorldGenMapImage(baseImage, overlayImage, null, null, overlayBiome);
     }
 
     private static void setWorldGenMapImage(BufferedImage baseImage, BufferedImage overlayImage, int[] overlayRgbColors, LOTRBiome[] overlayBiomes, LOTRBiome fallbackOverlayBiome) {

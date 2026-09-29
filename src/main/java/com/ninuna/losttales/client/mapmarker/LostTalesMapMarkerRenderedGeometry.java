@@ -62,15 +62,8 @@ final class LostTalesMapMarkerRenderedGeometry {
         private int objectCount;
         private int candidateCount;
         private int[] objectIndexByCandidate = new int[0];
-        private Object guiIdentity;
-        private float zoomExp;
-        private int guiScale;
 
-        void begin(Object guiIdentity, float zoomExp,
-                   int guiScale, int candidateCount) {
-            this.guiIdentity = guiIdentity;
-            this.zoomExp = zoomExp;
-            this.guiScale = Math.max(1, guiScale);
+        void begin(int candidateCount) {
             this.objectCount = 0;
             this.candidateCount = Math.max(0, candidateCount);
             if (this.objectIndexByCandidate.length
@@ -82,9 +75,7 @@ final class LostTalesMapMarkerRenderedGeometry {
                     this.candidateCount, -1);
         }
 
-        RenderedObject beginObject(
-                String identity, int representativeIndex,
-                int representedMemberCount) {
+        RenderedObject beginObject(int representativeIndex) {
             RenderedObject object;
             if (this.objectCount < this.objectPool.size()) {
                 object = this.objectPool.get(this.objectCount);
@@ -92,16 +83,13 @@ final class LostTalesMapMarkerRenderedGeometry {
                 object = new RenderedObject();
                 this.objectPool.add(object);
             }
-            object.reset(identity, representativeIndex,
-                    representedMemberCount);
+            object.reset(representativeIndex);
             this.objectCount++;
             return object;
         }
 
         void addMember(
-                RenderedObject object,
-                int candidateIndex, String markerId,
-                float baseCenterX, float baseCenterY,
+                RenderedObject object, int candidateIndex,
                 float finalCenterX, float finalCenterY,
                 float artHalfWidth, float artAbove, float artBelow,
                 float visualScale,
@@ -110,9 +98,7 @@ final class LostTalesMapMarkerRenderedGeometry {
             if (object == null) {
                 return;
             }
-            Member member = object.addMember(
-                    candidateIndex, markerId,
-                    baseCenterX, baseCenterY,
+            Member member = object.addMember(candidateIndex,
                     finalCenterX, finalCenterY,
                     artHalfWidth, artAbove, artBelow, visualScale,
                     transitionVisibility, renderAlpha,
@@ -157,18 +143,6 @@ final class LostTalesMapMarkerRenderedGeometry {
             return object == null
                     ? null : object.getMemberForCandidate(candidateIndex);
         }
-
-        Object getGuiIdentity() {
-            return this.guiIdentity;
-        }
-
-        float getZoomExp() {
-            return this.zoomExp;
-        }
-
-        int getGuiScale() {
-            return this.guiScale;
-        }
     }
 
     /** One complete visible marker or cluster. */
@@ -177,26 +151,17 @@ final class LostTalesMapMarkerRenderedGeometry {
                 new ArrayList<Member>();
         private final Bounds visibleBounds = new Bounds();
         private final Bounds interactionBounds = new Bounds();
-        private String identity = "";
         private int representativeIndex = -1;
-        private int representedMemberCount;
         private int memberCount;
-        private int visibleMemberCount;
         private Member representativeMember;
         private float nameAnchorX;
         private float nameAnchorY;
         private float statusAnchorX;
         private float statusAnchorY;
 
-        private void reset(
-                String identity, int representativeIndex,
-                int representedMemberCount) {
-            this.identity = identity == null ? "" : identity;
+        private void reset(int representativeIndex) {
             this.representativeIndex = representativeIndex;
-            this.representedMemberCount =
-                    Math.max(0, representedMemberCount);
             this.memberCount = 0;
-            this.visibleMemberCount = 0;
             this.representativeMember = null;
             this.visibleBounds.clear();
             this.interactionBounds.clear();
@@ -206,9 +171,7 @@ final class LostTalesMapMarkerRenderedGeometry {
             this.statusAnchorY = 0.0F;
         }
 
-        private Member addMember(
-                int candidateIndex, String markerId,
-                float baseCenterX, float baseCenterY,
+        private Member addMember(int candidateIndex,
                 float finalCenterX, float finalCenterY,
                 float artHalfWidth, float artAbove, float artBelow,
                 float visualScale,
@@ -221,15 +184,12 @@ final class LostTalesMapMarkerRenderedGeometry {
                 member = new Member();
                 this.memberPool.add(member);
             }
-            member.reset(candidateIndex, markerId,
-                    baseCenterX, baseCenterY,
-                    finalCenterX, finalCenterY,
+            member.reset(candidateIndex, finalCenterX, finalCenterY,
                     artHalfWidth, artAbove, artBelow, visualScale,
                     transitionVisibility, renderAlpha,
                     fanOffsetX, fanOffsetY);
             this.memberCount++;
             if (member.visible) {
-                this.visibleMemberCount++;
                 // Only sprites still gathered around the leader shape the
                 // stack. One that has travelled most of the way to its own
                 // position is leaving, and must not drag the stack's target
@@ -274,24 +234,8 @@ final class LostTalesMapMarkerRenderedGeometry {
             }
         }
 
-        String getIdentity() {
-            return this.identity;
-        }
-
         int getRepresentativeIndex() {
             return this.representativeIndex;
-        }
-
-        int getRepresentedMemberCount() {
-            return this.representedMemberCount;
-        }
-
-        int getVisibleMemberCount() {
-            return this.visibleMemberCount;
-        }
-
-        boolean isCluster() {
-            return this.representedMemberCount > 1;
         }
 
         Bounds getVisibleBounds() {
@@ -367,7 +311,6 @@ final class LostTalesMapMarkerRenderedGeometry {
     static final class Member {
         private final Bounds visibleBounds = new Bounds();
         private int candidateIndex;
-        private String markerId = "";
         private float centerX;
         private float centerY;
         private float artHalfWidth;
@@ -378,20 +321,15 @@ final class LostTalesMapMarkerRenderedGeometry {
         private float renderAlpha;
         private float fanOffsetX;
         private float fanOffsetY;
-        private float animationOffsetX;
-        private float animationOffsetY;
         private boolean visible;
 
-        private void reset(
-                int candidateIndex, String markerId,
-                float baseCenterX, float baseCenterY,
+        private void reset(int candidateIndex,
                 float finalCenterX, float finalCenterY,
                 float artHalfWidth, float artAbove, float artBelow,
                 float visualScale,
                 float transitionVisibility, float renderAlpha,
                 float fanOffsetX, float fanOffsetY) {
             this.candidateIndex = candidateIndex;
-            this.markerId = markerId == null ? "" : markerId;
             this.centerX = finalCenterX;
             this.centerY = finalCenterY;
             this.artHalfWidth = Math.max(0.0F, artHalfWidth);
@@ -403,8 +341,6 @@ final class LostTalesMapMarkerRenderedGeometry {
             this.renderAlpha = clamp01(renderAlpha);
             this.fanOffsetX = fanOffsetX;
             this.fanOffsetY = fanOffsetY;
-            this.animationOffsetX = finalCenterX - baseCenterX;
-            this.animationOffsetY = finalCenterY - baseCenterY;
             this.visible = this.artHalfWidth > 0.0F
                     && this.renderAlpha > MIN_VISIBLE_ALPHA;
             if (this.visible) {
@@ -422,28 +358,12 @@ final class LostTalesMapMarkerRenderedGeometry {
             return this.candidateIndex;
         }
 
-        String getMarkerId() {
-            return this.markerId;
-        }
-
         float getCenterX() {
             return this.centerX;
         }
 
         float getCenterY() {
             return this.centerY;
-        }
-
-        float getArtHalfWidth() {
-            return this.artHalfWidth;
-        }
-
-        float getArtAbove() {
-            return this.artAbove;
-        }
-
-        float getArtBelow() {
-            return this.artBelow;
         }
 
         float getVisualScale() {
@@ -464,14 +384,6 @@ final class LostTalesMapMarkerRenderedGeometry {
 
         float getFanOffsetY() {
             return this.fanOffsetY;
-        }
-
-        float getAnimationOffsetX() {
-            return this.animationOffsetX;
-        }
-
-        float getAnimationOffsetY() {
-            return this.animationOffsetY;
         }
 
         boolean isVisible() {
@@ -587,22 +499,9 @@ final class LostTalesMapMarkerRenderedGeometry {
             return this.bottom;
         }
 
-        float getWidth() {
-            return this.valid ? this.right - this.left : 0.0F;
-        }
-
-        float getHeight() {
-            return this.valid ? this.bottom - this.top : 0.0F;
-        }
-
         float getCenterX() {
             return this.valid
                     ? (this.left + this.right) * 0.5F : 0.0F;
-        }
-
-        float getCenterY() {
-            return this.valid
-                    ? (this.top + this.bottom) * 0.5F : 0.0F;
         }
     }
 

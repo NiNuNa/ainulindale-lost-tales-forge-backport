@@ -121,10 +121,6 @@ public final class CharacterRaceDefinition {
                 && this.allowedGenderIds.contains(CharacterGenderRegistry.FEMALE);
     }
 
-    public String getDefaultGenderId() {
-        return this.allowedGenderIds.iterator().next();
-    }
-
     public float getWidth() {
         return this.width;
     }
@@ -139,18 +135,6 @@ public final class CharacterRaceDefinition {
 
     public float getSneakingEyeHeight() {
         return this.sneakingEyeHeight;
-    }
-
-    public double getMaxHealth() {
-        return this.maxHealth;
-    }
-
-    public double getMovementSpeedMultiplier() {
-        return this.movementSpeedMultiplier;
-    }
-
-    public double getAttackDamage() {
-        return this.attackDamage;
     }
 
     public float getRendererScale() {

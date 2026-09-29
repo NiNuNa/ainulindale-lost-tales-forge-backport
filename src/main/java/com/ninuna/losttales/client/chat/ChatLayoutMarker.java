@@ -34,6 +34,12 @@ import net.minecraft.util.IChatComponent;
  * message's header and a <em>body</em> marker on every row of its body
  * say which rows name its speaker and which carry its words, so the
  * stack can lay each out, measure it and draw it at its own size.</p>
+ *
+ * <p>An action has no header row: an <em>action break</em> in place of
+ * the body break opens its words on the row it is on, behind no chevron,
+ * the speaker's name the sentence's first word; a <em>span end</em>
+ * after that name closes the speaker's span, which a header closes with
+ * its bracket.</p>
  */
 final class ChatLayoutMarker {
     private static final String PREFIX = "losttales-chat-layout:";
@@ -44,6 +50,8 @@ final class ChatLayoutMarker {
     private static final String ROW = "row";
     private static final String HEADER = "header";
     private static final String BODY_ROW = "bodyrow";
+    private static final String ACTION = "action";
+    private static final String SPAN_END = "spanend";
 
     private ChatLayoutMarker() {}
 
@@ -103,16 +111,30 @@ final class ChatLayoutMarker {
         return marker(PREFIX + BODY + (senderColor & 0xFFFFFF));
     }
 
-    static ChatComponentText indent(int closedWidth, int openWidth) {
-        return indent(closedWidth, openWidth, -1, -1);
+    /**
+     * Ends an action's header — its channel prefix and head — and opens
+     * its words on the same row, behind no chevron: the sentence is the
+     * line. Continuation rows start at the words' own edge.
+     */
+    static ChatComponentText actionBreak() {
+        return marker(PREFIX + ACTION);
     }
 
     /**
-     * As above, carrying the sender's own colours. A wrapped message
-     * leaves its head marker on the first line, and the head marker is
-     * where the renderer reads the sender's name and title colours from;
-     * a continuation line carries them here instead, so a name that
-     * wrapped is drawn in the same colour as one that did not.
+     * Closes the speaker's span on a row that names them inside its
+     * words, as an action does: what follows is not the name. Draws and
+     * measures nothing.
+     */
+    static ChatComponentText spanEnd() {
+        return marker(PREFIX + SPAN_END);
+    }
+
+    /**
+     * An indent marker carrying the sender's own colours, -1 for none. A
+     * wrapped message leaves its head marker on the first line, and the
+     * head marker is where the renderer reads the sender's name and title
+     * colours from; a continuation line carries them here instead, so a
+     * name that wrapped is drawn in the same colour as one that did not.
      */
     static ChatComponentText indent(int closedWidth, int openWidth,
                                     int nameColor, int titleColor) {
@@ -164,6 +186,12 @@ final class ChatLayoutMarker {
         if (BODY_ROW.equals(payload)) {
             return Data.BODY_ROW;
         }
+        if (ACTION.equals(payload)) {
+            return Data.ACTION;
+        }
+        if (SPAN_END.equals(payload)) {
+            return Data.SPAN_END;
+        }
         if (payload.startsWith(BODY)) {
             return Data.BODY;
         }
@@ -207,6 +235,16 @@ final class ChatLayoutMarker {
     static boolean isRowBreak(IChatComponent component) {
         Data data = decode(component);
         return data != null && data.rowBreak;
+    }
+
+    static boolean isActionBreak(IChatComponent component) {
+        Data data = decode(component);
+        return data != null && data.actionBreak;
+    }
+
+    static boolean isSpanEnd(IChatComponent component) {
+        Data data = decode(component);
+        return data != null && data.spanEnd;
     }
 
     /**
@@ -266,16 +304,22 @@ final class ChatLayoutMarker {
         static final Data ROW =
                 new Data(false, false, false, 0, 0, -1, -1, true);
         static final Data HEADER =
-                new Data(false, false, false, 0, 0, -1, -1, false, true);
+                new Data(false, false, false, 0, 0, -1, -1, false);
         static final Data BODY_ROW =
-                new Data(false, false, false, 0, 0, -1, -1, false, true);
+                new Data(false, false, false, 0, 0, -1, -1, false);
+        static final Data ACTION = new Data(false, false, false, 0, 0, -1,
+                -1, false, true, false);
+        static final Data SPAN_END = new Data(false, false, false, 0, 0, -1,
+                -1, false, false, true);
 
         final boolean anchor;
         final boolean lineBreak;
         final boolean bodyBreak;
         final boolean rowBreak;
-        /** Whether this marker says what kind of row it is on. */
-        final boolean rowMark;
+        /** Whether this marker opens an action's words ({@link #actionBreak}). */
+        final boolean actionBreak;
+        /** Whether this marker closes the speaker's span ({@link #spanEnd}). */
+        final boolean spanEnd;
         private final int closedIndent;
         private final int openIndent;
         /** The sender's colours, or -1 when the line carries none. */
@@ -299,14 +343,16 @@ final class ChatLayoutMarker {
                      int closedIndent, int openIndent, int nameColor,
                      int titleColor, boolean rowBreak) {
             this(anchor, lineBreak, bodyBreak, closedIndent, openIndent,
-                    nameColor, titleColor, rowBreak, false);
+                    nameColor, titleColor, rowBreak, false, false);
         }
 
         private Data(boolean anchor, boolean lineBreak, boolean bodyBreak,
                      int closedIndent, int openIndent, int nameColor,
-                     int titleColor, boolean rowBreak, boolean rowMark) {
+                     int titleColor, boolean rowBreak,
+                     boolean actionBreak, boolean spanEnd) {
+            this.actionBreak = actionBreak;
+            this.spanEnd = spanEnd;
             this.rowBreak = rowBreak;
-            this.rowMark = rowMark;
             this.anchor = anchor;
             this.lineBreak = lineBreak;
             this.bodyBreak = bodyBreak;

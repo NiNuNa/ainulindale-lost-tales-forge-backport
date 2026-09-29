@@ -316,19 +316,6 @@ public final class LostTalesChatVisualStyle {
     }
 
     /**
-     * The size large text is drawn at: one display pixel more per font
-     * pixel than the text beside it, the next step up the screen can
-     * draw without pixels of two sizes. Double at GUI scale 1, three
-     * halves at 2, four thirds at 3, five quarters at 4. Asked with the
-     * display scale of this frame, so a GUI-scale change picks the new
-     * step at once.
-     */
-    static float largeTextScale(int displayScaleFactor) {
-        int factor = Math.max(1, displayScaleFactor);
-        return (factor + 1) / (float)factor;
-    }
-
-    /**
      * How far from the words' top edge a row drawn at another size than
      * they are starts, in the stack's units ({@link #rowRise}), negative
      * being up the screen: every row of the stack stands on the line the
@@ -341,16 +328,6 @@ public final class LostTalesChatVisualStyle {
         float words = Math.max(0.001F, factor * chat);
         return -rowRise(chat, factor,
                 Math.max(1, Math.round(rowScale * words))) / words;
-    }
-
-    /**
-     * Display pixels per font pixel of large text beside words drawn at
-     * {@code chatScale} on a display of {@code displayScaleFactor}
-     * pixels per GUI pixel: the smallest whole number above the words'
-     * own. Unlike the small size, every scale has one.
-     */
-    static int largePixels(float chatScale, int displayScaleFactor) {
-        return rowPixels(chatScale, displayScaleFactor, 1);
     }
 
     /**
@@ -822,8 +799,12 @@ public final class LostTalesChatVisualStyle {
             ChatLayoutMarker.Data layout = ChatLayoutMarker.decode(part);
             if (layout != null) {
                 // Zero-width layout metadata; an indent marker insets a
-                // continuation line under the message body.
+                // continuation line under the message body. An action's
+                // name ends the speaker's span where its words begin.
                 cursor += layout.indent(chatOpen);
+                if (layout.spanEnd) {
+                    identitySpan = false;
+                }
                 continue;
             }
             if (ChatStampMarker.isMarker(part)

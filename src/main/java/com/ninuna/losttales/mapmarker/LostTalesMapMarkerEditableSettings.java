@@ -139,9 +139,6 @@ public final class LostTalesMapMarkerEditableSettings {
         return this.waystoneStructureType;
     }
     public int getPriority() { return this.priority; }
-    public LostTalesMapMarkerRelevance getRelevance() {
-        return LostTalesMapMarkerRelevance.fromRank(this.priority);
-    }
     public LostTalesMapMarkerVisibility getVisibility() {
         return this.visibility;
     }

@@ -98,7 +98,7 @@ public final class PartyTrackingSyncManager {
         }
         // The identity being played owns the marker and holds the party
         // membership, whether it is a character or the account itself.
-        Party party = view.partyData.getPartyForCharacter(receiver.gameplayId);
+        Party party = view.partyData.getPartyForIdentity(receiver.gameplayId);
         PartyTrackingSnapshot content = party == null
                 ? buildSoloContent(recipient.getUniqueID(),
                         receiver.gameplayId, receiver.displayName, view)
@@ -150,13 +150,13 @@ public final class PartyTrackingSyncManager {
 
     private static PartyTrackingSnapshot buildPartyContent(
             UUID recipientOwnerId,
-            UUID recipientCharacterId,
+            UUID recipientIdentityId,
             Party party,
             ServerView view) {
         ArrayList<PartyTrackedMemberSnapshot> tracked =
                 new ArrayList<PartyTrackedMemberSnapshot>();
         for (PartyMember member : party.getMembers()) {
-            if (recipientCharacterId.equals(member.getCharacterId())) {
+            if (recipientIdentityId.equals(member.getIdentityId())) {
                 continue;
             }
             OnlinePlayerContext online = view.onlineByOwner.get(
@@ -172,7 +172,7 @@ public final class PartyTrackingSyncManager {
                 new ArrayList<PartyGoHereMarkerSnapshot>();
         for (PartyMember owner : party.getMembers()) {
             PartyGoHereMarker marker = view.markerData.getMarker(
-                    owner.getCharacterId());
+                    owner.getIdentityId());
             if (marker != null) {
                 markers.add(toMarkerSnapshot(
                         marker, owner.getCharacterName(), owner.getColor()));
@@ -183,14 +183,14 @@ public final class PartyTrackingSyncManager {
                     @Override
                     public int compare(PartyGoHereMarkerSnapshot left,
                                        PartyGoHereMarkerSnapshot right) {
-                        return left.getOwnerCharacterId().toString().compareTo(
-                                right.getOwnerCharacterId().toString());
+                        return left.getOwnerIdentityId().toString().compareTo(
+                                right.getOwnerIdentityId().toString());
                     }
                 });
         return new PartyTrackingSnapshot(
                 recipientOwnerId,
                 1L,
-                recipientCharacterId,
+                recipientIdentityId,
                 party.getPartyId(),
                 party.getRevision(),
                 tracked,
@@ -201,7 +201,7 @@ public final class PartyTrackingSyncManager {
             PartyGoHereMarker marker, String ownerName,
             PartyColor ownerColor) {
         return new PartyGoHereMarkerSnapshot(
-                marker.getOwnerCharacterId(), ownerName, ownerColor,
+                marker.getOwnerIdentityId(), ownerName, ownerColor,
                 marker.getDimensionId(),
                 marker.getX(), marker.getY(), marker.getZ(),
                 marker.getUpdatedAt());
@@ -211,7 +211,7 @@ public final class PartyTrackingSyncManager {
             PartyMember member,
             OnlinePlayerContext online) {
         if (online == null || online.player == null
-                || !member.getCharacterId().equals(online.gameplayId)) {
+                || !member.getIdentityId().equals(online.gameplayId)) {
             return null;
         }
         EntityPlayerMP player = online.player;
@@ -222,7 +222,7 @@ public final class PartyTrackingSyncManager {
             return null;
         }
         return new PartyTrackedMemberSnapshot(
-                member.getCharacterId(),
+                member.getIdentityId(),
                 member.getCharacterName(),
                 member.getColor(),
                 player.dimension,
@@ -236,13 +236,13 @@ public final class PartyTrackingSyncManager {
         return source.hasParty()
                 ? new PartyTrackingSnapshot(
                 source.getOwnerId(), sequence,
-                source.getActiveCharacterId(),
+                source.getActiveIdentityId(),
                 source.getPartyId(), source.getPartyRevision(),
                 source.getTrackedMembers(),
                 source.getGoHereMarkers())
                 : PartyTrackingSnapshot.noParty(
                 source.getOwnerId(), sequence,
-                source.getActiveCharacterId(),
+                source.getActiveIdentityId(),
                 source.getGoHereMarkers());
     }
 
@@ -283,8 +283,8 @@ public final class PartyTrackingSyncManager {
                 if (!LostTalesServerPlayers.isServerPlayer(player)) {
                     continue;
                 }
-                PartyService.ActiveCharacterContext active =
-                        PartyService.getInstance().resolveActiveCharacter(player);
+                PartyService.ActiveIdentityContext active =
+                        PartyService.getInstance().resolveActiveIdentity(player);
                 if (!active.isValid()) {
                     continue;
                 }

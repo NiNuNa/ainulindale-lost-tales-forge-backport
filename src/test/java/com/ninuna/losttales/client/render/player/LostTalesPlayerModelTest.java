@@ -20,7 +20,6 @@ public final class LostTalesPlayerModelTest {
     @Test
     public void wideBodyKeepsVanillaArms() {
         LostTalesPlayerModel model = plainBody(false);
-        assertFalse(model.isSlim());
         assertEquals(64.0F, model.textureWidth, 0.0F);
         assertEquals(64.0F, model.textureHeight, 0.0F);
         assertEquals(4.0F, width(model.bipedRightArm), 0.0F);
@@ -35,7 +34,6 @@ public final class LostTalesPlayerModelTest {
     @Test
     public void slimBodyNarrowsBothArmsAndKeepsTheirHeight() {
         LostTalesPlayerModel model = plainBody(true);
-        assertTrue(model.isSlim());
         assertEquals(3.0F, width(model.bipedRightArm), 0.0F);
         assertEquals(3.0F, width(model.bipedLeftArm), 0.0F);
         assertEquals(2.0F, model.bipedRightArm.rotationPointY, 0.0F);

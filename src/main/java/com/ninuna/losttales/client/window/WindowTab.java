@@ -7,7 +7,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.util.StatCollector;
 
 /**
- * One thing a window holds: a conversation, the quest journal, the party.
+ * One thing a window holds: a conversation or a page.
  * A window keeps its tabs in a row and shows the one in front; the tab
  * says how it looks in that row, its words, its colour, its icon and
  * what waits in the icon's corner, and each kind of tab lives with the
@@ -104,9 +104,27 @@ public abstract class WindowTab {
         return Collections.emptyList();
     }
 
+    /**
+     * Whether the tab puts any row in its menu, asked every frame to grey
+     * the cog of a tab with nothing to choose; a tab whose rows cost
+     * something to build answers without building them.
+     */
+    public boolean hasMenuRows() {
+        return !menuRows().isEmpty();
+    }
+
     /** One of its menu's rows taken; answers whether the menu stays open. */
     public boolean takeMenuRow(String id) {
         return false;
+    }
+
+    /**
+     * As above, taken with a right-click when {@code back} says so: a
+     * few-word choice steps back. A tab with no such row takes either
+     * press alike.
+     */
+    public boolean takeMenuRow(String id, boolean back) {
+        return takeMenuRow(id);
     }
 
     /** The panel button at the strip's left end; null for none. */
@@ -137,6 +155,15 @@ public abstract class WindowTab {
 
     /** What the well says while nothing is typed in it. */
     public String searchPrompt() {
+        return "";
+    }
+
+    /**
+     * Why the well has nothing to search while the tab is in front, for
+     * its tip; empty while it searches. A well with nothing to do stays,
+     * greyed.
+     */
+    public String searchUnavailable() {
         return "";
     }
 

@@ -66,15 +66,6 @@ public final class InspectionCameraMath {
     }
 
     /**
-     * How far below the eye the middle of the body is: where the camera
-     * looks so the whole figure, not the head, sits where it is framed.
-     */
-    public static double pivotDropBelowEye(double subjectHeight,
-                                           double eyeHeightAboveFeet) {
-        return pivotDropBelowEye(subjectHeight, eyeHeightAboveFeet, 0.5D);
-    }
-
-    /**
      * How far below the eye the point the camera looks at is, for a point
      * that far up the body: zero at the feet, one at the top of the head.
      * A negative drop is above the eye.

@@ -1,11 +1,7 @@
 package com.ninuna.losttales.block.tileentity;
 
-import lotr.common.item.LOTRWeaponStats;
 import net.minecraft.entity.EntityLiving;
 import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemFishingRod;
-import net.minecraft.item.ItemHoe;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.NetworkManager;
@@ -29,41 +25,8 @@ public class LostTalesTileEntityStatue extends TileEntity implements IAnimatable
         return this.factory;
     }
 
-    public boolean canAcceptItem(ItemStack itemstack) {
-        if (itemstack != null) {
-            Item item = itemstack.getItem();
-            if (LOTRWeaponStats.isMeleeWeapon(itemstack)) {
-                return true;
-            }
-
-            if (LOTRWeaponStats.isRangedWeapon(itemstack)) {
-                return true;
-            }
-
-            if (item instanceof ItemHoe) {
-                return true;
-            }
-
-            if (item instanceof ItemFishingRod) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     public ItemStack getWeaponItem() {
         return this.weaponItem;
-    }
-
-    public void setWeaponItem(ItemStack item) {
-        if (item != null && item.stackSize <= 0) {
-            item = null;
-        }
-
-        this.weaponItem = item;
-        this.worldObj.markBlockForUpdate(this.xCoord, this.yCoord, this.zCoord);
-        this.markDirty();
     }
 
     public EntityLivingBase getEntityForRender() {

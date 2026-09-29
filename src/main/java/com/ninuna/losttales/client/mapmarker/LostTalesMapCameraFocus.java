@@ -279,10 +279,6 @@ final class LostTalesMapCameraFocus {
         this.active = false;
     }
 
-    boolean isActive() {
-        return this.active;
-    }
-
     /**
      * Steps the camera one frame.
      *

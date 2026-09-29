@@ -50,7 +50,6 @@ public final class LoreCharacterSyncManager {
                 LoreCharacterTransferStorage.get(player.worldObj);
         List<LoreCharacterSummary> summaries =
                 new ArrayList<LoreCharacterSummary>();
-        boolean definitionsValid = LoreCharacterRegistry.getLoadErrors().isEmpty();
         for (LoreCharacterDefinition definition : LoreCharacterRegistry.getAll()) {
             LoreCharacterOwnershipRecord record = ownership.getRecord(
                     definition.getId());
@@ -69,7 +68,7 @@ public final class LoreCharacterSyncManager {
                     appearance == null ? "" : appearance.getGenderId(),
                     appearance == null ? "" : appearance.getModelId(),
                     appearance == null ? "" : appearance.getSkinId(),
-                    definitionsValid && appearance != null,
+                    appearance != null,
                     claimed, owned,
                     transfers.getTransaction(definition.getId()) != null,
                     ownerName,

@@ -9,10 +9,10 @@ public final class PartyInvitationSnapshot {
 
     private final UUID invitationId;
     private final UUID partyId;
-    private final UUID invitingCharacterId;
+    private final UUID invitingIdentityId;
     private final UUID invitingOwnerId;
     private final String invitingCharacterName;
-    private final UUID targetCharacterId;
+    private final UUID targetIdentityId;
     private final UUID targetOwnerId;
     private final String targetCharacterName;
     private final long createdAt;
@@ -20,29 +20,29 @@ public final class PartyInvitationSnapshot {
 
     public PartyInvitationSnapshot(UUID invitationId,
                                    UUID partyId,
-                                   UUID invitingCharacterId,
+                                   UUID invitingIdentityId,
                                    UUID invitingOwnerId,
                                    String invitingCharacterName,
-                                   UUID targetCharacterId,
+                                   UUID targetIdentityId,
                                    UUID targetOwnerId,
                                    String targetCharacterName,
                                    long createdAt,
                                    long expiresAt) {
         if (invitationId == null || partyId == null
-                || invitingCharacterId == null || invitingOwnerId == null
-                || targetCharacterId == null || targetOwnerId == null) {
+                || invitingIdentityId == null || invitingOwnerId == null
+                || targetIdentityId == null || targetOwnerId == null) {
             throw new IllegalArgumentException("invitation identities must not be null");
         }
-        if (invitingCharacterId.equals(targetCharacterId)
+        if (invitingIdentityId.equals(targetIdentityId)
                 || createdAt < 0L || expiresAt <= createdAt) {
             throw new IllegalArgumentException("invitation snapshot is invalid");
         }
         this.invitationId = invitationId;
         this.partyId = partyId;
-        this.invitingCharacterId = invitingCharacterId;
+        this.invitingIdentityId = invitingIdentityId;
         this.invitingOwnerId = invitingOwnerId;
         this.invitingCharacterName = normalizeName(invitingCharacterName);
-        this.targetCharacterId = targetCharacterId;
+        this.targetIdentityId = targetIdentityId;
         this.targetOwnerId = targetOwnerId;
         this.targetCharacterName = normalizeName(targetCharacterName);
         this.createdAt = createdAt;
@@ -56,10 +56,10 @@ public final class PartyInvitationSnapshot {
         return new PartyInvitationSnapshot(
                 invitation.getInvitationId(),
                 invitation.getPartyId(),
-                invitation.getInvitingCharacterId(),
+                invitation.getInvitingIdentityId(),
                 invitation.getInvitingOwnerId(),
                 invitation.getInvitingCharacterName(),
-                invitation.getTargetCharacterId(),
+                invitation.getTargetIdentityId(),
                 invitation.getTargetOwnerId(),
                 invitation.getTargetCharacterName(),
                 invitation.getCreatedAt(),
@@ -74,8 +74,8 @@ public final class PartyInvitationSnapshot {
         return this.partyId;
     }
 
-    public UUID getInvitingCharacterId() {
-        return this.invitingCharacterId;
+    public UUID getInvitingIdentityId() {
+        return this.invitingIdentityId;
     }
 
     public UUID getInvitingOwnerId() {
@@ -86,8 +86,8 @@ public final class PartyInvitationSnapshot {
         return this.invitingCharacterName;
     }
 
-    public UUID getTargetCharacterId() {
-        return this.targetCharacterId;
+    public UUID getTargetIdentityId() {
+        return this.targetIdentityId;
     }
 
     public UUID getTargetOwnerId() {

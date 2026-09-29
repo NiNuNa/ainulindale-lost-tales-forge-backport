@@ -1,7 +1,9 @@
 package com.ninuna.losttales.mapmarker;
 
-import com.mojang.authlib.GameProfile;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityWaystone;
+import com.ninuna.losttales.character.server.KnownAccounts;
+import com.ninuna.losttales.character.storage.CharacterStorage;
+import com.ninuna.losttales.character.storage.CharacterWorldData;
 import com.ninuna.losttales.compat.lotr.LostTalesWaystonePermissionPolicy;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesWaystoneSettingsRequestPacket;
@@ -15,7 +17,6 @@ import lotr.common.LOTRPlayerData;
 import lotr.common.fellowship.LOTRFellowship;
 import lotr.common.fellowship.LOTRFellowshipData;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.world.World;
@@ -83,12 +84,12 @@ public final class LostTalesWaystoneSettingsService {
                 break;
             case SHARE_PLAYER:
                 outcome = applyPlayerSharing(
-                        context.record,
+                        context.world, context.record,
                         request.getTargetPlayerName(), false);
                 break;
             case UNSHARE_PLAYER:
                 outcome = applyPlayerSharing(
-                        context.record,
+                        context.world, context.record,
                         request.getTargetPlayerName(), true);
                 break;
             case SHARE_FELLOWSHIP:
@@ -119,7 +120,7 @@ public final class LostTalesWaystoneSettingsService {
                     LostTalesWaystoneStateReason.SAVE_FAILED);
             return;
         }
-        LostTalesMapMarkerSyncManager.syncAll();
+        LostTalesMapMarkerSyncManager.syncViewersOf(context.record, updated);
         sendState(player, context.tile, updated,
                 LostTalesWaystoneStateReason.SAVED);
         player.addChatMessage(new ChatComponentTranslation(
@@ -330,9 +331,12 @@ public final class LostTalesWaystoneSettingsService {
     }
 
     private static Outcome applyPlayerSharing(
-            LostTalesMapMarkerRecord record,
+            World world, LostTalesMapMarkerRecord record,
             String playerName, boolean remove) {
-        UUID targetId = findPlayerId(playerName);
+        UUID targetId = remove ? sharedNamed(world, record, playerName) : null;
+        if (targetId == null) {
+            targetId = KnownAccounts.find(world, playerName);
+        }
         if (targetId == null) {
             return Outcome.refused(
                     LostTalesWaystoneStateReason.PLAYER_NOT_FOUND);
@@ -433,18 +437,29 @@ public final class LostTalesWaystoneSettingsService {
                 : ownerData.getFellowshipByName(normalized);
     }
 
-    private static UUID findPlayerId(String playerName) {
-        String normalized =
-                playerName == null ? "" : playerName.trim();
-        MinecraftServer server = MinecraftServer.getServer();
-        if (normalized.length() == 0 || server == null
-                || server.getConfigurationManager() == null
-                || server.func_152358_ax() == null) {
+    /**
+     * The player already shared with who goes by that name, so one who has
+     * not visited in a while can still be taken off the list.
+     */
+    private static UUID sharedNamed(
+            World world, LostTalesMapMarkerRecord record, String playerName) {
+        String wanted = trim(playerName);
+        if (wanted.length() == 0) {
             return null;
         }
-        GameProfile profile = server.func_152358_ax()
-                .func_152655_a(normalized);
-        return profile == null ? null : profile.getId();
+        CharacterWorldData storage;
+        try {
+            storage = CharacterStorage.get(world);
+        } catch (RuntimeException unreadable) {
+            return null;
+        }
+        for (UUID shared : record.getSharedPlayerIds()) {
+            if (wanted.equalsIgnoreCase(
+                    KnownAccounts.nameOf(shared, storage.getRoster(shared)))) {
+                return shared;
+            }
+        }
+        return null;
     }
 
     private static String normalizeColor(String value) {

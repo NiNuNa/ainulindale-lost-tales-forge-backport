@@ -27,8 +27,7 @@ public final class CharacterRaceSelectabilityTest {
                 CharacterRaceRegistry.get(CharacterRaceRegistry.HALF_TROLL);
         assertNotNull("the race is still known", halfTroll);
         assertFalse("but nobody may choose it", halfTroll.isSelectable());
-        assertFalse(CharacterRaceRegistry.getSelectableIds()
-                .contains(CharacterRaceRegistry.HALF_TROLL));
+        assertFalse(selectableIds().contains(CharacterRaceRegistry.HALF_TROLL));
     }
 
     @Test
@@ -41,7 +40,7 @@ public final class CharacterRaceSelectabilityTest {
 
     @Test
     public void everyOtherRaceStaysChoosable() {
-        List<String> selectable = CharacterRaceRegistry.getSelectableIds();
+        List<String> selectable = selectableIds();
         assertTrue(selectable.contains(CharacterRaceRegistry.HUMAN));
         assertTrue(selectable.contains(CharacterRaceRegistry.ELF));
         assertTrue(selectable.contains(CharacterRaceRegistry.DWARF));
@@ -50,5 +49,15 @@ public final class CharacterRaceSelectabilityTest {
         assertTrue(selectable.contains(CharacterRaceRegistry.URUK));
         assertEquals("six races, and the half-troll left out",
                 CharacterRaceRegistry.getAll().size() - 1, selectable.size());
+    }
+
+    private static List<String> selectableIds() {
+        List<String> ids = new java.util.ArrayList<String>();
+        for (CharacterRaceDefinition race : CharacterRaceRegistry.getAll()) {
+            if (race.isSelectable()) {
+                ids.add(race.getId());
+            }
+        }
+        return ids;
     }
 }

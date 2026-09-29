@@ -12,7 +12,8 @@ import net.minecraft.util.IChatComponent;
  * character; a join or a leave is an account coming or going, so it is
  * out-of-character news in OOC, naming the account. The other lines the
  * whole server sees — {@code /say}, {@code /me}, a travelling trader —
- * are conversation everyone shares and go to Global too. Everything else
+ * are conversation everyone shares and go to Global too. The server's
+ * welcome to a new player waits in OOC. Everything else
  * (command output, fast-travel countdowns, LOTR notices, other mods'
  * lines, plain text components) is the player's private console. The
  * server's Discord bridge asks the finer question of {@link #kindOf}:
@@ -59,6 +60,8 @@ public final class ChatSystemLineClassifier {
             "lotr.travellingTrader.arriveMP",
             "lotr.travellingTrader.depart",
     };
+    /** The server's welcome to a new player (ChatWelcome), which waits in OOC. */
+    private static final String WELCOME_KEY = "chat.losttales.welcome";
     /**
      * Vanilla's notice to every operator of what a command did:
      * {@code [Server: Opped Nils]}, its first argument the name of whoever
@@ -90,6 +93,9 @@ public final class ChatSystemLineClassifier {
         }
         if (contains(OTHER_GLOBAL_KEYS, key)) {
             return ChatChannel.GLOBAL;
+        }
+        if (WELCOME_KEY.equals(key)) {
+            return ChatChannel.OOC;
         }
         return ChatChannel.CLIENT_CONSOLE;
     }

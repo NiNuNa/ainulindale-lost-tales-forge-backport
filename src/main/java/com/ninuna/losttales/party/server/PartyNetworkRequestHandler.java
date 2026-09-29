@@ -21,7 +21,7 @@ public final class PartyNetworkRequestHandler {
     public static void handleAction(EntityPlayerMP player,
                                     int requestId,
                                     PartyOperationType operationType,
-                                    UUID expectedActiveCharacterId,
+                                    UUID expectedActiveIdentityId,
                                     UUID expectedPartyId,
                                     long expectedPartyRevision,
                                     UUID targetId,
@@ -29,7 +29,8 @@ public final class PartyNetworkRequestHandler {
                                     boolean hasMarkerPosition,
                                     int markerDimensionId,
                                     double markerX,
-                                    double markerZ) {
+                                    double markerZ,
+                                    String name) {
         if (player == null || operationType == null) {
             return;
         }
@@ -41,7 +42,7 @@ public final class PartyNetworkRequestHandler {
         PartyErrorId contextError = validateRequestContext(
                 player,
                 operationType,
-                expectedActiveCharacterId,
+                expectedActiveIdentityId,
                 expectedPartyId);
         if (contextError != PartyErrorId.NONE) {
             PartySyncManager.sendFailure(
@@ -95,17 +96,21 @@ public final class PartyNetworkRequestHandler {
                             PartyServerActionService.setMemberColor(
                                     player, expectedPartyRevision, color));
                     return;
+                case RENAME:
+                    finish(player, requestId, operationType, before,
+                            PartyServerActionService.renameParty(
+                                    player, expectedPartyRevision, name));
+                    return;
                 case SET_GO_HERE_MARKER:
                     finish(player, requestId, operationType, before,
                             PartyServerActionService.setGoHereMarker(
-                                    player, expectedPartyRevision,
-                                    hasMarkerPosition, markerDimensionId,
-                                    markerX, markerZ));
+                                    player, hasMarkerPosition,
+                                    markerDimensionId, markerX, markerZ));
                     return;
                 case REMOVE_GO_HERE_MARKER:
                     finish(player, requestId, operationType, before,
                             PartyServerActionService.removeGoHereMarker(
-                                    player, expectedPartyRevision));
+                                    player));
                     return;
                 case INVITE_PLAYER: {
                     PartyInvitationOperationResult invited =
@@ -182,7 +187,7 @@ public final class PartyNetworkRequestHandler {
     private static PartyErrorId validateRequestContext(
             EntityPlayerMP player,
             PartyOperationType operationType,
-            UUID expectedActiveCharacterId,
+            UUID expectedActiveIdentityId,
             UUID expectedPartyId) {
         PartyService service = PartyService.getInstance();
         if (isPersonalMarkerOperation(operationType)) {
@@ -194,20 +199,20 @@ public final class PartyNetworkRequestHandler {
             if (!owner.isValid()) {
                 return owner.errorId;
             }
-            return expectedActiveCharacterId != null
-                    && expectedActiveCharacterId.equals(owner.ownerId)
+            return expectedActiveIdentityId != null
+                    && expectedActiveIdentityId.equals(owner.ownerId)
                     ? PartyErrorId.NONE
                     : PartyErrorId.ACTIVE_CHARACTER_CHANGED;
         }
-        PartyService.ActiveCharacterContext active =
-                service.resolveActiveCharacter(player);
+        PartyService.ActiveIdentityContext active =
+                service.resolveActiveIdentity(player);
         if (!active.isValid()) {
             return active.errorId;
         }
         // The request names the identity it was made for; a switch to
         // another character, or to or from the account, has changed it.
-        if (expectedActiveCharacterId == null
-                || !expectedActiveCharacterId.equals(active.gameplayId())) {
+        if (expectedActiveIdentityId == null
+                || !expectedActiveIdentityId.equals(active.gameplayId())) {
             return PartyErrorId.ACTIVE_CHARACTER_CHANGED;
         }
         if (!operationType.requiresPartyRevision()) {
@@ -220,7 +225,7 @@ public final class PartyNetworkRequestHandler {
         if (partyData.isReadOnlyForNewerVersion()) {
             return PartyErrorId.PARTY_STORAGE_READ_ONLY;
         }
-        Party party = partyData.getPartyForCharacter(active.gameplayId());
+        Party party = partyData.getPartyForIdentity(active.gameplayId());
         if (party == null) {
             return PartyErrorId.NOT_IN_PARTY;
         }

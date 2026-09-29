@@ -10,6 +10,13 @@ import java.util.UUID;
 final class ChatHistoryRequesters {
     private ChatHistoryRequesters() {}
 
+    /** An account with no character, reading every channel. */
+    static ChatHistory.Requester reader(UUID accountId) {
+        return new ChatHistory.Requester(accountId,
+                Collections.<String, Long>emptyMap(), null,
+                java.util.Arrays.asList(ChatChannel.values()));
+    }
+
     /**
      * An account with one character, in that faction, made then; a
      * faction id of nothing is an account with no character in any.

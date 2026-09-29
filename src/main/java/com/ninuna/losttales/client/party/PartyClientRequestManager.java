@@ -10,7 +10,12 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.client.Minecraft;
 
-/** Client-only request builder used by future party interfaces. */
+/**
+ * Builds and sends the party requests of the Party page, the map and the
+ * invitation lines in the chat. Each names the identity it was made for;
+ * a change to the party names the party and the revision it was made
+ * against, so the server refuses it once the party has changed.
+ */
 public final class PartyClientRequestManager {
 
     private static final AtomicInteger NEXT_REQUEST_ID = new AtomicInteger();
@@ -23,196 +28,151 @@ public final class PartyClientRequestManager {
                 null, null);
     }
 
-    public static int createParty() {
-        return createParty(currentActiveCharacterId());
-    }
-
-    public static int createParty(UUID expectedActiveCharacterId) {
+    public static int createParty(UUID expectedActiveIdentityId) {
         return send(PartyOperationType.CREATE,
-                expectedActiveCharacterId, null,
+                expectedActiveIdentityId, null,
                 PartyActionRequestPacket.NO_PARTY_REVISION, null, null);
     }
 
-    public static int leaveParty(long expectedPartyRevision) {
-        return leaveParty(currentActiveCharacterId(), currentPartyId(),
-                expectedPartyRevision);
-    }
-
-    public static int leaveParty(UUID expectedActiveCharacterId,
+    public static int leaveParty(UUID expectedActiveIdentityId,
                                  UUID expectedPartyId,
                                  long expectedPartyRevision) {
         return send(PartyOperationType.LEAVE,
-                expectedActiveCharacterId, expectedPartyId,
+                expectedActiveIdentityId, expectedPartyId,
                 expectedPartyRevision, null, null);
     }
 
-    public static int removeMember(long expectedPartyRevision,
-                                   UUID targetCharacterId) {
-        return removeMember(currentActiveCharacterId(), currentPartyId(),
-                expectedPartyRevision, targetCharacterId);
-    }
-
-    public static int removeMember(UUID expectedActiveCharacterId,
+    public static int removeMember(UUID expectedActiveIdentityId,
                                    UUID expectedPartyId,
                                    long expectedPartyRevision,
-                                   UUID targetCharacterId) {
+                                   UUID targetIdentityId) {
         return send(PartyOperationType.REMOVE_MEMBER,
-                expectedActiveCharacterId, expectedPartyId,
-                expectedPartyRevision, targetCharacterId, null);
+                expectedActiveIdentityId, expectedPartyId,
+                expectedPartyRevision, targetIdentityId, null);
     }
 
-    public static int disbandParty(long expectedPartyRevision) {
-        return disbandParty(currentActiveCharacterId(), currentPartyId(),
-                expectedPartyRevision);
-    }
-
-    public static int disbandParty(UUID expectedActiveCharacterId,
+    public static int disbandParty(UUID expectedActiveIdentityId,
                                    UUID expectedPartyId,
                                    long expectedPartyRevision) {
         return send(PartyOperationType.DISBAND,
-                expectedActiveCharacterId, expectedPartyId,
+                expectedActiveIdentityId, expectedPartyId,
                 expectedPartyRevision, null, null);
     }
 
-    public static int transferLeadership(long expectedPartyRevision,
-                                         UUID targetCharacterId) {
-        return transferLeadership(currentActiveCharacterId(), currentPartyId(),
-                expectedPartyRevision, targetCharacterId);
-    }
-
-    public static int transferLeadership(UUID expectedActiveCharacterId,
+    public static int transferLeadership(UUID expectedActiveIdentityId,
                                          UUID expectedPartyId,
                                          long expectedPartyRevision,
-                                         UUID targetCharacterId) {
+                                         UUID targetIdentityId) {
         return send(PartyOperationType.TRANSFER_LEADERSHIP,
-                expectedActiveCharacterId, expectedPartyId,
-                expectedPartyRevision, targetCharacterId, null);
+                expectedActiveIdentityId, expectedPartyId,
+                expectedPartyRevision, targetIdentityId, null);
     }
 
-    public static int setColor(long expectedPartyRevision,
-                               PartyColor color) {
-        return setColor(currentActiveCharacterId(), currentPartyId(),
-                expectedPartyRevision, color);
-    }
-
-    public static int setColor(UUID expectedActiveCharacterId,
+    public static int setColor(UUID expectedActiveIdentityId,
                                UUID expectedPartyId,
                                long expectedPartyRevision,
                                PartyColor color) {
         return send(PartyOperationType.SET_COLOR,
-                expectedActiveCharacterId, expectedPartyId,
+                expectedActiveIdentityId, expectedPartyId,
                 expectedPartyRevision, null, color);
     }
 
-    public static int setGoHereMarker(long expectedPartyRevision) {
-        return setGoHereMarker(currentActiveCharacterId(), currentPartyId(),
-                expectedPartyRevision);
+    /** The leader names the party; an empty name takes its name away. */
+    public static int renameParty(UUID expectedActiveIdentityId,
+                                  UUID expectedPartyId,
+                                  long expectedPartyRevision,
+                                  String name) {
+        return send(PartyOperationType.RENAME,
+                expectedActiveIdentityId, expectedPartyId,
+                expectedPartyRevision, null, null,
+                false, 0, 0.0D, 0.0D, name == null ? "" : name);
     }
 
-    public static int setGoHereMarker(UUID expectedActiveCharacterId,
-                                      UUID expectedPartyId,
-                                      long expectedPartyRevision) {
+    /** Places the player's go-here marker where they stand. */
+    public static int setGoHereMarker(UUID expectedActiveIdentityId) {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (minecraft == null || minecraft.thePlayer == null) {
             return failWithoutSend(PartyOperationType.SET_GO_HERE_MARKER);
         }
-        return setGoHereMarker(expectedActiveCharacterId, expectedPartyId,
-                expectedPartyRevision, minecraft.thePlayer.dimension,
+        return setGoHereMarker(expectedActiveIdentityId,
+                minecraft.thePlayer.dimension,
                 minecraft.thePlayer.posX, minecraft.thePlayer.posZ);
     }
 
-    public static int setGoHereMarker(UUID expectedActiveCharacterId,
-                                      UUID expectedPartyId,
-                                      long expectedPartyRevision,
+    /** Places the player's go-here marker at a place picked on the map. */
+    public static int setGoHereMarker(UUID expectedActiveIdentityId,
                                       int dimensionId,
                                       double x,
                                       double z) {
         return send(PartyOperationType.SET_GO_HERE_MARKER,
-                expectedActiveCharacterId, null,
+                expectedActiveIdentityId, null,
                 PartyActionRequestPacket.NO_PARTY_REVISION, null, null,
-                true, dimensionId, x, z);
+                true, dimensionId, x, z, null);
     }
 
-    public static int removeGoHereMarker(long expectedPartyRevision) {
-        return removeGoHereMarker(currentActiveCharacterId(), currentPartyId(),
-                expectedPartyRevision);
-    }
-
-    public static int removeGoHereMarker(UUID expectedActiveCharacterId,
-                                         UUID expectedPartyId,
-                                         long expectedPartyRevision) {
+    public static int removeGoHereMarker(UUID expectedActiveIdentityId) {
         return send(PartyOperationType.REMOVE_GO_HERE_MARKER,
-                expectedActiveCharacterId, null,
+                expectedActiveIdentityId, null,
                 PartyActionRequestPacket.NO_PARTY_REVISION, null, null);
     }
 
-    public static int invitePlayer(long expectedPartyRevision,
-                                   UUID targetOwnerId) {
-        return invitePlayer(currentActiveCharacterId(), currentPartyId(),
-                expectedPartyRevision, targetOwnerId);
-    }
-
-    public static int invitePlayer(UUID expectedActiveCharacterId,
+    public static int invitePlayer(UUID expectedActiveIdentityId,
                                    UUID expectedPartyId,
                                    long expectedPartyRevision,
                                    UUID targetOwnerId) {
         return send(PartyOperationType.INVITE_PLAYER,
-                expectedActiveCharacterId, expectedPartyId,
+                expectedActiveIdentityId, expectedPartyId,
                 expectedPartyRevision, targetOwnerId, null);
     }
 
+    /** Accepts an invitation for the identity the party state was last sent for. */
     public static int acceptInvitation(UUID invitationId) {
-        return acceptInvitation(currentActiveCharacterId(), invitationId);
+        return acceptInvitation(currentActiveIdentityId(), invitationId);
     }
 
-    public static int acceptInvitation(UUID expectedActiveCharacterId,
+    public static int acceptInvitation(UUID expectedActiveIdentityId,
                                        UUID invitationId) {
         return send(PartyOperationType.ACCEPT_INVITATION,
-                expectedActiveCharacterId, null,
+                expectedActiveIdentityId, null,
                 PartyActionRequestPacket.NO_PARTY_REVISION,
                 invitationId, null);
     }
 
+    /** Declines an invitation for the identity the party state was last sent for. */
     public static int declineInvitation(UUID invitationId) {
-        return declineInvitation(currentActiveCharacterId(), invitationId);
+        return declineInvitation(currentActiveIdentityId(), invitationId);
     }
 
-    public static int declineInvitation(UUID expectedActiveCharacterId,
+    public static int declineInvitation(UUID expectedActiveIdentityId,
                                         UUID invitationId) {
         return send(PartyOperationType.DECLINE_INVITATION,
-                expectedActiveCharacterId, null,
+                expectedActiveIdentityId, null,
                 PartyActionRequestPacket.NO_PARTY_REVISION,
                 invitationId, null);
     }
 
-    public static int cancelInvitation(long expectedPartyRevision,
-                                       UUID invitationId) {
-        return cancelInvitation(currentActiveCharacterId(), currentPartyId(),
-                expectedPartyRevision, invitationId);
-    }
-
-    public static int cancelInvitation(UUID expectedActiveCharacterId,
+    public static int cancelInvitation(UUID expectedActiveIdentityId,
                                        UUID expectedPartyId,
                                        long expectedPartyRevision,
                                        UUID invitationId) {
         return send(PartyOperationType.CANCEL_INVITATION,
-                expectedActiveCharacterId, expectedPartyId,
+                expectedActiveIdentityId, expectedPartyId,
                 expectedPartyRevision, invitationId, null);
     }
 
     private static int send(PartyOperationType operationType,
-                            UUID expectedActiveCharacterId,
+                            UUID expectedActiveIdentityId,
                             UUID expectedPartyId,
                             long expectedPartyRevision,
                             UUID targetId,
                             PartyColor color) {
-        return send(operationType, expectedActiveCharacterId,
+        return send(operationType, expectedActiveIdentityId,
                 expectedPartyId, expectedPartyRevision, targetId, color,
-                false, 0, 0.0D, 0.0D);
+                false, 0, 0.0D, 0.0D, null);
     }
 
     private static int send(PartyOperationType operationType,
-                            UUID expectedActiveCharacterId,
+                            UUID expectedActiveIdentityId,
                             UUID expectedPartyId,
                             long expectedPartyRevision,
                             UUID targetId,
@@ -220,7 +180,8 @@ public final class PartyClientRequestManager {
                             boolean hasMarkerPosition,
                             int markerDimensionId,
                             double markerX,
-                            double markerZ) {
+                            double markerZ,
+                            String name) {
         int requestId = nextRequestId();
         ClientPartyStateCache.beginRequest(requestId, operationType);
         try {
@@ -228,7 +189,7 @@ public final class PartyClientRequestManager {
                     new PartyActionRequestPacket(
                             requestId,
                             operationType,
-                            expectedActiveCharacterId,
+                            expectedActiveIdentityId,
                             expectedPartyId,
                             expectedPartyRevision,
                             targetId,
@@ -236,7 +197,8 @@ public final class PartyClientRequestManager {
                             hasMarkerPosition,
                             markerDimensionId,
                             markerX,
-                            markerZ));
+                            markerZ,
+                            name));
         } catch (Throwable throwable) {
             ClientPartyStateCache.failLocalRequest(requestId, operationType);
         }
@@ -250,17 +212,10 @@ public final class PartyClientRequestManager {
         return requestId;
     }
 
-    private static UUID currentActiveCharacterId() {
+    private static UUID currentActiveIdentityId() {
         PartyStateSnapshot snapshot = ClientPartyStateCache.getSnapshot();
         return snapshot != null && snapshot.isAvailable()
-                ? snapshot.getActiveCharacterId() : null;
-    }
-
-    private static UUID currentPartyId() {
-        PartyStateSnapshot snapshot = ClientPartyStateCache.getSnapshot();
-        return snapshot != null && snapshot.isAvailable()
-                && snapshot.getParty() != null
-                ? snapshot.getParty().getPartyId() : null;
+                ? snapshot.getActiveIdentityId() : null;
     }
 
     private static int nextRequestId() {

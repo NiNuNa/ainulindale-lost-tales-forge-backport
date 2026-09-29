@@ -27,9 +27,4 @@ public enum CharacterSkinLayout {
      * and every limb has an overlay region in rows 32 to 63.
      */
     MINECRAFT_64X64;
-
-    /** Rows of the texture. */
-    public int getHeight() {
-        return this == LOTR_64X32 ? 32 : 64;
-    }
 }

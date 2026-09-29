@@ -11,8 +11,6 @@ import com.ninuna.losttales.config.LostTalesConfig;
  * backgrounds out of sync.</p>
  */
 final class LostTalesMapTerrainTransition {
-    static final float DEFAULT_MAP_ONLY_ZOOM_EXP = 4.0F;
-    static final float DEFAULT_TERRAIN_ONLY_ZOOM_EXP = 4.6F;
     /** Starts bounded preparation shortly before terrain can become visible. */
     static final float PREPARE_MARGIN = 0.2F;
 
@@ -32,14 +30,6 @@ final class LostTalesMapTerrainTransition {
         }
         float progress = clamp((zoomExp - mapOnly) / span);
         return progress * progress * (3.0F - 2.0F * progress);
-    }
-
-    /**
-     * Opacity retained by the map image where terrain data is available.
-     * Unknown tiles will continue to use a fully opaque map image.
-     */
-    static float mapAlpha(float zoomExp) {
-        return 1.0F - terrainAlpha(zoomExp);
     }
 
     static float mapOnlyZoomExp() {

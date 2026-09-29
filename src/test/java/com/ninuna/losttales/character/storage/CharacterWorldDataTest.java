@@ -13,6 +13,7 @@ import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
 import org.junit.Test;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
@@ -43,6 +44,13 @@ public final class CharacterWorldDataTest {
     private static final UUID STRANGER =
             UUID.fromString("60000000-0000-0000-0000-000000000006");
 
+    /** The quarantined entries the store writes back, as the next load reads them. */
+    private static List<NBTTagCompound> quarantinedOf(CharacterWorldData data) {
+        NBTTagCompound written = new NBTTagCompound();
+        data.writeToNBT(written);
+        return NbtQuarantine.read(written).getEntries();
+    }
+
     @Test
     public void aStoreWrittenAndReadBackNeedsNoRepair() {
         NBTTagCompound saved = savedRosters();
@@ -53,8 +61,8 @@ public final class CharacterWorldDataTest {
                 saved.getInteger("DataVersion"));
         assertFalse(loaded.isReadOnlyForNewerVersion());
         assertFalse(loaded.isDirty());
-        assertEquals(2, loaded.getRosterCount());
-        assertEquals(0, loaded.getQuarantinedEntryCount());
+        assertEquals(2, loaded.getRosters().size());
+        assertEquals(0, quarantinedOf(loaded).size());
         assertNotNull(loaded.findCharacter(CHARACTER_A));
         assertNotNull(loaded.findCharacter(CHARACTER_B));
     }
@@ -71,9 +79,7 @@ public final class CharacterWorldDataTest {
         loaded.writeToNBT(written);
 
         assertTrue(loaded.isReadOnlyForNewerVersion());
-        assertEquals(CharacterNbtCodec.CURRENT_ROOT_DATA_VERSION + 1,
-                loaded.getUnsupportedDataVersion());
-        assertEquals(0, loaded.getRosterCount());
+        assertEquals(0, loaded.getRosters().size());
         assertEquals(expected, written);
     }
 
@@ -88,7 +94,7 @@ public final class CharacterWorldDataTest {
         loaded.writeToNBT(written);
 
         assertTrue(loaded.isReadOnlyForNewerVersion());
-        assertEquals(0, loaded.getRosterCount());
+        assertEquals(0, loaded.getRosters().size());
         assertEquals(expected, written);
     }
 
@@ -105,9 +111,7 @@ public final class CharacterWorldDataTest {
         loaded.writeToNBT(written);
 
         assertTrue(loaded.isReadOnlyForNewerVersion());
-        assertEquals(NbtQuarantine.CURRENT_DATA_VERSION + 1,
-                loaded.getUnsupportedDataVersion());
-        assertEquals(0, loaded.getRosterCount());
+        assertEquals(0, loaded.getRosters().size());
         assertEquals(expected, written);
     }
 
@@ -123,7 +127,7 @@ public final class CharacterWorldDataTest {
         loaded.writeToNBT(written);
 
         assertTrue(loaded.isReadOnlyForNewerVersion());
-        assertEquals(0, loaded.getRosterCount());
+        assertEquals(0, loaded.getRosters().size());
         assertEquals(expected, written);
     }
 
@@ -140,9 +144,7 @@ public final class CharacterWorldDataTest {
         loaded.writeToNBT(written);
 
         assertTrue(loaded.isReadOnlyForNewerVersion());
-        assertEquals(RoleplayCharacter.CURRENT_DATA_VERSION + 1,
-                loaded.getUnsupportedDataVersion());
-        assertEquals(0, loaded.getRosterCount());
+        assertEquals(0, loaded.getRosters().size());
         assertEquals(expected, written);
     }
 
@@ -165,7 +167,7 @@ public final class CharacterWorldDataTest {
         } catch (IllegalStateException expected) {
             assertTrue(expected.getMessage().contains("read-only"));
         }
-        assertEquals(0, loaded.getRosterCount());
+        assertEquals(0, loaded.getRosters().size());
     }
 
     @Test
@@ -181,11 +183,11 @@ public final class CharacterWorldDataTest {
 
         assertFalse(loaded.isReadOnlyForNewerVersion());
         assertTrue(loaded.isDirty());
-        assertEquals(1, loaded.getRosterCount());
+        assertEquals(1, loaded.getRosters().size());
         assertNull(loaded.getRoster(OWNER_A));
         assertNotNull(loaded.getRoster(OWNER_B));
-        assertEquals(1, loaded.getQuarantinedEntryCount());
-        NBTTagCompound entry = loaded.getQuarantinedEntriesCopy().get(0);
+        assertEquals(1, quarantinedOf(loaded).size());
+        NBTTagCompound entry = quarantinedOf(loaded).get(0);
         assertEquals("roster", entry.getString("EntryType"));
         assertEquals("missing_or_invalid_owner_uuid", entry.getString("Reason"));
         assertEquals(0, entry.getInteger("RosterIndex"));
@@ -200,10 +202,10 @@ public final class CharacterWorldDataTest {
 
         CharacterWorldData loaded = load(saved);
 
-        assertEquals(2, loaded.getRosterCount());
+        assertEquals(2, loaded.getRosters().size());
         assertNotNull(loaded.getRoster(OWNER_A));
-        assertEquals(1, loaded.getQuarantinedEntryCount());
-        NBTTagCompound entry = loaded.getQuarantinedEntriesCopy().get(0);
+        assertEquals(1, quarantinedOf(loaded).size());
+        NBTTagCompound entry = quarantinedOf(loaded).get(0);
         assertEquals("roster", entry.getString("EntryType"));
         assertEquals("duplicate_roster_owner", entry.getString("Reason"));
         assertEquals(2, entry.getInteger("RosterIndex"));
@@ -223,12 +225,12 @@ public final class CharacterWorldDataTest {
 
         CharacterWorldData loaded = load(saved);
 
-        assertEquals(2, loaded.getRosterCount());
+        assertEquals(2, loaded.getRosters().size());
         assertNotNull(loaded.getRoster(OWNER_A));
-        assertEquals(0, loaded.getRoster(OWNER_A).getCharacterCount());
+        assertEquals(0, loaded.getRoster(OWNER_A).getCharacters().size());
         assertNull(loaded.findCharacter(CHARACTER_A));
-        assertEquals(1, loaded.getQuarantinedEntryCount());
-        NBTTagCompound entry = loaded.getQuarantinedEntriesCopy().get(0);
+        assertEquals(1, quarantinedOf(loaded).size());
+        NBTTagCompound entry = quarantinedOf(loaded).get(0);
         assertEquals("character", entry.getString("EntryType"));
         assertEquals("owner_uuid_mismatch", entry.getString("Reason"));
         assertEquals(0, entry.getInteger("RosterIndex"));
@@ -248,9 +250,9 @@ public final class CharacterWorldDataTest {
         CharacterWorldData loaded = load(saved);
 
         assertNotNull(loaded.findCharacter(CHARACTER_A));
-        assertEquals(1, loaded.getRoster(OWNER_A).getCharacterCount());
-        assertEquals(1, loaded.getQuarantinedEntryCount());
-        NBTTagCompound entry = loaded.getQuarantinedEntriesCopy().get(0);
+        assertEquals(1, loaded.getRoster(OWNER_A).getCharacters().size());
+        assertEquals(1, quarantinedOf(loaded).size());
+        NBTTagCompound entry = quarantinedOf(loaded).get(0);
         assertEquals("character", entry.getString("EntryType"));
         assertEquals("duplicate_character_uuid_or_occupied_slot",
                 entry.getString("Reason"));
@@ -267,16 +269,16 @@ public final class CharacterWorldDataTest {
         firstCharacterOf(saved).removeTag("SlotIndex");
 
         CharacterWorldData loaded = load(saved);
-        assertEquals(1, loaded.getQuarantinedEntryCount());
+        assertEquals(1, quarantinedOf(loaded).size());
         NBTTagCompound rewritten = new NBTTagCompound();
         loaded.writeToNBT(rewritten);
         CharacterWorldData reloaded = load(rewritten);
 
-        assertEquals(1, reloaded.getQuarantinedEntryCount());
-        NBTTagCompound entry = reloaded.getQuarantinedEntriesCopy().get(0);
+        assertEquals(1, quarantinedOf(reloaded).size());
+        NBTTagCompound entry = quarantinedOf(reloaded).get(0);
         assertEquals("missing_slot_index", entry.getString("Reason"));
-        assertEquals(loaded.getQuarantinedEntriesCopy().get(0), entry);
-        assertEquals(2, reloaded.getRosterCount());
+        assertEquals(quarantinedOf(loaded).get(0), entry);
+        assertEquals(2, reloaded.getRosters().size());
     }
 
     @Test
@@ -292,7 +294,7 @@ public final class CharacterWorldDataTest {
         assertNotNull(repaired);
         assertEquals(CharacterRaceRegistry.HUMAN, repaired.getRaceId());
         assertEquals(storedSkinId, repaired.getSkinId());
-        assertEquals(0, loaded.getQuarantinedEntryCount());
+        assertEquals(0, quarantinedOf(loaded).size());
         assertTrue(loaded.isDirty());
     }
 
@@ -314,7 +316,7 @@ public final class CharacterWorldDataTest {
                         CharacterRaceRegistry.HUMAN, CharacterGenderRegistry.MALE,
                         CHARACTER_A),
                 repaired.getSkinId());
-        assertEquals(0, loaded.getQuarantinedEntryCount());
+        assertEquals(0, quarantinedOf(loaded).size());
     }
 
     /** A record written before the body and chest keys existed takes the sex's defaults. */
@@ -342,7 +344,7 @@ public final class CharacterWorldDataTest {
         assertNotNull(repaired);
         assertEquals(CharacterBodyTypeRegistry.WIDE, repaired.getBodyTypeId());
         assertEquals(CharacterChestTypeRegistry.NONE, repaired.getChestTypeId());
-        assertEquals(0, loaded.getQuarantinedEntryCount());
+        assertEquals(0, quarantinedOf(loaded).size());
         assertTrue(loaded.isDirty());
     }
 
@@ -366,7 +368,7 @@ public final class CharacterWorldDataTest {
         CharacterRoster restored = loaded.getRoster(OWNER_A);
         assertNotNull(restored);
         assertNull(restored.getActiveCharacterId());
-        assertEquals(1, restored.getCharacterCount());
+        assertEquals(1, restored.getCharacters().size());
         assertTrue(loaded.isDirty());
     }
 

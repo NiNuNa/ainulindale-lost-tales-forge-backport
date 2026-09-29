@@ -27,7 +27,9 @@ import org.lwjgl.input.Mouse;
  * — with its magnifier at the well's right end; before the well the
  * member list's button, two people, which a page has none of, and before
  * that the cog, which opens the tab's menu. The panel buttons rest lit
- * while their panels are out, and the cog while its menu is.
+ * while their panels are out, and the cog while its menu is. A cog with
+ * nothing to choose and a well with nothing to search stay where they
+ * are, greyed, and their tips say why.
  * While a search stands in a well, the count stands inside the well
  * before its end, and the magnifier has crossed over to the cross that
  * clears it: over a conversation the match stood on of how many, with
@@ -116,7 +118,6 @@ public final class ToolStrip {
 
     /** Where one window's strip stands this frame, in its row's space. */
     static final class Layout {
-        int stripTop;
         int wellLeft;
         int wellTop;
         int wellRight;
@@ -266,7 +267,6 @@ public final class ToolStrip {
                          int panelWidth, int panelHeight, boolean members,
                          Count count, int countWidth) {
         Layout laid = new Layout();
-        laid.stripTop = stripTop;
         laid.wellTop = stripTop
                 + (WindowPlacement.TOOL_STRIP_HEIGHT - 1 - WELL_HEIGHT) / 2;
         laid.wellBottom = laid.wellTop + WELL_HEIGHT;
@@ -340,12 +340,17 @@ public final class ToolStrip {
                     state.panelMotion, laid.panelX,
                     glyphTop(laid, laid.panelHeight), ink);
         }
-        state.settingsMotion.advance(now, menuOut || under == Part.SETTINGS,
-                under == Part.SETTINGS,
-                under == Part.SETTINGS && Mouse.isButtonDown(0));
-        LostTalesUiButton.drawGlyph(LostTalesUiSheet.COG,
-                LostTalesUiSheet.COG_HOVER, state.settingsMotion,
-                laid.settingsX, glyphTop(laid, COG_HEIGHT), ink);
+        if (TabMenus.hasRows(front)) {
+            state.settingsMotion.advance(now, menuOut || under == Part.SETTINGS,
+                    under == Part.SETTINGS,
+                    under == Part.SETTINGS && Mouse.isButtonDown(0));
+            LostTalesUiButton.drawGlyph(LostTalesUiSheet.COG,
+                    LostTalesUiSheet.COG_HOVER, state.settingsMotion,
+                    laid.settingsX, glyphTop(laid, COG_HEIGHT), ink);
+        } else {
+            drawGreyed(LostTalesUiSheet.COG, laid.settingsX,
+                    glyphTop(laid, COG_HEIGHT), ink);
+        }
         if (laid.hasMembers) {
             state.membersMotion.advance(now, front.isMemberListOut(window)
                             || under == Part.MEMBERS_TOGGLE,
@@ -369,6 +374,11 @@ public final class ToolStrip {
                 LostTalesUiInk.argb(LostTalesUiInk.SURFACE_RGB,
                         surfaceAlpha));
         LostTalesUiInk.beginContent();
+        if (front.searchUnavailable().length() > 0) {
+            drawGreyed(LostTalesUiSheet.SEARCH, laid.iconSlotLeft,
+                    glyphTop(laid, LostTalesUiSheet.SEARCH.getHeight()), ink);
+            return;
+        }
         boolean typed = searching && WindowSearch.query().length() > 0;
         if (searching && this.field != null) {
             if (this.field.getText().length() == 0) {
@@ -458,6 +468,37 @@ public final class ToolStrip {
                 glyphTop(laid, resting.getHeight()), alpha);
     }
 
+    /** A control with nothing to do: its resting glyph, faint, with no motion. */
+    private static void drawGreyed(LostTalesUiSheet glyph, int x, int y,
+                                   int alpha) {
+        LostTalesUiSheet.drawPairWithShadow(glyph, glyph, 0.0F, x, y,
+                Math.round(alpha * WindowStyle.UNAVAILABLE_OPACITY));
+    }
+
+    /**
+     * Why a part of {@code window}'s strip has nothing to do for the tab
+     * in front, for its tip: a cog with nothing to choose, a well with
+     * nothing to search; empty while it acts.
+     */
+    static String greyedWhy(Part part, Window window) {
+        WindowTab front = window == null ? null : window.getActiveTab();
+        if (part == null || front == null) {
+            return "";
+        }
+        switch (part) {
+            case SETTINGS:
+                return TabMenus.hasRows(front) ? ""
+                        : StatCollector.translateToLocalFormatted(
+                                "gui.losttales.window.cog.nothing",
+                                front.title());
+            case FIELD:
+            case ICON:
+                return front.searchUnavailable();
+            default:
+                return "";
+        }
+    }
+
     /** A glyph's top: centred on the well's capitals, the odd pixel up. */
     private static int glyphTop(Layout laid, int height) {
         return laid.textTop + WindowStyle.centredBoxTop(height);
@@ -533,6 +574,10 @@ public final class ToolStrip {
         WindowTab front = window == null ? null : window.getActiveTab();
         if (front == null) {
             return "";
+        }
+        String greyed = greyedWhy(part, window);
+        if (greyed.length() > 0) {
+            return greyed;
         }
         switch (part) {
             case PANEL: {

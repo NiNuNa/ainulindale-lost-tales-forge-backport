@@ -32,6 +32,19 @@ public final class ChatRolePresentation {
                 && channel.getPresentation() == ChatPresentationMode.IN_CHARACTER;
     }
 
+    /**
+     * Whether the channel's lines speak as the character each player plays
+     * rather than the chat identity: speech in the world around them (a
+     * channel reaching those nearby) and the party they travel with (Nils,
+     * 2026-09-28, C3 a and P1 a). So words float only over the body that
+     * says them, and a party speaks as the characters in it.
+     */
+    public static boolean speaksAsPlayedCharacter(ChatChannel channel) {
+        return isInCharacter(channel)
+                && (channel.getRecipientRule() == ChatRecipientRule.PROXIMITY
+                        || channel.getAccess() == ChatChannelAccess.PARTY_MEMBERSHIP);
+    }
+
     /** Whether the channel's lines colour their sender by the primary role: out of character. */
     public static boolean showsRoles(ChatChannel channel) {
         return channel != null

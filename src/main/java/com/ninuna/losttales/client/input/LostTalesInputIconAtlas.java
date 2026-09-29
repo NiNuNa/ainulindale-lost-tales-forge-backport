@@ -179,17 +179,9 @@ public final class LostTalesInputIconAtlas {
             this.glyphOffsetY = glyphOffsetY;
         }
 
-        public int getU() {
-            return this.frameU;
-        }
-
         public int getU(int frame) {
             int bounded = Math.max(0, Math.min(this.frameCount - 1, frame));
             return this.frameU + bounded * this.frameStrideX;
-        }
-
-        public int getV() {
-            return this.frameV;
         }
 
         public int getV(int frame) {
@@ -202,14 +194,6 @@ public final class LostTalesInputIconAtlas {
 
         public int getHeight() {
             return this.height;
-        }
-
-        public boolean isAnimated() {
-            return this.frameCount > 1;
-        }
-
-        public int getFrameCount() {
-            return this.frameCount;
         }
 
         public boolean hasGlyph() {
@@ -234,10 +218,6 @@ public final class LostTalesInputIconAtlas {
 
         public int getGlyphOffsetX() {
             return this.glyphOffsetX;
-        }
-
-        public int getGlyphOffsetY() {
-            return this.glyphOffsetY;
         }
 
         public int getGlyphOffsetY(int frame) {

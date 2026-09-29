@@ -54,10 +54,6 @@ public final class LostTalesSilhouetteRenderState {
         apply();
     }
 
-    public static boolean isActive() {
-        return active;
-    }
-
     /**
      * Makes every textured fragment's alpha the texture's times
      * {@code opacity} (0–1), whatever the vertex alpha; nestable no-op.
@@ -75,10 +71,6 @@ public final class LostTalesSilhouetteRenderState {
         }
         alphaActive = false;
         apply();
-    }
-
-    public static boolean isConstantAlphaActive() {
-        return alphaActive;
     }
 
     /**

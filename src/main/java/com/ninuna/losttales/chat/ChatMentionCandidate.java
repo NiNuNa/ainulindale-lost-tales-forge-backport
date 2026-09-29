@@ -27,8 +27,6 @@ import java.util.Locale;
 public final class ChatMentionCandidate {
     private final String key;
     private final String displayName;
-    private final String accountName;
-    private final String characterName;
     private final String accountId;
     private final String characterId;
     private final int roleColor;
@@ -36,7 +34,7 @@ public final class ChatMentionCandidate {
 
     public ChatMentionCandidate(String key, String displayName,
                                 List<String> aliases) {
-        this(key, displayName, displayName, "", aliases, "", "", -1);
+        this(key, displayName, aliases, "", "", -1);
     }
 
     /**
@@ -45,18 +43,8 @@ public final class ChatMentionCandidate {
      */
     public static ChatMentionCandidate role(String key, String name,
                                             int color) {
-        return new ChatMentionCandidate(key, name, "", "", null, "", "",
+        return new ChatMentionCandidate(key, name, null, "", "",
                 color & 0xFFFFFF);
-    }
-
-    /** A player, with the account id their face is drawn from. */
-    public static ChatMentionCandidate player(String key, String displayName,
-                                              String accountName,
-                                              String characterName,
-                                              String accountId,
-                                              List<String> aliases) {
-        return player(key, displayName, accountName, characterName,
-                accountId, "", aliases);
     }
 
     /**
@@ -64,26 +52,20 @@ public final class ChatMentionCandidate {
      * id of the character they are displayed as; empty for none.
      */
     public static ChatMentionCandidate player(String key, String displayName,
-                                              String accountName,
-                                              String characterName,
                                               String accountId,
                                               String characterId,
                                               List<String> aliases) {
-        return new ChatMentionCandidate(key, displayName, accountName,
-                characterName, aliases, accountId, characterId, -1);
+        return new ChatMentionCandidate(key, displayName, aliases, accountId,
+                characterId, -1);
     }
 
     private ChatMentionCandidate(String key, String displayName,
-                                 String accountName, String characterName,
                                  List<String> aliases, String accountId,
                                  String characterId, int roleColor) {
         String trimmedDisplay = displayName == null ? "" : displayName.trim();
         this.key = key == null || key.trim().length() == 0
                 ? trimmedDisplay.toLowerCase(Locale.ROOT) : key.trim();
         this.displayName = trimmedDisplay;
-        this.accountName = accountName == null ? "" : accountName.trim();
-        this.characterName = characterName == null ? ""
-                : characterName.trim();
         List<String> normalized = new ArrayList<String>(2);
         addAlias(normalized, trimmedDisplay);
         if (aliases != null) {
@@ -124,11 +106,6 @@ public final class ChatMentionCandidate {
         return this.roleColor;
     }
 
-    /** Convenience for a player known by a single name. */
-    public static ChatMentionCandidate single(String key, String name) {
-        return new ChatMentionCandidate(key, name, null);
-    }
-
     private static void addAlias(List<String> target, String alias) {
         String trimmed = alias == null ? "" : alias.trim();
         if (trimmed.length() == 0) {
@@ -148,16 +125,6 @@ public final class ChatMentionCandidate {
     /** Name shown in the list and inserted after the {@code @}. */
     public String getDisplayName() {
         return this.displayName;
-    }
-
-    /** Minecraft account name; equals the display name when nothing else is known. */
-    public String getAccountName() {
-        return this.accountName;
-    }
-
-    /** Active character name, or empty when the player has none. */
-    public String getCharacterName() {
-        return this.characterName;
     }
 
     /** Lowercased searchable names, the display name first. */

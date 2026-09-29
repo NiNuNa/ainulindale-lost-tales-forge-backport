@@ -14,10 +14,6 @@ public final class LostTalesQuestRewardHelper {
 
     private LostTalesQuestRewardHelper() {}
 
-    public static boolean grantRewards(EntityPlayerMP player, LostTalesQuestDefinition quest) {
-        return grantRewards(player, quest, null);
-    }
-
     public static boolean grantRewards(EntityPlayerMP player,
             LostTalesQuestDefinition quest,
             LostTalesQuestProgress progress) {

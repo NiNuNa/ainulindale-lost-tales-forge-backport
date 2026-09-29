@@ -24,7 +24,6 @@ public final class LostTalesMapHoverFocusTest {
         focus.update("marker:a", 1100L);
 
         assertEquals("", focus.update("marker:b", 1110L));
-        assertEquals("", focus.getActiveKey());
         assertEquals("marker:b", focus.update("marker:b", 1210L));
     }
 
@@ -36,7 +35,6 @@ public final class LostTalesMapHoverFocusTest {
         focus.update("marker:a", 1100L);
 
         assertEquals("", focus.update("", 1110L));
-        assertEquals("", focus.getActiveKey());
         assertEquals("", focus.update("marker:a", 1150L));
     }
 }

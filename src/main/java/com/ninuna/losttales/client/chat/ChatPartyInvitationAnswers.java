@@ -12,7 +12,7 @@ import net.minecraft.util.ChatComponentTranslation;
 
 /**
  * Answers to party invitations clicked in the chat. They are sent as the
- * Party screen sends them, and since that screen is not open to show the
+ * Party page sends them, and since the page may not be open to show the
  * outcome, the outcome is said in the Client Console.
  */
 public final class ChatPartyInvitationAnswers {
@@ -38,7 +38,7 @@ public final class ChatPartyInvitationAnswers {
         }
     }
 
-    /** Says how an answer given in the chat went; every other request is the Party screen's. */
+    /** Says how an answer given in the chat went; every other request is the Party page's. */
     public static void onResult(PartyOperationFeedback feedback) {
         if (feedback == null
                 || !WAITING.remove(Integer.valueOf(feedback.getRequestId()))) {

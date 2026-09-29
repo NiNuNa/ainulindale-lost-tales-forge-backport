@@ -53,18 +53,6 @@ public final class CameraPresetTest {
     }
 
     @Test
-    public void overhaulPerspectiveCycleHasNoFrontFacingMode() {
-        assertEquals(CameraPerspective.THIRD_PERSON,
-                CameraPerspective.FIRST_PERSON.next());
-        assertEquals(CameraPerspective.FIRST_PERSON,
-                CameraPerspective.THIRD_PERSON.next());
-        assertEquals(0,
-                CameraPerspective.THIRD_PERSON.next().getVanillaValue());
-        assertEquals(CameraPerspective.THIRD_PERSON,
-                CameraPerspective.fromVanillaValue(2));
-    }
-
-    @Test
     public void disabledOverhaulPreservesVanillaFrontFacingMode() {
         assertEquals(2, CameraPerspective.normalizeVanillaValue(2, false));
         assertEquals(0, CameraPerspective.normalizeVanillaValue(2, true));

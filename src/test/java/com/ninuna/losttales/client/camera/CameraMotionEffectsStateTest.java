@@ -84,7 +84,8 @@ public final class CameraMotionEffectsStateTest {
         CameraMotionOffset offset = state.update(
                 sample(true, false, true, true,
                         true, 10, -1.0D, 4.0D),
-                CameraMotionEffectsSettings.NONE, 0.05D);
+                new CameraMotionEffectsSettings(
+                        0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D), 0.05D);
 
         assertTrue(magnitude(offset) == 0.0D);
     }

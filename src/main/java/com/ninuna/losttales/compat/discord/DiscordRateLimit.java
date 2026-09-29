@@ -14,7 +14,7 @@ import java.util.Locale;
 final class DiscordRateLimit {
     /** Discord said nothing, or nothing that could be read. */
     static final DiscordRateLimit NONE =
-            new DiscordRateLimit(-1, 0L, "", false, "");
+            new DiscordRateLimit(-1, 0L, "", false);
     /** The longest bucket hash kept; Discord's are far shorter. */
     static final int MAX_BUCKET_LENGTH = 64;
     /** The longest reset kept: the lanes' own longest pause. */
@@ -23,7 +23,7 @@ final class DiscordRateLimit {
     private static final int MAX_NUMBER_LENGTH = 32;
     /** Past this many seconds a reset is clamped whatever follows. */
     private static final long SATURATED_SECONDS = 1000000L;
-    /** The longest scope kept; Discord's are user, global and shared. */
+    /** The longest scope read; Discord's are user, global and shared. */
     private static final int MAX_SCOPE_LENGTH = 16;
 
     /** Requests left in the bucket; -1 when Discord did not say. */
@@ -34,16 +34,13 @@ final class DiscordRateLimit {
     final String bucket;
     /** Whether the limit that answered is the bot's own, across every route. */
     final boolean global;
-    /** Which limit a 429 was, in lower case; empty when not said. */
-    final String scope;
 
     private DiscordRateLimit(int remaining, long resetAfterMillis,
-                             String bucket, boolean global, String scope) {
+                             String bucket, boolean global) {
         this.remaining = remaining;
         this.resetAfterMillis = resetAfterMillis;
         this.bucket = bucket;
         this.global = global;
-        this.scope = scope;
     }
 
     /**
@@ -74,14 +71,12 @@ final class DiscordRateLimit {
             }
         }
         String hash = cleanBucket(bucket);
-        String scopeName = cleanScope(scope);
         boolean isGlobal = "true".equalsIgnoreCase(trimmed(global))
-                || "global".equals(scopeName);
-        if (left < 0 && reset == 0L && hash.length() == 0 && !isGlobal
-                && scopeName.length() == 0) {
+                || "global".equals(cleanScope(scope));
+        if (left < 0 && reset == 0L && hash.length() == 0 && !isGlobal) {
             return NONE;
         }
-        return new DiscordRateLimit(left, reset, hash, isGlobal, scopeName);
+        return new DiscordRateLimit(left, reset, hash, isGlobal);
     }
 
     /** Whether the bucket has nothing left until it resets. */

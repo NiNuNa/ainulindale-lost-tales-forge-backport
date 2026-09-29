@@ -9,21 +9,26 @@ import java.util.UUID;
 
 /**
  * The server's answer to a chat identity selection: the identity it now
- * holds for the player, and that identity's party as the chat sees it,
+ * holds for the player, and the party of the character they play as the
+ * chat sees it,
  * independent of the gameplay party snapshot: the party's id, the colour
- * the identity wears in it, and its leader's character name, which names
- * the Party tab.
+ * the identity wears in it, its leader's character name and its own name
+ * if the leader gave it one: what names the Party tab.
  */
 public final class LostTalesChatIdentitySyncPacket implements IMessage {
     /** A character name is at most 32 characters; room for them in UTF-8. */
     static final int MAX_PARTY_LEADER_BYTES = 96;
-    /** Two optional ids, the colour, the leader's name behind its length, the voice's flag. */
-    private static final int MAX_PACKET_BYTES = 2 * 17 + 4 + 2 + MAX_PARTY_LEADER_BYTES + 1;
+    /** A party's name is at most 24 characters; room for them in UTF-8. */
+    static final int MAX_PARTY_NAME_BYTES = 96;
+    /** Two optional ids, the colour, the two names behind their lengths, the voice's flag. */
+    private static final int MAX_PACKET_BYTES = 2 * 17 + 4 + 2 + MAX_PARTY_LEADER_BYTES
+            + 2 + MAX_PARTY_NAME_BYTES + 1;
 
     private UUID characterId;
     private UUID partyId;
     private int partyColor;
     private String partyLeader = "";
+    private String partyName = "";
     /** Whether the Narrator's voice is taken up over the identity. */
     private boolean narrating;
     private boolean malformed;
@@ -31,11 +36,13 @@ public final class LostTalesChatIdentitySyncPacket implements IMessage {
     public LostTalesChatIdentitySyncPacket() {}
 
     public LostTalesChatIdentitySyncPacket(UUID characterId, UUID partyId, int partyColor,
-                                           String partyLeader, boolean narrating) {
+                                           String partyLeader, String partyName,
+                                           boolean narrating) {
         this.characterId = characterId;
         this.partyId = partyId;
         this.partyColor = partyColor;
         this.partyLeader = partyLeader == null ? "" : partyLeader;
+        this.partyName = partyName == null ? "" : partyName;
         this.narrating = narrating;
         validate();
     }
@@ -52,6 +59,8 @@ public final class LostTalesChatIdentitySyncPacket implements IMessage {
             this.partyColor = buffer.readInt();
             this.partyLeader = LostTalesPacketCodec.readUtf8String(buffer,
                     MAX_PARTY_LEADER_BYTES);
+            this.partyName = LostTalesPacketCodec.readUtf8String(buffer,
+                    MAX_PARTY_NAME_BYTES);
             int voice = buffer.readUnsignedByte();
             if (voice > 1) {
                 throw new LostTalesPacketCodec.DecodeException("invalid narrator flag");
@@ -65,6 +74,7 @@ public final class LostTalesChatIdentitySyncPacket implements IMessage {
             this.partyId = null;
             this.partyColor = 0;
             this.partyLeader = "";
+            this.partyName = "";
             this.narrating = false;
             LostTalesPacketCodec.discardRemaining(buffer);
         }
@@ -77,6 +87,7 @@ public final class LostTalesChatIdentitySyncPacket implements IMessage {
         writeId(buffer, this.partyId);
         buffer.writeInt(this.partyColor);
         LostTalesPacketCodec.writeUtf8String(buffer, this.partyLeader, MAX_PARTY_LEADER_BYTES);
+        LostTalesPacketCodec.writeUtf8String(buffer, this.partyName, MAX_PARTY_NAME_BYTES);
         buffer.writeBoolean(this.narrating);
     }
 
@@ -104,6 +115,9 @@ public final class LostTalesChatIdentitySyncPacket implements IMessage {
         if (!LostTalesPacketCodec.isUtf8WithinLimit(this.partyLeader, MAX_PARTY_LEADER_BYTES)) {
             throw new IllegalArgumentException("party leader name exceeds packet limit");
         }
+        if (!LostTalesPacketCodec.isUtf8WithinLimit(this.partyName, MAX_PARTY_NAME_BYTES)) {
+            throw new IllegalArgumentException("party name exceeds packet limit");
+        }
     }
 
     public UUID getCharacterId() {
@@ -121,6 +135,11 @@ public final class LostTalesChatIdentitySyncPacket implements IMessage {
     /** The party leader's character name; empty without a party. */
     public String getPartyLeader() {
         return this.partyLeader;
+    }
+
+    /** The name the leader gave the party; empty when it has none, or without a party. */
+    public String getPartyName() {
+        return this.partyName;
     }
 
     /** Whether the Narrator's voice is taken up over the identity. */

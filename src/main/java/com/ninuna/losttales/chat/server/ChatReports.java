@@ -47,7 +47,8 @@ public final class ChatReports {
             return;
         }
         UUID account = reporter.getUniqueID();
-        ChatHistory.Reportable message = ChatHistory.reportable(messageId, account);
+        ChatHistory.Reportable message = ChatHistory.reportable(messageId,
+                LostTalesChatService.requesterFor(reporter));
         if (message == null) {
             tell(reporter, "chat.losttales.report.refused");
             return;

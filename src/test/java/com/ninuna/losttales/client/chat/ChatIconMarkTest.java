@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.client.window.TabIcons;
 import com.ninuna.losttales.client.window.TabMark;
 import com.ninuna.losttales.gui.style.LostTalesUiCornerCut;
@@ -43,13 +44,12 @@ public final class ChatIconMarkTest {
         ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
         ChatTab selected = ChatTab.of(ChatChannel.OOC);
         assertTrue(TabMark.of(global).isNone());
-        ClientChatChannelViews.record(-1, global, selected, false);
+        ClientChatChannelViews.record(-1, global, selected, false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
         assertSame(TabMark.UNREAD, TabMark.of(global));
         assertSame(LostTalesUiSheet.PRESENCE_SELECTED,
                 TabMark.of(global).figure());
-        ClientChatChannelViews.record(-2, global, selected, true);
-        ClientChatChannelViews.record(-3, global, selected, true);
-        assertEquals(2, TabMark.of(global).pingCount());
+        ClientChatChannelViews.record(-2, global, selected, true, ChatMessageIds.NONE, System.currentTimeMillis(), false);
+        ClientChatChannelViews.record(-3, global, selected, true, ChatMessageIds.NONE, System.currentTimeMillis(), false);
         assertSame(LostTalesUiSheet.COUNT_2, TabMark.of(global).figure());
     }
 
@@ -58,13 +58,13 @@ public final class ChatIconMarkTest {
         ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
         ChatTab proximity = ChatTab.of(ChatChannel.PROXIMITY);
         ChatTab selected = ChatTab.of(ChatChannel.OOC);
-        ClientChatChannelViews.record(-1, proximity, selected, false);
+        ClientChatChannelViews.record(-1, proximity, selected, false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
         assertSame(TabMark.UNREAD,
                 TabMark.combined(Arrays.asList(global, proximity)));
-        ClientChatChannelViews.record(-2, global, selected, true);
-        ClientChatChannelViews.record(-3, proximity, selected, true);
-        assertEquals(2, TabMark.combined(Arrays.asList(global, proximity))
-                .pingCount());
+        ClientChatChannelViews.record(-2, global, selected, true, ChatMessageIds.NONE, System.currentTimeMillis(), false);
+        ClientChatChannelViews.record(-3, proximity, selected, true, ChatMessageIds.NONE, System.currentTimeMillis(), false);
+        assertSame(LostTalesUiSheet.COUNT_2, TabMark.combined(
+                Arrays.asList(global, proximity)).figure());
     }
 
     /** Past nine the tile shows the plus, and keeps its width. */
@@ -100,12 +100,12 @@ public final class ChatIconMarkTest {
     public void theSpheresCutFollowsItsRoundOutline() {
         LostTalesUiCornerCut cut = TabMark.UNREAD.cut(0.0F, 0.0F, ICON);
         for (int row = 0; row < 5; row++) {
-            assertFalse("row " + row, cut.cuts(ICON - 1, row));
+            assertFalse("row " + row, CornerCuts.cuts(cut, ICON - 1, row));
         }
-        assertEquals(8.0F, cut.cutFrom(5), 0.0F);
-        assertEquals(7.0F, cut.cutFrom(6), 0.0F);
-        assertEquals(6.0F, cut.cutFrom(7), 0.0F);
-        assertEquals(6.0F, cut.cutFrom(9), 0.0F);
+        assertEquals(8.0F, CornerCuts.cutFrom(cut, 5), 0.0F);
+        assertEquals(7.0F, CornerCuts.cutFrom(cut, 6), 0.0F);
+        assertEquals(6.0F, CornerCuts.cutFrom(cut, 7), 0.0F);
+        assertEquals(6.0F, CornerCuts.cutFrom(cut, 9), 0.0F);
     }
 
     /** Nils's mock-up of the "2" tile: the row over it cut from its left edge, the rows beside it a pixel further left. */
@@ -113,11 +113,11 @@ public final class ChatIconMarkTest {
     public void theTilesCutIsItsBoxGrownByAPixel() {
         LostTalesUiCornerCut cut = TabMark.pings(2).cut(0.0F, 0.0F, ICON);
         for (int row = 0; row < 3; row++) {
-            assertFalse("row " + row, cut.cuts(ICON - 1, row));
+            assertFalse("row " + row, CornerCuts.cuts(cut, ICON - 1, row));
         }
-        assertEquals(7.0F, cut.cutFrom(3), 0.0F);
-        assertEquals(6.0F, cut.cutFrom(4), 0.0F);
-        assertEquals(6.0F, cut.cutFrom(9), 0.0F);
+        assertEquals(7.0F, CornerCuts.cutFrom(cut, 3), 0.0F);
+        assertEquals(6.0F, CornerCuts.cutFrom(cut, 4), 0.0F);
+        assertEquals(6.0F, CornerCuts.cutFrom(cut, 9), 0.0F);
     }
 
     /**

@@ -67,7 +67,7 @@ public final class LostTalesThirdPersonConfigPersistenceTest {
 
         LostTalesThirdPersonConfig.distanceMultiplier = 1.0D;
         LostTalesThirdPersonConfig.projectileTrajectorySamplesPerTick = 6;
-        LostTalesThirdPersonConfig.reload();
+        LostTalesThirdPersonConfig.load(directory);
         assertEquals(1.73D,
                 LostTalesThirdPersonConfig.distanceMultiplier, 0.0D);
         assertEquals(9, LostTalesThirdPersonConfig

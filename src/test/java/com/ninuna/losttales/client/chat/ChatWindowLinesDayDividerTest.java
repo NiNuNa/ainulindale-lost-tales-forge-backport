@@ -89,7 +89,7 @@ public final class ChatWindowLinesDayDividerTest {
         assertNull(ChatWindowLines.dateDividerLabel(null));
         // The rule's own row is a whole line; its gaps are blank rows
         // laid beside it.
-        assertEquals(ChatStackRows.LINE_HEIGHT, ChatStackRows.heightOf(rule));
+        assertEquals(ChatStackRows.LINE_HEIGHT, heightOf(rule));
     }
 
     /** Newest first: Tuesday's message, then Monday's two, the oldest last. */
@@ -132,7 +132,7 @@ public final class ChatWindowLinesDayDividerTest {
         // capitals of the newer message and the older one, it stands
         // exactly as far from each.
         int ruleBottom = rows.top(3)
-                - LostTalesChatOverlayRenderer.DIVIDER_RULE_OFFSET - 1;
+                - (WindowStyle.ROW_TEXT_TOP + WindowStyle.centredBoxTop(1)) - 1;
         int clearBelow = ruleBottom - rows.top(1);
         int clearAbove = rows.top(4) - (ruleBottom + 1);
         assertEquals(14, clearBelow);
@@ -250,5 +250,12 @@ public final class ChatWindowLinesDayDividerTest {
         calendar.clear();
         calendar.set(year, month, day, hour, minute, 0);
         return calendar.getTimeInMillis();
+    }
+
+    /** A line's row height in the open window, as the rows lay it out. */
+    private static int heightOf(ChatLine line) {
+        ChatStackRows rows = new ChatStackRows();
+        rows.reset(java.util.Collections.singletonList(line), -1, true);
+        return rows.height(0);
     }
 }

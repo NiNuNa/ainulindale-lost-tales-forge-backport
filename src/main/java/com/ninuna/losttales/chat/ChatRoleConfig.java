@@ -23,8 +23,8 @@ import java.util.regex.Pattern;
  * <p>{@code roles.definitions} in {@code server/roles.cfg}, one role per
  * entry:</p>
  * <pre>
- * operator=name:Operator;color:A94B54;mention:true;rank:10;op:2;icon:emoji:expressionless
- * moderator=name:Moderator;color:A94B54;mention:true;rank:15;op:1;faction:GONDOR@gondor.knight;grant:chat.moderate;icon:item:minecraft:iron_sword;desc:Keeps the peace.
+ * operator=name:Operator;colour:A94B54;mention:true;rank:10;op:2;icon:emoji:expressionless
+ * moderator=name:Moderator;colour:A94B54;mention:true;rank:15;op:1;faction:GONDOR@gondor.knight;grant:chat.moderate;icon:item:minecraft:iron_sword;desc:Keeps the peace.
  * </pre>
  * Options are optional and case-insensitive; a role without a name is
  * named by its id. {@code icon:} is what the role wears over its members
@@ -78,7 +78,7 @@ public final class ChatRoleConfig {
      * — and the file's to change once written.
      */
     public static final String DEFAULT_OPERATOR_ENTRY =
-            "operator=name:Operator;color:A94B54;mention:true;rank:10;op:2"
+            "operator=name:Operator;colour:A94B54;mention:true;rank:10;op:2"
             + ";icon:channel:" + ChatChannel.OPERATOR.getId()
             + ";desc:Runs the server day to day.";
     /** The gate a fresh file starts with: the Operator channel for the operator role. */
@@ -145,7 +145,7 @@ public final class ChatRoleConfig {
         String name = first(options, "name");
         String description = first(options, "desc");
         int color = LostTalesColorsDefault.ROLE;
-        String colorOption = first(options, "color");
+        String colorOption = first(options, "colour");
         if (colorOption.length() > 0) {
             if (!COLOR.matcher(colorOption).matches()) {
                 out.warn("Chat role '" + id + "' has colour '" + colorOption
@@ -291,7 +291,7 @@ public final class ChatRoleConfig {
     /**
      * The permissions the entries describe:
      * <pre>
-     * keeper=capability:chat.moderate;capability:chat.server_console.read;desc:Keeps the peace.
+     * keeper=capability:chat.moderate;capability:chat.server_console.read
      * </pre>
      * {@code capability:} may repeat and names a capability the code
      * registers; one naming none is skipped with a warning and the rest
@@ -304,7 +304,6 @@ public final class ChatRoleConfig {
                                                               Warnings warnings) {
         Warnings out = warnings == null ? SILENT : warnings;
         Map<String, Set<String>> capabilities = new LinkedHashMap<String, Set<String>>();
-        Map<String, String> descriptions = new LinkedHashMap<String, String>();
         for (String entry : entries == null ? new String[0] : entries) {
             if (isBlankOrComment(entry)) {
                 continue;
@@ -341,30 +340,8 @@ public final class ChatRoleConfig {
                         + "is kept and allows nothing");
             }
             capabilities.put(id, named);
-            String description = first(options, "desc");
-            if (description.length() > 0) {
-                descriptions.put(id, description);
-            }
         }
-        return LostTalesPermissionCatalog.of(capabilities, descriptions);
-    }
-
-    /** The entry a permission is written as. */
-    public static String formatPermission(String id, Set<String> capabilityIds,
-                                          String description) {
-        StringBuilder entry = new StringBuilder(id == null ? ""
-                : id.trim().toLowerCase(Locale.ROOT));
-        entry.append('=');
-        boolean first = true;
-        for (String capability : capabilityIds == null
-                ? Collections.<String>emptySet() : capabilityIds) {
-            entry.append(first ? "" : ";").append("capability:").append(capability);
-            first = false;
-        }
-        if (description != null && description.trim().length() > 0) {
-            entry.append(first ? "" : ";").append("desc:").append(description.trim());
-        }
-        return entry.toString();
+        return LostTalesPermissionCatalog.of(capabilities);
     }
 
     /**
@@ -654,7 +631,7 @@ public final class ChatRoleConfig {
         StringBuilder entry = new StringBuilder(role.getId());
         entry.append("=name:").append(role.getName().length() == 0
                 ? role.getDisplayName() : role.getName());
-        entry.append(";color:").append(String.format("%06X", role.getColor()));
+        entry.append(";colour:").append(String.format("%06X", role.getColor()));
         entry.append(";mention:").append(role.isMentionable());
         entry.append(";rank:").append(role.getRank());
         for (ChatRoleSource source : role.getSources()) {
@@ -699,11 +676,6 @@ public final class ChatRoleConfig {
             }
         }
         return result;
-    }
-
-    /** The member entries with the role's accounts replaced, or removed when empty. */
-    public static List<String> withMembers(String[] entries, String roleId, Set<UUID> members) {
-        return withMembers(entries, roleId, members, Collections.<UUID>emptySet());
     }
 
     /**

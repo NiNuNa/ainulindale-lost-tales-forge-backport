@@ -105,7 +105,30 @@ final class ClientChatIdentities {
     }
 
     static synchronized Identity effectiveFor(ChatTab tab) {
-        return speaksInCharacter(tab) ? viewing() : accountIdentity();
+        if (!speaksInCharacter(tab)) {
+            return accountIdentity();
+        }
+        return speaksAsPlayed(tab) ? played() : viewing();
+    }
+
+    /**
+     * Whether the tab speaks as the character played, whatever the head
+     * button chose: Proximity and Party
+     * ({@link ChatRolePresentation#speaksAsPlayedCharacter}).
+     */
+    static boolean speaksAsPlayed(ChatTab tab) {
+        return tab != null && ChatRolePresentation.speaksAsPlayedCharacter(tab.getChannel());
+    }
+
+    /** Whether the head button chooses who the tab speaks as: Global, Faction, whispers. */
+    static boolean picksIdentity(ChatTab tab) {
+        return speaksInCharacter(tab) && !speaksAsPlayed(tab);
+    }
+
+    /** The character played, or the account playing as itself. */
+    static synchronized Identity played() {
+        CharacterSummary active = activeCharacter();
+        return active == null ? accountIdentity() : of(active);
     }
 
     /**
@@ -121,7 +144,7 @@ final class ClientChatIdentities {
         if (!speaksInCharacter(tab)) {
             return LostTalesChatSendPacket.IDENTITY_ACCOUNT;
         }
-        return viewing == null || !isHeld(viewing)
+        return speaksAsPlayed(tab) || viewing == null || !isHeld(viewing)
                 ? LostTalesChatSendPacket.IDENTITY_DEFAULT
                 : LostTalesChatSendPacket.IDENTITY_CHARACTER;
     }

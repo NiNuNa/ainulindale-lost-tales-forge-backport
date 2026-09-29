@@ -116,8 +116,8 @@ public final class LostTalesMapMarkerNbtCodecTest {
         LostTalesMapMarkerNbtCodec.ReadResult reread =
                 LostTalesMapMarkerNbtCodec.read(encoded);
 
-        assertEquals("WAYMEET", reread.getRecords()
-                .get(marker.getId()).getLotrWaypointId());
+        assertEquals("WAYMEET", LostTalesMapMarkerIdResolver.resolveLotrWaypointId(
+                reread.getRecords().get(marker.getId()).getId()));
     }
 
     @Test

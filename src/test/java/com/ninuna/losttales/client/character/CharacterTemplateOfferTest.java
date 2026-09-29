@@ -80,8 +80,8 @@ public final class CharacterTemplateOfferTest {
     @Test
     public void onlyTheAnswerToTheOfferStillWaitingCounts() {
         CharacterOperationFeedback refused = new CharacterOperationFeedback(7,
-                CharacterOperationType.CREATE, false, false,
-                CharacterErrorId.INTERNAL_ERROR, 2L, 0L, true);
+                CharacterOperationType.CREATE, false,
+                CharacterErrorId.INTERNAL_ERROR, 0L, true);
         assertTrue(CharacterTemplateOffer.isAnswerTo(refused, 7));
         // Another request's answer, an offer already answered, no offer.
         assertFalse(CharacterTemplateOffer.isAnswerTo(refused, 8));

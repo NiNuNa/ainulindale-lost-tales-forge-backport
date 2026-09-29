@@ -77,7 +77,7 @@ public final class CharacterRosterDefaultCharacterTest {
 
         assertEquals(CharacterRoster.MAX_SLOTS, roster.roleplayCharacterCount());
         assertEquals("the account's own identity rides beside them",
-                CharacterRoster.MAX_SLOTS + 1, roster.getCharacterCount());
+                CharacterRoster.MAX_SLOTS + 1, roster.getCharacters().size());
     }
 
     /** The nine are still nine once the default character is there. */

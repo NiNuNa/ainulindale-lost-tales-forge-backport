@@ -44,8 +44,9 @@ import java.util.UUID;
  * <p>The audience is decided when the message is sent and checked again
  * when it is replayed, and both have to agree: a whisper reaches its two
  * parties, a party line the members the party had, a faction line every
- * account with a character that was in the faction then, a
- * staff line those who were sent it and may still read the channel.
+ * account whose chat identity was in the faction then, a gated line
+ * (Operator Chat, the consoles, a read gate) whoever may read the channel
+ * when they ask.
  * Gaining a role, a party or a faction afterwards never opens what was
  * said before. Proximity lines reach only those who were near, since
  * where a player stood then cannot be asked again.</p>
@@ -53,8 +54,8 @@ import java.util.UUID;
  * <p>Bounded per channel — per faction and per party on the channels
  * that hold several, and per conversation for whispers, so one busy
  * faction, party or pair cannot push another's lines out —
- * ({@link #MAX_PER_CHANNEL}
- * unless the server's config says otherwise) and in all
+ * ({@link #perChannelCapacity}, the server's {@code historyPerChannel})
+ * and in all
  * ({@link #MAX_TOTAL}), the oldest
  * going first; a replay hands a player at most
  * {@link #MAX_REPLAY_PER_CHANNEL} of a channel and
@@ -65,8 +66,6 @@ import java.util.UUID;
  * chat state at both ends of a run, after the save has taken it.</p>
  */
 public final class ChatHistory {
-    /** Messages kept per channel unless the config says otherwise; what a channel's replay can reach back over. */
-    public static final int MAX_PER_CHANNEL = 200;
     /** Messages kept in all, whatever the channels. */
     public static final int MAX_TOTAL = 2000;
     /** The most one request for older lines of a channel is answered with. */
@@ -220,15 +219,10 @@ public final class ChatHistory {
      * choosing, which is the one thing this check exists to stop.</p>
      */
     public static synchronized ChatReplyReference quoteFor(
-            long messageId, UUID replier,
+            long messageId, Requester replier,
             ChatChannel replyChannel, String replyScopeValue) {
         Entry entry = ENTRIES.get(Long.valueOf(messageId));
-        // A line for everyone may be quoted by anyone: a player shown it
-        // by the replay — their own join, broadcast before they were on
-        // the player list — was as much its reader as anyone online.
-        if (entry == null || replier == null || replyChannel == null
-                || !(entry.seenBy.contains(replier)
-                        || entry.audience.isOpen())) {
+        if (entry == null || replyChannel == null || !canRead(entry, replier)) {
             return ChatReplyReference.NONE;
         }
         if (!entry.channelId.equals(replyChannel.getId())) {
@@ -239,8 +233,74 @@ public final class ChatHistory {
         if (!(quotedScope == null ? "" : quotedScope).equals(replyScope)) {
             return ChatReplyReference.NONE;
         }
+        return quoteOf(messageId, entry);
+    }
+
+    /**
+     * The quote of a kept line: its author, its excerpt and the colour
+     * its name was drawn in, wearing its head, and read as the sentence
+     * it is when the line is an action.
+     */
+    private static ChatReplyReference quoteOf(long messageId, Entry entry) {
         return withHead(ChatReplyReference.of(messageId, entry.author,
-                entry.excerpt, entry.forOthers.getNameColor()), entry);
+                entry.excerpt, entry.forOthers.getNameColor()), entry)
+                .asAction(entry.forOthers.isAction());
+    }
+
+    /**
+     * Whether the kept line {@code messageId} is an action; false for a
+     * line the history does not hold.
+     */
+    public static synchronized boolean isAction(long messageId) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        return entry != null && entry.forOthers.isAction();
+    }
+
+    /**
+     * Whether a line may be shown again, by a reply's quote or a forward,
+     * to the readers of {@code channel}'s conversation {@code scopeValue};
+     * {@code partner} is the other person of a whisper, else null. A line
+     * said for everyone may go anywhere. Any other goes back only into its
+     * own conversation (the same channel, the same party or faction), or
+     * into a whisper whose two people could both read it. A Proximity line
+     * and a whisper were said to exactly those who heard them, so they go
+     * only into such a whisper.
+     */
+    public static synchronized boolean mayShowTo(long messageId,
+                                                 ChatChannel channel,
+                                                 String scopeValue,
+                                                 Requester sender,
+                                                 Requester partner) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        if (entry == null || channel == null || sender == null) {
+            return false;
+        }
+        if (entry.audience.isOpen()) {
+            return true;
+        }
+        if (channel == ChatChannel.WHISPER) {
+            return partner != null && canRead(entry, sender) && canRead(entry, partner);
+        }
+        ChatChannel source = ChatChannel.fromId(entry.channelId);
+        if (source == null || source == ChatChannel.WHISPER
+                || source.getRecipientRule() == ChatRecipientRule.PROXIMITY
+                || !entry.channelId.equals(channel.getId())) {
+            return false;
+        }
+        String sourceScope = entry.forOthers.getScopeValue();
+        return (sourceScope == null ? "" : sourceScope)
+                .equals(scopeValue == null ? "" : scopeValue);
+    }
+
+    /**
+     * The one rule for who may quote, react to, forward, share or report
+     * a line: whoever was sent it, or may read it now as the replay
+     * would show it to them.
+     */
+    private static boolean canRead(Entry entry, Requester requester) {
+        return requester != null && requester.accountId != null
+                && (entry.seenBy.contains(requester.accountId)
+                        || entry.audience.admits(requester, entry));
     }
 
     /**
@@ -251,10 +311,7 @@ public final class ChatHistory {
     public static synchronized QuestShareClaim questShareFor(
             long messageId, int tokenIndex, Requester requester) {
         Entry entry = ENTRIES.get(Long.valueOf(messageId));
-        if (entry == null || requester == null || requester.accountId == null
-                || tokenIndex < 0
-                || !(entry.seenBy.contains(requester.accountId)
-                        || entry.audience.admits(requester, entry))) {
+        if (entry == null || tokenIndex < 0 || !canRead(entry, requester)) {
             return null;
         }
         for (ChatShowcase showcase : entry.forOthers.getShowcases()) {
@@ -277,9 +334,7 @@ public final class ChatHistory {
     public static synchronized Forwardable forwardable(long messageId,
                                                        Requester requester) {
         Entry entry = ENTRIES.get(Long.valueOf(messageId));
-        if (entry == null || requester == null || requester.accountId == null
-                || !(entry.seenBy.contains(requester.accountId)
-                        || entry.audience.admits(requester, entry))
+        if (entry == null || !canRead(entry, requester)
                 || LostTalesChatMessagePacket.isSystemSender(
                         entry.forOthers.getSenderId())) {
             return null;
@@ -292,7 +347,8 @@ public final class ChatHistory {
         if (!reference.exists()) {
             return null;
         }
-        return new Forwardable(entry.forOthers.getMessage(),
+        return new Forwardable(messageId, entry.forOthers.getMessage(),
+                entry.forOthers.isAction(),
                 forwardedShowcases(entry.forOthers.getShowcases()),
                 withHead(reference, entry));
     }
@@ -319,15 +375,23 @@ public final class ChatHistory {
         return carried;
     }
 
-    /** A message as a forward carries it: its words, what it shares, and the quote naming it. */
+    /**
+     * A message as a forward carries it: its words, whether they are an
+     * action, what it shares, and the quote naming it.
+     */
     public static final class Forwardable {
+        public final long messageId;
         public final String text;
+        public final boolean action;
         public final List<ChatShowcase> showcases;
         public final ChatReplyReference reference;
 
-        Forwardable(String text, List<ChatShowcase> showcases,
+        Forwardable(long messageId, String text, boolean action,
+                    List<ChatShowcase> showcases,
                     ChatReplyReference reference) {
+            this.messageId = messageId;
             this.text = text;
+            this.action = action;
             this.showcases = Collections.unmodifiableList(showcases);
             this.reference = reference;
         }
@@ -340,11 +404,10 @@ public final class ChatHistory {
      * themselves.
      */
     public static synchronized Reportable reportable(long messageId,
-                                                     UUID reporter) {
+                                                     Requester reporter) {
         Entry entry = ENTRIES.get(Long.valueOf(messageId));
-        if (entry == null || reporter == null
-                || !(entry.seenBy.contains(reporter) || entry.audience.isOpen())
-                || reporter.equals(entry.authorId)
+        if (entry == null || !canRead(entry, reporter)
+                || reporter.accountId.equals(entry.authorId)
                 || LostTalesChatMessagePacket.isSystemSender(
                         entry.forOthers.getSenderId())) {
             return null;
@@ -408,9 +471,7 @@ public final class ChatHistory {
             long messageId) {
         Entry entry = ENTRIES.get(Long.valueOf(messageId));
         return entry == null ? ChatReplyReference.NONE
-                : withHead(ChatReplyReference.of(messageId, entry.author,
-                        entry.excerpt, entry.forOthers.getNameColor()),
-                        entry);
+                : quoteOf(messageId, entry);
     }
 
     /**
@@ -425,7 +486,8 @@ public final class ChatHistory {
      */
     public static synchronized Set<UUID> applyEdit(long messageId,
                                                    UUID editor,
-                                                   String message) {
+                                                   String message,
+                                                   List<ChatNamedPlayer> named) {
         Entry entry = authored(messageId, editor);
         if (entry == null || message == null
                 || message.equals(entry.forOthers.getMessage())) {
@@ -434,8 +496,8 @@ public final class ChatHistory {
         LostTalesChatMessagePacket forSender;
         LostTalesChatMessagePacket forOthers;
         try {
-            forSender = entry.forSender.withMessage(message);
-            forOthers = entry.forOthers.withMessage(message);
+            forSender = entry.forSender.withMessage(message).withNamedPlayers(named);
+            forOthers = entry.forOthers.withMessage(message).withNamedPlayers(named);
         } catch (RuntimeException refused) {
             // The caller validated the text; a line that still cannot be
             // rebuilt is left as it was rather than half-changed.
@@ -549,8 +611,7 @@ public final class ChatHistory {
         if (entry == null || reactor == null) {
             return null;
         }
-        if (requester != null && !(entry.seenBy.contains(reactor)
-                || entry.audience.admits(requester, entry))) {
+        if (requester != null && !canRead(entry, requester)) {
             return null;
         }
         ChatReactions.Stand before = entry.reactions.standOf(emoji);
@@ -642,6 +703,20 @@ public final class ChatHistory {
                 : entry.forOthers.getNamedPlayers();
     }
 
+    /** Every account a kept message was sent to; empty for none kept. */
+    public static synchronized Set<UUID> recipientsOf(long messageId) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        return entry == null ? Collections.<UUID>emptySet()
+                : Collections.unmodifiableSet(new HashSet<UUID>(entry.seenBy));
+    }
+
+    /** Who said a kept message, by id and by name; null for none kept. */
+    public static synchronized ChatNamedPlayer authorOf(long messageId) {
+        Entry entry = ENTRIES.get(Long.valueOf(messageId));
+        return entry == null || entry.authorId == null ? null
+                : ChatNamedPlayer.account(entry.authorId, entry.author);
+    }
+
     /** The channel a kept message was said in, or null for none kept. */
     public static synchronized ChatChannel channelOf(long messageId) {
         Entry entry = ENTRIES.get(Long.valueOf(messageId));
@@ -721,7 +796,7 @@ public final class ChatHistory {
             return null;
         }
         forget(messageId);
-        return new Removal(entry.authorId, entry.author,
+        return new Removal(entry.author,
                 Collections.unmodifiableSet(new HashSet<UUID>(entry.seenBy)));
     }
 
@@ -850,12 +925,10 @@ public final class ChatHistory {
 
     /** A message a moderator took back: whose it was and who saw it. */
     public static final class Removal {
-        public final UUID authorId;
         public final String author;
         public final Set<UUID> recipients;
 
-        Removal(UUID authorId, String author, Set<UUID> recipients) {
-            this.authorId = authorId;
+        Removal(String author, Set<UUID> recipients) {
             this.author = author;
             this.recipients = recipients;
         }
@@ -929,11 +1002,10 @@ public final class ChatHistory {
         }
 
         /**
-         * Every account with a character in the faction, made before the
-         * line was said. A character's faction is fixed when it is made,
-         * so "was in it then" is "existed then", and an account may play
-         * any of its characters at will, so owning one is being reachable
-         * by it. {@code gated} asks the channel's read gate again besides.
+         * Every account whose chat identity was in the faction when the
+         * line was said: made in it, or pledged to it, before then. Joining
+         * a faction later never opens what was said before.
+         * {@code gated} asks the channel's read gate again besides.
          */
         public static Audience faction(String factionId, boolean gated) {
             return new Audience(null, null, factionId, gated);
@@ -1007,9 +1079,9 @@ public final class ChatHistory {
     public static final class Requester {
         final UUID accountId;
         /**
-         * Every faction the account has a character in, and when its
-         * earliest such character was made. A faction line is replayed
-         * to whoever could read it by playing that character.
+         * The faction of the account's chat identity, and since when that
+         * identity has been in it. A faction line is replayed to whoever
+         * was in that faction when it was said.
          */
         final Map<String, Long> ownedFactions;
         /** The party the played identity is in; null for none. */
@@ -1067,12 +1139,6 @@ public final class ChatHistory {
         }
     }
 
-    /** Drops the oldest of a channel past its cap, then the oldest of all past the total. */
-    /**
-     * What a kept line's share of the budget is charged to: its channel,
-     * or for a whisper the pair of identities in it, whichever side
-     * spoke, so every pair keeps its own recent lines.
-     */
     /**
      * The budget a line is charged to: its channel; on a channel that
      * holds several conversations, the one faction or party it was said
@@ -1094,6 +1160,7 @@ public final class ChatHistory {
                 ? one + "|" + other : other + "|" + one);
     }
 
+    /** Drops the oldest of a budget past its cap, then the oldest of all past the total. */
     private static void trim(String budgetKey) {
         Integer count = COUNT_BY_CHANNEL.get(budgetKey);
         if (count != null && count.intValue() > perChannelCapacity()) {

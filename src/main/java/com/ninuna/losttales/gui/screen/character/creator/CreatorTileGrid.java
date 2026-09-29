@@ -15,17 +15,23 @@ import org.lwjgl.input.Keyboard;
  * <p>The tiles are heads because a head is what tells skins apart at
  * this size, and because the head renderer already draws one from a skin
  * id alone. The full figure on the stage shows the rest.</p>
+ *
+ * <p>A grid made without a label draws the tiles alone, for a window that
+ * names the chosen skin above a grid it scrolls.</p>
  */
 public final class CreatorTileGrid extends CreatorControl {
 
     private static final int TILE = 26;
     private static final int TILE_GAP = 4;
+    /** From one row of tiles to the next. */
+    public static final int ROW_PITCH = TILE + TILE_GAP;
     private static final int HEAD_INSET = 3;
     private static final int TITLE_HEIGHT = 12;
 
     private final String label;
     private final CreatorChoice choice;
 
+    /** A null label leaves the title out. */
     public CreatorTileGrid(CreatorContext context, String label,
                            CreatorChoice choice) {
         super(context);
@@ -50,12 +56,16 @@ public final class CreatorTileGrid extends CreatorControl {
     @Override
     public int height() {
         int rows = rows();
-        return TITLE_HEIGHT + (rows == 0
+        return titleHeight() + (rows == 0
                 ? LABEL_HEIGHT : rows * (TILE + TILE_GAP) - TILE_GAP) + 2;
     }
 
+    private int titleHeight() {
+        return this.label == null ? 0 : TITLE_HEIGHT;
+    }
+
     private int gridTop() {
-        return this.y + TITLE_HEIGHT;
+        return this.y + titleHeight();
     }
 
     private int tileX(int index) {
@@ -71,11 +81,13 @@ public final class CreatorTileGrid extends CreatorControl {
         FontRenderer font = this.context.getFont();
         int count = this.choice.count();
         int selected = this.choice.index();
-        String title = this.label;
-        if (count > 0 && selected >= 0 && selected < count) {
-            title = this.label + ": " + this.choice.label(selected);
+        if (this.label != null) {
+            String title = this.label;
+            if (count > 0 && selected >= 0 && selected < count) {
+                title = this.label + ": " + this.choice.label(selected);
+            }
+            drawLabel(LostTalesSkyrimUiStyle.trimToWidth(font, title, this.width));
         }
-        drawLabel(LostTalesSkyrimUiStyle.trimToWidth(font, title, this.width));
         if (count == 0) {
             font.drawStringWithShadow(LostTalesSkyrimUiStyle.trimToWidth(font,
                     this.choice.emptyLabel(), this.width), this.x, gridTop(),

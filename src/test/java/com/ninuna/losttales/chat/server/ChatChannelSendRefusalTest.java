@@ -37,7 +37,7 @@ public final class ChatChannelSendRefusalTest {
 
     @After
     public void tearDown() {
-        ChatChannelGates.resetToDefaults();
+        ChatChannelGates.install(ChatChannelGates.defaults());
         ChatRoleCatalog.resetToBuiltIn();
     }
 

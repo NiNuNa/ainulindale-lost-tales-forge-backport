@@ -1,11 +1,13 @@
 package com.ninuna.losttales.character.switching;
 
+import com.ninuna.losttales.character.state.CharacterLastSeen;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.compat.lotr.hired.LotrHiredUnitCustody;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.server.CharacterOperationResult;
+import com.ninuna.losttales.character.server.CharacterPledges;
 import com.ninuna.losttales.character.server.CharacterRaceGameplayHandler;
 import com.ninuna.losttales.character.state.CharacterLiveStatePersistence;
 import com.ninuna.losttales.character.state.CharacterPlayerStateAccount;
@@ -57,20 +59,6 @@ public final class CharacterSwitchCoordinator {
 
     public static CharacterSwitchCoordinator getInstance() {
         return INSTANCE;
-    }
-
-    public CharacterOperationResult selectCharacter(EntityPlayerMP player,
-                                                      int requestId,
-                                                      long expectedRosterRevision,
-                                                      UUID targetCharacterId) {
-        if (!LostTalesServerPlayers.isServerPlayer(player)) {
-            return CharacterOperationResult.failure(CharacterErrorId.INVALID_PLAYER, null);
-        }
-        if (targetCharacterId == null) {
-            return CharacterOperationResult.failure(CharacterErrorId.INVALID_CHARACTER_ID, null);
-        }
-        return selectIdentity(player, requestId, expectedRosterRevision,
-                PlayableIdentity.character(player.getUniqueID(), targetCharacterId));
     }
 
     /**
@@ -590,6 +578,10 @@ public final class CharacterSwitchCoordinator {
             // account that has never been left gets its record from this.
             sourceSnapshot = this.playerStateService.captureOrCreate(
                     player, playerStateAccount, stores.playerStates, source);
+            // The source's pledge as the player leaves it, while the live
+            // LOTR data is still the source's.
+            CharacterPledges.refresh(player, stores.rosters, roster,
+                    sourceCharacter);
             // An account never played before starts from fresh defaults; a
             // character always has a record once the account is bootstrapped.
             targetSnapshot = this.playerStateService.getOrCreateCurrent(
@@ -685,6 +677,7 @@ public final class CharacterSwitchCoordinator {
             stores.switches.saveAccount(account);
             CharacterSwitchStorage.flush(player.worldObj);
 
+            CharacterLastSeen.saw(player.worldObj, source.getGameplayId());
             roster.setActiveCharacterId(target.getCharacterId());
             roster.incrementRevision();
             stores.rosters.saveRoster(roster);
@@ -696,6 +689,10 @@ public final class CharacterSwitchCoordinator {
             CharacterSwitchStorage.flush(player.worldObj);
             commitFlushed = true;
 
+            // The live LOTR data is the target's now; its record keeps
+            // the pledge it holds.
+            CharacterPledges.refresh(player, stores.rosters, roster,
+                    targetCharacter);
             CharacterRaceGameplayHandler.apply(player, targetCharacter);
             LotrHiredUnitCustody.settle(player, target, roster);
             this.playerStateService.synchronize(player);
@@ -735,8 +732,10 @@ public final class CharacterSwitchCoordinator {
                 try {
                     CharacterRaceGameplayHandler.apply(player, targetCharacter);
                     this.playerStateService.synchronize(player);
-                } catch (Throwable ignored) {
-                    // The committed stores remain authoritative for login recovery.
+                } catch (Throwable resyncFailure) {
+                    // The committed stores stay authoritative for login
+                    // recovery; the live entity is brought up to date then.
+                    logFailure(player, "post_commit_resync", resyncFailure);
                 }
                 return CharacterOperationResult.success(true, roster, targetCharacter);
             }
@@ -779,8 +778,9 @@ public final class CharacterSwitchCoordinator {
                     try {
                         stores.switches.saveAccount(account);
                         CharacterSwitchStorage.flush(player.worldObj);
-                    } catch (Throwable ignored) {
+                    } catch (Throwable journalFailure) {
                         // The next login fails closed if the journal cannot be written.
+                        logFailure(player, "rollback_journal", journalFailure);
                     }
                 }
                 disconnectForRecovery(player);
@@ -1013,8 +1013,9 @@ public final class CharacterSwitchCoordinator {
                         "Character state could not be finalized safely. Reconnect; "
                                 + "contact an administrator if this repeats.");
             }
-        } catch (Throwable ignored) {
+        } catch (Throwable kickFailure) {
             // The durable journal still prevents an unsafe future switch.
+            logFailure(player, "recovery_disconnect", kickFailure);
         }
     }
 

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatAction;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatReplyReference;
@@ -15,7 +16,6 @@ import com.ninuna.losttales.network.packet.LostTalesChatEditPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
 import com.ninuna.losttales.network.packet.LostTalesChatTypingPacket;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.StatCollector;
@@ -91,17 +91,54 @@ final class ChatOutbox {
             this.composer.cancelReply();
             return;
         }
-        if (LostTalesConfig.enableChatEmojis) {
-            for (ChatEmojiParser.Segment segment
-                    : ChatEmojiParser.split(outgoing)) {
-                if (segment.isEmoji()) {
-                    ChatEmojiUsageStore.recordUse(segment.getEmoji());
-                }
-            }
-        }
-        sendToTab(tab, outgoing, this.composer.replyReference());
+        recordEmojiUse(outgoing);
+        sendToTab(tab, outgoing, this.composer.replyReference(), false);
         // Answered: the next message is a message of its own.
         this.composer.cancelReply();
+    }
+
+    /**
+     * Sends an action typed into {@code tab} ({@code /me draws his
+     * sword}), its words ended as the sentence they read as, the way a
+     * message is sent: shown at once and answering whatever the composer
+     * holds. A message being rewritten takes the words and stays what it
+     * was; in an NPC conversation the action is shown here, as a line
+     * there is.
+     */
+    void sendAction(ChatTab tab, String words) {
+        ClientChatIdentitySelection.update();
+        String outgoing = ChatAction.sentence(
+                ChatInputRules.outgoingMessage(words));
+        if (this.composer.isEditing()) {
+            long edited = this.composer.editingMessageId();
+            this.composer.cancelEdit();
+            LostTalesNetworkHandler.CHANNEL.sendToServer(
+                    new LostTalesChatEditPacket(edited, outgoing));
+            return;
+        }
+        if (tab.isNpc()) {
+            LostTalesChatPresentation.echoToNpc(tab, outgoing,
+                    resolveLocalShowcases(outgoing),
+                    this.composer.replyReference(), true);
+            this.composer.cancelReply();
+            return;
+        }
+        recordEmojiUse(outgoing);
+        sendToTab(tab, outgoing, this.composer.replyReference(), true);
+        this.composer.cancelReply();
+    }
+
+    /** Counts the emoji a line goes out with, for Frequently Used. */
+    private static void recordEmojiUse(String outgoing) {
+        if (!LostTalesConfig.enableChatEmojis) {
+            return;
+        }
+        for (ChatEmojiParser.Segment segment
+                : ChatEmojiParser.split(outgoing)) {
+            if (segment.isEmoji()) {
+                ChatEmojiUsageStore.recordUse(segment.getEmoji());
+            }
+        }
     }
 
     /**
@@ -123,7 +160,7 @@ final class ChatOutbox {
             return;
         }
         sendToTab(tab, ChatInputRules.outgoingMessage(text),
-                ChatReplyReference.NONE);
+                ChatReplyReference.NONE, false);
     }
 
     /**
@@ -153,16 +190,17 @@ final class ChatOutbox {
     /**
      * Shows the line at once, named so the copy that comes back replaces
      * it rather than arriving underneath it, and sends it with the
-     * references the server re-checks.
+     * references the server re-checks; {@code action} sends the words as
+     * an action.
      */
     private void sendToTab(ChatTab tab, String outgoing,
-                           ChatReplyReference reply) {
+                           ChatReplyReference reply, boolean action) {
         if (tab == null) {
             return;
         }
         ClientChatIdentitySelection.update();
         long echoNonce = LostTalesChatPresentation.echoPending(tab, outgoing,
-                resolveLocalShowcases(outgoing), reply);
+                resolveLocalShowcases(outgoing), reply, action);
         // Only a message the server named travels as its id; a line
         // this client anchored for itself is quoted by its words.
         boolean named = ChatMessageIds.isServerId(reply.getMessageId());
@@ -188,7 +226,8 @@ final class ChatOutbox {
                                                 || this.mc.thePlayer == null
                                                 ? null
                                                 : this.mc.thePlayer
-                                                        .getUniqueID())));
+                                                        .getUniqueID()),
+                        action));
     }
 
     /**
@@ -206,15 +245,6 @@ final class ChatOutbox {
         return resolveLocalShowcases(tokens,
                 ChatShareCandidates.items(this.mc.thePlayer),
                 ChatShareCandidates.markers(), ChatShareCandidates.quests());
-    }
-
-    /** As above over given candidates, so the matching is testable. */
-    static List<ChatShowcase> resolveLocalShowcases(
-            List<ChatShareTokenParser.Token> tokens,
-            List<ChatShareCandidates.ItemEntry> items,
-            List<ChatShareCandidates.MarkerEntry> markers) {
-        return resolveLocalShowcases(tokens, items, markers,
-                Collections.<ChatShareCandidates.QuestEntry>emptyList());
     }
 
     static List<ChatShowcase> resolveLocalShowcases(
@@ -306,15 +336,6 @@ final class ChatOutbox {
                 ChatShareCandidates.markers(), ChatShareCandidates.quests());
     }
 
-    /** As above over given candidates, so the matching is testable. */
-    static List<ChatShareReference> resolveShareReferences(
-            List<ChatShareTokenParser.Token> tokens,
-            List<ChatShareCandidates.ItemEntry> items,
-            List<ChatShareCandidates.MarkerEntry> markers) {
-        return resolveShareReferences(tokens, items, markers,
-                Collections.<ChatShareCandidates.QuestEntry>emptyList());
-    }
-
     static List<ChatShareReference> resolveShareReferences(
             List<ChatShareTokenParser.Token> tokens,
             List<ChatShareCandidates.ItemEntry> items,
@@ -387,14 +408,18 @@ final class ChatOutbox {
 
     /**
      * Whether the field's text, {@code sinceKeystrokeNanos} after it
-     * last changed, counts as typing into {@code selected}.
+     * last changed, counts as typing into {@code selected}. An action
+     * being written is typing; any other command is not.
      */
     static boolean isTyping(String text, ChatTab selected,
                             long sinceKeystrokeNanos) {
         return LostTalesConfig.sendChatTypingStatus
                 && text.trim().length() > 0
                 && sinceKeystrokeNanos < TYPING_IDLE_NANOS
-                && !ChatInputRules.isCommand(text) && !selected.isNpc()
+                && (!ChatInputRules.isCommand(text)
+                        || ChatInputRules.isAction(text,
+                                selected.getChannel()))
+                && !selected.isNpc()
                 && ClientChatChannelState.canSend(selected);
     }
 

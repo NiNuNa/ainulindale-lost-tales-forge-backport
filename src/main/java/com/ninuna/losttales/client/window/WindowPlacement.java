@@ -4,7 +4,6 @@ import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
 import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import net.minecraft.util.MathHelper;
-import java.util.List;
 import com.ninuna.losttales.client.gui.LostTalesGuiPointer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiNewChat;
@@ -24,8 +23,7 @@ import net.minecraft.client.gui.GuiNewChat;
  * the room above its baseline is pushed down just far enough to stay on
  * screen and returns to its anchor once it fits; the stored position
  * never changes. Windows keep off the screen edges only: they may
- * overlap one another — the one in use is drawn in front — and only a
- * window linked to another moves with it.
+ * overlap one another, the one in use drawn in front.
  *
  * <p>Boxes are computed in fractional pixels with the same margin as
  * {@link HudPlacementLayout}, so a dragged window moves as smoothly as
@@ -55,8 +53,8 @@ public final class WindowPlacement {
     public static final int EDGE_MARGIN = HudPlacementLayout.SCREEN_MARGIN
             + FRAME_WIDTH;
     /**
-     * How far apart two windows stuck together stand: the margin and a
-     * frame for each, so their frames stand side by side.
+     * How far apart two windows lined up against each other stand: the
+     * margin and a frame for each, so their frames stand side by side.
      */
     public static final int WINDOW_GAP = HudPlacementLayout.SCREEN_MARGIN
             + 2 * FRAME_WIDTH;
@@ -340,10 +338,6 @@ public final class WindowPlacement {
                 + Math.max(1.0D, room) + barHeight(minecraft);
     }
 
-    /** The box height a window of {@code lines} message lines takes. */
-    public static double heightForLines(double lines, Minecraft minecraft) {
-        return heightForRoom(roomForLines(lines, minecraft), minecraft);
-    }
 
 
     /**
@@ -360,104 +354,15 @@ public final class WindowPlacement {
     }
 
     /**
-     * The window's box from its own place and size. A window linked to
-     * another takes its place from its target — a window gap above or
-     * below it, following chains — and is kept on screen like any other. No
+     * The window's box from its own place and size, kept on screen. No
      * window is a border for another: windows may overlap, and a tall
      * one never loses lines to a neighbour. Stored anchors never change;
-     * it is all recomputed every frame.
-     * Links are followed between resting boxes, so a window filling the
-     * screen never moves the windows stuck to it; this is also the box
-     * it goes back to, and what a drag measures a window from.
+     * it is all recomputed every frame. This is the box a window filling
+     * a part of the screen goes back to, and what a drag measures a
+     * window from.
      */
     public static Box restingBounds(Window window, Minecraft minecraft,
                                     int screenWidth, int screenHeight) {
-        List<Window> windows = WindowLayout.windows();
-        int count = windows.size();
-        int index = windows.indexOf(window);
-        if (index < 0) {
-            return anchoredBounds(window, minecraft, screenWidth,
-                    screenHeight);
-        }
-        int gap = WINDOW_GAP;
-        int row = rowHeight(minecraft);
-        int barHeight = barHeight(minecraft);
-        double[] x = new double[count];
-        double[] baseline = new double[count];
-        double[] room = new double[count];
-        int[] widths = new int[count];
-        for (int i = 0; i < count; i++) {
-            Box box = anchoredBounds(windows.get(i), minecraft, screenWidth,
-                    screenHeight);
-            x[i] = box.x;
-            baseline[i] = box.baseline();
-            room[i] = box.room;
-            widths[i] = box.width;
-        }
-        // A linked window takes its place from its target — above it or
-        // below it, a window gap apart, room for both frames — following
-        // chains in passes, and stops at the screen margins like any
-        // window.
-        for (int pass = 0; pass < count; pass++) {
-            boolean moved = false;
-            for (int i = 0; i < count; i++) {
-                Window linked = windows.get(i);
-                if (!linked.isLinked()) {
-                    continue;
-                }
-                int t = windows.indexOf(window(windows,
-                        linked.getLinkTarget()));
-                if (t < 0 || t == i) {
-                    continue;
-                }
-                if (linked.getLinkSide().isHorizontal()) {
-                    // Stuck to a side: it keeps its own baseline and
-                    // takes its left edge from the window it holds.
-                    double wantedX = linked.getLinkSide()
-                            == Window.LinkSide.LEFT
-                            ? x[t] - gap - widths[i]
-                            : x[t] + widths[t] + gap;
-                    wantedX = holdOnScreen(wantedX, widths[i], screenWidth);
-                    if (wantedX != x[i]) {
-                        x[i] = wantedX;
-                        moved = true;
-                    }
-                    continue;
-                }
-                double wanted = linked.isLinkedAbove()
-                        ? baseline[t] - room[t] - HISTORY_TOP_MARGIN - row
-                                - gap - barHeight
-                        : baseline[t] + barHeight + gap + room[i]
-                                + HISTORY_TOP_MARGIN + row;
-                wanted = holdBaseline(wanted,
-                        row + HISTORY_TOP_MARGIN + room[i] + barHeight,
-                        barHeight, screenHeight);
-                if (wanted != baseline[i]) {
-                    baseline[i] = wanted;
-                    moved = true;
-                }
-            }
-            if (!moved) {
-                break;
-            }
-        }
-        double height = heightForRoom(room[index], minecraft);
-        return new Box(x[index], baseline[index] - (height - barHeight),
-                widths[index], height, barHeight, room[index]);
-    }
-
-    private static Window window(List<Window> windows, String id) {
-        for (int index = 0; index < windows.size(); index++) {
-            if (windows.get(index).getId().equals(id)) {
-                return windows.get(index);
-            }
-        }
-        return null;
-    }
-
-    /** The window's box from its stored anchor alone, kept on screen. */
-    static Box anchoredBounds(Window window, Minecraft minecraft,
-                              int screenWidth, int screenHeight) {
         int width = windowWidth(window, minecraft);
         // A stored height the current screen cannot hold — the GUI
         // scale changed under a window resized tall — is capped to what
@@ -753,30 +658,17 @@ public final class WindowPlacement {
     }
 
     /**
-     * The narrowest a window may be dragged, in the windows' own units:
-     * enough for a message to still lay out under its sender rather than
-     * falling back to vanilla's wrapping, and for the input bar to keep
-     * its furniture. Measured in chat units, so the readable minimum is
-     * the same amount of text at every chat scale.
+     * The narrowest box a window may be dragged to, in GUI pixels, the
+     * same at every Chat Scale: the scale sizes the words in a window,
+     * never the window. Room for a hundred and sixty pixels of words at
+     * the scale's full size, the history's margins round them, and the
+     * input bar's furniture.
      */
-    public static final int MIN_READABLE_CHAT_WIDTH = 160;
-
-    /** That minimum in GUI pixels, at the scale the chat is drawn at. */
-    public static int minChatWidth(Minecraft minecraft) {
-        GuiNewChat chat = chat(minecraft);
-        float scale = chat == null ? 1.0F : chat.func_146244_h();
-        return Math.max(WindowLayout.MIN_WINDOW_SIZE,
-                Math.round(MIN_READABLE_CHAT_WIDTH * scale));
-    }
-
-    /** The narrowest box a window may be dragged to, in GUI pixels. */
-    public static double minBoxWidth(Minecraft minecraft) {
-        return boxWidthForChatWidth(minChatWidth(minecraft), minecraft);
-    }
+    public static final int MIN_BOX_WIDTH = 166;
 
     /**
      * The narrowest box <em>this</em> window may be dragged to: the
-     * readable minimum above, or the width its own tab row needs to keep
+     * least above, or the width its own tab row needs to keep
      * every tab in the strip — the widest whole, the others at their
      * icons — whichever is greater. A window with more tabs therefore
      * has a wider floor, so pulling an edge shortens the other tabs'
@@ -785,7 +677,7 @@ public final class WindowPlacement {
      */
     public static double minBoxWidth(Minecraft minecraft,
                                      Window window) {
-        return Math.max(minBoxWidth(minecraft),
+        return Math.max(MIN_BOX_WIDTH,
                 TabRow.boxWidthForNarrowestRow(minecraft, window));
     }
 

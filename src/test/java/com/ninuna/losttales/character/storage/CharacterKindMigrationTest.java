@@ -40,7 +40,6 @@ public final class CharacterKindMigrationTest {
         RoleplayCharacter loaded = CharacterNbtCodec.readCharacterRecord(record, OWNER);
 
         assertNotNull(loaded);
-        assertEquals(RoleplayCharacter.CURRENT_DATA_VERSION, loaded.getDataVersion());
         assertEquals(CharacterKind.ROLEPLAY, loaded.getKind());
         assertFalse(loaded.isDefault());
     }
@@ -138,7 +137,7 @@ public final class CharacterKindMigrationTest {
 
         CharacterRoster loaded = reloaded.getRoster(OWNER);
         assertNotNull(loaded);
-        assertEquals(2, loaded.getCharacterCount());
+        assertEquals(2, loaded.getCharacters().size());
         assertEquals("only one of them spends a slot",
                 1, loaded.roleplayCharacterCount());
 

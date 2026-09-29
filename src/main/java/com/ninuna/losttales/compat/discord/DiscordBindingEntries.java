@@ -89,15 +89,6 @@ public final class DiscordBindingEntries {
         return webhooks;
     }
 
-    public static boolean contains(String[] entries, String key) {
-        for (String entry : entries == null ? new String[0] : entries) {
-            if (key.equalsIgnoreCase(keyOf(entry))) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     /** The game channel key an entry names: everything before its first '='. */
     public static String keyOf(String entry) {
         if (entry == null || entry.trim().startsWith("#")) {

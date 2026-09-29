@@ -53,8 +53,8 @@ public class LostTalesQuickLootRequestPacket implements IMessage {
             return;
         }
         LostTalesQuickLootInventoryHelper.InventoryAccess access =
-                LostTalesQuickLootInventoryHelper.resolve(player.worldObj, x, y, z);
-        if (!LostTalesQuickLootInventoryHelper.isUsableBy(player, access)) {
+                LostTalesQuickLootInventoryHelper.resolveFor(player, x, y, z);
+        if (access == null) {
             return;
         }
 

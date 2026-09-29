@@ -75,7 +75,7 @@ final class DiscordChannelStatus {
                     DiscordJson.channelTopicBody(topic));
         } catch (DiscordHttp.PatchUnsupportedException unsupported) {
             disable("this Java runtime cannot send the request: "
-                    + unsupported.getMessage());
+                    + DiscordHttp.describe(unsupported));
             return;
         } catch (IOException exception) {
             failed(now, DiscordHttp.describe(exception));
@@ -85,6 +85,7 @@ final class DiscordChannelStatus {
             return;
         }
         if (reply.status == 429) {
+            // Discord's pause, which retryAfterMillis bounds to a minute.
             long retryAfter = Math.max(MIN_BACKOFF_MILLIS,
                     DiscordJson.retryAfterMillis(reply.body));
             synchronized (this) {
@@ -136,7 +137,7 @@ final class DiscordChannelStatus {
         }
         this.disabled = true;
         FMLLog.severe("[%s] Discord topic updates of channel %s are off until "
-                + "the server restarts: %s", LostTalesMetaData.MOD_ID,
+                + "the bridge is reloaded: %s", LostTalesMetaData.MOD_ID,
                 this.channelId, reason);
     }
 }

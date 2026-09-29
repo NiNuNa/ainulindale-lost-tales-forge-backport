@@ -163,7 +163,7 @@ public final class ChatMuteNbtCodecTest {
         assertEquals(timed, store.getActiveMute(ACCOUNT_A, 4999L));
         // Expiry drops the entry the moment a check passes it.
         assertNull(store.getActiveMute(ACCOUNT_A, 5000L));
-        assertEquals(0, store.getMuteCount());
+        assertTrue(store.getActiveMutes(5000L).isEmpty());
 
         for (int index = 0; index < ChatMuteNbtCodec.MAX_MUTES; index++) {
             assertTrue(store.mute(new ChatMuteEntry(new UUID(1L, index + 1L),

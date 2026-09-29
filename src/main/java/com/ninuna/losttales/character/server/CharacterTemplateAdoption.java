@@ -1,11 +1,11 @@
 package com.ninuna.losttales.character.server;
 
 /**
- * What a client says its account's default character should start as, the
+ * What a client says its account character should start as, the
  * one time a world asks.
  *
  * <p>An account keeps a template on its own installation. The world that
- * makes its default character reads that template once and then owns the
+ * makes its account character reads that template once and then owns the
  * character; what the player does to the template afterwards is about the
  * next world. This is that one reading, and the server checks every field
  * of it against its own content exactly as it checks a character somebody
@@ -15,7 +15,7 @@ package com.ninuna.losttales.character.server;
  * account's own identity belongs to no faction — it did not before it was
  * a character either — and its alignment is whatever the account has
  * already earned in that world, which is not a thing a template may
- * decide. It carries no slot: the default character's place is the one
+ * decide. It carries no slot: the account character's place is the one
  * outside the nine and is never chosen.</p>
  *
  * <p>{@link #isOffered()} is false when the account has no template. The

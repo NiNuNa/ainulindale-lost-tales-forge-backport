@@ -77,11 +77,6 @@ final class MotionLabSample {
         playBeat(motion, now);
     }
 
-    /** The motion the sample plays; null before one is. */
-    String id() {
-        return this.id;
-    }
-
     private void playBeat(Motion motion, long now) {
         if (this.beats.isEmpty()) {
             return;

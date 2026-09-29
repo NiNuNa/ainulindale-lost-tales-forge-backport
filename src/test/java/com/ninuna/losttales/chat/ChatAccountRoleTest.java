@@ -29,7 +29,7 @@ public final class ChatAccountRoleTest {
         assertEquals(0, ChatAccountRole.NONE.bit());
         assertTrue(ChatAccountRole.NONE.isNone());
         assertEquals("", ChatAccountRole.NONE.getDisplayName());
-        assertEquals(0, ChatAccountRole.maskOf(ChatAccountRole.NONE));
+        assertEquals(0, ChatAccountRole.NONE.bit());
         assertEquals(Collections.emptyList(), ChatAccountRole.fromMask(0));
         assertEquals(ChatAccountRole.NONE, ChatAccountRole.primary(0));
         assertEquals(ChatAccountRole.NONE, ChatAccountRole.byId("nobody"));
@@ -56,7 +56,7 @@ public final class ChatAccountRoleTest {
     /** The team mark outranks Operator: it colours the name, both are tagged. */
     @Test
     public void theTeamMarkIsPrimaryOverOperatorAndBothAreListed() {
-        int both = ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR,
+        int both = ChatRoleFixtures.maskOf(ChatRoleFixtures.OPERATOR,
                 ChatAccountRole.TEAM);
         assertEquals(Arrays.asList(ChatAccountRole.TEAM,
                 ChatRoleFixtures.OPERATOR), ChatAccountRole.fromMask(both));
@@ -101,7 +101,7 @@ public final class ChatAccountRoleTest {
         assertEquals(ChatRoleFixtures.OPERATOR.getColor(),
                 ChatAccountRole.nameColor(ChatRoleFixtures.OPERATOR.bit()));
         assertEquals(ChatAccountRole.TEAM.getColor(),
-                ChatAccountRole.nameColor(ChatAccountRole.maskOf(
+                ChatAccountRole.nameColor(ChatRoleFixtures.maskOf(
                         ChatRoleFixtures.OPERATOR,
                         ChatAccountRole.TEAM)));
     }
@@ -111,7 +111,7 @@ public final class ChatAccountRoleTest {
     public void aConfigRoleTakesTheNextBitAndItsRankPlacesIt() {
         ChatAccountRole moderator = ChatAccountRole.custom("moderator", "Moderator",
                 "Keeps the peace.", 0x123456, true, 5,
-                Collections.singletonList(ChatRoleSource.opLevel(1)));
+                Collections.singletonList(ChatRoleSource.opLevel(1)), null, null);
         ChatRoleCatalog.install(ChatRoleCatalog.of(
                 Arrays.asList(ChatRoleFixtures.OPERATOR, moderator), null, null));
         ChatAccountRole listed = ChatAccountRole.byId("moderator");

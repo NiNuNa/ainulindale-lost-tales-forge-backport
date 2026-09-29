@@ -18,7 +18,7 @@ public final class ChatOutboxTest {
         this.originalSend = LostTalesConfig.sendChatTypingStatus;
         LostTalesConfig.sendChatTypingStatus = true;
         ClientChatChannelState.clear();
-        ClientChatChannelState.select(ChatChannel.OOC);
+        ClientChatChannelState.select(ChatTab.of(ChatChannel.OOC));
     }
 
     @After

@@ -15,10 +15,10 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * A quote of a line no server named says whose line it was, as far as
- * the sender can tell: the Server's or the Client's, the sender's own,
- * or anybody else's. The claim travels after the quote's words, and the
- * message a forward carries on after it; a forward has no words of its
- * own.
+ * the sender can tell: the sender's own, or anybody else's. The claim
+ * travels after the quote's words, and the message a forward carries on
+ * after it; a forward has no words of its own. Quote words holding a
+ * section sign or a control character are refused.
  */
 public final class LostTalesChatSendPacketQuoteSourceTest {
 
@@ -32,7 +32,7 @@ public final class LostTalesChatSendPacketQuoteSourceTest {
     @Test
     public void theSourceRoundTripsWithTheQuote() {
         for (int source = LostTalesChatSendPacket.QUOTE_OTHER;
-             source <= LostTalesChatSendPacket.QUOTE_SYSTEM; source++) {
+             source <= LostTalesChatSendPacket.QUOTE_OWN; source++) {
             ByteBuf buffer = Unpooled.buffer();
             quoting(source).toBytes(buffer);
             LostTalesChatSendPacket decoded = new LostTalesChatSendPacket();
@@ -47,7 +47,7 @@ public final class LostTalesChatSendPacketQuoteSourceTest {
     @Test
     public void aQuoteWithoutASourceIsMalformed() {
         ByteBuf buffer = Unpooled.buffer();
-        quoting(LostTalesChatSendPacket.QUOTE_SYSTEM).toBytes(buffer);
+        quoting(LostTalesChatSendPacket.QUOTE_OWN).toBytes(buffer);
         LostTalesChatSendPacket shortened = new LostTalesChatSendPacket();
         shortened.fromBytes(buffer.slice(0, buffer.readableBytes() - 1));
         assertTrue(shortened.isMalformed());
@@ -66,12 +66,36 @@ public final class LostTalesChatSendPacketQuoteSourceTest {
     }
 
     @Test
+    public void quoteWordsWithACodeOrAControlCharacterAreRefused() throws Exception {
+        String[] forged = { "\u00a7\u00a7aGold", "line\nbreak", "be\u0007ll" };
+        for (String words : forged) {
+            byte[] wanted = words.getBytes("UTF-8");
+            char[] filler = new char[wanted.length];
+            java.util.Arrays.fill(filler, 'q');
+            String placeholder = new String(filler);
+            ByteBuf buffer = Unpooled.buffer();
+            new LostTalesChatSendPacket(ChatChannel.GLOBAL, "which one?",
+                    null, "", LostTalesChatSendPacket.IDENTITY_DEFAULT, null,
+                    ChatMessageIds.NONE, "", 7L, null, "Server", placeholder,
+                    LostTalesChatSendPacket.QUOTE_OTHER).toBytes(buffer);
+            // A client that skips its own checks writes the words in place.
+            byte[] bytes = new byte[buffer.readableBytes()];
+            buffer.getBytes(0, bytes);
+            int at = new String(bytes, "ISO-8859-1").indexOf(placeholder);
+            System.arraycopy(wanted, 0, bytes, at, wanted.length);
+            LostTalesChatSendPacket decoded = new LostTalesChatSendPacket();
+            decoded.fromBytes(Unpooled.wrappedBuffer(bytes));
+            assertTrue(words, decoded.isMalformed());
+        }
+    }
+
+    @Test
     public void aSourceWithoutAQuoteIsDropped() {
         LostTalesChatSendPacket plain = new LostTalesChatSendPacket(
                 ChatChannel.GLOBAL, "hello", null, "",
                 LostTalesChatSendPacket.IDENTITY_DEFAULT, null,
                 ChatMessageIds.NONE, "", 7L, null, "", "",
-                LostTalesChatSendPacket.QUOTE_SYSTEM);
+                LostTalesChatSendPacket.QUOTE_OWN);
         assertEquals(LostTalesChatSendPacket.QUOTE_OTHER,
                 plain.getQuoteSource());
     }
@@ -125,7 +149,8 @@ public final class LostTalesChatSendPacketQuoteSourceTest {
         assertEquals(LostTalesChatSendPacket.QUOTE_OTHER,
                 LostTalesChatSendPacket.quoteSourceOf(
                         quote.withHead(UUID.randomUUID(), true, ""), self));
-        assertEquals(LostTalesChatSendPacket.QUOTE_SYSTEM,
+        // The Server's mark is the server's own record to give, never a claim.
+        assertEquals(LostTalesChatSendPacket.QUOTE_OTHER,
                 LostTalesChatSendPacket.quoteSourceOf(quote.withHead(
                         LostTalesChatMessagePacket.SERVER_SENDER_ID, true, ""),
                         self));

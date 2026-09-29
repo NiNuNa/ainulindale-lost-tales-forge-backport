@@ -149,7 +149,6 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     private LostTalesClientEventHandler clientEventHandler;
     private LostTalesKeyBindings keyBindings;
     private CharacterClientTaskQueue characterClientTaskQueue;
-    private LostTalesChatClientHandler chatClientHandler;
     private LostTalesGuiAnimationHandler guiAnimationHandler;
 
     @Override
@@ -183,7 +182,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         // GuiOpenEvent at the lowest priority, and the animation handler
         // must see the Lost Tales chat screen the chat handler puts in
         // place of vanilla's, not the one it replaces.
-        chatClientHandler = new LostTalesChatClientHandler();
+        new LostTalesChatClientHandler();
         guiAnimationHandler = new LostTalesGuiAnimationHandler();
         keyBindings = new LostTalesKeyBindings();
         characterClientTaskQueue = new CharacterClientTaskQueue();
@@ -673,7 +672,6 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
             WindowLayoutStore.reload();
             ClientChatChannelState.setChannelGates(
                     packet.getReadableChannels(), packet.getSendableChannels());
-            ClientChatChannelState.setOperatorAccess(packet.hasOperatorAccess());
             ClientChatChannelState.setCapabilities(packet.getCapabilities());
             ClientChatChannelState.setCanModerate(packet.canModerate());
             ClientChatChannelState.setCanEditServerConfig(

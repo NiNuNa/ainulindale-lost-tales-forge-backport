@@ -5,13 +5,13 @@ import com.ninuna.losttales.character.registry.CharacterBodyTypeRegistry;
 import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
 
 import com.ninuna.losttales.util.LostTalesIdentifiers;
+import java.util.Locale;
 import java.util.UUID;
 
 /** Persistent server-authoritative record for one roleplaying character. */
 public class RoleplayCharacter {
 
-    public static final int CURRENT_DATA_VERSION = 9;
-    public static final int INITIAL_ROLEPLAY_LEVEL = 1;
+    public static final int CURRENT_DATA_VERSION = 10;
     public static final boolean DEFAULT_SHOW_MINECRAFT_CAPE = true;
     public static final int DEFAULT_COSMETIC_CAPE_ID = CharacterCapeCatalog.NONE_ID;
 
@@ -31,25 +31,13 @@ public class RoleplayCharacter {
     private final String startingWaypointId;
     private final boolean unconventionalSettings;
     private final long creationTimestamp;
-    private final int dataVersion;
 
-    private int roleplayLevel;
-    private CharacterProgression progression;
     private boolean showMinecraftCape;
     private int cosmeticCapeId;
-
-    /** A character made now: every optional field at its default. */
-    public static RoleplayCharacter createNew(UUID ownerId, int slotIndex, String name,
-                                               String raceId, String genderId,
-                                               String skinId, int age,
-                                               String startingFactionId,
-                                               long creationTimestamp) {
-        return builder(UUID.randomUUID(), ownerId)
-                .slot(slotIndex).name(name).race(raceId).gender(genderId)
-                .skin(skinId).age(age).startingFaction(startingFactionId)
-                .createdAt(creationTimestamp)
-                .build();
-    }
+    /** The faction LOTR says the character is pledged to; empty while it has no pledge. */
+    private String pledgedFactionId;
+    /** When the character's faction became its faction: its making, or its latest pledge. */
+    private long factionSince;
 
     /** A builder for a character with these ids; everything else defaults. */
     public static Builder builder(UUID characterId, UUID ownerId) {
@@ -66,10 +54,9 @@ public class RoleplayCharacter {
                 .slot(source.slotIndex).name(source.name).race(source.raceId)
                 .gender(source.genderId).skin(source.skinId).age(source.age)
                 .startingFaction(source.startingFactionId)
-                .roleplayLevel(source.roleplayLevel)
-                .progression(source.progression)
+                .pledgedFaction(source.pledgedFactionId)
+                .factionSince(source.factionSince)
                 .createdAt(source.creationTimestamp)
-                .dataVersion(source.dataVersion)
                 .minecraftCapeVisible(source.showMinecraftCape)
                 .cosmeticCape(source.cosmeticCapeId)
                 .startingWaypoint(source.startingWaypointId)
@@ -99,12 +86,10 @@ public class RoleplayCharacter {
         this.startingFactionId = builder.startingFactionId;
         this.startingWaypointId = builder.startingWaypointId;
         this.unconventionalSettings = builder.unconventionalSettings;
-        this.roleplayLevel = Math.max(INITIAL_ROLEPLAY_LEVEL, builder.roleplayLevel);
-        this.progression = builder.progression == null
-                ? new CharacterProgression() : builder.progression;
+        this.pledgedFactionId = normalizeFactionId(builder.pledgedFactionId);
         this.creationTimestamp = Math.max(0L, builder.creationTimestamp);
-        this.dataVersion = builder.dataVersion <= 0
-                ? CURRENT_DATA_VERSION : builder.dataVersion;
+        this.factionSince = builder.factionSince > 0L ? builder.factionSince
+                : this.creationTimestamp;
         this.showMinecraftCape = builder.showMinecraftCape;
         this.cosmeticCapeId = CharacterCapeCatalog.normalizeSelection(
                 builder.cosmeticCapeId);
@@ -113,7 +98,7 @@ public class RoleplayCharacter {
     /**
      * Every field a character record holds, with the default a record
      * without the field gets: the body and chest types follow the sex,
-     * the level is the first, the capes are the catalogue's defaults.
+     * the capes are the catalogue's defaults, and there is no pledge.
      */
     public static final class Builder {
         private final UUID characterId;
@@ -125,10 +110,9 @@ public class RoleplayCharacter {
         private String skinId = "";
         private int age;
         private String startingFactionId = "";
-        private int roleplayLevel = INITIAL_ROLEPLAY_LEVEL;
-        private CharacterProgression progression;
+        private String pledgedFactionId = "";
         private long creationTimestamp;
-        private int dataVersion = CURRENT_DATA_VERSION;
+        private long factionSince;
         private boolean showMinecraftCape = DEFAULT_SHOW_MINECRAFT_CAPE;
         private int cosmeticCapeId = DEFAULT_COSMETIC_CAPE_ID;
         private String startingWaypointId = "";
@@ -200,23 +184,21 @@ public class RoleplayCharacter {
             return this;
         }
 
-        public Builder roleplayLevel(int roleplayLevel) {
-            this.roleplayLevel = roleplayLevel;
+        /** The faction LOTR says the character is pledged to; null or empty for none. */
+        public Builder pledgedFaction(String pledgedFactionId) {
+            this.pledgedFactionId = pledgedFactionId == null
+                    ? "" : pledgedFactionId;
             return this;
         }
 
-        public Builder progression(CharacterProgression progression) {
-            this.progression = progression;
+        /** When the faction became the character's; 0 for its making. */
+        public Builder factionSince(long factionSince) {
+            this.factionSince = factionSince;
             return this;
         }
 
         public Builder createdAt(long creationTimestamp) {
             this.creationTimestamp = creationTimestamp;
-            return this;
-        }
-
-        public Builder dataVersion(int dataVersion) {
-            this.dataVersion = dataVersion;
             return this;
         }
 
@@ -321,8 +303,66 @@ public class RoleplayCharacter {
         return this.age;
     }
 
+    /** The faction the character chose when it was made. */
     public String getStartingFactionId() {
         return this.startingFactionId;
+    }
+
+    /** The faction LOTR says the character is pledged to; empty while it has no pledge. */
+    public String getPledgedFactionId() {
+        return this.pledgedFactionId;
+    }
+
+    /**
+     * The character's faction: its LOTR pledge while it has one, else its
+     * starting faction. Its chat colour, its Faction Chat and the people
+     * its title names all follow this.
+     */
+    public String getFactionId() {
+        return factionOf(this.pledgedFactionId, this.startingFactionId);
+    }
+
+    /** The pledge when there is one, else the starting faction. */
+    public static String factionOf(String pledgedFactionId,
+                                   String startingFactionId) {
+        String pledged = normalizeFactionId(pledgedFactionId);
+        if (pledged.length() > 0) {
+            return pledged;
+        }
+        return startingFactionId == null ? "" : startingFactionId;
+    }
+
+    /**
+     * Keeps the pledge LOTR reports for this character, read from the
+     * player data of the one being played. Answers whether it changed.
+     */
+    public boolean setPledgedFactionId(String pledgedFactionId, long now) {
+        String normalized = normalizeFactionId(pledgedFactionId);
+        if (normalized.equals(this.pledgedFactionId)) {
+            return false;
+        }
+        String before = getFactionId();
+        this.pledgedFactionId = normalized;
+        if (!before.equals(getFactionId())) {
+            // A faction's past is its own: the character reads it from
+            // the moment it joined, never from before.
+            this.factionSince = Math.max(0L, now);
+        }
+        return true;
+    }
+
+    /**
+     * When the character's faction became its faction: its making for
+     * the starting faction, the pledge for a pledged one. Its Faction
+     * history starts here.
+     */
+    public long getFactionSince() {
+        return this.factionSince;
+    }
+
+    private static String normalizeFactionId(String factionId) {
+        return factionId == null ? ""
+                : factionId.trim().toLowerCase(Locale.ROOT);
     }
 
     public String getStartingWaypointId() {
@@ -331,19 +371,6 @@ public class RoleplayCharacter {
 
     public boolean hasUnconventionalSettings() {
         return this.unconventionalSettings;
-    }
-
-    /**
-     * The level and progression are stored and shown but nothing
-     * awards them yet; they change only through the codec that reads
-     * them back.
-     */
-    public int getRoleplayLevel() {
-        return this.roleplayLevel;
-    }
-
-    public CharacterProgression getProgression() {
-        return this.progression;
     }
 
     public boolean isMinecraftCapeVisible() {
@@ -366,9 +393,5 @@ public class RoleplayCharacter {
 
     public long getCreationTimestamp() {
         return this.creationTimestamp;
-    }
-
-    public int getDataVersion() {
-        return this.dataVersion;
     }
 }

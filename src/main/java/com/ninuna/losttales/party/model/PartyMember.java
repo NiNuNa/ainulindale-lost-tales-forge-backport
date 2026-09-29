@@ -2,21 +2,25 @@ package com.ninuna.losttales.party.model;
 
 import java.util.UUID;
 
-/** Immutable persisted identity snapshot for one character in a party. */
+/**
+ * One member of a party: an identity, which is a character or the account
+ * playing as itself, with its owner and name as last seen, when it joined,
+ * and the colour it wears.
+ */
 public final class PartyMember {
 
     public static final int CURRENT_DATA_VERSION = 1;
 
-    private final UUID characterId;
+    private final UUID identityId;
     private final UUID ownerId;
     private final String characterName;
     private final long joinedAt;
     private final PartyColor color;
 
-    public PartyMember(UUID characterId, UUID ownerId, String characterName,
+    public PartyMember(UUID identityId, UUID ownerId, String characterName,
                        long joinedAt, PartyColor color) {
-        if (characterId == null) {
-            throw new IllegalArgumentException("characterId must not be null");
+        if (identityId == null) {
+            throw new IllegalArgumentException("identityId must not be null");
         }
         if (ownerId == null) {
             throw new IllegalArgumentException("ownerId must not be null");
@@ -24,15 +28,15 @@ public final class PartyMember {
         if (color == null) {
             throw new IllegalArgumentException("color must not be null");
         }
-        this.characterId = characterId;
+        this.identityId = identityId;
         this.ownerId = ownerId;
         this.characterName = normalizeName(characterName);
         this.joinedAt = Math.max(0L, joinedAt);
         this.color = color;
     }
 
-    public UUID getCharacterId() {
-        return this.characterId;
+    public UUID getIdentityId() {
+        return this.identityId;
     }
 
     public UUID getOwnerId() {
@@ -52,12 +56,12 @@ public final class PartyMember {
     }
 
     public PartyMember withColor(PartyColor newColor) {
-        return new PartyMember(this.characterId, this.ownerId, this.characterName,
+        return new PartyMember(this.identityId, this.ownerId, this.characterName,
                 this.joinedAt, newColor);
     }
 
     public PartyMember withIdentity(UUID newOwnerId, String newCharacterName) {
-        return new PartyMember(this.characterId, newOwnerId, newCharacterName,
+        return new PartyMember(this.identityId, newOwnerId, newCharacterName,
                 this.joinedAt, this.color);
     }
 

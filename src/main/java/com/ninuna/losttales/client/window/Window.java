@@ -6,10 +6,8 @@ import java.util.List;
 
 /**
  * One window in the client layout: an ordered row of tabs, the tab
- * currently in front, a lock, a position, how many message lines it may
- * show, whether it fills the screen, and optionally a link to another
- * window it sits directly above or below, keeping its gap as that window
- * grows, shrinks or moves. Instances are owned and mutated only by
+ * currently in front, a lock, a position, its own size, and whether it
+ * fills a part of the screen. Instances are owned and mutated only by
  * {@link WindowLayout}; everyone else reads them.
  */
 public final class Window {
@@ -27,10 +25,6 @@ public final class Window {
     private double ownHeight;
     /** The window's own width in GUI pixels; 0 follows the game's chat settings. */
     private int ownWidth;
-    /** Id of the window this one is linked to, or null. */
-    private String linkTarget;
-    /** Which side of its target this window sits on. */
-    private LinkSide linkSide = LinkSide.BELOW;
     /**
      * The part of the screen the window fills, or none while it stands
      * in its own box. Its own position and size stay as they were
@@ -288,41 +282,6 @@ public final class Window {
         }
     }
 
-    /**
-     * Where a stuck window sits relative to the one it is stuck to. Two
-     * stuck windows keep their gap and move as one, whichever of them is
-     * dragged.
-     */
-    public enum LinkSide {
-        ABOVE("above", false),
-        BELOW("below", false),
-        LEFT("left", true),
-        RIGHT("right", true);
-
-        private final String id;
-        private final boolean horizontal;
-
-        LinkSide(String id, boolean horizontal) {
-            this.id = id;
-            this.horizontal = horizontal;
-        }
-
-        public String id() { return this.id; }
-
-        /** Whether the side is a left or right one, not a top or bottom. */
-        public boolean isHorizontal() { return this.horizontal; }
-
-        /** The side of that name; below for anything else, as files had. */
-        public static LinkSide fromId(String id) {
-            for (LinkSide side : values()) {
-                if (side.id.equalsIgnoreCase(id)) {
-                    return side;
-                }
-            }
-            return BELOW;
-        }
-    }
-
     public Window(String id) {
         this.id = id;
     }
@@ -344,12 +303,6 @@ public final class Window {
      * follows the game's chat-width setting.
      */
     public int getOwnWidth() { return this.ownWidth; }
-    public String getLinkTarget() { return this.linkTarget; }
-    public boolean isLinkedAbove() { return this.linkSide == LinkSide.ABOVE; }
-
-    /** Which side of its target this window is stuck to. */
-    public LinkSide getLinkSide() { return this.linkSide; }
-    public boolean isLinked() { return this.linkTarget != null; }
 
     /** The part of the screen the window fills; none in its own box. */
     public ScreenFill getFill() { return this.fill; }
@@ -391,15 +344,5 @@ public final class Window {
     void setOffsets(double offsetX, double offsetY) {
         this.offsetX = offsetX;
         this.offsetY = offsetY;
-    }
-
-    void setLink(String target, boolean above) {
-        setLink(target, above ? LinkSide.ABOVE : LinkSide.BELOW);
-    }
-
-    void setLink(String target, LinkSide side) {
-        this.linkTarget = target;
-        this.linkSide = target == null || side == null
-                ? LinkSide.BELOW : side;
     }
 }

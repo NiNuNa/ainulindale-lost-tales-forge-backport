@@ -26,10 +26,8 @@ public final class MissiveBoardLayoutTest {
         assertEquals(list.right() + MissiveBoardLayout.GUTTER, divider.left, 0.0D);
         assertEquals(divider.right() + MissiveBoardLayout.GUTTER, letter.left, 0.0D);
         assertEquals(420 - MissiveBoardLayout.MARGIN, letter.right(), 0.0D);
-        LostTalesUiHitBox status = layout.status();
-        assertEquals("the status line stands under the letter",
-                letter.bottom(), status.top, 0.0D);
-        assertEquals(240 - MissiveBoardLayout.MARGIN, status.bottom(), 0.0D);
+        assertEquals("the letter reaches the page's foot; answers stand over the bar",
+                240 - MissiveBoardLayout.MARGIN, letter.bottom(), 0.0D);
     }
 
     @Test

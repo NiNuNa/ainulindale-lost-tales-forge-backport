@@ -8,8 +8,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.util.StatCollector;
 
 /**
- * The tab of a page: the quest journal, the party. One per page, made by
- * {@link WindowPages}, so a page stands in one window at most.
+ * The tab of a page: the journal, the map, a waystone. One per page,
+ * made by {@link WindowPages}, so a page stands in one window at most.
  */
 public final class PageTab extends WindowTab {
     /** What a page tab's id opens with, before the page's code name. */
@@ -58,6 +58,14 @@ public final class PageTab extends WindowTab {
         return content().isAvailable();
     }
 
+    /** Whether the page is on screen: the window screen open, and the page in front of its window. */
+    public boolean isShown() {
+        Window window = WindowLayout.windowOf(this);
+        return window != null && WindowScreen.current() != null
+                && equals(WindowFrame.activeTab(window,
+                        WindowFrame.visibleTabs(window)));
+    }
+
     /** A page that stands for a thing in the world ends with the session. */
     @Override
     public boolean isKeptInLayout() {
@@ -84,6 +92,11 @@ public final class PageTab extends WindowTab {
         WindowMenus.addSection(headed, StatCollector.translateToLocal(
                 page.choicesHeading()), rows);
         return headed;
+    }
+
+    @Override
+    public boolean hasMenuRows() {
+        return !content().choices().isEmpty();
     }
 
     /** A choice taken; the menu stays for the next. */
@@ -116,6 +129,14 @@ public final class PageTab extends WindowTab {
     @Override
     public int searchFound() {
         return content().found();
+    }
+
+    /** A page that names nothing it searches has nothing to search. */
+    @Override
+    public String searchUnavailable() {
+        return content().searchPrompt().length() > 0 ? ""
+                : StatCollector.translateToLocalFormatted(
+                        "gui.losttales.window.search.nothing", title());
     }
 
     @Override

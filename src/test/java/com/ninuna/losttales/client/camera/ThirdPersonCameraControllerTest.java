@@ -1,7 +1,7 @@
 package com.ninuna.losttales.client.camera;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -9,9 +9,30 @@ import org.junit.After;
 import org.junit.Test;
 
 public final class ThirdPersonCameraControllerTest {
+    private static final CameraSmoothing SMOOTHING = new CameraSmoothing(
+            10.0D, 10.0D, 10.0D, 10.0D, 10.0D, 10.0D, 10.0D);
+    private static final CameraMotionEffectsSample STILL =
+            new CameraMotionEffectsSample(false, true, false, false,
+                    false, 0, 0.0D, 0.0D);
+    private static final CameraMotionEffectsSettings NO_EFFECTS =
+            new CameraMotionEffectsSettings(
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
+
     @After
     public void resetController() {
-        ThirdPersonCameraController.reset();
+        ThirdPersonCameraController.reset(true);
+    }
+
+    /** The first update of a world puts the camera at the pose at once. */
+    private static CameraPose update(String contextKey, CameraPose pose,
+                                     long updateNanos) {
+        return ThirdPersonCameraController.update(contextKey, pose, SMOOTHING,
+                CameraMotionProfile.NONE, 0.0D, Double.NaN, Double.NaN,
+                STILL, NO_EFFECTS, updateNanos);
+    }
+
+    private static void activate(CameraPose pose) {
+        update("test", pose, 0L);
     }
 
     @Test
@@ -24,11 +45,11 @@ public final class ThirdPersonCameraControllerTest {
 
     @Test
     public void activeControllerProvidesDecoupledHudYaw() {
-        ThirdPersonCameraController.activate(new CameraPose(
+        activate(new CameraPose(
                 0.0D, 64.0D, 0.0D, -75.0D, 10.0D,
                 3.5D, 0.6D, 0.2D, 0.0D));
 
-        assertTrue(ThirdPersonCameraController.isActive());
+        assertNotNull(ThirdPersonCameraController.getCurrentPose());
         assertEquals(-75.0F,
                 ThirdPersonCameraController.resolveViewYaw(
                         20.0F, 40.0F, 0.5F),
@@ -37,12 +58,11 @@ public final class ThirdPersonCameraControllerTest {
 
     @Test
     public void resetRestoresInactivePassThroughState() {
-        ThirdPersonCameraController.activate(new CameraPose(
+        activate(new CameraPose(
                 0.0D, 64.0D, 0.0D, 90.0D, 0.0D,
                 3.5D, 0.6D, 0.2D, 0.0D));
-        ThirdPersonCameraController.reset();
+        ThirdPersonCameraController.reset(true);
 
-        assertFalse(ThirdPersonCameraController.isActive());
         assertNull(ThirdPersonCameraController.getCurrentPose());
         assertEquals(10.0F,
                 ThirdPersonCameraController.resolveViewYaw(
@@ -54,13 +74,8 @@ public final class ThirdPersonCameraControllerTest {
     public void profileChangesWithinAWorldInterpolateWithoutSnapping() {
         CameraPose standing = pose(3.5D, 0.6D);
         CameraPose sprinting = pose(4.2D, 0.5D);
-        CameraSmoothing smoothing = new CameraSmoothing(
-                10.0D, 10.0D, 10.0D, 10.0D, 10.0D, 10.0D, 10.0D);
-
-        ThirdPersonCameraController.update(
-                "7@0", standing, smoothing, 1000000000L);
-        CameraPose transitioned = ThirdPersonCameraController.update(
-                "7@0", sprinting, smoothing, 1050000000L);
+        update("7@0", standing, 1000000000L);
+        CameraPose transitioned = update("7@0", sprinting, 1050000000L);
 
         assertTrue(transitioned.getDistance() > standing.getDistance());
         assertTrue(transitioned.getDistance() < sprinting.getDistance());
@@ -69,33 +84,33 @@ public final class ThirdPersonCameraControllerTest {
     @Test
     public void shoulderChoicePersistsAcrossDeactivationAndUsesConfiguredReset() {
         ThirdPersonCameraController.reset(false);
-        assertFalse(ThirdPersonCameraController.isRightShoulder());
         assertEquals(-1.0D,
                 ThirdPersonCameraController.getShoulderSign(), 0.0D);
 
         ThirdPersonCameraController.deactivate();
-        assertFalse(ThirdPersonCameraController.isRightShoulder());
+        assertEquals(-1.0D,
+                ThirdPersonCameraController.getShoulderSign(), 0.0D);
 
         ThirdPersonCameraController.toggleShoulder();
-        assertTrue(ThirdPersonCameraController.isRightShoulder());
+        assertEquals(1.0D,
+                ThirdPersonCameraController.getShoulderSign(), 0.0D);
     }
 
     @Test
     public void renderedFrameUsesCollisionScaledOffsetsAndClearsSafely() {
-        ThirdPersonCameraController.activate(new CameraPose(
+        activate(new CameraPose(
                 0.0D, 64.0D, 0.0D, 0.0D, 0.0D,
                 4.0D, 1.0D, 0.5D, 0.0D));
-        ThirdPersonCameraController.recordRenderedFov(80.0D);
-        ThirdPersonCameraController.recordRenderFrame(
+        ThirdPersonCameraController.prepareRenderFrame(
                 10.0D, 65.0D, 20.0D,
                 0.0D, 0.0D, 2.0D);
 
+        // Half the distance scales the shoulder and the lift by half too.
         CameraRenderFrame frame =
                 ThirdPersonCameraController.getRenderFrame();
-        assertEquals(2.0D, frame.getDistance(), 0.0D);
-        assertEquals(0.5D, frame.getShoulderOffset(), 0.0D);
-        assertEquals(0.25D, frame.getVerticalOffset(), 0.0D);
-        assertEquals(80.0D, frame.getVerticalFov(), 0.0D);
+        assertEquals(frame.getPivotZ() - 2.0D, frame.getCameraZ(), 0.000001D);
+        assertEquals(frame.getPivotX() - 0.5D, frame.getCameraX(), 0.000001D);
+        assertEquals(frame.getPivotY() + 0.25D, frame.getCameraY(), 0.000001D);
 
         ThirdPersonCameraController.deactivate();
         assertNull(ThirdPersonCameraController.getRenderFrame());
@@ -103,7 +118,7 @@ public final class ThirdPersonCameraControllerTest {
 
     @Test
     public void modifierWheelZoomsInAndOutWithinConfiguredBounds() {
-        ThirdPersonCameraController.activate(new CameraPose(
+        activate(new CameraPose(
                 0.0D, 64.0D, 0.0D, 0.0D, 0.0D,
                 2.65D, 0.6D, 0.2D, 0.0D));
 
@@ -122,7 +137,7 @@ public final class ThirdPersonCameraControllerTest {
 
     @Test
     public void manualZoomPreservesProfileRelativeFraming() {
-        ThirdPersonCameraController.activate(new CameraPose(
+        activate(new CameraPose(
                 0.0D, 64.0D, 0.0D, 0.0D, 0.0D,
                 2.65D, 0.6D, 0.2D, 0.0D));
         ThirdPersonCameraController.resolveZoomDistance(
@@ -143,7 +158,7 @@ public final class ThirdPersonCameraControllerTest {
 
     @Test
     public void manualZoomSurvivesPerspectiveChangeButNotSessionReset() {
-        ThirdPersonCameraController.activate(new CameraPose(
+        activate(new CameraPose(
                 0.0D, 64.0D, 0.0D, 0.0D, 0.0D,
                 2.65D, 0.6D, 0.2D, 0.0D));
         ThirdPersonCameraController.adjustZoom(
@@ -154,9 +169,7 @@ public final class ThirdPersonCameraControllerTest {
                 ThirdPersonCameraController.resolveZoomDistance(
                 3.20D, 1.35D, 8.0D), 0.0000001D);
 
-        ThirdPersonCameraController.reset();
-        assertTrue(Double.isNaN(
-                ThirdPersonCameraController.getManualZoomOffset()));
+        ThirdPersonCameraController.reset(true);
         assertEquals(3.20D,
                 ThirdPersonCameraController.resolveZoomDistance(
                 3.20D, 1.35D, 8.0D), 0.0000001D);

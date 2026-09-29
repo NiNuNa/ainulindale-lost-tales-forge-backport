@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
+import java.net.ProtocolException;
 import java.nio.charset.Charset;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -11,10 +12,12 @@ import java.util.Random;
 
 /**
  * The WebSocket wire format (RFC 6455) as the Gateway client needs it:
- * a frame written masked, the way a client must, and a frame read from
- * the server, which sends unmasked; plus the two strings the opening
- * handshake exchanges. Pure byte work, no socket in sight, so it can be
- * proven without one.
+ * a frame written masked, the way a client must; a frame read from the
+ * server, which must come unmasked; the frames of a message joined into
+ * its text; and the two strings the opening handshake exchanges.
+ * Whatever the protocol forbids a server to send is refused as a
+ * {@link ProtocolException}. Pure byte work, no socket in sight, so it
+ * can be proven without one.
  */
 public final class DiscordWebSocketFrames {
 
@@ -26,6 +29,10 @@ public final class DiscordWebSocketFrames {
     public static final int OPCODE_PONG = 0xA;
     /** A Gateway payload is far below this; anything larger is not one. */
     public static final int MAX_PAYLOAD_BYTES = 4 * 1024 * 1024;
+    /** The most a control frame may carry. */
+    public static final int MAX_CONTROL_PAYLOAD_BYTES = 125;
+    /** The close code that says the other side broke the protocol. */
+    public static final int CLOSE_PROTOCOL_ERROR = 1002;
     private static final String HANDSHAKE_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
     private static final Charset UTF_8 = Charset.forName("UTF-8");
 
@@ -99,9 +106,11 @@ public final class DiscordWebSocketFrames {
     }
 
     /**
-     * The next frame off the stream, unmasked. A server frame carries no
-     * mask; one that does is unmasked all the same. Throws at end of
-     * stream, and refuses a payload beyond the bound.
+     * The next frame off the stream. A server's frame comes unmasked,
+     * with no extension bits and a known opcode, and a control frame
+     * comes whole and carries at most {@link #MAX_CONTROL_PAYLOAD_BYTES};
+     * anything else is a {@link ProtocolException}. Throws at end of
+     * stream, and refuses a payload beyond {@link #MAX_PAYLOAD_BYTES}.
      */
     public static Frame read(DataInputStream in) throws IOException {
         int first = in.read();
@@ -111,8 +120,20 @@ public final class DiscordWebSocketFrames {
         }
         boolean fin = (first & 0x80) != 0;
         int opcode = first & 0x0F;
-        boolean masked = (second & 0x80) != 0;
+        if ((first & 0x70) != 0) {
+            throw new ProtocolException("frame with extension bits nobody agreed on");
+        }
+        if (!isKnown(opcode)) {
+            throw new ProtocolException("frame with the reserved opcode " + opcode);
+        }
+        if ((second & 0x80) != 0) {
+            throw new ProtocolException("masked frame from the server");
+        }
         long length = second & 0x7F;
+        if (opcode >= 0x8 && (!fin || length > MAX_CONTROL_PAYLOAD_BYTES)) {
+            throw new ProtocolException("control frame split up or over "
+                    + MAX_CONTROL_PAYLOAD_BYTES + " bytes");
+        }
         if (length == 126) {
             length = in.readUnsignedShort();
         } else if (length == 127) {
@@ -121,19 +142,59 @@ public final class DiscordWebSocketFrames {
         if (length < 0 || length > MAX_PAYLOAD_BYTES) {
             throw new IOException("frame payload of " + length + " bytes refused");
         }
-        byte[] mask = null;
-        if (masked) {
-            mask = new byte[4];
-            in.readFully(mask);
-        }
         byte[] payload = new byte[(int)length];
         in.readFully(payload);
-        if (mask != null) {
-            for (int index = 0; index < payload.length; index++) {
-                payload[index] = (byte)(payload[index] ^ mask[index & 3]);
-            }
-        }
         return new Frame(fin, opcode, payload);
+    }
+
+    private static boolean isKnown(int opcode) {
+        return opcode == OPCODE_CONTINUATION || opcode == OPCODE_TEXT
+                || opcode == OPCODE_BINARY || opcode == OPCODE_CLOSE
+                || opcode == OPCODE_PING || opcode == OPCODE_PONG;
+    }
+
+    /**
+     * Joins one connection's data frames into text messages, as RFC 6455
+     * lays them out: a text frame, final or followed by continuation
+     * frames up to a final one. Anything else in its place is a
+     * {@link ProtocolException}: a continuation with no message begun, a
+     * new message before the last one ended, and a binary message, which
+     * a Gateway asked for JSON never sends. Control frames belong to no
+     * message and are passed over.
+     */
+    public static final class Messages {
+        private ByteArrayOutputStream fragments;
+
+        /** The text message the frame completes, or null while one is still being joined. */
+        public String accept(Frame frame) throws IOException {
+            if (frame.isControl()) {
+                return null;
+            }
+            if (frame.opcode == OPCODE_BINARY) {
+                throw new ProtocolException("binary message on a JSON connection");
+            }
+            if (frame.opcode == OPCODE_TEXT) {
+                if (this.fragments != null) {
+                    throw new ProtocolException("new message inside a fragmented one");
+                }
+                if (frame.fin) {
+                    return frame.text();
+                }
+                this.fragments = new ByteArrayOutputStream();
+            } else if (this.fragments == null) {
+                throw new ProtocolException("continuation frame with no message begun");
+            }
+            if (this.fragments.size() + frame.payload.length > MAX_PAYLOAD_BYTES) {
+                throw new IOException("fragmented message too large");
+            }
+            this.fragments.write(frame.payload, 0, frame.payload.length);
+            if (!frame.fin) {
+                return null;
+            }
+            String text = new String(this.fragments.toByteArray(), UTF_8);
+            this.fragments = null;
+            return text;
+        }
     }
 
     /** The random key the handshake offers, base64 of sixteen bytes. */

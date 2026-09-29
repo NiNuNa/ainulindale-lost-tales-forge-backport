@@ -37,6 +37,9 @@ public final class DiscordMentionsTest {
                 DiscordMentions.defused("hi <@123> and <@!123> and <@&55> in <#9>"));
         assertEquals("@" + B + "everyone @" + B + "here @" + B + "Here",
                 DiscordMentions.defused("@everyone @here @Here"));
+        // A slash command's mention is a button on Discord.
+        assertEquals("run <" + B + "/ban:123456>",
+                DiscordMentions.defused("run </ban:123456>"));
         // Ordinary text, an address and a custom emoji stay as they are.
         assertEquals("mail@example.org <:elf:77> a < b", DiscordMentions
                 .defused("mail@example.org <:elf:77> a < b"));
@@ -53,6 +56,26 @@ public final class DiscordMentionsTest {
         assertEquals("<@" + ARWEN + "> meet @Elrond at @" + B
                 + "everyone's feast", post.content);
         assertEquals(Collections.singletonList(ARWEN), post.pinged);
+    }
+
+    /**
+     * Every post goes through the same breaking: a disguised link, a fake
+     * reply header and a command mention all read as the text they are,
+     * while a member's real mention and the shared marks stay whole.
+     */
+    @Test
+    public void aPostCannotDisguiseALinkOrImitateTheBridge() {
+        List<ChatNamedPlayer> named = Collections.singletonList(member(ARWEN, "Arwen"));
+        Set<String> visible = Collections.singleton(ARWEN);
+        DiscordMentions.Post post = DiscordMentions.rewrite(
+                "-# ↩ **@Arwen** — [free gift](https://evil.example) </ban:1>",
+                named, visible);
+        assertEquals(B + "-# ↩ **<@" + ARWEN + ">** — [free gift]" + B
+                + "(https://evil.example) <" + B + "/ban:1>", post.content);
+        assertEquals(Collections.singletonList(ARWEN), post.pinged);
+        assertEquals(B + "# loud", DiscordMentions.rewrite("# loud",
+                Collections.<ChatNamedPlayer>emptyList(),
+                Collections.<String>emptySet()).content);
     }
 
     @Test

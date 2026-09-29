@@ -6,8 +6,12 @@ import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiRegionBlur;
 import com.ninuna.losttales.client.input.LostTalesKeyPress;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
+import com.ninuna.losttales.client.motion.MotionIds;
+import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
+import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -25,8 +29,8 @@ import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
 
 /**
- * The screen every window stands on: the conversations, the journal, the
- * party. Tabs can be dragged along their row to reorder, away from it to
+ * The screen every window stands on: the conversations and every page.
+ * Tabs can be dragged along their row to reorder, away from it to
  * detach into a window of their own, onto another window's row to dock
  * there; a window is moved by its strip, its grip or its only tab,
  * resized by its edges, sent to a part of the screen by its fullscreen
@@ -62,6 +66,9 @@ public final class WindowScreen extends GuiChat
     private static final long DOUBLE_CLICK_NANOS = 500L * 1000000L;
     /** Where a tab given a window of its own lands: a little below its old row. */
     private static final int DETACH_DROP = 40;
+    /** Clear pixels between a new player's tip and what it points at, and between its two lines. */
+    private static final int FIRST_TIP_GAP = 4;
+    private static final int FIRST_TIP_LINE = 10;
 
     private static final List<ScreenPart.Maker> MAKERS =
             new CopyOnWriteArrayList<ScreenPart.Maker>();
@@ -180,19 +187,27 @@ public final class WindowScreen extends GuiChat
     private final boolean worldless;
     /** Whether Settings opens once the screen has drawn its first frame. */
     private boolean settingsToOpen;
+    /** Whether the chat opened the screen, rather than a page or Settings: a new player's tips show then. */
+    private final boolean openedForChat;
 
+    /**
+     * The screen the chat opens, and a page's: {@link #screenForPage}
+     * names its page before it makes one.
+     */
     public WindowScreen(String defaultText) {
-        this(defaultText, null);
+        this(defaultText, null, pageToFocus == null);
     }
 
     /**
      * A screen that goes back to {@code parent} as it closes. Made without
      * a world, a part that needs one is left out by its maker.
      */
-    private WindowScreen(String defaultText, GuiScreen parent) {
+    private WindowScreen(String defaultText, GuiScreen parent,
+                         boolean openedForChat) {
         super(defaultText == null ? "" : defaultText);
         this.parent = parent;
         this.worldless = !hasWorld();
+        this.openedForChat = openedForChat && !this.worldless;
         for (ScreenPart.Maker maker : MAKERS) {
             ScreenPart part = maker.make(this);
             if (part != null) {
@@ -227,7 +242,7 @@ public final class WindowScreen extends GuiChat
             open.showSettings();
             return;
         }
-        WindowScreen screen = new WindowScreen("", parent);
+        WindowScreen screen = new WindowScreen("", parent, false);
         screen.settingsToOpen = true;
         minecraft.displayGuiScreen(screen);
     }
@@ -284,11 +299,10 @@ public final class WindowScreen extends GuiChat
     }
 
     /**
-     * Opens the screen with a page in front — the quest journal, the party
-     * — in the window holding its tab, else in a window of its own where
-     * the page last stood. With the screen already open the page only
-     * comes forward. Nothing opens for a page no system registered, or
-     * when every window there may be is out and none holds it.
+     * Opens the screen with a page in front — the journal, the map, a
+     * waystone — in the window holding its tab, else in a window of its
+     * own where the page last stood. With the screen already open the page
+     * only comes forward. Nothing opens for a page no system registered.
      */
     public static void openPage(String pageId) {
         GuiScreen screen = screenForPage(pageId);
@@ -491,12 +505,14 @@ public final class WindowScreen extends GuiChat
     /**
      * Whether a field holding the keys keeps this press: anything but a
      * Ctrl shortcut of the screen's, and of those a field's own editing
-     * ones — Backspace and Delete, the clipboard's and the selection's
-     * letters. Ctrl+Shift+A is the screen's and passes.
+     * ones — Backspace and Delete, the arrows that jump by words, the
+     * clipboard's and the selection's letters. Ctrl+Shift+A is the
+     * screen's and passes.
      */
     public static boolean fieldKeeps(LostTalesKeyPress press) {
         return !press.command || press.is(Keyboard.KEY_BACK)
                 || press.is(Keyboard.KEY_DELETE)
+                || press.is(Keyboard.KEY_LEFT) || press.is(Keyboard.KEY_RIGHT)
                 || press.is(Keyboard.KEY_C) || press.is(Keyboard.KEY_V)
                 || press.is(Keyboard.KEY_X)
                 || press.is(Keyboard.KEY_A) && !press.shift;
@@ -569,8 +585,24 @@ public final class WindowScreen extends GuiChat
         }
     }
 
-    /** Closes one tab; the group it was marked with ends with it. */
+    /**
+     * Closes one tab; the group it was marked with ends with it. Its
+     * window brings forward the tab to its right, else the one to its
+     * left, which takes the keys when the tab closed held them.
+     */
     public void closeTab(WindowTab tab) {
+        Window window = WindowLayout.windowOf(tab);
+        boolean hadKeys = tab != null && window != null
+                && window == keysWindow() && tab.equals(window.getActiveTab());
+        closeOnly(tab);
+        WindowTab front = hadKeys && WindowLayout.windows().contains(window)
+                ? window.getActiveTab() : null;
+        if (front != null && !front.equals(tab)) {
+            jumpToTab(front);
+        }
+    }
+
+    private void closeOnly(WindowTab tab) {
         for (ScreenPart part : this.parts) {
             if (part.closeTab(tab)) {
                 return;
@@ -622,6 +654,9 @@ public final class WindowScreen extends GuiChat
         if (!this.openAnimationStarted) {
             this.openAnimationStarted = true;
             WindowOpening.start();
+            if (this.openedForChat) {
+                FirstTips.chatOpened();
+            }
             for (ScreenPart part : this.parts) {
                 part.opened();
             }
@@ -702,8 +737,10 @@ public final class WindowScreen extends GuiChat
         if (!this.worldless) {
             SubWindowPlaces.rememberOpen(this.subWindows.openWindows());
         }
-        // A search belongs to the open screen and goes with it.
+        // A search belongs to the open screen and goes with it, and a
+        // tip left showing waits for the next opening of the chat.
         WindowSearch.close();
+        FirstTips.screenClosed();
         leavePage();
         this.pressedPage = null;
         this.pressedSubWindow = null;
@@ -726,6 +763,9 @@ public final class WindowScreen extends GuiChat
         LostTalesKeyPress press = LostTalesKeyPress.read(typedChar, keyCode);
         syncTypingFocus();
         if (handleSnapKey(press)) {
+            return;
+        }
+        if (tabKey(press)) {
             return;
         }
         for (ScreenPart part : this.parts) {
@@ -833,6 +873,71 @@ public final class WindowScreen extends GuiChat
     }
 
     /**
+     * The tab keys, from anywhere on the screen, as a browser's: Ctrl+Tab
+     * and Ctrl+Shift+Tab walk every tab of every window, pages and
+     * conversations alike ({@link TabWalk}); Ctrl+PageDown and
+     * Ctrl+PageUp walk the tabs of the window the keys are in, as
+     * Ctrl+Right and Ctrl+Left do where no field — a sub-window's, the
+     * search's, a page's own — keeps them for its words; Ctrl+1 to Ctrl+8 pick that
+     * window's tabs by place and Ctrl+9 its last. The tab reached comes
+     * forward with the keys. A sub-window holding the keys that walks
+     * tabs of its own takes Ctrl+Tab first.
+     */
+    private boolean tabKey(LostTalesKeyPress press) {
+        if (!press.command || press.alt) {
+            return false;
+        }
+        SubWindow front = this.subWindows.focused();
+        boolean subWindowKeys = front != null && front.content.holdsKeys();
+        PageContent page = WindowPages.contentOf(this.focusedPage);
+        boolean fieldHasWords = subWindowKeys || this.toolStrip.isFocused()
+                || page != null && page.holdsKeys();
+        int key = press.key;
+        WindowTab from = keysTab();
+        Window window = keysWindow();
+        List<WindowTab> row = window == null
+                ? Collections.<WindowTab>emptyList()
+                : WindowFrame.visibleTabs(window);
+        WindowTab next;
+        if (key == Keyboard.KEY_TAB) {
+            if (subWindowKeys
+                    && front.content.keyTyped(press.character, key)) {
+                syncTypingFocus();
+                return true;
+            }
+            next = TabWalk.step(TabWalk.everyTab(WindowLayout.windows()),
+                    from, press.shift ? -1 : 1);
+        } else if (key == Keyboard.KEY_NEXT || key == Keyboard.KEY_PRIOR) {
+            next = TabWalk.step(row, from, key == Keyboard.KEY_NEXT ? 1 : -1);
+        } else if ((key == Keyboard.KEY_RIGHT || key == Keyboard.KEY_LEFT)
+                && !fieldHasWords) {
+            next = TabWalk.step(row, from, key == Keyboard.KEY_RIGHT ? 1 : -1);
+        } else if (key >= Keyboard.KEY_1 && key <= Keyboard.KEY_9) {
+            next = TabWalk.ordinal(row, key - Keyboard.KEY_1 + 1);
+        } else {
+            return false;
+        }
+        if (next != null && !next.equals(from)) {
+            TabSelection.clear();
+            jumpToTab(next);
+        }
+        return true;
+    }
+
+    /**
+     * The tab the keys are in: the page holding them, else the front tab
+     * of the window a part types into; null with neither.
+     */
+    private WindowTab keysTab() {
+        if (this.focusedPage != null) {
+            return this.focusedPage;
+        }
+        Window window = keysWindow();
+        return window == null ? null : WindowFrame.activeTab(window,
+                WindowFrame.visibleTabs(window));
+    }
+
+    /**
      * A page's key over the page holding the keys (N1 a): the page's own
      * key closes it, as Ctrl+W does, and another page's brings that page
      * forward with the keys. False when the press is no page's key, or
@@ -926,7 +1031,7 @@ public final class WindowScreen extends GuiChat
     private void openSearch() {
         Window typed = keysWindow();
         WindowTab inFront = typed == null ? null : typed.getActiveTab();
-        if (inFront == null) {
+        if (inFront == null || inFront.searchUnavailable().length() > 0) {
             return;
         }
         leavePage();
@@ -1054,7 +1159,9 @@ public final class WindowScreen extends GuiChat
     private void clickToolStrip(WindowHover press, double x, double y,
                                 int button) {
         if (button != 0 || press.frame == null || press.window == null
-                || press.stripPart == null || press.row == null) {
+                || press.stripPart == null || press.row == null
+                || ToolStrip.greyedWhy(press.stripPart, press.window)
+                        .length() > 0) {
             return;
         }
         WindowTab front = press.row.selected;
@@ -1140,6 +1247,8 @@ public final class WindowScreen extends GuiChat
         selectTab(tab);
         if (tab instanceof PageTab) {
             focusPage((PageTab)tab);
+        } else {
+            leavePage();
         }
         syncTypingFocus();
     }
@@ -1389,7 +1498,7 @@ public final class WindowScreen extends GuiChat
         // blurred once, before any window is on it; each window then
         // pastes its own rectangle of the result under its backdrop while
         // the rest of the screen stays sharp.
-        if (LostTalesConfig.enableChatBackgroundBlur
+        if (LostTalesConfig.windowBackgroundBlur
                 && LostTalesConfig.enableGuiBackgroundBlur) {
             LostTalesGuiRegionBlur.getInstance().capture(this.mc,
                     partialTicks, (float)LostTalesConfig.guiBlurStrength);
@@ -1435,7 +1544,7 @@ public final class WindowScreen extends GuiChat
             part.drawOverSubWindows(typing, pointerX, pointerY, mouseX,
                     mouseY);
         }
-        this.gestures.drawLinkHighlight();
+        this.gestures.drawLineUpEdge();
         float shownOpacity = WindowOpening.sample().getOpacity();
         this.gestures.drawSnapBar(shownOpacity);
         this.snapAssist.layOut(this.mc, this.fontRendererObj, this.width,
@@ -1448,11 +1557,140 @@ public final class WindowScreen extends GuiChat
                         && this.hover.snapZone >= 0 ? this.hover.snapZone
                         : this.snapFlyout.keyZone(), shownOpacity);
         this.subWindows.drawTip(this.mc, this.hover, mouseX, mouseY);
-        // The snap layouts own their tooltips; controls behind them stay
-        // quiet.
+        // A new player's tip stands over everything, and quiets the
+        // pointer's own; so do the snap layouts, which own their tips.
+        if (drawFirstTip()) {
+            return;
+        }
         if (this.hoverTip.length() > 0 && !this.snapFlyout.isShown()) {
             drawHoverTip();
         }
+    }
+
+    /**
+     * The window a new player's tip is shown on: the one the keys are in,
+     * while the tips are showing and it is drawn; null otherwise.
+     */
+    private WindowFrame firstTipFrame() {
+        if (FirstTips.current() == null || isEmpty()) {
+            return null;
+        }
+        Window window = keysWindow();
+        WindowFrame frame = window == null ? null
+                : WindowFrame.find(window.getId());
+        return frame != null && frame.drawn ? frame : null;
+    }
+
+    /**
+     * The new player's tip showing now ({@link FirstTips}): its words in
+     * a popup beside what it points at, that thing ringed in honey, and
+     * under the words which tip of how many it is. The Ctrl+K tip stands
+     * in the middle of the window, where the quick switcher opens.
+     * Answers whether one was drawn.
+     */
+    private boolean drawFirstTip() {
+        WindowFrame frame = firstTipFrame();
+        if (frame == null) {
+            return false;
+        }
+        FirstTips.Tip tip = FirstTips.current();
+        LostTalesUiHitBox target = firstTipTarget(tip, frame);
+        String words = tip == FirstTips.Tip.SWITCHER
+                ? StatCollector.translateToLocalFormatted(
+                        "gui.losttales.window.tips.switcher",
+                        StatCollector.translateToLocal(
+                                Minecraft.isRunningOnMac
+                                        ? "gui.losttales.window.key.command_mac"
+                                        : "gui.losttales.window.key.command")
+                                + "+K")
+                : StatCollector.translateToLocal(
+                        "gui.losttales.window.tips." + tip.id);
+        String next = StatCollector.translateToLocalFormatted(
+                "gui.losttales.window.tips.next",
+                Integer.valueOf(tip.ordinal() + 1),
+                Integer.valueOf(FirstTips.Tip.values().length));
+        int width = Math.max(this.fontRendererObj.getStringWidth(words),
+                this.fontRendererObj.getStringWidth(next))
+                + 2 * WindowStyle.POPUP_INSET;
+        int height = WindowStyle.POPUP_LINE_HEIGHT + FIRST_TIP_LINE;
+        double x;
+        double y;
+        if (target == null) {
+            LostTalesUiHitBox box = frame.drawnBox();
+            x = box.left + (box.width - width) / 2.0D;
+            y = frame.historyTop() + (frame.barTop() - frame.historyTop()
+                    - height) / 2.0D;
+        } else {
+            x = target.left + target.width / 2.0D - width / 2.0D;
+            y = tip == FirstTips.Tip.HEAD
+                    ? target.top - FIRST_TIP_GAP - height
+                    : target.bottom() + FIRST_TIP_GAP;
+        }
+        // Laid out in whole pixels and moved by the fraction of where it
+        // stands, so it rides a control still coming in without stepping.
+        double exactLeft = Math.max(2.0D, Math.min(this.width - width - 2.0D, x));
+        double exactTop = Math.max(2.0D, Math.min(this.height - height - 2.0D, y));
+        int left = (int)Math.floor(exactLeft);
+        int top = (int)Math.floor(exactTop);
+        float opacity = WindowOpening.sample().getOpacity();
+        if (target != null) {
+            drawRing(target.grown(1.0D), opacity);
+        }
+        GL11.glPushMatrix();
+        try {
+            GL11.glTranslatef((float)(exactLeft - left),
+                    (float)(exactTop - top), 0.0F);
+            WindowStyle.drawPopup(left, top, left + width, top + height,
+                    opacity);
+            LostTalesUiInk.beginContent();
+            int alpha = Math.round(255.0F * opacity);
+            LostTalesUiInk.drawText(this.fontRendererObj, words,
+                    left + WindowStyle.POPUP_INSET,
+                    top + WindowStyle.POPUP_INSET, LostTalesUiInk.IVORY, alpha);
+            LostTalesUiInk.drawText(this.fontRendererObj, next,
+                    left + WindowStyle.POPUP_INSET,
+                    top + WindowStyle.POPUP_INSET + FIRST_TIP_LINE,
+                    WindowStyle.asideRgb(), alpha);
+        } finally {
+            GL11.glPopMatrix();
+        }
+        return true;
+    }
+
+    /** What a tip points at on screen: the row's {@code +}, the head button a part draws; null for the Ctrl+K tip, or a thing not drawn. */
+    private LostTalesUiHitBox firstTipTarget(FirstTips.Tip tip,
+                                             WindowFrame frame) {
+        if (tip == FirstTips.Tip.PLUS) {
+            Window window = WindowLayout.window(frame.windowId);
+            TabRow.Row row = window == null ? null
+                    : rowFor(window, frame, WindowOpening.sample());
+            return row == null ? null : frame.tabBar.restoreControlBox(row);
+        }
+        if (tip == FirstTips.Tip.HEAD) {
+            for (ScreenPart part : this.parts) {
+                LostTalesUiHitBox box = part.tipTarget(tip.id);
+                if (box != null) {
+                    return box;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** A one-pixel ring in honey round what a tip points at, as a landing edge is lit. */
+    private static void drawRing(LostTalesUiHitBox box, float opacity) {
+        int colour = LostTalesUiInk.argb(WindowStyle.LANDING_RGB,
+                Math.round(255.0F * opacity));
+        float left = (float)box.left;
+        float top = (float)box.top;
+        float right = (float)box.right();
+        float bottom = (float)box.bottom();
+        LostTalesUiInk.fillRect(left, top, right, top + 1.0F, colour);
+        LostTalesUiInk.fillRect(left, bottom - 1.0F, right, bottom, colour);
+        LostTalesUiInk.fillRect(left, top + 1.0F, left + 1.0F,
+                bottom - 1.0F, colour);
+        LostTalesUiInk.fillRect(right - 1.0F, top + 1.0F, right,
+                bottom - 1.0F, colour);
     }
 
     /**
@@ -1505,7 +1743,7 @@ public final class WindowScreen extends GuiChat
         if (!WindowSearch.isOpen() && this.toolStrip.isFocused()) {
             focusSearch(false);
         }
-        boolean blurActive = LostTalesConfig.enableChatBackgroundBlur
+        boolean blurActive = LostTalesConfig.windowBackgroundBlur
                 && LostTalesConfig.enableGuiBackgroundBlur;
         List<WindowPlacement.Box> drawnBoxes = blurActive
                 ? new ArrayList<WindowPlacement.Box>(windows.size()) : null;
@@ -1606,6 +1844,7 @@ public final class WindowScreen extends GuiChat
                                 && this.hover.frame == frame
                                 ? new WindowBar.Hit(this.hover.barItem,
                                         this.hover.listRow) : null);
+                drawAnswer(frame, frame.page.content(), shown);
             } else {
                 for (ScreenPart part : this.parts) {
                     part.drawWindowFoot(window, frame, shown, mouseX, mouseY);
@@ -1996,17 +2235,52 @@ public final class WindowScreen extends GuiChat
      * Asks before an action that cannot be undone, in a question
      * sub-window inside the page's window, over its middle: the action
      * runs only on the player's yes. A page asks one question at a time;
-     * a new one takes the old one's place.
+     * a new one takes the old one's place. Answers whether it was asked:
+     * nothing opens while the page's window is not drawn.
      */
-    public void ask(PageTab page, String title, String detail,
-                    String confirmLabel, Runnable action) {
+    public boolean ask(PageTab page, String title, String detail,
+                       String confirmLabel, Runnable action) {
         String key = page.id();
         SubWindow asking = this.subWindows.find(SubWindowKind.QUESTION, key);
         QuestionWindow question = asking != null
                 && asking.content instanceof QuestionWindow
                 ? (QuestionWindow)asking.content : new QuestionWindow();
         question.ask(title, detail, confirmLabel, action);
-        openOverPage(page, SubWindowKind.QUESTION, key, question);
+        return openOverPage(page, SubWindowKind.QUESTION, key,
+                question) != null;
+    }
+
+    /**
+     * A page's answer over its window's bar, drawn as a notice is: done
+     * in ivory, refused and faults in red, on its way in the aside tone.
+     * It rides the bar's entrance and fades with its window.
+     */
+    private void drawAnswer(WindowFrame frame, PageContent content,
+                            LostTalesGuiAnimationSample shown) {
+        PageAnswer answer = content.lastAnswer();
+        float share = answer.shown(System.nanoTime());
+        if (share <= 0.0F) {
+            return;
+        }
+        int rgb;
+        switch (answer.kind()) {
+            case REFUSED:
+            case FAULT:
+                rgb = LostTalesColors.rgb(LostTalesColors.RED);
+                break;
+            case WORKING:
+                rgb = WindowStyle.asideRgb();
+                break;
+            default:
+                rgb = LostTalesUiInk.IVORY;
+                break;
+        }
+        float rise = answer.isStanding() ? (1.0F - share) * Motions.param(
+                MotionIds.WINDOW_ANSWER, "rise", 3.0F) : 0.0F;
+        WindowNotice.drawLine(this.fontRendererObj, answer.words(), rgb,
+                frame.drawnLeft() + (frame.boxRight - frame.boxLeft) / 2.0D,
+                frame.barTop(), WindowBar.entranceOffset(), this.width,
+                share * shown.getOpacity(), rise);
     }
 
     /**
@@ -2352,6 +2626,11 @@ public final class WindowScreen extends GuiChat
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int button) {
         this.pressCount++;
+        // A new player's tip goes with a click anywhere, and the next
+        // comes; the click does nothing else.
+        if (firstTipFrame() != null && FirstTips.dismiss()) {
+            return;
+        }
         // What a press lands on is found at the pointer's exact position,
         // the way the hover finds it; whole pixels only for a field and
         // for where a menu opens.
@@ -2708,7 +2987,7 @@ public final class WindowScreen extends GuiChat
                 this.inputField.setSelectionPos(0);
                 return;
             case LOCK:
-                WindowLinks.setLocked(window, !window.isLocked());
+                WindowLayout.setLocked(window.getId(), !window.isLocked());
                 return;
             case RESTORE:
                 // A switch like the search control beside it: a press

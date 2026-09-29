@@ -57,6 +57,9 @@ public final class DiscordRateLimitTest {
                 "0", "99999999999999999999", null, null, null).resetAfterMillis);
         assertEquals(DiscordOutboundLanes.MAX_RETRY_MILLIS, DiscordRateLimit.parse(
                 "0", "3600", null, null, null).resetAfterMillis);
+        assertEquals("a header's pause and a body's end at the same minute",
+                DiscordRateLimit.MAX_RESET_MILLIS,
+                DiscordJson.retryAfterMillis("{\"retry_after\":3600}"));
     }
 
     @Test
@@ -80,7 +83,10 @@ public final class DiscordRateLimitTest {
         assertTrue(DiscordRateLimit.parse(null, "1", null, null, "GLOBAL").global);
         DiscordRateLimit user = DiscordRateLimit.parse("0", "1", null, null, "user");
         assertFalse(user.global);
-        assertEquals("user", user.scope);
+        assertTrue(user.exhausted());
         assertFalse(DiscordRateLimit.parse("0", "1", null, "false", null).global);
+        // A scope that is no plain word says nothing of the limit.
+        assertSame(DiscordRateLimit.NONE,
+                DiscordRateLimit.parse(null, null, null, null, "global!"));
     }
 }

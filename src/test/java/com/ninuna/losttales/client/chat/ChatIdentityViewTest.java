@@ -4,6 +4,7 @@ import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import java.util.Arrays;
@@ -53,14 +54,14 @@ public final class ChatIdentityViewTest {
         roster();
         UUID firstParty = new UUID(1L, 1L);
         UUID secondParty = new UUID(2L, 2L);
-        ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(ALDRIC, firstParty, 0x123456, "Aldric", false));
+        ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(ALDRIC, firstParty, 0x123456, "Aldric", "", false));
         assertEquals(firstParty.toString(), ClientChatChannelState.scopeKeyRead(ChatChannel.PARTY));
         ClientChatIdentities.select(identityOf(BEREN));
         assertEquals("", ClientChatChannelState.scopeKeyRead(ChatChannel.PARTY));
         assertFalse(ClientChatChannelState.canSend(ChatChannel.PARTY));
-        ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(ALDRIC, firstParty, 0x123456, "Aldric", false));
+        ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(ALDRIC, firstParty, 0x123456, "Aldric", "", false));
         assertEquals("", ClientChatChannelState.scopeKeyRead(ChatChannel.PARTY));
-        ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(BEREN, secondParty, 0xABCDEF, "Beren", false));
+        ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(BEREN, secondParty, 0xABCDEF, "Beren", "", false));
         assertEquals(secondParty.toString(), ClientChatChannelState.scopeKeyRead(ChatChannel.PARTY));
         assertEquals(0xABCDEF, ClientChatIdentitySelection.partyColor());
         assertTrue(ClientChatChannelState.canSend(ChatChannel.PARTY));
@@ -74,7 +75,7 @@ public final class ChatIdentityViewTest {
     @Test
     public void accountPartyIsSeparateAndDisconnectDropsMembership() {
         UUID party = new UUID(3L, 3L);
-        ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(null, party, 0x123456, "Steve", false));
+        ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(null, party, 0x123456, "Steve", "", false));
         assertEquals(party.toString(), ClientChatChannelState.scopeOfIdentity(ChatChannel.PARTY, ""));
         assertTrue(ClientChatChannelState.canSend(ChatChannel.PARTY));
         ClientChatIdentitySelection.clear();
@@ -93,7 +94,7 @@ public final class ChatIdentityViewTest {
         String plain = ChatChannel.PARTY.getDisplayName();
         assertEquals(plain, ClientChatChannelState.displayName(ChatChannel.PARTY));
         ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(
-                ALDRIC, new UUID(4L, 4L), 0x123456, "Aldric", false));
+                ALDRIC, new UUID(4L, 4L), 0x123456, "Aldric", "", false));
         assertEquals("Aldric", ClientChatIdentitySelection.partyLeader());
         assertNotEquals(plain, ClientChatChannelState.displayName(ChatChannel.PARTY));
         ClientChatIdentities.select(identityOf(BEREN));
@@ -169,22 +170,22 @@ public final class ChatIdentityViewTest {
         roster();
         for (ChatChannel channel : new ChatChannel[] {ChatChannel.OOC, ChatChannel.PROXIMITY,
                 ChatChannel.FACTION}) {
-            ClientChatChannelState.select(channel);
+            ClientChatChannelState.select(ChatTab.of(channel));
             // Opening and resizing the screen both use this availability check.
             ClientChatChannelState.ensureAvailable();
-            assertEquals(channel, ClientChatChannelState.getSelectedChannel());
+            assertEquals(channel, ClientChatChannelState.getSelected().getChannel());
             ClientChatIdentities.select(identityOf(BEREN));
             ClientChatChannelState.ensureAvailable();
-            assertEquals(channel, ClientChatChannelState.getSelectedChannel());
+            assertEquals(channel, ClientChatChannelState.getSelected().getChannel());
             ClientChatIdentities.select(identityOf(ALDRIC));
         }
         ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(
-                ALDRIC, new UUID(5L, 5L), 0x123456, "Aldric", false));
-        ClientChatChannelState.select(ChatChannel.PARTY);
-        assertEquals(ChatChannel.PARTY, ClientChatChannelState.getSelectedChannel());
+                ALDRIC, new UUID(5L, 5L), 0x123456, "Aldric", "", false));
+        ClientChatChannelState.select(ChatTab.of(ChatChannel.PARTY));
+        assertEquals(ChatChannel.PARTY, ClientChatChannelState.getSelected().getChannel());
         ClientChatIdentities.select(identityOf(BEREN));
         ClientChatChannelState.ensureAvailable();
-        assertNotEquals(ChatChannel.PARTY, ClientChatChannelState.getSelectedChannel());
+        assertNotEquals(ChatChannel.PARTY, ClientChatChannelState.getSelected().getChannel());
     }
 
     @Test
@@ -212,7 +213,7 @@ public final class ChatIdentityViewTest {
     public void everyRoleplayingChannelProducesBubblesForItsRecipient() {
         roster();
         UUID party = new UUID(1L, 2L);
-        ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(ALDRIC, party, 0, "Aldric", false));
+        ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(ALDRIC, party, 0, "Aldric", "", false));
         for (ChatChannel channel : new ChatChannel[] {ChatChannel.GLOBAL, ChatChannel.PROXIMITY,
                 ChatChannel.FACTION, ChatChannel.PARTY, ChatChannel.WHISPER}) {
             ChatSpeechBubbles.clear();
@@ -236,31 +237,32 @@ public final class ChatIdentityViewTest {
     private static void roster() {
         ClientCharacterRosterCache.acceptRoster(0, new CharacterRosterSnapshot(
                 UUID.fromString("00000000-0000-0000-0000-0000000000a1"), 2,
-                ALDRIC, 1L, RoleplayCharacter.CURRENT_DATA_VERSION,
+                ALDRIC, 1L,
                 Arrays.asList(summary(ALDRIC, "Aldric", GONDOR, 0),
                         summary(BEREN, "Beren", ROHAN, 1)),
                 RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true));
+                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true,
+                java.util.Collections.<com.ninuna.losttales.character.sync.DeletedCharacterSummary>emptyList()));
     }
 
     /** As above, with a second character of the same faction as Aldric. */
     private static void rosterWithTwoInGondor() {
         ClientCharacterRosterCache.acceptRoster(0, new CharacterRosterSnapshot(
                 UUID.fromString("00000000-0000-0000-0000-0000000000a1"), 3,
-                ALDRIC, 1L, RoleplayCharacter.CURRENT_DATA_VERSION,
+                ALDRIC, 1L,
                 Arrays.asList(summary(ALDRIC, "Aldric", GONDOR, 0),
                         summary(BEREN, "Beren", ROHAN, 1),
                         summary(CIRION, "Cirion", GONDOR, 2)),
                 RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true));
+                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true,
+                java.util.Collections.<com.ninuna.losttales.character.sync.DeletedCharacterSummary>emptyList()));
     }
 
     private static CharacterSummary summary(UUID id, String name, String faction,
                                             int slot) {
         return new CharacterSummary(id, slot, name, "human", "male",
                 "human_male_0", RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, 30, faction, 1, 0L, 1L,
-                RoleplayCharacter.CURRENT_DATA_VERSION, "", "");
+                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, 30, faction, "", "");
     }
 
     private static String keyOf(UUID characterId) {
@@ -340,7 +342,7 @@ public final class ChatIdentityViewTest {
 
         // A faction line arrives while another tab is in front.
         ClientChatChannelViews.record(41, gondor,
-                ChatTab.of(ChatChannel.GLOBAL), false);
+                ChatTab.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
 
         assertEquals(Integer.valueOf(41),
                 ClientChatChannelViews.unreadDividerLine(row));
@@ -358,11 +360,11 @@ public final class ChatIdentityViewTest {
         roster();
         ChatTab row = ChatTab.of(ChatChannel.FACTION);
         ChatTab gondor = ChatTab.of(ChatChannel.FACTION, GONDOR);
-        ClientChatChannelViews.scroll(row, 5, 100, 10.0D);
+        scroll(row, 5, 100, 10.0D);
         assertTrue("the view is scrolled back",
                 ClientChatChannelViews.getScroll(row, 100, 10.0D) > 0.0D);
 
-        ClientChatChannelViews.record(42, gondor, row, false);
+        ClientChatChannelViews.record(42, gondor, row, false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
 
         assertEquals(1, ClientChatChannelViews.waitingBelow(row));
         assertEquals(Integer.valueOf(42),
@@ -381,7 +383,7 @@ public final class ChatIdentityViewTest {
         ChatTab row = ChatTab.of(ChatChannel.FACTION);
         ClientChatChannelViews.record(43,
                 ChatTab.of(ChatChannel.FACTION, GONDOR),
-                ChatTab.of(ChatChannel.GLOBAL), false);
+                ChatTab.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
         assertEquals(1, ClientChatChannelViews.unreadCount(row));
 
         ClientChatIdentities.select(identityOf(BEREN));
@@ -482,12 +484,12 @@ public final class ChatIdentityViewTest {
         ChatTab gondor = ChatTab.of(ChatChannel.FACTION, GONDOR);
         ChatTab rohan = ChatTab.of(ChatChannel.FACTION, ROHAN);
         try {
-            ClientChatChannelViews.record(-501, gondor, row, false);
+            ClientChatChannelViews.record(-501, gondor, row, false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
             assertEquals("read as Aldric, Gondor's talk is on screen",
                     0, ClientChatChannelViews.unreadCount(row));
 
             // The other faction's talk is not on screen and is counted.
-            ClientChatChannelViews.record(-502, rohan, row, false);
+            ClientChatChannelViews.record(-502, rohan, row, false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
             assertEquals(0, ClientChatChannelViews.unreadCount(row));
             ClientChatIdentities.select(identityOf(BEREN));
             assertEquals("and is waiting when it is read as",
@@ -531,5 +533,11 @@ public final class ChatIdentityViewTest {
         assertEquals(plain, ChatTab.fromId(plain.id()));
         assertNull("a conversation named by a character names none now",
                 ChatTab.fromId("faction|own:" + keyOf(BEREN)));
+    }
+
+    /** Scrolls a view by whole lines the way the wheel does: from where it stands. */
+    private static void scroll(ChatTab tab, int lines, int totalLines, double roomLines) {
+        double current = ClientChatChannelViews.getScroll(tab, totalLines, roomLines);
+        ClientChatChannelViews.scrollTo(tab, current + lines, totalLines, roomLines);
     }
 }

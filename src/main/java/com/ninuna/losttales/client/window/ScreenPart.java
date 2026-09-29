@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
 import com.ninuna.losttales.client.input.LostTalesKeyPress;
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import java.util.List;
 
 /**
@@ -82,6 +83,15 @@ public abstract class ScreenPart {
     /** Whether the part has a field that can take the keys now. */
     public boolean hasField() {
         return false;
+    }
+
+    /**
+     * The box on screen a new player's tip points at ({@link FirstTips}),
+     * by the tip's id: the chat's head button for {@code head}. Null
+     * while the part draws no such thing.
+     */
+    public LostTalesUiHitBox tipTarget(String tip) {
+        return null;
     }
 
 

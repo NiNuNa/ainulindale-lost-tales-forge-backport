@@ -1,16 +1,13 @@
 package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerIdentity;
-import com.ninuna.losttales.mapmarker.LostTalesMapMarkerIdentity.Authority;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import lotr.common.LOTRDimension;
 
 /**
@@ -99,7 +96,6 @@ final class LostTalesClientMapMarkerIndex {
 
     static final class Snapshot {
         private final List<LostTalesMapMarkerData> allMarkers;
-        private final Set<String> markerIds;
         private final Map<String, LostTalesMapMarkerData>
                 markersByCanonicalKey;
         private final Map<String, LostTalesMapMarkerData> fastTravelByCode;
@@ -109,13 +105,11 @@ final class LostTalesClientMapMarkerIndex {
 
         private Snapshot(
                 List<LostTalesMapMarkerData> allMarkers,
-                Set<String> markerIds,
                 Map<String, LostTalesMapMarkerData> markersByCanonicalKey,
                 Map<String, LostTalesMapMarkerData> fastTravelByCode,
                 Map<String, LostTalesMapMarkerData> fastTravelByPosition,
                 Map<String, LostTalesMapMarkerData> fastTravelByName) {
             this.allMarkers = allMarkers;
-            this.markerIds = markerIds;
             this.markersByCanonicalKey = markersByCanonicalKey;
             this.fastTravelByCode = fastTravelByCode;
             this.fastTravelByPosition = fastTravelByPosition;
@@ -133,8 +127,8 @@ final class LostTalesClientMapMarkerIndex {
                 List<LostTalesMapMarkerData> quest) {
             LinkedHashMap<String, LostTalesMapMarkerData> merged =
                     new LinkedHashMap<String, LostTalesMapMarkerData>();
-            addReplacing(merged, world, Authority.WORLD_RECORD);
-            addReplacing(merged, quest, Authority.QUEST_PLAYER);
+            addReplacing(merged, world);
+            addReplacing(merged, quest);
             return createFromMerged(merged);
         }
 
@@ -146,23 +140,18 @@ final class LostTalesClientMapMarkerIndex {
             if (persistent != null) {
                 for (LostTalesMapMarkerData marker
                         : persistent.allMarkers) {
-                    LostTalesMapMarkerIdentity identity = identity(
-                            marker, authorityFor(marker));
+                    LostTalesMapMarkerIdentity identity = identity(marker);
                     if (identity != null) {
                         merged.put(identity.getCanonicalKey(), marker);
                     }
                 }
             }
-            addMissing(merged, party, Authority.PARTY_CHARACTER);
+            addMissing(merged, party);
             return createFromMerged(merged);
         }
 
         List<LostTalesMapMarkerData> getAllMarkers() {
             return this.allMarkers;
-        }
-
-        Set<String> getMarkerIds() {
-            return this.markerIds;
         }
 
         LostTalesMapMarkerData findById(String markerId) {
@@ -197,7 +186,6 @@ final class LostTalesClientMapMarkerIndex {
                 LinkedHashMap<String, LostTalesMapMarkerData> merged) {
             ArrayList<LostTalesMapMarkerData> markers =
                     new ArrayList<LostTalesMapMarkerData>(merged.values());
-            LinkedHashSet<String> ids = new LinkedHashSet<String>();
             LinkedHashMap<String, LostTalesMapMarkerData> byCode =
                     new LinkedHashMap<String, LostTalesMapMarkerData>();
             LinkedHashMap<String, LostTalesMapMarkerData> byPosition =
@@ -205,7 +193,6 @@ final class LostTalesClientMapMarkerIndex {
             LinkedHashMap<String, LostTalesMapMarkerData> byName =
                     new LinkedHashMap<String, LostTalesMapMarkerData>();
             for (LostTalesMapMarkerData marker : markers) {
-                ids.add(marker.getId());
                 if (!isWaypointMappingCandidate(marker)) {
                     continue;
                 }
@@ -223,7 +210,6 @@ final class LostTalesClientMapMarkerIndex {
             }
             return new Snapshot(
                     Collections.unmodifiableList(markers),
-                    Collections.unmodifiableSet(ids),
                     Collections.unmodifiableMap(
                             new LinkedHashMap<String,
                                     LostTalesMapMarkerData>(merged)),
@@ -234,14 +220,12 @@ final class LostTalesClientMapMarkerIndex {
 
         private static void addReplacing(
                 Map<String, LostTalesMapMarkerData> destination,
-                List<LostTalesMapMarkerData> source,
-                Authority authority) {
+                List<LostTalesMapMarkerData> source) {
             if (source == null) {
                 return;
             }
             for (LostTalesMapMarkerData marker : source) {
-                LostTalesMapMarkerIdentity identity =
-                        identity(marker, authority);
+                LostTalesMapMarkerIdentity identity = identity(marker);
                 if (identity != null) {
                     destination.put(
                             identity.getCanonicalKey(), marker);
@@ -251,14 +235,12 @@ final class LostTalesClientMapMarkerIndex {
 
         private static void addMissing(
                 Map<String, LostTalesMapMarkerData> destination,
-                List<LostTalesMapMarkerData> source,
-                Authority authority) {
+                List<LostTalesMapMarkerData> source) {
             if (source == null) {
                 return;
             }
             for (LostTalesMapMarkerData marker : source) {
-                LostTalesMapMarkerIdentity identity =
-                        identity(marker, authority);
+                LostTalesMapMarkerIdentity identity = identity(marker);
                 if (identity != null
                         && !destination.containsKey(
                                 identity.getCanonicalKey())) {
@@ -268,24 +250,13 @@ final class LostTalesClientMapMarkerIndex {
             }
         }
 
-        private static Authority authorityFor(
-                LostTalesMapMarkerData marker) {
-            return marker != null && marker.getSource()
-                    == com.ninuna.losttales.mapmarker
-                            .LostTalesMapMarkerSource.QUEST_DYNAMIC
-                    ? Authority.QUEST_PLAYER
-                    : Authority.WORLD_RECORD;
-        }
-
         private static LostTalesMapMarkerIdentity identity(
-                LostTalesMapMarkerData marker,
-                Authority authority) {
+                LostTalesMapMarkerData marker) {
             if (marker == null || marker.getId() == null
                     || marker.getId().trim().length() == 0) {
                 return null;
             }
-            return LostTalesMapMarkerIdentity.create(
-                    marker.getId(), authority);
+            return LostTalesMapMarkerIdentity.create(marker.getId());
         }
 
         private static LostTalesMapMarkerIdentity createLookupIdentity(
@@ -293,8 +264,7 @@ final class LostTalesClientMapMarkerIndex {
             if (markerId == null || markerId.trim().length() == 0) {
                 return null;
             }
-            return LostTalesMapMarkerIdentity.create(
-                    markerId, Authority.WORLD_RECORD);
+            return LostTalesMapMarkerIdentity.create(markerId);
         }
 
         private static boolean isWaypointMappingCandidate(

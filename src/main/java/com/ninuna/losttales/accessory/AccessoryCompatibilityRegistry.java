@@ -81,10 +81,6 @@ public final class AccessoryCompatibilityRegistry {
         this.frozen = true;
     }
 
-    public synchronized boolean isFrozen() {
-        return this.frozen;
-    }
-
     public AccessoryDefinition find(
             AccessorySlotType slotType, ItemStack stack) {
         if (slotType == null || stack == null || stack.getItem() == null) {
@@ -122,10 +118,6 @@ public final class AccessoryCompatibilityRegistry {
         return player == null || player.worldObj == null
                 || player.worldObj.isRemote
                 || definition.canEquip(player, stack);
-    }
-
-    public synchronized List<AccessoryDefinition> getDefinitions() {
-        return snapshotDefinitions();
     }
 
     public synchronized AccessoryDefinition getDefinition(String id) {

@@ -4,6 +4,7 @@ import com.ninuna.losttales.config.LostTalesConfig;
 import net.minecraftforge.common.config.Configuration;
 import org.junit.Test;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
@@ -37,7 +38,7 @@ public final class ServerConfigAuthorizationCategoriesTest {
 
         List<ServerConfigEntry> entries = ServerConfigSnapshot.fromConfiguration(
                 config, ServerConfigSnapshot.EXCLUDED_CATEGORIES,
-                ServerConfigSnapshot.SECRET_KEYS);
+                Collections.<String>emptySet(), ServerConfigSnapshot.SECRET_KEYS);
 
         assertNull("the role definitions are not offered",
                 ServerConfigSnapshot.find(entries,

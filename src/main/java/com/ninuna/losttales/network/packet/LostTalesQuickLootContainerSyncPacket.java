@@ -34,14 +34,15 @@ public class LostTalesQuickLootContainerSyncPacket implements IMessage {
         validate();
     }
 
+    /** A sealed urn keeps its secret: its snapshot says it is sealed and holds nothing. */
     public static LostTalesQuickLootContainerSyncPacket fromInventory(int x, int y, int z, IInventory inventory) {
-        int size = Math.min(Math.max(0, inventory.getSizeInventory()), MAX_ITEM_SLOTS);
+        boolean sealed = inventory instanceof LostTalesTileEntityUrn && ((LostTalesTileEntityUrn) inventory).isSealed();
+        int size = sealed ? 0 : Math.min(Math.max(0, inventory.getSizeInventory()), MAX_ITEM_SLOTS);
         ItemStack[] items = new ItemStack[size];
         for (int i = 0; i < items.length; i++) {
             ItemStack stack = inventory.getStackInSlot(i);
             items[i] = stack == null ? null : stack.copy();
         }
-        boolean sealed = inventory instanceof LostTalesTileEntityUrn && ((LostTalesTileEntityUrn) inventory).isSealed();
         return new LostTalesQuickLootContainerSyncPacket(x, y, z, inventory.getInventoryName(), sealed, items);
     }
 

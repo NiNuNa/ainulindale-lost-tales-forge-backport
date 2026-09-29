@@ -22,8 +22,4 @@ public final class LostTalesHostilityHelper {
         }
         return LostTalesCombatEngagement.NONE;
     }
-
-    public static boolean isActivelyHostileTo(EntityLivingBase living, EntityPlayer player) {
-        return getDirectEngagement(living, player) != LostTalesCombatEngagement.NONE;
-    }
 }

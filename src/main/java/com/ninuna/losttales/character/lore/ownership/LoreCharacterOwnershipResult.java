@@ -14,7 +14,6 @@ public final class LoreCharacterOwnershipResult {
         STALE_REVISION,
         UNKNOWN_LORE_CHARACTER,
         APPEARANCE_NOT_CONFIGURED,
-        DEFINITION_REGISTRY_INVALID,
         CHARACTER_ID_CONFLICT,
         RECORD_LIMIT_REACHED,
         STORAGE_READ_ONLY,
@@ -22,31 +21,19 @@ public final class LoreCharacterOwnershipResult {
     }
 
     private final Status status;
-    private final LoreCharacterOwnershipRecord record;
 
-    private LoreCharacterOwnershipResult(
-            Status status, LoreCharacterOwnershipRecord record) {
+    private LoreCharacterOwnershipResult(Status status) {
         if (status == null) {
             throw new IllegalArgumentException("status must not be null");
         }
         this.status = status;
-        this.record = record;
     }
 
-    public static LoreCharacterOwnershipResult of(
-            Status status, LoreCharacterOwnershipRecord record) {
-        return new LoreCharacterOwnershipResult(status, record);
+    public static LoreCharacterOwnershipResult of(Status status) {
+        return new LoreCharacterOwnershipResult(status);
     }
 
     public Status getStatus() {
         return this.status;
-    }
-
-    public LoreCharacterOwnershipRecord getRecord() {
-        return this.record;
-    }
-
-    public boolean changed() {
-        return this.status == Status.CLAIMED || this.status == Status.RELEASED;
     }
 }

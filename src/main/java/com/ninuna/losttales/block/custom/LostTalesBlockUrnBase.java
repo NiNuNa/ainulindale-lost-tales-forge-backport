@@ -210,19 +210,6 @@ public class LostTalesBlockUrnBase extends LostTalesBlockDirectionalContainerBas
         return 2;
     }
 
-    public boolean isTallUrn() {
-        return false;
-    }
-
-    public String getModelName(boolean sealed) {
-        String blockName = this.getUnlocalizedName();
-        if (blockName == null) return null;
-        if (blockName.startsWith("tile.")) {
-            blockName = blockName.substring("tile.".length());
-        }
-        return sealed ? blockName + "_sealed" : blockName;
-    }
-
     protected void configureTileEntity(World world, int x, int y, int z) {
         TileEntity tileEntity = world.getTileEntity(x, y, z);
         if (tileEntity instanceof LostTalesTileEntityUrn) {

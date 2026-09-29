@@ -38,7 +38,6 @@ import net.minecraftforge.event.entity.living.LivingHurtEvent;
  * Direct evidence remains player-scoped; authorized online party members in the same world receive a filtered union.
  */
 public class LostTalesMobAggroEventHandler {
-    public static final int DEFAULT_AGGRO_MOB_SCAN_RADIUS = 64;
     private static final int SNAPSHOT_HEARTBEAT_TICKS = 100;
     private static final Map<UUID, PlayerCombatState> PLAYER_STATES = new HashMap<UUID, PlayerCombatState>();
 
@@ -246,7 +245,7 @@ public class LostTalesMobAggroEventHandler {
         Party party;
         try {
             PartyWorldData data = PartyStorage.get(recipient.worldObj);
-            party = data.getPartyForCharacter(
+            party = data.getPartyForIdentity(
                     RoleplayCharacterIdentityHook.resolveGameplayId(recipient));
         } catch (RuntimeException ignored) {
             return;
@@ -269,7 +268,7 @@ public class LostTalesMobAggroEventHandler {
                     || sourcePlayer.isDead || !sourcePlayer.isEntityAlive()) {
                 continue;
             }
-            if (!member.getCharacterId().equals(
+            if (!member.getIdentityId().equals(
                     RoleplayCharacterIdentityHook.resolveGameplayId(sourcePlayer))) {
                 continue;
             }

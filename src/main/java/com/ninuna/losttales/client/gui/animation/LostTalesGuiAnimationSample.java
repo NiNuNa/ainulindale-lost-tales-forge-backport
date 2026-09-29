@@ -29,13 +29,10 @@ public final class LostTalesGuiAnimationSample {
     }
 
     public float getProgress() { return this.progress; }
-    public float getEasedProgress() { return this.easedProgress; }
     public float getOpacity() { return this.opacity; }
     public float getBackdropProgress() { return this.opacity; }
     public float getTranslationX() { return this.translationX; }
     public float getTranslationY() { return this.translationY; }
-    /** Compatibility accessor for callers that only support uniform scaling. */
-    public float getScale() { return (this.scaleX + this.scaleY) * 0.5F; }
     public float getScaleX() { return this.scaleX; }
     public float getScaleY() { return this.scaleY; }
 

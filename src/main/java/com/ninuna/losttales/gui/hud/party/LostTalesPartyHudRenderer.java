@@ -5,6 +5,7 @@ import com.ninuna.losttales.client.party.ClientPartyStateCache;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.party.model.Party;
 import com.ninuna.losttales.party.model.PartyColor;
 import com.ninuna.losttales.party.sync.PartyMemberAvailability;
 import com.ninuna.losttales.party.sync.PartyMemberSnapshot;
@@ -30,7 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-/** Compact party HUD showing only the local character's other party members. */
+/** Compact party HUD showing the other members of the player's party, one row each. */
 public final class LostTalesPartyHudRenderer {
 
     private static final ResourceLocation GUI_ICONS =
@@ -42,6 +43,19 @@ public final class LostTalesPartyHudRenderer {
     private static final int MAX_VISIBLE_HEARTS = 15;
 
     private LostTalesPartyHudRenderer() {}
+
+    /**
+     * The rows a full party shows, for placing the HUD: the server's member
+     * limit less the player, or this game's own setting before the server
+     * has said.
+     */
+    public static int placementRows() {
+        PartyStateSnapshot state = ClientPartyStateCache.getSnapshot();
+        int limit = state == null
+                ? Party.clampMemberLimit(LostTalesConfig.partyMaxMembers)
+                : state.getMemberLimit();
+        return limit - 1;
+    }
 
     public static void render(Minecraft minecraft, float partialTicks) {
         if (!LostTalesConfig.showLostTalesHud
@@ -56,12 +70,12 @@ public final class LostTalesPartyHudRenderer {
         PartySnapshot party = state == null || !state.isAvailable()
                 ? null : state.getParty();
         if (party == null || party.getMemberCount() <= 1
-                || state.getActiveCharacterId() == null) {
+                || state.getActiveIdentityId() == null) {
             return;
         }
 
         List<PartyMemberSnapshot> others =
-                collectOtherMembers(party, state.getActiveCharacterId());
+                collectOtherMembers(party, state.getActiveIdentityId());
         if (others.isEmpty()) {
             return;
         }
@@ -92,13 +106,13 @@ public final class LostTalesPartyHudRenderer {
                 PartyMemberSnapshot member = others.get(index);
                 PartyMemberStatusSnapshot status = statuses == null
                         ? null : statuses.getMemberStatus(
-                        member.getCharacterId());
+                        member.getIdentityId());
                 renderMemberRow(
                         minecraft,
                         member,
                         status,
                         stale,
-                        party.isLeader(member.getCharacterId()),
+                        party.isLeader(member.getIdentityId()),
                         bounds.x + PartyHudLayout.PANEL_PADDING,
                         bounds.y + PartyHudLayout.PANEL_PADDING
                                 + index * PartyHudLayout.ROW_HEIGHT,
@@ -272,11 +286,11 @@ public final class LostTalesPartyHudRenderer {
     }
 
     private static List<PartyMemberSnapshot> collectOtherMembers(
-            PartySnapshot party, UUID activeCharacterId) {
+            PartySnapshot party, UUID activeIdentityId) {
         ArrayList<PartyMemberSnapshot> result =
                 new ArrayList<PartyMemberSnapshot>();
         for (PartyMemberSnapshot member : party.getMembers()) {
-            if (!member.getCharacterId().equals(activeCharacterId)) {
+            if (!member.getIdentityId().equals(activeIdentityId)) {
                 result.add(member);
             }
         }

@@ -155,6 +155,12 @@ public final class LostTalesLotrWaystoneTravelAdapter {
         }
     }
 
+    /** Forgets every travel waiting to finish; called as the server starts and stops. */
+    public static void clear() {
+        PENDING.clear();
+        NATIVE_PENDING.clear();
+    }
+
     public static void clearPending(EntityPlayerMP player) {
         if (player != null && player.getUniqueID() != null) {
             PENDING.remove(player.getUniqueID());
@@ -318,7 +324,7 @@ public final class LostTalesLotrWaystoneTravelAdapter {
                 return null;
             }
         }
-        return new ResolvedTravel(data, source, destination);
+        return new ResolvedTravel(data, destination);
     }
 
     private static boolean isLiveLink(
@@ -419,20 +425,17 @@ public final class LostTalesLotrWaystoneTravelAdapter {
 
     private static final class ResolvedTravel {
         private final LostTalesMapMarkerWorldData data;
-        private final LostTalesMapMarkerRecord source;
         private final LostTalesMapMarkerRecord destination;
 
         private ResolvedTravel(
                 LostTalesMapMarkerWorldData data,
-                LostTalesMapMarkerRecord source,
                 LostTalesMapMarkerRecord destination) {
             this.data = data;
-            this.source = source;
             this.destination = destination;
         }
 
         private static ResolvedTravel denied() {
-            return new ResolvedTravel(null, null, null);
+            return new ResolvedTravel(null, null);
         }
     }
 

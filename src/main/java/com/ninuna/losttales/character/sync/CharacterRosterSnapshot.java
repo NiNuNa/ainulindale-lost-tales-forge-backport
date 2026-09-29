@@ -1,7 +1,6 @@
 package com.ninuna.losttales.character.sync;
 
 import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
-import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.CharacterSlotState;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
@@ -17,25 +16,33 @@ import java.util.UUID;
 /** Immutable private roster snapshot synchronized to the owning client only. */
 public final class CharacterRosterSnapshot {
 
+    /** The most deleted characters a snapshot carries: as many as an account may keep. */
+    public static final int MAX_DELETED = 128;
+
     private final UUID ownerId;
     private final int unlockedSlotCount;
     private final UUID activeCharacterId;
     private final long revision;
-    private final int dataVersion;
     private final List<CharacterSummary> characters;
     private final Map<UUID, CharacterSummary> charactersById;
     private final Map<Integer, CharacterSummary> charactersBySlot;
     private final boolean accountShowMinecraftCape;
     private final int accountCosmeticCapeId;
     private final boolean templateTaken;
+    private final List<DeletedCharacterSummary> deleted;
 
+    /**
+     * {@code deleted} are the owner's deleted characters the server still
+     * keeps, soonest purged first; past {@link #MAX_DELETED} the rest are
+     * left out.
+     */
     public CharacterRosterSnapshot(UUID ownerId, int unlockedSlotCount,
                                    UUID activeCharacterId, long revision,
-                                   int dataVersion,
                                    List<CharacterSummary> characters,
                                    boolean accountShowMinecraftCape,
                                    int accountCosmeticCapeId,
-                                   boolean templateTaken) {
+                                   boolean templateTaken,
+                                   List<DeletedCharacterSummary> deleted) {
         if (ownerId == null) {
             throw new IllegalArgumentException("ownerId must not be null");
         }
@@ -43,7 +50,6 @@ public final class CharacterRosterSnapshot {
         this.unlockedSlotCount = Math.max(CharacterRoster.INITIAL_UNLOCKED_SLOTS,
                 Math.min(CharacterRoster.MAX_SLOTS, unlockedSlotCount));
         this.revision = Math.max(0L, revision);
-        this.dataVersion = Math.max(1, dataVersion);
 
         ArrayList<CharacterSummary> accepted = new ArrayList<CharacterSummary>();
         HashMap<UUID, CharacterSummary> byId = new HashMap<UUID, CharacterSummary>();
@@ -75,9 +81,20 @@ public final class CharacterRosterSnapshot {
         this.accountShowMinecraftCape = accountShowMinecraftCape;
         this.accountCosmeticCapeId = CharacterCapeCatalog.normalizeSelection(accountCosmeticCapeId);
         this.templateTaken = templateTaken;
+        List<DeletedCharacterSummary> kept = new ArrayList<DeletedCharacterSummary>();
+        if (deleted != null) {
+            for (DeletedCharacterSummary each : deleted) {
+                if (each != null && kept.size() < MAX_DELETED
+                        && !byId.containsKey(each.getCharacterId())) {
+                    kept.add(each);
+                }
+            }
+        }
+        this.deleted = Collections.unmodifiableList(kept);
     }
 
-    public static CharacterRosterSnapshot fromRoster(CharacterRoster roster) {
+    public static CharacterRosterSnapshot fromRoster(CharacterRoster roster,
+            List<DeletedCharacterSummary> deleted) {
         if (roster == null) {
             throw new IllegalArgumentException("roster must not be null");
         }
@@ -90,19 +107,15 @@ public final class CharacterRosterSnapshot {
                 roster.getUnlockedSlotCount(),
                 roster.getActiveCharacterId(),
                 roster.getRevision(),
-                roster.getDataVersion(),
                 summaries,
                 roster.isAccountMinecraftCapeVisible(),
                 roster.getAccountCosmeticCapeId(),
-                roster.isTemplateTaken()
+                roster.isTemplateTaken(),
+                deleted
         );
     }
 
-    /**
-     * Whether this world has already taken the account's template. A
-     * snapshot built without an answer says it has, so nothing older
-     * than the flag asks a client to send one.
-     */
+    /** Whether this world has already taken the account character's look. */
     public boolean isTemplateTaken() {
         return this.templateTaken;
     }
@@ -132,17 +145,13 @@ public final class CharacterRosterSnapshot {
         return getCharacter(this.activeCharacterId);
     }
 
-    /** The id gameplay keys on: the active character's, or the owner's own when on the account. */
-    public UUID getActiveGameplayId() {
-        return PlayableIdentity.gameplayId(this.activeCharacterId, this.ownerId);
-    }
-
     public long getRevision() {
         return this.revision;
     }
 
-    public int getDataVersion() {
-        return this.dataVersion;
+    /** The owner's deleted characters the server still keeps, soonest purged first. */
+    public List<DeletedCharacterSummary> getDeleted() {
+        return this.deleted;
     }
 
     public List<CharacterSummary> getCharacters() {
@@ -153,7 +162,7 @@ public final class CharacterRosterSnapshot {
         return this.characters.size();
     }
 
-    /** The account's own identity, or null on a roster that has none. */
+    /** The account character, or null on a roster that has none. */
     public CharacterSummary getDefaultCharacter() {
         for (CharacterSummary character : this.characters) {
             if (character != null && character.isDefault()) {

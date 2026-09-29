@@ -65,12 +65,6 @@ public final class LostTalesClientMapMarkerVisibility {
                 && (!marker.isDiscoverable() || isDiscovered(marker));
     }
 
-    public static boolean isNonDiscoverableVisible(
-            LostTalesMapMarkerData marker) {
-        return marker != null && !marker.isDiscoverable()
-                && isRegionRequirementMet(marker);
-    }
-
     /** Whether the independent LOTR biome/faction-region gate is satisfied. */
     public static boolean isRegionRequirementMet(
             LostTalesMapMarkerData marker) {

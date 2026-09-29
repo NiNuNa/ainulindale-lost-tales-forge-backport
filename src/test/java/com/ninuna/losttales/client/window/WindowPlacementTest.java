@@ -142,7 +142,7 @@ public final class WindowPlacementTest {
         TwoWindowLayout.reset();
         Window dragged = WindowLayout.firstWindow();
         WindowLayout.setWindowHeight(dragged.getId(),
-                WindowPlacement.heightForLines(1.0D, null), false);
+                heightForLines(1.0D), false);
         // Above the top edge: the strip stops the frame's two pixels
         // below it (baseline 2 + 88 - 35 = 55); fifty pixels past the left
         // edge is allowed, since 110 of the 160 stay on screen.
@@ -206,17 +206,17 @@ public final class WindowPlacementTest {
      * window.
      */
     @Test
-    public void aTallWindowOverlapsItsNeighbourAndMovesALinkedOne() {
+    public void aTallWindowOverlapsItsNeighbour() {
         TwoWindowLayout.reset();
         Window console = WindowLayout.firstWindow();
         Window below = WindowLayout.windows().get(1);
         WindowLayout.setPosition(console.getId(), 0.0D, 10.0D, false);
         WindowLayout.setPosition(below.getId(), 0.0D, 22.0D, false);
         WindowLayout.setWindowHeight(console.getId(),
-                WindowPlacement.heightForLines(1.0D, null), false);
+                heightForLines(1.0D), false);
         WindowLayout.setWindowHeight(below.getId(),
-                WindowPlacement.heightForLines(8.0D, null), false);
-        // Unlinked, the console window is no border: it stays put and the
+                heightForLines(8.0D), false);
+        // The console window is no border: it stays put and the
         // tall window shows every line, over it.
         WindowPlacement.Box consoleBox =
                 WindowPlacement.windowBounds(console, null, 1000, 592);
@@ -228,34 +228,6 @@ public final class WindowPlacementTest {
         assertEquals(165.0D, belowBox.baseline(), 0.0001D);
         assertEquals(28.0D, belowBox.y, 0.0001D);
         assertTrue(belowBox.y < consoleBox.bottom());
-        // Linked above the tall window, it moves up with it until it meets
-        // the top margin; the tall window keeps its height. The console
-        // window would stand at 165 - 96 - 2 - 39 - 4 - 35 = -11, the
-        // window gap between them, and is held where its top is the
-        // frame's two pixels below the edge: baseline 2 + 12 + 2 + 39 = 55.
-        WindowLayout.link(console.getId(), below.getId(), true);
-        consoleBox = WindowPlacement.windowBounds(console, null, 1000,
-                592);
-        belowBox = WindowPlacement.windowBounds(below, null, 1000, 592);
-        assertEquals(55.0D, consoleBox.baseline(), 0.0001D);
-        assertEquals(2.0D, consoleBox.y, 0.0001D);
-        assertEquals(96.0D, belowBox.room, 0.0001D);
-        assertEquals(165.0D, belowBox.baseline(), 0.0001D);
-        // Stored anchors are untouched.
-        assertEquals(10.0D, console.getOffsetY(), 0.0D);
-        assertEquals(22.0D, below.getOffsetY(), 0.0D);
-        // One line tall, the window has the linked one simply sit a
-        // window gap above it (its top at 165 - 53 = 112, the linked
-        // one's baseline at 112 - 4 - 35 = 73).
-        WindowLayout.setWindowHeight(below.getId(),
-                WindowPlacement.heightForLines(1.0D, null), false);
-        consoleBox = WindowPlacement.windowBounds(console, null, 1000,
-                592);
-        belowBox = WindowPlacement.windowBounds(below, null, 1000, 592);
-        assertEquals(12.0D, belowBox.room, 0.0001D);
-        assertEquals(73.0D, consoleBox.baseline(), 0.0001D);
-        assertEquals(belowBox.y - WindowPlacement.WINDOW_GAP,
-                consoleBox.bottom(), 0.0001D);
     }
 
     /**
@@ -279,54 +251,40 @@ public final class WindowPlacementTest {
                         new net.minecraft.util.ChatComponentText("x"), index));
             }
             frame.lines = lines;
-            assertEquals(WindowPlacement.heightForLines(20.0D, null), empty,
+            assertEquals(heightForLines(20.0D), empty,
                     0.0D);
             assertEquals(empty, WindowPlacement.currentHeight(window, null),
                     0.0D);
             WindowLayout.setWindowHeight(window.getId(),
-                WindowPlacement.heightForLines(3.0D, null), false);
-            assertEquals(WindowPlacement.heightForLines(3.0D, null),
+                heightForLines(3.0D), false);
+            assertEquals(heightForLines(3.0D),
                     WindowPlacement.currentHeight(window, null), 0.0D);
             frame.lines = lines.subList(0, 1);
-            assertEquals(WindowPlacement.heightForLines(3.0D, null),
+            assertEquals(heightForLines(3.0D),
                     WindowPlacement.currentHeight(window, null), 0.0D);
         } finally {
             ChatFrame.clear();
         }
     }
 
+    /** Windows stand on their own: moving one moves no other (W7 a). */
     @Test
-    public void aLinkedWindowKeepsItsGapToItsTarget() {
+    public void movingAWindowLeavesEveryOtherWhereItStands() {
         TwoWindowLayout.reset();
         Window console = WindowLayout.firstWindow();
         Window below = WindowLayout.windows().get(1);
         WindowLayout.setWindowHeight(console.getId(),
-                WindowPlacement.heightForLines(3.0D, null), false);
+                heightForLines(3.0D), false);
         WindowLayout.setWindowHeight(below.getId(),
-                WindowPlacement.heightForLines(3.0D, null), false);
-        // The console window sits above the conversation window and is
-        // linked to it; wherever the conversation window is, the console
-        // window ends a window gap above its top, their frames side by
-        // side.
-        WindowLayout.setPosition(below.getId(), 0.0D, 50.0D, false);
-        WindowLayout.link(console.getId(), below.getId(), true);
-        WindowPlacement.Box belowBox = WindowPlacement.windowBounds(
-                below, null, 1000, 600);
+                heightForLines(3.0D), false);
         WindowPlacement.Box consoleBox = WindowPlacement.windowBounds(
                 console, null, 1000, 600);
-        int gap = WindowPlacement.WINDOW_GAP;
-        assertEquals(belowBox.y - gap, consoleBox.bottom(), 0.0001D);
+        WindowLayout.setPosition(below.getId(), 0.0D, 50.0D, false);
         WindowLayout.setPosition(below.getId(), 0.0D, 80.0D, false);
-        belowBox = WindowPlacement.windowBounds(below, null, 1000, 600);
-        consoleBox = WindowPlacement.windowBounds(console, null, 1000,
-                600);
-        assertEquals(belowBox.y - gap, consoleBox.bottom(), 0.0001D);
-        // Linked below instead: its top follows the target's bottom, the
-        // same gap apart.
-        WindowLayout.link(console.getId(), below.getId(), false);
-        consoleBox = WindowPlacement.windowBounds(console, null, 1000,
-                600);
-        assertEquals(belowBox.bottom() + gap, consoleBox.y, 0.0001D);
+        WindowPlacement.Box after = WindowPlacement.windowBounds(console,
+                null, 1000, 600);
+        assertEquals(consoleBox.x, after.x, 0.0D);
+        assertEquals(consoleBox.y, after.y, 0.0D);
     }
 
     @Test
@@ -378,10 +336,10 @@ public final class WindowPlacementTest {
         TwoWindowLayout.reset();
         // Twelve lines: 12 * 12 = 144 of room.
         assertEquals(39 + 2 + 144 + 35,
-                WindowPlacement.heightForLines(12.0D, null), 0.0001D);
+                heightForLines(12.0D), 0.0001D);
         // 12.37 lines: 12.37 * 12 = 148.44 of room.
         assertEquals(39 + 2 + 148.44D + 35,
-                WindowPlacement.heightForLines(12.37D, null), 0.0001D);
+                heightForLines(12.37D), 0.0001D);
         // Every height between two whole lines is a room of its own, and
         // the room gives the height back unchanged, exactly: twelve lines
         // are 76 + 144 = 220 tall, thirteen 76 + 156 = 232.
@@ -394,7 +352,7 @@ public final class WindowPlacementTest {
         // the draw shows one more line than the whole ones to clip.
         Window window = WindowLayout.firstWindow();
         WindowLayout.setWindowHeight(window.getId(),
-                WindowPlacement.heightForLines(12.37D, null), true);
+                heightForLines(12.37D), true);
         ChatFrame frame = ChatFrame.of(window);
         List<net.minecraft.client.gui.ChatLine> lines =
                 new java.util.ArrayList<net.minecraft.client.gui.ChatLine>();
@@ -466,5 +424,23 @@ public final class WindowPlacementTest {
         // A box that fits stays where it was put.
         assertEquals(100.0D, WindowPlacement.holdOnScreen(100.0D, 300,
                 640), 0.0001D);
+    }
+
+    /**
+     * A window's smallest width is one number, whatever the Chat Scale:
+     * the scale sizes the words, never the window. A window's own floor
+     * is never under it.
+     */
+    @Test
+    public void theSmallestWidthIsFixed() {
+        assertEquals(166, WindowPlacement.MIN_BOX_WIDTH);
+        assertEquals(WindowPlacement.MIN_BOX_WIDTH,
+                WindowPlacement.minBoxWidth(null, null), 0.0D);
+    }
+
+    /** The box height a window of {@code lines} message lines takes, off the client. */
+    private static double heightForLines(double lines) {
+        return WindowPlacement.heightForRoom(
+                WindowPlacement.roomForLines(lines, null), null);
     }
 }

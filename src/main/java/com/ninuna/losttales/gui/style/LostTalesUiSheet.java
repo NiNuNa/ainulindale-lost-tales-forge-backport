@@ -165,7 +165,7 @@ public enum LostTalesUiSheet {
     /**
      * A framed button's four corners, resting and lit: six-texel cells
      * whose innermost column and row are the frame's edges, stretched
-     * between the corners to any size ({@link ChatFramedButton}). Like
+     * between the corners to any size ({@link LostTalesUiFramedButton}). Like
      * the tab pieces they bring ink alone; their backdrop texels preview
      * the surface the button paints itself.
      */

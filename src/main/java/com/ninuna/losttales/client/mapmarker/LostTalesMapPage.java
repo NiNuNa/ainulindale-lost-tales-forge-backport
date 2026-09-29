@@ -8,6 +8,7 @@ import com.ninuna.losttales.client.window.ToolStrip;
 import com.ninuna.losttales.client.window.WindowBar;
 import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WindowScreen;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiLayerFade;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
@@ -121,6 +122,12 @@ public final class LostTalesMapPage extends PageContent {
     @Override
     public boolean holdsKeys() {
         return this.map != null && this.map.hasFieldPrompt();
+    }
+
+    /** The map's tab wears seafoam, its water's colour on the palette. */
+    @Override
+    public int tone() {
+        return LostTalesColors.rgb(LostTalesColors.SEAFOAM);
     }
 
     /* ---- The window's strip: the legend and Find Location ---- */

@@ -1,6 +1,10 @@
 package com.ninuna.losttales.proxy;
 
 import com.ninuna.losttales.chat.server.ChatIdentitySelection;
+import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSyncManager;
+import com.ninuna.losttales.party.quest.PartyQuestProgressCoordinator;
+import com.ninuna.losttales.party.server.PartyDeclines;
+import com.ninuna.losttales.compat.lotr.LostTalesLotrWaystoneTravelAdapter;
 import com.ninuna.losttales.network.packet.LostTalesChatIdentitySyncPacket;
 import com.ninuna.losttales.network.packet.character.CharacterProfilePacket;
 import java.io.File;
@@ -114,6 +118,7 @@ import com.ninuna.losttales.chat.server.ChatMessageIdAllocator;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.server.ChatConsoleCommandHandler;
 import com.ninuna.losttales.chat.server.ChatArrivals;
+import com.ninuna.losttales.chat.server.ChatWelcome;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.server.ChatCommandContexts;
 import com.ninuna.losttales.chat.server.ChatConsoleStream;
@@ -202,6 +207,7 @@ public class LostTalesCommonProxy {
         MinecraftForge.EVENT_BUS.register(new CharacterRoomWorldHandler());
         MinecraftForge.EVENT_BUS.register(new ChatConsoleCommandHandler());
         MinecraftForge.EVENT_BUS.register(new ChatArrivals());
+        cpw.mods.fml.common.FMLCommonHandler.instance().bus().register(new ChatWelcome());
         MinecraftForge.TERRAIN_GEN_BUS.register(waystoneGenerationHandler);
         GameRegistry.registerWorldGenerator(
                 waystoneGenerationHandler, 1000);
@@ -221,6 +227,7 @@ public class LostTalesCommonProxy {
                 waystoneGenerationHandler);
         FMLCommonHandler.instance().bus().register(chatRoleRosterWatcher);
         FMLCommonHandler.instance().bus().register(new MissiveBoardWatches());
+        FMLCommonHandler.instance().bus().register(new LostTalesMapMarkerSyncManager());
 
         ELostTalesItem.initAndRegisterItems();
         AccessoryBootstrap.initialize();
@@ -394,7 +401,11 @@ public class LostTalesCommonProxy {
         PartySyncManager.clear();
         PartyMemberStatusSyncManager.clear();
         PartyTrackingSyncManager.clear();
+        PartyDeclines.clear();
+        PartyQuestProgressCoordinator.getInstance().clear();
         MissiveBoardWatches.clear();
+        LostTalesMapMarkerSyncManager.clear();
+        LostTalesLotrWaystoneTravelAdapter.clear();
         LostTalesChatRoleRosterWatcher.clear();
         ChatMessageIdAllocator.reset();
         ChatHistory.clear();
@@ -419,6 +430,7 @@ public class LostTalesCommonProxy {
         LostTalesQuestRegistry.clearRuntimeQuests();
         LostTalesServerBroadcastHook.clear();
         ChatArrivals.clear();
+        ChatWelcome.clear();
         ChatConsoleCommandHandler.clear();
         DiscordGameEventRelay.clear();
         LostTalesDiscordBridge.getInstance().resetSession();
@@ -517,7 +529,11 @@ public class LostTalesCommonProxy {
         PartySyncManager.clear();
         PartyMemberStatusSyncManager.clear();
         PartyTrackingSyncManager.clear();
+        PartyDeclines.clear();
+        PartyQuestProgressCoordinator.getInstance().clear();
         MissiveBoardWatches.clear();
+        LostTalesMapMarkerSyncManager.clear();
+        LostTalesLotrWaystoneTravelAdapter.clear();
         LostTalesChatRoleRosterWatcher.clear();
         ChatChannel.resetToBuiltIn();
         ChatChannelIconCatalog.resetToDefaults();
@@ -539,6 +555,7 @@ public class LostTalesCommonProxy {
         LostTalesQuestRegistry.clearRuntimeQuests();
         LostTalesServerBroadcastHook.clear();
         ChatArrivals.clear();
+        ChatWelcome.clear();
         ChatConsoleCommandHandler.clear();
         DiscordGameEventRelay.clear();
         LostTalesDiscordBridge.getInstance().resetSession();

@@ -78,10 +78,6 @@ final class LostTalesMapFastTravelCycle {
         return this.candidates.size() > 1;
     }
 
-    int size() {
-        return this.candidates.size();
-    }
-
     /**
      * The next destination in the given direction, or null when there is
      * nowhere else to go.

@@ -156,29 +156,4 @@ public final class CameraMotionProfile {
     public double getIdleCyclesPerSecond() {
         return idleCyclesPerSecond;
     }
-
-    public CameraMotionProfile scaled(
-            double amplitudeMultiplier, double responseMultiplier) {
-        CameraMath.requireNonNegativeFinite(
-                "amplitudeMultiplier", amplitudeMultiplier);
-        CameraMath.requireNonNegativeFinite(
-                "responseMultiplier", responseMultiplier);
-        return new CameraMotionProfile(
-                horizontalFollowLimit * amplitudeMultiplier,
-                verticalFollowLimit * amplitudeMultiplier,
-                sideSway * amplitudeMultiplier,
-                verticalSway * amplitudeMultiplier,
-                forwardSway * amplitudeMultiplier,
-                turnSway * amplitudeMultiplier,
-                lookPitchSway * amplitudeMultiplier,
-                lookForwardSway * amplitudeMultiplier,
-                lookResponseRate * responseMultiplier,
-                lookReferenceSpeed,
-                swayCyclesPerBlock,
-                responseRate * responseMultiplier,
-                idleSideSway * amplitudeMultiplier,
-                idleVerticalSway * amplitudeMultiplier,
-                idleForwardSway * amplitudeMultiplier,
-                idleCyclesPerSecond);
-    }
 }

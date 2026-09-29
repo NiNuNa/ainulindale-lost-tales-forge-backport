@@ -23,7 +23,7 @@ public final class ChatComposerTest {
     public void selectGlobal() {
         ChatLayout.reset();
         ClientChatChannelState.clear();
-        ClientChatChannelState.select(ChatChannel.GLOBAL);
+        ClientChatChannelState.select(ChatTab.of(ChatChannel.GLOBAL));
     }
 
     @After
@@ -43,11 +43,11 @@ public final class ChatComposerTest {
         assertEquals(42L, reference.getMessageId());
         assertEquals("Beren", reference.getAuthor());
         // Selecting another tab is moving away from the message.
-        ClientChatChannelState.select(ChatChannel.OOC);
+        ClientChatChannelState.select(ChatTab.of(ChatChannel.OOC));
         assertFalse(composer.isReplying());
         assertFalse(composer.replyReference().exists());
         composer.onTabSelected(ChatTab.of(ChatChannel.OOC));
-        ClientChatChannelState.select(ChatChannel.GLOBAL);
+        ClientChatChannelState.select(ChatTab.of(ChatChannel.GLOBAL));
         assertFalse(composer.isReplying());
     }
 

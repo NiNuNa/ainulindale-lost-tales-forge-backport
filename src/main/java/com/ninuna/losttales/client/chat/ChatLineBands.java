@@ -46,31 +46,14 @@ public final class ChatLineBands {
     }
 
     /**
-     * Records one drawn band. {@code left} is where the line's own x origin
-     * (text start) landed on screen, including any horizontal motion.
-     */
-    void add(int lineViewIndex, float bandLeft, float bandRight,
-             float bandTop, float bandBottom) {
-        add(lineViewIndex, bandLeft, bandRight, bandTop, bandBottom, 0.0F,
-                1.0F);
-    }
-
-    /**
-     * As above, for a row drawn at {@code rowScale} of its size about the
+     * Records one drawn band. {@code bandLeft} is where the line's own x
+     * origin (text start) landed on screen, including any horizontal
+     * motion. The row is drawn at {@code rowScale} of its size about the
      * text-space x {@code rowPivot}, which keeps its place: a row of the
-     * chat's small text, hit where it is drawn.
-     */
-    void add(int lineViewIndex, float bandLeft, float bandRight,
-             float bandTop, float bandBottom, float rowPivot,
-             float rowScale) {
-        add(lineViewIndex, bandLeft, bandRight, bandTop, bandBottom,
-                rowPivot, rowScale, bandLeft);
-    }
-
-    /**
-     * As above for a band that answers the pointer from {@code reachLeft}
-     * on, left of where its text starts: an open window's row, from the
-     * window's edge across its timestamp area.
+     * chat's small text is hit where it is drawn. The band answers the
+     * pointer from {@code reachLeft} on, which may stand left of where
+     * its text starts: an open window's row, from the window's edge
+     * across its timestamp area.
      */
     void add(int lineViewIndex, float bandLeft, float bandRight,
              float bandTop, float bandBottom, float rowPivot,
@@ -113,28 +96,12 @@ public final class ChatLineBands {
         return -1;
     }
 
-    int count() {
-        return this.count;
-    }
-
     int viewIndexOf(int band) {
         return this.viewIndex[band];
     }
 
     float leftOf(int band) {
         return this.left[band];
-    }
-
-    float topOf(int band) {
-        return this.top[band];
-    }
-
-    float bottomOf(int band) {
-        return this.bottom[band];
-    }
-
-    float scale() {
-        return this.scale;
     }
 
     /**

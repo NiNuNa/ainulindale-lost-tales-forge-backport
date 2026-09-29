@@ -21,8 +21,8 @@ import net.minecraft.client.gui.FontRenderer;
  * A click on a card sends that window to the zone, and the panes left go
  * on offering the windows left; Escape, a press anywhere else, or the
  * last zone taken ends it. A zone another window already fills is not
- * offered, nor is a window that is locked, stuck to another, or already
- * filling one of the layout's zones.
+ * offered, nor is a window that is locked or already filling one of the
+ * layout's zones.
  */
 public final class SnapAssist {
     /** Clear pixels between two cards of a pane. */
@@ -145,7 +145,7 @@ public final class SnapAssist {
     /**
      * The windows that may be put in a zone beside the window
      * {@code windowId}, the one in front first: not that window, nor one
-     * that is locked, stuck to another or showing no tab.
+     * that is locked or showing no tab.
      */
     static List<Window> otherWindows(String windowId) {
         List<Window> result = new ArrayList<Window>();
@@ -153,8 +153,7 @@ public final class SnapAssist {
         for (int index = windows.size() - 1; index >= 0; index--) {
             Window window = windows.get(index);
             if (window.getId().equals(windowId) || window.isLocked()
-                    || WindowFrame.visibleTabs(window).isEmpty()
-                    || WindowLayout.linkedGroup(window).size() > 1) {
+                    || WindowFrame.visibleTabs(window).isEmpty()) {
                 continue;
             }
             result.add(window);

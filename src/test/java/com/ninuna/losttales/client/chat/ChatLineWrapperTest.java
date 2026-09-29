@@ -81,9 +81,9 @@ public final class ChatLineWrapperTest {
     @Test
     public void eachStateReservesOnlyTheHeaderRunsItDraws() {
         List<IChatComponent> closed = ChatLineWrapper.wrap(METRICS,
-                line("<N> ", "aaa bbb ccc ddd"), 150, false);
+                line("<N> ", "aaa bbb ccc ddd"), 150, false, 1.0F, 1.0F, 1.0F, null);
         List<IChatComponent> open = ChatLineWrapper.wrap(METRICS,
-                line("<N> ", "aaa bbb ccc ddd"), 150, true);
+                line("<N> ", "aaa bbb ccc ddd"), 150, true, 1.0F, 1.0F, 1.0F, null);
         // Closed: 48 + 24 = 72 taken, 78 left — two words of 18 and a
         // space. Open: only the name's 24 taken, so the 90px body fits
         // on the first line whole.
@@ -106,7 +106,9 @@ public final class ChatLineWrapperTest {
         for (Object value : line) {
             ChatLayoutMarker.Data data =
                     ChatLayoutMarker.decode((IChatComponent)value);
-            if (data != null && !data.anchor && !data.rowMark) {
+            if (data != null && !data.anchor
+                    && data != ChatLayoutMarker.Data.HEADER
+                    && data != ChatLayoutMarker.Data.BODY_ROW) {
                 return data.indent(chatOpen);
             }
         }
@@ -127,14 +129,14 @@ public final class ChatLineWrapperTest {
         root.appendSibling(text("hello"));
         root.appendSibling(ChatLayoutMarker.rowBreak());
         root.appendSibling(ChatReactionMarker.create(
-                com.ninuna.losttales.chat.emoji.ChatEmoji.SMILE, 3, true,
+                com.ninuna.losttales.chat.emoji.ChatEmoji.SMILE.getName(), 3, true,
                 12345L, 6));
         root.appendSibling(ChatSpacerMarker.of(ChatReactionMarker.BETWEEN));
         root.appendSibling(ChatReactionMarker.create(
-                com.ninuna.losttales.chat.emoji.ChatEmoji.JOY, 1, false,
+                com.ninuna.losttales.chat.emoji.ChatEmoji.JOY.getName(), 1, false,
                 12345L, 6));
         List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS, root, 200,
-                true);
+                true, 1.0F, 1.0F, 1.0F, null);
         assertEquals(3, lines.size());
         assertFalse(ChatReactionMarker.isReactionRow(lines.get(1)));
         assertTrue(ChatReactionMarker.isReactionRow(lines.get(2)));
@@ -144,21 +146,21 @@ public final class ChatLineWrapperTest {
         assertEquals(ChatReactionMarker.PAD + ChatReactionMarker.ICON
                 + ChatReactionMarker.GAP + 6 + ChatReactionMarker.TRAIL,
                 ChatInlineIcons.declaredWidth(ChatReactionMarker.create(
-                        com.ninuna.losttales.chat.emoji.ChatEmoji.SMILE, 3,
+                        com.ninuna.losttales.chat.emoji.ChatEmoji.SMILE.getName(), 3,
                         true, 12345L, 6)));
     }
 
     @Test
     public void linesWithoutAnAnchorAreLeftToVanilla() {
         ChatComponentText vanilla = new ChatComponentText("hello world");
-        assertNull(ChatLineWrapper.wrap(METRICS, vanilla, 100));
+        assertNull(ChatLineWrapper.wrap(METRICS, vanilla, 100, false, 1.0F, 1.0F, 1.0F, null));
     }
 
     @Test
     public void continuationLinesIndentUnderTheBodyInBothChatStates() {
         // "Global: " is 48px, "<Name> " is 42px: 90 closed, 42 open.
         List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
-                line("<Name> ", "one two three four five six"), 150);
+                line("<Name> ", "one two three four five six"), 150, false, 1.0F, 1.0F, 1.0F, null);
         assertNotNull(lines);
         assertEquals(2, lines.size());
         assertEquals("Global: <Name> one two", plain(lines.get(0)));
@@ -186,9 +188,9 @@ public final class ChatLineWrapperTest {
     @Test
     public void theOpenLayoutGivesTheChannelPrefixWidthToTheBody() {
         List<IChatComponent> closed = ChatLineWrapper.wrap(METRICS,
-                line("<Name> ", "one two three four five six"), 150, false);
+                line("<Name> ", "one two three four five six"), 150, false, 1.0F, 1.0F, 1.0F, null);
         List<IChatComponent> open = ChatLineWrapper.wrap(METRICS,
-                line("<Name> ", "one two three four five six"), 150, true);
+                line("<Name> ", "one two three four five six"), 150, true, 1.0F, 1.0F, 1.0F, null);
         assertNotNull(open);
         assertEquals("Global: <Name> one two", plain(closed.get(0)));
         assertEquals("Global: <Name> one two three four",
@@ -207,7 +209,7 @@ public final class ChatLineWrapperTest {
     @Test
     public void breakSpacesAreDroppedAndNeverInsertedAsText() {
         List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
-                line("<N> ", "aaaa bbbb cccc dddd eeee"), 140);
+                line("<N> ", "aaaa bbbb cccc dddd eeee"), 140, false, 1.0F, 1.0F, 1.0F, null);
         // Prefix 48 + 24 = 72 leaves 68: "aaaa bbbb" (54) fits, a third
         // word would not; the continuation line has the whole width.
         assertEquals(2, lines.size());
@@ -223,7 +225,7 @@ public final class ChatLineWrapperTest {
             word.append('x');
         }
         List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
-                line("<N> ", word.toString()), 120);
+                line("<N> ", word.toString()), 120, false, 1.0F, 1.0F, 1.0F, null);
         assertTrue(lines.size() > 1);
         StringBuilder joined = new StringBuilder();
         for (IChatComponent line : lines) {
@@ -238,7 +240,7 @@ public final class ChatLineWrapperTest {
     public void activeFormattingSurvivesASplit() {
         String body = SECTION + "6gold " + SECTION + "lbold words that wrap";
         List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
-                line("<N> ", body), 130);
+                line("<N> ", body), 130, false, 1.0F, 1.0F, 1.0F, null);
         assertTrue(lines.size() > 1);
         // The line is filled up to the last word that fits (58 of 58).
         assertEquals("Global: <N> " + SECTION + "6gold " + SECTION + "lbold",
@@ -259,9 +261,9 @@ public final class ChatLineWrapperTest {
         String plainBody = "abcdef abcdef";
         String codedBody = SECTION + "6abcdef " + SECTION + "cabcdef";
         List<IChatComponent> plainLines = ChatLineWrapper.wrap(METRICS,
-                line("<N> ", plainBody), 130);
+                line("<N> ", plainBody), 130, false, 1.0F, 1.0F, 1.0F, null);
         List<IChatComponent> codedLines = ChatLineWrapper.wrap(METRICS,
-                line("<N> ", codedBody), 130);
+                line("<N> ", codedBody), 130, false, 1.0F, 1.0F, 1.0F, null);
         assertEquals(plainLines.size(), codedLines.size());
     }
 
@@ -276,7 +278,7 @@ public final class ChatLineWrapperTest {
         // 24 + 42 = 66; the 14px bold-space slot does not fit in 76 and
         // moves down whole, never split between its two spaces; the text
         // after it, space included, still fits beside it (24+14+36).
-        List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS, root, 76);
+        List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS, root, 76, false, 1.0F, 1.0F, 1.0F, null);
         assertEquals(2, lines.size());
         assertEquals("<N> hello!!", plain(lines.get(0)));
         boolean emojiOnSecond = false;
@@ -295,7 +297,7 @@ public final class ChatLineWrapperTest {
         // so the body starts below it; once the body has begun, short
         // pieces keep filling whatever line they are on.
         List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
-                line("<N> ", "abcdef h"), 100);
+                line("<N> ", "abcdef h"), 100, false, 1.0F, 1.0F, 1.0F, null);
         assertEquals(2, lines.size());
         assertEquals("Global: <N> ", plain(lines.get(0)));
         // 48 of the 50 available after the capped 50px indent.
@@ -312,19 +314,19 @@ public final class ChatLineWrapperTest {
         // Prefix 48 + 102 = 150 of 160: no room, body starts a line down
         // at the left edge, whatever the prefix measured.
         List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
-                line(name.toString(), "short"), 160);
+                line(name.toString(), "short"), 160, false, 1.0F, 1.0F, 1.0F, null);
         assertEquals(2, lines.size());
         assertEquals("Global: " + name, plain(lines.get(0)));
         assertEquals("short", plain(lines.get(1)));
         assertEquals(0, indentOf(lines.get(1), false));
         // And one that does not even fit the width goes back to vanilla.
         assertNull(ChatLineWrapper.wrap(METRICS,
-                line(name.toString(), "short"), 100));
+                line(name.toString(), "short"), 100, false, 1.0F, 1.0F, 1.0F, null));
     }
 
     @Test
     public void realMessagesPutTheirBodyUnderTheirSender() {
-        IChatComponent message = LostTalesChatPresentation.build(
+        IChatComponent message = build(
                 ChatPacketFixtures.line(
                         ChatChannel.GLOBAL, "Arathorn", "Ranger",
                         "The road goes ever on and on, down from the " + "door where it began.")
@@ -332,7 +334,7 @@ public final class ChatLineWrapperTest {
         for (int state = 0; state < 2; state++) {
             boolean chatOpen = state == 1;
             List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
-                    message, 200, chatOpen);
+                    message, 200, chatOpen, 1.0F, 1.0F, 1.0F, null);
             assertNotNull(lines);
             assertTrue(lines.size() > 2);
             // The feed names the sender in brackets round the head;
@@ -378,7 +380,7 @@ public final class ChatLineWrapperTest {
         for (int state = 0; state < 2; state++) {
             boolean chatOpen = state == 1;
             List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
-                    grouped, 200, chatOpen);
+                    grouped, 200, chatOpen, 1.0F, 1.0F, 1.0F, null);
             assertNotNull(lines);
             assertEquals("and on, down from the door where it began.",
                     joinedText(lines));
@@ -414,7 +416,7 @@ public final class ChatLineWrapperTest {
         for (int state = 0; state < 2; state++) {
             boolean chatOpen = state == 1;
             List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
-                    line, 200, chatOpen);
+                    line, 200, chatOpen, 1.0F, 1.0F, 1.0F, null);
             assertNotNull(lines);
             assertTrue(lines.size() > 2);
             String header = chatOpen ? "Global Chat:   Arathorn"
@@ -491,7 +493,7 @@ public final class ChatLineWrapperTest {
         root.appendSibling(head);
         root.appendSibling(ChatLayoutMarker.anchor());
         root.appendSibling(text("one two three four five six"));
-        List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS, root, 150);
+        List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS, root, 150, false, 1.0F, 1.0F, 1.0F, null);
         assertNotNull(lines);
         assertTrue(lines.size() > 1);
         for (int index = 1; index < lines.size(); index++) {
@@ -513,11 +515,11 @@ public final class ChatLineWrapperTest {
      */
     @Test
     public void theBodyChevronIsDrawnButNeverReadBack() {
-        IChatComponent message = LostTalesChatPresentation.build(
+        IChatComponent message = build(
                 ChatPacketFixtures.line(ChatChannel.GLOBAL, "Arathorn", "Ranger", "Halt.")
                         .colors(0x55AA55, 0x336633).skin("losttales:human_ranger_male_2").build());
         List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
-                message, 400, true);
+                message, 400, true, 1.0F, 1.0F, 1.0F, null);
         assertNotNull(lines);
         assertEquals(2, lines.size());
         IChatComponent chevron = null;
@@ -542,11 +544,54 @@ public final class ChatLineWrapperTest {
         }
     }
 
+    /**
+     * An action is one sentence: its speaker's name opens its words on
+     * the row the header is on, behind no chevron, all in italics. No row
+     * names the speaker, so an open window draws no name row and no
+     * avatar for it, and the name's span ends where the words begin.
+     */
+    @Test
+    public void anActionIsOneSentenceBehindNoChevron() {
+        IChatComponent message = build(
+                ChatPacketFixtures.line(ChatChannel.GLOBAL, "Aldric", "Steve",
+                        "draws his sword.").colors(0x55AA55, 0x336633).build()
+                        .withAction(true));
+        for (boolean open : new boolean[] {true, false}) {
+            List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
+                    message, 400, open, 1.0F, 1.0F, 1.0F, null);
+            assertNotNull(lines);
+            assertEquals(1, lines.size());
+            IChatComponent row = lines.get(0);
+            assertTrue(ChatLayoutMarker.isBodyRow(row));
+            assertFalse(ChatLayoutMarker.isHeaderRow(row));
+            assertNull(ChatAvatar.of(row));
+            assertTrue(words(row), words(row).endsWith(
+                    "Aldric draws his sword."));
+            boolean spanEnds = false;
+            for (Object value : row) {
+                IChatComponent part = (IChatComponent)value;
+                assertFalse("no chevron", ChatBodyMarker.isMarker(part));
+                spanEnds |= ChatLayoutMarker.isSpanEnd(part);
+                String text = part.getUnformattedTextForChat();
+                if (text.trim().length() > 0 && ("Aldric".equals(text)
+                        || text.contains("sword"))) {
+                    assertTrue(text, part.getChatStyle().getItalic());
+                }
+            }
+            assertTrue(spanEnds);
+            // The head stands in the feed's row; a window takes it for
+            // the avatar slot, which a row of words draws nothing in.
+            ChatHeadMarker.Data head = ChatHeadMarker.of(row);
+            assertNotNull(head);
+            assertEquals(open, head.avatar);
+        }
+    }
+
     /** A line with no head of its own carries no colours either. */
     @Test
     public void aHeadlessLineCarriesNoColours() {
         List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
-                line("<Name> ", "one two three four five six"), 150);
+                line("<Name> ", "one two three four five six"), 150, false, 1.0F, 1.0F, 1.0F, null);
         assertNotNull(lines);
         ChatLayoutMarker.Data indent = indentMarker(lines.get(1));
         assertNotNull(indent);
@@ -557,7 +602,9 @@ public final class ChatLineWrapperTest {
         for (Object value : line) {
             ChatLayoutMarker.Data data =
                     ChatLayoutMarker.decode((IChatComponent)value);
-            if (data != null && !data.anchor && !data.rowMark) {
+            if (data != null && !data.anchor
+                    && data != ChatLayoutMarker.Data.HEADER
+                    && data != ChatLayoutMarker.Data.BODY_ROW) {
                 return data;
             }
         }
@@ -571,11 +618,11 @@ public final class ChatLineWrapperTest {
      */
     @Test
     public void anOpenWindowStandsTheHeadAsTheAvatarAndDropsTheBrackets() {
-        IChatComponent message = LostTalesChatPresentation.build(
+        IChatComponent message = build(
                 ChatPacketFixtures.line(ChatChannel.GLOBAL, "Arathorn", "Ranger", "Well met.")
                         .colors(0x55AA55, 0x336633).skin("losttales:human_ranger_male_2").build());
         List<IChatComponent> open = ChatLineWrapper.wrap(METRICS,
-                message, 200, true);
+                message, 200, true, 1.0F, 1.0F, 1.0F, null);
         ChatHeadMarker.Data avatar = ChatAvatar.of(open.get(0));
         assertNotNull(avatar);
         assertTrue(avatar.avatar);
@@ -594,7 +641,7 @@ public final class ChatLineWrapperTest {
         }
         // The feed keeps the head in the row and the brackets round it.
         List<IChatComponent> feed = ChatLineWrapper.wrap(METRICS,
-                message, 200, false);
+                message, 200, false, 1.0F, 1.0F, 1.0F, null);
         assertEquals(null, ChatAvatar.of(feed.get(0)));
         assertEquals("Global Chat: <  Arathorn> ", plain(feed.get(0)));
     }
@@ -610,7 +657,7 @@ public final class ChatLineWrapperTest {
         LostTalesChatMessagePacket packet = ChatPacketFixtures.line(
                 ChatChannel.GLOBAL, "Arathorn", "Ranger", "Well met.").colors(0x55AA55, 0x336633)
                 .skin("losttales:human_ranger_male_2").build();
-        IChatComponent message = LostTalesChatPresentation.build(packet);
+        IChatComponent message = build(packet);
         IChatComponent stamp = ChatStampMarker.of("9:54 PM", 30);
         List<IChatComponent> open = ChatLineWrapper.wrap(METRICS, message,
                 200, true, 1.0F, 1.0F, 1.0F, stamp);
@@ -646,7 +693,7 @@ public final class ChatLineWrapperTest {
      */
     @Test
     public void aTimeWithNoRoomBesideTheNameTakesARowOfItsOwn() {
-        IChatComponent message = LostTalesChatPresentation.build(
+        IChatComponent message = build(
                 ChatPacketFixtures.line(ChatChannel.GLOBAL, "Arathorn", "Ranger", "Well met.")
                         .colors(0x55AA55, 0x336633).skin("losttales:human_ranger_male_2").build());
         List<IChatComponent> open = ChatLineWrapper.wrap(METRICS, message,
@@ -692,7 +739,7 @@ public final class ChatLineWrapperTest {
         root.appendSibling(ChatLayoutMarker.anchor());
         root.appendSibling(text("Rivendell."));
         List<IChatComponent> open = ChatLineWrapper.wrap(METRICS, root, 200,
-                true);
+                true, 1.0F, 1.0F, 1.0F, null);
         assertEquals("Beren> Where to?", plain(open.get(0)));
         int spacer = -1;
         for (Object value : open.get(0)) {
@@ -703,7 +750,7 @@ public final class ChatLineWrapperTest {
         }
         assertEquals(METRICS.width(" "), spacer);
         List<IChatComponent> feed = ChatLineWrapper.wrap(METRICS, root, 200,
-                false);
+                false, 1.0F, 1.0F, 1.0F, null);
         assertEquals("<Beren> Where to?", plain(feed.get(0)));
     }
 
@@ -726,7 +773,7 @@ public final class ChatLineWrapperTest {
         root.appendSibling(ChatLayoutMarker.lineBreak());
         root.appendSibling(ChatLayoutMarker.anchor());
         root.appendSibling(text("Rivendell."));
-        IChatComponent open = ChatLineWrapper.wrap(METRICS, root, 200, true)
+        IChatComponent open = ChatLineWrapper.wrap(METRICS, root, 200, true, 1.0F, 1.0F, 1.0F, null)
                 .get(0);
         IChatComponent first = null;
         boolean bubble = false;
@@ -743,7 +790,7 @@ public final class ChatLineWrapperTest {
         assertEquals(ChatReplyMarker.OPEN_INDENT,
                 LostTalesChatVisualStyle.contentStart(open, true));
         boolean feedBubble = false;
-        for (Object value : ChatLineWrapper.wrap(METRICS, root, 200, false)
+        for (Object value : ChatLineWrapper.wrap(METRICS, root, 200, false, 1.0F, 1.0F, 1.0F, null)
                 .get(0)) {
             feedBubble |= ChatReplyMarker.isIconSlot((IChatComponent)value);
         }
@@ -771,7 +818,7 @@ public final class ChatLineWrapperTest {
     @Test
     public void aLeadingRowStandsAboveTheMessage() {
         List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
-                quoted("to Aldric: hello", "answering"), 400, false);
+                quoted("to Aldric: hello", "answering"), 400, false, 1.0F, 1.0F, 1.0F, null);
         assertNotNull(lines);
         assertEquals(2, lines.size());
         assertEquals("to Aldric: hello", plain(lines.get(0)));
@@ -790,7 +837,7 @@ public final class ChatLineWrapperTest {
         }
         int width = METRICS.width("xxxxxxxxxx");
         List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
-                quoted(quote.toString(), "hi"), width, false);
+                quoted(quote.toString(), "hi"), width, false, 1.0F, 1.0F, 1.0F, null);
         assertNotNull(lines);
         // One row for the cut quote; the message follows on its own.
         assertEquals(10, plain(lines.get(0)).length());
@@ -801,9 +848,14 @@ public final class ChatLineWrapperTest {
     @Test
     public void aLineWithoutABreakIsUnaffected() {
         List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
-                line("Global: ", "hello"), 400, false);
+                line("Global: ", "hello"), 400, false, 1.0F, 1.0F, 1.0F, null);
         assertNotNull(lines);
         assertEquals(1, lines.size());
     }
 
+    /** The line as the chat shows it, filed where its packet says. */
+    private static IChatComponent build(LostTalesChatMessagePacket packet) {
+        return LostTalesChatPresentation.build(packet,
+                LostTalesChatPresentation.fileUnder(packet), new int[0], false);
+    }
 }

@@ -27,7 +27,7 @@ public final class CharacterBodyTypePacketTest {
         CharacterAppearance appearance = new CharacterAppearance(
                 playerId, "Steve123", "Aragorn", "losttales:human",
                 "losttales:male", CharacterSkinRegistry.ACCOUNT_SKIN_ID,
-                true, 0, "lotr:gondor", 7, 87, CharacterBodyTypeRegistry.SLIM,
+                true, 0, "lotr:gondor", 87, CharacterBodyTypeRegistry.SLIM,
                 CharacterChestTypeRegistry.FULL_MEDIUM);
         ByteBuf buffer = Unpooled.buffer();
         try {
@@ -54,17 +54,17 @@ public final class CharacterBodyTypePacketTest {
                 "losttales:female", "losttales:human_bree_female_0",
                 RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
                 RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID,
-                32, "lotr:bree", 1, 0L, 1L,
-                RoleplayCharacter.CURRENT_DATA_VERSION,
+                32, "lotr:bree",
                 CharacterBodyTypeRegistry.WIDE, CharacterChestTypeRegistry.NONE);
         assertEquals(CharacterBodyTypeRegistry.WIDE, summary.getBodyTypeId());
         assertEquals(CharacterChestTypeRegistry.NONE, summary.getChestTypeId());
         CharacterRosterSnapshot snapshot = new CharacterRosterSnapshot(
                 ownerId, CharacterRoster.INITIAL_UNLOCKED_SLOTS,
-                characterId, 1L, CharacterRoster.CURRENT_DATA_VERSION,
+                characterId, 1L,
                 Collections.singletonList(summary),
                 RoleplayCharacter.DEFAULT_SHOW_MINECRAFT_CAPE,
-                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true);
+                RoleplayCharacter.DEFAULT_COSMETIC_CAPE_ID, true,
+                Collections.<com.ninuna.losttales.character.sync.DeletedCharacterSummary>emptyList());
 
         ByteBuf buffer = Unpooled.buffer();
         try {
@@ -83,8 +83,7 @@ public final class CharacterBodyTypePacketTest {
         CharacterSummary unknown = new CharacterSummary(
                 characterId, 0, "Ranger", "losttales:human",
                 "losttales:female", "losttales:human_bree_female_0",
-                true, 0, 32, "lotr:bree", 1, 0L, 1L,
-                RoleplayCharacter.CURRENT_DATA_VERSION, "losttales:huge", "");
+                true, 0, 32, "lotr:bree", "losttales:huge", "");
         assertEquals(CharacterBodyTypeRegistry.SLIM, unknown.getBodyTypeId());
     }
 }

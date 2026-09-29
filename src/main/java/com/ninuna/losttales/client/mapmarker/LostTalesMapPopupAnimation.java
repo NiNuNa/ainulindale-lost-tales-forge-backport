@@ -73,10 +73,6 @@ final class LostTalesMapPopupAnimation {
                 + (mouseY - pivotY - sample.offsetY) / sample.scale);
     }
 
-    static float progress(Object popup) {
-        return sample(popup).progress;
-    }
-
     /** The same eased completion share used by the popup's visual motion. */
     static float easedProgress(Object popup) {
         return sample(popup).easedProgress;
@@ -103,21 +99,18 @@ final class LostTalesMapPopupAnimation {
         float progress = LostTalesGuiEasing.clamp(
                 (now - started) / (float)duration);
         float eased = Motions.curve(MotionIds.MAP_POPUP_OPEN).apply(progress);
-        return new Sample(progress, eased, travel * (1.0F - eased),
+        return new Sample(eased, travel * (1.0F - eased),
                 startScale + (1.0F - startScale) * eased);
     }
 
     private static final class Sample {
         private static final Sample SETTLED =
-                new Sample(1.0F, 1.0F, 0.0F, 1.0F);
-        private final float progress;
+                new Sample(1.0F, 0.0F, 1.0F);
         private final float easedProgress;
         private final float offsetY;
         private final float scale;
 
-        private Sample(float progress, float easedProgress,
-                       float offsetY, float scale) {
-            this.progress = progress;
+        private Sample(float easedProgress, float offsetY, float scale) {
             this.easedProgress = easedProgress;
             this.offsetY = offsetY;
             this.scale = scale;

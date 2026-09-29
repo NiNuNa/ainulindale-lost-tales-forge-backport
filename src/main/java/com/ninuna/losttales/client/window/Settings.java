@@ -717,16 +717,16 @@ public final class Settings {
         @Override
         public List<Setting> settings() {
             List<Setting> windows = new ArrayList<Setting>();
-            windows.add(new Colour("chatBackgroundColor",
+            windows.add(new Colour("windowBackgroundColor",
                     "gui.losttales.window.settings.color.background") {
                 @Override
                 protected String current() {
-                    return LostTalesConfig.chatBackgroundColor;
+                    return LostTalesConfig.windowBackgroundColor;
                 }
 
                 @Override
                 protected void set(String name) {
-                    LostTalesConfig.chatBackgroundColor = name;
+                    LostTalesConfig.windowBackgroundColor = name;
                 }
             });
             // Window Opacity is the game's own chat opacity underneath,
@@ -744,28 +744,28 @@ public final class Settings {
                     options.chatOpacity = share;
                 }
             });
-            windows.add(new ModSwitch("enableChatBackgroundBlur",
+            windows.add(new ModSwitch("windowBackgroundBlur",
                     "gui.losttales.window.settings.blur") {
                 @Override
                 protected boolean get() {
-                    return LostTalesConfig.enableChatBackgroundBlur;
+                    return LostTalesConfig.windowBackgroundBlur;
                 }
 
                 @Override
                 protected void set(boolean on) {
-                    LostTalesConfig.enableChatBackgroundBlur = on;
+                    LostTalesConfig.windowBackgroundBlur = on;
                 }
             });
-            windows.add(new ModSwitch("hideHudWhileChatting",
+            windows.add(new ModSwitch("hideHudWithWindows",
                     "gui.losttales.window.settings.hide_hud") {
                 @Override
                 protected boolean get() {
-                    return LostTalesConfig.hideHudWhileChatting;
+                    return LostTalesConfig.hideHudWithWindows;
                 }
 
                 @Override
                 protected void set(boolean on) {
-                    LostTalesConfig.hideHudWhileChatting = on;
+                    LostTalesConfig.hideHudWithWindows = on;
                 }
             });
             return windows;

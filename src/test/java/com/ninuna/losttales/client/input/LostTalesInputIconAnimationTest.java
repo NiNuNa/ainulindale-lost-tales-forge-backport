@@ -43,39 +43,39 @@ public final class LostTalesInputIconAnimationTest {
                 new LostTalesInputIconAnimation();
 
         assertEquals(LostTalesInputIconAnimation.IDLE_FRAME,
-                animation.frame(false, 1L));
+                animation.pose(false, 1L, Keyboard.KEY_NONE).getFrame());
         assertEquals(LostTalesInputIconAnimation.PRESSED_FRAME,
-                animation.frame(true, 2L));
+                animation.pose(true, 2L, Keyboard.KEY_NONE).getFrame());
         assertEquals(LostTalesInputIconAnimation.PRESSED_FRAME,
-                animation.frame(true, 20_000_000L));
+                animation.pose(true, 20_000_000L, Keyboard.KEY_NONE).getFrame());
     }
 
     @Test
     public void releaseMovesFromThirdThroughSecondToIdle() {
         LostTalesInputIconAnimation animation =
                 new LostTalesInputIconAnimation();
-        animation.frame(true, 1L);
+        animation.pose(true, 1L, Keyboard.KEY_NONE).getFrame();
 
         long released = 10_000_000L;
         assertEquals(LostTalesInputIconAnimation.RELEASE_FRAME,
-                animation.frame(false, released));
+                animation.pose(false, released, Keyboard.KEY_NONE).getFrame());
         assertEquals(LostTalesInputIconAnimation.RELEASE_FRAME,
-                animation.frame(false, released
-                        + LostTalesInputIconAnimation.RELEASE_FRAME_NANOS - 1L));
+                animation.pose(false, released
+                        + LostTalesInputIconAnimation.RELEASE_FRAME_NANOS - 1L, Keyboard.KEY_NONE).getFrame());
         assertEquals(LostTalesInputIconAnimation.IDLE_FRAME,
-                animation.frame(false, released
-                        + LostTalesInputIconAnimation.RELEASE_FRAME_NANOS));
+                animation.pose(false, released
+                        + LostTalesInputIconAnimation.RELEASE_FRAME_NANOS, Keyboard.KEY_NONE).getFrame());
     }
 
     @Test
     public void staleHiddenKeyStateDoesNotAnimateWhenGuiReopens() {
         LostTalesInputIconAnimation animation =
                 new LostTalesInputIconAnimation();
-        animation.frame(true, 1L);
+        animation.pose(true, 1L, Keyboard.KEY_NONE).getFrame();
 
         assertEquals(LostTalesInputIconAnimation.IDLE_FRAME,
-                animation.frame(false,
-                        LostTalesInputIconAnimation.STALE_AFTER_NANOS + 2L));
+                animation.pose(false,
+                        LostTalesInputIconAnimation.STALE_AFTER_NANOS + 2L, Keyboard.KEY_NONE).getFrame());
     }
 
     @Test

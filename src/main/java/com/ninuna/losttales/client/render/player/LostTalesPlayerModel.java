@@ -61,9 +61,6 @@ public final class LostTalesPlayerModel extends ModelBiped {
     private static final int CHESTPLATE_SLOT = 2;
 
     private final PlayerBodyShape shape;
-    private final CharacterSkinLayout layout;
-    private final boolean slim;
-    private final boolean armorTexture;
     private final float bipedArmPivotY;
     private final ModelRenderer[] overlays;
     private final CharacterChestTypeRegistry.Shape chestShape;
@@ -90,9 +87,6 @@ public final class LostTalesPlayerModel extends ModelBiped {
             throw new IllegalArgumentException("shape and layout must not be null");
         }
         this.shape = shape;
-        this.layout = layout;
-        this.slim = slim;
-        this.armorTexture = armorTexture;
         this.bipedArmPivotY = ARM_PIVOT_Y;
         boolean minecraftLayout = !armorTexture
                 && layout == CharacterSkinLayout.MINECRAFT_64X64;
@@ -325,22 +319,6 @@ public final class LostTalesPlayerModel extends ModelBiped {
         this.bipedLeftLeg.mirror = true;
         this.bipedLeftLeg.addBox(-3.0F, 0.0F, -3.0F, 6, 16, 6, inflation);
         this.bipedHeadwear.isHidden = true;
-    }
-
-    public PlayerBodyShape getShape() {
-        return this.shape;
-    }
-
-    public CharacterSkinLayout getLayout() {
-        return this.layout;
-    }
-
-    public boolean isSlim() {
-        return this.slim;
-    }
-
-    public boolean isArmorTexture() {
-        return this.armorTexture;
     }
 
     /** True when a feminine chest is drawn. */

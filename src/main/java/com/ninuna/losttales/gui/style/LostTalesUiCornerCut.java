@@ -95,23 +95,4 @@ public final class LostTalesUiCornerCut {
     public float bandColumn(int band) {
         return this.columns[band];
     }
-
-    /**
-     * Where the picture is cut from on the row at {@code y}: the column
-     * of the band it lies in, or positive infinity where it is whole.
-     */
-    public float cutFrom(float y) {
-        float column = Float.POSITIVE_INFINITY;
-        for (int band = 0; band < this.rows.length; band++) {
-            if (y >= this.rows[band]) {
-                column = this.columns[band];
-            }
-        }
-        return column;
-    }
-
-    /** Whether the pixel whose top-left is {@code x}, {@code y} is cut away. */
-    public boolean cuts(float x, float y) {
-        return x >= cutFrom(y);
-    }
 }

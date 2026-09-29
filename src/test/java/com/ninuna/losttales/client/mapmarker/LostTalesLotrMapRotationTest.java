@@ -6,21 +6,12 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 public final class LostTalesLotrMapRotationTest {
+    /** The furthest the turn goes while a drag pulls past the normal limit. */
+    private static final float MAX_VISUAL_DEGREES =
+            LostTalesLotrMapRotation.MAX_DEGREES
+                    * LostTalesLotrMapRotation.MAX_VISUAL_LEAN;
     private static final float CENTER_X = 320.0F;
     private static final float CENTER_Y = 180.0F;
-
-    @Test
-    public void rotationIsClampedToItsOwnBounds() {
-        assertEquals(LostTalesLotrMapRotation.MAX_DEGREES,
-                LostTalesLotrMapRotation.clampDegrees(120.0F), 0.0F);
-        assertEquals(-LostTalesLotrMapRotation.MAX_DEGREES,
-                LostTalesLotrMapRotation.clampDegrees(-120.0F), 0.0F);
-        assertEquals(20.0F,
-                LostTalesLotrMapRotation.clampDegrees(20.0F), 0.0F);
-        // A malformed angle must not lock the map at an angle it cannot leave.
-        assertEquals(0.0F,
-                LostTalesLotrMapRotation.clampDegrees(Float.NaN), 0.0F);
-    }
 
     /** Square is a detent: a small drag either side of it turns nothing. */
     @Test
@@ -90,9 +81,9 @@ public final class LostTalesLotrMapRotationTest {
                 LostTalesLotrMapRotation.degreesForInput(-1.0F), 0.001F);
         assertTrue(LostTalesLotrMapRotation.degreesForInput(1.1F)
                 > LostTalesLotrMapRotation.MAX_DEGREES);
-        assertEquals(LostTalesLotrMapRotation.MAX_VISUAL_DEGREES,
+        assertEquals(MAX_VISUAL_DEGREES,
                 LostTalesLotrMapRotation.degreesForInput(4.0F), 0.001F);
-        assertEquals(-LostTalesLotrMapRotation.MAX_VISUAL_DEGREES,
+        assertEquals(-MAX_VISUAL_DEGREES,
                 LostTalesLotrMapRotation.degreesForInput(-4.0F), 0.001F);
     }
 
@@ -606,9 +597,9 @@ public final class LostTalesLotrMapRotationTest {
                 LostTalesLotrMapRotation.pitchDegrees(1.0F), 0.0001F);
         // Dragging may briefly pass the normal limit, but never its visual
         // safety bound, and both axes get the same amount of overshoot.
-        assertEquals(LostTalesLotrMapRotation.MAX_VISUAL_DEGREES,
+        assertEquals(MAX_VISUAL_DEGREES,
                 LostTalesLotrMapRotation.pitchDegrees(4.0F), 0.0001F);
-        assertEquals(LostTalesLotrMapRotation.MAX_VISUAL_DEGREES,
+        assertEquals(MAX_VISUAL_DEGREES,
                 Math.abs(LostTalesLotrMapRotation.degreesForInput(-9.0F)),
                 0.001F);
         assertEquals(LostTalesLotrMapRotation.MAX_VISUAL_LEAN,

@@ -70,11 +70,6 @@ public class LostTalesBlockUrnTall extends LostTalesBlockUrnBase {
     }
 
     @Override
-    public boolean isTallUrn() {
-        return true;
-    }
-
-    @Override
     protected int[] getBottomCoords(World world, int x, int y, int z) {
         if (world.getBlockMetadata(x, y, z) == UPPER_PART_METADATA) {
             return world.getBlock(x, y - 1, z) == this ? new int[]{x, y - 1, z} : null;

@@ -65,9 +65,9 @@ public final class LostTalesQuestShareJoinPacket implements IMessage {
                                 int tokenIndex) {
         ChatHistory.QuestShareClaim claim = ChatHistory.questShareFor(
                 messageId, tokenIndex,
-                LostTalesChatService.historyRequesterFor(player));
+                LostTalesChatService.requesterFor(player));
         Party party = PartyService.getInstance()
-                .getPartyForActiveCharacter(player);
+                .getPartyForActiveIdentity(player);
         if (claim == null || claim.authorId == null || party == null
                 || !party.hasMemberOwnedBy(claim.authorId)
                 || LotrQuestReference.isLotrQuest(

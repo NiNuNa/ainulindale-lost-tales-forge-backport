@@ -87,6 +87,14 @@ public final class CharacterNameProfanityValidationTest {
         assertTrue(validate("Glorfin").isValid());
     }
 
+    @Test
+    public void nobodyTakesTheNameOfTheChatsOwnVoices() {
+        assertEquals(CharacterErrorId.NAME_RESERVED,
+                validate("Server").getErrorId());
+        assertEquals(CharacterErrorId.NAME_RESERVED,
+                validate("narrator").getErrorId());
+    }
+
     private static CharacterAppearanceValidationResult validate(String name) {
         return CharacterValidator.validateAppearance(
                 new CharacterRoster(OWNER), null, null,

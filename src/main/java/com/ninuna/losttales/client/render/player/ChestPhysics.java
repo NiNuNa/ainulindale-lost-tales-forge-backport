@@ -80,11 +80,6 @@ public final class ChestPhysics {
         return this.previousY + (this.positionY - this.previousY) * clamp(partialTick, 0.0F, 1.0F);
     }
 
-    public boolean isAtRest() {
-        return this.positionX == 0.0F && this.positionY == 0.0F
-                && this.velocityX == 0.0F && this.velocityY == 0.0F;
-    }
-
     private static boolean isNegligible(float value) {
         return Math.abs(value) < REST_EPSILON;
     }

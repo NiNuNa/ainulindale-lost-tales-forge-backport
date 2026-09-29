@@ -40,9 +40,9 @@ public final class ChatAccountRoleResolverTest {
 
     private static ChatRoleCatalog catalogue(Set<UUID> accounts, Set<UUID> characters) {
         ChatAccountRole moderator = ChatAccountRole.custom("moderator", "Moderator",
-                "", 0xA94B54, true, 15, null, null);
+                "", 0xA94B54, true, 15, null, null, null);
         ChatAccountRole herald = ChatAccountRole.custom("herald", "Herald", "",
-                0x112233, true, 30, null, null);
+                0x112233, true, 30, null, null, null);
         Map<String, Set<UUID>> accountMembers = new LinkedHashMap<String, Set<UUID>>();
         if (accounts != null) {
             accountMembers.put("moderator", accounts);
@@ -68,9 +68,9 @@ public final class ChatAccountRoleResolverTest {
     @Test
     public void anAbsentAccountHoldsItsAssignmentsAndItsOperatorLevel() {
         ChatAccountRole staff = ChatAccountRole.custom("staff", "Staff", "",
-                0x112233, true, 10, Arrays.asList(ChatRoleSource.opLevel(2)));
+                0x112233, true, 10, Arrays.asList(ChatRoleSource.opLevel(2)), null, null);
         ChatAccountRole anyOperator = ChatAccountRole.custom("op0", "Op", "",
-                0x223344, true, 20, Arrays.asList(ChatRoleSource.opLevel(0)));
+                0x223344, true, 20, Arrays.asList(ChatRoleSource.opLevel(0)), null, null);
         Map<String, Set<UUID>> characterMembers = new LinkedHashMap<String, Set<UUID>>();
         characterMembers.put("staff", setOf(ALDRIC));
         ChatRoleCatalog catalog = ChatRoleCatalog.of(Arrays.asList(staff, anyOperator),

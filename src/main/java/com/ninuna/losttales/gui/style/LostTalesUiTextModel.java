@@ -57,10 +57,6 @@ public final class LostTalesUiTextModel {
         return this.caret;
     }
 
-    public int anchor() {
-        return this.anchor;
-    }
-
     public boolean hasSelection() {
         return this.caret != this.anchor;
     }

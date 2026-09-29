@@ -39,7 +39,6 @@ import lotr.common.world.map.LOTRAbstractWaypoint;
 import lotr.common.world.map.LOTRCustomWaypoint;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
@@ -1093,12 +1092,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             List<MarkerRenderCandidate> candidates,
             LostTalesMapMarkerGrouping.Result result,
             LostTalesMapMarkerRenderedGeometry.Frame geometry) {
-        ScaledResolution resolution = new ScaledResolution(
-                context.minecraft,
-                context.minecraft.displayWidth,
-                context.minecraft.displayHeight);
-        geometry.begin(context.gui, context.zoomExp,
-                resolution.getScaleFactor(), candidates.size());
+        geometry.begin(candidates.size());
         // One scratch pair for the whole frame; every travelling position is
         // solved into it and read straight back out.
         float[] point = new float[2];
@@ -1108,9 +1102,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             MarkerRenderCandidate representative =
                     candidates.get(representativeIndex);
             LostTalesMapMarkerRenderedGeometry.RenderedObject object =
-                    geometry.beginObject(
-                            representative.marker.getId(),
-                            representativeIndex, group.size());
+                    geometry.beginObject(representativeIndex);
             // The fan is laid out around the marker leading it, so its spacing
             // follows that icon's artwork rather than a fixed pixel count.
             LostTalesCompassMarkerIcon leaderIcon =
@@ -1178,9 +1170,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                 }
                 LostTalesCompassMarkerIcon icon =
                         getMarkerIcon(candidate.marker);
-                geometry.addMember(object,
-                        candidateIndex, markerId,
-                        candidate.position.x, candidate.position.y,
+                geometry.addMember(object, candidateIndex,
                         finalX, finalY,
                         artHalfWidth(icon, drawSize),
                         artAbove(icon, drawSize),
@@ -1593,7 +1583,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                         continue;
                     }
                     PartyMemberSnapshot member = partyState.getParty()
-                            .getMember(tracked.getCharacterId());
+                            .getMember(tracked.getIdentityId());
                     if (member == null
                             || !renderedOwners.add(member.getOwnerId())) {
                         continue;
@@ -2557,19 +2547,6 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         }
     }
 
-    /**
-     * Whether the pointer is on a marker that is standing in for several.
-     *
-     * <p>A stack is opened before its members are used: it claims the click
-     * so nothing is dropped underneath it, but a member only becomes
-     * actionable once a double click has framed the stack and the markers
-     * stand apart.</p>
-     */
-    public static boolean isClusterUnderPointer(
-            LOTRGuiMap gui, int mouseX, int mouseY) {
-        return findClusterUnderPointer(gui, mouseX, mouseY) != null;
-    }
-
     /** The stack under the pointer, or null unless it holds several markers. */
     private static LostTalesMapMarkerGrouping.Group
     findClusterUnderPointer(LOTRGuiMap gui, int mouseX, int mouseY) {
@@ -2635,21 +2612,6 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         }
     }
 
-    public static LOTRAbstractWaypoint getSelectedWaypoint(
-            LOTRGuiMap gui) {
-        if (gui == null || !ensureReflection()
-                || selectedWaypointField == null) {
-            return null;
-        }
-        try {
-            Object selected = selectedWaypointField.get(gui);
-            return selected instanceof LOTRAbstractWaypoint
-                    ? (LOTRAbstractWaypoint)selected : null;
-        } catch (Throwable ignored) {
-            return null;
-        }
-    }
-
     /**
      * Clears native interaction state that no longer has an authoritative
      * visible marker. The decorative catalog still identifies deleted native
@@ -2698,11 +2660,6 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     private static LostTalesMapMarkerData getReplacementMarker(LOTRAbstractWaypoint waypoint) {
         LostTalesMapMarkerData marker = getMappedMarker(waypoint);
         return isReplacementMarkerEligible(marker) ? marker : null;
-    }
-
-    public static LostTalesMapMarkerData getMarkerForWaypoint(
-            LOTRAbstractWaypoint waypoint) {
-        return getMappedMarker(waypoint);
     }
 
     private static LostTalesMapMarkerData getMappedMarker(LOTRAbstractWaypoint waypoint) {
@@ -3127,7 +3084,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
             }
         }
         return new EnemyMarkerPosition(
-                trackedEnemy.getEntityId(), name, x, y, z);
+                trackedEnemy.getEntityId(), name, x, z);
     }
 
     private static double getTransientEnemyDisplayRadiusSq() {
@@ -3792,8 +3749,6 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         float getExitOffsetX() { return this.exitOffsetX; }
         float getExitOffsetY() { return this.exitOffsetY; }
         boolean isLeavingStack() { return this.leavingStack; }
-        float getStackOffsetX() { return this.stackOffsetX; }
-        float getStackOffsetY() { return this.stackOffsetY; }
         float getHandoverProgress() { return this.handoverProgress; }
     }
 
@@ -3908,16 +3863,14 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         private final int entityId;
         private final String name;
         private final double x;
-        private final double y;
         private final double z;
 
         private EnemyMarkerPosition(int entityId, String name,
-                                    double x, double y, double z) {
+                                    double x, double z) {
             this.entityId = entityId;
             this.name = name == null || name.length() == 0
                     ? "Enemy" : name;
             this.x = x;
-            this.y = y;
             this.z = z;
         }
     }

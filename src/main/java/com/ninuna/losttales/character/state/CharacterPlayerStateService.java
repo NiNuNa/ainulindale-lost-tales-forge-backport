@@ -295,18 +295,6 @@ public final class CharacterPlayerStateService {
         return snapshot;
     }
 
-    public void apply(EntityPlayerMP player,
-                      RoleplayCharacter character,
-                      CharacterPlayerStateSnapshot snapshot)
-            throws CharacterStateValidationException {
-        if (player == null || character == null) {
-            throw new CharacterStateValidationException(
-                    "Target character and snapshot do not match");
-        }
-        apply(player, PlayableIdentity.character(player.getUniqueID(),
-                character.getCharacterId()), character, snapshot);
-    }
-
     /**
      * Puts the snapshot on the live player as the given identity. The
      * character is the identity's own, or null for the account, whose race
@@ -448,7 +436,7 @@ public final class CharacterPlayerStateService {
             if (character != null && component == this.lotrProgressionComponent) {
                 // A character made in the roster names the faction it starts
                 // with, and starts with alignment for it. Unaligned is
-                // nobody's chosen side: it is the default character's, the
+                // nobody's chosen side: it is the account character's, the
                 // identity that was already being played, so its progression
                 // is whatever that player had, and clean progression is the
                 // right blank for it.

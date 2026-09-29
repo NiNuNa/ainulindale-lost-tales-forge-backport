@@ -72,7 +72,7 @@ public final class LostTalesHudFade {
      * client has not turned this off.
      */
     static boolean chatWantsWorld(Minecraft minecraft) {
-        return LostTalesConfig.hideHudWhileChatting && minecraft != null
+        return LostTalesConfig.hideHudWithWindows && minecraft != null
                 && minecraft.currentScreen instanceof GuiChat
                 && !(minecraft.currentScreen instanceof GuiSleepMP);
     }

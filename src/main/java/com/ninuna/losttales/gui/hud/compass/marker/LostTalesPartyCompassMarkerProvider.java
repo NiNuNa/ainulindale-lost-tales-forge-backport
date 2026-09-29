@@ -12,7 +12,7 @@ import java.util.Collections;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 
-/** Client-only compass projection of character and party tracking data. */
+/** Client-only compass projection of the party members' positions and the go-here markers. */
 public final class LostTalesPartyCompassMarkerProvider
         implements LostTalesCompassMarkerProvider {
 
@@ -38,25 +38,25 @@ public final class LostTalesPartyCompassMarkerProvider
                 continue;
             }
             result.add(LostTalesCompassMarker.persistentPositionWithStateKey(
-                    "party_member:" + member.getCharacterId(),
+                    "party_member:" + member.getIdentityId(),
                     member.getCharacterName(),
                     ClientPartyTrackingCache.partyIcon(member.getColor()),
                     member.getX(), member.getY(), member.getZ(),
                     true, true,
                     LostTalesConfig.partyCompassMarkerFadeRadius,
-                    member.getColor().getId()));
+                    member.getColor().getTint()));
         }
         for (PartyGoHereMarkerSnapshot marker : tracking.getGoHereMarkers()) {
             if (marker.getDimensionId() != dimensionId) {
                 continue;
             }
             result.add(LostTalesCompassMarker.alwaysVisiblePositionWithStateKey(
-                    "party_go_here:" + marker.getOwnerCharacterId(),
+                    "party_go_here:" + marker.getOwnerIdentityId(),
                     marker.getOwnerCharacterName(),
                     LostTalesCompassMarkerIcon.QUEST,
                     marker.getX(), marker.getY(), marker.getZ(),
                     true, true,
-                    marker.getOwnerColor().getId()));
+                    marker.getOwnerColor().getTint()));
         }
         return result;
     }

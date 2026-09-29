@@ -23,7 +23,7 @@ public final class ClientChatRoleSplitTest {
     @Before
     public void setUp() {
         ChatRoleCatalog.install(ChatRoleFixtures.catalogue());
-        this.operator = ChatAccountRole.maskOf(ChatRoleFixtures.OPERATOR);
+        this.operator = ChatRoleFixtures.maskOf(ChatRoleFixtures.OPERATOR);
         this.team = ChatAccountRole.TEAM.bit();
     }
 

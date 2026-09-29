@@ -70,11 +70,6 @@ final class ChatReactionMarker {
 
     private ChatReactionMarker() {}
 
-    static ChatComponentText create(ChatEmoji emoji, int count, boolean mine,
-                                    long messageId, int countWidth) {
-        return create(emoji.getName(), count, mine, messageId, countWidth);
-    }
-
     /** A chip for the emoji with reaction key {@code emoji}. */
     static ChatComponentText create(String emoji, int count, boolean mine,
                                     long messageId, int countWidth) {

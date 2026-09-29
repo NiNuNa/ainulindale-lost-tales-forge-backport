@@ -81,7 +81,8 @@ public final class LostTalesInputIconAtlasTest {
             assertNotNull(sprite);
             assertEquals(sprite.getWidth(),
                     sprite.getGlyphWidth() + sprite.getGlyphOffsetX() * 2);
-            int lastFrame = sprite.getFrameCount() - 1;
+            // A frame past the strip is read as its last one.
+            int lastFrame = Integer.MAX_VALUE;
             assertTrue(sprite.getU(lastFrame) + sprite.getWidth()
                     <= LostTalesInputIconAtlas.TEXTURE_WIDTH);
             assertTrue(sprite.getGlyphV() + sprite.getGlyphHeight()

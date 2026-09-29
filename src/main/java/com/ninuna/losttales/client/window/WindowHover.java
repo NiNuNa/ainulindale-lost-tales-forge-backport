@@ -33,7 +33,7 @@ public class WindowHover {
         SNAP_LAYOUT,
         /** A card of snap assist, offering a window for an empty zone. */
         SNAP_ASSIST,
-        /** A page in a window: the journal, the party. */
+        /** A page in a window: the journal, the map, a waystone, any tab that is not a conversation. */
         PAGE,
         /** A page's input bar: one of its items, a row of its field's list, or the bare bar. */
         BAR,
@@ -119,10 +119,12 @@ public class WindowHover {
                 // locked; a locked one is inert.
                 return this.window != null && !this.window.isLocked();
             case TOOL_STRIP:
-                // Every control acts; the field takes the caret without
-                // a hand.
+                // Every control acts but a greyed one; the field takes
+                // the caret without a hand.
                 return this.stripPart != null
-                        && this.stripPart != ToolStrip.Part.FIELD;
+                        && this.stripPart != ToolStrip.Part.FIELD
+                        && ToolStrip.greyedWhy(this.stripPart,
+                                this.window).length() == 0;
             case SNAP_LAYOUT:
                 return this.snapZone >= 0;
             case SNAP_ASSIST:

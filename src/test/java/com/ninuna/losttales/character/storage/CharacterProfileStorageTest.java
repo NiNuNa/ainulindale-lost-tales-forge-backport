@@ -60,8 +60,6 @@ public final class CharacterProfileStorageTest {
         RoleplayCharacter loaded = CharacterNbtCodec.readCharacterRecord(
                 record, OWNER);
         assertNotNull(loaded);
-        assertEquals(RoleplayCharacter.CURRENT_DATA_VERSION,
-                loaded.getDataVersion());
         assertEquals(CharacterProfile.EMPTY, loaded.getProfile());
     }
 

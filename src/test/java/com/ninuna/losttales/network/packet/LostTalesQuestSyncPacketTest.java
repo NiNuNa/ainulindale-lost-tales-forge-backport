@@ -75,8 +75,9 @@ public final class LostTalesQuestSyncPacketTest {
         assertEquals(1, decoded.getActiveQuests().size());
         assertEquals(3, decoded.getActiveQuests().get(0)
                 .getObjectiveProgress("collect"));
-        assertEquals(Collections.singleton("losttales:completed"),
-                decoded.getCompletedQuestIds());
+        assertEquals("losttales:completed",
+                decoded.getQuestHistory().get(0).getQuestId());
+        assertTrue(decoded.getQuestHistory().get(0).isCompleted());
         assertTrue(decoded.getQuestHistory().get(1).isFailed());
         assertEquals("Time limit expired.",
                 decoded.getQuestHistory().get(1).getDetail());
@@ -119,7 +120,7 @@ public final class LostTalesQuestSyncPacketTest {
         decoded.fromBytes(buffer);
 
         assertTrue(decoded.isMalformed());
-        assertTrue(decoded.getCompletedQuestIds().isEmpty());
+        assertTrue(decoded.getQuestHistory().isEmpty());
     }
 
     @Test

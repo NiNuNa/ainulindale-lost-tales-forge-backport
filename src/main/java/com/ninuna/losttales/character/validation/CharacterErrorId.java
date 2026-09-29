@@ -70,6 +70,11 @@ public enum CharacterErrorId {
     DELETE_PLAYER_STATE_INVALID("delete_player_state_invalid"),
     DELETE_RECOVERY_LIMIT("delete_recovery_limit"),
     DELETE_RECOVERY_REQUIRED("delete_recovery_required"),
+    RESTORE_NOT_ALLOWED("restore_not_allowed"),
+    RESTORE_NOT_FOUND("restore_not_found"),
+    RESTORE_NO_SLOT("restore_no_slot"),
+    RESTORE_STATE_UNAVAILABLE("restore_state_unavailable"),
+    RESTORE_STORAGE_READ_ONLY("restore_storage_read_only"),
     LORE_CHARACTER_UNKNOWN("lore_character_unknown"),
     LORE_CHARACTER_UNAVAILABLE("lore_character_unavailable"),
     LORE_CHARACTER_ALREADY_OWNED("lore_character_already_owned"),
@@ -77,6 +82,7 @@ public enum CharacterErrorId {
     LORE_CHARACTER_ACTIVE("lore_character_active"),
     LORE_CHARACTER_CANNOT_DELETE("lore_character_cannot_delete"),
     LORE_CHARACTER_CANNOT_EDIT("lore_character_cannot_edit"),
+    LORE_CHARACTER_KEEPS_LOOK("lore_character_keeps_look"),
     LORE_CHARACTER_STALE_OWNERSHIP("lore_character_stale_ownership"),
     LORE_CHARACTER_TRANSFER_IN_PROGRESS("lore_character_transfer_in_progress"),
     LORE_CHARACTER_TRANSFER_STORAGE_READ_ONLY("lore_character_transfer_storage_read_only"),
@@ -88,6 +94,7 @@ public enum CharacterErrorId {
     PARTY_CLEANUP_FAILED("party_cleanup_failed"),
     CAPE_UPDATE_NOT_ALLOWED("cape_update_not_allowed"),
     PROFILE_UPDATE_NOT_ALLOWED("profile_update_not_allowed"),
+    LOOK_UPDATE_NOT_ALLOWED("look_update_not_allowed"),
     INTERNAL_ERROR("internal_error");
 
     private final String id;

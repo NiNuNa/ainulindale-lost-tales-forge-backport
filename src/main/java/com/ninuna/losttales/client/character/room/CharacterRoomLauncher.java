@@ -22,7 +22,7 @@ import net.minecraft.world.storage.ISaveFormat;
  * list never keeps it. A fresh world makes the account's default
  * character and takes the account's template for it, exactly as any
  * other new world does, which is what stands the player in the room
- * already looking like their default character.</p>
+ * already looking like their account character.</p>
  *
  * <p>Adventure mode, so the player is placed exactly at the layout's
  * spawn and cannot dig; the room's own handler guards the rest.</p>

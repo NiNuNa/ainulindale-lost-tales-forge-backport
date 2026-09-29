@@ -69,12 +69,19 @@ public final class ChatAuditLog {
         failedThisSession = false;
     }
 
+    /**
+     * A line said in a channel, recorded as the event {@code message}; an
+     * {@code action} ({@code /me}) is recorded as the event
+     * {@code action}, its text the words the speaker's name opens.
+     */
     public static void logMessage(long messageId, String channel,
                                   UUID account, String accountName,
                                   UUID characterId, String identityName,
-                                  String whisperTarget, String text) {
-        append("message", messageId, account, accountName, characterId,
-                identityName, channel, whisperTarget, text);
+                                  String whisperTarget, String text,
+                                  boolean action) {
+        append(action ? "action" : "message", messageId, account,
+                accountName, characterId, identityName, channel,
+                whisperTarget, text);
     }
 
     /**
@@ -89,6 +96,20 @@ public final class ChatAuditLog {
                                          String text) {
         append("discord_message", messageId, senderId, displayName, null,
                 "", channel, "", text);
+    }
+
+    /** A Discord member's edit of their line, under the member's sender id and name. */
+    public static void logDiscordEdit(long messageId, UUID senderId,
+                                      String displayName, String text) {
+        append("discord_edit", messageId, senderId, displayName, null, "", "",
+                "", text);
+    }
+
+    /** A Discord member's deletion of their line. */
+    public static void logDiscordDelete(long messageId, UUID senderId,
+                                        String displayName) {
+        append("discord_delete", messageId, senderId, displayName, null, "",
+                "", "", "");
     }
 
     public static void logEdit(long messageId, UUID account,

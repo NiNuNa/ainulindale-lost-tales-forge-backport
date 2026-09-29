@@ -83,19 +83,19 @@ public final class ChatLayoutTest {
         assertEquals(1, WindowLayout.windows().size());
         Window window = WindowLayout.firstWindow();
         assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.OOC),
-                ChatTab.channelsOf(window));
-        assertEquals(ChatChannel.GLOBAL, ChatTab.frontChannelOf(window));
+                ChatLayoutViews.channelsOf(window));
+        assertEquals(ChatChannel.GLOBAL, ChatLayoutViews.frontChannelOf(window));
         assertEquals(Window.ScreenFill.BOTTOM_LEFT, window.getFill());
         assertEquals(Arrays.asList(ChatChannel.PROXIMITY, ChatChannel.FACTION,
                 ChatChannel.PARTY, ChatChannel.OPERATOR,
                 ChatChannel.CLIENT_CONSOLE, ChatChannel.SERVER_CONSOLE),
                 ChatLayout.closedChannels());
-        assertFalse(ChatLayout.isHidden(ChatChannel.PROXIMITY));
-        assertFalse(ChatLayout.isHidden(ChatChannel.FACTION));
-        assertFalse(ChatLayout.isHidden(ChatChannel.PARTY));
-        assertTrue(ChatLayout.isHidden(ChatChannel.OPERATOR));
-        assertTrue(ChatLayout.isHidden(ChatChannel.CLIENT_CONSOLE));
-        assertTrue(ChatLayout.isHidden(ChatChannel.SERVER_CONSOLE));
+        assertFalse(ChatLayout.isHidden(ChatTab.of(ChatChannel.PROXIMITY)));
+        assertFalse(ChatLayout.isHidden(ChatTab.of(ChatChannel.FACTION)));
+        assertFalse(ChatLayout.isHidden(ChatTab.of(ChatChannel.PARTY)));
+        assertTrue(ChatLayout.isHidden(ChatTab.of(ChatChannel.OPERATOR)));
+        assertTrue(ChatLayout.isHidden(ChatTab.of(ChatChannel.CLIENT_CONSOLE)));
+        assertTrue(ChatLayout.isHidden(ChatTab.of(ChatChannel.SERVER_CONSOLE)));
         // The closed-chat feed starts where vanilla draws the chat.
         assertEquals(0.0D, ChatLayout.feedOffsetX(), 0.0D);
         assertEquals(100.0D, ChatLayout.feedOffsetY(), 0.0D);
@@ -104,10 +104,10 @@ public final class ChatLayoutTest {
         WindowLayoutStore.load(written);
         assertEquals(1, WindowLayout.windows().size());
         assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.OOC),
-                ChatTab.channelsOf(WindowLayout.firstWindow()));
+                ChatLayoutViews.channelsOf(WindowLayout.firstWindow()));
         assertEquals(Window.ScreenFill.BOTTOM_LEFT,
                 WindowLayout.firstWindow().getFill());
-        assertTrue(ChatLayout.isHidden(ChatChannel.SERVER_CONSOLE));
+        assertTrue(ChatLayout.isHidden(ChatTab.of(ChatChannel.SERVER_CONSOLE)));
         assertFalse(ChatLayout.isOpen(ChatChannel.PROXIMITY));
         assertEquals(written, WindowLayoutStore.describe());
     }
@@ -120,13 +120,13 @@ public final class ChatLayoutTest {
         assertEquals("w1", console.getId());
         assertEquals(Arrays.asList(ChatChannel.CLIENT_CONSOLE,
                 ChatChannel.SERVER_CONSOLE, ChatChannel.OPERATOR),
-                ChatTab.channelsOf(console));
+                ChatLayoutViews.channelsOf(console));
         Window conversation = WindowLayout.windows().get(1);
         assertEquals("w2", conversation.getId());
         assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.PROXIMITY,
                 ChatChannel.FACTION, ChatChannel.OOC,
-                ChatChannel.PARTY), ChatTab.channelsOf(conversation));
-        assertEquals(ChatChannel.GLOBAL, ChatTab.frontChannelOf(conversation));
+                ChatChannel.PARTY), ChatLayoutViews.channelsOf(conversation));
+        assertEquals(ChatChannel.GLOBAL, ChatLayoutViews.frontChannelOf(conversation));
         assertTrue(ChatLayout.closedChannels().isEmpty());
         ChatLayout.setFeedPosition(40.0D, -3.0D, true);
         assertEquals(40.0D, ChatLayout.feedOffsetX(), 0.0D);
@@ -135,65 +135,70 @@ public final class ChatLayoutTest {
 
     @Test
     public void closeRestoreAndMuteKeepIdentityAndNotifyTheStore() {
-        assertTrue(ChatLayout.close(ChatChannel.OPERATOR));
+        assertTrue(ChatLayout.close(ChatTab.of(ChatChannel.OPERATOR)));
         assertFalse(ChatLayout.isOpen(ChatChannel.OPERATOR));
-        assertNull(ChatLayout.windowOf(ChatChannel.OPERATOR));
+        assertNull(WindowLayout.windowOf(ChatTab.of(ChatChannel.OPERATOR)));
         assertEquals(Collections.singletonList(ChatChannel.OPERATOR),
                 ChatLayout.closedChannels());
         assertEquals(1, this.changes);
         // Closing again is a no-op; restoring lands in the first window.
-        assertFalse(ChatLayout.close(ChatChannel.OPERATOR));
-        assertTrue(ChatLayout.restore(ChatChannel.OPERATOR));
-        List<ChatChannel> tabs = ChatTab.channelsOf(WindowLayout.firstWindow());
+        assertFalse(ChatLayout.close(ChatTab.of(ChatChannel.OPERATOR)));
+        assertTrue(ChatLayoutViews.reopen(ChatChannel.OPERATOR));
+        List<ChatChannel> tabs = ChatLayoutViews.channelsOf(WindowLayout.firstWindow());
         assertEquals(ChatChannel.OPERATOR, tabs.get(tabs.size() - 1));
         assertEquals(ChatChannel.OPERATOR,
-                ChatTab.frontChannelOf(WindowLayout.firstWindow()));
-        assertFalse(ChatLayout.restore(ChatChannel.OPERATOR));
+                ChatLayoutViews.frontChannelOf(WindowLayout.firstWindow()));
+        assertFalse(ChatLayoutViews.reopen(ChatChannel.OPERATOR));
         assertEquals(2, this.changes);
 
-        ChatLayout.setMuted(ChatChannel.OOC, true);
+        ChatLayout.setNotification(ChatTab.of(ChatChannel.OOC), ChatNotification.NOTHING);
         assertTrue(ChatLayout.isMuted(ChatChannel.OOC));
         assertTrue(ChatLayout.isOpen(ChatChannel.OOC));
-        ChatLayout.setMuted(ChatChannel.OOC, false);
+        ChatLayout.setNotification(ChatTab.of(ChatChannel.OOC),
+                ChatNotification.EVERYTHING);
         assertFalse(ChatLayout.isMuted(ChatChannel.OOC));
         assertEquals(4, this.changes);
     }
 
     /**
-     * Open, muted and closed are three separate things: closing a tab
-     * neither mutes nor unmutes it, and the setting is still there when
-     * the channel comes back.
+     * Open, the notification choice and closed are separate things:
+     * closing a tab leaves its choice alone, and the choice is still
+     * there when the channel comes back.
      */
     @Test
-    public void closingNeverTouchesMuteAndMuteSurvivesRestore() {
-        ChatLayout.setMuted(ChatChannel.PARTY, true);
-        assertTrue(ChatLayout.close(ChatChannel.PARTY));
-        assertTrue(ChatLayout.isMuted(ChatChannel.PARTY));
+    public void closingNeverTouchesTheChoiceAndItSurvivesRestore() {
+        ChatLayout.setNotification(ChatTab.of(ChatChannel.PARTY), ChatNotification.NOTHING);
+        assertTrue(ChatLayout.close(ChatTab.of(ChatChannel.PARTY)));
+        assertEquals(ChatNotification.NOTHING,
+                ChatLayout.notification(ChatTab.of(ChatChannel.PARTY)));
         assertFalse(ChatLayout.isOpen(ChatChannel.PARTY));
-        assertTrue(ChatLayout.restore(ChatChannel.PARTY));
-        assertTrue(ChatLayout.isMuted(ChatChannel.PARTY));
-        assertTrue(ChatLayout.close(ChatChannel.OOC));
-        assertFalse(ChatLayout.isMuted(ChatChannel.OOC));
-        assertTrue(ChatLayout.restore(ChatChannel.OOC));
-        assertFalse(ChatLayout.isMuted(ChatChannel.OOC));
-        // Muting a closed channel is allowed and is kept for its return.
-        assertTrue(ChatLayout.close(ChatChannel.OOC));
-        ChatLayout.setMuted(ChatChannel.OOC, true);
-        assertTrue(ChatLayout.isMuted(ChatChannel.OOC));
-        assertTrue(ChatLayout.restore(ChatChannel.OOC));
-        assertTrue(ChatLayout.isMuted(ChatChannel.OOC));
+        assertTrue(ChatLayoutViews.reopen(ChatChannel.PARTY));
+        assertEquals(ChatNotification.NOTHING,
+                ChatLayout.notification(ChatTab.of(ChatChannel.PARTY)));
+        assertTrue(ChatLayout.close(ChatTab.of(ChatChannel.OOC)));
+        assertEquals(ChatNotification.EVERYTHING,
+                ChatLayout.notification(ChatTab.of(ChatChannel.OOC)));
+        assertTrue(ChatLayoutViews.reopen(ChatChannel.OOC));
+        assertEquals(ChatNotification.EVERYTHING,
+                ChatLayout.notification(ChatTab.of(ChatChannel.OOC)));
+        // Choosing for a closed channel is allowed and kept for its return.
+        assertTrue(ChatLayout.close(ChatTab.of(ChatChannel.OOC)));
+        ChatLayout.setNotification(ChatTab.of(ChatChannel.OOC),
+                ChatNotification.ONLY_MENTIONS);
+        assertTrue(ChatLayoutViews.reopen(ChatChannel.OOC));
+        assertEquals(ChatNotification.ONLY_MENTIONS,
+                ChatLayout.notification(ChatTab.of(ChatChannel.OOC)));
     }
 
     /**
      * Moving the closed-chat feed, which is all the HUD placement editor
-     * does with the chat layout, moves no window and breaks no link, and
-     * reaches the store only when the caller asks for it.
+     * does with the chat layout, moves no window, and reaches the store
+     * only when the caller asks for it.
      */
     @Test
     public void movingTheFeedLeavesEveryWindowAlone() {
         Window console = WindowLayout.window("w1");
         Window conversation = WindowLayout.window("w2");
-        assertTrue(WindowLayout.link("w2", "w1", false));
         this.changes = 0;
 
         ChatLayout.setFeedPosition(35.0D, 60.0D, false);
@@ -208,48 +213,59 @@ public final class ChatLayoutTest {
         assertEquals(0.0D, console.getOffsetY(), 0.0D);
         assertEquals(0.0D, conversation.getOffsetX(), 0.0D);
         assertEquals(100.0D, conversation.getOffsetY(), 0.0D);
-        assertEquals("w1", conversation.getLinkTarget());
-        assertFalse(console.isLinked());
     }
 
     /**
-     * Mute (out of the feed) and mention-mute (cue silent) are two
-     * independent preferences: each changes only its own half, both
-     * survive closing, and both travel with the store.
+     * One choice per conversation decides what reaches the player while
+     * they are not reading it: Everything by default, Only Mentions or
+     * Nothing. It answers for the conversation's row entry, so a line's
+     * own tab asks the same question; setting what is already set is no
+     * change; a whisper keeps its choice past the session, an NPC
+     * conversation's goes with it.
      */
     @Test
-    public void muteAndMentionMuteAreIndependentPreferences() {
+    public void oneChoicePerConversationDecidesFeedAndChime() {
         ChatTab party = ChatTab.of(ChatChannel.PARTY);
         ChatTab ooc = ChatTab.of(ChatChannel.OOC);
-        assertTrue(ChatLayout.isInFeed(party));
+        assertEquals(ChatNotification.EVERYTHING, ChatLayout.notification(party));
         assertTrue(ChatLayout.isPingAudible(party));
-        ChatLayout.setMuted(party, true);
-        assertFalse(ChatLayout.isInFeed(party));
-        assertTrue(ChatLayout.isPingAudible(party));
-        assertFalse(ChatLayout.isPingsMuted(party));
-        ChatLayout.setPingsMuted(ooc, true);
-        assertTrue(ChatLayout.isInFeed(ooc));
-        assertFalse(ChatLayout.isPingAudible(ooc));
+        ChatLayout.setNotification(party, ChatNotification.NOTHING);
+        assertTrue(ChatLayout.isMuted(party));
+        assertFalse(ChatLayout.isPingAudible(party));
+        assertFalse(ChatLayout.chimes(party, true));
+        ChatLayout.setNotification(ooc, ChatNotification.ONLY_MENTIONS);
         assertFalse(ChatLayout.isMuted(ooc));
+        assertTrue(ChatLayout.chimes(ooc, true));
+        assertFalse(ChatLayout.chimes(ooc, false));
         assertEquals(2, this.changes);
         // Setting what is already set is not a change.
-        ChatLayout.setMuted(party, true);
+        ChatLayout.setNotification(party, ChatNotification.NOTHING);
         assertEquals(2, this.changes);
-        assertTrue(ChatLayout.close(ChatChannel.PARTY));
-        assertTrue(ChatLayout.isMuted(party));
-        assertEquals(Collections.singletonList(party),
-                ChatLayout.mutedTabs());
-        assertEquals(Collections.singletonList(ooc),
-                ChatLayout.pingsMutedTabs());
-        // Conversations drop their preferences with their tabs.
-        ChatTab whisper = ChatLayout.openWhisper("Bilbo", null);
-        ChatLayout.setMuted(whisper, true);
-        ChatLayout.setPingsMuted(whisper, true);
-        assertTrue(ChatLayout.mutedTabs().size() == 1);
+        assertTrue(ChatLayout.close(ChatTab.of(ChatChannel.PARTY)));
+        assertEquals(ChatNotification.NOTHING, ChatLayout.notification(party));
+        assertEquals(Arrays.asList(ooc, party), ChatLayout.notificationTabs());
+        // The steps go round the three, a right-click back.
+        assertEquals(ChatNotification.NOTHING,
+                ChatLayout.stepNotification(ooc, false));
+        assertEquals(ChatNotification.ONLY_MENTIONS,
+                ChatLayout.stepNotification(ooc, true));
+        // A whisper's every line chimes where everything reaches the
+        // player, only one addressed to them where only mentions do.
+        ChatTab whisper = ChatLayout.openWhisper("Bilbo", "", null);
+        assertTrue(ChatLayout.chimes(whisper, false));
+        ChatLayout.setNotification(whisper, ChatNotification.ONLY_MENTIONS);
+        assertFalse(ChatLayout.chimes(whisper, false));
+        assertTrue(ChatLayout.chimes(whisper, true));
+        ChatTab wanderer = ChatLayout.openTab(ChatTab.npc("Grey Wanderer"),
+                "w2");
+        ChatLayout.setNotification(wanderer, ChatNotification.NOTHING);
+        assertFalse(ChatLayout.notificationTabs().contains(wanderer));
         ChatLayout.closeConversations();
-        assertFalse(ChatLayout.isMuted(whisper));
-        assertFalse(ChatLayout.isPingsMuted(whisper));
-        assertTrue(ChatLayout.isMuted(party));
+        assertEquals(ChatNotification.ONLY_MENTIONS,
+                ChatLayout.notification(whisper));
+        assertEquals(ChatNotification.EVERYTHING,
+                ChatLayout.notification(wanderer));
+        assertEquals(ChatNotification.NOTHING, ChatLayout.notification(party));
     }
 
     /**
@@ -264,23 +280,22 @@ public final class ChatLayoutTest {
         ChatLayout.setHidden(party, true);
         assertTrue(ChatLayout.isHidden(party));
         assertTrue(WindowLayout.isOpen(party));
-        assertFalse(ChatLayout.isMuted(party));
-        assertTrue(ChatLayout.isInFeed(party));
-        assertTrue(ChatLayout.isPingAudible(party));
+        assertEquals(ChatNotification.EVERYTHING,
+                ChatLayout.notification(party));
         assertEquals(1, this.changes);
         // Setting what is already set is not a change.
         ChatLayout.setHidden(party, true);
         assertEquals(1, this.changes);
-        assertTrue(ChatLayout.close(ChatChannel.PARTY));
+        assertTrue(ChatLayout.close(ChatTab.of(ChatChannel.PARTY)));
         assertTrue(ChatLayout.isHidden(party));
         assertEquals(Collections.singletonList(party),
                 ChatLayout.hiddenTabs());
-        assertTrue(ChatLayout.restore(ChatChannel.PARTY));
+        assertTrue(ChatLayoutViews.reopen(ChatChannel.PARTY));
         assertTrue(ChatLayout.isHidden(party));
         ChatLayout.setHidden(party, false);
         assertFalse(ChatLayout.isHidden(party));
         // Conversations drop the preference with their tabs.
-        ChatTab whisper = ChatLayout.openWhisper("Bilbo", null);
+        ChatTab whisper = ChatLayout.openWhisper("Bilbo", "", null);
         ChatLayout.setHidden(whisper, true);
         assertTrue(ChatLayout.isHidden(whisper));
         assertTrue(ChatLayout.hiddenTabs().isEmpty());
@@ -306,13 +321,13 @@ public final class ChatLayoutTest {
         assertEquals(0, this.changes);
         // A new window starts at the back; a window that goes leaves the
         // stack with it.
-        Window w3 = ChatLayout.detach(ChatChannel.PARTY, 50.0D,
+        Window w3 = WindowLayout.detach(ChatTab.of(ChatChannel.PARTY), 50.0D,
                 50.0D);
         assertNotNull(w3);
         assertEquals(Arrays.asList(w3, w1, w2), WindowLayout.stacked());
         WindowLayout.raise(w3.getId());
         assertEquals(Arrays.asList(w1, w2, w3), WindowLayout.stacked());
-        assertTrue(ChatLayout.moveTab(ChatChannel.PARTY, "w2", 0));
+        assertTrue(WindowLayout.moveTab(ChatTab.of(ChatChannel.PARTY), "w2", 0));
         assertEquals(Arrays.asList(w1, w2), WindowLayout.stacked());
         ChatLayout.reset();
         assertEquals(WindowLayout.windows(), WindowLayout.stacked());
@@ -321,14 +336,14 @@ public final class ChatLayoutTest {
     /** Every tab closes, down to no tab and no window at all. */
     @Test
     public void everyTabClosesAndTheEmptyLayoutIsValid() {
-        assertEquals(8, WindowLayout.openTabCount());
+        assertEquals(8, WindowLayout.order().size());
         List<ChatChannel> order = new ArrayList<ChatChannel>(
-                ChatLayout.orderChannels());
+                ChatLayoutViews.orderChannels());
         for (int index = 0; index < order.size(); index++) {
-            assertTrue(ChatLayout.isClosable(order.get(index)));
-            assertTrue(ChatLayout.close(order.get(index)));
+            assertTrue(WindowLayout.isClosable(ChatTab.of(order.get(index))));
+            assertTrue(ChatLayout.close(ChatTab.of(order.get(index))));
         }
-        assertEquals(0, WindowLayout.openTabCount());
+        assertEquals(0, WindowLayout.order().size());
         assertTrue(WindowLayout.isEmpty());
         assertTrue(WindowLayout.windows().isEmpty());
         assertNull(WindowLayout.firstWindow());
@@ -336,10 +351,10 @@ public final class ChatLayoutTest {
                 ChatLayout.closedChannels().size());
         // A closed tab is not closable, and a message finds no window to
         // open itself in: the channel keeps receiving, closed.
-        assertFalse(ChatLayout.isClosable(order.get(0)));
-        assertFalse(ChatLayout.close(order.get(0)));
-        assertFalse(ChatLayout.restore(order.get(0)));
-        assertNull(ChatLayout.openTab(ChatTab.whisper("Someone"),
+        assertFalse(WindowLayout.isClosable(ChatTab.of(order.get(0))));
+        assertFalse(ChatLayout.close(ChatTab.of(order.get(0))));
+        assertFalse(ChatLayoutViews.reopen(order.get(0)));
+        assertNull(ChatLayout.openTab(ChatTab.whisper("Someone", ""),
                 null));
         assertTrue(WindowLayout.isEmpty());
         // The + opens one back into a window of its own.
@@ -347,17 +362,17 @@ public final class ChatLayoutTest {
                 ChatTab.of(order.get(0))));
         assertEquals(1, WindowLayout.windows().size());
         assertEquals(Collections.singletonList(order.get(0)),
-                ChatLayout.orderChannels());
+                ChatLayoutViews.orderChannels());
         assertEquals(order.get(0),
-                ChatTab.frontChannelOf(WindowLayout.firstWindow()));
+                ChatLayoutViews.frontChannelOf(WindowLayout.firstWindow()));
         // Repeated closing and reopening leaves a consistent layout.
         for (int round = 0; round < 5; round++) {
-            assertTrue(ChatLayout.close(order.get(0)));
+            assertTrue(ChatLayout.close(ChatTab.of(order.get(0))));
             assertTrue(WindowLayout.isEmpty());
             assertNotNull(WindowLayout.openInNewWindow(
                     ChatTab.of(order.get(0))));
         }
-        assertEquals(1, WindowLayout.openTabCount());
+        assertEquals(1, WindowLayout.order().size());
     }
 
     /** A whole window closes at once, and its channels survive it. */
@@ -367,16 +382,13 @@ public final class ChatLayoutTest {
         assertTrue(WindowLayout.setLocked("w1", true));
         assertFalse(WindowLayout.closeWindow("w1"));
         assertTrue(WindowLayout.setLocked("w1", false));
-        assertTrue(WindowLayout.link("w2", "w1", true));
         assertTrue(WindowLayout.closeWindow("w1"));
         assertNull(WindowLayout.window("w1"));
         assertEquals(1, WindowLayout.windows().size());
-        // The window that was stuck to it lets go.
-        assertFalse(WindowLayout.window("w2").isLinked());
         // Its channels are closed, not gone: still restorable, and
         // still carrying whatever preferences they had.
         assertTrue(ChatLayout.closedChannels().contains(ChatChannel.CLIENT_CONSOLE));
-        assertTrue(ChatLayout.restore(ChatChannel.CLIENT_CONSOLE, "w2"));
+        assertTrue(ChatLayoutViews.reopen(ChatChannel.CLIENT_CONSOLE, "w2"));
         assertTrue(WindowLayout.closeWindow("w2"));
         assertTrue(WindowLayout.isEmpty());
     }
@@ -384,13 +396,13 @@ public final class ChatLayoutTest {
     /** A marked group moves as one and keeps its order. */
     @Test
     public void groupsOfTabsMoveTogetherAndKeepTheirOrder() {
-        List<ChatChannel> start = ChatTab.channelsOf(WindowLayout.window("w2"));
+        List<ChatChannel> start = ChatLayoutViews.channelsOf(WindowLayout.window("w2"));
         // A non-contiguous pair from the conversation window, moved to
         // its front: they arrive as one run, in row order.
         List<ChatTab> group = Arrays.asList(
                 ChatTab.of(start.get(3)), ChatTab.of(start.get(1)));
         assertTrue(WindowLayout.moveTabs(group, "w2", 0));
-        List<ChatChannel> moved = ChatTab.channelsOf(WindowLayout.window("w2"));
+        List<ChatChannel> moved = ChatLayoutViews.channelsOf(WindowLayout.window("w2"));
         assertEquals(start.size(), moved.size());
         assertEquals(start.get(1), moved.get(0));
         assertEquals(start.get(3), moved.get(1));
@@ -400,25 +412,25 @@ public final class ChatLayoutTest {
         assertEquals(Arrays.asList(start.get(1), start.get(3),
                 ChatChannel.CLIENT_CONSOLE, ChatChannel.SERVER_CONSOLE,
                 ChatChannel.OPERATOR),
-                ChatTab.channelsOf(WindowLayout.window("w1")));
+                ChatLayoutViews.channelsOf(WindowLayout.window("w1")));
         assertEquals(start.get(3),
-                ChatTab.frontChannelOf(WindowLayout.window("w1")));
+                ChatLayoutViews.frontChannelOf(WindowLayout.window("w1")));
         assertFalse(WindowLayout.window("w2").contains(ChatTab.of(start.get(1))));
         // A group detaches into a window of its own the same way.
         Window detached = WindowLayout.detach(group, 20.0D, 30.0D);
         assertNotNull(detached);
         assertEquals(Arrays.asList(start.get(1), start.get(3)),
-                ChatTab.channelsOf(detached));
+                ChatLayoutViews.channelsOf(detached));
         assertEquals(Arrays.asList(ChatChannel.CLIENT_CONSOLE,
                 ChatChannel.SERVER_CONSOLE, ChatChannel.OPERATOR),
-                ChatTab.channelsOf(WindowLayout.window("w1")));
+                ChatLayoutViews.channelsOf(WindowLayout.window("w1")));
         // Tabs from two windows are not a group, and neither is a closed
         // one: both are refused whole rather than half-applied.
         assertFalse(WindowLayout.moveTabs(Arrays.asList(
                 ChatTab.of(start.get(1)), ChatTab.of(ChatChannel.CLIENT_CONSOLE)),
                 "w1", 0));
         assertEquals(Arrays.asList(start.get(1), start.get(3)),
-                ChatTab.channelsOf(detached));
+                ChatLayoutViews.channelsOf(detached));
     }
 
     /**
@@ -431,7 +443,7 @@ public final class ChatLayoutTest {
         assertTrue(WindowLayout.setWindowHeight("w1", 200.5D, false));
         assertTrue(WindowLayout.setWindowWidth("w1", 240, false));
         Window source = WindowLayout.window("w1");
-        Window detached = ChatLayout.detach(ChatChannel.CLIENT_CONSOLE,
+        Window detached = WindowLayout.detach(ChatTab.of(ChatChannel.CLIENT_CONSOLE),
                 20.0D, 30.0D);
         assertNotNull(detached);
         assertTrue(detached != source);
@@ -440,41 +452,26 @@ public final class ChatLayoutTest {
     }
 
     @Test
-    public void closedChannelsRestoreIntoTheWindowThatAsked() {
-        ChatLayout.close(ChatChannel.OOC);
-        assertTrue(ChatLayout.restore(ChatChannel.OOC, "w2"));
-        List<ChatChannel> tabs = ChatTab.channelsOf(WindowLayout.window("w2"));
-        assertEquals(ChatChannel.OOC, tabs.get(tabs.size() - 1));
-        assertFalse(ChatLayout.restore(ChatChannel.OOC, "w2"));
-        ChatLayout.close(ChatChannel.OOC);
-        WindowLayout.setLocked("w2", true);
-        assertFalse(ChatLayout.restore(ChatChannel.OOC, "w2"));
-        assertFalse(ChatLayout.restore(ChatChannel.OOC, "nope"));
-        assertTrue(ChatLayout.restore(ChatChannel.OOC));
-        assertTrue(WindowLayout.firstWindow().contains(ChatTab.of(ChatChannel.OOC)));
-    }
-
-    @Test
     public void everyWindowIsEqualAndTheLastOneIsNoDifferent() {
         // Emptying the console window by docking drops it.
-        assertTrue(ChatLayout.moveTab(ChatChannel.CLIENT_CONSOLE, "w2", 0));
-        assertTrue(ChatLayout.moveTab(ChatChannel.SERVER_CONSOLE,
+        assertTrue(WindowLayout.moveTab(ChatTab.of(ChatChannel.CLIENT_CONSOLE), "w2", 0));
+        assertTrue(WindowLayout.moveTab(ChatTab.of(ChatChannel.SERVER_CONSOLE),
                 "w2", 99));
-        assertTrue(ChatLayout.moveTab(ChatChannel.OPERATOR, "w2", 99));
+        assertTrue(WindowLayout.moveTab(ChatTab.of(ChatChannel.OPERATOR), "w2", 99));
         assertNull(WindowLayout.window("w1"));
         assertEquals(1, WindowLayout.windows().size());
         assertEquals(ChatChannel.CLIENT_CONSOLE,
-                ChatTab.channelsOf(WindowLayout.firstWindow()).get(0));
+                ChatLayoutViews.channelsOf(WindowLayout.firstWindow()).get(0));
         for (ChatChannel channel : ChatChannel.presentationOrder()) {
             if (channel != ChatChannel.CLIENT_CONSOLE) {
-                ChatLayout.close(channel);
+                ChatLayout.close(ChatTab.of(channel));
             }
         }
-        assertEquals(1, ChatTab.channelsOf(WindowLayout.firstWindow()).size());
-        ChatChannel last = ChatTab.channelsOf(WindowLayout.firstWindow()).get(0);
+        assertEquals(1, ChatLayoutViews.channelsOf(WindowLayout.firstWindow()).size());
+        ChatChannel last = ChatLayoutViews.channelsOf(WindowLayout.firstWindow()).get(0);
         // Its only tab dragged out moves the window like any other.
         assertSame(WindowLayout.firstWindow(),
-                ChatLayout.detach(last, 10.0D, 20.0D));
+                WindowLayout.detach(ChatTab.of(last), 10.0D, 20.0D));
         assertEquals(1, WindowLayout.windows().size());
         assertEquals(10.0D, WindowLayout.firstWindow().getOffsetX(), 0.0D);
         assertEquals(20.0D, WindowLayout.firstWindow().getOffsetY(), 0.0D);
@@ -486,54 +483,54 @@ public final class ChatLayoutTest {
     @Test
     public void reorderDetachDockAndEmptyWindowLifecycle() {
         // Reorder within the conversation window: OOC to the front.
-        assertTrue(ChatLayout.moveTab(ChatChannel.OOC, "w2", 0));
+        assertTrue(WindowLayout.moveTab(ChatTab.of(ChatChannel.OOC), "w2", 0));
         assertEquals(ChatChannel.OOC,
-                ChatTab.channelsOf(WindowLayout.window("w2")).get(0));
-        assertFalse(ChatLayout.moveTab(ChatChannel.OOC, "w2", 0));
+                ChatLayoutViews.channelsOf(WindowLayout.window("w2")).get(0));
+        assertFalse(WindowLayout.moveTab(ChatTab.of(ChatChannel.OOC), "w2", 0));
 
         // Detach Party into its own window.
-        Window party = ChatLayout.detach(ChatChannel.PARTY,
+        Window party = WindowLayout.detach(ChatTab.of(ChatChannel.PARTY),
                 60.0D, 120.0D);
         assertNotNull(party);
         assertEquals("w3", party.getId());
         assertEquals(Collections.singletonList(ChatChannel.PARTY),
-                ChatTab.channelsOf(party));
-        assertEquals(ChatChannel.PARTY, ChatTab.frontChannelOf(party));
+                ChatLayoutViews.channelsOf(party));
+        assertEquals(ChatChannel.PARTY, ChatLayoutViews.frontChannelOf(party));
         assertEquals(60.0D, party.getOffsetX(), 0.0D);
         // A percent past the margin stands: the window may hang off the
         // screen by up to its own size.
         assertEquals(120.0D, party.getOffsetY(), 0.0D);
         assertEquals(3, WindowLayout.windows().size());
-        assertSame(party, ChatLayout.windowOf(ChatChannel.PARTY));
+        assertSame(party, WindowLayout.windowOf(ChatTab.of(ChatChannel.PARTY)));
         assertFalse(WindowLayout.window("w2").contains(ChatTab.of(ChatChannel.PARTY)));
-        List<ChatChannel> order = ChatLayout.orderChannels();
+        List<ChatChannel> order = ChatLayoutViews.orderChannels();
         assertEquals(ChatChannel.PARTY, order.get(order.size() - 1));
 
         // Dock Faction into the party window, at the front.
-        assertTrue(ChatLayout.moveTab(ChatChannel.FACTION, "w3", 0));
+        assertTrue(WindowLayout.moveTab(ChatTab.of(ChatChannel.FACTION), "w3", 0));
         assertEquals(Arrays.asList(ChatChannel.FACTION, ChatChannel.PARTY),
-                ChatTab.channelsOf(party));
-        assertEquals(ChatChannel.FACTION, ChatTab.frontChannelOf(party));
+                ChatLayoutViews.channelsOf(party));
+        assertEquals(ChatChannel.FACTION, ChatLayoutViews.frontChannelOf(party));
 
         // A window's only tab dragged out just moves the window.
-        Window moved = ChatLayout.detach(ChatChannel.FACTION,
+        Window moved = WindowLayout.detach(ChatTab.of(ChatChannel.FACTION),
                 5.0D, 5.0D);
         assertNotNull(moved);
         assertEquals("w4", moved.getId());
         assertEquals(4, WindowLayout.windows().size());
-        assertSame(party, ChatLayout.detach(ChatChannel.PARTY,
+        assertSame(party, WindowLayout.detach(ChatTab.of(ChatChannel.PARTY),
                 1.0D, 2.0D));
         assertEquals(1.0D, party.getOffsetX(), 0.0D);
         assertEquals(4, WindowLayout.windows().size());
 
         // Docking the last tab elsewhere empties the window away.
-        assertTrue(ChatLayout.moveTab(ChatChannel.PARTY, "w2", 99));
+        assertTrue(WindowLayout.moveTab(ChatTab.of(ChatChannel.PARTY), "w2", 99));
         assertNull(WindowLayout.window("w3"));
         assertEquals(3, WindowLayout.windows().size());
-        List<ChatChannel> tabs = ChatTab.channelsOf(WindowLayout.window("w2"));
+        List<ChatChannel> tabs = ChatLayoutViews.channelsOf(WindowLayout.window("w2"));
         assertEquals(ChatChannel.PARTY, tabs.get(tabs.size() - 1));
         // Closing a window's last tab drops the window too.
-        assertTrue(ChatLayout.close(ChatChannel.FACTION));
+        assertTrue(ChatLayout.close(ChatTab.of(ChatChannel.FACTION)));
         assertNull(WindowLayout.window("w4"));
         assertEquals(Collections.singletonList(ChatChannel.FACTION),
                 ChatLayout.closedChannels());
@@ -541,29 +538,29 @@ public final class ChatLayoutTest {
 
     @Test
     public void lockRefusesLayoutChangesButNotPreferences() {
-        Window party = ChatLayout.detach(ChatChannel.PARTY,
+        Window party = WindowLayout.detach(ChatTab.of(ChatChannel.PARTY),
                 0.0D, 0.0D);
         assertTrue(WindowLayout.setLocked("w3", true));
         assertFalse(WindowLayout.setLocked("w3", true));
         assertTrue(party.isLocked());
         // A locked window keeps the tabs it has: nothing moves out of
         // it, and nothing closes in it either.
-        assertNull(ChatLayout.detach(ChatChannel.PARTY, 1.0D, 1.0D));
-        assertFalse(ChatLayout.isClosable(ChatChannel.PARTY));
-        assertFalse(ChatLayout.close(ChatChannel.PARTY));
-        assertFalse(ChatLayout.moveTab(ChatChannel.OOC, "w3", 0));
-        assertFalse(ChatLayout.moveTab(ChatChannel.PARTY, "w2", 0));
-        // Position and mute are not layout movement.
+        assertNull(WindowLayout.detach(ChatTab.of(ChatChannel.PARTY), 1.0D, 1.0D));
+        assertFalse(WindowLayout.isClosable(ChatTab.of(ChatChannel.PARTY)));
+        assertFalse(ChatLayout.close(ChatTab.of(ChatChannel.PARTY)));
+        assertFalse(WindowLayout.moveTab(ChatTab.of(ChatChannel.OOC), "w3", 0));
+        assertFalse(WindowLayout.moveTab(ChatTab.of(ChatChannel.PARTY), "w2", 0));
+        // Position and the notification choice are not layout movement.
         assertTrue(WindowLayout.setPosition("w3", 30.0D, 40.0D, false));
         assertEquals(30.0D, party.getOffsetX(), 0.0D);
-        ChatLayout.setMuted(ChatChannel.PARTY, true);
+        ChatLayout.setNotification(ChatTab.of(ChatChannel.PARTY), ChatNotification.NOTHING);
         assertTrue(ChatLayout.isMuted(ChatChannel.PARTY));
         WindowLayout.setLocked("w2", true);
-        assertFalse(ChatLayout.moveTab(ChatChannel.OOC, "w2", 0));
-        assertFalse(ChatLayout.close(ChatChannel.OOC));
+        assertFalse(WindowLayout.moveTab(ChatTab.of(ChatChannel.OOC), "w2", 0));
+        assertFalse(ChatLayout.close(ChatTab.of(ChatChannel.OOC)));
         // Unlocking gives the row its cross back.
         assertTrue(WindowLayout.setLocked("w2", false));
-        assertTrue(ChatLayout.close(ChatChannel.OOC));
+        assertTrue(ChatLayout.close(ChatTab.of(ChatChannel.OOC)));
         assertFalse(WindowLayout.setPosition("nope", 1.0D, 1.0D, true));
     }
 
@@ -581,7 +578,7 @@ public final class ChatLayoutTest {
         WindowLayout.setWindowWidth("w1", 320, true);
         WindowLayout.raise("w1");
         int before = WindowLayout.windows().size();
-        ChatTab whisper = ChatLayout.openWhisper("Bilbo", null);
+        ChatTab whisper = ChatLayout.openWhisper("Bilbo", "", null);
         assertNotNull(whisper);
         Window opened = WindowLayout.windowOf(whisper);
         assertNotNull(opened);
@@ -611,7 +608,7 @@ public final class ChatLayoutTest {
         }
         WindowLayout.raise("w2");
         Window opened = WindowLayout.windowOf(
-                ChatLayout.openWhisper("Bilbo", null));
+                ChatLayout.openWhisper("Bilbo", "", null));
         return new double[] {opened.getOffsetX(), opened.getOffsetY()};
     }
 
@@ -623,17 +620,17 @@ public final class ChatLayoutTest {
     public void anArrivingConversationPrefersTheWindowLastBroughtToTheFront() {
         WindowLayout.raise("w1");
         assertEquals("w1", WindowLayout.windowOf(
-                ChatLayout.openWhisper("Bilbo", null)).getId());
+                ChatLayout.openWhisper("Bilbo", "", null)).getId());
         WindowLayout.raise("w2");
         assertEquals("w2", WindowLayout.windowOf(
-                ChatLayout.openWhisper("Frodo", null)).getId());
+                ChatLayout.openWhisper("Frodo", "", null)).getId());
         // The window asked for wins over the front one.
         assertEquals("w1", WindowLayout.windowOf(
-                ChatLayout.openWhisper("Sam", "w1")).getId());
+                ChatLayout.openWhisper("Sam", "", "w1")).getId());
         // A locked window asked for hands the tab to the front unlocked one.
         WindowLayout.setLocked("w1", true);
         assertEquals("w2", WindowLayout.windowOf(
-                ChatLayout.openWhisper("Merry", "w1")).getId());
+                ChatLayout.openWhisper("Merry", "", "w1")).getId());
     }
 
     @Test
@@ -643,10 +640,10 @@ public final class ChatLayoutTest {
         }
         WindowLayout.raise("w2");
         Window opened = WindowLayout.windowOf(
-                ChatLayout.openWhisper("Bilbo", null));
+                ChatLayout.openWhisper("Bilbo", "", null));
         java.util.List<Window> order = WindowLayout.stacked();
         assertSame(opened, order.get(order.size() - 1));
-        ChatTab plus = ChatTab.whisper("Frodo");
+        ChatTab plus = ChatTab.whisper("Frodo", "");
         WindowLayout.openInNewWindow(plus);
         order = WindowLayout.stacked();
         assertSame(WindowLayout.windowOf(plus), order.get(order.size() - 1));
@@ -656,7 +653,7 @@ public final class ChatLayoutTest {
     public void theEmptyStateOpensAWindowCascadedFromTheFrontOne() {
         WindowLayout.setWindowHeight("w2", 150.0D, true);
         WindowLayout.raise("w2");
-        ChatTab whisper = ChatTab.whisper("Pippin");
+        ChatTab whisper = ChatTab.whisper("Pippin", "");
         assertNotNull(WindowLayout.openInNewWindow(whisper));
         Window opened = WindowLayout.windowOf(whisper);
         assertEquals(150.0D, opened.getOwnHeight(), 0.0D);
@@ -664,59 +661,23 @@ public final class ChatLayoutTest {
     }
 
     @Test
-    public void linksFollowTheirTargetAndNeverHoldEachOther() {
-        assertTrue(WindowLayout.link("w1", "w2", true));
-        assertTrue(WindowLayout.window("w1").isLinked());
-        assertTrue(WindowLayout.window("w1").isLinkedAbove());
-        assertEquals("w2", WindowLayout.window("w1").getLinkTarget());
-        assertEquals(1, WindowLayout.linkedTo("w2").size());
-        assertFalse(WindowLayout.link("w1", "w1", true));
-        assertFalse(WindowLayout.link("w1", "nope", true));
-        // Linking the target back lets the first link go.
-        assertTrue(WindowLayout.link("w2", "w1", false));
-        assertFalse(WindowLayout.window("w1").isLinked());
-        assertTrue(WindowLayout.window("w2").isLinked());
-        assertFalse(WindowLayout.window("w2").isLinkedAbove());
-        assertTrue(WindowLayout.unlink("w2"));
-        assertFalse(WindowLayout.unlink("w2"));
-        // A link dies with its target window.
-        ChatLayout.detach(ChatChannel.PARTY, 0.0D, 0.0D);
-        assertTrue(WindowLayout.link("w3", "w1", true));
-        ChatLayout.moveTab(ChatChannel.CLIENT_CONSOLE, "w2", 0);
-        ChatLayout.moveTab(ChatChannel.SERVER_CONSOLE, "w2", 0);
-        ChatLayout.moveTab(ChatChannel.OPERATOR, "w2", 0);
-        assertNull(WindowLayout.window("w1"));
-        assertFalse(WindowLayout.window("w3").isLinked());
-        // Loading validates links: a missing target, self, and cycles.
-        WindowLayoutStore.load(Arrays.asList(
-                "window w1 x=0 y=0 link=w2:above tabs=global",
-                "window w2 x=0 y=0 link=w1:below tabs=ooc",
-                "window w3 x=0 y=0 link=w9:below tabs=party",
-                "window w4 x=0 y=0 link=w4:above tabs=client_console"));
-        assertTrue(WindowLayout.window("w1").isLinked());
-        assertFalse(WindowLayout.window("w2").isLinked());
-        assertFalse(WindowLayout.window("w3").isLinked());
-        assertFalse(WindowLayout.window("w4").isLinked());
-    }
-
-    @Test
     public void onlyTheTabsBoundHowManyWindowsStand() {
         List<ChatChannel> order = ChatChannel.presentationOrder();
         for (ChatChannel channel : order) {
-            Window source = ChatLayout.windowOf(channel);
-            if (ChatTab.channelsOf(source).size() > 1) {
-                assertNotNull(ChatLayout.detach(channel, 0.0D, 0.0D));
+            Window source = WindowLayout.windowOf(ChatTab.of(channel));
+            if (ChatLayoutViews.channelsOf(source).size() > 1) {
+                assertNotNull(WindowLayout.detach(ChatTab.of(channel), 0.0D, 0.0D));
             }
         }
         for (Window window : WindowLayout.windows()) {
-            assertEquals(1, ChatTab.channelsOf(window).size());
+            assertEquals(1, ChatLayoutViews.channelsOf(window).size());
         }
         // Past every channel's own window, each whisper gets one too:
         // no count of windows refuses a tab its own.
         int before = WindowLayout.windows().size();
         for (int index = 0; index < 12; index++) {
             ChatTab friend = ChatLayout.openTab(
-                    ChatTab.whisper("Friend" + index), "w2");
+                    ChatTab.whisper("Friend" + index, ""), "w2");
             assertNotNull(WindowLayout.detach(friend, 0.0D, 0.0D));
         }
         assertEquals(before + 12, WindowLayout.windows().size());
@@ -737,7 +698,7 @@ public final class ChatLayoutTest {
     @Test
     public void loadRepairsStaleDuplicateAndMissingEntries() {
         // Party listed twice, an unknown window id, an empty window,
-        // percents out of range, Console placed nowhere.
+        // percents out of range, Faction and the consoles placed nowhere.
         WindowLayoutStore.load(Arrays.asList(
                 "window w3 locked=true x=250 y=-5 active=ooc tabs=party,ooc",
                 "window w8 x=0 y=100 active=party tabs=global,party,proximity",
@@ -745,8 +706,9 @@ public final class ChatLayoutTest {
                 "window w7 x=0 y=0 tabs=",
                 "window w3 x=0 y=0 tabs=faction",
                 "closed operator",
-                "muted ooc",
-                "muted operator",
+                "notify\tnothing\tooc",
+                "notify\tmentions\toperator",
+                "muted party",
                 "feed x=120 y=33"));
         assertEquals(100.0D, ChatLayout.feedOffsetX(), 0.0D);
         assertEquals(33.0D, ChatLayout.feedOffsetY(), 0.0D);
@@ -755,12 +717,13 @@ public final class ChatLayoutTest {
         Window w3 = WindowLayout.firstWindow();
         assertEquals("w3", w3.getId());
         // Party keeps its first placement; the unplaced channels land
-        // in the first window.
+        // in the first window, the consoles aside: they wait in the +,
+        // hidden, as for a new player.
         assertEquals(Arrays.asList(ChatChannel.PARTY, ChatChannel.OOC,
-                ChatChannel.FACTION, ChatChannel.CLIENT_CONSOLE,
-                ChatChannel.SERVER_CONSOLE),
-                ChatTab.channelsOf(w3));
-        assertEquals(ChatChannel.OOC, ChatTab.frontChannelOf(w3));
+                ChatChannel.FACTION), ChatLayoutViews.channelsOf(w3));
+        assertTrue(ChatLayout.isHidden(ChatTab.of(ChatChannel.CLIENT_CONSOLE)));
+        assertTrue(ChatLayout.isHidden(ChatTab.of(ChatChannel.SERVER_CONSOLE)));
+        assertEquals(ChatChannel.OOC, ChatLayoutViews.frontChannelOf(w3));
         assertTrue(w3.isLocked());
         // A window's percent is bounded a whole window past the margins
         // (250 to 200); a little past the top is kept as stored.
@@ -771,15 +734,21 @@ public final class ChatLayoutTest {
         Window second = WindowLayout.windows().get(1);
         assertEquals("w8", second.getId());
         assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.PROXIMITY),
-                ChatTab.channelsOf(second));
-        assertEquals(ChatChannel.GLOBAL, ChatTab.frontChannelOf(second));
+                ChatLayoutViews.channelsOf(second));
+        assertEquals(ChatChannel.GLOBAL, ChatLayoutViews.frontChannelOf(second));
         assertEquals(100.0D, second.getOffsetY(), 0.0D);
-        assertEquals(Collections.singletonList(ChatChannel.OPERATOR),
+        assertEquals(Arrays.asList(ChatChannel.OPERATOR,
+                ChatChannel.CLIENT_CONSOLE, ChatChannel.SERVER_CONSOLE),
                 ChatLayout.closedChannels());
-        assertTrue(ChatLayout.isMuted(ChatChannel.OOC));
-        assertTrue(ChatLayout.isMuted(ChatChannel.OPERATOR));
+        assertEquals(ChatNotification.NOTHING,
+                ChatLayout.notification(ChatTab.of(ChatChannel.OOC)));
+        assertEquals(ChatNotification.ONLY_MENTIONS,
+                ChatLayout.notification(ChatTab.of(ChatChannel.OPERATOR)));
+        // The old mute lines are read no more.
+        assertEquals(ChatNotification.EVERYTHING,
+                ChatLayout.notification(ChatTab.of(ChatChannel.PARTY)));
         // New windows number on from the highest id seen.
-        assertEquals("w9", ChatLayout.detach(ChatChannel.PROXIMITY,
+        assertEquals("w9", WindowLayout.detach(ChatTab.of(ChatChannel.PROXIMITY),
                 0.0D, 0.0D).getId());
         assertEquals(1, this.changes);
     }
@@ -797,15 +766,16 @@ public final class ChatLayoutTest {
         assertNull(WindowLayout.firstWindow());
         assertEquals(0.0D, ChatLayout.feedOffsetX(), 0.0D);
         WindowLayoutStore.load(Arrays.asList("closed operator"));
-        // No windows at all: one window with everything still open.
+        // No windows at all: one window with everything still open but
+        // the consoles, which wait in the + as for a new player.
         assertEquals(1, WindowLayout.windows().size());
         Window only = WindowLayout.firstWindow();
         assertEquals("w1", only.getId());
         assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.PROXIMITY,
-                ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.PARTY,
-                ChatChannel.CLIENT_CONSOLE, ChatChannel.SERVER_CONSOLE),
-                ChatTab.channelsOf(only));
-        assertEquals(ChatChannel.GLOBAL, ChatTab.frontChannelOf(only));
+                ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.PARTY),
+                ChatLayoutViews.channelsOf(only));
+        assertTrue(ChatLayout.isHidden(ChatTab.of(ChatChannel.CLIENT_CONSOLE)));
+        assertEquals(ChatChannel.GLOBAL, ChatLayoutViews.frontChannelOf(only));
         assertEquals(100.0D, only.getOffsetY(), 0.0D);
     }
 }

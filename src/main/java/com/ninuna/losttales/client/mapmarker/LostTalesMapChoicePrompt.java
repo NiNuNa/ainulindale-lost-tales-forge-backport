@@ -70,26 +70,6 @@ final class LostTalesMapChoicePrompt {
                 : Math.max(0.0F, Math.min(floor, above));
     }
 
-    /** Draws everything above the buttons: shade, panel, text and divider. */
-    static void renderPanel(
-            FontRenderer font, Layout layout, int screenWidth,
-            int screenHeight, String title, String subtitle) {
-        renderPanel(font, layout, screenWidth, screenHeight,
-                title, subtitle, null);
-    }
-
-    /**
-     * @param litArea {@code {x, y, width, height}} left out of the shade, or
-     *                null to shade the whole screen
-     */
-    static void renderPanel(
-            FontRenderer font, Layout layout, int screenWidth,
-            int screenHeight, String title, String subtitle,
-            int[] litArea) {
-        renderShadeFixed(screenWidth, screenHeight, litArea);
-        renderPanelContents(font, layout, title, subtitle);
-    }
-
     static void renderShadeFixed(
             int screenWidth, int screenHeight, int[] litArea) {
         LostTalesMapPopupAnimation.pushFixed();

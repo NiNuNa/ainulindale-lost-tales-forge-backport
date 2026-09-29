@@ -328,11 +328,6 @@ public final class MenuWindow extends SubWindowContent {
             return this;
         }
 
-        public Entry withSprite(LostTalesUiSheet sprite) {
-            this.sprite = sprite;
-            return this;
-        }
-
         /**
          * The same entry with a sprite that lights: under the pointer,
          * and for as long as the row is {@code chosen}.

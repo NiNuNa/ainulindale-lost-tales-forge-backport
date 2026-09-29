@@ -361,17 +361,7 @@ public final class LostTalesQuestHudRenderer {
             }
             LostTalesMapMarkerData marker = LostTalesClientMapMarkerStore.getSharedMarker(normalized);
             if (marker != null && marker.getDimensionId() == dimension) {
-                Minecraft minecraft = Minecraft.getMinecraft();
-                double fallbackY = minecraft == null
-                        || minecraft.thePlayer == null
-                        ? 64.0D : minecraft.thePlayer.posY;
-                targets.add(new HudQuestTarget(
-                        marker.getX(),
-                        marker.getEffectiveY(
-                                minecraft == null
-                                        ? null : minecraft.theWorld,
-                                fallbackY),
-                        marker.getZ()));
+                targets.add(new HudQuestTarget(marker.getX(), marker.getZ()));
             }
         }
     }
@@ -385,7 +375,7 @@ public final class LostTalesQuestHudRenderer {
         if (location == null || location.getDimensionId() != currentDimension) {
             return null;
         }
-        return new HudQuestTarget(location.getX(), location.getY(), location.getZ());
+        return new HudQuestTarget(location.getX(), location.getZ());
     }
 
     private static boolean isGotoObjective(LostTalesQuestObjectiveDefinition objective) {
@@ -487,12 +477,10 @@ public final class LostTalesQuestHudRenderer {
 
     private static final class HudQuestTarget {
         private final double x;
-        private final double y;
         private final double z;
 
-        private HudQuestTarget(double x, double y, double z) {
+        private HudQuestTarget(double x, double z) {
             this.x = x;
-            this.y = y;
             this.z = z;
         }
     }

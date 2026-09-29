@@ -16,9 +16,15 @@ import static org.junit.Assert.assertTrue;
  */
 public final class PartyColorTest {
 
+    /** There is a colour for every member a party can hold. */
+    @Test
+    public void everyMemberHasAColourOfTheirOwn() {
+        assertEquals(Party.MAX_MEMBERS, PartyColor.values().length);
+    }
+
     /** Every colour is drawn in a different one. */
     @Test
-    public void theFourColoursAreFourColours() {
+    public void theEightColoursAreEightColours() {
         Set<Integer> drawn = new HashSet<Integer>();
         for (PartyColor color : PartyColor.values()) {
             assertTrue(color.getId() + " has a colour of its own",
@@ -38,6 +44,31 @@ public final class PartyColorTest {
                 PartyColor.PURPLE.getRgb());
         assertEquals(LostTalesColors.rgb(LostTalesColors.SEAFOAM),
                 PartyColor.BLUE.getRgb());
+        assertEquals(LostTalesColors.rgb(LostTalesColors.APRICOT),
+                PartyColor.ORANGE.getRgb());
+        assertEquals(LostTalesColors.rgb(LostTalesColors.SALMON),
+                PartyColor.RED.getRgb());
+        assertEquals(LostTalesColors.rgb(LostTalesColors.TEAL),
+                PartyColor.TEAL.getRgb());
+        assertEquals(LostTalesColors.rgb(LostTalesColors.ROSE_BEIGE),
+                PartyColor.ROSE.getRgb());
+    }
+
+    /** The wire names the colours 0 to 7, in the order they are given out. */
+    @Test
+    public void theNetworkIdsRunFromZeroToSeven() {
+        for (PartyColor color : PartyColor.values()) {
+            assertEquals(color.ordinal(), color.getNetworkId());
+        }
+    }
+
+    /** The compass and the map are told the member's own colour. */
+    @Test
+    public void theTintIsTheColour() {
+        for (PartyColor color : PartyColor.values()) {
+            assertEquals(color.getRgb(), Integer.parseInt(
+                    color.getTint().substring(1), 16));
+        }
     }
 
     /** It is a colour and nothing else: no alpha rides along with it. */

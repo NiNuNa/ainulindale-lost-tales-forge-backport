@@ -8,7 +8,6 @@ import net.minecraft.world.WorldSavedData;
 import net.minecraftforge.common.util.Constants;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -210,10 +209,6 @@ public final class CharacterSwitchWorldData extends WorldSavedData {
         return this.readOnlyForNewerVersion;
     }
 
-    public int getUnsupportedDataVersion() {
-        return this.unsupportedDataVersion;
-    }
-
     public CharacterSwitchAccountState getAccount(UUID ownerId) {
         return ownerId == null ? null : this.accounts.get(ownerId);
     }
@@ -248,10 +243,6 @@ public final class CharacterSwitchWorldData extends WorldSavedData {
         }
         this.accounts.put(state.getOwnerId(), state);
         markDirty();
-    }
-
-    public Collection<CharacterSwitchAccountState> getAccounts() {
-        return Collections.unmodifiableCollection(this.accounts.values());
     }
 
     public int getQuarantinedEntryCount() {

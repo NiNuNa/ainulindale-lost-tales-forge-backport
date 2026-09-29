@@ -260,8 +260,8 @@ public final class ChatHistoryNbtCodecTest {
         assertEquals(1, ChatHistory.replayFor(ChatHistoryRequesters.oneFaction(
                 UUID.randomUUID(), "", 0L, null, EVERY_CHANNEL), 0L).size());
         // The whisper still quotes back into its own conversation only.
-        assertTrue(ChatHistory.quoteFor(whisper, BOB, ChatChannel.WHISPER, "").exists());
-        assertFalse(ChatHistory.quoteFor(whisper, BOB, ChatChannel.GLOBAL, "").exists());
+        assertTrue(ChatHistory.quoteFor(whisper, ChatHistoryRequesters.reader(BOB), ChatChannel.WHISPER, "").exists());
+        assertFalse(ChatHistory.quoteFor(whisper, ChatHistoryRequesters.reader(BOB), ChatChannel.GLOBAL, "").exists());
     }
 
     /**

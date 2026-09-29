@@ -1,7 +1,6 @@
 package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.chat.ChatReplyReference;
-import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.network.packet.LostTalesChatSendPacket;
 import java.util.UUID;
 import org.junit.Test;
@@ -9,13 +8,12 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 
 /**
  * A quote of a line no server named wears a head only where the server
- * can vouch for it: the console mark for a line of the Server's, and the
- * sender's own head for a line of theirs, when the quote names the
- * identity the reply is signed as.
+ * can vouch for it: the sender's own head for a line of theirs, when the
+ * quote names the identity the reply is signed as. A quote claiming the
+ * Server wears nothing, since only the server's own record can say so.
  */
 public final class LostTalesChatServiceQuoteHeadTest {
 
@@ -27,14 +25,10 @@ public final class LostTalesChatServiceQuoteHeadTest {
     }
 
     @Test
-    public void aServerLineWearsTheConsoleMark() {
-        ChatReplyReference head = LostTalesChatService.vouchedHead(
-                quote("Server"), LostTalesChatSendPacket.QUOTE_SYSTEM, SENDER,
-                "Aldric", false, "skin", 0x64B082);
-        assertEquals(LostTalesChatMessagePacket.SERVER_SENDER_ID,
-                head.getSenderId());
-        assertTrue(head.isAccountLine());
-        assertEquals("Server", head.getAuthor());
+    public void aQuoteClaimingTheServerWearsNoHead() {
+        assertNull(LostTalesChatService.vouchedHead(quote("Server"),
+                LostTalesChatSendPacket.QUOTE_OTHER, SENDER, "Aldric", false,
+                "skin", 0x64B082).getSenderId());
     }
 
     @Test
@@ -60,7 +54,7 @@ public final class LostTalesChatServiceQuoteHeadTest {
                 "skin", 0x64B082).getSenderId());
         // A quote of nothing stays nothing.
         assertFalse(LostTalesChatService.vouchedHead(ChatReplyReference.NONE,
-                LostTalesChatSendPacket.QUOTE_SYSTEM, SENDER, "Aldric", false,
+                LostTalesChatSendPacket.QUOTE_OTHER, SENDER, "Aldric", false,
                 "skin", 0).exists());
     }
 }

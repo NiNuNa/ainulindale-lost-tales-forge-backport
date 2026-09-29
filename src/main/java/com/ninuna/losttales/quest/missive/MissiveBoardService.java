@@ -52,7 +52,7 @@ public final class MissiveBoardService {
         }
         ItemStack stack = board.getStackInSlot(slot);
         MissiveBoardStateReason refusal =
-                MissiveAcceptance.check(stack, expectedQuestId);
+                MissiveAcceptance.check(player.worldObj, stack, expectedQuestId);
         if (refusal != null) {
             answer(player, board, refusal);
             return;
@@ -115,6 +115,10 @@ public final class MissiveBoardService {
         String questId = MissiveAcceptance.pageQuestId(stack);
         if (questId == null || !questId.equals(expectedQuestId)) {
             answer(player, board, MissiveBoardStateReason.LETTER_GONE);
+            return;
+        }
+        if (!MissiveSeals.isGenuine(player.worldObj, stack)) {
+            answer(player, board, MissiveBoardStateReason.DAMAGED);
             return;
         }
         if (!board.hasRoomForMissive() || !board.addMissive(stack)) {

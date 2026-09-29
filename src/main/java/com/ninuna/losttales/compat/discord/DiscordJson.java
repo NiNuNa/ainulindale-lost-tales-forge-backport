@@ -16,12 +16,13 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * The shapes the bridge exchanges with Discord, with the bundled Gson:
- * the message list a channel returns, the bodies a webhook is given — a
- * chat line as text under a name, a server notice as one embed — and
- * the body that sets a channel's topic. Nothing else of the API is
- * modelled. Parsing never throws: anything that is not the expected
- * shape yields an empty list.
+ * The JSON the bridge exchanges with Discord, read and written with the
+ * bundled Gson. It reads channel listings and gateway messages,
+ * reactions, slash commands, the webhook and channel objects that say
+ * where a channel is, error codes and rate-limit pauses; it writes the
+ * bodies the bridge sends, from a webhook's line or notice to a
+ * channel's topic. Parsing never throws: each reader says what it
+ * answers for a reply that is not the shape it expects.
  */
 public final class DiscordJson {
     /** Messages read at a time; Discord allows up to a hundred. */
@@ -30,6 +31,10 @@ public final class DiscordJson {
     public static final int ERROR_UNKNOWN_EMOJI = 10014;
 
     private DiscordJson() {}
+
+    /** The most files and stickers of one message the chat names. */
+    static final int MAX_FILES = 3;
+    static final int MAX_STICKERS = 2;
 
     /** One Discord message, reduced to what the chat needs. */
     public static final class Message {
@@ -61,11 +66,27 @@ public final class DiscordJson {
          * an author who has none of their own.
          */
         public final String authorAvatarUrl;
+        /** The server the message is in; empty when the listing did not say. */
+        public final String guildId;
+        /** The names of the files the message carries, at most {@link #MAX_FILES}. */
+        public final List<String> fileNames;
+        /** The names of its stickers, at most {@link #MAX_STICKERS}. */
+        public final List<String> stickerNames;
+        /** The words of the message it forwards; empty for anything but a forward. */
+        public final String forwardedContent;
 
         Message(String id, String authorId, String authorName, boolean bot,
                 String content, Map<String, String> mentionNames,
                 String referencedMessageId, String editedTimestamp,
-                String channelId, String authorAvatarUrl) {
+                String channelId, String authorAvatarUrl, String guildId,
+                List<String> fileNames, List<String> stickerNames,
+                String forwardedContent) {
+            this.guildId = guildId == null ? "" : guildId;
+            this.fileNames = fileNames == null ? Collections.<String>emptyList()
+                    : Collections.unmodifiableList(fileNames);
+            this.stickerNames = stickerNames == null ? Collections.<String>emptyList()
+                    : Collections.unmodifiableList(stickerNames);
+            this.forwardedContent = forwardedContent == null ? "" : forwardedContent;
             this.channelId = channelId == null ? "" : channelId;
             this.authorAvatarUrl = authorAvatarUrl == null ? "" : authorAvatarUrl;
             this.id = id;
@@ -92,30 +113,36 @@ public final class DiscordJson {
     }
 
     /**
-     * The messages in a channel listing, oldest first, or an empty list
-     * for anything that does not parse as one.
+     * The messages in a channel listing, oldest first, or null for a
+     * reply that is not a whole listing: no JSON array, or an array with
+     * an entry that is not a message with an id. A page that cannot be
+     * read says nothing about what the channel holds, so it is never an
+     * empty list; only Discord's own empty array is.
      */
     public static List<Message> parseMessages(String json) {
         if (json == null || json.trim().length() == 0) {
-            return Collections.emptyList();
+            return null;
         }
         JsonElement root;
         try {
             root = new JsonParser().parse(json);
         } catch (RuntimeException exception) {
-            return Collections.emptyList();
+            return null;
         }
         if (root == null || !root.isJsonArray()) {
-            return Collections.emptyList();
+            return null;
         }
         JsonArray array = root.getAsJsonArray();
         List<Message> messages = new ArrayList<Message>(array.size());
         // Discord lists newest first; the chat wants them as they came.
         for (int index = array.size() - 1; index >= 0; index--) {
             Message message = parseMessage(array.get(index));
-            if (message != null) {
-                messages.add(message);
+            if (message == null) {
+                // A message missing from a page reads as deleted, so a
+                // page with an entry that cannot be read is no page.
+                return null;
             }
+            messages.add(message);
         }
         return messages;
     }
@@ -153,7 +180,59 @@ public final class DiscordJson {
                 string(object, "edited_timestamp"),
                 string(object, "channel_id"),
                 author == null ? "" : avatarUrl(string(author, "id"),
-                        string(author, "avatar")));
+                        string(author, "avatar")),
+                string(object, "guild_id"),
+                names(object, "attachments", "filename", MAX_FILES),
+                names(object, "sticker_items", "name", MAX_STICKERS),
+                forwardedContent(object));
+    }
+
+    /** The {@code key} of each object in the array {@code field}, the first {@code most}. */
+    private static List<String> names(JsonObject object, String field, String key, int most) {
+        List<String> names = new ArrayList<String>();
+        if (!object.has(field) || !object.get(field).isJsonArray()) {
+            return names;
+        }
+        for (JsonElement value : object.getAsJsonArray(field)) {
+            if (names.size() >= most) {
+                break;
+            }
+            if (value.isJsonObject()) {
+                String name = string(value.getAsJsonObject(), key);
+                if (name.length() > 0) {
+                    names.add(name);
+                }
+            }
+        }
+        return names;
+    }
+
+    /**
+     * The words of the message a forward carries: Discord puts them in the
+     * first of the message's snapshots, and marks the reference as a
+     * forward (type 1). Empty for anything else.
+     */
+    private static String forwardedContent(JsonObject object) {
+        if (!object.has("message_reference") || !object.get("message_reference").isJsonObject()
+                || !object.has("message_snapshots")
+                || !object.get("message_snapshots").isJsonArray()) {
+            return "";
+        }
+        JsonElement type = object.getAsJsonObject("message_reference").get("type");
+        try {
+            if (type == null || !type.isJsonPrimitive() || type.getAsInt() != 1) {
+                return "";
+            }
+        } catch (RuntimeException notANumber) {
+            return "";
+        }
+        for (JsonElement snapshot : object.getAsJsonArray("message_snapshots")) {
+            if (snapshot.isJsonObject() && snapshot.getAsJsonObject().has("message")
+                    && snapshot.getAsJsonObject().get("message").isJsonObject()) {
+                return string(snapshot.getAsJsonObject().getAsJsonObject("message"), "content");
+            }
+        }
+        return "";
     }
 
     /**
@@ -168,6 +247,39 @@ public final class DiscordJson {
         }
         return "https://cdn.discordapp.com/avatars/" + userId + "/" + avatarHash
                 + ".png?size=64";
+    }
+
+    /** A member typing, as the gateway says it: the channel, the member and their name. */
+    public static final class Typing {
+        public final String channelId;
+        public final String userId;
+        public final String name;
+        public final boolean bot;
+
+        Typing(String channelId, String userId, String name, boolean bot) {
+            this.channelId = channelId;
+            this.userId = userId;
+            this.name = name;
+            this.bot = bot;
+        }
+    }
+
+    /** A TYPING_START event's member, or null for one that names no channel or member. */
+    public static Typing parseTyping(JsonObject data) {
+        if (data == null) {
+            return null;
+        }
+        String channelId = string(data, "channel_id");
+        String userId = string(data, "user_id");
+        if (channelId.length() == 0 || userId.length() == 0) {
+            return null;
+        }
+        JsonObject member = member(data);
+        JsonObject user = member != null && member.has("user") && member.get("user").isJsonObject()
+                ? member.getAsJsonObject("user") : null;
+        return new Typing(channelId, userId,
+                user == null ? "" : memberName(member, user),
+                user != null && bool(user, "bot"));
     }
 
     /** One message object as the gateway delivers it, or null for anything else. */
@@ -718,7 +830,11 @@ public final class DiscordJson {
         }
     }
 
-    /** {@code retry_after} of a rate-limit reply, in milliseconds; 0 if absent. */
+    /**
+     * {@code retry_after} of a rate-limit reply, in milliseconds rounded
+     * up and at most {@link DiscordRateLimit#MAX_RESET_MILLIS}, the
+     * longest pause the headers may ask for too; 0 if absent.
+     */
     public static long retryAfterMillis(String json) {
         if (json == null) {
             return 0L;
@@ -729,7 +845,12 @@ public final class DiscordJson {
                     && root.getAsJsonObject().has("retry_after")) {
                 double seconds = root.getAsJsonObject()
                         .get("retry_after").getAsDouble();
-                return seconds > 0.0D ? (long)Math.ceil(seconds * 1000.0D) : 0L;
+                if (!(seconds > 0.0D)) {
+                    return 0L;
+                }
+                double millis = Math.ceil(seconds * 1000.0D);
+                return millis >= DiscordRateLimit.MAX_RESET_MILLIS
+                        ? DiscordRateLimit.MAX_RESET_MILLIS : (long)millis;
             }
         } catch (RuntimeException ignored) {
             // Not the shape Discord documents; back off by default instead.

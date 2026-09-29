@@ -85,9 +85,9 @@ public final class ChatRoleConfigTest {
     public void rolesMembersAndSourcesAreRead() {
         ChatRoleCatalog catalog = ChatRoleConfig.parse(new String[] {
                 "# comment",
-                "moderator=name:Moderator;color:#A94B54;mention:true;rank:15;op:1;"
+                "moderator=name:Moderator;colour:#A94B54;mention:true;rank:15;op:1;"
                         + "faction:GONDOR@gondor.knight;desc:Keeps the peace.",
-                "builder=color:112233;mention:false",
+                "builder=colour:112233;mention:false",
         }, new String[] {
                 "moderator=" + STEVE + "," + ALEX,
                 "builder=" + STEVE + ", not-a-uuid",
@@ -141,7 +141,7 @@ public final class ChatRoleConfigTest {
         assertTrue(warnings.isEmpty());
         // Restyled, regranted, given another source: the file's word holds.
         ChatRoleCatalog restyled = ChatRoleConfig.parse(new String[] {
-                "operator=name:Staff;color:00FF00;op:4;grant:chat.moderate",
+                "operator=name:Staff;colour:00FF00;op:4;grant:chat.moderate",
         }, null, collect);
         ChatAccountRole staff = restyled.byId(ChatRoleFixtures.OPERATOR_ID);
         assertEquals("Staff", staff.getDisplayName());
@@ -266,12 +266,6 @@ public final class ChatRoleConfigTest {
         assertFalse(seeded.canRead(moderator, ChatChannel.OPERATOR));
         assertTrue(seeded.canRead(operator, ChatChannel.OPERATOR));
         assertFalse(seeded.canSend(0, ChatChannel.OPERATOR));
-        assertEquals("operator=read:moderator,operator;send:operator",
-                ChatChannelGates.format(ChatChannel.OPERATOR, gates.gateOf(ChatChannel.OPERATOR)));
-        assertEquals("party=read:any;send:none",
-                ChatChannelGates.format(ChatChannel.PARTY, gates.gateOf(ChatChannel.PARTY)));
-        assertNull(ChatChannelGates.format(ChatChannel.PROXIMITY,
-                gates.gateOf(ChatChannel.PROXIMITY)));
     }
 
     /**
@@ -310,9 +304,9 @@ public final class ChatRoleConfigTest {
         ChatAccountRole moderator = ChatAccountRole.custom("moderator", "Moderator",
                 "Keeps the peace.", 0xA94B54, true, 15,
                 Arrays.asList(ChatRoleSource.opLevel(1),
-                        ChatRoleSource.factionRank("gondor", "Gondor.Knight")));
+                        ChatRoleSource.factionRank("gondor", "Gondor.Knight")), null, null);
         String entry = ChatRoleConfig.formatRole(moderator);
-        assertEquals("moderator=name:Moderator;color:A94B54;mention:true;rank:15;"
+        assertEquals("moderator=name:Moderator;colour:A94B54;mention:true;rank:15;"
                 + "op:1;faction:GONDOR@gondor.knight;desc:Keeps the peace.", entry);
         ChatAccountRole again = ChatRoleConfig.parse(new String[] {entry}, null, collect)
                 .byId("moderator");
@@ -326,11 +320,13 @@ public final class ChatRoleConfigTest {
                         "MODERATOR"));
         Set<UUID> members = new HashSet<UUID>(Arrays.asList(ALEX, STEVE));
         List<String> written = ChatRoleConfig.withMembers(
-                new String[] {"builder=" + STEVE, "moderator=old"}, "moderator", members);
+                new String[] {"builder=" + STEVE, "moderator=old"}, "moderator", members,
+                Collections.<UUID>emptySet());
         assertEquals(Arrays.asList("builder=" + STEVE, "moderator=" + STEVE + "," + ALEX),
                 written);
         assertEquals(Collections.singletonList("builder=" + STEVE),
                 ChatRoleConfig.withMembers(new String[] {"builder=" + STEVE, "moderator=old"},
-                        "moderator", Collections.<UUID>emptySet()));
+                        "moderator", Collections.<UUID>emptySet(),
+                        Collections.<UUID>emptySet()));
     }
 }

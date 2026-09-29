@@ -2,6 +2,7 @@ package com.ninuna.losttales.character.storage;
 
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
+import com.ninuna.losttales.character.validation.CharacterNames;
 import com.ninuna.losttales.storage.NbtTags;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.WorldSavedData;
@@ -80,10 +81,6 @@ public class CharacterWorldData extends WorldSavedData {
         return this.readOnlyForNewerVersion;
     }
 
-    public int getUnsupportedDataVersion() {
-        return this.unsupportedDataVersion;
-    }
-
     public CharacterRoster getRoster(UUID ownerId) {
         return ownerId == null ? null : this.rosters.get(ownerId);
     }
@@ -116,10 +113,6 @@ public class CharacterWorldData extends WorldSavedData {
         this.rosters.put(roster.getOwnerId(), roster);
         this.index = null;
         markDirty();
-    }
-
-    public int getRosterCount() {
-        return this.rosters.size();
     }
 
     public Collection<CharacterRoster> getRosters() {
@@ -155,18 +148,21 @@ public class CharacterWorldData extends WorldSavedData {
         return characterIndex().contains(characterId);
     }
 
-    public int getQuarantinedEntryCount() {
-        return this.quarantinedEntries.size();
-    }
-
-    public List<NBTTagCompound> getQuarantinedEntriesCopy() {
-        ArrayList<NBTTagCompound> copies = new ArrayList<NBTTagCompound>();
-        for (NBTTagCompound entry : this.quarantinedEntries) {
-            if (entry != null) {
-                copies.add((NBTTagCompound) entry.copy());
+    /**
+     * Whether a character on the server other than {@code exceptCharacterId}
+     * already goes by the name, as {@link CharacterNames#same} compares
+     * names.
+     */
+    public boolean isNameTaken(String name, UUID exceptCharacterId) {
+        for (CharacterRoster roster : this.rosters.values()) {
+            for (RoleplayCharacter character : roster.getCharacters()) {
+                if (!character.getCharacterId().equals(exceptCharacterId)
+                        && CharacterNames.same(name, character.getName())) {
+                    return true;
+                }
             }
         }
-        return Collections.unmodifiableList(copies);
+        return false;
     }
 
     private void ensureWritable() {

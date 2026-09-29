@@ -4,6 +4,8 @@ import com.mojang.authlib.GameProfile;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
+import com.ninuna.losttales.character.server.KnownAccounts;
+import com.ninuna.losttales.character.state.CharacterLastSeen;
 import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
@@ -91,6 +93,11 @@ public final class ChatMemberDirectory {
     public static final String ABSENT_GROUP = "";
     /** How long the identities that may be absent from a conversation are kept before they are read again. */
     static final long ABSENT_REFRESH_MILLIS = 15000L;
+    /**
+     * How lately a character must have been played or heard to stand under
+     * *Offline* (Nils, 2026-09-28, C5 a): the rest are nobody's business.
+     */
+    static final long OFFLINE_WINDOW_MILLIS = 30L * 24L * 3600000L;
 
     private static final Map<String, Absentees> ABSENT = new HashMap<String, Absentees>();
     /** A Discord server's heading while its name is not known. */
@@ -170,7 +177,7 @@ public final class ChatMemberDirectory {
         boolean inCharacter = ChatRolePresentation.isInCharacter(channel);
         if (channel.getRecipientRule() == ChatRecipientRule.SELF) {
             RoleplayCharacter speaking = inCharacter
-                    ? ChatIdentitySelection.character(viewer) : null;
+                    ? ChatIdentitySelection.speakerFor(viewer, channel) : null;
             List<LostTalesChatMembersPacket.Member> alone =
                     new ArrayList<LostTalesChatMembersPacket.Member>(2);
             alone.add(isShown(viewer, speaking)
@@ -202,7 +209,7 @@ public final class ChatMemberDirectory {
                 continue;
             }
             RoleplayCharacter character = inCharacter
-                    ? ChatIdentitySelection.character(member) : null;
+                    ? ChatIdentitySelection.speakerFor(member, channel) : null;
             if (!isShown(member, character)) {
                 continue;
             }
@@ -215,7 +222,7 @@ public final class ChatMemberDirectory {
         List<Absentee> absent = absenteesOf(viewer, channel, party, factionId,
                 inCharacter);
         RoleplayCharacter viewerAs = inCharacter
-                ? ChatIdentitySelection.character(viewer) : null;
+                ? ChatIdentitySelection.speakerFor(viewer, channel) : null;
         if (!presentKeys.contains(keyOf(viewer, viewerAs))) {
             absent = with(absent, absentAs(viewer, viewerAs, channel));
         }
@@ -286,7 +293,7 @@ public final class ChatMemberDirectory {
             EntityPlayerMP online = server.getConfigurationManager()
                     .func_152612_a(named);
             UUID owner = online != null ? online.getUniqueID()
-                    : ownerNamed(server, viewer, named);
+                    : KnownAccounts.ownerNamed(viewer.worldObj, named);
             CharacterRoster roster = owner == null ? null : rosterOf(viewer, owner);
             RoleplayCharacter character = identityIn(roster, partnerCharacterId,
                     partnerIdentity, named);
@@ -295,7 +302,13 @@ public final class ChatMemberDirectory {
                 presentKeys.add(keyOf(online, character));
             } else if (owner != null && !owner.equals(viewer.getUniqueID())) {
                 String account = online != null ? accountOf(online)
-                        : accountName(server, owner, roster);
+                        : KnownAccounts.nameOf(owner, roster);
+                // A character nobody has met lately is not told of; the
+                // conversation names its account instead, as the viewer did.
+                if (character != null && !CharacterLastSeen.seenWithin(viewer.worldObj,
+                        character.getCharacterId(), OFFLINE_WINDOW_MILLIS)) {
+                    character = null;
+                }
                 absent.add(character != null
                         ? new Absentee(characterKey(character.getCharacterId()),
                                 characterMember(owner, account.length() > 0
@@ -423,8 +436,9 @@ public final class ChatMemberDirectory {
 
     /**
      * Every identity that has been in the world and may read the channel:
-     * each character of the world's rosters, of {@code factionId} where
-     * one is named, on an in-character channel; on an out-of-character one
+     * each character of the world's rosters played or heard in the last
+     * {@link #OFFLINE_WINDOW_MILLIS}, of {@code factionId} where one is
+     * named, on an in-character channel; on an out-of-character one
      * each account the world keeps a roster or a player file for, so an
      * operator who never made a character still stands among the
      * operators. An account the server knows no name for is left out.
@@ -458,7 +472,7 @@ public final class ChatMemberDirectory {
         for (Map.Entry<UUID, CharacterRoster> entry : known.entrySet()) {
             UUID owner = entry.getKey();
             CharacterRoster roster = entry.getValue();
-            String account = accountName(server, owner, roster);
+            String account = KnownAccounts.nameOf(owner, roster);
             if (account.length() == 0) {
                 continue;
             }
@@ -485,6 +499,8 @@ public final class ChatMemberDirectory {
                         : character.getCharacterId();
                 if (characterId == null || (factionId != null
                         && !factionId.equals(ChatChannelPolicy.factionOf(character)))
+                        || !CharacterLastSeen.seenWithin(viewer.worldObj, characterId,
+                                OFFLINE_WINDOW_MILLIS)
                         || !ChatChannelPolicy.canRead(reader, channel,
                                 reader.rolesAs(characterId), gates)) {
                     continue;
@@ -538,12 +554,12 @@ public final class ChatMemberDirectory {
         }
         for (PartyMember member : party.getMembers()) {
             UUID owner = member == null ? null : member.getOwnerId();
-            UUID characterId = member == null ? null : member.getCharacterId();
+            UUID characterId = member == null ? null : member.getIdentityId();
             if (owner == null || characterId == null) {
                 continue;
             }
             CharacterRoster roster = rosterOf(viewer, owner);
-            String account = accountName(server, owner, roster);
+            String account = KnownAccounts.nameOf(owner, roster);
             if (account.length() == 0 || !new ChatAbsentReader(server,
                     new GameProfile(owner, account), false).mayJoin()) {
                 continue;
@@ -674,7 +690,7 @@ public final class ChatMemberDirectory {
     /** An absent character, in its faction's colour; the title is read from a player here only. */
     private static LostTalesChatMembersPacket.Member characterMember(
             UUID owner, String account, RoleplayCharacter character) {
-        int color = LotrFactionColors.forFactionId(character.getStartingFactionId(),
+        int color = LotrFactionColors.forFactionId(character.getFactionId(),
                 ChatRolePresentation.unassignedColor());
         return new LostTalesChatMembersPacket.Member(owner, account,
                 character.getCharacterId(),
@@ -728,54 +744,6 @@ public final class ChatMemberDirectory {
         } catch (RuntimeException unreadable) {
             return null;
         }
-    }
-
-    /**
-     * The account the server knows by {@code name} while its player is not
-     * here: the roster owner whose last known name it is, or null.
-     */
-    private static UUID ownerNamed(MinecraftServer server, EntityPlayerMP viewer,
-                                   String name) {
-        if (viewer.worldObj == null) {
-            return null;
-        }
-        try {
-            for (CharacterRoster roster : CharacterStorage.get(viewer.worldObj)
-                    .getRosters()) {
-                UUID owner = roster == null ? null : roster.getOwnerId();
-                if (owner != null
-                        && name.equalsIgnoreCase(accountName(server, owner, roster))) {
-                    return owner;
-                }
-            }
-        } catch (RuntimeException unreadable) {
-            return null;
-        }
-        return null;
-    }
-
-    /**
-     * An account's name while its player is not here: the one the server
-     * last saw it log in with, else the name its default character was
-     * given on its first visit, which was the account's; empty when
-     * neither is known. Asked of the server's own memory, never of Mojang.
-     */
-    private static String accountName(MinecraftServer server, UUID account,
-                                      CharacterRoster roster) {
-        GameProfile profile = null;
-        try {
-            profile = server.func_152358_ax() == null ? null
-                    : server.func_152358_ax().func_152652_a(account);
-        } catch (RuntimeException unavailable) {
-            profile = null;
-        }
-        if (profile != null && profile.getName() != null
-                && profile.getName().trim().length() > 0) {
-            return profile.getName().trim();
-        }
-        RoleplayCharacter first = roster == null ? null : roster.getDefaultCharacter();
-        return first == null || first.getName() == null ? ""
-                : first.getName().trim();
     }
 
     /** The key an identity is known by here: its character, or the account for null. */

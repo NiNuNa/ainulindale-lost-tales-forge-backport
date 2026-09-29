@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.character.LostTalesClientAccount;
 import com.ninuna.losttales.config.LostTalesConfigFiles;
 import com.ninuna.losttales.util.LostTalesCloseables;
 import com.ninuna.losttales.util.LostTalesTextFiles;
@@ -32,8 +33,8 @@ import java.util.UUID;
  * names live only for the session; the file keeps accounts alone.</p>
  */
 public final class ClientChatIgnores {
-    /** Under the client's config folder. */
-    static final String FILE_PATH = LostTalesConfigFiles.CHAT_IGNORES;
+    /** The folder under the client's, one file per account. */
+    static final String FOLDER = LostTalesConfigFiles.CHAT_IGNORES;
     /** Safety bound on stored ignores; adding past it is refused. */
     public static final int MAX_IGNORES = 256;
     private static final Charset UTF_8 = Charset.forName("UTF-8");
@@ -57,9 +58,18 @@ public final class ClientChatIgnores {
 
     private ClientChatIgnores() {}
 
+    /**
+     * Reads the signed-in account's file as the client starts; with no
+     * account to name, nothing is read or written.
+     */
     public static synchronized void initialize(File configDirectory) {
-        storeFile = configDirectory == null
-                ? null : new File(configDirectory, FILE_PATH);
+        initialize(configDirectory, configDirectory == null ? null
+                : LostTalesClientAccount.templateId());
+    }
+
+    static synchronized void initialize(File configDirectory, UUID accountId) {
+        storeFile = configDirectory == null || accountId == null ? null
+                : new File(new File(configDirectory, FOLDER), accountId + ".txt");
         ignoredAccounts.clear();
         knownNames.clear();
         ignoredIdentities.clear();

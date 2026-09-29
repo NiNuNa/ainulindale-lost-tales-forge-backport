@@ -83,6 +83,8 @@ public final class ChatChannelPolicy {
      * needs a party, a faction line a faction — then the role gate,
      * which a channel may ask besides.
      *
+     * @param playedId the identity the sender plays, whose party a party line
+     *                 needs
      * @param roles    the sender's roles as the selected chat identity
      * @param operator whether the sender holds the server's operator level,
      *                 which is what reaches a staff channel the config
@@ -91,14 +93,14 @@ public final class ChatChannelPolicy {
      *                 {@code chat.server_console.read}, which is what reaches
      *                 the server's console; see {@link #readsConsole}
      */
-    public static String sendRefusal(ChatChannel channel, Party party, UUID gameplayId,
+    public static String sendRefusal(ChatChannel channel, Party party, UUID playedId,
                                      String factionId, int roles, boolean operator,
                                      boolean consoleReader) {
         if (channel == null) {
             return "chat.losttales.channel.role_unavailable";
         }
         if (channel.getAccess() == ChatChannelAccess.PARTY_MEMBERSHIP
-                && (party == null || gameplayId == null || !party.containsMember(gameplayId))) {
+                && (party == null || playedId == null || !party.containsMember(playedId))) {
             return "chat.losttales.channel.party_unavailable";
         }
         if (channel.getAccess() == ChatChannelAccess.CHARACTER_FACTION
@@ -359,12 +361,13 @@ public final class ChatChannelPolicy {
 
     /**
      * The faction the selected identity speaks and reads Faction chat in:
-     * the character's own, or Unaligned for the account and for a
-     * character created without one. Never empty.
+     * the character's own — its LOTR pledge while it has one, else its
+     * starting faction — or Unaligned for the account and for a character
+     * with neither. Never empty.
      */
     public static String factionOf(RoleplayCharacter character) {
         return LotrCharacterAdapter.factionIdOrUnaligned(
-                character == null ? "" : character.getStartingFactionId());
+                character == null ? "" : character.getFactionId());
     }
 
     private static boolean isCurrentOnlinePartyMember(EntityPlayerMP player, Party party) {
@@ -372,32 +375,31 @@ public final class ChatChannelPolicy {
             return false;
         }
         PartyMember member = party.getMember(
-                ChatIdentitySelection.identityId(player));
+                ChatIdentitySelection.playedId(player));
         return member != null && player.getUniqueID().equals(member.getOwnerId());
     }
 
     /**
      * The selected identity's faction, with the time its Faction history
-     * starts: the character's creation, or for the account the creation
-     * of its default character, which is when the account first joined.
+     * starts: when that faction became the character's, by its making or
+     * by its pledge; for the account, its account character's.
      */
     public static Map<String, Long> selectedFactions(EntityPlayerMP player) {
         Map<String, Long> owned = new HashMap<String, Long>();
         RoleplayCharacter character = ChatIdentitySelection.character(player);
         owned.put(factionOf(character), Long.valueOf(character != null
-                ? character.getCreationTimestamp() : accountSince(player)));
+                ? character.getFactionSince() : accountSince(player)));
         return owned;
     }
 
     /**
-     * When the account's default character was made, or 0 when the roster
-     * cannot be read: the account has been able to read Unaligned talk
-     * since then.
+     * When the account character's faction became its own, or 0 when the
+     * roster cannot be read.
      */
     private static long accountSince(EntityPlayerMP player) {
         for (RoleplayCharacter character : charactersOf(player)) {
             if (character != null && character.getKind() == CharacterKind.DEFAULT) {
-                return character.getCreationTimestamp();
+                return character.getFactionSince();
             }
         }
         return 0L;

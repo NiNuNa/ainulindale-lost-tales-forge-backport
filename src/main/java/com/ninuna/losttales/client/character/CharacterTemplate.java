@@ -4,22 +4,21 @@ import com.ninuna.losttales.character.registry.CharacterRaceDefinition;
 import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
 import com.ninuna.losttales.character.registry.CharacterSkinRegistry;
-import com.ninuna.losttales.character.server.CharacterCreationRequest;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.character.validation.CharacterValidator;
 
 import java.util.UUID;
 
 /**
- * What an account wants its default character to start as: the same
- * choices the creation form asks for, kept on this installation for the
- * account that made them.
+ * The account character's look: what an account wants its account
+ * character to start as on every new world, the same choices the creation
+ * form asks for, kept on this installation for the account that made them
+ * in the character room.
  *
  * <p>It is a starting point and never an answer. A server decides which
  * races, factions and starting waypoints it offers and owns every rule
- * about them, so a template is read as the form's opening values and the
- * player confirms them there; nothing here crosses the wire, and nothing
- * a server is asked for is decided by it.</p>
+ * about them: a world checks the look once, at the first join, as it
+ * checks a creation, and the creation form opens with it.</p>
  *
  * <p>Every field is stored as the player left it, unvalidated beyond the
  * bounds a string has to respect to be written at all. What a particular
@@ -74,24 +73,6 @@ public final class CharacterTemplate {
         this.history = trimmed(history);
         this.age = Math.max(0, age);
         this.unconventionalSettings = unconventionalSettings;
-    }
-
-    /**
-     * The template a creation the player just made would be remembered
-     * as. The slot and the roster revision are a particular world's and
-     * are not part of it; neither is the starting waypoint, which every
-     * server resolves against its own map.
-     */
-    public static CharacterTemplate of(CharacterCreationRequest request) {
-        if (request == null) {
-            return EMPTY;
-        }
-        return new CharacterTemplate(request.getName(), request.getRaceId(),
-                request.getGenderId(), request.getSkinId(),
-                request.getBodyTypeId(), request.getChestTypeId(),
-                request.getStartingFactionId(), request.getHistory(),
-                request.getAge(), request.hasUnconventionalSettings(),
-                request.isMinecraftCapeVisible(), request.getCosmeticCapeId());
     }
 
     public String getName() { return this.name; }
@@ -161,8 +142,7 @@ public final class CharacterTemplate {
     /**
      * The template as an appearance the body model can be built from,
      * for that account. A choice not made resolves to what a world would
-     * make the account's default character as: a human of the account's
-     * own skin.
+     * make the account character as: a human of the account's own skin.
      */
     public CharacterAppearance toAppearance(UUID accountId) {
         String race = this.raceId.length() > 0

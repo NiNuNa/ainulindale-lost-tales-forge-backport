@@ -39,6 +39,11 @@ public final class PartyQuestProgressCoordinator {
         return INSTANCE;
     }
 
+    /** Forgets the recent kills, as the server starts and stops. */
+    public synchronized void clear() {
+        this.recentKillEvents.clear();
+    }
+
     public synchronized void handleAuthoritativeKill(EntityPlayerMP creditedPlayer,
                                                        Entity victim) {
         if (creditedPlayer == null || victim == null
@@ -65,7 +70,7 @@ public final class PartyQuestProgressCoordinator {
         UUID creditedId = RoleplayCharacterIdentityHook.resolveGameplayId(
                 creditedPlayer);
         Party party = PartyService.getInstance()
-                .getPartyForActiveCharacter(creditedPlayer);
+                .getPartyForActiveIdentity(creditedPlayer);
         if (creditedId == null || party == null
                 || !party.containsMember(creditedId)) {
             return;
@@ -83,7 +88,7 @@ public final class PartyQuestProgressCoordinator {
 
         for (PartyMember member : party.getMembers()) {
             if (member == null
-                    || creditedId.equals(member.getCharacterId())) {
+                    || creditedId.equals(member.getIdentityId())) {
                 continue;
             }
             EntityPlayerMP participant = findOnlinePlayer(
@@ -110,7 +115,7 @@ public final class PartyQuestProgressCoordinator {
         UUID sourceId = RoleplayCharacterIdentityHook.resolveGameplayId(
                 source);
         Party party = PartyService.getInstance()
-                .getPartyForActiveCharacter(source);
+                .getPartyForActiveIdentity(source);
         if (sourceId == null || party == null
                 || !party.containsMember(sourceId)) {
             return;
@@ -126,7 +131,7 @@ public final class PartyQuestProgressCoordinator {
         }
         for (PartyMember member : party.getMembers()) {
             if (member == null
-                    || sourceId.equals(member.getCharacterId())) {
+                    || sourceId.equals(member.getIdentityId())) {
                 continue;
             }
             EntityPlayerMP participant = findOnlinePlayer(
@@ -171,7 +176,7 @@ public final class PartyQuestProgressCoordinator {
                 || participant.getHealth() <= 0.0F) {
             return false;
         }
-        if (!member.getCharacterId().equals(
+        if (!member.getIdentityId().equals(
                 RoleplayCharacterIdentityHook.resolveGameplayId(participant))
                 || !member.getOwnerId().equals(participant.getUniqueID())) {
             return false;

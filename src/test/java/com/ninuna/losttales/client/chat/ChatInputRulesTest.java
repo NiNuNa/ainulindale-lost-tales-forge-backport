@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.config.LostTalesConfig;
 import org.junit.Test;
@@ -29,6 +30,41 @@ public final class ChatInputRulesTest {
         assertTrue(ChatInputRules.isServerCommand("/losttales hud"));
         assertFalse(ChatInputRules.isServerCommand("/msg Bilbo hi"));
         assertFalse(ChatInputRules.isServerCommand("a message"));
+    }
+
+    /**
+     * {@code /me} in an in-character channel is the chat's own action;
+     * out of character it stays the game's command, sent as it is.
+     */
+    @Test
+    public void meIsAnActionInCharacterAndTheGamesCommandOutOfIt() {
+        assertTrue(ChatInputRules.isActionCommand("/me draws his sword"));
+        assertTrue(ChatInputRules.isActionCommand("  /ME waves"));
+        assertTrue(ChatInputRules.isActionCommand("/me"));
+        assertFalse(ChatInputRules.isActionCommand("/meet you there"));
+        assertFalse(ChatInputRules.isActionCommand("me waves"));
+        assertFalse(ChatInputRules.isActionCommand(null));
+
+        assertTrue(ChatInputRules.isAction("/me waves", ChatChannel.GLOBAL));
+        assertTrue(ChatInputRules.isAction("/me waves", ChatChannel.PROXIMITY));
+        assertTrue(ChatInputRules.isAction("/me waves", ChatChannel.WHISPER));
+        assertFalse(ChatInputRules.isAction("/me waves", ChatChannel.OOC));
+        assertFalse(ChatInputRules.isAction("/me waves",
+                ChatChannel.SERVER_CONSOLE));
+        assertFalse(ChatInputRules.isAction("/me waves", null));
+
+        assertFalse(ChatInputRules.isServerCommand("/me waves",
+                ChatChannel.GLOBAL));
+        assertTrue(ChatInputRules.isServerCommand("/me waves",
+                ChatChannel.OOC));
+        assertTrue(ChatInputRules.isServerCommand("/losttales hud",
+                ChatChannel.GLOBAL));
+
+        assertEquals("draws his  sword",
+                ChatInputRules.actionWords("  /me   draws his  sword "));
+        assertEquals("", ChatInputRules.actionWords("/me"));
+        assertEquals("", ChatInputRules.actionWords("/me   "));
+        assertEquals("", ChatInputRules.actionWords(null));
     }
 
     @Test

@@ -4,11 +4,13 @@ import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.client.window.BarItem;
 import com.ninuna.losttales.client.window.PageContent;
 import com.ninuna.losttales.client.window.PageTab;
+import com.ninuna.losttales.client.window.WindowBar;
 import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.client.window.WorldPageWatch;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
@@ -28,15 +30,16 @@ import org.lwjgl.input.Keyboard;
 /**
  * A missive letter, a page a window holds (Q9 a): the letter in the
  * inventory slot it was used from, on the sheet the board's page shows a
- * notice on ({@link MissiveLetterView}), and Accept on the bar, greyed
- * with its reason where the letter cannot be accepted. Using a letter
- * opens it; using another turns the page to that one.
+ * notice on ({@link MissiveLetterView}), and Accept (A) on the bar,
+ * greyed with its reason where the letter cannot be accepted. Using a
+ * letter opens it; using another turns the page to that one.
  *
  * <p>The page closes by itself once that slot no longer holds that
  * letter, checked every tick: moved, dropped, or used up by its own
  * Accept, which closes it without a word, since the quest's own banner
  * says it started. The server reads the slot again before it starts the
- * quest, and says a refusal in the chat.</p>
+ * quest, and says a refusal in the chat, which stands over the page's
+ * bar instead while the page is shown (W2 a).</p>
  */
 public final class MissiveLetterPage extends PageContent
         implements WorldPageWatch.Watched {
@@ -48,6 +51,8 @@ public final class MissiveLetterPage extends PageContent
 
     /** The bar's item: its id, which the page is told when it is pressed. */
     private static final String ACCEPT = "accept";
+    /** The key Accept answers to while the page holds the keys. */
+    private static final int ACCEPT_KEY = Keyboard.KEY_A;
     /** Clear pixels round the sheet. */
     private static final int MARGIN = 8;
     /** The widest the sheet grows, so its lines stay a letter's. */
@@ -128,6 +133,7 @@ public final class MissiveLetterPage extends PageContent
         if (!same) {
             this.accepted = false;
             this.view.toTop();
+            clearAnswer();
         }
         return true;
     }
@@ -141,6 +147,23 @@ public final class MissiveLetterPage extends PageContent
         this.lookedAt = null;
         this.lookedAtId = null;
         this.view.toTop();
+        clearAnswer();
+    }
+
+    /**
+     * The server's lines about a missive, and a quest's about its
+     * requirements, answer the letter's Accept while the page is shown:
+     * the refusal stands over the bar, and Accept can be pressed again.
+     */
+    @Override
+    public boolean answersLine(String key) {
+        return MissiveActions.answersRequest(key);
+    }
+
+    @Override
+    public void answerLine(String key, String words) {
+        this.accepted = false;
+        sayRefused(words);
     }
 
     /* ---- The letter leaving ---- */
@@ -232,9 +255,15 @@ public final class MissiveLetterPage extends PageContent
                 && this.view.scroll(sheet, lines);
     }
 
-    /** The page keys turn the letter. */
+    /** The page keys turn the letter, and A takes Accept while it can be taken, as its tip names it. */
     @Override
     public boolean keyTyped(char typedChar, int keyCode) {
+        if (this.slot >= 0 && keyCode == ACCEPT_KEY) {
+            if (whyNotAccept().length() == 0) {
+                barPressed(ACCEPT, -1);
+            }
+            return true;
+        }
         if (this.slot < 0 || keyCode != Keyboard.KEY_PRIOR
                 && keyCode != Keyboard.KEY_NEXT) {
             return false;
@@ -246,6 +275,12 @@ public final class MissiveLetterPage extends PageContent
         return true;
     }
 
+    /** The letter's tab wears tan, its paper, as the board's does. */
+    @Override
+    public int tone() {
+        return LostTalesColors.rgb(LostTalesColors.TAN);
+    }
+
     /* ---- The window's bar ---- */
 
     /** Accept, there whatever the letter, greyed with the reason where it cannot be accepted. */
@@ -255,17 +290,24 @@ public final class MissiveLetterPage extends PageContent
         if (this.slot < 0) {
             return items;
         }
-        boolean active = this.missive != null
-                && LostTalesClientQuestProgressStore.isQuestActive(this.questId);
         BarItem accept = BarItem.button(ACCEPT, StatCollector.translateToLocal(
                 "gui.losttales.missive_letter.accept"), LostTalesUiSheet.QUEST,
-                LostTalesUiSheet.QUEST_HOVER).tip(StatCollector.translateToLocal(
-                        "gui.losttales.missive_letter.accept.tip"));
-        String why = MissiveActions.whyNotAcceptLetter(this.missive != null,
-                active, this.accepted);
+                LostTalesUiSheet.QUEST_HOVER).tip(WindowBar.withKey(
+                        StatCollector.translateToLocal(
+                                "gui.losttales.missive_letter.accept.tip"),
+                        ACCEPT_KEY));
+        String why = whyNotAccept();
         items.add(why.length() == 0 ? accept
                 : accept.unavailable(StatCollector.translateToLocal(why)));
         return items;
+    }
+
+    /** Why Accept cannot be taken now, as a lang key; empty while it can. */
+    private String whyNotAccept() {
+        boolean active = this.missive != null
+                && LostTalesClientQuestProgressStore.isQuestActive(this.questId);
+        return MissiveActions.whyNotAcceptLetter(this.missive != null,
+                active, this.accepted);
     }
 
     /** Accept asks the server to start the letter's quest; the letter's leaving closes the page. */

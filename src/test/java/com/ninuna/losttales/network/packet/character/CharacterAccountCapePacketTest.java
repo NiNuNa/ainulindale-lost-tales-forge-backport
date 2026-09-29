@@ -7,6 +7,7 @@ import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.character.sync.CharacterAppearanceKind;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
+import com.ninuna.losttales.character.sync.DeletedCharacterSummary;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import org.junit.Test;
@@ -71,9 +72,9 @@ public final class CharacterAccountCapePacketTest {
     public void thePrivateRosterCarriesTheAccountCapeAndTemplateFlag() {
         CharacterRosterSnapshot snapshot = new CharacterRosterSnapshot(
                 OWNER, CharacterRoster.INITIAL_UNLOCKED_SLOTS, null, 3L,
-                CharacterRoster.CURRENT_DATA_VERSION,
                 Collections.<CharacterSummary>emptyList(), false,
-                CharacterCapeCatalog.RANGER, false);
+                CharacterCapeCatalog.RANGER, false,
+                Collections.<DeletedCharacterSummary>emptyList());
         ByteBuf buffer = Unpooled.buffer();
         new CharacterRosterSyncPacket(1, snapshot).toBytes(buffer);
 

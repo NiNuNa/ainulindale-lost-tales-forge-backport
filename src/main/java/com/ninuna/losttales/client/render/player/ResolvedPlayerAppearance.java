@@ -11,14 +11,12 @@ import java.util.Locale;
  * from the synchronized character appearance (or, without a character, from
  * the account) by {@link PlayerAppearanceResolver}.
  *
- * Nothing here is gameplay state. Race is kept only for render decisions
- * that are still keyed by race, such as the cape attachment transform.
+ * Nothing here is gameplay state.
  */
 public final class ResolvedPlayerAppearance {
 
     private static final String KEY_SEPARATOR = "|";
 
-    private final String raceId;
     private final String modelId;
     private final CharacterSkinLayout layout;
     private final String bodyTypeId;
@@ -28,19 +26,15 @@ public final class ResolvedPlayerAppearance {
     private final ResourceLocation texture;
     private final String rendererKey;
 
-    ResolvedPlayerAppearance(String raceId, String modelId, CharacterSkinLayout layout,
+    ResolvedPlayerAppearance(String modelId, CharacterSkinLayout layout,
                              String bodyTypeId, String chestTypeId, float rendererScale,
                              boolean accountSkin, ResourceLocation texture) {
-        if (raceId == null || raceId.length() == 0) {
-            throw new IllegalArgumentException("raceId must not be blank");
-        }
         if (modelId == null || modelId.length() == 0) {
             throw new IllegalArgumentException("modelId must not be blank");
         }
         if (layout == null) {
             throw new IllegalArgumentException("layout must not be null");
         }
-        this.raceId = raceId;
         this.modelId = modelId;
         this.layout = layout;
         this.bodyTypeId = bodyTypeId == null ? "" : bodyTypeId;
@@ -49,10 +43,6 @@ public final class ResolvedPlayerAppearance {
         this.accountSkin = accountSkin;
         this.texture = texture;
         this.rendererKey = rendererKey(modelId, layout, this.bodyTypeId, this.chestTypeId);
-    }
-
-    public String getRaceId() {
-        return this.raceId;
     }
 
     public String getModelId() {
@@ -72,11 +62,6 @@ public final class ResolvedPlayerAppearance {
     /** The chest type drawn; {@link CharacterChestTypeRegistry#NONE} when none. */
     public String getChestTypeId() {
         return this.chestTypeId;
-    }
-
-    /** True when a feminine chest is drawn. */
-    public boolean hasChest() {
-        return !CharacterChestTypeRegistry.NONE.equals(this.chestTypeId);
     }
 
     /** Uniform scale applied to the whole body before it is drawn. */
@@ -104,7 +89,7 @@ public final class ResolvedPlayerAppearance {
 
     /** The same appearance drawn with another texture. */
     ResolvedPlayerAppearance withTexture(ResourceLocation replacement) {
-        return new ResolvedPlayerAppearance(this.raceId, this.modelId, this.layout,
+        return new ResolvedPlayerAppearance(this.modelId, this.layout,
                 this.bodyTypeId, this.chestTypeId, this.rendererScale, this.accountSkin,
                 replacement);
     }

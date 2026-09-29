@@ -22,8 +22,7 @@ public final class CameraRenderTransform {
     public static CameraRenderTransform resolve(
             double rawPivotX, double rawPivotY, double rawPivotZ,
             double yaw, double pitch, double actualDistance,
-            CameraPose pose, CameraMotionOffset motion,
-            double verticalFov) {
+            CameraPose pose, CameraMotionOffset motion) {
         if (pose == null || motion == null) {
             throw new IllegalArgumentException(
                     "pose and motion are required");
@@ -50,7 +49,7 @@ public final class CameraRenderTransform {
                 + basis.forwardZ * forwardMotion;
         CameraRenderFrame frame = new CameraRenderFrame(
                 pivotX, pivotY, pivotZ, yaw, pitch,
-                actualDistance, shoulder, vertical, verticalFov);
+                actualDistance, shoulder, vertical);
 
         double cameraOffsetX = followX
                 + basis.forwardX * forwardMotion

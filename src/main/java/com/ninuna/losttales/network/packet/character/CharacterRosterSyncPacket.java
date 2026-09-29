@@ -5,6 +5,7 @@ import com.ninuna.losttales.character.cape.CharacterCapeCatalog;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
+import com.ninuna.losttales.character.sync.DeletedCharacterSummary;
 import com.ninuna.losttales.network.packet.LostTalesPacketCodec;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
@@ -17,7 +18,11 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-/** Full private roster snapshot sent only to the owning player. */
+/**
+ * Full private roster snapshot sent only to the owning player: its
+ * characters, the account character's capes, and the deleted characters
+ * the server still keeps for it.
+ */
 public final class CharacterRosterSyncPacket implements IMessage {
 
     private int requestId;
@@ -42,12 +47,11 @@ public final class CharacterRosterSyncPacket implements IMessage {
             int unlockedSlotCount = buffer.readUnsignedByte();
             UUID activeCharacterId = LostTalesPacketCodec.readNullableUuid(buffer);
             long revision = buffer.readLong();
-            int dataVersion = buffer.readInt();
             int characterCount = buffer.readUnsignedByte();
 
             if (unlockedSlotCount < CharacterRoster.INITIAL_UNLOCKED_SLOTS
                     || unlockedSlotCount > CharacterRoster.MAX_SLOTS
-                    || dataVersion <= 0
+                    || revision < 0L
                     || characterCount > CharacterPacketCodec.MAX_CHARACTERS) {
                 throw new CharacterPacketCodec.DecodeException("invalid roster header");
             }
@@ -57,7 +61,7 @@ public final class CharacterRosterSyncPacket implements IMessage {
             Set<Integer> slots = new HashSet<Integer>();
             for (int index = 0; index < characterCount; index++) {
                 UUID characterId = LostTalesPacketCodec.readUuid(buffer);
-                // Signed: the default character sits in slot -1, and the
+                // Signed: the account character sits in slot -1, and the
                 // nine a player fills encode the same either way.
                 int slotIndex = buffer.readByte();
                 String name = LostTalesPacketCodec.readUtf8String(buffer, CharacterPacketCodec.MAX_NAME_BYTES);
@@ -70,10 +74,6 @@ public final class CharacterRosterSyncPacket implements IMessage {
                 int cosmeticCapeId = buffer.readUnsignedShort();
                 int age = buffer.readInt();
                 String factionId = LostTalesPacketCodec.readUtf8String(buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-                int roleplayLevel = buffer.readInt();
-                long experiencePoints = buffer.readLong();
-                long creationTimestamp = buffer.readLong();
-                int characterDataVersion = buffer.readInt();
                 String bodyTypeId = LostTalesPacketCodec.readUtf8String(
                         buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
                 String chestTypeId = LostTalesPacketCodec.readUtf8String(
@@ -82,11 +82,7 @@ public final class CharacterRosterSyncPacket implements IMessage {
                 if (!CharacterRoster.isValidSlotIndex(slotIndex)
                         || !ids.add(characterId)
                         || !slots.add(Integer.valueOf(slotIndex))
-                        || !CharacterCapeCatalog.isValidSelection(cosmeticCapeId)
-                        || roleplayLevel < 1
-                        || experiencePoints < 0L
-                        || creationTimestamp < 0L
-                        || characterDataVersion <= 0) {
+                        || !CharacterCapeCatalog.isValidSelection(cosmeticCapeId)) {
                     throw new CharacterPacketCodec.DecodeException("invalid character summary");
                 }
                 characters.add(new CharacterSummary(
@@ -100,34 +96,54 @@ public final class CharacterRosterSyncPacket implements IMessage {
                         cosmeticCapeId,
                         age,
                         factionId,
-                        roleplayLevel,
-                        experiencePoints,
-                        creationTimestamp,
-                        characterDataVersion,
                         bodyTypeId,
                         chestTypeId
                 ));
             }
             // After every character: the cape the account wears when
             // played as itself, then whether this world has taken the
-            // account's template.
+            // account character's look.
             boolean accountShowMinecraftCape = buffer.readBoolean();
             int accountCosmeticCapeId = buffer.readUnsignedShort();
             if (!CharacterCapeCatalog.isValidSelection(accountCosmeticCapeId)) {
                 throw new CharacterPacketCodec.DecodeException("invalid account cape");
             }
             boolean templateTaken = buffer.readBoolean();
+            // Last, the deleted characters the server still keeps.
+            int deletedCount = buffer.readUnsignedByte();
+            if (deletedCount > CharacterRosterSnapshot.MAX_DELETED) {
+                throw new CharacterPacketCodec.DecodeException(
+                        "too many deleted characters");
+            }
+            List<DeletedCharacterSummary> deleted =
+                    new ArrayList<DeletedCharacterSummary>(deletedCount);
+            for (int index = 0; index < deletedCount; index++) {
+                UUID characterId = LostTalesPacketCodec.readUuid(buffer);
+                String name = LostTalesPacketCodec.readUtf8String(
+                        buffer, CharacterPacketCodec.MAX_NAME_BYTES);
+                String raceId = LostTalesPacketCodec.readUtf8String(
+                        buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+                String skinId = LostTalesPacketCodec.readUtf8String(
+                        buffer, CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+                int daysLeft = buffer.readUnsignedShort();
+                if (!ids.add(characterId)) {
+                    throw new CharacterPacketCodec.DecodeException(
+                            "a deleted character named twice");
+                }
+                deleted.add(new DeletedCharacterSummary(characterId, name,
+                        raceId, skinId, daysLeft));
+            }
             LostTalesPacketCodec.requireFinished(buffer);
             this.snapshot = new CharacterRosterSnapshot(
                     ownerId,
                     unlockedSlotCount,
                     activeCharacterId,
                     revision,
-                    dataVersion,
                     characters,
                     accountShowMinecraftCape,
                     accountCosmeticCapeId,
-                    templateTaken
+                    templateTaken,
+                    deleted
             );
             if (activeCharacterId != null && this.snapshot.getActiveCharacterId() == null) {
                 throw new CharacterPacketCodec.DecodeException("invalid active character reference");
@@ -148,7 +164,6 @@ public final class CharacterRosterSyncPacket implements IMessage {
         buffer.writeByte(this.snapshot.getUnlockedSlotCount());
         LostTalesPacketCodec.writeNullableUuid(buffer, this.snapshot.getActiveCharacterId());
         buffer.writeLong(this.snapshot.getRevision());
-        buffer.writeInt(this.snapshot.getDataVersion());
         buffer.writeByte(this.snapshot.getCharacterCount());
         for (CharacterSummary character : this.snapshot.getCharacters()) {
             LostTalesPacketCodec.writeUuid(buffer, character.getCharacterId());
@@ -162,11 +177,7 @@ public final class CharacterRosterSyncPacket implements IMessage {
             buffer.writeBoolean(character.isMinecraftCapeVisible());
             buffer.writeShort(character.getCosmeticCapeId());
             buffer.writeInt(character.getAge());
-            LostTalesPacketCodec.writeUtf8String(buffer, character.getStartingFactionId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
-            buffer.writeInt(character.getRoleplayLevel());
-            buffer.writeLong(character.getExperiencePoints());
-            buffer.writeLong(character.getCreationTimestamp());
-            buffer.writeInt(character.getDataVersion());
+            LostTalesPacketCodec.writeUtf8String(buffer, character.getFactionId(), CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
             // The arm width and chest type chosen for the character.
             LostTalesPacketCodec.writeUtf8String(
                     buffer, character.getBodyTypeId(),
@@ -178,6 +189,17 @@ public final class CharacterRosterSyncPacket implements IMessage {
         buffer.writeBoolean(this.snapshot.isAccountMinecraftCapeVisible());
         buffer.writeShort(this.snapshot.getAccountCosmeticCapeId());
         buffer.writeBoolean(this.snapshot.isTemplateTaken());
+        buffer.writeByte(this.snapshot.getDeleted().size());
+        for (DeletedCharacterSummary deleted : this.snapshot.getDeleted()) {
+            LostTalesPacketCodec.writeUuid(buffer, deleted.getCharacterId());
+            LostTalesPacketCodec.writeUtf8String(buffer, deleted.getName(),
+                    CharacterPacketCodec.MAX_NAME_BYTES);
+            LostTalesPacketCodec.writeUtf8String(buffer, deleted.getRaceId(),
+                    CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+            LostTalesPacketCodec.writeUtf8String(buffer, deleted.getSkinId(),
+                    CharacterPacketCodec.MAX_IDENTIFIER_BYTES);
+            buffer.writeShort(Math.min(0xFFFF, deleted.getDaysLeft()));
+        }
     }
 
     public int getRequestId() {

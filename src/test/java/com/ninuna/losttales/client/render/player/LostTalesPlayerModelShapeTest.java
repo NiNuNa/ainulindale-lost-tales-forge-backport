@@ -222,7 +222,6 @@ public final class LostTalesPlayerModelShapeTest {
     public void armorVariantsKeepProportionsOnly() {
         LostTalesPlayerModel armor = new LostTalesPlayerModel(
                 1.0F, false, PlayerBodyShape.HOBBIT, LOTR, ROUNDED, true);
-        assertTrue(armor.isArmorTexture());
         assertEquals(32.0F, armor.textureHeight, 0.0F);
         assertFalse(armor.hasChest());
         assertNull(armor.bipedBody.childModels);

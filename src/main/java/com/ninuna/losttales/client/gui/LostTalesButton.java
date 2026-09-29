@@ -35,10 +35,6 @@ public class LostTalesButton extends GuiButton {
         }
     }
 
-    public void setSelected(boolean selected) {
-        this.selected = selected;
-    }
-
     public boolean isHovered() {
         return this.visible && this.field_146123_n;
     }
@@ -74,11 +70,6 @@ public class LostTalesButton extends GuiButton {
         } finally {
             LostTalesUiButton.endPose();
         }
-    }
-
-    /** How far the button has crossed to its lit look, for a subclass. */
-    protected final float lit() {
-        return this.motion.lit();
     }
 
     /** The default content is a centered label using the shared palette. */
