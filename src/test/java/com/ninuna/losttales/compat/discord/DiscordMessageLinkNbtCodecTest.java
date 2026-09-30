@@ -92,7 +92,7 @@ public final class DiscordMessageLinkNbtCodecTest {
         assertNoWebhook(written);
         assertEquals(2, DiscordMessageLinkNbtCodec.read(written).getEntries().size());
         // The store writes nothing else, attached or after the stop.
-        DiscordMessageLinkWorldData data = new DiscordMessageLinkWorldData();
+        DiscordMessageLinkWorldData data = new DiscordMessageLinkWorldData(DiscordMessageLinkWorldData.DATA_NAME);
         data.attach(links, false);
         NBTTagCompound attached = new NBTTagCompound();
         data.writeToNBT(attached);
@@ -121,7 +121,7 @@ public final class DiscordMessageLinkNbtCodecTest {
 
         // The store writes it back exactly as it was read, and takes no
         // live map to write from.
-        DiscordMessageLinkWorldData data = new DiscordMessageLinkWorldData();
+        DiscordMessageLinkWorldData data = new DiscordMessageLinkWorldData(DiscordMessageLinkWorldData.DATA_NAME);
         data.readFromNBT(newer);
         assertTrue(data.isReadOnlyForNewerVersion());
         assertTrue(data.restoredLinks().isEmpty());

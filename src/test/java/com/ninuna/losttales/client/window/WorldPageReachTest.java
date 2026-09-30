@@ -9,7 +9,7 @@ import static org.junit.Assert.assertNull;
 
 /**
  * A world page's tab closes once its player is further than the server's
- * reach from its thing, in another world, or the thing is gone (Q8 a):
+ * reach from its thing, in another world, or the thing is gone:
  * the same eight blocks the server lets a player use a waystone or a
  * missive board from, measured from the feet to the block's middle.
  */

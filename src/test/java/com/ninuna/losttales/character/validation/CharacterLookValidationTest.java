@@ -16,7 +16,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Change Look (R1 a) holds a new skin, arm width and chest to the
+ * Change Look holds a new skin, arm width and chest to the
  * creator's checks for the character's own race and sex, and never
  * touches who the character is.
  */

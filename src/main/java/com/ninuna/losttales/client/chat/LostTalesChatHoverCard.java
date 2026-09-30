@@ -218,7 +218,7 @@ final class LostTalesChatHoverCard {
             addDetail(lines, "gui.losttales.character.age",
                     details == null || details.getAge() <= 0
                             ? "" : String.valueOf(details.getAge()));
-            // The glances the character shows (P3 a): asked for as the
+            // The glances the character shows: asked for as the
             // card shows them, a row of their emoji once they come.
             if (target.hasProfile()) {
                 ClientCharacterProfileCache.want(target.characterId);

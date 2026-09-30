@@ -228,7 +228,7 @@ public final class DiscordCopyLivenessTest {
      * done to its lines already bridged as it stops a new line: no edit,
      * deletion or reaction crosses either way while the gate stands, and
      * lifting it brings everything back, the links kept all along. A gate
-     * that only asks for a role leaves the channel linked (D1 b).
+     * that only asks for a role leaves the channel linked.
      */
     @Test
     public void aClosedChannelsCopiesAreLeftAloneBothWays() {

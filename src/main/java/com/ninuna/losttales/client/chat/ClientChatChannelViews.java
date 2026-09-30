@@ -1023,9 +1023,4 @@ public final class ClientChatChannelViews {
                     && head == this.first;
         }
     }
-
-    /** Test and diagnostics hook: tracked line count. */
-    static synchronized int trackedLineCount() {
-        return TAB_BY_LINE_ID.size();
-    }
 }

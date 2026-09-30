@@ -68,7 +68,7 @@ public final class ChatInputBar {
     static final int CONTENT_HEIGHT = LostTalesUiFramedButton.HEIGHT;
     /**
      * Height of the typing well: one message row, as every chat input box
-     * is (Nils), so what is typed stands exactly as it will once it is
+     * is, so what is typed stands exactly as it will once it is
      * sent.
      */
     static final int WELL_HEIGHT = LostTalesChatOverlayRenderer.LINE_HEIGHT;
@@ -572,7 +572,7 @@ public final class ChatInputBar {
     /**
      * The active window's input bar in the tool strip's surface — the
      * tab in front's plum grey at two thirds, one flat stretch of it, so
-     * the history stands between two bands of one tone (Nils) — exactly
+     * the history stands between two bands of one tone — exactly
      * as wide as the window,
      * with holes cut in it for the tab and identity buttons' frames and
      * the typing well, and the empty field's hint in the well. The strip's

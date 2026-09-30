@@ -176,6 +176,12 @@ public final class LostTalesServerConfigService {
         if (categories.contains(LostTalesConfig.CATEGORY_DISCORD)) {
             LostTalesDiscordBridge.getInstance().start();
             restarted.add("Discord bridge");
+        } else if ((categories.contains(LostTalesConfig.CATEGORY_ROLES)
+                || categories.contains(LostTalesConfig.CATEGORY_CHANNELS))
+                && LostTalesDiscordBridge.getInstance().restartIfGatesMoved()) {
+            // The bridge refuses a link to a channel nobody may read, so
+            // a gate that opened or closed one changes what it carries.
+            restarted.add("Discord bridge");
         }
         // The chat access names the channels linked to Discord, so the
         // bridge's category sends it again too.

@@ -21,8 +21,8 @@ public final class ChatSettingsSectionsTest {
     /**
      * The Channels section lists every channel the player can see, in
      * the order the chat shows them. The whisper channel has no tab of
-     * its own, only its conversations, and a gate open to it once
-     * crashed the window as it opened (2026-09-24).
+     * its own, only its conversations, and a gate open to it must not
+     * crash the window as it opens.
      */
     @Test
     public void theChannelsSectionPassesOverTheWhisperChannel() {

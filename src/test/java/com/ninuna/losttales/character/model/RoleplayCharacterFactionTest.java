@@ -17,7 +17,7 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * A character's faction is its LOTR pledge while it has one, else its
- * starting faction (R3 a). The record keeps the pledge, so a character not
+ * starting faction. The record keeps the pledge, so a character not
  * played answers too, and the chat, the roster and the appearance all read
  * the one rule.
  */

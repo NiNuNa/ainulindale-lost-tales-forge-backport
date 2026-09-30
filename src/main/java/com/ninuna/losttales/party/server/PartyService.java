@@ -133,6 +133,12 @@ public final class PartyService {
         PartyMember leaving = context.party.getMember(leavingIdentityId);
         boolean leaderLeaving = leavingIdentityId.equals(
                 context.party.getLeaderIdentityId());
+        // A leader with others in the party hands it on first, so it never
+        // loses its leader to a slip; alone, leaving ends the party.
+        if (leaderLeaving && context.party.getMemberCount() > 1) {
+            return PartyOperationResult.failure(
+                    PartyErrorId.LEADER_MUST_HAND_OVER, context.party);
+        }
         if (leaderLeaving) {
             invitationData.removeInvitationsForParty(
                     context.party.getPartyId());

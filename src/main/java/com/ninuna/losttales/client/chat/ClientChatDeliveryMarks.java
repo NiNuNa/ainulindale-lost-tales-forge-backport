@@ -73,11 +73,6 @@ public final class ClientChatDeliveryMarks {
         BY_MESSAGE.clear();
     }
 
-    /** Test and diagnostics hook: messages marked. */
-    static synchronized int size() {
-        return BY_MESSAGE.size();
-    }
-
     /**
      * The mark on a drawn line, or null. Asked for every line drawn, so
      * a session with no marks answers before the line is looked up.

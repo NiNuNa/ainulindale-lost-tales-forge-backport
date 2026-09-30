@@ -2,7 +2,7 @@ package com.ninuna.losttales.client.window;
 
 /**
  * The three tips a new player's first opening of the chat shows, one
- * after another (W9 a): the {@code +}, where closed channels, direct
+ * after another: the {@code +}, where closed channels, direct
  * messages and pages wait; the head button, which picks who speaks; and
  * Ctrl+K, the quick switcher. A click anywhere takes the tip showing
  * away and brings the next; once the last has gone none shows again,

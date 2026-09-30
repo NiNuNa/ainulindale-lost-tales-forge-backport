@@ -14,7 +14,7 @@ import java.util.Map;
 import net.minecraft.util.StatCollector;
 
 /**
- * The waystone page's rows (Q10 a): Marker, Location, Rules and Sharing,
+ * The waystone page's rows: Marker, Location, Rules and Sharing,
  * each a section of Settings' own rows — typed lines and numbers between
  * chevrons as Settings' own kinds, switches and few-word options as
  * Settings words them, rows that act, and quiet rows that only read —

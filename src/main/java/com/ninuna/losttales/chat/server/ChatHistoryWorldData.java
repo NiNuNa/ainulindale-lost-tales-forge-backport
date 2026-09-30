@@ -43,10 +43,6 @@ public final class ChatHistoryWorldData extends WorldSavedData {
     private int unsupportedDataVersion = -1;
     private NBTTagCompound preservedNewerData;
 
-    public ChatHistoryWorldData() {
-        this(DATA_NAME);
-    }
-
     public ChatHistoryWorldData(String name) {
         super(name);
     }

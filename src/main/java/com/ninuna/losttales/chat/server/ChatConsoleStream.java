@@ -256,9 +256,4 @@ public final class ChatConsoleStream {
         EVENTS.clear();
         REACTIONS.clear();
     }
-
-    /** Test and diagnostics hook. */
-    static synchronized int size() {
-        return EVENTS.size();
-    }
 }

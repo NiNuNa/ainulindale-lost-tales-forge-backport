@@ -27,25 +27,31 @@ public final class LostTalesQuestObjectiveTypeTest {
     }
 
     @Test
-    public void everySpellingOfAKindNamesThatKind() {
+    public void eachKindHasOneWord() {
         assertEquals(LostTalesQuestObjectiveType.GATHER,
                 LostTalesQuestObjectiveType.of("gather"));
         assertEquals(LostTalesQuestObjectiveType.GATHER,
-                LostTalesQuestObjectiveType.of("PICKUP_ITEM"));
-        // Read by the journal before it was read by the server; one
-        // catalogue means both answer the same.
-        assertEquals(LostTalesQuestObjectiveType.GATHER,
-                LostTalesQuestObjectiveType.of(" Collect "));
+                LostTalesQuestObjectiveType.of(" gather "));
         assertEquals(LostTalesQuestObjectiveType.GOTO,
-                LostTalesQuestObjectiveType.of("travel"));
+                LostTalesQuestObjectiveType.of("goto"));
         assertEquals(LostTalesQuestObjectiveType.TALK,
-                LostTalesQuestObjectiveType.of("speak_to"));
+                LostTalesQuestObjectiveType.of("talk"));
         assertEquals(LostTalesQuestObjectiveType.DELIVER,
-                LostTalesQuestObjectiveType.of("hand_in"));
+                LostTalesQuestObjectiveType.of("deliver"));
         assertEquals(LostTalesQuestObjectiveType.KILL,
                 LostTalesQuestObjectiveType.of("kill"));
         assertEquals(LostTalesQuestObjectiveType.CRAFT,
                 LostTalesQuestObjectiveType.of("craft"));
+    }
+
+    @Test
+    public void aSecondSpellingNamesNothing() {
+        String[] others = {"collect", "pickup", "PICKUP_ITEM", "Gather",
+                "travel", "go_to", "speak_to", "visit", "hand_in", "give"};
+        for (String other : others) {
+            assertEquals(other, LostTalesQuestObjectiveType.UNKNOWN,
+                    LostTalesQuestObjectiveType.of(other));
+        }
     }
 
     @Test
@@ -93,17 +99,19 @@ public final class LostTalesQuestObjectiveTypeTest {
     public void theJournalDescribesATalkAndADeliveryWithoutAuthoredText() {
         assertEquals("Speak to Nia.", LostTalesQuestObjectiveTextHelper
                 .buildObjectiveLine(null, objective("talk",
-                        "entity", "Nia,losttalesnia"), false, false)
+                        "entity", "losttales.Nia,losttales.OdaneMan"), false, false)
                         .replace(" (0/1)", ""));
         assertEquals("Bring Nia 4 Stick.", LostTalesQuestObjectiveTextHelper
                 .buildObjectiveLine(null, objective("deliver",
-                        "entity", "Nia", "item", "minecraft:stick",
+                        "entity", "losttales.Nia", "item", "minecraft:stick",
                         "count", "4"), false, false)
                         .replace(" (0/4)", ""));
+        assertEquals("Defeat 3 hostile.", LostTalesQuestObjectiveTextHelper
+                .describe(objective("kill", "group", "hostile", "count", "3")));
         assertEquals("Deliver", LostTalesQuestObjectiveTextHelper
-                .typeName("turn_in"));
+                .typeName("deliver"));
         assertEquals("Speak", LostTalesQuestObjectiveTextHelper
-                .typeName("visit"));
+                .typeName("talk"));
         assertEquals("Dance", LostTalesQuestObjectiveTextHelper
                 .typeName("dance"));
     }

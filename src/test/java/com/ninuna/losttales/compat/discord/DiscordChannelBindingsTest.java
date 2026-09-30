@@ -1,6 +1,7 @@
 package com.ninuna.losttales.compat.discord;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatChannelGates;
 import com.ninuna.losttales.chat.ChatCodeNames;
 import org.junit.After;
 import org.junit.Before;
@@ -9,7 +10,9 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -31,6 +34,42 @@ public final class DiscordChannelBindingsTest {
     @After
     public void forgetFactions() {
         ChatCodeNames.installFactions(Collections.<String>emptyList());
+        ChatChannelGates.install(ChatChannelGates.defaults());
+    }
+
+    /** Gates with OOC closed to every reader, as a gate naming a role nothing knows is. */
+    private static void closeOocToReading() {
+        Map<ChatChannel, ChatChannelGates.Gate> gates =
+                new HashMap<ChatChannel, ChatChannelGates.Gate>();
+        gates.put(ChatChannel.OOC, new ChatChannelGates.Gate(
+                Collections.<String>emptySet(), Collections.<String>emptySet(),
+                true, false));
+        ChatChannelGates.install(ChatChannelGates.of(gates));
+    }
+
+    /**
+     * A channel nobody may read carries nothing, so an entry for it is
+     * refused with a warning, and the other entries stand; the channels
+     * the bridge would refuse are known by id, to restart it when a gate
+     * opens or closes one.
+     */
+    @Test
+    public void aChannelClosedToReadingIsRefused() {
+        closeOocToReading();
+        Collected warnings = new Collected();
+        DiscordChannelBindings bindings = DiscordChannelBindings.parse(new String[] {
+                "ooc=BIDIRECTIONAL;channel=123456789;webhook=" + WEBHOOK,
+                "global=GAME_TO_DISCORD;webhook=" + WEBHOOK + "-global",
+        }, true, warnings);
+        assertTrue(bindings.forGame(ChatChannel.OOC, "").isEmpty());
+        assertEquals(1, bindings.forGame(ChatChannel.GLOBAL, "").size());
+        assertEquals(1, warnings.messages.size());
+        assertTrue(warnings.messages.get(0), warnings.messages.get(0).contains("gate"));
+        assertEquals(Collections.singleton(ChatChannel.OOC.getId()),
+                LostTalesDiscordBridge.closedChannels());
+
+        ChatChannelGates.install(ChatChannelGates.defaults());
+        assertTrue(LostTalesDiscordBridge.closedChannels().isEmpty());
     }
 
     private static final String WEBHOOK = "https://discord.com/api/webhooks/1/abc";

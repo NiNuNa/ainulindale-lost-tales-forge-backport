@@ -47,14 +47,13 @@ public final class LostTalesQuestObjectiveTextHelper {
                 return translate(type.canonicalName(), count, itemName(objective));
             case KILL:
                 return translate("kill", count, targetName(objective,
-                        getObjectiveTargetCount(objective) == 1 ? "enemy" : "enemies",
-                        "entity", "group"));
+                        getObjectiveTargetCount(objective) == 1 ? "enemy" : "enemies"));
             case TALK: {
-                String who = targetName(objective, "", "entity");
+                String who = targetName(objective, "");
                 return who.length() == 0 ? translate("talk.anyone") : translate("talk", who);
             }
             case DELIVER: {
-                String who = targetName(objective, "", "entity");
+                String who = targetName(objective, "");
                 return who.length() == 0 ? translate("deliver.anyone", count, itemName(objective))
                         : translate("deliver", who, count, itemName(objective));
             }
@@ -101,14 +100,17 @@ public final class LostTalesQuestObjectiveTextHelper {
     }
 
     /**
-     * Who or what the objective names in the first of those params: its
-     * entity name where the game has one, else the id made readable. A
-     * selector may list several spellings of the same target; the first
-     * is the one written for a reader. {@code noun} names none at all.
+     * Who the objective names, for a reader: the first creature kind its
+     * {@code entity} lists, by the game's name for it where the game has
+     * one, else the kind made readable; else the first group its
+     * {@code group} lists. {@code noun} stands for nobody named.
      */
     private static String targetName(LostTalesQuestObjectiveDefinition objective,
-            String noun, String... keys) {
-        String target = LostTalesQuestParams.first(objective.getParams(), keys);
+            String noun) {
+        String target = LostTalesQuestParams.value(objective.getParams(), "entity");
+        if (target.length() == 0) {
+            target = LostTalesQuestParams.value(objective.getParams(), "group");
+        }
         int comma = target.indexOf(',');
         if (comma >= 0) {
             target = target.substring(0, comma).trim();
@@ -120,13 +122,10 @@ public final class LostTalesQuestObjectiveTextHelper {
         if (StatCollector.canTranslate(key)) {
             return StatCollector.translateToLocal(key);
         }
-        int colon = target.indexOf(':');
-        if (colon >= 0 && colon + 1 < target.length()) {
-            target = target.substring(colon + 1);
-        }
-        int at = target.indexOf('@');
-        if (at >= 0) {
-            target = target.substring(0, at);
+        // A mod's creature is registered as mod.Kind; the kind is what reads.
+        int dot = target.lastIndexOf('.');
+        if (dot >= 0 && dot + 1 < target.length()) {
+            target = target.substring(dot + 1);
         }
         return target.replace('-', ' ').replace('_', ' ');
     }

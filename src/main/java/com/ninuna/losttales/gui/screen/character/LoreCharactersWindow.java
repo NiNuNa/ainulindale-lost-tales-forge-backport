@@ -29,7 +29,7 @@ import net.minecraft.client.gui.Gui;
 import net.minecraft.client.resources.I18n;
 
 /**
- * The world's lore characters (R9 a), in a sub-window of the Characters
+ * The world's lore characters, in a sub-window of the Characters
  * tab's window: yours, each a press from being released; those free to
  * claim, into the empty slot picked in the roster or else the first empty
  * one; and those another player has. Each figure's description stands

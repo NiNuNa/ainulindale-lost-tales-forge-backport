@@ -113,11 +113,6 @@ public final class CharacterUnselectableRaceValidationTest {
         }
 
         @Override
-        public String getUnavailableReason() {
-            return "";
-        }
-
-        @Override
         public CharacterFactionDefinition resolve(String factionId) {
             return FACTION.equals(factionId) ? this.trolls : null;
         }

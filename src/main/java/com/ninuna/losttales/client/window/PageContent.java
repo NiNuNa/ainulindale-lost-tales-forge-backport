@@ -219,7 +219,7 @@ public abstract class PageContent {
         return false;
     }
 
-    /** Once a game tick, while the page is open: a list that follows the world. */
+    /** Once a game tick, while the page is on screen, pinned while playing included: a list that follows the world. */
     public void tick() {}
 
     /**

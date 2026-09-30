@@ -7,7 +7,6 @@ import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -53,7 +52,7 @@ public final class LostTalesServerQuestSyncPacket implements IMessage {
         int bytes = 0;
         if (quests != null) {
             for (LostTalesQuestDefinition quest : quests) {
-                int size = encodedSize(quest);
+                int size = LostTalesQuestDefinitionCodec.encodedSize(quest);
                 if (size < 0 || size > CHUNK_BYTES) {
                     continue;
                 }
@@ -72,19 +71,6 @@ public final class LostTalesServerQuestSyncPacket implements IMessage {
                     chunk));
         }
         return packets;
-    }
-
-    /** How many bytes a quest takes on the wire; -1 for one that cannot be written. */
-    private static int encodedSize(LostTalesQuestDefinition quest) {
-        ByteBuf probe = Unpooled.buffer();
-        try {
-            LostTalesQuestDefinitionCodec.write(probe, quest);
-            return probe.readableBytes();
-        } catch (RuntimeException unwritable) {
-            return -1;
-        } finally {
-            probe.release();
-        }
     }
 
     @Override

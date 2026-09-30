@@ -53,7 +53,7 @@ public final class DiscordDeliveryTrackerTest {
         DiscordDeliveryTracker tracker = new DiscordDeliveryTracker();
         tracker.queued(7L, SENDER, 0L);
         assertNull("a line out in time says nothing", tracker.delivered(7L));
-        assertEquals(0, tracker.size());
+        assertTrue("and is followed no more", tracker.due(WAIT).isEmpty());
 
         tracker.queued(8L, SENDER, 0L);
         assertEquals(1, tracker.due(WAIT).size());
@@ -61,7 +61,7 @@ public final class DiscordDeliveryTrackerTest {
         assertEquals(8L, lifted.messageId);
         assertEquals(ChatDeliveryMark.State.NONE, lifted.state);
         assertEquals(ChatDeliveryMark.Reason.NONE, lifted.reason);
-        assertEquals(0, tracker.size());
+        assertTrue("a stop has no line left to mark", tracker.abandon().isEmpty());
     }
 
     @Test
@@ -73,8 +73,8 @@ public final class DiscordDeliveryTrackerTest {
         assertEquals(SENDER, failed.senderId);
         assertEquals(ChatDeliveryMark.State.FAILED, failed.state);
         assertEquals(ChatDeliveryMark.Reason.REFUSED, failed.reason);
-        assertEquals(0, tracker.size());
         assertTrue(tracker.due(WAIT).isEmpty());
+        assertTrue(tracker.abandon().isEmpty());
     }
 
     @Test
@@ -87,7 +87,6 @@ public final class DiscordDeliveryTrackerTest {
                 tracker.lost(7L, ChatDeliveryMark.Reason.WEBHOOK_OFF).state);
         assertTrue("no clock after a crimson mark", tracker.due(WAIT).isEmpty());
         assertNull(tracker.delivered(7L));
-        assertEquals(0, tracker.size());
 
         // A clock, then one copy out and one still waiting: nothing yet.
         tracker.queued(8L, SENDER, 0L);
@@ -104,7 +103,7 @@ public final class DiscordDeliveryTrackerTest {
 
         // The clocked line's last copy out lifts its clock.
         assertEquals(ChatDeliveryMark.State.NONE, tracker.delivered(8L).state);
-        assertEquals(0, tracker.size());
+        assertTrue("a stop has no line left to mark", tracker.abandon().isEmpty());
     }
 
     /** A copy that reaches its lane after its line was lost adds nothing. */
@@ -115,9 +114,31 @@ public final class DiscordDeliveryTrackerTest {
         assertEquals(ChatDeliveryMark.State.FAILED,
                 tracker.lost(7L, ChatDeliveryMark.Reason.WEBHOOK_OFF).state);
         tracker.queued(7L, SENDER, 0L);
-        assertEquals(0, tracker.size());
         assertTrue(tracker.due(WAIT).isEmpty());
         assertNull(tracker.delivered(7L));
+        assertTrue(tracker.abandon().isEmpty());
+    }
+
+    /**
+     * A line whose last copy is done, out or lost, is followed no more:
+     * it takes none of the room the bound leaves the lines still waiting.
+     */
+    @Test
+    public void aSettledLineLeavesItsPlaceToAnother() {
+        DiscordDeliveryTracker tracker = new DiscordDeliveryTracker();
+        tracker.queued(1L, SENDER, 0L);
+        tracker.queued(2L, SENDER, 0L);
+        tracker.queued(3L, SENDER, 0L);
+        assertNull(tracker.delivered(2L));
+        assertEquals(ChatDeliveryMark.State.FAILED,
+                tracker.lost(3L, ChatDeliveryMark.Reason.REFUSED).state);
+        // As many more as the bound holds beside the first line.
+        for (int index = 1; index < DiscordDeliveryTracker.MAX_TRACKED; index++) {
+            tracker.queued(3L + index, SENDER, 0L);
+        }
+        assertEquals("the first line is followed still",
+                ChatDeliveryMark.State.FAILED,
+                tracker.lost(1L, ChatDeliveryMark.Reason.REFUSED).state);
     }
 
     @Test
@@ -151,7 +172,6 @@ public final class DiscordDeliveryTrackerTest {
             assertEquals(ChatDeliveryMark.State.FAILED, mark.state);
             assertEquals(ChatDeliveryMark.Reason.STOPPED, mark.reason);
         }
-        assertEquals(0, tracker.size());
         assertEquals(Long.MAX_VALUE, tracker.nextDueMillis());
         assertTrue(tracker.abandon().isEmpty());
     }
@@ -162,11 +182,15 @@ public final class DiscordDeliveryTrackerTest {
         for (int index = 0; index <= DiscordDeliveryTracker.MAX_TRACKED; index++) {
             tracker.queued(1L + index, SENDER, index);
         }
-        assertEquals(DiscordDeliveryTracker.MAX_TRACKED, tracker.size());
         assertNull("the oldest line is no longer followed",
                 tracker.lost(1L, ChatDeliveryMark.Reason.REFUSED));
+        // Only the oldest fell out: the one after it and the newest are
+        // both followed still.
         assertEquals(ChatDeliveryMark.State.FAILED,
                 tracker.lost(2L, ChatDeliveryMark.Reason.REFUSED).state);
+        assertEquals(ChatDeliveryMark.State.FAILED,
+                tracker.lost(1L + DiscordDeliveryTracker.MAX_TRACKED,
+                        ChatDeliveryMark.Reason.REFUSED).state);
     }
 
     @Test
@@ -175,7 +199,6 @@ public final class DiscordDeliveryTrackerTest {
         tracker.queued(7L, null, 0L);
         // Nor is an id no server hands out.
         tracker.queued(0L, SENDER, 0L);
-        assertEquals(0, tracker.size());
         assertTrue(tracker.due(WAIT).isEmpty());
         assertNull(tracker.lost(7L, ChatDeliveryMark.Reason.REFUSED));
         assertNull(tracker.delivered(7L));

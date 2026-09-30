@@ -5,6 +5,7 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import javax.imageio.ImageIO;
@@ -27,7 +28,7 @@ public final class CharacterSkinRegistryTest {
     @Test
     public void bundledSkinsShipAsSkinSizedTextures() throws Exception {
         int bundled = 0;
-        for (CharacterSkinDefinition definition : CharacterSkinRegistry.getAll()) {
+        for (CharacterSkinDefinition definition : everySkin()) {
             if (!isBundled(definition)) {
                 continue;
             }
@@ -51,7 +52,7 @@ public final class CharacterSkinRegistryTest {
 
     @Test
     public void lotrSkinsStayInsideTheLotrNamespace() {
-        for (CharacterSkinDefinition definition : CharacterSkinRegistry.getAll()) {
+        for (CharacterSkinDefinition definition : everySkin()) {
             if (isBundled(definition) || definition.isAccountSkin()) {
                 continue;
             }
@@ -87,7 +88,7 @@ public final class CharacterSkinRegistryTest {
 
     @Test
     public void everySkinNamesItsRaceModelAndTheLotrLayout() {
-        for (CharacterSkinDefinition definition : CharacterSkinRegistry.getAll()) {
+        for (CharacterSkinDefinition definition : everySkin()) {
             assertNotNull(definition.getId() + " model must be registered",
                     CharacterBodyModelRegistry.get(definition.getModelId()));
             assertTrue(definition.getId() + " model must suit its race",
@@ -156,7 +157,7 @@ public final class CharacterSkinRegistryTest {
     @Test
     public void everyDisplayGroupHasAnEnglishName() throws Exception {
         Set<String> groups = new HashSet<String>();
-        for (CharacterSkinDefinition definition : CharacterSkinRegistry.getAll()) {
+        for (CharacterSkinDefinition definition : everySkin()) {
             groups.add(definition.getDisplayGroupId());
         }
         InputStream stream = CharacterSkinRegistryTest.class.getResourceAsStream(
@@ -179,6 +180,21 @@ public final class CharacterSkinRegistryTest {
         for (String group : groups) {
             assertTrue("skin group " + group + " has no en_US name", named.contains(group));
         }
+    }
+
+    /**
+     * Every skin the catalogue offers, as the creator asks for them: each
+     * race's, for each sex it may be.
+     */
+    private static Set<CharacterSkinDefinition> everySkin() {
+        Set<CharacterSkinDefinition> skins = new LinkedHashSet<CharacterSkinDefinition>();
+        for (CharacterRaceDefinition race : CharacterRaceRegistry.getAll()) {
+            for (String genderId : race.getAllowedGenderIds()) {
+                skins.addAll(CharacterSkinRegistry.getCompatibleSkins(
+                        race.getId(), genderId));
+            }
+        }
+        return skins;
     }
 
     /** Whether the texture ships inside the Lost Tales jar. */

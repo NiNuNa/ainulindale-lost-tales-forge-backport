@@ -57,7 +57,7 @@ public final class ClientChatReadMarks {
                 : LostTalesClientAccount.templateId());
     }
 
-    /** As above, for a named account; visible for tests. */
+    /** As above, for a named account. */
     static synchronized void initialize(File configDirectory, UUID accountId) {
         storeFile = fileFor(configDirectory, accountId);
         MARKS.clear();
@@ -203,16 +203,6 @@ public final class ClientChatReadMarks {
                 oldest.remove();
             }
         }
-    }
-
-    /** Forgets every mark without touching the file; for tests. */
-    static synchronized void clear() {
-        MARKS.clear();
-        dirty = false;
-    }
-
-    static synchronized int size() {
-        return MARKS.size();
     }
 
     private static String key(String serverKey, ChatTab view) {

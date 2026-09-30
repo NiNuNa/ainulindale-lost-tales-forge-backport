@@ -47,7 +47,7 @@ import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 
 /**
- * A missive board, a page a window holds (Q7 a): the board's notices in
+ * A missive board, a page a window holds: the board's notices in
  * a list at the left — each its title, and who posted it and how long it
  * has left on the board under that — and the picked notice's letter at
  * the right, the same letter a letter's own page shows
@@ -61,15 +61,15 @@ import org.lwjgl.opengl.GL11;
  * <p>Using a board opens it: the server checks the board and sends its
  * notices as an opening. One board is shown at a time; using another
  * turns the page to it. Every request is answered with the board's
- * notices and why, which stands over the page's bar (W2 a), as do the
+ * notices and why, which stands over the page's bar, as do the
  * server's lines in the chat about a missive while the page is shown.
  * The server sends the notices again whenever the board changes while the
  * player stands at it — somebody else's take, pin or accept, a notice
  * posted or taken down — so the list follows the board.</p>
  *
  * <p>The tab closes by itself, fading as tabs close, once the player is
- * more than eight blocks away, in another world, or the board is gone
- * (Q8 a), and a notice over the window's bar says which.</p>
+ * more than eight blocks away, in another world, or the board is gone,
+ * and a notice over the window's bar says which.</p>
  */
 public final class MissiveBoardPage extends PageContent
         implements WorldPageWatch.Watched {
@@ -326,7 +326,7 @@ public final class MissiveBoardPage extends PageContent
         return world == null ? 0L : world.getTotalWorldTime();
     }
 
-    /* ---- Walking away (Q8 a) ---- */
+    /* ---- Walking away ---- */
 
     /** Once a game tick while the page is in front: the board watched, and a request left unanswered let go. */
     @Override

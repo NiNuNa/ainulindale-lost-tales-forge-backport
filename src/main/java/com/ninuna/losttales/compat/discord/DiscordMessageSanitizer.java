@@ -110,7 +110,7 @@ public final class DiscordMessageSanitizer {
 
     /**
      * A member's message as the chat shows it, with what it carries
-     * besides its words (Nils, 2026-09-28, D3 a): a forward's words behind
+     * besides its words: a forward's words behind
      * *[Forwarded]*, each sticker as *[Sticker: name]*, and each file by
      * its name in italics, followed by the message's own link on Discord,
      * where the file is. The address stays in sight: no word stands in for
@@ -411,8 +411,8 @@ public final class DiscordMessageSanitizer {
 
     /**
      * An action as Discord shows it: its words in italics under the
-     * speaker's name, as the game shows <em>Aldric draws his sword.</em>
-     * (Nils, 2026-09-28, C2 a), each paragraph in italics of its own.
+     * speaker's name, as the game shows <em>Aldric draws his sword.</em>,
+     * each paragraph in italics of its own.
      * Empty for no words.
      */
     public static String outboundAction(String message) {

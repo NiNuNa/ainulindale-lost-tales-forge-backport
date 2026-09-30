@@ -4,6 +4,7 @@ import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerDefinition;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
+import com.ninuna.losttales.quest.LostTalesQuestIds;
 import com.ninuna.losttales.quest.player.LostTalesQuestPlayerData;
 import com.ninuna.losttales.quest.progress.LostTalesQuestHistoryEntry;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
@@ -20,11 +21,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 /**
- * Server-to-client snapshot of a player's quest state.
- *
- * <p>This packet intentionally stays snapshot-based for Forge 1.7.10 simplicity. It
- * carries active and historical quests, objective counters, tracked quests,
- * and the player's discovered/tracked map marker IDs.</p>
+ * A player's whole quest log, sent whenever it changes: running quests and
+ * their counts, the History, tracked quests, discovered and placed
+ * markers, and the missives' quests.
  */
 public class LostTalesQuestSyncPacket implements IMessage {
     private static final int MAX_PACKET_BYTES = 2 * 1024 * 1024;
@@ -33,7 +32,8 @@ public class LostTalesQuestSyncPacket implements IMessage {
     static final int MAX_OBJECTIVE_PROGRESS = 512;
     static final int MAX_DYNAMIC_MARKERS = 2048;
     static final int MAX_DYNAMIC_QUESTS = 512;
-    static final int MAX_IDENTIFIER_BYTES = 256;
+    /** Quest ids, and the stage, objective and marker ids beside them, all within the one quest-id bound. */
+    static final int MAX_IDENTIFIER_BYTES = LostTalesQuestIds.MAX_BYTES;
     static final int MAX_NAME_BYTES = 1024;
     static final int MAX_TEXT_BYTES = 8192;
 

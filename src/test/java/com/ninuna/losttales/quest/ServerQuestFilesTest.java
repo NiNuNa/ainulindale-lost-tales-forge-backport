@@ -86,4 +86,21 @@ public final class ServerQuestFilesTest {
         assertTrue(result.quests.isEmpty());
         assertEquals(4, result.problems.size());
     }
+
+    /** A quest a player could not be sent whole is left out, so nobody is ever sent half of one. */
+    @Test
+    public void aQuestThatCannotBeSentIsLeftOut() throws IOException {
+        StringBuilder title = new StringBuilder();
+        while (title.length() <= 1024) {
+            title.append('T');
+        }
+        write("long.json", String.format(GOOD, "long", title));
+        write("short.json", String.format(GOOD, "short", "Short"));
+        ServerQuestFiles.Result result = ServerQuestFiles.read(
+                this.folder.getRoot(), Collections.<String>emptySet());
+        assertEquals(1, result.quests.size());
+        assertEquals("Short", result.quests.get(0).getTitle());
+        assertEquals(1, result.problems.size());
+        assertTrue(result.problems.get(0).contains("cannot be sent"));
+    }
 }

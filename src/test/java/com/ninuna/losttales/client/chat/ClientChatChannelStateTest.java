@@ -5,6 +5,7 @@ import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.sync.CharacterRosterSnapshot;
 import com.ninuna.losttales.character.sync.CharacterSummary;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
+import com.ninuna.losttales.client.window.Tearing;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
@@ -39,7 +40,7 @@ public final class ClientChatChannelStateTest {
     @Test
     public void closingTheSelectedTabStaysInItsWindow() {
         // Proximity and OOC in a window of their own, Global elsewhere.
-        Window own = WindowLayout.detach(ChatTab.of(ChatChannel.PROXIMITY), 0.0D, 0.0D);
+        Window own = Tearing.off(ChatTab.of(ChatChannel.PROXIMITY), 0.0D, 0.0D);
         assertTrue(WindowLayout.moveTab(ChatTab.of(ChatChannel.OOC), own.getId(), 1));
         ClientChatChannelState.select(ChatTab.of(ChatChannel.OOC));
         assertTrue(ClientChatChannelState.close(ChatTab.of(ChatChannel.OOC)));
@@ -65,7 +66,7 @@ public final class ClientChatChannelStateTest {
     @Test
     public void closedChannelsAreNeverSelected() {
         joinParty(acceptRoster("lotr:gondor"));
-        WindowLayout.detach(ChatTab.of(ChatChannel.PROXIMITY), 0.0D, 0.0D);
+        Tearing.off(ChatTab.of(ChatChannel.PROXIMITY), 0.0D, 0.0D);
         assertEquals(java.util.Arrays.asList(ChatChannel.CLIENT_CONSOLE,
                 ChatChannel.GLOBAL, ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.PARTY,
                 ChatChannel.PROXIMITY),

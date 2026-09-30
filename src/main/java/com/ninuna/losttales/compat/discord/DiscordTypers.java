@@ -8,7 +8,7 @@ import java.util.Map;
 
 /**
  * The Discord members typing in a linked channel, so the game shows them
- * typing as it shows a player (Nils, 2026-09-28, D5 a). Discord says a
+ * typing as it shows a player. Discord says a
  * member is typing about every ten seconds while they are, and the game
  * forgets a typer after six, so each is told again every
  * {@link #RESEND_MILLIS} until {@link #SHOWN_MILLIS} after Discord last

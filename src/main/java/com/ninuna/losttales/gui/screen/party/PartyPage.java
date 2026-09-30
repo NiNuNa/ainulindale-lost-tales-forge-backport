@@ -41,7 +41,7 @@ import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 
 /**
- * The party, a page a window holds (U5 a): one list, as a member list is,
+ * The party, a page a window holds: one list, as a member list is,
  * with its members under a heading (the party's name, when the leader gave
  * it one), then the invitations to the player and those the party sent.
  * The window holds the rest: the search in its tool strip's well narrows

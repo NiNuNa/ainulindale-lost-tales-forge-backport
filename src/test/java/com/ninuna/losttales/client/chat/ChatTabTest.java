@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.client.window.Tearing;
 import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowLayoutStore;
 import com.ninuna.losttales.client.window.WindowTab;
@@ -125,10 +126,11 @@ public final class ChatTabTest {
         assertEquals(ChatTab.of(ChatChannel.GLOBAL),
                 WindowLayout.window("w2").getActiveTab());
         assertEquals(1, countWhispers());
-        // A locked preferred window is passed over for an unlocked one.
-        WindowLayout.setLocked("w1", true);
+        // A locked window asked for takes it: the padlock holds a
+        // window's place, not its tabs.
+        assertTrue(WindowLayout.window("w1").isLocked());
         ChatTab alex = ChatLayout.openWhisper("Alex", "", "w1");
-        assertTrue(WindowLayout.window("w2").contains(alex));
+        assertTrue(WindowLayout.window("w1").contains(alex));
         // Whispers cycle like any tab and never count as closed channels.
         ClientChatChannelState.select(steve);
         assertEquals(steve, ClientChatChannelState.getSelected());
@@ -162,7 +164,7 @@ public final class ChatTabTest {
         // They also end with the session: closed along with the history.
         ChatTab wanderer = ChatLayout.openTab(
                 ChatTab.npc("Grey Wanderer"), "w2");
-        WindowLayout.detach(wanderer, 0.0D, 0.0D);
+        Tearing.off(wanderer, 0.0D, 0.0D);
         assertEquals(3, WindowLayout.windows().size());
         ChatLayout.closeConversations();
         assertEquals(2, WindowLayout.windows().size());

@@ -146,7 +146,7 @@ public final class ChatIdentitySelection {
                 ? played(player) : character(player);
     }
 
-    /** The party the player travels with: the played character's (Nils, 2026-09-28, P1 a). */
+    /** The party the player travels with: the played character's. */
     public static Party party(EntityPlayerMP player) { return partyFor(player, playedId(player)); }
 
     private static Party partyFor(EntityPlayerMP player, UUID identityId) {

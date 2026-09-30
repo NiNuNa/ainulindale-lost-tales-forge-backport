@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -183,25 +184,25 @@ public final class SnapLayoutsTest {
      */
     @Test
     public void theSnapBarPeeksAsACarriedWindowNearsTheTop() {
-        SnapLayouts.Bar bar = new SnapLayouts.Bar();
-        assertNull(bar.follow(null, null, 480.0D, 300.0D, 960, 540));
+        FollowedBar bar = new FollowedBar();
+        assertNull(bar.follow(480.0D, 300.0D));
         assertEquals(SnapLayouts.Bar.Stage.HIDDEN, bar.stage());
         // All the way down the bar is 39 tall under a margin of 2, and
         // the pointer brings it out 24 below that: above 65.
-        assertNull(bar.follow(null, null, 480.0D, 65.0D, 960, 540));
+        assertNull(bar.follow(480.0D, 65.0D));
         assertEquals(SnapLayouts.Bar.Stage.HIDDEN, bar.stage());
-        assertNull(bar.follow(null, null, 100.0D, 64.0D, 960, 540));
+        assertNull(bar.follow(100.0D, 64.0D));
         assertEquals(SnapLayouts.Bar.Stage.PEEKING, bar.stage());
         // In the top edge's band under the peek nothing is touched yet,
         // and the edge fills the whole screen.
-        assertNull(bar.follow(null, null, 480.0D, 12.0D, 960, 540));
-        assertNull(bar.follow(null, null, 480.0D, 9.0D, 960, 540));
-        assertNull(bar.follow(null, null, 480.0D, 9.0D, 960, 540));
+        assertNull(bar.follow(480.0D, 12.0D));
+        assertNull(bar.follow(480.0D, 9.0D));
+        assertNull(bar.follow(480.0D, 9.0D));
         assertEquals(SnapLayouts.Bar.Stage.PEEKING, bar.stage());
         assertEquals(Window.ScreenFill.FULL,
                 WindowGestures.snapZoneAt(480.0D, 9.0D, 960, 540, true));
         // Beside the bar the top edge is the screen's.
-        assertNull(bar.follow(null, null, 200.0D, 0.0D, 960, 540));
+        assertNull(bar.follow(200.0D, 0.0D));
         assertEquals(SnapLayouts.Bar.Stage.PEEKING, bar.stage());
         assertNull(bar.litLayout());
     }
@@ -248,11 +249,11 @@ public final class SnapLayoutsTest {
      */
     @Test
     public void touchingThePeekBringsTheBarAllTheWayDown() {
-        SnapLayouts.Bar bar = revealed();
+        FollowedBar bar = revealed();
         // Layout k's small screen starts at (326 + 52k, 8); the half with
         // two quarters is the third layout, the thirds the fifth.
         assertEquals(Window.ScreenFill.TOP_RIGHT,
-                bar.follow(null, null, 460.0D, 10.0D, 960, 540));
+                bar.follow(460.0D, 10.0D));
         assertArrayEquals(new Window.ScreenFill[] {
                         Window.ScreenFill.LEFT,
                         Window.ScreenFill.TOP_RIGHT,
@@ -260,17 +261,17 @@ public final class SnapLayoutsTest {
                 bar.litLayout());
         assertTrue(bar.litCompanions().isEmpty());
         assertEquals(Window.ScreenFill.RIGHT_THIRD,
-                bar.follow(null, null, 570.0D, 10.0D, 960, 540));
+                bar.follow(570.0D, 10.0D));
         assertEquals(Window.ScreenFill.NONE,
-                bar.follow(null, null, 323.0D, 10.0D, 960, 540));
+                bar.follow(323.0D, 10.0D));
         assertEquals(Window.ScreenFill.LEFT,
-                bar.follow(null, null, 330.0D, 0.5D, 960, 540));
+                bar.follow(330.0D, 0.5D));
         assertEquals(Window.ScreenFill.RIGHT_THIRD,
-                bar.follow(null, null, 570.0D, 0.0D, 960, 540));
+                bar.follow(570.0D, 0.0D));
         assertEquals(Window.ScreenFill.NONE,
-                bar.follow(null, null, 323.0D, 0.0D, 960, 540));
+                bar.follow(323.0D, 0.0D));
         assertEquals(SnapLayouts.Bar.Stage.REVEALED, bar.stage());
-        assertNull(bar.follow(null, null, 200.0D, 0.0D, 960, 540));
+        assertNull(bar.follow(200.0D, 0.0D));
     }
 
     /**
@@ -280,18 +281,18 @@ public final class SnapLayoutsTest {
      */
     @Test
     public void theBarPeeksAgainOnceThePointerLeavesItsReach() {
-        SnapLayouts.Bar bar = revealed();
+        FollowedBar bar = revealed();
         // All the way down it spans 320 to 640 and 2 to 41.
-        assertNull(bar.follow(null, null, 296.0D, 20.0D, 960, 540));
-        assertNull(bar.follow(null, null, 480.0D, 64.0D, 960, 540));
+        assertNull(bar.follow(296.0D, 20.0D));
+        assertNull(bar.follow(480.0D, 64.0D));
         assertEquals(SnapLayouts.Bar.Stage.REVEALED, bar.stage());
-        assertNull(bar.follow(null, null, 295.5D, 20.0D, 960, 540));
+        assertNull(bar.follow(295.5D, 20.0D));
         assertEquals(SnapLayouts.Bar.Stage.PEEKING, bar.stage());
-        assertNull(bar.follow(null, null, 330.0D, 12.0D, 960, 540));
-        assertNull(bar.follow(null, null, 330.0D, 10.0D, 960, 540));
+        assertNull(bar.follow(330.0D, 12.0D));
+        assertNull(bar.follow(330.0D, 10.0D));
         assertEquals(SnapLayouts.Bar.Stage.PEEKING, bar.stage());
         assertEquals(Window.ScreenFill.NONE,
-                bar.follow(null, null, 330.0D, 3.0D, 960, 540));
+                bar.follow(330.0D, 3.0D));
         assertEquals(SnapLayouts.Bar.Stage.REVEALED, bar.stage());
     }
 
@@ -302,14 +303,14 @@ public final class SnapLayoutsTest {
      */
     @Test
     public void leavingTheTopOfTheScreenPutsTheBarAway() {
-        SnapLayouts.Bar bar = revealed();
-        assertNull(bar.follow(null, null, 330.0D, 65.0D, 960, 540));
+        FollowedBar bar = revealed();
+        assertNull(bar.follow(330.0D, 65.0D));
         assertEquals(SnapLayouts.Bar.Stage.HIDDEN, bar.stage());
-        assertNull(bar.follow(null, null, 330.0D, 5.0D, 960, 540));
+        assertNull(bar.follow(330.0D, 5.0D));
         assertEquals(SnapLayouts.Bar.Stage.PEEKING, bar.stage());
         // The peek comes down past the pointer: touched.
         assertEquals(Window.ScreenFill.NONE,
-                bar.follow(null, null, 330.0D, 5.0D, 960, 540));
+                bar.follow(330.0D, 5.0D));
         assertEquals(SnapLayouts.Bar.Stage.REVEALED, bar.stage());
         bar.hide();
         assertEquals(SnapLayouts.Bar.Stage.HIDDEN, bar.stage());
@@ -570,15 +571,72 @@ public final class SnapLayoutsTest {
      * pointer holds under its peek until the peek comes down to eight,
      * then touches it at seven, on its padding above the first zone.
      */
-    private static SnapLayouts.Bar revealed() {
-        SnapLayouts.Bar bar = new SnapLayouts.Bar();
-        assertNull(bar.follow(null, null, 330.0D, 9.0D, 960, 540));
-        assertNull(bar.follow(null, null, 330.0D, 9.0D, 960, 540));
+    private static FollowedBar revealed() {
+        FollowedBar bar = new FollowedBar();
+        assertNull(bar.follow(330.0D, 9.0D));
+        assertNull(bar.follow(330.0D, 9.0D));
         assertEquals(SnapLayouts.Bar.Stage.PEEKING, bar.stage());
         assertEquals(Window.ScreenFill.NONE,
-                bar.follow(null, null, 330.0D, 7.0D, 960, 540));
+                bar.follow(330.0D, 7.0D));
         assertEquals(SnapLayouts.Bar.Stage.REVEALED, bar.stage());
         return bar;
+    }
+
+    /**
+     * A snap bar on a screen of 960 by 540 and the frames it has followed.
+     * Where it stands is read off what it answers the next frame. Away, a
+     * pointer under its peek touches nothing. All the way down, it
+     * answers a pointer on it below any peek. Peeking, it is touched
+     * under its peek and answers nothing below it. Asking is a frame of
+     * the carry and moves the bar, so each question goes to a bar of its
+     * own taken through the same frames.
+     */
+    private static final class FollowedBar {
+        /** The frames so far: where the pointer stood, or null where the carry ended. */
+        private final List<double[]> frames = new ArrayList<double[]>();
+        private final SnapLayouts.Bar bar = new SnapLayouts.Bar();
+
+        Window.ScreenFill follow(double x, double y) {
+            this.frames.add(new double[] {x, y});
+            return this.bar.follow(null, null, x, y, 960, 540);
+        }
+
+        void hide() {
+            this.frames.add(null);
+            this.bar.hide();
+        }
+
+        Window.ScreenFill[] litLayout() {
+            return this.bar.litLayout();
+        }
+
+        Map<String, Window.ScreenFill> litCompanions() {
+            return this.bar.litCompanions();
+        }
+
+        SnapLayouts.Bar.Stage stage() {
+            // Under the shallowest peek, across the bar.
+            if (again().follow(null, null, 330.0D, 5.0D, 960, 540) == null) {
+                return SnapLayouts.Bar.Stage.HIDDEN;
+            }
+            // On the bar where it rests, below the deepest peek.
+            return again().follow(null, null, 330.0D, 20.0D, 960, 540) == null
+                    ? SnapLayouts.Bar.Stage.PEEKING
+                    : SnapLayouts.Bar.Stage.REVEALED;
+        }
+
+        /** Another bar taken through the same frames. */
+        private SnapLayouts.Bar again() {
+            SnapLayouts.Bar copy = new SnapLayouts.Bar();
+            for (double[] frame : this.frames) {
+                if (frame == null) {
+                    copy.hide();
+                } else {
+                    copy.follow(null, null, frame[0], frame[1], 960, 540);
+                }
+            }
+            return copy;
+        }
     }
 
     /** How deep the bar of a 960 by 540 screen peeks for a pointer at ({@code x}, {@code y}). */

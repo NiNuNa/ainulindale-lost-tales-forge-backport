@@ -77,6 +77,7 @@ import com.ninuna.losttales.network.packet.LostTalesQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesServerQuestSyncPacket;
 import com.ninuna.losttales.network.packet.LostTalesWorldQuestSyncPacket;
 import com.ninuna.losttales.quest.ServerQuestFiles;
+import com.ninuna.losttales.quest.ServerQuestSync;
 import com.ninuna.losttales.quest.world.WorldQuests;
 import com.ninuna.losttales.network.packet.AccessoryInventorySyncPacket;
 import com.ninuna.losttales.network.packet.AccessoryEffectSyncPacket;
@@ -440,6 +441,7 @@ public class LostTalesCommonProxy {
         LostTalesQuestRegistry.clearRuntimeQuests();
         // The server's own quest files, as they are on disk now.
         LostTalesQuestRegistry.loadServerQuests();
+        ServerQuestSync.clear();
         WorldQuests.clear();
         LostTalesServerBroadcastHook.clear();
         ChatArrivals.clear();
@@ -546,6 +548,7 @@ public class LostTalesCommonProxy {
         PartyQuestProgressCoordinator.getInstance().clear();
         MissiveBoardWatches.clear();
         LostTalesQuestRegistry.clearServerQuests();
+        ServerQuestSync.clear();
         WorldQuests.clear();
         LostTalesMapMarkerSyncManager.clear();
         LostTalesLotrWaystoneTravelAdapter.clear();

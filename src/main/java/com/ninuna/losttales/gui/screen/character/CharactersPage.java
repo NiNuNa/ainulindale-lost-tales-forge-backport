@@ -54,18 +54,18 @@ import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 
 /**
- * The Characters tab (C1 a): the account character and every slot in a
- * roster the tool strip's left button folds away, the deleted characters
- * still to be restored at its foot (R6 a), and the picked character's
- * profile beside it in one column (C2 a), its figure live for the one
- * played and posed from its look for any other (C3 a). The window holds
+ * The Characters tab: the account character and every slot in a roster
+ * the tool strip's left button folds away, the deleted characters still
+ * to be restored at its foot, and the picked character's profile beside
+ * it in one column, its figure live for the one played and posed from
+ * its look for any other. The window holds
  * the rest: the well's search narrows the roster, and the input bar holds
  * Play as, Edit Profile, Change Look, Capes and Delete, last in red —
  * Create in Play as's place for an empty slot, Restore alone for a deleted
  * character. Edit Profile, Change Look, Capes, the lore characters and the
  * questions before a deletion or a restore open as sub-windows in the
  * tab's window; the creator stays a screen of its own. Another person's
- * profile, opened from their card or their menu (P5 a), stands in the
+ * profile, opened from their card or their menu, stands in the
  * roster's place, read only, until Back.
  *
  * <p>It draws only the server's roster and never changes it on its own;

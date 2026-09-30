@@ -19,7 +19,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
-/** Public-API adapter for character-owned visited LOTR waypoint regions. */
+/** The LOTR waypoint regions each character has visited, read and written through LOTR's public API. */
 public final class LotrFastTravelRegionStateAdapter {
 
     private static final UUID DETACHED_PLAYER_ID =

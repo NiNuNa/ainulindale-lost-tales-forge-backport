@@ -33,10 +33,6 @@ public final class PartyInvitationWorldData extends WorldSavedData {
     private int unsupportedDataVersion = -1;
     private NBTTagCompound preservedNewerData;
 
-    public PartyInvitationWorldData() {
-        this(DATA_NAME);
-    }
-
     public PartyInvitationWorldData(String name) {
         super(name);
     }

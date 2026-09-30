@@ -33,15 +33,25 @@ public final class ClientChatMessageIdsTest {
                 ClientChatMessageIds.chatLineIdOf(1234L));
     }
 
-    /** A line nobody can name is not recorded, and names nothing. */
+    /**
+     * A line nobody can name is not recorded and names nothing: it takes
+     * none of the room the bound leaves the lines that are named.
+     */
     @Test
     public void unnamedLinesAreNotRecorded() {
         ClientChatMessageIds.remember(7, ChatMessageIds.NONE);
         assertEquals(ChatMessageIds.NONE,
                 ClientChatMessageIds.messageIdOf(7));
-        assertEquals(0, ClientChatMessageIds.size());
         assertNull(ClientChatMessageIds.chatLineIdOf(ChatMessageIds.NONE));
         assertNull(ClientChatMessageIds.chatLineIdOf(99L));
+
+        int capacity = ClientChatChannelViews.maxTrackedLines();
+        ClientChatMessageIds.remember(-1, 999L);
+        ClientChatMessageIds.remember(-2, ChatMessageIds.NONE);
+        for (int index = 1; index < capacity; index++) {
+            ClientChatMessageIds.remember(index, 1000L + index);
+        }
+        assertEquals(999L, ClientChatMessageIds.messageIdOf(-1));
     }
 
     /**
@@ -83,10 +93,16 @@ public final class ClientChatMessageIdsTest {
         for (int index = 0; index < capacity + 50; index++) {
             ClientChatMessageIds.remember(index, 1000L + index);
         }
-        assertEquals(capacity, ClientChatMessageIds.size());
         assertEquals(ChatMessageIds.NONE,
                 ClientChatMessageIds.messageIdOf(0));
         assertNull(ClientChatMessageIds.chatLineIdOf(1000L));
+        // Fifty past the bound: the fiftieth is gone and the next stands.
+        assertEquals(ChatMessageIds.NONE,
+                ClientChatMessageIds.messageIdOf(49));
+        assertNull(ClientChatMessageIds.chatLineIdOf(1049L));
+        assertEquals(1050L, ClientChatMessageIds.messageIdOf(50));
+        assertEquals(Integer.valueOf(50),
+                ClientChatMessageIds.chatLineIdOf(1050L));
         int newest = capacity + 49;
         assertEquals(1000L + newest,
                 ClientChatMessageIds.messageIdOf(newest));
@@ -94,6 +110,8 @@ public final class ClientChatMessageIdsTest {
                 ClientChatMessageIds.chatLineIdOf(1000L + newest));
 
         ClientChatMessageIds.clear();
-        assertEquals(0, ClientChatMessageIds.size());
+        assertEquals(ChatMessageIds.NONE,
+                ClientChatMessageIds.messageIdOf(newest));
+        assertNull(ClientChatMessageIds.chatLineIdOf(1000L + newest));
     }
 }

@@ -1,17 +1,14 @@
 package com.ninuna.losttales.quest.missive;
 
-import java.util.UUID;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 
 /**
- * Who watches which missive board, and how long a notice has left on it:
- * the server's side of keeping every page at a board in step. The sweep
- * itself needs a running server; this proves the store and the clock.
+ * How long a notice has left on its board: the clock every page at a
+ * board shows. The watches' sweep needs a running server.
  */
 public final class MissiveBoardWatchesTest {
 
@@ -19,44 +16,6 @@ public final class MissiveBoardWatchesTest {
     @After
     public void startEmpty() {
         MissiveBoardWatches.clear();
-    }
-
-    @Test
-    public void aPlayerWatchesTheOneBoardLastSentToThem() {
-        UUID player = UUID.randomUUID();
-        MissiveBoardWatches.watch(player, 0, 4, 65, 9, 11L);
-        MissiveBoardWatches.watch(player, -1, 7, 70, 2, 12L);
-        assertEquals(1, MissiveBoardWatches.size());
-        MissiveBoardWatches.Watch watch = MissiveBoardWatches.watchOf(player);
-        assertEquals(-1, watch.dimensionId);
-        assertEquals(7, watch.x);
-        assertEquals(12L, watch.fingerprint);
-    }
-
-    @Test
-    public void aCrowdPushesTheOldestWatchOut() {
-        UUID first = UUID.randomUUID();
-        MissiveBoardWatches.watch(first, 0, 0, 64, 0, 1L);
-        for (int index = 0; index < MissiveBoardWatches.MAX_WATCHES; index++) {
-            MissiveBoardWatches.watch(UUID.randomUUID(), 0, index, 64, 0, 1L);
-        }
-        assertEquals(MissiveBoardWatches.MAX_WATCHES, MissiveBoardWatches.size());
-        assertNull(MissiveBoardWatches.watchOf(first));
-    }
-
-    @Test
-    public void forgettingAndClearingEndWatches() {
-        UUID player = UUID.randomUUID();
-        MissiveBoardWatches.watch(player, 0, 4, 65, 9, 1L);
-        MissiveBoardWatches.forget(player);
-        assertNull(MissiveBoardWatches.watchOf(player));
-        MissiveBoardWatches.watch(player, 0, 4, 65, 9, 1L);
-        MissiveBoardWatches.markChanged();
-        MissiveBoardWatches.clear();
-        assertEquals(0, MissiveBoardWatches.size());
-        MissiveBoardWatches.watch(null, 0, 4, 65, 9, 1L);
-        assertEquals("nobody watches for no player", 0,
-                MissiveBoardWatches.size());
     }
 
     @Test

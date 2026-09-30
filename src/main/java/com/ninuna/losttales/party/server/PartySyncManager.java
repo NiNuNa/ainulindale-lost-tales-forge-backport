@@ -438,7 +438,11 @@ public final class PartySyncManager {
         }
     }
 
-    /** Immutable-by-exposure owner UUID set captured before a mutation. */
+    /**
+     * The accounts a party change must reach, taken before the change is
+     * made, so members who leave with it are told too. It hands out
+     * copies only, so nothing outside changes it.
+     */
     public static final class AudienceSnapshot {
         private final LinkedHashSet<UUID> ownerIds =
                 new LinkedHashSet<UUID>();

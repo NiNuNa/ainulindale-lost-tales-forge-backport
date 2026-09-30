@@ -159,11 +159,6 @@ public abstract class ScreenPart {
     public void addOpenable(List<MenuWindow.Entry> entries, String filter,
                             boolean search) {}
 
-    /** Where the empty screen's {@code +} the part draws stands, as an anchor to hang a menu from; null for none. */
-    public SubWindowAnchor emptyPlusAnchor() {
-        return null;
-    }
-
     /** Whether the part has anything closed to offer again under the {@code +}. */
     public boolean hasRestorable() {
         return false;
@@ -216,11 +211,6 @@ public abstract class ScreenPart {
 
     /* ---- The pointer ---- */
 
-    /** Under the sub-windows while no window shows anything. */
-    public WindowHover hoverEmpty(double x, double y) {
-        return null;
-    }
-
     /** Over the sub-windows and everything else. */
     public WindowHover hoverOverAll(double x, double y) {
         return null;
@@ -242,12 +232,6 @@ public abstract class ScreenPart {
     /** The words beside the pointer for a hover of the part's; null for another part's. */
     public String tipFor(WindowHover hover) {
         return null;
-    }
-
-    /** A press while no window shows anything. */
-    public boolean pressEmpty(WindowHover press, int mouseX, int mouseY,
-                              int button) {
-        return false;
     }
 
     /** A press on a sub-window's content, the sub-window just brought in front. */

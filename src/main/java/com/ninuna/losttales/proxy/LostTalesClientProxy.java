@@ -5,7 +5,6 @@ import com.ninuna.losttales.client.chat.ChatScreenPart;
 import com.ninuna.losttales.client.settings.ClientSettingsSections;
 import com.ninuna.losttales.client.chat.ClientChatIdentitySelection;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapPage;
-import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.network.packet.LostTalesChatIdentitySyncPacket;
 import com.ninuna.losttales.config.LostTalesConfigFiles;
 import java.io.File;
@@ -106,6 +105,7 @@ import com.ninuna.losttales.client.chat.ClientChatChannelState;
 import com.ninuna.losttales.client.chat.ClientChatDeliveryMarks;
 import com.ninuna.losttales.client.chat.ClientChatIgnores;
 import com.ninuna.losttales.client.chat.ClientChatPresenceChoices;
+import com.ninuna.losttales.client.chat.ClientChatDrafts;
 import com.ninuna.losttales.client.chat.ClientChatReadMarks;
 import com.ninuna.losttales.client.chat.ClientChatTypingState;
 import com.ninuna.losttales.network.packet.LostTalesQuickLootContainerSyncPacket;
@@ -171,6 +171,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         ClientSettingsSections.install();
         WindowLayoutStore.initialize(clientFolder);
         ClientChatReadMarks.initialize(clientFolder);
+        ClientChatDrafts.initialize(clientFolder);
         ClientChatPresenceChoices.initialize(clientFolder);
         LostTalesClientMapMarkerUsageStore.initialize(clientFolder);
         CharacterTemplateStore.initialize(clientFolder);
@@ -204,15 +205,15 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
 
     /**
      * The quest journal, the party, the map and the characters, each a
-     * page a window can hold, with the key that opens it from another page
-     * (N1 a); the Characters tab's own kinds of sub-window; the Motion
-     * Lab, a page with no key, which needs no world (Q5 a, Q6 a); and the
-     * pages that open only from a thing in the world: a waystone's (Q10 a),
-     * a missive board's (Q7 a) and a missive letter's (Q9 a).
+     * page a window can hold, with the key that opens it from another
+     * page; the Characters tab's own kinds of sub-window; the Motion Lab,
+     * a page with no key, which needs no world; and the pages that open
+     * only from a thing in the world: a waystone's, a missive board's and
+     * a missive letter's.
      */
     private static void registerPages() {
         WindowPages.register(QuestJournalPage.PAGE_ID, "gui.losttales.page.journal",
-                new ItemStack(Items.writable_book), Window.ScreenFill.NONE,
+                new ItemStack(Items.writable_book),
                 LostTalesKeyBindings.getQuestJournalKeyBinding(),
                 new WindowPages.Factory() {
                     @Override
@@ -221,7 +222,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                     }
                 });
         WindowPages.register(PartyPage.PAGE_ID, "gui.losttales.page.party",
-                new ItemStack(Items.iron_helmet), Window.ScreenFill.NONE,
+                new ItemStack(Items.iron_helmet),
                 LostTalesKeyBindings.getPartyKeyBinding(),
                 new WindowPages.Factory() {
                     @Override
@@ -229,10 +230,8 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                         return new PartyPage();
                     }
                 });
-        // The map fills the screen the first time it opens, and after that
-        // opens where it was left (M1 a).
         WindowPages.register(LostTalesMapPage.PAGE_ID, "gui.losttales.page.map",
-                new ItemStack(Items.map), Window.ScreenFill.FULL,
+                new ItemStack(Items.map),
                 LostTalesKeyBindings.getMapKeyBinding(),
                 new WindowPages.Factory() {
                     @Override
@@ -242,7 +241,6 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                 });
         WindowPages.register(CharactersPage.PAGE_ID,
                 "gui.losttales.page.characters", CharactersPage.ICON,
-                Window.ScreenFill.NONE,
                 LostTalesKeyBindings.getCharactersKeyBinding(),
                 new WindowPages.Factory() {
                     @Override
@@ -252,8 +250,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                 });
         CharacterSubWindows.install();
         WindowPages.register(MotionLabPage.PAGE_ID,
-                "gui.losttales.page.motion_lab", MotionLabPage.ICON,
-                Window.ScreenFill.NONE, null,
+                "gui.losttales.page.motion_lab", MotionLabPage.ICON, null,
                 new WindowPages.Factory() {
                     @Override
                     public PageContent create() {

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.compat.lotr;
 
+import com.ninuna.losttales.client.quest.ClientQuestCatalog;
 import com.ninuna.losttales.client.quest.ClientQuestEntry;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import cpw.mods.fml.relauncher.Side;
@@ -96,7 +97,9 @@ public final class LotrClientQuestAdapter {
                 : objective;
 
         return new ClientQuestEntry(ClientQuestEntry.Source.LOTR,
-                reference, title, subtitle, category(quest), journal, status,
+                reference, title, subtitle,
+                ClientQuestCatalog.categoryName(LotrQuestCategory.of(quest)),
+                journal, status,
                 tracked, stageNumber, stageCount, -1L, objectives, rewards,
                 targets, null, null);
     }
@@ -173,15 +176,6 @@ public final class LotrClientQuestAdapter {
         targets.add(new ClientQuestEntry.Target(location.getDimensionId(),
                 coordinates.posX, coordinates.posY, coordinates.posZ));
         return targets;
-    }
-
-    private static String category(LOTRMiniQuest quest) {
-        if (quest instanceof LOTRMiniQuestWelcome) {
-            return "Tutorials";
-        }
-        return quest.getFactionSubtitle() == null
-                || quest.getFactionSubtitle().length() == 0
-                ? "Regional" : "Factions";
     }
 
     private static String formatNumber(float value) {

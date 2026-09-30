@@ -770,11 +770,6 @@ public final class SnapLayouts {
             return PEEK + (PEEK_MOST - PEEK) * (1.0D - away);
         }
 
-        /** Where the bar stands; for tests. */
-        Stage stage() {
-            return this.stage;
-        }
-
         /** The layout the zone under the pointer is one of, or null. */
         Window.ScreenFill[] litLayout() {
             return this.panel == null ? null : this.panel.layoutOf(this.lit);

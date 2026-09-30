@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-/** Public-API adapter for character-owned LOTR miniquest and quest records. */
+/** Each character's own LOTR miniquest and quest records, read and written through LOTR's public API. */
 public final class LotrQuestStateAdapter {
 
     private static final UUID DETACHED_PLAYER_ID =

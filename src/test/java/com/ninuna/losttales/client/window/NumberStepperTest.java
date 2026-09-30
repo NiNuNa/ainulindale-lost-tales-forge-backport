@@ -11,7 +11,7 @@ import static org.junit.Assert.assertTrue;
  * A number in Settings steps to the next multiple of its step, ten with
  * Shift, and stops at its bounds; a typed number is taken only within
  * them and in the places it is shown to; Default puts back the shipped
- * value (Nils, 2026-09-26, Q2 a). Its row's chevrons and value answer
+ * value. Its row's chevrons and value answer
  * where they are drawn.
  */
 public final class NumberStepperTest {

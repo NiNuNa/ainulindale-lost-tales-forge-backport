@@ -26,8 +26,8 @@ public final class ClientChatChannelViewsTest {
     @After
     public void cleanUp() {
         ClientChatChannelViews.clear();
-        ClientChatReadMarks.clear();
-        ClientChatSession.resumeAt("");
+        ClientChatReadMarks.initialize(null, null);
+        ClientChatSession.resume("");
     }
 
     /**
@@ -37,7 +37,7 @@ public final class ClientChatChannelViewsTest {
      */
     @Test
     public void aPlayersOwnLineIsReadOnceTheServerNamesIt() {
-        ClientChatSession.resumeAt("server:play.example");
+        ClientChatSession.resume("server:play.example");
         ClientChatReadMarks.markArrival("server:play.example", 4000L);
         ChatTab party = ChatTab.of(ChatChannel.PARTY);
         ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
@@ -56,7 +56,7 @@ public final class ClientChatChannelViewsTest {
      */
     @Test
     public void aFirstVisitCountsNoneOfTheReplayUnread() {
-        ClientChatSession.resumeAt("server:new.example");
+        ClientChatSession.resume("server:new.example");
         ClientChatChannelViews.noteArrival(700L);
         assertEquals(700L, ClientChatReadMarks.arrival("server:new.example"));
         ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
@@ -83,7 +83,7 @@ public final class ClientChatChannelViewsTest {
      */
     @Test
     public void aReturnVisitStillCountsWhatWasSaidWhileAway() {
-        ClientChatSession.resumeAt("server:known.example");
+        ClientChatSession.resume("server:known.example");
         ClientChatReadMarks.markArrival("server:known.example", 100L);
         ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
         ChatTab console = ChatTab.of(ChatChannel.CLIENT_CONSOLE);
@@ -106,7 +106,7 @@ public final class ClientChatChannelViewsTest {
      */
     @Test
     public void aViewNeverReadCountsWhatWasSaidSinceTheFirstArrival() {
-        ClientChatSession.resumeAt("server:return.example");
+        ClientChatSession.resume("server:return.example");
         ClientChatReadMarks.markArrival("server:return.example", 400L);
         ClientChatChannelViews.noteArrival(900L);
         assertEquals(400L,
@@ -132,7 +132,7 @@ public final class ClientChatChannelViewsTest {
     /** A line said while the player is here, in a tab not in front, is unread. */
     @Test
     public void aLiveLineInAnotherTabIsUnread() {
-        ClientChatSession.resumeAt("server:live.example");
+        ClientChatSession.resume("server:live.example");
         ClientChatChannelViews.noteArrival(100L);
         ChatTab proximity = ChatTab.of(ChatChannel.PROXIMITY);
         ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
@@ -404,8 +404,10 @@ public final class ClientChatChannelViewsTest {
             ClientChatChannelViews.record(-index - 1, ChatTab.of(ChatChannel.GLOBAL),
                     ChatTab.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
         }
-        assertEquals(bound, ClientChatChannelViews.trackedLineCount());
+        // The newest `bound` lines keep their tab; every older one is let go.
         assertNull(channelOf(-1));
+        assertNull(channelOf(-(recorded - bound)));
+        assertEquals(ChatChannel.GLOBAL, channelOf(-(recorded - bound + 1)));
         assertEquals(ChatChannel.GLOBAL,
                 channelOf(-recorded));
     }

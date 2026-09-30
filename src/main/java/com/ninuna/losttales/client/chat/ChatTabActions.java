@@ -232,8 +232,9 @@ public final class ChatTabActions {
 
     /**
      * Closes a whole window: its tabs leave it and the window goes. The
-     * channels behind them keep receiving, so nothing is lost — they are
-     * offered back by the {@code +} control and by the empty state.
+     * channels behind them keep receiving, so nothing is lost — the
+     * {@code +} offers them back, and with no conversation left open the
+     * chat's next opening brings its first window back.
      */
     void closeWindow(Window window) {
         if (window == null

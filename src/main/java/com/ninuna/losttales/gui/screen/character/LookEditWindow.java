@@ -39,7 +39,7 @@ import net.minecraft.client.resources.I18n;
 import org.lwjgl.input.Keyboard;
 
 /**
- * Change Look (R1 a): a character's skin, arm width and chest, in a
+ * Change Look: a character's skin, arm width and chest, in a
  * sub-window of the Characters tab's window, its player's to change at any
  * time. The skins are the grid of faces the creator shows — every skin the
  * character's race and sex may wear, the account's own among them where

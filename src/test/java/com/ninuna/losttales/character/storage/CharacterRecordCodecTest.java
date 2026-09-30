@@ -17,8 +17,8 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
- * A character record carries no level and no experience (R2 a) and keeps
- * the pledge LOTR last reported (R3 a). A record of the layout before
+ * A character record carries no level and no experience and keeps
+ * the pledge LOTR last reported. A record of the layout before
  * either is refused whole, and the store stays read-only rather than
  * guessing: that world needs making anew.
  */

@@ -465,6 +465,30 @@ public final class LostTalesClassTransformerTest {
     }
 
     @Test
+    public void theChatLogWritesEveryLineOnOneLine() throws Exception {
+        ClassNode chat = transform("net.minecraft.client.gui.GuiNewChat");
+        MethodNode method = findMethod(chat,
+                "printChatMessageWithOptionalDeletion");
+        boolean hookBeforeLog = false;
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (instruction instanceof MethodInsnNode
+                    && "com/ninuna/losttales/chat/ChatMessageValidator"
+                    .equals(((MethodInsnNode)instruction).owner)
+                    && "logged".equals(((MethodInsnNode)instruction).name)) {
+                AbstractInsnNode next = instruction.getNext();
+                hookBeforeLog = next instanceof MethodInsnNode
+                        && "org/apache/logging/log4j/Logger".equals(
+                                ((MethodInsnNode)next).owner)
+                        && "info".equals(((MethodInsnNode)next).name);
+            }
+        }
+        assertTrue(hookBeforeLog);
+        assertTrue(Boolean.getBoolean(
+                LostTalesClassTransformer.CHAT_LOG_ACTIVE_PROPERTY));
+    }
+
+    @Test
     public void chatLineReplacementSkipsRefreshes() throws Exception {
         ClassNode chat = transform("net.minecraft.client.gui.GuiNewChat");
         assertTrue(containsStaticHook(chat, "func_146237_a",

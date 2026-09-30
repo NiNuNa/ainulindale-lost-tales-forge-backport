@@ -11,41 +11,43 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 /**
- * Shared parser for bundled Lost Tales quest JSON files.
- *
- * The modern branch uses datapack reload listeners and codecs. Forge 1.7.10 does not
- * have those systems, so both the server registry and the client resource reload cache
- * use this small Gson parser instead.
+ * Reads a quest file's JSON, and the quest index that lists the bundled
+ * files. The server and the client read every quest file through here.
+ * It only reads what is written; {@link LostTalesQuestDefinitionValidator}
+ * says what is missing or wrong.
  */
 public final class LostTalesQuestDefinitionJsonParser {
 
     private LostTalesQuestDefinitionJsonParser() {}
 
+    /**
+     * The files a quest index lists under {@code quests}, in its order.
+     * Throws when the index is not an object with a {@code quests} list of
+     * file names, or names an empty file, so a broken index is said rather
+     * than read as an empty one.
+     */
     public static List<String> parseQuestIndex(Reader reader) {
-        List<String> files = new ArrayList<String>();
-        if (reader == null) {
-            return files;
-        }
-
-        JsonElement rootElement = new JsonParser().parse(reader);
-        if (rootElement == null || !rootElement.isJsonObject()) {
-            return files;
-        }
-
-        JsonElement questsElement = rootElement.getAsJsonObject().get("quests");
+        JsonElement rootElement = reader == null ? null
+                : new JsonParser().parse(reader);
+        JsonElement questsElement = rootElement != null
+                && rootElement.isJsonObject()
+                ? rootElement.getAsJsonObject().get("quests") : null;
         if (questsElement == null || !questsElement.isJsonArray()) {
-            return files;
+            throw new IllegalArgumentException(
+                    "it holds no \"quests\" list");
         }
-
+        List<String> files = new ArrayList<String>();
         JsonArray array = questsElement.getAsJsonArray();
         for (JsonElement entryElement : array) {
-            if (entryElement == null || entryElement.isJsonNull()) continue;
-            try {
-                String file = normalizeQuestFile(entryElement.getAsString());
-                if (file.length() > 0) {
-                    files.add(file);
-                }
-            } catch (RuntimeException ignored) {}
+            String file = entryElement != null
+                    && entryElement.isJsonPrimitive()
+                    && entryElement.getAsJsonPrimitive().isString()
+                    ? normalizeQuestFile(entryElement.getAsString()) : "";
+            if (file.length() == 0) {
+                throw new IllegalArgumentException("its entry "
+                        + (files.size() + 1) + " names no file");
+            }
+            files.add(file);
         }
         return files;
     }
@@ -125,7 +127,7 @@ public final class LostTalesQuestDefinitionJsonParser {
         for (JsonElement stageElement : array) {
             if (stageElement == null || !stageElement.isJsonObject()) continue;
             JsonObject stageObject = stageElement.getAsJsonObject();
-            String id = getString(stageObject, "id", String.valueOf(stages.size() + 1));
+            String id = getString(stageObject, "id", "");
             List<LostTalesQuestObjectiveDefinition> objectives = parseObjectives(stageObject.get("objectives"));
             stages.add(new LostTalesQuestStageDefinition(id, objectives));
         }
@@ -142,8 +144,8 @@ public final class LostTalesQuestDefinitionJsonParser {
         for (JsonElement objectiveElement : array) {
             if (objectiveElement == null || !objectiveElement.isJsonObject()) continue;
             JsonObject objectiveObject = objectiveElement.getAsJsonObject();
-            String id = getString(objectiveObject, "id", "objective_" + (objectives.size() + 1));
-            String type = getString(objectiveObject, "type", "unknown");
+            String id = getString(objectiveObject, "id", "");
+            String type = getString(objectiveObject, "type", "");
             String description = getString(objectiveObject, "description", "");
             boolean optional = getBoolean(objectiveObject, "optional", false);
             Map<String, String> params = parseStringMap(objectiveObject.get("params"));

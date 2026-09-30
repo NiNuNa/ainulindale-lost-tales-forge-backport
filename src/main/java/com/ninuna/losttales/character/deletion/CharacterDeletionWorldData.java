@@ -44,10 +44,6 @@ public final class CharacterDeletionWorldData extends WorldSavedData {
     private int unsupportedDataVersion = -1;
     private NBTTagCompound preservedNewerData;
 
-    public CharacterDeletionWorldData() {
-        this(DATA_NAME);
-    }
-
     public CharacterDeletionWorldData(String name) {
         super(name);
     }

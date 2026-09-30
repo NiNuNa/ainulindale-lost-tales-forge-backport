@@ -67,7 +67,7 @@ public final class DiscordMessageLinksTest {
         DiscordMessageLinks links = new DiscordMessageLinks();
         links.link(1000L, "111", "", "channel:5", "hookA");
         links.link(1000L, "222", "-# h\n", "channel:6", "hookB");
-        assertEquals(1, links.size());
+        assertEquals("one message in the save", 1, links.snapshot().links.size());
         List<DiscordMessageLinks.Copy> copies = links.copiesOf(1000L);
         assertEquals(2, copies.size());
         assertEquals("111", copies.get(0).discordId);
@@ -97,12 +97,17 @@ public final class DiscordMessageLinksTest {
     @Test
     public void halfALinkIsNoLink() {
         DiscordMessageLinks links = new DiscordMessageLinks();
-        links.link(ChatMessageIds.NONE, "111", "", "", "");
-        links.link(1000L, "", "", "", "");
-        links.link(1000L, null, "", "", "");
-        assertEquals(0, links.size());
+        long start = links.revision();
+        links.link(ChatMessageIds.NONE, "111", "", "channel:5", "");
+        links.link(1000L, "", "", "channel:5", "");
+        links.link(1000L, null, "", "channel:5", "");
+        assertEquals(ChatMessageIds.NONE, links.messageIdOf("111"));
+        assertEquals(ChatMessageIds.NONE, links.messageIdOf(""));
+        assertTrue(links.copiesOf(1000L).isEmpty());
+        assertTrue(links.copiesOf(ChatMessageIds.NONE).isEmpty());
+        assertTrue(links.snapshot().links.isEmpty());
+        assertEquals("nothing changed", start, links.revision());
     }
-
 
     @Test
     public void theOldestMessagesGoFirst() {
@@ -113,9 +118,13 @@ public final class DiscordMessageLinksTest {
         for (int index = 0; index <= newest; index++) {
             links.link(1000L + index, "d" + index, "", "", "");
         }
-        assertEquals(max, links.size());
         assertEquals("", firstDiscordIdOf(links, 1000L));
         assertEquals(ChatMessageIds.NONE, links.messageIdOf("d0"));
+        assertEquals("", firstDiscordIdOf(links, 1087L));
+        assertEquals(ChatMessageIds.NONE, links.messageIdOf("d87"));
+        // The bound's worth from there on is all held.
+        assertEquals("d88", firstDiscordIdOf(links, 1088L));
+        assertEquals(1088L, links.messageIdOf("d88"));
         assertEquals("d" + newest, firstDiscordIdOf(links, 1000L + newest));
         assertEquals(1000L + newest, links.messageIdOf("d" + newest));
         // A message given a second copy counts as the newest again: the
@@ -125,13 +134,14 @@ public final class DiscordMessageLinksTest {
         for (int index = newest + 1; index < newest + max; index++) {
             links.link(1000L + index, "d" + index, "", "", "");
         }
-        assertEquals(max, links.size());
         assertEquals("d88", firstDiscordIdOf(links, 1088L));
         assertEquals("d88b", links.discordIdOf(1088L, "channel:2"));
         // The messages that were older than the re-put one went first.
         assertEquals("", firstDiscordIdOf(links, 1089L));
         assertEquals("", firstDiscordIdOf(links, 1000L + newest));
         assertEquals("d" + (newest + 1), firstDiscordIdOf(links, 1000L + newest + 1));
+        assertEquals("d" + (newest + max - 1),
+                firstDiscordIdOf(links, 1000L + newest + max - 1));
     }
 
     @Test

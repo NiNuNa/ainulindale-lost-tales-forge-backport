@@ -1,6 +1,7 @@
 package com.ninuna.losttales.quest.missive;
 
 import com.ninuna.losttales.quest.LostTalesQuestDefinitionNbt;
+import com.ninuna.losttales.quest.LostTalesQuestIds;
 import com.ninuna.losttales.storage.NbtTags;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -11,7 +12,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
 
-/** NBT serialization helpers for generated missives and future missive letter item stacks. */
+/** A missive as a letter and a board keep it: in the letter's item data. */
 public final class LostTalesMissiveNbt {
     public static final String TAG_MISSIVE = "LostTalesMissive";
     public static final int MAX_OBJECTIVES = 512;
@@ -97,6 +98,7 @@ public final class LostTalesMissiveNbt {
     public static boolean isStructurallyReasonable(NBTTagCompound tag) {
         if (!NbtTags.hasReasonableString(tag, "QuestId",
                 MAX_IDENTIFIER_CHARACTERS, true)
+                || !LostTalesQuestIds.fits(tag.getString("QuestId"))
                 || !NbtTags.hasReasonableString(tag, "QuestType",
                 MAX_IDENTIFIER_CHARACTERS, true)
                 || !NbtTags.hasReasonableString(tag, "Title",

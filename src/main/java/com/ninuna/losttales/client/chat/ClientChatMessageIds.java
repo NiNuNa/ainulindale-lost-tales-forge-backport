@@ -85,9 +85,4 @@ public final class ClientChatMessageIds {
         BY_MESSAGE.clear();
         lastLocalId = 0L;
     }
-
-    /** Test and diagnostics hook: how many lines are named. */
-    static synchronized int size() {
-        return BY_LINE.size();
-    }
 }

@@ -180,7 +180,8 @@ public final class ChatStackRowsGeometryTest {
     @Test
     public void scrollOffsetsMapOntoDistancesAndBack() {
         ChatStackRows rows = new ChatStackRows();
-        rows.reset(new int[] {LINE, GAP, LINE, LINE});
+        // Newest first: message, blank, message, message.
+        rows.reset(lines(false, true, false, false), -1);
         assertEquals(0.0D, rows.offsetOf(0.0D), 1.0E-9D);
         assertEquals(LINE / 2.0D, rows.offsetOf(0.5D), 1.0E-9D);
         assertEquals(LINE, rows.offsetOf(1.0D), 1.0E-9D);
@@ -201,7 +202,8 @@ public final class ChatStackRowsGeometryTest {
     @Test
     public void theHighestRowBelowALimit() {
         ChatStackRows rows = new ChatStackRows();
-        rows.reset(new int[] {LINE, GAP, LINE});
+        // Newest first: message, blank, message.
+        rows.reset(lines(false, true, false), -1);
         assertEquals(-1, rows.lastRowBelow(0.0D));
         assertEquals(0, rows.lastRowBelow(0.5D));
         assertEquals(0, rows.lastRowBelow(LINE));
@@ -218,9 +220,9 @@ public final class ChatStackRowsGeometryTest {
     @Test
     public void theDrawStartsFromEveryRowTheStripReveals() {
         ChatStackRows rows = new ChatStackRows();
-        // Newest first: a day's first message, the rule's lower gap, the
-        // rule, its upper gap.
-        rows.reset(new int[] {LINE, GAP, LINE, GAP});
+        // Newest first: a day's first message, the rule's lower gap, a
+        // whole line as the rule is, its upper gap.
+        rows.reset(lines(false, true, false, true), -1);
         float strip = LINE;
         // Resting on the rule: the gap under it fills part of the strip,
         // and the message's top shows in the rest.
@@ -228,7 +230,7 @@ public final class ChatStackRowsGeometryTest {
         // Slid down until the gap fills the strip: the message is below it.
         assertEquals(1, rows.firstRowShown(2, LINE - GAP, strip));
         // Whole lines under the baseline: the one row under the view.
-        rows.reset(new int[] {LINE, LINE, LINE});
+        rows.reset(lines(false, false, false), -1);
         assertEquals(1, rows.firstRowShown(2, 0.0F, strip));
         assertEquals(0, rows.firstRowShown(1, 0.0F, strip));
         assertEquals(0, rows.firstRowShown(0, 0.0F, strip));

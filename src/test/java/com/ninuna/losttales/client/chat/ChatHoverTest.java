@@ -18,7 +18,7 @@ public final class ChatHoverTest {
     @Test
     public void theHandIsWhereAPressActs() {
         for (ChatHover.Kind kind : new ChatHover.Kind[] {
-                ChatHover.Kind.EMPTY_PLUS, ChatHover.Kind.SUGGESTION,
+                ChatHover.Kind.SUGGESTION,
                 ChatHover.Kind.PICKER_CELL, ChatHover.Kind.PICKER_LABEL,
                 ChatHover.Kind.OTHER_BAR,
                 ChatHover.Kind.CHARACTER_BUTTON, ChatHover.Kind.INDICATOR,

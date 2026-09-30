@@ -13,7 +13,7 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 /**
- * A new player's three tips (W9 a): shown in turn as the chat first
+ * A new player's three tips: shown in turn as the chat first
  * opens, each gone with a click, and never again once the last has gone,
  * which the account's window layout file remembers.
  */

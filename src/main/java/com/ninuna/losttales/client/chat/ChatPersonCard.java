@@ -25,8 +25,8 @@ import net.minecraft.util.StatCollector;
  * reads the person afresh every frame, so a status or a status line
  * changed while the card stands shows at once. A character's card shows
  * its glances, the pointer on one saying its words, and View Profile
- * under them, which opens the character's profile in the Characters tab
- * (P5 a). A card narrower or shorter than it wants cuts its rows at the
+ * under them, which opens the character's profile in the Characters
+ * tab. A card narrower or shorter than it wants cuts its rows at the
  * window's edge.
  */
 final class ChatPersonCard extends SubWindowContent {

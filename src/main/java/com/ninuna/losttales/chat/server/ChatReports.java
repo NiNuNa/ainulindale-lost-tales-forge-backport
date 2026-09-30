@@ -15,7 +15,7 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.util.ChatComponentTranslation;
 
 /**
- * Messages reported to staff (Nils, 2026-09-24). A player may report a
+ * Messages reported to staff. A player may report a
  * line by another player or a Discord member that they were shown, once
  * per message, and five times in ten minutes at most. A report becomes a
  * Server Console entry, which counts as a mention for everyone reading

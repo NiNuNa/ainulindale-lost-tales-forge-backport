@@ -175,11 +175,6 @@ final class DiscordDeliveryTracker {
         return marks;
     }
 
-    /** Test hook: lines followed. */
-    int size() {
-        return this.entries.size();
-    }
-
     private void waitsOn(long messageId, ChatDeliveryMark.Reason cause) {
         Entry entry = this.entries.get(Long.valueOf(messageId));
         if (entry != null) {

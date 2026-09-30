@@ -33,7 +33,11 @@ public final class ChatConsoleStreamTest {
         for (int index = 0; index < ChatConsoleStream.MAX_EVENTS; index++) {
             record("entry " + index);
         }
-        assertEquals(ChatConsoleStream.MAX_EVENTS, ChatConsoleStream.size());
+        // A ring's worth is kept, and the first of all is not among them.
+        assertEquals(ChatConsoleStream.MAX_EVENTS,
+                ChatConsoleStream.snapshot().size());
+        assertNull(ChatConsoleStream.find(first));
+        assertEquals("entry 0", ChatConsoleStream.snapshot().get(0).getText());
         List<ChatConsoleEvent> replay = ChatConsoleStream.replay(0L);
         assertEquals(ChatConsoleStream.MAX_REPLAY, replay.size());
         assertTrue(replay.get(0).getId() > first);
@@ -46,7 +50,8 @@ public final class ChatConsoleStreamTest {
         assertEquals(3, ChatConsoleStream.replay(since).size());
         ChatConsoleStream.record(null);
         ChatConsoleStream.clear();
-        assertEquals(0, ChatConsoleStream.size());
+        assertTrue(ChatConsoleStream.snapshot().isEmpty());
+        assertTrue(ChatConsoleStream.replay(0L).isEmpty());
     }
 
     @Test
@@ -152,7 +157,7 @@ public final class ChatConsoleStreamTest {
         assertTrue(ChatMessageIdAllocator.next() > 30L);
         // Restoring nothing changes nothing.
         assertEquals(0, ChatConsoleStream.restore(null, null));
-        assertEquals(3, ChatConsoleStream.size());
+        assertEquals(3, ChatConsoleStream.snapshot().size());
     }
 
     private static long record(String text) {

@@ -14,7 +14,7 @@ import static org.junit.Assert.assertEquals;
 
 /**
  * A lore character claimed again takes its profile and age from its lore
- * file (R8 a); everything it lived through — its record's pledge and capes,
+ * file; everything it lived through — its record's pledge and capes,
  * with its saved state beside it — comes from the last holder.
  */
 public final class LoreCharacterRebindTest {

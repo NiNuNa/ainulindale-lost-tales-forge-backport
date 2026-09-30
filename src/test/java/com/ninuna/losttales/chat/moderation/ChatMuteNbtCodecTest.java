@@ -80,7 +80,7 @@ public final class ChatMuteNbtCodecTest {
                 ChatMuteNbtCodec.CURRENT_ROOT_DATA_VERSION + 1);
         newer.setString("FutureField", "kept");
 
-        ChatMuteWorldData store = new ChatMuteWorldData();
+        ChatMuteWorldData store = new ChatMuteWorldData(ChatMuteWorldData.DATA_NAME);
         store.readFromNBT(newer);
         assertTrue(store.isReadOnlyForNewerVersion());
         assertNull(store.getActiveMute(ACCOUNT_A, 0L));
@@ -155,7 +155,7 @@ public final class ChatMuteNbtCodecTest {
 
     @Test
     public void storeExpiresLazilyAndRefusesPastTheCap() {
-        ChatMuteWorldData store = new ChatMuteWorldData();
+        ChatMuteWorldData store = new ChatMuteWorldData(ChatMuteWorldData.DATA_NAME);
         store.readFromNBT(new NBTTagCompound());
         ChatMuteEntry timed = new ChatMuteEntry(ACCOUNT_A, "Aldric",
                 "Operator", "", 0L, 5000L);

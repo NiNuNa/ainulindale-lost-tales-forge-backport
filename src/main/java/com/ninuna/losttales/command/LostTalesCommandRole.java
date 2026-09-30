@@ -1,10 +1,10 @@
 package com.ninuna.losttales.command;
 
-import com.mojang.authlib.GameProfile;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.model.CharacterRoster;
+import com.ninuna.losttales.character.server.KnownAccounts;
 import com.ninuna.losttales.chat.ChatChannelGates;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
@@ -17,7 +17,6 @@ import com.ninuna.losttales.config.server.ServerConfigSnapshot;
 import com.ninuna.losttales.permission.LostTalesCapability;
 import com.ninuna.losttales.permission.LostTalesPermissionCatalog;
 import com.ninuna.losttales.permission.LostTalesPermissions;
-import com.ninuna.losttales.util.LostTalesServerPlayers;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.relauncher.Side;
 import java.util.ArrayList;
@@ -27,7 +26,6 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import net.minecraft.command.ICommandSender;
-import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.EnumChatFormatting;
 
@@ -127,8 +125,8 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
 
     /**
      * {@code assign|unassign <role> <player|character>}: the name is an
-     * account's (online, by id, or known to the server's profile cache)
-     * or a character's, on any roster, and is looked up as both. An
+     * account's (online, by id, or one this world has a roster for) or a
+     * character's, on any roster, and is looked up as both. An
      * account holds the role as every identity it plays and gains its
      * grants; a character alone wears it and nothing is granted. A name
      * both an account and a character answer to is refused until it is
@@ -206,8 +204,8 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
 
     /**
      * The account or character the name stands for, read from the
-     * server's own records — the player list, the profile cache and the
-     * character rosters — never from the command's words alone.
+     * server's own records, the player list and the character rosters,
+     * never from the command's words alone and never by asking Mojang.
      */
     private static Subject resolveSubject(ICommandSender sender, String typed) {
         String name = typed == null ? "" : typed.trim();
@@ -223,7 +221,7 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
         if (name.length() == 0) {
             return new Subject(null, null, "", "Name an account or a character.");
         }
-        UUID account = characterOnly ? null : resolveAccount(name);
+        UUID account = characterOnly ? null : resolveAccount(sender, name);
         RoleplayCharacter character = accountOnly ? null
                 : resolveCharacter(sender, name);
         if (account != null && character != null) {
@@ -502,22 +500,18 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
         return ids.toString();
     }
 
-    private static UUID resolveAccount(String name) {
-        EntityPlayerMP online = LostTalesServerPlayers.findOnline(name);
-        if (online != null) {
-            return online.getUniqueID();
-        }
+    /**
+     * The account an id or a name names: a player online, or one this
+     * world knows by that name. Mojang is never asked, so a name nobody
+     * here has used names nobody.
+     */
+    private static UUID resolveAccount(ICommandSender sender, String name) {
         try {
             return UUID.fromString(name);
         } catch (IllegalArgumentException notAnId) {
-            // A name: the server's profile cache may know it.
+            return KnownAccounts.find(
+                    sender == null ? null : sender.getEntityWorld(), name);
         }
-        MinecraftServer server = MinecraftServer.getServer();
-        if (server == null || server.func_152358_ax() == null) {
-            return null;
-        }
-        GameProfile profile = server.func_152358_ax().func_152655_a(name);
-        return profile == null ? null : profile.getId();
     }
 
     private static ChatRoleConfig.Warnings collecting(final List<String> into) {

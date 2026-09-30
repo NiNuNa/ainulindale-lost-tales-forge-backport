@@ -31,7 +31,7 @@ import net.minecraft.client.resources.I18n;
 import net.minecraft.world.World;
 
 /**
- * The words of a character's profile (C2 a, P1-P3 a), one column like a
+ * The words of a character's profile, one column like a
  * messenger's profile panel: the name, and under it what the character is
  * — played now, its race, its people — then its glances, About with
  * Appearance, Personality and History, the Facts (age, the six short

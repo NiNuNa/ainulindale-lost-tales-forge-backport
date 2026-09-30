@@ -7,12 +7,13 @@ import net.minecraft.block.Block;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.nbt.NBTTagCompound;
+
 /**
- * Small server-side bridge for quest giver interactions.
- *
- * Modern versions can use richer entity/block interaction hooks and registries. In 1.7.10
- * we keep this data-driven and conservative: a quest only starts from an interaction when
- * its JSON defines an explicit entity or block target.
+ * Quests that start by touching somebody or something, on the server. A
+ * quest starts this way only when its file's {@code interaction} names its
+ * giver: an {@code entity} ({@link LostTalesQuestObjectiveMatcher} reads
+ * it), or a {@code block} with an optional {@code meta}, {@code dimension},
+ * {@code x}, {@code y}, {@code z} and {@code radius}.
  */
 public final class LostTalesQuestInteractionHelper {
 
@@ -56,9 +57,9 @@ public final class LostTalesQuestInteractionHelper {
             if (LostTalesQuestDialogue.of(quest).isOffered()) {
                 continue;
             }
-            String giver = LostTalesQuestParams.value(quest.getInteraction(), "entity");
-            if (matchesDimension(player, quest.getInteraction()) && giver.length() > 0
-                    && LostTalesQuestObjectiveMatcher.matchesEntity(target, giver, "")) {
+            if (matchesDimension(player, quest.getInteraction())
+                    && LostTalesQuestParams.value(quest.getInteraction(), "entity").length() > 0
+                    && LostTalesQuestObjectiveMatcher.matchesEntity(target, quest.getInteraction())) {
                 boolean markerChanged = LostTalesQuestManager.revealQuestGiverMarker(player, quest, target, false);
                 LostTalesQuestManager.StartResult result = LostTalesQuestManager.startQuest(player, quest.getId(), LostTalesQuestStartSource.INTERACTION);
                 if (result == LostTalesQuestManager.StartResult.STARTED || result == LostTalesQuestManager.StartResult.ALREADY_ACTIVE || result == LostTalesQuestManager.StartResult.ALREADY_COMPLETED) {
@@ -85,7 +86,7 @@ public final class LostTalesQuestInteractionHelper {
                 continue;
             }
             Map<String, String> interaction = quest.getInteraction();
-            String blockSpec = LostTalesQuestParams.first(interaction, "block", "blockId", "target");
+            String blockSpec = LostTalesQuestParams.value(interaction, "block");
             if (blockSpec.length() == 0) {
                 continue;
             }
@@ -108,6 +109,7 @@ public final class LostTalesQuestInteractionHelper {
         return false;
     }
 
+    /** The quest a creature's own data names under {@code LostTalesQuestId}; empty for none or one past the id bound. */
     private static String getQuestIdFromEntityNbt(Entity entity) {
         if (entity == null) {
             return "";
@@ -116,8 +118,8 @@ public final class LostTalesQuestInteractionHelper {
         if (data == null) {
             return "";
         }
-        String questId = data.getString("LostTalesQuestId");
-        return questId == null ? "" : questId.trim();
+        String questId = data.getString("LostTalesQuestId").trim();
+        return LostTalesQuestIds.fits(questId) ? questId : "";
     }
 
     private static boolean canProcess(EntityPlayerMP player) {
@@ -125,7 +127,7 @@ public final class LostTalesQuestInteractionHelper {
     }
 
     private static boolean matchesDimension(EntityPlayerMP player, Map<String, String> interaction) {
-        String dimension = LostTalesQuestParams.first(interaction, "dimension", "dim");
+        String dimension = LostTalesQuestParams.value(interaction, "dimension");
         if (dimension.length() == 0) {
             return true;
         }
@@ -140,7 +142,7 @@ public final class LostTalesQuestInteractionHelper {
                 : LostTalesQuestObjectiveMatcher.normalizeResourceId(blockNameObject.toString());
         for (String entry : entries) {
             String normalized = LostTalesQuestObjectiveMatcher.normalizeResourceId(entry);
-            if (normalized.length() == 0 || entry.trim().startsWith("#")) {
+            if (normalized.length() == 0) {
                 continue;
             }
             Object registered = Block.blockRegistry.getObject(normalized);
@@ -151,14 +153,14 @@ public final class LostTalesQuestInteractionHelper {
         return false;
     }
 
+    /** Whether the block's metadata is one {@code meta} lists; any, where it lists none. */
     private static boolean matchesMetadata(int metadata, Map<String, String> interaction) {
-        String metaText = LostTalesQuestParams.first(interaction, "metadata", "meta", "damage");
-        if (metaText.length() == 0 || "*".equals(metaText)) {
+        String metaText = LostTalesQuestParams.value(interaction, "meta");
+        if (metaText.length() == 0) {
             return true;
         }
-        String[] entries = metaText.split(",");
-        for (String entry : entries) {
-            if (metadata == LostTalesQuestParams.parseInt(entry, -9999)) {
+        for (String entry : metaText.split(",")) {
+            if (metadata == LostTalesQuestParams.parseInt(entry, -1)) {
                 return true;
             }
         }
@@ -166,10 +168,10 @@ public final class LostTalesQuestInteractionHelper {
     }
 
     private static boolean matchesLocation(EntityPlayerMP player, int blockX, int blockY, int blockZ, Map<String, String> interaction) {
-        String xText = interaction.get("x");
-        String yText = interaction.get("y");
-        String zText = interaction.get("z");
-        if ((xText == null || xText.length() == 0) && (yText == null || yText.length() == 0) && (zText == null || zText.length() == 0)) {
+        String xText = LostTalesQuestParams.value(interaction, "x");
+        String yText = LostTalesQuestParams.value(interaction, "y");
+        String zText = LostTalesQuestParams.value(interaction, "z");
+        if (xText.length() == 0 && yText.length() == 0 && zText.length() == 0) {
             return true;
         }
 
@@ -177,7 +179,7 @@ public final class LostTalesQuestInteractionHelper {
         double targetY = LostTalesQuestParams.parseDouble(yText, blockY) + 0.5D;
         double targetZ = LostTalesQuestParams.parseDouble(zText, blockZ) + 0.5D;
         double radius = Math.max(0.5D, LostTalesQuestParams.parseDouble(
-                LostTalesQuestParams.first(interaction, "radius", "range"), 1.5D));
+                LostTalesQuestParams.value(interaction, "radius"), 1.5D));
         double dx = player.posX - targetX;
         double dy = player.posY - targetY;
         double dz = player.posZ - targetZ;

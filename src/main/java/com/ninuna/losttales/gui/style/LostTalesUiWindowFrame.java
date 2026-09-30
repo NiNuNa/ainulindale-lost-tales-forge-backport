@@ -3,8 +3,8 @@ package com.ninuna.losttales.gui.style;
 /**
  * The frame every window wears, and every panel that stands like one: a
  * lit framed button's frame just outside the window's box, differing only
- * in that it is no button, it fades and it is always lit (Nils,
- * 2026-09-23). Its edges and corners come from the sheet's
+ * in that it is no button, it fades and it is always lit. Its edges
+ * and corners come from the sheet's
  * {@code WINDOW_FRAME_*} cells, which carry the lit button's ink texel for
  * texel. The left and bottom edges are strongest at the bottom-left corner
  * and the top and right ones at the top-right, each fading to nothing at

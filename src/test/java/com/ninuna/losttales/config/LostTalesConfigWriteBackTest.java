@@ -20,8 +20,7 @@ public final class LostTalesConfigWriteBackTest {
     public void everyClientOptionIsWrittenBack() {
         Configuration written = new Configuration();
         LostTalesConfig.writeCurrentValues(written);
-        Set<String> missing = new TreeSet<String>(
-                LostTalesConfig.clientOptionKeys());
+        Set<String> missing = new TreeSet<String>(DefinedClientOptions.keys());
         missing.removeAll(written.getCategory(
                 LostTalesConfig.CATEGORY_CLIENT).keySet());
         assertEquals("client options a save leaves out",

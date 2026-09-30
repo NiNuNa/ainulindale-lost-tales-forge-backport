@@ -6,6 +6,7 @@ import com.ninuna.losttales.quest.LostTalesQuestObjectiveSelection;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveTextHelper;
 import com.ninuna.losttales.quest.LostTalesQuestTimeText;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.quest.progress.LostTalesQuestHistoryEntry;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import com.ninuna.losttales.quest.world.WorldQuestView;
@@ -18,10 +19,9 @@ import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.StatCollector;
 /**
- * Small client-side notification queue for quest HUD messages.
- *
- * Short quest banners are derived from authoritative sync snapshots, keeping
- * state-change feedback out of chat while avoiding a second event protocol.
+ * The quest banners waiting to be shown. They are read off the quest log
+ * the server sends, by comparing it with the one held, so a quest's news
+ * stays out of the chat and needs no packet of its own.
  */
 public final class LostTalesClientQuestNotificationStore {
     private static final long DEFAULT_DURATION_MS = 4200L;
@@ -100,14 +100,18 @@ public final class LostTalesClientQuestNotificationStore {
             if (entry.isCompleted()) {
                 continue;
             }
-            String reason = entry.getDetail().length() == 0 ? ""
-                    : " - " + StatCollector.translateToLocal(entry.getDetail());
+            String event = entry.isFailed() ? "failed" : "abandoned";
+            String line = entry.getDetail().length() == 0
+                    ? banner(event, entry.getQuestId())
+                    : StatCollector.translateToLocalFormatted(
+                            "gui.losttales.quest.banner." + event + ".reason",
+                            questTitle(entry.getQuestId()),
+                            StatCollector.translateToLocal(entry.getDetail()));
             if (entry.isFailed()) {
-                addFailed(banner("failed", entry.getQuestId()) + reason);
+                addFailed(line);
                 playQuestSound(SOUND_FAILED, 0.3F, 0.8F);
             } else {
-                add(banner("abandoned", entry.getQuestId()) + reason,
-                        Type.ABANDONED);
+                add(line, Type.ABANDONED);
             }
         }
 
@@ -222,7 +226,10 @@ public final class LostTalesClientQuestNotificationStore {
                 addComplete(StatCollector.translateToLocalFormatted(
                         "gui.losttales.quest.banner.objective_done", description));
             } else {
-                addProgress(description + " (" + Math.min(after, target) + "/" + target + ")");
+                addProgress(StatCollector.translateToLocalFormatted(
+                        "gui.losttales.quest.banner.objective_progress",
+                        description, Integer.valueOf(Math.min(after, target)),
+                        Integer.valueOf(target)));
             }
             playQuestSound(SOUND_PROGRESS, 0.35F, 1.25F);
         }
@@ -306,27 +313,29 @@ public final class LostTalesClientQuestNotificationStore {
         }
     }
 
+    /** What a banner tells of: its colour from the palette and its title from the lang file. */
     public enum Type {
-        INFO(0xDDBB77, "Quest Updated"),
-        PROGRESS(0xAADDFF, "Objective Progress"),
-        COMPLETE(0x77DD77, "Quest Complete"),
-        FAILED(0xDD7777, "Quest Failed"),
-        ABANDONED(0xCCAA77, "Quest Abandoned");
+        INFO(LostTalesColors.GOLD, "updated"),
+        PROGRESS(LostTalesColors.BLUE, "progress"),
+        COMPLETE(LostTalesColors.GREEN, "complete"),
+        FAILED(LostTalesColors.RED, "failed"),
+        ABANDONED(LostTalesColors.TAN, "abandoned");
 
         private final int color;
-        private final String displayTitle;
+        private final String titleKey;
 
-        Type(int color, String displayTitle) {
-            this.color = color;
-            this.displayTitle = displayTitle;
+        Type(int color, String title) {
+            this.color = LostTalesColors.rgb(color);
+            this.titleKey = "gui.losttales.quest.banner.title." + title;
         }
 
+        /** The banner's colour, without alpha. */
         public int getColor() {
             return this.color;
         }
 
         public String getDisplayTitle() {
-            return this.displayTitle;
+            return StatCollector.translateToLocal(this.titleKey);
         }
     }
 

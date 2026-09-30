@@ -2,7 +2,6 @@ package com.ninuna.losttales.quest;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -10,13 +9,12 @@ import java.util.Map;
  *
  * <p>A quest's {@code dialogue} block is written as plain entries beside
  * its other blocks, so it is loaded, stored and carried over the wire
- * the same way. This reads that block by name rather than leaving every
- * caller to remember the keys, and answers with nothing rather than null
- * where a line was not written.</p>
+ * the same way. This reads that block by the lines' names, each written
+ * one way, and answers with nothing rather than null where a line was
+ * not written.</p>
  *
- * <p>A quest with no dialogue at all is offered the way it always was —
- * by touching its trigger — so authoring a conversation is what turns a
- * quest into one that is talked about, and nothing else changes.</p>
+ * <p>A quest with no dialogue starts by touching its trigger; writing a
+ * conversation is what makes a quest one that is talked about.</p>
  */
 public final class LostTalesQuestDialogue {
 
@@ -64,7 +62,7 @@ public final class LostTalesQuestDialogue {
             if (line.length() == 0) {
                 continue;
             }
-            lines.put(entry.getKey().trim().toLowerCase(Locale.ROOT),
+            lines.put(entry.getKey().trim(),
                     line.length() > MAX_LINE
                             ? line.substring(0, MAX_LINE) : line);
         }
@@ -92,10 +90,9 @@ public final class LostTalesQuestDialogue {
         return line(HAND_IN).length() > 0;
     }
 
-    /** One line, or empty where it was not written. */
+    /** One line, named as it is written, or empty where it was not written. */
     public String line(String name) {
-        String key = name == null ? "" : name.trim().toLowerCase(Locale.ROOT);
-        String line = this.lines.get(key);
+        String line = name == null ? null : this.lines.get(name);
         return line == null ? "" : line;
     }
 

@@ -155,11 +155,6 @@ public final class CharacterUnconventionalCreationValidationTest {
         }
 
         @Override
-        public String getUnavailableReason() {
-            return "";
-        }
-
-        @Override
         public CharacterFactionDefinition resolve(String factionId) {
             return ORC_FACTION.equals(factionId) ? this.orcs : null;
         }

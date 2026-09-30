@@ -20,7 +20,7 @@ public final class ChatMentionBarTest {
         // then another one-row message; every row twelve pixels tall.
         List<ChatLine> lines = list(row(1), row(2), row(2), row(2), row(3));
         ChatStackRows rows = new ChatStackRows();
-        rows.reset(new int[] {12, 12, 12, 12, 12});
+        rows.reset(lines, -1);
         for (int index = 1; index <= 3; index++) {
             float[] span = LostTalesChatOverlayRenderer.mentionSpan(lines,
                     index, -1, rows, 0.0F, -1, 0.0F);
@@ -37,7 +37,7 @@ public final class ChatMentionBarTest {
     public void theTopmostMessageReachesIntoTheHeadRoom() {
         List<ChatLine> lines = list(row(1), row(2));
         ChatStackRows rows = new ChatStackRows();
-        rows.reset(new int[] {12, 12});
+        rows.reset(lines, -1);
         float[] span = LostTalesChatOverlayRenderer.mentionSpan(lines, 1, -1,
                 rows, 0.0F, 1, 2.0F);
         assertEquals(-26.0F, span[0], 0.0F);

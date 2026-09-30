@@ -19,7 +19,7 @@ import net.minecraft.client.gui.GuiPlayerInfo;
  * a mention does anywhere else. A mention of a player wears the one
  * mention colour, the palette's honey, whoever it names — an account or a
  * character, with a role or without — and a mention of a role wears that
- * role's own colour exactly (Nils, 2026-09-19): what marks a mention is
+ * role's own colour exactly: what marks a mention is
  * its colour, never the colour of the identity it reaches. The completion
  * rows say it the same way: a role in its colour, every player in ivory
  * ({@link #rowColorOf}).</p>
@@ -63,8 +63,7 @@ final class ChatMentionColors {
     /**
      * The colour a completion row names its candidate in: a role its own
      * colour, and every player ivory, as a mention of any player is one
-     * colour whoever it names (Nils, 2026-09-19: "for pings only roles
-     * have colours").
+     * colour whoever it names: only roles have colours of their own.
      */
     static int rowColorOf(ChatMentionCandidate candidate) {
         return candidate != null && candidate.isRole()

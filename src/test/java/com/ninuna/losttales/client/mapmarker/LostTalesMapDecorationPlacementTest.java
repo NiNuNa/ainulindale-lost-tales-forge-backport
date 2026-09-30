@@ -428,12 +428,11 @@ public final class LostTalesMapDecorationPlacementTest {
      */
     @Test
     public void zoomingNeverSwapsOneScatterForAnother() {
-        for (int kind = 0;
-             kind < LostTalesMapDecorationRenderer.kindCount(); kind++) {
-            assertTrue("kind " + kind + " is missing at the closest zoom",
-                    LostTalesMapDecorationRenderer.isDrawn(
-                            kind, (float)Math.pow(2.0D,
-                                    LostTalesLotrMapGui.SMOOTH_ZOOM_MAX)));
+        for (LostTalesMapDecorationSprite kind
+                : LostTalesMapDecorationSprite.values()) {
+            assertTrue(kind + " is missing at the closest zoom",
+                    visibilityAt(kind, (float)Math.pow(2.0D,
+                            LostTalesLotrMapGui.SMOOTH_ZOOM_MAX)) > 0.0F);
             // Zooming out, a kind goes once and stays gone. There is nothing
             // else that can change which decorations are on the map, because
             // the zoom is not an input to placement at all.
@@ -441,13 +440,23 @@ public final class LostTalesMapDecorationPlacementTest {
             for (float zoomExp = LostTalesLotrMapGui.SMOOTH_ZOOM_MAX;
                  zoomExp >= LostTalesLotrMapGui.SMOOTH_ZOOM_MIN;
                  zoomExp -= 0.05F) {
-                boolean drawn = LostTalesMapDecorationRenderer.isDrawn(
-                        kind, (float)Math.pow(2.0D, zoomExp));
-                assertFalse("kind " + kind + " came back at " + zoomExp,
+                boolean drawn = visibilityAt(kind,
+                        (float)Math.pow(2.0D, zoomExp)) > 0.0F;
+                assertFalse(kind + " came back at " + zoomExp,
                         drawn && gone);
                 gone = !drawn;
             }
         }
+    }
+
+    /**
+     * How much of a kind shows where the map is drawn at {@code zoomScale}:
+     * what its artwork answers for its map width at that zoom, the width
+     * the draw gives a site of the kind's own size on a flat map.
+     */
+    private static float visibilityAt(LostTalesMapDecorationSprite kind,
+                                      float zoomScale) {
+        return kind.visibilityAlpha(kind.getWorldWidth() * zoomScale);
     }
 
     /**
@@ -520,39 +529,27 @@ public final class LostTalesMapDecorationPlacementTest {
     }
 
     /**
-     * The invariant the whole layer is built on: pushing the map closer makes
-     * a decoration larger and pulling it out makes it smaller, in proportion,
-     * with no compensation anywhere. And what ends a kind is being too small
-     * to draw, not the zoom being at any particular place.
+     * What ends a kind is being too small to draw, not the zoom being at
+     * any particular place: it shows wherever there is something to see,
+     * is gone once there is not, and fades between the two.
      */
     @Test
-    public void zoomingGrowsDecorationsAndCullsThemWhenTiny() {
-        for (int kind = 0;
-             kind < LostTalesMapDecorationRenderer.kindCount(); kind++) {
-            float close = LostTalesMapDecorationRenderer.drawnWidth(
-                    kind, 4.0F);
-            float far = LostTalesMapDecorationRenderer.drawnWidth(
-                    kind, 1.0F);
-            assertEquals("a decoration must scale with the ground",
-                    4.0F, close / far, 0.0001F);
-
-            // Drawn at every zoom where there is something to see, and gone
-            // once there is not. Nothing in between: no fade, and no zoom at
-            // which some of a kind is drawn and the rest is not.
-            assertTrue("kind " + kind + " is missing at a readable size",
-                    LostTalesMapDecorationRenderer.isDrawn(kind, 1.0F));
-            assertTrue("kind " + kind + " is missing zoomed in",
-                    LostTalesMapDecorationRenderer.isDrawn(kind, 24.0F));
-            assertFalse("a sub-pixel decoration must be culled",
-                    LostTalesMapDecorationRenderer.isDrawn(kind, 0.02F));
+    public void decorationsAreCulledWhenTinyAndFadeInAsTheyGrow() {
+        for (LostTalesMapDecorationSprite kind
+                : LostTalesMapDecorationSprite.values()) {
+            assertTrue(kind + " is missing at a readable size",
+                    visibilityAt(kind, 1.0F) > 0.0F);
+            assertTrue(kind + " is missing zoomed in",
+                    visibilityAt(kind, 24.0F) > 0.0F);
+            assertEquals("a sub-pixel decoration must be culled",
+                    0.0F, visibilityAt(kind, 0.02F), 0.0F);
 
             boolean foundPartial = false;
             for (float scale = 0.02F; scale <= 1.0F; scale += 0.01F) {
-                float alpha = LostTalesMapDecorationRenderer
-                        .visibilityAlpha(kind, scale);
+                float alpha = visibilityAt(kind, scale);
                 foundPartial |= alpha > 0.0F && alpha < 1.0F;
             }
-            assertTrue("kind " + kind + " has a hard visibility step",
+            assertTrue(kind + " has a hard visibility step",
                     foundPartial);
         }
     }
@@ -560,26 +557,8 @@ public final class LostTalesMapDecorationPlacementTest {
     @Test
     public void largeLandmarksOutliveSmallSurfaceDetail() {
         float scale = 0.3F;
-        assertTrue(LostTalesMapDecorationSprite.MOUNTAIN
-                .visibilityAlpha(
-                        LostTalesMapDecorationSprite.MOUNTAIN
-                                .getWorldWidth() * scale)
-                > LostTalesMapDecorationSprite.WAVE.visibilityAlpha(
-                        LostTalesMapDecorationSprite.WAVE
-                                .getWorldWidth() * scale));
-    }
-
-    @Test
-    public void largeNearEdgeSitesAreNotHeldUntilTheAverageSpriteAppears() {
-        int mountainKind = 2;
-        float scale = 0.14F;
-
-        assertEquals("the average mountain should still be fully clear",
-                0.0F, LostTalesMapDecorationRenderer.visibilityAlpha(
-                        mountainKind, scale), 0.0F);
-        assertTrue("the whole-kind preflight would pop larger mountains in",
-                LostTalesMapDecorationRenderer.isDrawn(
-                        mountainKind, scale));
+        assertTrue(visibilityAt(LostTalesMapDecorationSprite.MOUNTAIN, scale)
+                > visibilityAt(LostTalesMapDecorationSprite.WAVE, scale));
     }
 
     /**

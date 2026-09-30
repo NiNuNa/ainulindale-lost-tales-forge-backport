@@ -26,7 +26,14 @@ import java.util.Locale;
 import java.util.UUID;
 import com.ninuna.losttales.character.lore.LoreCharacterRegistry;
 
-/** Centralized authoritative validation for character-management operations. */
+/**
+ * Every check a character is held to, on the server and in the creator
+ * alike: the player's state, the roster's revision and slots, the name,
+ * race, sex, look, profile, age, faction and starting waypoint. Each
+ * refusal is a {@link CharacterErrorId}. The server checks a name against
+ * the other rosters and the accounts it has seen as well
+ * ({@code CharacterService}).
+ */
 public final class CharacterValidator {
 
     public static final int MIN_NAME_LENGTH = 2;

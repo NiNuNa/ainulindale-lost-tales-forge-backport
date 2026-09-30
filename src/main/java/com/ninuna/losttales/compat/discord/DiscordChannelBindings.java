@@ -47,7 +47,9 @@ import java.util.regex.Pattern;
  * the bridge sends the game's lines wherever it points. An entry that
  * asks for something it cannot have is trimmed to what it can, with one
  * warning each, and an entry for a private channel is refused outright:
- * the channel's own word on whether it may be bridged is final. A fresh
+ * the channel's own word on whether it may be bridged is final. So is an
+ * entry for a channel whose gate lets nobody read it, by the gates in
+ * force as the bridge starts; a change to the gates restarts it. A fresh
  * file holds no link: links are made with a pairing code
  * ({@link DiscordLinkCodes}).
  */
@@ -197,6 +199,12 @@ public final class DiscordChannelBindings {
         if (!channel.isBridgeable()) {
             warn(warnings, "Discord binding for the " + channel.getDisplayName()
                     + " channel refused: that channel is private and never leaves the game");
+            return null;
+        }
+        if (!DiscordBridgePolicy.isOpenToTheBridge(channel)) {
+            warn(warnings, "Discord binding for the " + channel.getDisplayName()
+                    + " channel refused: its gate in channels.cfg lets nobody read it,"
+                    + " so nothing would cross");
             return null;
         }
         DiscordBridgeDirection direction = DiscordBridgeDirection.parse(

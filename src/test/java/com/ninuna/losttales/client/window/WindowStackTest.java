@@ -50,7 +50,7 @@ public final class WindowStackTest {
     }
 
     private static void detach(ChatChannel channel) {
-        WindowLayout.detach(
+        Tearing.off(
                 Collections.singletonList(ChatTab.of(channel)), 0.5D, 0.5D);
     }
 

@@ -1,7 +1,6 @@
 package com.ninuna.losttales.character.registry;
 
 import com.ninuna.losttales.util.LostTalesIdentifiers;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -78,10 +77,6 @@ public final class CharacterBodyModelRegistry {
 
     public static CharacterBodyModelDefinition get(String id) {
         return DEFINITIONS.get(LostTalesIdentifiers.normalize(id));
-    }
-
-    public static Collection<CharacterBodyModelDefinition> getAll() {
-        return DEFINITIONS.values();
     }
 
     /** The model a race's catalogue skins draw with; empty for an unknown race. */

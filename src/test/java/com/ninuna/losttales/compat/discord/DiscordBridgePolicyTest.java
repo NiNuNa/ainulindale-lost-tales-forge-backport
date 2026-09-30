@@ -18,7 +18,7 @@ import static org.junit.Assert.assertTrue;
  * What the bridge may carry. A channel says whether it is bridgeable at
  * all, and the gates in force say whether anybody may read it right now.
  * A channel only some players read may be linked: on Discord, the Discord
- * channel's own permissions decide who reads it (Nils, 2026-09-28, D1 b).
+ * channel's own permissions decide who reads it.
  */
 public final class DiscordBridgePolicyTest {
 

@@ -33,10 +33,11 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import java.util.UUID;
 
 /**
- * Single authoritative entry point for roleplaying character mutations.
+ * Every change to a player's characters goes through here: making one,
+ * the account character, its look, capes, profile and look edits.
  *
  * Callers must invoke this service on the logical server thread. Public
- * mutation methods are synchronized as a defensive atomicity boundary;
+ * mutation methods are synchronized so each change is made whole;
  * packet handlers schedule their work onto the server thread first.
  */
 public final class CharacterService {
@@ -98,15 +99,14 @@ public final class CharacterService {
      * plays as it when nothing else is being played.
      *
      * <p>The record carries the account's own UUID as its character id.
-     * That is what keeps a world that already existed working: party
-     * membership, LOTR bounty records, personal map markers and the
+     * Party membership, LOTR bounty records, personal map markers and the
      * account's saved player state are all filed under the gameplay id,
-     * which for the account was its own UUID and for this character is
-     * the same value. Nothing is re-keyed, and nothing has to be.</p>
+     * which for the account is its own UUID and for this character is the
+     * same value, so everything the account has in the world is the
+     * character's. Nothing is re-keyed.</p>
      *
-     * <p>It belongs to no faction, exactly as the account did before it
-     * was a character, and wears the account's own skin and the cape the
-     * account was already wearing.</p>
+     * <p>It belongs to no faction, as the bare account belongs to none,
+     * and wears the account's own skin and the cape the account wears.</p>
      */
     public synchronized CharacterOperationResult ensureDefaultCharacter(
             EntityPlayerMP player) {
@@ -143,9 +143,9 @@ public final class CharacterService {
                     CharacterErrorId.INTERNAL_ERROR, roster);
         }
         if (roster.getActiveCharacterId() == null) {
-            // The account was the identity being played, and this record
-            // is that identity: the same gameplay id, the same saved
-            // state, now with a name and a face of its own.
+            // The account is the identity being played, and this record
+            // is that identity: the same gameplay id and the same saved
+            // state, with a name and a face of its own.
             roster.setActiveCharacterId(defaultCharacter.getCharacterId());
         }
         roster.incrementRevision();
@@ -160,12 +160,8 @@ public final class CharacterService {
     private RoleplayCharacter buildDefaultCharacter(EntityPlayerMP player,
                                                      CharacterRoster roster) {
         UUID ownerId = player.getUniqueID();
-        String accountName = player.getGameProfile() == null
-                || player.getGameProfile().getName() == null
-                || player.getGameProfile().getName().trim().length() == 0
-                ? player.getCommandSenderName()
-                : player.getGameProfile().getName().trim();
-        String name = CharacterValidator.normalizeName(accountName);
+        String name = CharacterValidator.normalizeName(
+                SeenAccountNames.accountNameOf(player));
         if (name == null || name.length() == 0) {
             // A record with no name is one the codec would skip, so the
             // identity would vanish on the next load.
@@ -245,6 +241,9 @@ public final class CharacterService {
         ValidatedCharacterCreation creation = validation.getCreation();
         if (nameTakenElsewhere(data, player.getUniqueID(), creation.getName())) {
             return CharacterOperationResult.failure(CharacterErrorId.DUPLICATE_NAME, roster);
+        }
+        if (isAnotherAccountsName(player, creation.getName())) {
+            return CharacterOperationResult.failure(CharacterErrorId.ACCOUNT_NAME, roster);
         }
         RoleplayCharacter character = createUniqueCharacter(
                 data, player.getUniqueID(), creation);
@@ -383,6 +382,9 @@ public final class CharacterService {
                 appearance.getAppearance().getName())) {
             return refuseTemplate(data, roster, CharacterErrorId.DUPLICATE_NAME);
         }
+        if (isAnotherAccountsName(player, appearance.getAppearance().getName())) {
+            return refuseTemplate(data, roster, CharacterErrorId.ACCOUNT_NAME);
+        }
         CharacterValidationResult cape = this.capeEligibilityPolicy.validate(
                 player, current, adoption.getCosmeticCapeId());
         if (!cape.isValid()) {
@@ -416,8 +418,7 @@ public final class CharacterService {
     /**
      * Whether a character of another account already goes by the name.
      * Names are unique on the server, so a whisper by name reaches the one
-     * person it names (Nils, 2026-09-28, C6 b); a roster's own names are the
-     * validator's to check.
+     * person it names; a roster's own names are the validator's to check.
      */
     private static boolean nameTakenElsewhere(CharacterWorldData data,
                                               UUID ownerId, String name) {
@@ -432,6 +433,18 @@ public final class CharacterService {
             }
         }
         return false;
+    }
+
+    /**
+     * Whether a name the player chose is another account's that the
+     * server has seen ({@link SeenAccountNames}). The player's own account
+     * name is theirs to take.
+     */
+    private static boolean isAnotherAccountsName(EntityPlayerMP player,
+                                                 String name) {
+        return SeenAccountNames.isAnotherAccountsName(name,
+                SeenAccountNames.accountNameOf(player),
+                SeenAccountNames.ofServer(player.worldObj, player.getUniqueID()));
     }
 
     /**

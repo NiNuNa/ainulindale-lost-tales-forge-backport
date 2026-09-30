@@ -16,8 +16,7 @@ import net.minecraftforge.common.util.Constants;
 /**
  * When each identity was last played or heard on this server, so a member
  * list names under *Offline* only the characters somebody has met lately
- * (Nils, 2026-09-28, C5 a) and never a character its owner has kept to
- * themselves. An identity is seen when its player logs out playing it,
+ * and never a character its owner has kept to themselves. An identity is seen when its player logs out playing it,
  * switches away from it, or speaks as it; a time is written at most once
  * {@link #RECORD_EVERY_MILLIS} per identity, and one older than
  * {@link #FORGET_AFTER_MILLIS} is forgotten as the store loads.
@@ -41,10 +40,6 @@ public final class CharacterLastSeenWorldData extends WorldSavedData {
     private final Map<UUID, Long> seen = new LinkedHashMap<UUID, Long>();
     private final List<NBTTagCompound> quarantined = new ArrayList<NBTTagCompound>();
     private NBTTagCompound unsupported;
-
-    public CharacterLastSeenWorldData() {
-        this(DATA_NAME);
-    }
 
     public CharacterLastSeenWorldData(String name) {
         super(name);

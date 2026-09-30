@@ -1,92 +1,54 @@
 package com.ninuna.losttales.client.quest;
 
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.quest.BundledQuestFiles;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestDefinitionJsonParser;
-import com.ninuna.losttales.util.LostTalesCloseables;
+import com.ninuna.losttales.quest.LostTalesQuestDefinitionValidator;
+import cpw.mods.fml.common.FMLLog;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import net.minecraft.client.resources.IResource;
 import net.minecraft.client.resources.IResourceManager;
 import net.minecraft.util.ResourceLocation;
 
+/**
+ * The bundled quest files as the client reads them: from its resources,
+ * a resource pack's included, the same way the server reads its own
+ * ({@link BundledQuestFiles}). A file left out and a warning the checker
+ * raises are logged, as the server logs them.
+ */
 final class LostTalesQuestDefinitionResourceLoader {
-    private static final String INDEX_FILE = "quests/index.json";
-    private static final String[] FALLBACK_QUEST_FILES = new String[] {
-            "quests/tutorial/meet_nia.json",
-            "quests/tutorial/cheese_cache.json",
-            "quests/tutorial/starter_note.json"
-    };
 
     private LostTalesQuestDefinitionResourceLoader() {}
 
-    static List<LostTalesQuestDefinition> loadQuests(IResourceManager resourceManager) {
+    static List<LostTalesQuestDefinition> loadQuests(final IResourceManager resourceManager) {
         if (resourceManager == null) {
             return Collections.emptyList();
         }
-
-        List<String> questFiles = loadQuestIndex(resourceManager);
-        Map<String, LostTalesQuestDefinition> byId = new LinkedHashMap<String, LostTalesQuestDefinition>();
-
-        for (String questFile : questFiles) {
-            LostTalesQuestDefinition quest = loadQuestFile(resourceManager, questFile);
-            if (quest != null) {
-                byId.put(quest.getId(), quest);
-            }
+        BundledQuestFiles.Result read = BundledQuestFiles.read(
+                new BundledQuestFiles.Source() {
+                    @Override
+                    public Reader open(String path) throws IOException {
+                        try {
+                            return new InputStreamReader(resourceManager
+                                    .getResource(toResourceLocation(path))
+                                    .getInputStream(), StandardCharsets.UTF_8);
+                        } catch (FileNotFoundException missing) {
+                            return null;
+                        }
+                    }
+                });
+        for (String problem : read.problems) {
+            FMLLog.warning("[%s] Bundled quest left out: %s",
+                    LostTalesMetaData.MOD_ID, problem);
         }
-
-        List<LostTalesQuestDefinition> quests = new ArrayList<LostTalesQuestDefinition>(byId.values());
-        Collections.sort(quests, new Comparator<LostTalesQuestDefinition>() {
-            @Override
-            public int compare(LostTalesQuestDefinition left, LostTalesQuestDefinition right) {
-                return left.getTitle().compareToIgnoreCase(right.getTitle());
-            }
-        });
-        return quests;
-    }
-
-    private static List<String> loadQuestIndex(IResourceManager resourceManager) {
-        List<String> files = new ArrayList<String>();
-        Reader reader = null;
-        try {
-            IResource resource = resourceManager.getResource(new ResourceLocation(LostTalesMetaData.MOD_ID, INDEX_FILE));
-            reader = new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8);
-            files.addAll(LostTalesQuestDefinitionJsonParser.parseQuestIndex(reader));
-        } catch (IOException ignored) {
-            // Missing index is allowed; fall back to the built-in files copied from the modern branch.
-        } catch (RuntimeException ignored) {
-            // Broken index files should not make the journal unusable.
-        } finally {
-            LostTalesCloseables.closeQuietly(reader);
-        }
-
-        if (files.isEmpty()) {
-            Collections.addAll(files, FALLBACK_QUEST_FILES);
-        }
-        return files;
-    }
-
-    private static LostTalesQuestDefinition loadQuestFile(IResourceManager resourceManager, String questFile) {
-        Reader reader = null;
-        try {
-            IResource resource = resourceManager.getResource(toResourceLocation(questFile));
-            reader = new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8);
-            return LostTalesQuestDefinitionJsonParser.parseQuest(reader, questFile);
-        } catch (IOException ignored) {
-            return null;
-        } catch (RuntimeException ignored) {
-            return null;
-        } finally {
-            LostTalesCloseables.closeQuietly(reader);
-        }
+        LostTalesQuestDefinitionValidator.logWarnings(read.quests);
+        return read.quests;
     }
 
     private static ResourceLocation toResourceLocation(String questFile) {

@@ -19,6 +19,8 @@ import static org.junit.Assert.assertTrue;
  * role past the eighth bit travels too.
  */
 public final class LostTalesChatRoleMaskTest {
+    /** An optional id at the payload's tail: a presence flag and a UUID, written whole either way. */
+    private static final int IDENTITY_ID_TAIL_BYTES = 1 + 16;
 
     @Before
     public void setUp() {
@@ -142,7 +144,7 @@ public final class LostTalesChatRoleMaskTest {
         LostTalesChatMessagePacket decoded = new LostTalesChatMessagePacket();
         decoded.fromBytes(buffer.slice(0, buffer.readableBytes()
                 - scopeTailBytes("") - 4
-                - 3 * LostTalesChatMessagePacket.IDENTITY_ID_TAIL_BYTES));
+                - 3 * IDENTITY_ID_TAIL_BYTES));
         assertTrue(decoded.isMalformed());
         assertEquals(0, decoded.getRoles());
     }

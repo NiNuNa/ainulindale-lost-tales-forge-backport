@@ -30,20 +30,17 @@ public final class WindowPages {
         public final String id;
         private final String titleKey;
         private final ItemStack icon;
-        private final Window.ScreenFill firstFill;
         private final KeyBinding key;
         private final Factory factory;
         private final boolean fromWorld;
         private final PageTab tab;
         private PageContent content;
 
-        Page(String id, String titleKey, ItemStack icon,
-             Window.ScreenFill firstFill, KeyBinding key, Factory factory,
-             boolean fromWorld) {
+        Page(String id, String titleKey, ItemStack icon, KeyBinding key,
+             Factory factory, boolean fromWorld) {
             this.id = id;
             this.titleKey = titleKey;
             this.icon = icon;
-            this.firstFill = firstFill;
             this.key = key;
             this.factory = factory;
             this.fromWorld = fromWorld;
@@ -62,15 +59,6 @@ public final class WindowPages {
         boolean hasKey(int keyCode) {
             return this.key != null && keyCode > 0
                     && this.key.getKeyCode() == keyCode;
-        }
-
-        /**
-         * The part of the screen the page's window fills the first time it
-         * opens, before it has a place of its own; none for a window of the
-         * page's size.
-         */
-        public Window.ScreenFill firstFill() {
-            return this.firstFill;
         }
 
         /** The page's one tab. */
@@ -124,16 +112,14 @@ public final class WindowPages {
     /**
      * Registers a page under {@code id}, a code name as a channel's is:
      * lower-case letters, digits and underscores. A second page under an
-     * id already taken is refused. Its window fills {@code firstFill} the
-     * first time it opens, and its {@code key}, when it has one, opens it
-     * from another page and closes it from itself.
+     * id already taken is refused. Its window opens as every window does,
+     * and its {@code key}, when it has one, opens it from another page and
+     * closes it from itself.
      */
     public static synchronized void register(String id, String titleKey,
-                                             ItemStack icon,
-                                             Window.ScreenFill firstFill,
-                                             KeyBinding key,
+                                             ItemStack icon, KeyBinding key,
                                              Factory factory) {
-        add(new Page(id, titleKey, icon, firstFill, key, factory, false));
+        add(new Page(id, titleKey, icon, key, factory, false));
     }
 
     /**
@@ -147,14 +133,13 @@ public final class WindowPages {
                                                       String titleKey,
                                                       ItemStack icon,
                                                       Factory factory) {
-        add(new Page(id, titleKey, icon, Window.ScreenFill.NONE, null,
-                factory, true));
+        add(new Page(id, titleKey, icon, null, factory, true));
     }
 
     private static void add(Page page) {
         if (page.id == null || !page.id.matches("[a-z0-9_]{1,24}")
                 || page.titleKey == null || page.icon == null
-                || page.firstFill == null || page.factory == null
+                || page.factory == null
                 || PAGES.containsKey(page.id)) {
             throw new IllegalArgumentException("Not a page, or one twice: "
                     + page.id);

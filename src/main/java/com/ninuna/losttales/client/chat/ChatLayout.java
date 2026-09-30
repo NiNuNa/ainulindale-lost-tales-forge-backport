@@ -1,7 +1,10 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
+import com.ninuna.losttales.client.window.PinnedWindows;
 import com.ninuna.losttales.client.window.Window;
+import com.ninuna.losttales.client.window.WindowFrame;
 import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowLayoutStore;
 import com.ninuna.losttales.client.window.WindowPlacement;
@@ -100,6 +103,12 @@ public final class ChatLayout {
     /** The channels the file said were closed, while it is read. */
     private static final Set<ChatChannel> CLOSED_READ =
             new LinkedHashSet<ChatChannel>();
+    /**
+     * Conversations that tried to open by themselves while no window held
+     * a conversation: the chat's next opening brings them in its first
+     * window. For the session only.
+     */
+    private static final Set<ChatTab> WAITING = new LinkedHashSet<ChatTab>();
     /** Closed-chat feed position, percent of its travel; vanilla's spot. */
     private static double feedOffsetX;
     private static double feedOffsetY = 100.0D;
@@ -142,34 +151,97 @@ public final class ChatLayout {
         });
         WindowLayout.setDefaults(DEFAULT_WINDOWS);
         WindowLayoutStore.addPart(PART);
+        // A conversation's window pinned to the screen while playing is
+        // drawn as the screen draws it.
+        PinnedWindows.setConversationPainter(
+                new PinnedWindows.ConversationPainter() {
+                    @Override
+                    public void draw(net.minecraft.client.Minecraft minecraft,
+                                     Window window, int screenWidth,
+                                     int screenHeight,
+                                     LostTalesGuiAnimationSample shown) {
+                        LostTalesChatOverlayRenderer.drawWindowForScreen(
+                                minecraft, window, screenWidth, screenHeight,
+                                shown);
+                    }
+                });
     }
 
     /** Back to a new player's layout: the chat's own state and every window. */
     public static synchronized void reset() {
         install();
         PART.clear();
+        WAITING.clear();
         WindowLayout.reset();
     }
 
     /**
-     * A new player's window: Global and OOC, Global in front, snapped to
-     * the screen's bottom-left quarter. Every other channel starts closed;
-     * Proximity, Faction and Party open with their first line, and
-     * Operator and the consoles wait in the {@code +} until opened by hand.
-     * From then on the layout is whatever the player makes of it.
+     * A new player's window: Global and OOC, Global in front, in the
+     * middle of the screen at two thirds of it and locked, as every new
+     * window opens. Every other channel starts closed; Proximity, Faction
+     * and Party open with their first line, and Operator and the consoles
+     * wait in the {@code +} until opened by hand. From then on the layout
+     * is whatever the player makes of it.
      */
     static final Runnable DEFAULT_WINDOWS = new Runnable() {
         @Override
         public void run() {
-            Window window = WindowLayout.addWindow(FIRST_TABS,
-                    FIRST_TABS.get(0), 0.0D, 100.0D);
-            if (window != null) {
-                WindowLayout.setFill(window.getId(),
-                        Window.ScreenFill.BOTTOM_LEFT, false);
-            }
+            WindowLayout.addWindow(FIRST_TABS, FIRST_TABS.get(0));
             HIDDEN.addAll(FIRST_HIDDEN);
         }
     };
+
+    /** Whether a conversation is on screen: in front of a window or not, in a row the view shows. */
+    public static synchronized boolean showsConversation() {
+        for (Window window : WindowLayout.windows()) {
+            for (WindowTab tab : WindowFrame.visibleTabs(window)) {
+                if (ChatTab.from(tab) != null) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Whether any window holds a conversation. */
+    public static synchronized boolean hasConversationWindow() {
+        return firstConversationWindow() != null;
+    }
+
+    /** The first window, in layout order, holding a conversation; null for none. */
+    private static Window firstConversationWindow() {
+        for (Window window : WindowLayout.windows()) {
+            for (WindowTab tab : window.getTabs()) {
+                if (ChatTab.from(tab) != null) {
+                    return window;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The chat's first window again, as a new player's opens: Global and
+     * OOC, Global in front, with every conversation that tried to open
+     * while no window held one. What the chat opens with once every
+     * conversation window was closed. Null when all of them are open
+     * already.
+     */
+    public static synchronized Window openFirstWindow() {
+        List<ChatTab> tabs = new ArrayList<ChatTab>(FIRST_TABS);
+        for (ChatTab waiting : WAITING) {
+            if (!tabs.contains(waiting)) {
+                tabs.add(waiting);
+            }
+        }
+        WAITING.clear();
+        Window window = WindowLayout.addWindow(tabs, FIRST_TABS.get(0));
+        if (window != null) {
+            WindowLayout.raise(window.getId());
+            WindowLayout.persist();
+        }
+        return window;
+    }
 
     /* ---- Where channels stand ---- */
 
@@ -366,7 +438,8 @@ public final class ChatLayout {
         for (ChatChannel channel : ChatChannel.presentationOrder()) {
             ChatTab tab = ChatTab.of(channel);
             if (ClientChatChannelState.isAvailable(tab)
-                    && notification(tab) == choice) {
+                    && notification(tab) == choice
+                    && !PinnedWindows.shows(tab)) {
                 audible.add(tab);
             }
         }
@@ -377,7 +450,8 @@ public final class ChatLayout {
             ChatTab tab = ChatTab.from(each);
             if (tab != null && tab.isWhisper()
                     && ClientChatChannelState.isAvailable(tab)
-                    && notification(tab) == choice) {
+                    && notification(tab) == choice
+                    && !PinnedWindows.shows(tab)) {
                 audible.add(tab);
             }
         }
@@ -404,28 +478,49 @@ public final class ChatLayout {
 
     /**
      * The whisper tab with the named account as one identity of theirs,
-     * empty for the account's own, opened if it is not: it joins the
-     * preferred window, or the first unlocked one. The front tab is left
-     * alone, so an arriving whisper does not steal the row. The tab is
+     * empty for the account's own, opened if it is not, as the player asked
+     * for it ({@link #openHere}). The front tab is left alone. The tab is
      * the person's row entry: which conversation it shows follows the
      * identity the chat is read as, which is who speaks in it.
      */
     public static synchronized ChatTab openWhisper(
             String partner, String identity, String preferredWindowId) {
-        return openTab(ChatTab.whisper(partner, identity), preferredWindowId);
+        return openHere(ChatTab.whisper(partner, identity), preferredWindowId);
     }
 
     /**
-     * Opens a conversation's tab where a tab that opens by itself belongs,
-     * and answers it as the layout holds it. The row holds one entry per
-     * channel and per person, so a conversation held as one character
-     * opens as its row entry: a line's own tab never stands in a window
-     * beside the one that shows it.
+     * Opens a conversation's tab where a tab that opens by itself belongs
+     * ({@link WindowLayout#receivingWindow}), and answers it as the layout
+     * holds it. The row holds one entry per channel and per person, so a
+     * conversation held as one character opens as its row entry: a line's
+     * own tab never stands in a window beside the one that shows it. Null
+     * while no window holds a conversation: the tab waits for the chat's
+     * next opening.
      */
     public static synchronized ChatTab openTab(ChatTab tab,
                                                String preferredWindowId) {
-        return ChatTab.from(WindowLayout.openTab(ChatTab.row(tab),
+        ChatTab row = ChatTab.row(tab);
+        ChatTab opened = ChatTab.from(WindowLayout.openTab(row,
                 preferredWindowId));
+        if (opened == null && row != null) {
+            WAITING.add(row);
+        }
+        return opened;
+    }
+
+    /**
+     * Opens a conversation the player asked for — a whisper, a link, a
+     * jump to a line — as {@link #openTab} does, and when no window holds
+     * a conversation, in the chat's first window, which it opens.
+     */
+    public static synchronized ChatTab openHere(ChatTab tab,
+                                                String preferredWindowId) {
+        ChatTab opened = openTab(tab, preferredWindowId);
+        if (opened != null || tab == null) {
+            return opened;
+        }
+        Window first = openFirstWindow();
+        return first == null ? null : openTab(tab, first.getId());
     }
 
     /* ---- Whisper tabs per place ---- */
@@ -518,6 +613,7 @@ public final class ChatLayout {
      */
     public static synchronized void closeConversations() {
         rememberConversations(conversationsPlace);
+        WAITING.clear();
         Iterator<ChatTab> closedByHand = HIDDEN.iterator();
         while (closedByHand.hasNext()) {
             if (isRemembered(closedByHand.next())) {
@@ -844,9 +940,9 @@ public final class ChatLayout {
 
         /**
          * Every plain channel the file neither placed nor closed goes to
-         * the first window, so a channel added after the file was written
-         * is never silently lost; with no window at all, one opens for
-         * them. Staff talk and the consoles are the exception: they wait
+         * the first window holding a conversation, so a channel added
+         * after the file was written is never silently lost; with no such
+         * window, one opens for them. Staff talk and the consoles are the exception: they wait
          * in the {@code +}, hidden, as they do for a new player. A file
          * that names no window and closes every channel describes the
          * empty layout and is loaded as one.
@@ -869,12 +965,13 @@ public final class ChatLayout {
             if (unplaced.isEmpty()) {
                 return;
             }
-            if (WindowLayout.isEmpty()) {
+            Window holding = firstConversationWindow();
+            if (holding == null) {
                 ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
                 WindowLayout.addWindow(unplaced, unplaced.contains(global)
-                        ? global : unplaced.get(0), 0.0D, 100.0D);
+                        ? global : unplaced.get(0));
             } else {
-                WindowLayout.appendTabs(WindowLayout.firstWindow(), unplaced);
+                WindowLayout.appendTabs(holding, unplaced);
             }
         }
 

@@ -96,11 +96,6 @@ final class DiscordRateBuckets {
         return this.globalResetMillis > nowMillis ? this.globalResetMillis : 0L;
     }
 
-    /** Test hook: bucket and lane pairs remembered. */
-    int size() {
-        return this.resets.size();
-    }
-
     /** One bucket of one lane: by the route's hash when Discord named it, else by the route. */
     private String key(String route, String major) {
         String bucket = this.bucketByRoute.get(route);

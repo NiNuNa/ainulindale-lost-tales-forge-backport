@@ -5,13 +5,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 /**
- * Data-only quest definition compatible with the JSON files used by the modern branch.
- *
- * Minecraft 1.7.10 has no datapack/codec system, so these definitions are loaded with
- * Gson from bundled assets instead of from server datapacks.
+ * A quest as its file writes it: the quests bundled with the mod, those a
+ * server writes in its own folder, and the missives the game makes. Read
+ * from JSON by {@link LostTalesQuestDefinitionJsonParser}, checked by
+ * {@link LostTalesQuestDefinitionValidator}.
  */
 public final class LostTalesQuestDefinition {
     public static final String START_MODE_ITEM = "item";
@@ -160,11 +159,12 @@ public final class LostTalesQuestDefinition {
 
     /**
      * Whether a party member may join this quest from a card shared in
-     * the chat. A locked quest starts only on its own server path, a
-     * missive board's for one, so its card is never joined.
+     * the chat: only a quest a player may start by item or interaction. A
+     * locked quest starts only on its own server path, a missive board's
+     * for one, so its card is never joined.
      */
     public boolean canStartFromShare() {
-        return !START_MODE_LOCKED.equals(this.startMode);
+        return canStartFromItem() || canStartFromInteraction();
     }
 
     public Map<String, String> getPrerequisites() {
@@ -188,8 +188,25 @@ public final class LostTalesQuestDefinition {
         return this.markers;
     }
 
+    /** The journal's lines, each under the id of the stage it is written for. */
     public Map<String, String> getJournalLog() {
         return this.journalLog;
+    }
+
+    /**
+     * The journal line for the stage at {@code stageIndex}: the one under
+     * that stage's id, else the one under the latest stage before it that
+     * has a line; empty where none has.
+     */
+    public String journalLine(int stageIndex) {
+        for (int index = Math.min(stageIndex, this.stages.size() - 1);
+                index >= 0; index--) {
+            String line = this.journalLog.get(this.stages.get(index).getId());
+            if (line != null && line.trim().length() > 0) {
+                return line;
+            }
+        }
+        return "";
     }
 
     public List<LostTalesQuestStageDefinition> getStages() {
@@ -200,20 +217,21 @@ public final class LostTalesQuestDefinition {
         return this.stages.isEmpty() ? null : this.stages.get(0);
     }
 
+    /**
+     * Whether the start mode is one of the four words: {@code item},
+     * {@code interaction}, {@code any} or {@code locked}. Any other word
+     * starts the quest from nowhere but a command, and the checker says so.
+     */
+    public boolean isKnownStartMode() {
+        return START_MODE_ITEM.equals(this.startMode)
+                || START_MODE_INTERACTION.equals(this.startMode)
+                || START_MODE_ANY.equals(this.startMode)
+                || START_MODE_LOCKED.equals(this.startMode);
+    }
+
+    /** The start mode as written, trimmed; {@code locked} when none is. */
     private static String normalizeStartMode(String value) {
-        String normalized = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
-        if (normalized.length() == 0) {
-            return START_MODE_LOCKED;
-        }
-        if ("npc".equals(normalized) || "entity".equals(normalized)) {
-            return START_MODE_INTERACTION;
-        }
-        if ("manual".equals(normalized) || "command".equals(normalized)) {
-            return START_MODE_LOCKED;
-        }
-        if (START_MODE_ITEM.equals(normalized) || START_MODE_INTERACTION.equals(normalized) || START_MODE_ANY.equals(normalized) || START_MODE_LOCKED.equals(normalized)) {
-            return normalized;
-        }
-        return START_MODE_LOCKED;
+        String trimmed = value == null ? "" : value.trim();
+        return trimmed.length() == 0 ? START_MODE_LOCKED : trimmed;
     }
 }

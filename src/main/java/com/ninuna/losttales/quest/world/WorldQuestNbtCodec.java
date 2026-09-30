@@ -1,15 +1,14 @@
 package com.ninuna.losttales.quest.world;
 
+import com.ninuna.losttales.quest.LostTalesQuestIds;
 import com.ninuna.losttales.storage.NbtQuarantine;
 import com.ninuna.losttales.storage.NbtTags;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
@@ -50,13 +49,12 @@ public final class WorldQuestNbtCodec {
     private static final String TAG_QUEST_IDS = "QuestIds";
     private static final String TAG_RUN_INDEX = "RunIndex";
     private static final String TAG_REWARD_INDEX = "RewardIndex";
-    private static final int MAX_ID_LENGTH = 256;
 
     private WorldQuestNbtCodec() {}
 
     public static void write(NBTTagCompound output,
                              Collection<WorldQuestRun> runs,
-                             Map<UUID, Set<String>> rewards,
+                             Map<UUID, List<String>> rewards,
                              Collection<NBTTagCompound> quarantined) {
         output.setInteger(TAG_DATA_VERSION, CURRENT_DATA_VERSION);
         NBTTagList runList = new NBTTagList();
@@ -65,7 +63,7 @@ public final class WorldQuestNbtCodec {
         }
         output.setTag(TAG_RUNS, runList);
         NBTTagList rewardList = new NBTTagList();
-        for (Map.Entry<UUID, Set<String>> entry : rewards.entrySet()) {
+        for (Map.Entry<UUID, List<String>> entry : rewards.entrySet()) {
             NBTTagCompound reward = new NBTTagCompound();
             NbtTags.writeUuid(reward, TAG_IDENTITY, entry.getKey());
             NBTTagList ids = new NBTTagList();
@@ -120,14 +118,14 @@ public final class WorldQuestNbtCodec {
             runs.put(run.getQuestId(), run);
         }
 
-        LinkedHashMap<UUID, Set<String>> rewards =
-                new LinkedHashMap<UUID, Set<String>>();
+        LinkedHashMap<UUID, List<String>> rewards =
+                new LinkedHashMap<UUID, List<String>>();
         NBTTagList rewardList = safe.getTagList(TAG_REWARDS,
                 Constants.NBT.TAG_COMPOUND);
         for (int index = 0; index < rewardList.tagCount(); index++) {
             NBTTagCompound raw = rewardList.getCompoundTagAt(index);
             UUID identity = NbtTags.readUuid(raw, TAG_IDENTITY);
-            Set<String> ids = readRewardIds(raw);
+            List<String> ids = readRewardIds(raw);
             if (identity == null || ids == null || ids.isEmpty()
                     || rewards.containsKey(identity)
                     || rewards.size() >= MAX_REWARDED) {
@@ -169,8 +167,8 @@ public final class WorldQuestNbtCodec {
 
     /** Why a saved run cannot be read, as its quarantine reason; empty for one that can. */
     private static String runProblem(NBTTagCompound raw) {
-        if (!NbtTags.hasReasonableString(raw, TAG_QUEST_ID, MAX_ID_LENGTH,
-                true)) {
+        if (!raw.hasKey(TAG_QUEST_ID, Constants.NBT.TAG_STRING)
+                || !LostTalesQuestIds.fits(raw.getString(TAG_QUEST_ID))) {
             return "missing_quest_id";
         }
         if (WorldQuestRun.State.of(raw.getString(TAG_STATE)) == null) {
@@ -197,7 +195,8 @@ public final class WorldQuestNbtCodec {
             NBTTagCompound count = countList.getCompoundTagAt(index);
             String objective = count.getString(TAG_OBJECTIVE);
             int value = count.getInteger(TAG_COUNT);
-            if (objective.length() == 0 || objective.length() > MAX_ID_LENGTH
+            if (objective.length() == 0
+                    || LostTalesQuestIds.utf8Bytes(objective) > WorldQuestRules.MAX_ID_BYTES
                     || value < 0 || counts.containsKey(objective)) {
                 return null;
             }
@@ -222,7 +221,7 @@ public final class WorldQuestNbtCodec {
                 raw.getLong(TAG_ENDED_AT), counts, helpers);
     }
 
-    private static Set<String> readRewardIds(NBTTagCompound raw) {
+    private static List<String> readRewardIds(NBTTagCompound raw) {
         if (!raw.hasKey(TAG_QUEST_IDS, Constants.NBT.TAG_LIST)) {
             return null;
         }
@@ -231,10 +230,10 @@ public final class WorldQuestNbtCodec {
         if (ids.tagCount() > MAX_REWARDS_EACH) {
             return null;
         }
-        Set<String> result = new LinkedHashSet<String>();
+        List<String> result = new ArrayList<String>();
         for (int index = 0; index < ids.tagCount(); index++) {
             String id = ids.getStringTagAt(index);
-            if (id.length() == 0 || id.length() > MAX_ID_LENGTH) {
+            if (!LostTalesQuestIds.fits(id)) {
                 return null;
             }
             result.add(id);
@@ -245,7 +244,7 @@ public final class WorldQuestNbtCodec {
     /** What a read found. */
     public static final class ReadResult {
         public final Map<String, WorldQuestRun> runs;
-        public final Map<UUID, Set<String>> rewards;
+        public final Map<UUID, List<String>> rewards;
         public final List<NBTTagCompound> quarantined;
         public final boolean repaired;
         /** The whole store as read, kept for a store this build cannot read; null otherwise. */
@@ -253,7 +252,7 @@ public final class WorldQuestNbtCodec {
         public final int unsupportedVersion;
 
         private ReadResult(Map<String, WorldQuestRun> runs,
-                           Map<UUID, Set<String>> rewards,
+                           Map<UUID, List<String>> rewards,
                            List<NBTTagCompound> quarantined, boolean repaired,
                            NBTTagCompound unsupported,
                            int unsupportedVersion) {
@@ -266,7 +265,7 @@ public final class WorldQuestNbtCodec {
         }
 
         static ReadResult success(Map<String, WorldQuestRun> runs,
-                                  Map<UUID, Set<String>> rewards,
+                                  Map<UUID, List<String>> rewards,
                                   List<NBTTagCompound> quarantined,
                                   boolean repaired) {
             return new ReadResult(runs, rewards, quarantined, repaired, null,
@@ -275,7 +274,7 @@ public final class WorldQuestNbtCodec {
 
         static ReadResult unsupported(NBTTagCompound source, int version) {
             return new ReadResult(Collections.<String, WorldQuestRun>emptyMap(),
-                    Collections.<UUID, Set<String>>emptyMap(),
+                    Collections.<UUID, List<String>>emptyMap(),
                     Collections.<NBTTagCompound>emptyList(), false,
                     (NBTTagCompound)source.copy(), version);
         }

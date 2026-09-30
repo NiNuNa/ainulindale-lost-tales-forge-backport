@@ -525,7 +525,7 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
                 detail = "The character's original roster slot is occupied.";
                 break;
             case NAME_TAKEN:
-                detail = "Another character, a lore character or a chat voice now goes by the character's name.";
+                detail = "Another character, another account the server has seen, a lore character or a chat voice goes by the character's name.";
                 break;
             case CHARACTER_ID_CONFLICT:
                 detail = "The character UUID is already present in a roster.";

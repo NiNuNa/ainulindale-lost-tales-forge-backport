@@ -240,7 +240,7 @@ public final class ChatPresenceService {
      * Whether the player shows as online to others as the identity they
      * play: false while they are Invisible, and until their client has
      * said how they show. What the game keeps quiet, Discord's answers
-     * keep quiet too (Nils, 2026-09-28, D2 a).
+     * keep quiet too.
      */
     public static synchronized boolean showsOnline(EntityPlayerMP player) {
         if (player == null || player.getUniqueID() == null) {

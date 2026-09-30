@@ -529,7 +529,7 @@ public final class LostTalesChatService {
     /**
      * A Discord member is typing, or has stopped, in the channel a linked
      * Discord channel is read into: everyone their line would reach is
-     * told, as a player's typing is told (Nils, 2026-09-28, D5 a). Never
+     * told, as a player's typing is told. Never
      * for a muted member, nor while the server has typing switched off.
      */
     public static void typingFromDiscord(ChatChannel channel, String factionScope,

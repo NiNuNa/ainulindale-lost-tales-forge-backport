@@ -5,8 +5,6 @@ import com.ninuna.losttales.client.camera.CameraPresetFileStore;
 import com.ninuna.losttales.config.LostTalesConfigDefinitions;
 import com.ninuna.losttales.config.LostTalesConfigFiles;
 import java.io.File;
-import java.util.Set;
-import java.util.TreeSet;
 import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.common.config.Property;
 
@@ -17,11 +15,6 @@ import net.minecraftforge.common.config.Property;
  */
 public final class LostTalesThirdPersonConfig {
     public static final String CATEGORY_CAMERA = "third_person_camera";
-    private static final double ORIGINAL_HEAD_TRACKING_ANGLE = 35.0D;
-    private static final double PREVIOUS_HEAD_TRACKING_ANGLE = 65.0D;
-    private static final double RECENT_HEAD_TRACKING_ANGLE = 70.0D;
-    private static final double LAST_HEAD_TRACKING_ANGLE = 80.0D;
-    private static final double FORMER_HEAD_TRACKING_ANGLE = 85.0D;
     private static final double DEFAULT_HEAD_TRACKING_ANGLE = 100.0D;
     private static final double MAXIMUM_HEAD_TRACKING_ANGLE = 120.0D;
 
@@ -104,10 +97,19 @@ public final class LostTalesThirdPersonConfig {
             // option keeps its shipped value, and what is left is each
             // option as it is defined.
             Configuration definitions = new Configuration();
-            readOptions(definitions, false);
+            defineOptions(definitions);
             shipped = definitions;
         }
         readOptions(new Configuration(loadedConfigFile), true);
+    }
+
+    /**
+     * Reads every camera option into {@code definitions}, a configuration
+     * of no file, as it is defined: the first load's first step, taken
+     * while each field still holds its shipped value.
+     */
+    static void defineOptions(Configuration definitions) {
+        readOptions(definitions, false);
     }
 
     /**
@@ -151,20 +153,6 @@ public final class LostTalesThirdPersonConfig {
      */
     public static double[] shippedBounds(String key) {
         return LostTalesConfigDefinitions.bounds(shipped, CATEGORY_CAMERA, key);
-    }
-
-    /**
-     * The key of every camera option, as the options are defined: from
-     * the first load, or, before it, read against no file.
-     */
-    public static Set<String> optionKeys() {
-        Configuration definitions = shipped;
-        if (definitions == null) {
-            definitions = new Configuration();
-            readOptions(definitions, false);
-        }
-        return new TreeSet<String>(
-                definitions.getCategory(CATEGORY_CAMERA).keySet());
     }
 
     public static void applyGuiMetadata(Configuration config) {
@@ -412,7 +400,10 @@ public final class LostTalesThirdPersonConfig {
                     config, "sprintBodyRotationSpeed",
                     sprintBodyRotationSpeed, 90.0D, 1440.0D,
                     "Sprinting body turn speed in degrees per second.");
-            headTrackingAngle = getHeadTrackingAngle(config);
+            headTrackingAngle = getClampedDouble(
+                    config, "headTrackingAngle", headTrackingAngle,
+                    0.0D, MAXIMUM_HEAD_TRACKING_ANGLE,
+                    "Maximum visible side angle for normal camera-relative head tracking. Reverse camera-facing tracking starts only after the configurable hysteresis and blends in over time.");
             headTrackingSpeed = getClampedDouble(
                     config, "headTrackingSpeed", headTrackingSpeed,
                     180.0D, 1440.0D,
@@ -449,7 +440,6 @@ public final class LostTalesThirdPersonConfig {
                     "enableSwimmingDirectionalMovement", CATEGORY_CAMERA,
                     enableSwimmingDirectionalMovement,
                     "Keep camera-relative visual body facing while swimming. Disable to retain vanilla swimming body rotation.");
-            removeObsoleteProperties(config);
             applyGuiMetadata(config);
             if (fromFiles) {
                 applyShippedDefinitions(config);
@@ -602,52 +592,5 @@ public final class LostTalesThirdPersonConfig {
             property.set(clamped);
         }
         return clamped;
-    }
-
-    private static double getHeadTrackingAngle(Configuration config) {
-        Property property = config.get(
-                CATEGORY_CAMERA, "headTrackingAngle",
-                headTrackingAngle,
-                "Maximum visible side angle for normal camera-relative head tracking. Reverse camera-facing tracking starts only after the configurable hysteresis and blends in over time.",
-                0.0D, MAXIMUM_HEAD_TRACKING_ANGLE);
-        double value = property.getDouble(headTrackingAngle);
-        if (isPreviousHeadTrackingDefault(value)) {
-            value = DEFAULT_HEAD_TRACKING_ANGLE;
-            property.set(value);
-        }
-        double clamped = Math.max(0.0D, Math.min(
-                MAXIMUM_HEAD_TRACKING_ANGLE, value));
-        if (clamped != value) {
-            property.set(clamped);
-        }
-        return clamped;
-    }
-
-    private static boolean isPreviousHeadTrackingDefault(double value) {
-        return Math.abs(value - ORIGINAL_HEAD_TRACKING_ANGLE) < 0.000001D
-                || Math.abs(value - PREVIOUS_HEAD_TRACKING_ANGLE)
-                < 0.000001D
-                || Math.abs(value - RECENT_HEAD_TRACKING_ANGLE)
-                < 0.000001D
-                || Math.abs(value - LAST_HEAD_TRACKING_ANGLE)
-                < 0.000001D
-                || Math.abs(value - FORMER_HEAD_TRACKING_ANGLE)
-                < 0.000001D;
-    }
-
-    private static void removeObsoleteProperties(Configuration config) {
-        if (config == null || !config.hasCategory(CATEGORY_CAMERA)) {
-            return;
-        }
-        config.getCategory(CATEGORY_CAMERA).remove(
-                "crosshairSmoothingSpeed");
-        config.getCategory(CATEGORY_CAMERA).remove(
-                "maximumHeadTurnAngle");
-        config.getCategory(CATEGORY_CAMERA).remove(
-                "enableAutomaticRecentering");
-        config.getCategory(CATEGORY_CAMERA).remove(
-                "automaticRecenteringDelaySeconds");
-        config.getCategory(CATEGORY_CAMERA).remove(
-                "automaticRecenteringSpeed");
     }
 }

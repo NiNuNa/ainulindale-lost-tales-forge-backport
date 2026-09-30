@@ -198,7 +198,7 @@ public final class WindowLayoutStoreTest {
             List<String> written = Files.readAllLines(own.toPath(),
                     Charset.forName("UTF-8"));
             assertTrue(written.toString(), written.get(1).startsWith(
-                    "window " + window.getId() + " locked=false x=10.00 y=20.00"));
+                    "window " + window.getId() + " locked=true x=10.00 y=20.00"));
         } finally {
             WindowLayoutStore.initialize(null);
             deleteTree(folder);
@@ -333,7 +333,7 @@ public final class WindowLayoutStoreTest {
 
     @Test
     public void describeRoundTripsThroughLoad() {
-        WindowLayout.detach(ChatTab.of(ChatChannel.PARTY), 62.5D, 8.0D);
+        Tearing.off(ChatTab.of(ChatChannel.PARTY), 62.5D, 8.0D);
         WindowLayout.moveTab(ChatTab.of(ChatChannel.FACTION), "w3", 1);
         WindowLayout.setLocked("w3", true);
         ChatLayout.close(ChatTab.of(ChatChannel.OPERATOR));
@@ -348,12 +348,14 @@ public final class WindowLayoutStoreTest {
         List<String> lines = WindowLayoutStore.describe();
         assertTrue(lines.contains("feed x=12.25 y=88.00"));
         assertTrue(lines.contains("toolbar collapsed=true"));
-        assertTrue(lines.contains("window w1 locked=false x=0.00 y=0.00 "
-                + "active=client_console tabs=client_console,server_console"));
-        assertTrue(lines.contains("window w2 locked=false x=3.00 y=97.50 "
-                + "active=ooc tabs=global,proximity,ooc"));
-        assertTrue(lines.contains("window w3 locked=true x=62.50 y=8.00 "
-                + "active=faction tabs=party,faction"));
+        assertTrue(lines.toString(), lines.contains("window w1 locked=true"
+                + " x=50.00 y=50.00 active=client_console"
+                + " tabs=client_console,server_console"));
+        assertTrue(lines.toString(), lines.contains("window w2 locked=true"
+                + " x=3.00 y=97.50 active=ooc tabs=global,proximity,ooc"));
+        assertTrue(lines.toString(), lines.contains("window w3 locked=true"
+                + " x=62.50 y=8.00 height=200.00 width=300 active=faction"
+                + " tabs=party,faction"));
         assertTrue(lines.contains("closed operator"));
         assertTrue(lines.contains("notify\tnothing\tooc"));
         assertTrue(lines.contains("notify\tmentions\tparty"));

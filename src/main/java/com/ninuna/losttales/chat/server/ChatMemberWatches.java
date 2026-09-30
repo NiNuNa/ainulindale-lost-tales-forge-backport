@@ -146,14 +146,8 @@ public final class ChatMemberWatches {
         }
     }
 
-    /** How many lists of a player's are still watched at {@code now}; those let go are dropped. */
-    static synchronized int watchedAt(UUID player, long now) {
-        List<Watch> watched = dueWatches(now).get(player);
-        return watched == null ? 0 : watched.size();
-    }
-
     /** The lists still watched at {@code now}, by player; those let go are dropped. */
-    private static Map<UUID, List<Watch>> dueWatches(long now) {
+    static synchronized Map<UUID, List<Watch>> dueWatches(long now) {
         Map<UUID, List<Watch>> due = new HashMap<UUID, List<Watch>>();
         Iterator<Map.Entry<UUID, Map<String, Watch>>> players =
                 WATCHES.entrySet().iterator();

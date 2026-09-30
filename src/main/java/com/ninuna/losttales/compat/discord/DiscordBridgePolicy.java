@@ -14,7 +14,7 @@ import com.ninuna.losttales.chat.ChatMessageOrigin;
  * own webhooks, so a message can never go round. A private channel
  * (a party, a whisper, a console) is refused here before any binding is
  * asked, so no configuration can carry it. A channel only some players may
- * read, Operator Chat among them, may be linked (Nils, 2026-09-28, D1 b):
+ * read, Operator Chat among them, may be linked:
  * on Discord the channel's own permissions then decide who reads it, and
  * whoever links it is told so ({@link #isLimitedInGame}).
  */

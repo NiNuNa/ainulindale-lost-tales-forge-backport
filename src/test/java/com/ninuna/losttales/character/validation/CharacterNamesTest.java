@@ -22,6 +22,14 @@ public final class CharacterNamesTest {
         assertEquals("feanor", CharacterNames.key("F\u00e9anor"));
     }
 
+    /** An account's name compares the same way: its underscores are no letters. */
+    @Test
+    public void anAccountsNameComparesAsAnyNameDoes() {
+        assertTrue(CharacterNames.same("Steve_2", "steve 2"));
+        assertTrue(CharacterNames.same("x_Aldric_x", "X-Aldric-X"));
+        assertFalse(CharacterNames.same("Steve_2", "Steve"));
+    }
+
     @Test
     public void namesWithNothingToCompareAreNeverTheSame() {
         assertFalse(CharacterNames.same("", ""));

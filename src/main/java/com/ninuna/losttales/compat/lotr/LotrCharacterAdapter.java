@@ -27,12 +27,11 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Public-API-only LOTR Legacy adapter for roleplaying-character metadata.
- *
- * This is the isolated character-system boundary for LOTR Legacy APIs.
- * Transient fast-travel state remains here for switch safety. Character-owned
- * progression capture and application are isolated in
- * {@link LotrProgressionStateAdapter}; metadata resolution stays in this class.
+ * What the character system reads from LOTR Legacy, through LOTR's public
+ * API only: factions, the pledge, starting waypoints, and whether a player
+ * is fast travelling, which a switch must wait for. What a character
+ * keeps of LOTR's progression is read and written by
+ * {@link LotrProgressionStateAdapter}.
  */
 public final class LotrCharacterAdapter implements CharacterFactionResolver {
 
@@ -143,7 +142,7 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
         return this.available;
     }
 
-    @Override
+    /** Why the catalogue cannot be used, as a stable id for the log and the creator; empty when it can. */
     public synchronized String getUnavailableReason() {
         ensureInitialized();
         return this.unavailableReason;
@@ -196,7 +195,7 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
                 : Collections.<String>emptyList();
     }
 
-    @Override
+    /** The static waypoints of a starting faction, which the creator offers. */
     public synchronized List<String> getStartingWaypointIds(String factionId) {
         LOTRFaction faction = resolveFactionForState(factionId);
         if (faction == null) {
@@ -223,12 +222,6 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
         }
         Collections.sort(ids);
         return Collections.unmodifiableList(ids);
-    }
-
-    @Override
-    public synchronized String resolveStartingWaypointId(String factionId,
-                                                         String waypointId) {
-        return resolveStartingWaypointId(factionId, waypointId, false);
     }
 
     @Override
@@ -384,7 +377,10 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
         return normalizedId.length() == 0 ? null : findFaction(normalizedId);
     }
 
-    /** Public-API-only transient fast-travel guard for character switching. */
+    /**
+     * Whether the player is fast travelling or waiting to, which a switch
+     * waits for; true when LOTR cannot say, so a switch never cuts into one.
+     */
     public boolean isFastTravelActive(EntityPlayerMP player) {
         if (player == null || player.worldObj == null || player.worldObj.isRemote) {
             return false;

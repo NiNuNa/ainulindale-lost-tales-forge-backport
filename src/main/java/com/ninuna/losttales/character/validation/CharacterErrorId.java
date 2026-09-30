@@ -21,6 +21,8 @@ public enum CharacterErrorId {
     INVALID_NAME_PROFANE("invalid_name_profane"),
     DUPLICATE_NAME("duplicate_name"),
     NAME_RESERVED("name_reserved"),
+    /** A new character's name is the name of an account the server has seen. */
+    ACCOUNT_NAME("account_name"),
     INVALID_RACE("invalid_race"),
     INVALID_GENDER("invalid_gender"),
     INVALID_SKIN("invalid_skin"),

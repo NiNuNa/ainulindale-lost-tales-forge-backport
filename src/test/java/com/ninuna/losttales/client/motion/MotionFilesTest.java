@@ -162,7 +162,7 @@ public final class MotionFilesTest {
     public void theBarsRideTheirWindowUnlessGivenATime() throws Exception {
         assertEquals(0, bundled().get(MotionIds.WINDOW_BAR_APPEAR)
                 .beat(Motion.ON).durationMillis());
-        assertEquals("a screen's strip rides its screen too (W25 a)", 0,
+        assertEquals("a screen's strip rides its screen too", 0,
                 bundled().get(MotionIds.SCREEN_CONTROL_BAR).beat(Motion.ON)
                         .durationMillis());
     }

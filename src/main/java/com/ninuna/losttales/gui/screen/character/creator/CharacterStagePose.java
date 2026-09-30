@@ -87,14 +87,6 @@ public final class CharacterStagePose {
     private float shownShotFocus = 0.5F;
     private long lastAdvanceNanos;
 
-    /** The player's own turn, apart from the page's shot. */
-    public float getYaw() { return this.yaw; }
-    public float getPitch() { return this.pitch; }
-    /** The player's own zoom, apart from the page's shot. */
-    public float getZoom() { return this.zoom; }
-    public float getPanX() { return this.panX; }
-    public float getPanY() { return this.panY; }
-
     /** The turn as drawn this frame: the page's shot and the player's turn together. */
     public float getShownYaw() {
         return wrap(this.shownShotYaw + this.shownYaw);

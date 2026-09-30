@@ -11,268 +11,158 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.oredict.OreDictionary;
+
 /**
- * Small compatibility matcher for data-driven quest objectives.
+ * Whether an item or a creature is the one a quest names. The one reading
+ * of the selectors, used by every objective, the conversation and the
+ * quest giver alike.
  *
- * The modern NeoForge branch can use vanilla item/entity tags. Minecraft 1.7.10 does
- * not have those tag registries, so this helper maps item "tag" parameters to the
- * Forge OreDictionary and maps entity "tag" parameters to simple legacy groups such
- * as hostile, passive, player, and living. Explicit registry names still remain the
- * preferred, most predictable format.
+ * <p>Items: {@code item} lists registry names, each {@code id} or
+ * {@code id@meta} (an id without a namespace is Minecraft's), and
+ * {@code ore} lists ore dictionary names; a stack matches any one of
+ * them.</p>
+ *
+ * <p>Whom: {@code entity} lists creature kinds by the name the game
+ * registers them under ({@code Zombie}, {@code losttales.Nia}), and
+ * {@code group} lists groups: {@code living}, {@code player},
+ * {@code hostile}, {@code animal} and {@code npc}. A creature matches
+ * when it is one of the kinds or in one of the groups; a selector that
+ * names nobody matches nobody.</p>
  */
 public final class LostTalesQuestObjectiveMatcher {
+    public static final String GROUP_LIVING = "living";
+    public static final String GROUP_PLAYER = "player";
+    public static final String GROUP_HOSTILE = "hostile";
+    public static final String GROUP_ANIMAL = "animal";
+    public static final String GROUP_NPC = "npc";
+
     private LostTalesQuestObjectiveMatcher() {}
 
-    public static boolean matchesItem(ItemStack stack, LostTalesQuestObjectiveDefinition objective) {
-        if (objective == null) {
-            return false;
-        }
-        Map<String, String> params = objective.getParams();
-        return matchesItemOrTag(stack,
-                LostTalesQuestParams.value(params, "item"),
-                LostTalesQuestParams.value(params, "ore"));
+    /** Whether the word is one of the five groups. */
+    public static boolean isGroup(String word) {
+        return GROUP_LIVING.equals(word) || GROUP_PLAYER.equals(word)
+                || GROUP_HOSTILE.equals(word) || GROUP_ANIMAL.equals(word)
+                || GROUP_NPC.equals(word);
     }
 
-    public static boolean matchesItemOrTag(ItemStack stack, String itemSpec, String tagSpec) {
+    /** Whether the params name anybody at all: an {@code entity} or a {@code group}. */
+    public static boolean namesWhom(Map<String, String> params) {
+        return LostTalesQuestParams.value(params, "entity").length() > 0
+                || LostTalesQuestParams.value(params, "group").length() > 0;
+    }
+
+    public static boolean matchesItem(ItemStack stack, LostTalesQuestObjectiveDefinition objective) {
+        return objective != null && matchesItem(stack, objective.getParams());
+    }
+
+    /** Whether the stack is one the params' {@code item} or {@code ore} names. */
+    public static boolean matchesItem(ItemStack stack, Map<String, String> params) {
         if (stack == null || stack.getItem() == null) {
             return false;
         }
-
-        if (itemSpec != null && itemSpec.trim().length() > 0) {
-            String[] entries = itemSpec.split(",");
-            for (String entry : entries) {
-                String spec = entry == null ? "" : entry.trim();
-                if (spec.length() == 0 || isComment(spec)) {
-                    continue;
-                }
-                if (isTagSelector(spec)) {
-                    if (matchesOreDictionary(stack, stripTagPrefix(spec))) {
-                        return true;
-                    }
-                } else if (matchesItemId(stack, spec)) {
-                    return true;
-                }
+        for (String spec : LostTalesQuestParams.value(params, "item").split(",")) {
+            String trimmed = spec.trim();
+            if (trimmed.length() > 0 && matchesItemId(stack, trimmed)) {
+                return true;
             }
         }
-
-        if (tagSpec != null && tagSpec.trim().length() > 0) {
-            String[] entries = tagSpec.split(",");
-            for (String entry : entries) {
-                String spec = entry == null ? "" : entry.trim();
-                if (spec.length() == 0 || isComment(spec)) {
-                    continue;
-                }
-                if (matchesOreDictionary(stack, stripTagPrefix(spec))) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    public static boolean matchesEntity(Entity entity, LostTalesQuestObjectiveDefinition objective) {
-        if (objective == null) {
-            return false;
-        }
-        Map<String, String> params = objective.getParams();
-        return matchesEntity(entity,
-                LostTalesQuestParams.value(params, "entity"),
-                LostTalesQuestParams.value(params, "group"));
-    }
-
-    public static boolean matchesEntity(Entity entity, String entitySpec, String tagSpec) {
-        if (entity == null) {
-            return false;
-        }
-
-        boolean hasSelector = false;
-        if (entitySpec != null && entitySpec.trim().length() > 0) {
-            String[] entries = entitySpec.split(",");
-            for (String entry : entries) {
-                String spec = entry == null ? "" : entry.trim();
-                if (spec.length() == 0 || isComment(spec)) {
-                    continue;
-                }
-                hasSelector = true;
-                if (isTagSelector(spec)) {
-                    if (matchesEntityGroup(entity, stripTagPrefix(spec))) {
-                        return true;
-                    }
-                } else if (matchesEntityId(entity, spec)) {
-                    return true;
-                }
-            }
-        }
-
-        if (tagSpec != null && tagSpec.trim().length() > 0) {
-            String[] entries = tagSpec.split(",");
-            for (String entry : entries) {
-                String spec = entry == null ? "" : entry.trim();
-                if (spec.length() == 0 || isComment(spec)) {
-                    continue;
-                }
-                hasSelector = true;
-                if (matchesEntityGroup(entity, stripTagPrefix(spec))) {
-                    return true;
-                }
-            }
-        }
-
-        // Preserve the previous 1.7.10 behavior: a kill objective without an entity
-        // selector means any killed entity can count.
-        return !hasSelector;
-    }
-
-    private static boolean matchesItemId(ItemStack stack, String spec) {
-        ParsedItemSelector selector = parseItemSelector(spec);
-        if (selector.itemId.length() == 0) {
-            return false;
-        }
-
-        Object registered = Item.itemRegistry.getObject(selector.itemId);
-        if (registered instanceof Item && stack.getItem() == registered) {
-            return selector.matchesMetadata(stack.getItemDamage());
-        }
-
-        Object stackName = Item.itemRegistry.getNameForObject(stack.getItem());
-        return stackName != null
-                && normalizeResourceId(stackName.toString()).equals(selector.itemId)
-                && selector.matchesMetadata(stack.getItemDamage());
-    }
-
-    private static boolean matchesOreDictionary(ItemStack stack, String oreSpec) {
-        String normalizedSpec = normalizeOreName(oreSpec);
-        if (normalizedSpec.length() == 0) {
-            return false;
-        }
-
-        int[] oreIds = OreDictionary.getOreIDs(stack);
-        for (int oreId : oreIds) {
-            String oreName = OreDictionary.getOreName(oreId);
-            if (matchesOreName(oreName, normalizedSpec)) {
+        for (String spec : LostTalesQuestParams.value(params, "ore").split(",")) {
+            String trimmed = spec.trim();
+            if (trimmed.length() > 0 && matchesOre(stack, trimmed)) {
                 return true;
             }
         }
         return false;
     }
 
-    private static boolean matchesOreName(String oreName, String spec) {
-        if (oreName == null || spec == null) {
+    public static boolean matchesEntity(Entity entity, LostTalesQuestObjectiveDefinition objective) {
+        return objective != null && matchesEntity(entity, objective.getParams());
+    }
+
+    /** Whether the creature is one the params' {@code entity} or {@code group} names. */
+    public static boolean matchesEntity(Entity entity, Map<String, String> params) {
+        if (entity == null) {
             return false;
         }
-        String normalizedOre = normalizeOreName(oreName);
-        String pathOnly = normalizeOreName(stripNamespace(spec));
-        return normalizedOre.equals(spec) || normalizedOre.equals(pathOnly) || normalizeLoose(oreName).equals(normalizeLoose(spec));
-    }
-
-    private static boolean matchesEntityId(Entity entity, String spec) {
-        String legacyName = normalizeLoose(EntityList.getEntityString(entity));
-        String className = normalizeLoose(entity.getClass().getSimpleName().replace("Entity", ""));
-        String normalized = normalizeLoose(spec);
-        String pathOnly = normalizeLoose(stripNamespace(spec));
-        return normalized.length() > 0
-                && (normalized.equals(legacyName) || pathOnly.equals(legacyName) || normalized.equals(className) || pathOnly.equals(className));
-    }
-
-    private static boolean matchesEntityGroup(Entity entity, String group) {
-        String normalized = normalizeLoose(group);
-        if (normalized.length() == 0) {
-            return false;
-        }
-        if ("living".equals(normalized) || "mob".equals(normalized)) {
-            return entity instanceof EntityLivingBase;
-        }
-        if ("player".equals(normalized) || "players".equals(normalized)) {
-            return entity instanceof EntityPlayer;
-        }
-        if ("hostile".equals(normalized) || "hostiles".equals(normalized) || "monster".equals(normalized) || "monsters".equals(normalized)) {
-            return entity instanceof IMob;
-        }
-        if ("passive".equals(normalized) || "passives".equals(normalized) || "animal".equals(normalized) || "animals".equals(normalized) || "creature".equals(normalized) || "creatures".equals(normalized)) {
-            return entity instanceof IAnimals && !(entity instanceof IMob);
-        }
-        if ("npc".equals(normalized) || "npcs".equals(normalized)) {
-            String legacyName = normalizeLoose(EntityList.getEntityString(entity));
-            String className = normalizeLoose(entity.getClass().getSimpleName());
-            return legacyName.indexOf("npc") >= 0 || className.indexOf("npc") >= 0;
-        }
-        return matchesEntityId(entity, group);
-    }
-
-    private static ParsedItemSelector parseItemSelector(String spec) {
-        String itemId = spec == null ? "" : spec.trim();
-        int meta = OreDictionary.WILDCARD_VALUE;
-
-        int at = itemId.lastIndexOf('@');
-        if (at >= 0 && at + 1 < itemId.length()) {
-            meta = parseMetadata(itemId.substring(at + 1), OreDictionary.WILDCARD_VALUE);
-            itemId = itemId.substring(0, at);
-        } else {
-            int firstColon = itemId.indexOf(':');
-            int lastColon = itemId.lastIndexOf(':');
-            if (firstColon >= 0 && lastColon > firstColon && lastColon + 1 < itemId.length()) {
-                int parsedMeta = parseMetadata(itemId.substring(lastColon + 1), Integer.MIN_VALUE);
-                if (parsedMeta != Integer.MIN_VALUE) {
-                    meta = parsedMeta;
-                    itemId = itemId.substring(0, lastColon);
+        String kinds = LostTalesQuestParams.value(params, "entity");
+        if (kinds.length() > 0) {
+            String name = EntityList.getEntityString(entity);
+            for (String kind : kinds.split(",")) {
+                if (name != null && name.equals(kind.trim())) {
+                    return true;
                 }
             }
         }
-
-        return new ParsedItemSelector(normalizeResourceId(itemId), meta);
+        for (String group : LostTalesQuestParams.value(params, "group").split(",")) {
+            if (inGroup(entity, group.trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    private static int parseMetadata(String value, int fallback) {
-        if (value == null) {
-            return fallback;
+    private static boolean inGroup(Entity entity, String group) {
+        if (GROUP_LIVING.equals(group)) {
+            return entity instanceof EntityLivingBase;
         }
-        String trimmed = value.trim();
-        if (trimmed.length() == 0 || "*".equals(trimmed)) {
-            return OreDictionary.WILDCARD_VALUE;
+        if (GROUP_PLAYER.equals(group)) {
+            return entity instanceof EntityPlayer;
         }
-        try {
-            return Math.max(0, Integer.parseInt(trimmed));
-        } catch (Exception ignored) {
-            return fallback;
+        if (GROUP_HOSTILE.equals(group)) {
+            return entity instanceof IMob;
         }
+        if (GROUP_ANIMAL.equals(group)) {
+            return entity instanceof IAnimals && !(entity instanceof IMob);
+        }
+        if (GROUP_NPC.equals(group)) {
+            return isNpc(entity);
+        }
+        return false;
     }
 
-    private static boolean isTagSelector(String spec) {
-        if (spec == null) {
+    /** Whether the creature is some mod's NPC: a class it is made from is named for one. */
+    private static boolean isNpc(Entity entity) {
+        for (Class<?> type = entity.getClass(); type != null
+                && type != Entity.class; type = type.getSuperclass()) {
+            if (type.getSimpleName().toLowerCase(Locale.ROOT).indexOf("npc") >= 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean matchesItemId(ItemStack stack, String spec) {
+        int meta = OreDictionary.WILDCARD_VALUE;
+        String id = spec;
+        int at = spec.lastIndexOf('@');
+        if (at >= 0) {
+            meta = LostTalesQuestParams.parseInt(spec.substring(at + 1), -1);
+            id = spec.substring(0, at).trim();
+            if (meta < 0) {
+                return false;
+            }
+        }
+        String itemId = normalizeResourceId(id);
+        if (itemId.length() == 0 || meta != OreDictionary.WILDCARD_VALUE
+                && meta != stack.getItemDamage()) {
             return false;
         }
-        String trimmed = spec.trim();
-        String lower = trimmed.toLowerCase(Locale.ROOT);
-        return trimmed.startsWith("#") || lower.startsWith("ore:") || lower.startsWith("oredict:") || lower.startsWith("oredictionary:") || lower.startsWith("tag:");
+        Object registered = Item.itemRegistry.getObject(itemId);
+        if (registered instanceof Item) {
+            return stack.getItem() == registered;
+        }
+        Object stackName = Item.itemRegistry.getNameForObject(stack.getItem());
+        return stackName != null
+                && normalizeResourceId(stackName.toString()).equals(itemId);
     }
 
-    private static boolean isComment(String spec) {
-        return spec != null && spec.trim().startsWith("//");
-    }
-
-    private static String stripTagPrefix(String value) {
-        if (value == null) {
-            return "";
+    private static boolean matchesOre(ItemStack stack, String ore) {
+        for (int oreId : OreDictionary.getOreIDs(stack)) {
+            if (ore.equals(OreDictionary.getOreName(oreId))) {
+                return true;
+            }
         }
-        String stripped = value.trim();
-        while (stripped.startsWith("#")) {
-            stripped = stripped.substring(1).trim();
-        }
-        String lower = stripped.toLowerCase(Locale.ROOT);
-        if (lower.startsWith("ore:")) {
-            return stripped.substring("ore:".length()).trim();
-        }
-        if (lower.startsWith("oredict:")) {
-            return stripped.substring("oredict:".length()).trim();
-        }
-        if (lower.startsWith("oredictionary:")) {
-            return stripped.substring("oredictionary:".length()).trim();
-        }
-        if (lower.startsWith("tag:")) {
-            return stripped.substring("tag:".length()).trim();
-        }
-        return stripped;
+        return false;
     }
 
     /**
@@ -288,50 +178,5 @@ public final class LostTalesQuestObjectiveMatcher {
             normalized = "minecraft:" + normalized;
         }
         return normalized;
-    }
-
-    private static String normalizeOreName(String value) {
-        if (value == null) {
-            return "";
-        }
-        return stripTagPrefix(value).trim().toLowerCase(Locale.ROOT);
-    }
-
-    private static String stripNamespace(String value) {
-        if (value == null) {
-            return "";
-        }
-        String trimmed = value.trim();
-        int colon = trimmed.indexOf(':');
-        return colon >= 0 && colon + 1 < trimmed.length() ? trimmed.substring(colon + 1) : trimmed;
-    }
-
-    private static String normalizeLoose(String value) {
-        if (value == null) {
-            return "";
-        }
-        String stripped = stripNamespace(value).toLowerCase(Locale.ROOT);
-        StringBuilder builder = new StringBuilder();
-        for (int i = 0; i < stripped.length(); i++) {
-            char c = stripped.charAt(i);
-            if (c >= 'a' && c <= 'z' || c >= '0' && c <= '9') {
-                builder.append(c);
-            }
-        }
-        return builder.toString();
-    }
-
-    private static final class ParsedItemSelector {
-        private final String itemId;
-        private final int metadata;
-
-        private ParsedItemSelector(String itemId, int metadata) {
-            this.itemId = itemId == null ? "" : itemId;
-            this.metadata = metadata;
-        }
-
-        private boolean matchesMetadata(int stackMetadata) {
-            return this.metadata == OreDictionary.WILDCARD_VALUE || this.metadata == stackMetadata;
-        }
     }
 }

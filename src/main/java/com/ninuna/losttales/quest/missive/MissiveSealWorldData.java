@@ -22,10 +22,6 @@ public final class MissiveSealWorldData extends WorldSavedData {
     private byte[] key;
     private NBTTagCompound unusable;
 
-    public MissiveSealWorldData() {
-        this(DATA_NAME);
-    }
-
     public MissiveSealWorldData(String name) {
         super(name);
     }

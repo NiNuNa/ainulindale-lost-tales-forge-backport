@@ -24,7 +24,7 @@ import net.minecraftforge.common.ForgeHooks;
 /**
  * The server's welcome: the lines of {@code chat.welcomeLines}, sent as
  * Server lines in OOC Chat the first time a player joins this world, so
- * they wait there unread (Nils, 2026-09-28, C9 a). They go out a moment
+ * they wait there unread. They go out a moment
  * after the join, behind the history the player is caught up with. A
  * player is welcomed once: their saved data remembers it.
  */

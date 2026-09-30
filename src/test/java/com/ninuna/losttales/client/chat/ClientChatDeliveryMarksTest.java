@@ -71,7 +71,7 @@ public final class ClientChatDeliveryMarksTest {
         ClientChatDeliveryMarks.apply(1234L, ChatDeliveryMark.State.NONE,
                 ChatDeliveryMark.Reason.NONE);
         assertEquals(ChatDeliveryMark.State.NONE, ClientChatDeliveryMarks.stateOf(7));
-        assertEquals(0, ClientChatDeliveryMarks.size());
+        assertEquals(ChatDeliveryMark.Reason.NONE, ClientChatDeliveryMarks.reasonOf(7));
     }
 
     @Test
@@ -81,24 +81,42 @@ public final class ClientChatDeliveryMarksTest {
             ClientChatDeliveryMarks.apply(1000L + index, ChatDeliveryMark.State.FAILED,
                     ChatDeliveryMark.Reason.STOPPED);
         }
-        assertEquals(ClientChatDeliveryMarks.MAX_MARKS, ClientChatDeliveryMarks.size());
+        // Ten past the bound: the ten oldest are gone and the rest stand.
         ClientChatMessageIds.remember(1, 1000L);
         assertEquals(ChatDeliveryMark.State.NONE, ClientChatDeliveryMarks.stateOf(1));
+        ClientChatMessageIds.remember(3, 1009L);
+        assertEquals(ChatDeliveryMark.State.NONE, ClientChatDeliveryMarks.stateOf(3));
+        ClientChatMessageIds.remember(4, 1010L);
+        assertEquals(ChatDeliveryMark.State.FAILED, ClientChatDeliveryMarks.stateOf(4));
         ClientChatMessageIds.remember(2, 1000L + count - 1);
         assertEquals(ChatDeliveryMark.State.FAILED, ClientChatDeliveryMarks.stateOf(2));
 
         ClientChatDeliveryMarks.clear();
-        assertEquals(0, ClientChatDeliveryMarks.size());
+        assertEquals(ChatDeliveryMark.State.NONE, ClientChatDeliveryMarks.stateOf(4));
         assertEquals(ChatDeliveryMark.State.NONE, ClientChatDeliveryMarks.stateOf(2));
     }
 
+    /**
+     * An id no server hands out, or no state, marks nothing and takes
+     * none of the room the bound leaves the marks that stand.
+     */
     @Test
     public void anIdTheServerCannotHaveSentIsIgnored() {
+        ClientChatMessageIds.remember(7, 5L);
+        ClientChatMessageIds.remember(8, 1000L);
+        ClientChatDeliveryMarks.apply(1000L, ChatDeliveryMark.State.FAILED,
+                ChatDeliveryMark.Reason.REFUSED);
         ClientChatDeliveryMarks.apply(0L, ChatDeliveryMark.State.FAILED,
                 ChatDeliveryMark.Reason.REFUSED);
         ClientChatDeliveryMarks.apply(-5L, ChatDeliveryMark.State.FAILED,
                 ChatDeliveryMark.Reason.REFUSED);
         ClientChatDeliveryMarks.apply(5L, null, ChatDeliveryMark.Reason.REFUSED);
-        assertEquals(0, ClientChatDeliveryMarks.size());
+        assertEquals(ChatDeliveryMark.State.NONE, ClientChatDeliveryMarks.stateOf(7));
+        // As many more as the bound holds beside the first mark.
+        for (int index = 1; index < ClientChatDeliveryMarks.MAX_MARKS; index++) {
+            ClientChatDeliveryMarks.apply(1000L + index, ChatDeliveryMark.State.FAILED,
+                    ChatDeliveryMark.Reason.STOPPED);
+        }
+        assertEquals(ChatDeliveryMark.State.FAILED, ClientChatDeliveryMarks.stateOf(8));
     }
 }

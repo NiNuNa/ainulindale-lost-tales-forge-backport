@@ -5,6 +5,7 @@ import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.registry.CharacterGenderRegistry;
 import com.ninuna.losttales.character.registry.CharacterRaceRegistry;
+import com.ninuna.losttales.character.server.SeenAccountNames;
 import com.ninuna.losttales.character.storage.CharacterWorldData;
 import com.ninuna.losttales.character.sync.DeletedCharacterSummary;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
@@ -19,10 +20,10 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Deleted characters (R6 a): the owner may restore one within the
- * retention, into a free open slot, while no other character has taken its
- * name; past the retention the server purges it, soonest due first and a
- * bounded number at a time.
+ * Deleted characters: the owner may restore one within the retention,
+ * into a free open slot, while no other character or other account has
+ * taken its name; past the retention the server purges it, soonest due
+ * first and a bounded number at a time.
  */
 public final class CharacterDeletionRetentionTest {
 
@@ -68,30 +69,61 @@ public final class CharacterDeletionRetentionTest {
 
     @Test
     public void itIsRefusedWhileItsNameIsAnothersNow() {
-        CharacterWorldData data = new CharacterWorldData();
+        CharacterWorldData data = new CharacterWorldData(CharacterWorldData.DATA_NAME);
         RoleplayCharacter deleted = character(OWNER, "Aldric", 0);
         assertEquals(CharacterErrorId.NONE,
-                CharacterDeletionService.nameRefusal(data, deleted));
+                CharacterDeletionService.nameRefusal(data, deleted, "Owner",
+                        accounts()));
         assertTrue(data.getOrCreateRoster(OTHER).addCharacter(
                 character(OTHER, "Al-dric", 0)));
         assertEquals(CharacterErrorId.DUPLICATE_NAME,
-                CharacterDeletionService.nameRefusal(data, deleted));
+                CharacterDeletionService.nameRefusal(data, deleted, "Owner",
+                        accounts()));
     }
 
     @Test
     public void aLoreNameOrAChatVoiceIsReserved() {
-        CharacterWorldData data = new CharacterWorldData();
+        CharacterWorldData data = new CharacterWorldData(CharacterWorldData.DATA_NAME);
         assertEquals(CharacterErrorId.NAME_RESERVED,
                 CharacterDeletionService.nameRefusal(data,
-                        character(OWNER, "Gandalf", 0)));
+                        character(OWNER, "Gandalf", 0), "Owner", accounts()));
         assertEquals(CharacterErrorId.NAME_RESERVED,
                 CharacterDeletionService.nameRefusal(data,
-                        character(OWNER, "Narrator", 0)));
+                        character(OWNER, "Narrator", 0), "Owner", accounts()));
+    }
+
+    /** An account the server has seen takes its name back from a deleted character; the owner's own does not. */
+    @Test
+    public void itIsRefusedWhileItsNameIsAnAccountsTheServerHasSeen() {
+        CharacterWorldData data = new CharacterWorldData(CharacterWorldData.DATA_NAME);
+        assertEquals(CharacterErrorId.ACCOUNT_NAME,
+                CharacterDeletionService.nameRefusal(data,
+                        character(OWNER, "Notch", 0), "Owner",
+                        accounts("Owner", "Notch")));
+        assertEquals(CharacterErrorId.NONE,
+                CharacterDeletionService.nameRefusal(data,
+                        character(OWNER, "Owner", 0), "Owner",
+                        accounts("Owner", "Notch")));
+    }
+
+    /** The accounts a server has seen, as a test names them. */
+    private static SeenAccountNames.Source accounts(final String... names) {
+        return new SeenAccountNames.Source() {
+            @Override
+            public void addNames(List<String> into, int limit) {
+                for (String name : names) {
+                    if (into.size() < limit) {
+                        into.add(name);
+                    }
+                }
+            }
+        };
     }
 
     @Test
     public void theExpiredArePurgedSoonestDueFirstAndBounded() {
-        CharacterDeletionWorldData data = new CharacterDeletionWorldData();
+        CharacterDeletionWorldData data = new CharacterDeletionWorldData(
+                CharacterDeletionWorldData.DATA_NAME);
         long now = 100L * DAY;
         data.saveTombstone(committed(character(OWNER, "Late", 1),
                 1000L, now - DAY));

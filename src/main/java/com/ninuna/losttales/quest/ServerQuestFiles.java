@@ -1,5 +1,6 @@
 package com.ninuna.losttales.quest;
 
+import com.ninuna.losttales.network.packet.LostTalesQuestDefinitionCodec;
 import com.ninuna.losttales.util.LostTalesCloseables;
 import java.io.File;
 import java.io.FileInputStream;
@@ -26,14 +27,17 @@ import java.util.Set;
  *
  * <p>A file is left out, with a line in the log saying why, when it is too
  * large, cannot be read, takes an id a bundled quest or an earlier file
- * already has, takes a missive's id, or raises any warning the bundled
- * quests are checked for. The others still load.</p>
+ * already has, takes a missive's id, raises any warning the bundled
+ * quests are checked for, or cannot be sent to a player whole. The others
+ * still load, until together they would pass {@link #MAX_SENT_BYTES}.</p>
  */
 public final class ServerQuestFiles {
     /** The folder under Forge's config directory. */
     public static final String DIRECTORY = "losttales/quests";
     public static final int MAX_FILES = 256;
     public static final long MAX_FILE_BYTES = 64L * 1024L;
+    /** The most every server quest together may take on the wire: what each player is sent as they join. */
+    public static final int MAX_SENT_BYTES = 4 * 1024 * 1024;
     /** The id path missives are made under; no written quest may take it. */
     private static final String MISSIVE_PATH = "missive/";
 
@@ -106,6 +110,7 @@ public final class ServerQuestFiles {
         if (takenIds != null) {
             ids.addAll(takenIds);
         }
+        long sent = 0L;
         for (File file : files) {
             String name = file.getName();
             if (!isDirectChild(folder, file)) {
@@ -126,6 +131,13 @@ public final class ServerQuestFiles {
                 problems.add(name + ": " + problem);
                 continue;
             }
+            int size = LostTalesQuestDefinitionCodec.encodedSize(quest);
+            if (sent + size > MAX_SENT_BYTES) {
+                problems.add(name + ": the server's quests would pass "
+                        + MAX_SENT_BYTES + " bytes for every player who joins");
+                continue;
+            }
+            sent += size;
             ids.add(quest.getId());
             quests.add(quest);
         }
@@ -147,12 +159,16 @@ public final class ServerQuestFiles {
         if (path.startsWith(MISSIVE_PATH)) {
             return "the id " + id + " is a missive's";
         }
-        if (quest.getStages().isEmpty()) {
-            return "it has no stages";
-        }
         List<String> warnings = LostTalesQuestDefinitionValidator
                 .describeWarnings(Collections.singletonList(quest));
-        return warnings.isEmpty() ? "" : warnings.get(0);
+        if (!warnings.isEmpty()) {
+            return warnings.get(0);
+        }
+        return LostTalesQuestDefinitionCodec.encodedSize(quest) < 0
+                ? "it cannot be sent to a player: an id, a name or a text is"
+                        + " too long, or it holds too many stages, objectives"
+                        + " or parameters"
+                : "";
     }
 
     private static LostTalesQuestDefinition parse(File file,

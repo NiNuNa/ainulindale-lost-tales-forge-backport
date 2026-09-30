@@ -3,6 +3,7 @@ package com.ninuna.losttales.gui.screen.quest;
 import com.ninuna.losttales.client.quest.ClientQuestCatalog;
 import com.ninuna.losttales.client.quest.ClientQuestEntry;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
+import com.ninuna.losttales.client.quest.QuestMarks;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.client.window.BarItem;
@@ -54,7 +55,7 @@ import com.ninuna.losttales.quest.LostTalesQuestRewardText;
  * The quest journal, a page a window holds: the quests on the left, the
  * one being read on the right. The window holds the rest: the list's
  * button at its tool strip's left, the filters behind its cog, the search
- * in its well, and the quest's actions on its input bar (U4 a), where
+ * in its well, and the quest's actions on its input bar, where
  * Abandon and Clear ask first. It reads the shared presentation assembled
  * from Lost Tales and LOTR's synchronized quest state, and draws itself
  * in the box its window gives it.
@@ -659,12 +660,12 @@ public final class QuestJournalPage extends PageContent {
     /** The mark a quest's state is read by, in the list and in the detail. */
     private static String stateGlyph(ClientQuestEntry quest) {
         if (quest.isCompleted()) {
-            return "\u2714";
+            return QuestMarks.DONE;
         }
         if (quest.isFailed() || quest.isAbandoned()) {
-            return "\u2715";
+            return QuestMarks.ENDED;
         }
-        return "\u25c7";
+        return QuestMarks.OPEN;
     }
 
     private static int glyphRgb(ClientQuestEntry quest) {
@@ -775,7 +776,8 @@ public final class QuestJournalPage extends PageContent {
         }
         if (line.objective) {
             this.fontRendererObj.drawStringWithShadow(
-                    line.complete ? "\u2714" : line.active ? "\u25c7" : "\u25cb",
+                    line.complete ? QuestMarks.DONE : line.active
+                            ? QuestMarks.OPEN : QuestMarks.AHEAD,
                     (int)rows.left + line.indent, y,
                     LostTalesColors.rgb(line.complete
                             ? LostTalesColors.GREEN
@@ -881,8 +883,8 @@ public final class QuestJournalPage extends PageContent {
     }
 
     /**
-     * Asks before a quest is abandoned or cleared (U4 a): one click used to
-     * lose a quest's progress. The answer acts on the quest asked about,
+     * Asks before a quest is abandoned or cleared, since either loses the
+     * quest's progress. The answer acts on the quest asked about,
      * whatever is read by then.
      */
     private void ask(final ClientQuestEntry quest, final boolean clear) {
@@ -1030,26 +1032,21 @@ public final class QuestJournalPage extends PageContent {
         addSeparator(lines, 0, LostTalesSkyrimUiStyle.BORDER_DIM);
     }
 
+    /**
+     * The journal line for where the quest stands: the current stage's, or
+     * the latest earlier stage's; the last stage's for a finished quest,
+     * the first's for one no longer running. The description stands in
+     * where no stage has a line.
+     */
     private String getCurrentJournalText(LostTalesQuestDefinition quest, LostTalesQuestProgress progress, boolean completed) {
-        String best = null;
-        if (!quest.getJournalLog().isEmpty()) {
-            int currentValue = completed ? Integer.MAX_VALUE : getProgressStageNumber(progress);
-            int bestValue = Integer.MIN_VALUE;
-            for (Map.Entry<String, String> entry : quest.getJournalLog().entrySet()) {
-                int value = parseStageNumber(entry.getKey(), Integer.MIN_VALUE);
-                if (value <= currentValue && value >= bestValue) {
-                    best = entry.getValue();
-                    bestValue = value;
-                }
-            }
-            if (best == null && !quest.getJournalLog().isEmpty()) {
-                best = quest.getJournalLog().values().iterator().next();
-            }
+        int stage = completed ? quest.getStages().size() - 1
+                : Math.max(0, LostTalesQuestObjectiveSelection
+                        .getCurrentStageIndex(quest, progress));
+        String line = quest.journalLine(stage);
+        if (line.length() == 0) {
+            line = quest.getDescription();
         }
-        if (best == null || best.length() == 0) {
-            best = quest.getDescription();
-        }
-        return best == null || best.length() == 0 ? translate("gui.losttales.quest.log.none") : best;
+        return line == null || line.length() == 0 ? translate("gui.losttales.quest.log.none") : line;
     }
 
     private void addStageSummary(List<DetailLine> lines,
@@ -1217,28 +1214,6 @@ public final class QuestJournalPage extends PageContent {
         }
         return LostTalesQuestObjectiveSelection
                 .getCurrentStageIndex(quest, progress);
-    }
-
-    private int getProgressStageNumber(LostTalesQuestProgress progress) {
-        if (progress == null) {
-            return Integer.MIN_VALUE;
-        }
-        int fromId = parseStageNumber(progress.getStageId(), Integer.MIN_VALUE);
-        if (fromId != Integer.MIN_VALUE) {
-            return fromId;
-        }
-        return progress.getStageIndex();
-    }
-
-    private int parseStageNumber(String text, int fallback) {
-        if (text == null) {
-            return fallback;
-        }
-        try {
-            return Integer.parseInt(text.trim());
-        } catch (NumberFormatException ignored) {
-            return fallback;
-        }
     }
 
     private void addSectionTitle(List<DetailLine> lines, String title) {

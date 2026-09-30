@@ -95,7 +95,7 @@ public final class ChatMemberDirectory {
     static final long ABSENT_REFRESH_MILLIS = 15000L;
     /**
      * How lately a character must have been played or heard to stand under
-     * *Offline* (Nils, 2026-09-28, C5 a): the rest are nobody's business.
+     * *Offline*: the rest are nobody's business.
      */
     static final long OFFLINE_WINDOW_MILLIS = 30L * 24L * 3600000L;
 

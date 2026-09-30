@@ -148,6 +148,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
      */
     public static final String CHAT_DELETE_ACTIVE_PROPERTY =
             "losttales.chatDelete.active";
+    /** Set once the game's chat log writes every line on one line of the log. */
+    public static final String CHAT_LOG_ACTIVE_PROPERTY =
+            "losttales.chatLogTransformer.active";
 
     private static final String ENTITY_RENDERER =
             "net.minecraft.client.renderer.EntityRenderer";
@@ -353,6 +356,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "com/ninuna/losttales/client/chat/LostTalesChatHistoryHooks";
     private static final String CHAT_HISTORY_ACTIVE_PROPERTY =
             "losttales.chatHistory.active";
+    private static final String CHAT_LOG_HOOK_OWNER =
+            "com/ninuna/losttales/chat/ChatMessageValidator";
     private static final String LOTR_GUI_ACHIEVEMENT_HOVER =
             "lotr.client.gui.LOTRGuiAchievementHoverEvent";
     private static final String LOTR_ACHIEVEMENT_HOVER_HOOK_OWNER =
@@ -419,9 +424,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     LOTR_GUI_MAIN_MENU.equals(transformedName));
         }
         if (GUI_NEW_CHAT.equals(transformedName)) {
-            return transformGuiNewChatDelete(transformGuiNewChatHistory(
-                    transformGuiNewChatWrap(
-                            transformGuiNewChatHitTest(basicClass))));
+            return transformGuiNewChatLog(transformGuiNewChatDelete(
+                    transformGuiNewChatHistory(transformGuiNewChatWrap(
+                            transformGuiNewChatHitTest(basicClass)))));
         }
         if (LOTR_PLAYER_DATA.equals(transformedName)) {
             return transformLotrFastTravelArrival(basicClass);
@@ -3150,6 +3155,70 @@ public final class LostTalesClassTransformer implements IClassTransformer {
     }
 
     /**
+     * Writes every chat line on one line of the game's log.
+     *
+     * <p>{@code GuiNewChat.printChatMessageWithOptionalDeletion} logs
+     * {@code "[CHAT] "} and the line's words as they are, so a message
+     * with a line break in it would start a line of its own in the log,
+     * one that could read as any other line there. The string handed to
+     * the logger goes through {@code ChatMessageValidator.logged} first,
+     * which writes the breaks out.</p>
+     */
+    private static byte[] transformGuiNewChatLog(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!"printChatMessageWithOptionalDeletion".equals(method.name)
+                        && !"func_146234_a".equals(method.name)
+                        || !"(Lnet/minecraft/util/IChatComponent;I)V"
+                        .equals(method.desc)) {
+                    continue;
+                }
+                if (containsHook(method, CHAT_LOG_HOOK_OWNER, "logged")) {
+                    System.setProperty(CHAT_LOG_ACTIVE_PROPERTY, "true");
+                    return basicClass;
+                }
+                int patched = 0;
+                for (AbstractInsnNode instruction = method.instructions.getFirst();
+                     instruction != null; instruction = instruction.getNext()) {
+                    if (instruction.getOpcode() != Opcodes.INVOKEINTERFACE) {
+                        continue;
+                    }
+                    MethodInsnNode call = (MethodInsnNode)instruction;
+                    if (!"org/apache/logging/log4j/Logger".equals(call.owner)
+                            || !"info".equals(call.name)
+                            || !"(Ljava/lang/String;)V".equals(call.desc)) {
+                        continue;
+                    }
+                    method.instructions.insertBefore(call, new MethodInsnNode(
+                            Opcodes.INVOKESTATIC, CHAT_LOG_HOOK_OWNER, "logged",
+                            "(Ljava/lang/String;)Ljava/lang/String;"));
+                    patched++;
+                }
+                if (patched != 1) {
+                    warn("Expected one log call in GuiNewChat#"
+                            + "printChatMessageWithOptionalDeletion, found "
+                            + patched + "; a chat line with a line break"
+                            + " starts a line of its own in the log");
+                    return basicClass;
+                }
+                System.setProperty(CHAT_LOG_ACTIVE_PROPERTY, "true");
+                info("Patched GuiNewChat logging to keep each chat line on one"
+                        + " log line");
+                return write(owner);
+            }
+            warn("Could not locate GuiNewChat#printChatMessageWithOptionalDeletion;"
+                    + " a chat line with a line break starts a line of its own"
+                    + " in the log");
+            return basicClass;
+        } catch (Throwable throwable) {
+            warn("Failed to patch the chat log: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /**
      * Keeps the chat history from deleting itself as it is laid out
      * again.
      *
@@ -4528,7 +4597,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         try {
             FMLLog.warning("[losttales] %s", message);
         } catch (Throwable ignored) {
-            // Unit tests and very early bootstrap may not have initialized FML's logger.
+            // Very early bootstrap may not have initialized FML's logger.
         }
     }
 
@@ -4536,7 +4605,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         try {
             FMLLog.info("[losttales] %s", message);
         } catch (Throwable ignored) {
-            // Unit tests and very early bootstrap may not have initialized FML's logger.
+            // Very early bootstrap may not have initialized FML's logger.
         }
     }
 }

@@ -7,10 +7,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Server-authored generated missive data.
- *
- * This class is deliberately independent from blocks, items, GUIs, and networking
- * so generated missives can be stored on item stacks, tile entities, or player data.
+ * A missive as the server writes it: its quest id, words, objectives,
+ * reward and time limit, and when and where it was posted. Plain data,
+ * kept in a letter's item data ({@link LostTalesMissiveNbt}).
  */
 public final class LostTalesMissiveData {
     public static final String QUEST_ID_PREFIX = "losttales:missive/generated/";
@@ -77,8 +76,18 @@ public final class LostTalesMissiveData {
         return this.firstComeFirstServed;
     }
 
+    /** The world time the notice was posted at, on the board it stands on; a board takes it down after its expiry. */
     public long getGenerationWorldTime() {
         return this.generationWorldTime;
+    }
+
+    /** The same missive, posted at {@code worldTime}: a letter pinned back on a board. */
+    public LostTalesMissiveData postedAt(long worldTime) {
+        return new LostTalesMissiveData(this.questId, this.questType,
+                this.title, this.description, this.issuer, this.flavorText,
+                this.repeatable, this.firstComeFirstServed, worldTime,
+                this.timeLimitTicks, this.generationContext, this.objectives,
+                this.rewardData);
     }
 
     public long getTimeLimitTicks() {

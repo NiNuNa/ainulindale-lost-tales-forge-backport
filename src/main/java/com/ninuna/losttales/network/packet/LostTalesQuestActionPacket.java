@@ -3,6 +3,7 @@ package com.ninuna.losttales.network.packet;
 import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
 import com.ninuna.losttales.network.server.LostTalesServerPacketDispatcher;
 import com.ninuna.losttales.network.server.LostTalesServerTaskQueue;
+import com.ninuna.losttales.quest.LostTalesQuestIds;
 import com.ninuna.losttales.quest.LostTalesQuestManager;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
@@ -58,7 +59,7 @@ public class LostTalesQuestActionPacket implements IMessage {
             this.action = normalizeAction(LostTalesPacketCodec.readUtf8String(
                     buffer, LostTalesPacketCodec.MAX_ACTION_BYTES));
             this.questId = normalizeIdentifier(LostTalesPacketCodec.readUtf8String(
-                    buffer, LostTalesPacketCodec.MAX_IDENTIFIER_BYTES));
+                    buffer, LostTalesQuestIds.MAX_BYTES));
             LostTalesPacketCodec.requireFinished(buffer);
             if (!isKnownAction(this.action) || !hasValidIdentifierUsage(this.action, this.questId)) {
                 throw new LostTalesPacketCodec.DecodeException("invalid quest action request");
@@ -87,7 +88,7 @@ public class LostTalesQuestActionPacket implements IMessage {
                 LostTalesPacketCodec.MAX_ACTION_BYTES);
         LostTalesPacketCodec.writeUtf8String(
                 buffer, this.questId == null ? "" : this.questId,
-                LostTalesPacketCodec.MAX_IDENTIFIER_BYTES);
+                LostTalesQuestIds.MAX_BYTES);
     }
 
     private static String normalizeAction(String action) {

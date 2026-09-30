@@ -39,7 +39,7 @@ import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
 
 /**
- * The Motion Lab, a page a window holds (Q5 a, Q6 a): every motion the
+ * The Motion Lab, a page a window holds: every motion the
  * mod plays in a list under the heading of its family, and beside it the
  * one picked — what it is for, a sample playing it over and over, and a
  * stepper for every number, curve and choice its file writes. The

@@ -19,12 +19,12 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.DamageSource;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.player.EntityInteractEvent;
-import net.minecraftforge.event.entity.player.EntityItemPickupEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 /**
- * Forge 1.7.10 objective event bridge.
- *
- * This replaces the modern NeoForge objective event hooks with stable old-Forge events.
+ * The game events quests count by, on the server: kills, pickups, crafts,
+ * right-clicks on items, blocks and creatures, and a look once a second
+ * at deadlines, places and markers. Registered on both Forge's bus and
+ * FML's, since the events come from both.
  */
 public final class LostTalesQuestObjectiveEventHandler {
 
@@ -41,15 +41,20 @@ public final class LostTalesQuestObjectiveEventHandler {
         }
     }
 
+    /**
+     * An item really picked up: FML's event, fired once the item is in the
+     * inventory. Forge's pickup event fires on every touch, before the
+     * inventory takes anything, so it is not listened to.
+     */
     @SubscribeEvent
-    public void onItemPickup(EntityItemPickupEvent event) {
-        if (event == null || !(event.entityPlayer instanceof EntityPlayerMP) || event.entityPlayer.worldObj == null || event.entityPlayer.worldObj.isRemote) {
+    public void onItemPickup(PlayerEvent.ItemPickupEvent event) {
+        if (event == null || !(event.player instanceof EntityPlayerMP) || event.player.worldObj == null || event.player.worldObj.isRemote) {
             return;
         }
 
-        EntityItem itemEntity = event.item;
+        EntityItem itemEntity = event.pickedUp;
         ItemStack stack = itemEntity == null ? null : itemEntity.getEntityItem();
-        LostTalesQuestManager.handleItemPickedUp((EntityPlayerMP) event.entityPlayer, stack);
+        LostTalesQuestManager.handleItemReceived((EntityPlayerMP) event.player, stack);
     }
 
     @SubscribeEvent

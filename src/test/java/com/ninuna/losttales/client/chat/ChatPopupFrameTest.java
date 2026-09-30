@@ -9,7 +9,7 @@ import static org.junit.Assert.assertEquals;
 /**
  * What follows the pointer or the caret wears a chat window's frame
  * inside its footprint, its content two pixels clear of the frame's ink
- * as a framed button's is (Nils, 2026-09-24, F1 a): a one-line popup is
+ * as a framed button's is: a one-line popup is
  * sixteen pixels tall.
  */
 public final class ChatPopupFrameTest {

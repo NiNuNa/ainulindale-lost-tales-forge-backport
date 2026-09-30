@@ -6,8 +6,7 @@
   "restartable": true,
   "startMode": "interaction",
   "interaction": {
-    "block": "losttales:cheese_wheel",
-    "metadata": "*"
+    "block": "losttales:cheese_wheel"
   },
   "markers": {
     "giver": "losttales:quest_giver_cheese_cache"

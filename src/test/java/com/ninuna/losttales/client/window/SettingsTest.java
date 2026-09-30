@@ -12,7 +12,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * A few-word setting steps forward on a click and back on a right-click,
  * round from either end, and the game's scale and opacity step a tenth
- * at a time, never under a tenth (Nils, 2026-09-24, S5 a). The search
+ * at a time, never under a tenth. The search
  * keeps what holds its words under its section's header and its group's
  * name.
  */

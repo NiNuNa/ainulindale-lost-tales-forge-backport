@@ -17,13 +17,13 @@ import net.minecraftforge.common.config.Configuration;
  * given one (the roles, the channels). Every read and write Forge's
  * {@link Configuration} offers goes through {@link #getCategory}, so
  * routing that one call by the category's file is enough for the whole
- * option surface to read and write the right file, and the loader keeps
- * naming categories the way it always did.
+ * option surface to read and write the right file, and the loader names
+ * each category as it would in one configuration.
  *
  * <p>A side without a file — the client's on a dedicated server — is a
  * configuration in memory only: reads answer with the defaults, and
- * saving writes nothing for it. The legacy single file is the case of
- * every category being one and the same file, loaded and saved once.</p>
+ * saving writes nothing for it. A file named for several categories is
+ * opened, loaded and saved once.</p>
  */
 public final class LostTalesSidedConfiguration extends Configuration {
 

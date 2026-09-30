@@ -12,10 +12,9 @@ package com.ninuna.losttales.character.server;
  * is making.</p>
  *
  * <p>It carries no starting faction and no starting waypoint. The
- * account's own identity belongs to no faction — it did not before it was
- * a character either — and its alignment is whatever the account has
- * already earned in that world, which is not a thing a template may
- * decide. It carries no slot: the account character's place is the one
+ * account's own identity belongs to no faction until it pledges, and its
+ * alignment is whatever the account has earned in that world, which is
+ * not a thing a template may decide. It carries no slot: the account character's place is the one
  * outside the nine and is never chosen.</p>
  *
  * <p>{@link #isOffered()} is false when the account has no template. The

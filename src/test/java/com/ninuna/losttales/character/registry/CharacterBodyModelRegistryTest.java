@@ -10,6 +10,15 @@ import static org.junit.Assert.assertTrue;
 
 /** Locks the body model catalogue to the race catalogue it serves. */
 public final class CharacterBodyModelRegistryTest {
+    /** Every body the registry names. */
+    private static final String[] MODEL_IDS = {
+            CharacterBodyModelRegistry.LOTR_HUMAN, CharacterBodyModelRegistry.LOTR_ELF,
+            CharacterBodyModelRegistry.LOTR_DWARF, CharacterBodyModelRegistry.LOTR_HOBBIT,
+            CharacterBodyModelRegistry.LOTR_ORC, CharacterBodyModelRegistry.LOTR_URUK,
+            CharacterBodyModelRegistry.LOTR_HALF_TROLL,
+            CharacterBodyModelRegistry.LOSTTALES_PLAYER
+    };
+
 
     @Test
     public void everyRaceHasARegisteredDefaultModel() {
@@ -35,8 +44,9 @@ public final class CharacterBodyModelRegistryTest {
 
     @Test
     public void everyBodyOffersArmWidthsAndOnlyOffsetShouldersLosePivots() {
-        for (CharacterBodyModelDefinition model : CharacterBodyModelRegistry.getAll()) {
-            String id = model.getId();
+        for (String id : MODEL_IDS) {
+            CharacterBodyModelDefinition model = CharacterBodyModelRegistry.get(id);
+            assertNotNull(id, model);
             boolean offsetShoulders = CharacterBodyModelRegistry.LOTR_HOBBIT.equals(id)
                     || CharacterBodyModelRegistry.LOTR_HALF_TROLL.equals(id);
             boolean classicLayout = CharacterBodyModelRegistry.LOTR_ORC.equals(id)

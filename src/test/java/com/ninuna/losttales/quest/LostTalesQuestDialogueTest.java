@@ -49,15 +49,16 @@ public final class LostTalesQuestDialogueTest {
     }
 
     @Test
-    public void namesAreReadWhateverTheirCaseAndBlankLinesAreNotLines() {
+    public void aNameIsReadAsWrittenAndBlankLinesAreNotLines() {
         Map<String, String> block = new LinkedHashMap<String, String>();
-        block.put("OFFER", "  Four sticks?  ");
+        block.put(" offer ", "  Four sticks?  ");
+        block.put("OFFER", "Another spelling");
         block.put("more", "   ");
         block.put("handIn", null);
         LostTalesQuestDialogue dialogue = LostTalesQuestDialogue.of(block);
 
         assertEquals("Four sticks?", dialogue.line("offer"));
-        assertEquals("Four sticks?", dialogue.line(" Offer "));
+        assertEquals("one spelling per key", "", dialogue.line("Offer"));
         assertFalse("whitespace is not a line", dialogue.isHandedIn());
         assertEquals("", dialogue.line(LostTalesQuestDialogue.MORE));
         assertEquals("", dialogue.line(null));
@@ -120,12 +121,17 @@ public final class LostTalesQuestDialogueTest {
         if (giver.length() > 0) {
             interaction.put("entity", giver);
         }
+        Map<String, String> params = new LinkedHashMap<String, String>();
+        params.put("entity", "losttales.Nia");
+        LostTalesQuestStageDefinition stage = new LostTalesQuestStageDefinition(
+                "10", Collections.singletonList(new LostTalesQuestObjectiveDefinition(
+                        "greet", "talk", "Greet Nia.", false, params)));
         return new LostTalesQuestDefinition("losttales:test", "Test", "",
                 false, false, LostTalesQuestDefinition.START_MODE_INTERACTION,
                 Collections.<String, String>emptyMap(),
                 Collections.<String, String>emptyMap(), interaction,
                 Collections.<String, String>emptyMap(),
                 Collections.<String, String>emptyMap(), dialogue,
-                Collections.<LostTalesQuestStageDefinition>emptyList());
+                Collections.singletonList(stage));
     }
 }

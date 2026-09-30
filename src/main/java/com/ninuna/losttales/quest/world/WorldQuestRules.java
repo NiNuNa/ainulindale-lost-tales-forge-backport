@@ -1,6 +1,7 @@
 package com.ninuna.losttales.quest.world;
 
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
+import com.ninuna.losttales.quest.LostTalesQuestIds;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveTextHelper;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveType;
@@ -33,6 +34,11 @@ public final class WorldQuestRules {
     public static final int MAX_GOAL = 1000000;
     /** The most helpers one world quest remembers. */
     public static final int MAX_HELPERS = 4096;
+    /**
+     * The longest quest or objective id, in UTF-8 bytes, that players are
+     * sent and the world keeps; the checker holds every quest to it.
+     */
+    public static final int MAX_ID_BYTES = LostTalesQuestIds.MAX_BYTES;
     /** In-game ticks in a day. */
     public static final long TICKS_PER_DAY = 24000L;
 
@@ -110,6 +116,10 @@ public final class WorldQuestRules {
         if (stage == null || stage.getObjectives().isEmpty()) {
             problems.add("a world quest's stage needs an objective");
             return problems;
+        }
+        if (stage.getObjectives().size() > WorldQuestNbtCodec.MAX_COUNTS) {
+            problems.add("a world quest counts at most "
+                    + WorldQuestNbtCodec.MAX_COUNTS + " objectives");
         }
         for (LostTalesQuestObjectiveDefinition objective
                 : stage.getObjectives()) {

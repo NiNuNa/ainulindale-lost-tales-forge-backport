@@ -52,7 +52,7 @@ public final class ClientChatChannelState {
     /**
      * Whether the player has picked or typed in a conversation since
      * joining; until then the chat key brings the one in front of the top
-     * window, as the layout file left it (K2 a).
+     * window, as the layout file left it.
      */
     private static boolean lastUsedKnown;
     /** Conversations remembered for their partner's colour; oldest go first. */
@@ -145,13 +145,6 @@ public final class ClientChatChannelState {
             new HashMap<String, Integer>();
     private static final Map<String, UUID> ROLE_HOLDER_CHARACTERS =
             new HashMap<String, UUID>();
-    /**
-     * Unsent text per tab, kept across closing and reopening the chat
-     * screen: oldest first, bounded, whispers included.
-     */
-    private static final Map<ChatTab, String> DRAFTS =
-            new LinkedHashMap<ChatTab, String>();
-    private static final int MAX_DRAFTS = 64;
     /** What was sent from each tab, for the arrows to recall there. */
     private static final ChatSentHistory SENT_HISTORY = new ChatSentHistory();
 
@@ -413,8 +406,8 @@ public final class ClientChatChannelState {
      * player's conversation takes the colour their name wears in
      * character — the faction's of the character it is with, as the
      * client knows it, or the plain ivory of an account — never a colour
-     * of the channel's own (Nils, 2026-09-19: "Whispers should be the
-     * colour of the person that you are talking to"). Every other tab
+     * of the channel's own: a whisper is the colour of the person it is
+     * with. Every other tab
      * takes its channel's colour.
      */
     public static synchronized int displayColor(ChatTab tab) {
@@ -940,29 +933,19 @@ public final class ClientChatChannelState {
     }
 
     /**
-     * Remembers the selected tab's unsent input so closing the screen or
-     * switching tabs does not lose it.
+     * Remembers the selected tab's unsent input so closing the screen,
+     * switching tabs or losing the connection does not lose it.
      */
     public static synchronized void setDraft(String text) {
         setDraft(selected, text);
     }
 
-    /** Remembers a tab's unsent input; empty text forgets it. */
+    /**
+     * Remembers a tab's unsent input where the client is now
+     * ({@link ClientChatDrafts}); empty text forgets it.
+     */
     public static synchronized void setDraft(ChatTab tab, String text) {
-        if (tab == null) {
-            return;
-        }
-        String value = text == null ? "" : text;
-        if (value.length() == 0) {
-            DRAFTS.remove(tab);
-            return;
-        }
-        if (!DRAFTS.containsKey(tab) && DRAFTS.size() >= MAX_DRAFTS) {
-            Iterator<ChatTab> oldest = DRAFTS.keySet().iterator();
-            oldest.next();
-            oldest.remove();
-        }
-        DRAFTS.put(tab, value);
+        ClientChatDrafts.set(ClientChatSession.currentKey(), tab, text);
     }
 
     public static synchronized String getDraft() {
@@ -993,10 +976,9 @@ public final class ClientChatChannelState {
         SENT_HISTORY.forgetConversations();
     }
 
-    /** A tab's unsent input; empty when it has none. */
+    /** A tab's unsent input where the client is now; empty when it has none. */
     public static synchronized String getDraft(ChatTab tab) {
-        String value = tab == null ? null : DRAFTS.get(tab);
-        return value == null ? "" : value;
+        return ClientChatDrafts.get(ClientChatSession.currentKey(), tab);
     }
 
     public static synchronized void clear() {
@@ -1020,7 +1002,7 @@ public final class ClientChatChannelState {
         ROLE_HOLDER_ACCOUNT_ROLES.clear();
         ROLE_HOLDER_CHARACTERS.clear();
         MUTED_SENDERS.clear();
-        DRAFTS.clear();
+        ClientChatDrafts.endSession();
         SENT_HISTORY.clear();
         DISCORD_LINKS.clear();
     }

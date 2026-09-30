@@ -10,8 +10,8 @@ import net.minecraft.util.StatCollector;
 import org.lwjgl.input.Keyboard;
 
 /**
- * Every shortcut the chat has, as Settings lists them (Nils,
- * 2026-09-24: "ALL of them"): what each does beside how it is done —
+ * Every shortcut the chat has, as Settings lists them, none left out:
+ * what each does beside how it is done —
  * keys in the mod's own key icons, a mouse press in words, and what is
  * typed as the chat's inline code — in groups by what they work on. A
  * list to read: the keys are the chat's own, not bindings the game's
@@ -102,23 +102,6 @@ final class ChatShortcuts {
             }
         }
         return rows;
-    }
-
-    /** Every language key the list reads, in the order it reads them: areas, shortcuts, words. */
-    static List<String> languageKeys() {
-        List<String> keys = new ArrayList<String>();
-        for (Area area : areas()) {
-            keys.add(area.labelKey);
-            for (Shortcut shortcut : area.shortcuts) {
-                keys.add(shortcut.labelKey);
-                for (Object part : shortcut.parts) {
-                    if (part instanceof Word) {
-                        keys.add(((Word)part).key);
-                    }
-                }
-            }
-        }
-        return keys;
     }
 
     /**

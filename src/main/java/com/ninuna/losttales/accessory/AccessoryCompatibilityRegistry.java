@@ -146,7 +146,7 @@ public final class AccessoryCompatibilityRegistry {
                     String.valueOf(stack.getItem()),
                     first.getId(), second.getId());
         } catch (Throwable ignored) {
-            // Early bootstrap and unit tests may not have an FML logger.
+            // FML's logger may not be set up, as in early bootstrap.
         }
     }
 }

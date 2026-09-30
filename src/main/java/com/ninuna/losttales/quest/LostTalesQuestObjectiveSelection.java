@@ -5,10 +5,15 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/** Shared rules for objectives that remain live at the player's current stage. */
+/** Which stage a quest stands at, and which objectives count there. */
 public final class LostTalesQuestObjectiveSelection {
     private LostTalesQuestObjectiveSelection() {}
 
+    /**
+     * Where the quest stands: the stage its progress names by id. Only
+     * when the quest's file no longer has that id does the saved position
+     * stand in, so a quest whose file changed keeps going. -1 for none.
+     */
     public static int getCurrentStageIndex(LostTalesQuestDefinition quest,
             LostTalesQuestProgress progress) {
         if (quest == null || progress == null || quest.getStages().isEmpty()) {

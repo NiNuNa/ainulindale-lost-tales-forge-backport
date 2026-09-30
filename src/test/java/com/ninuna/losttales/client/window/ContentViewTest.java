@@ -44,7 +44,7 @@ public final class ContentViewTest {
     @Test
     public void aTabStandsAloneUntilAnotherComesInFront() {
         Window window = WindowLayout.addWindow(row(this.map, this.journal),
-                this.map, 0.0D, 0.0D);
+                this.map);
         assertTrue(ContentView.enter(window));
         assertTrue(ContentView.isOn(window));
         assertEquals(Window.ScreenFill.CONTENT, ContentView.fillOf(window));
@@ -61,10 +61,8 @@ public final class ContentViewTest {
 
     @Test
     public void theKeysGoingToAnotherWindowPutItBack() {
-        Window first = WindowLayout.addWindow(row(this.global), this.global,
-                0.0D, 0.0D);
-        Window second = WindowLayout.addWindow(row(this.map), this.map,
-                50.0D, 50.0D);
+        Window first = WindowLayout.addWindow(row(this.global), this.global);
+        Window second = WindowLayout.addWindow(row(this.map), this.map);
         assertTrue(ContentView.enter(first));
         ContentView.follow(second, false);
         assertFalse(ContentView.isOn());
@@ -75,8 +73,7 @@ public final class ContentViewTest {
 
     @Test
     public void aClosedWindowPutsItsTabBack() {
-        Window window = WindowLayout.addWindow(row(this.map), this.map, 0.0D,
-                0.0D);
+        Window window = WindowLayout.addWindow(row(this.map), this.map);
         assertTrue(ContentView.enter(window));
         WindowLayout.load(Collections.<WindowLayout.WindowSpec>emptyList());
         ContentView.follow(null, false);

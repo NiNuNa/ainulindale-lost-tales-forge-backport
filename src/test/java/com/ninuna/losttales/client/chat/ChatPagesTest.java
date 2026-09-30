@@ -8,6 +8,7 @@ import com.ninuna.losttales.client.window.WindowFrame;
 import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowLayoutStore;
 import com.ninuna.losttales.client.window.WindowPages;
+import com.ninuna.losttales.client.window.WindowPlacement;
 import com.ninuna.losttales.client.window.WindowTab;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import java.util.Arrays;
@@ -37,7 +38,7 @@ import static org.junit.Assert.assertTrue;
  */
 public final class ChatPagesTest {
     private static final String PAGE = "test_page";
-    /** A page like the map's: it fills the screen the first time, has no tool strip, and can be out of reach. */
+    /** A page like the map's: it has a key, and can be out of reach. */
     private static final String FILLING = "test_filling_page";
     private static boolean fillingAvailable = true;
     /** The filling page's key, M's key code. */
@@ -49,7 +50,7 @@ public final class ChatPagesTest {
     public static void registerPage() {
         if (WindowPages.byId(PAGE) == null) {
             WindowPages.register(PAGE, "gui.test.page",
-                    new ItemStack(Items.book), Window.ScreenFill.NONE, null,
+                    new ItemStack(Items.book), null,
                     new WindowPages.Factory() {
                         @Override
                         public PageContent create() {
@@ -59,7 +60,7 @@ public final class ChatPagesTest {
         }
         if (WindowPages.byId(FILLING) == null) {
             WindowPages.register(FILLING, "gui.test.filling",
-                    new ItemStack(Items.map), Window.ScreenFill.FULL,
+                    new ItemStack(Items.map),
                     new KeyBinding("key.test.filling", FILLING_KEY,
                             "key.categories.test"),
                     new WindowPages.Factory() {
@@ -100,32 +101,45 @@ public final class ChatPagesTest {
         assertNull(WindowTab.fromId("page:nobody"));
     }
 
+    /** A page opens as every window does: at the default place, in the middle, locked. */
     @Test
-    public void aPageOpensInAWindowOfItsOwnAtAPagesSize() {
+    public void aPageOpensInAWindowOfItsOwnAtTheDefaultPlace() {
         PageTab page = WindowPages.tab(PAGE);
         Window window = WindowLayout.showPage(page);
         assertNotNull(window);
         assertEquals(Arrays.asList(page), window.getTabs());
         assertEquals(page, window.getActiveTab());
-        assertEquals(WindowLayout.PAGE_HEIGHT, window.getOwnHeight(), 1.0E-9D);
-        assertEquals(WindowLayout.PAGE_WIDTH, window.getOwnWidth());
+        assertTrue(WindowPlacement.atDefaultPlace(window));
+        assertTrue(window.isLocked());
+        assertEquals(Window.ScreenFill.NONE, window.getFill());
         assertSame("shown again, the same window comes forward", window,
                 WindowLayout.showPage(page));
     }
 
+    /** A page's window unlocked and moved comes back where it stood, unlocked; one never moved at the default place. */
     @Test
     public void aClosedPageComesBackWhereItsWindowStood() {
         PageTab page = WindowPages.tab(PAGE);
         Window window = WindowLayout.showPage(page);
+        WindowLayout.close(page);
+        assertTrue("never moved: the default place again",
+                WindowPlacement.atDefaultPlace(WindowLayout.showPage(page)));
+        window = WindowLayout.windowOf(page);
+        WindowLayout.setLocked(window.getId(), false);
+        WindowLayout.setWindowWidth(window.getId(), 320, false);
+        WindowLayout.setWindowHeight(window.getId(), 250.0D, false);
         WindowLayout.setPosition(window.getId(), 20.0D, 30.0D, false);
         WindowLayout.close(page);
         assertNull(WindowLayout.windowOf(page));
         Window again = WindowLayout.showPage(page);
         assertEquals(20.0D, again.getOffsetX(), 1.0E-9D);
         assertEquals(30.0D, again.getOffsetY(), 1.0E-9D);
+        assertEquals(320, again.getOwnWidth());
+        assertFalse(again.isLocked());
+        WindowLayout.close(page);
         List<String> described = WindowLayoutStore.describe();
         assertTrue(described.toString(), described.contains("place page:" + PAGE
-                + " x=20.00 y=30.00 height=292.00 width=366"));
+                + " locked=false x=20.00 y=30.00 height=250.00 width=320"));
     }
 
     @Test
@@ -200,29 +214,23 @@ public final class ChatPagesTest {
         assertNotNull(WindowLayout.showPage(WindowPages.tab(PAGE)));
     }
 
+    /** The map opens like any page, never filling the screen by itself; a part of the screen it was given comes back with it. */
     @Test
-    public void aFillingPageFillsTheScreenTheFirstTimeAndThenWhereItWasLeft() {
+    public void aMapLikePageOpensAtTheDefaultPlaceAndThenWhereItWasLeft() {
         PageTab page = WindowPages.tab(FILLING);
         Window window = WindowLayout.showPage(page);
-        assertEquals("the first time, the whole screen",
-                Window.ScreenFill.FULL, window.getFill());
-        assertEquals("the page's size to go back to", WindowLayout.PAGE_HEIGHT,
-                window.getOwnHeight(), 1.0E-9D);
-        WindowLayout.setFill(window.getId(), Window.ScreenFill.NONE, false);
-        WindowLayout.setPosition(window.getId(), 10.0D, 20.0D, false);
-        WindowLayout.close(page);
-        Window again = WindowLayout.showPage(page);
-        assertEquals("where it was left: its own box",
-                Window.ScreenFill.NONE, again.getFill());
-        assertEquals(10.0D, again.getOffsetX(), 1.0E-9D);
-        WindowLayout.setFill(again.getId(), Window.ScreenFill.FULL, false);
+        assertEquals(Window.ScreenFill.NONE, window.getFill());
+        assertTrue(WindowPlacement.atDefaultPlace(window));
+        WindowLayout.setLocked(window.getId(), false);
+        WindowLayout.setFill(window.getId(), Window.ScreenFill.FULL, false);
         WindowLayout.close(page);
         assertEquals(Window.ScreenFill.FULL,
                 WindowLayout.showPage(page).getFill());
         WindowLayout.close(page);
         List<String> described = WindowLayoutStore.describe();
         assertTrue(described.toString(), described.contains("place page:"
-                + FILLING + " x=10.00 y=20.00 height=292.00 width=366 fill=full"));
+                + FILLING + " locked=false x=50.00 y=50.00 height=0.00 width=0"
+                + " fill=full"));
     }
 
     @Test
@@ -239,7 +247,7 @@ public final class ChatPagesTest {
     /**
      * Closing the conversation typed in brings forward the tab to its
      * right, a page here, and the input waits in the window's other
-     * conversation (W6 a).
+     * conversation.
      */
     @Test
     public void closingTheConversationTypedInBringsTheTabToItsRightForward() {
@@ -267,8 +275,10 @@ public final class ChatPagesTest {
     public void aPageTakenOutByItselfRemembersWhereItsWindowStood() {
         final PageTab page = WindowPages.tab(PAGE);
         Window window = WindowLayout.showPage(page);
+        WindowLayout.setWindowWidth(window.getId(), 320, false);
+        WindowLayout.setWindowHeight(window.getId(), 250.0D, false);
         WindowLayout.setPosition(window.getId(), 25.0D, 35.0D, false);
-        WindowLayout.setLocked(window.getId(), true);
+        assertTrue(window.isLocked());
         WindowLayout.removeTabs(new WindowLayout.TabFilter() {
             @Override
             public boolean matches(WindowTab tab) {
@@ -278,13 +288,13 @@ public final class ChatPagesTest {
         assertNull(WindowLayout.windowOf(page));
         List<String> described = WindowLayoutStore.describe();
         assertTrue(described.toString(), described.contains("place page:"
-                + PAGE + " x=25.00 y=35.00 height=292.00 width=366"));
+                + PAGE + " locked=true x=25.00 y=35.00 height=250.00 width=320"));
     }
 
     /**
      * A line the server says to answer a page's action stands over the
      * page's bar only while the page is shown; with no screen open it
-     * stays in the chat, and the page says nothing (W2 a).
+     * stays in the chat, and the page says nothing.
      */
     @Test
     public void aLineForAPageNotShownStaysInTheChat() {

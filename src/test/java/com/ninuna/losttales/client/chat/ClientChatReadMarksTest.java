@@ -22,12 +22,12 @@ public final class ClientChatReadMarksTest {
 
     @Before
     public void setUp() {
-        ClientChatReadMarks.clear();
+        ClientChatReadMarks.initialize(null, null);
     }
 
     @After
     public void tearDown() {
-        ClientChatReadMarks.clear();
+        ClientChatReadMarks.initialize(null, null);
     }
 
     @Test
@@ -47,7 +47,8 @@ public final class ClientChatReadMarksTest {
         ClientChatReadMarks.markRead("", OOC, 9L);
         assertEquals(ChatMessageIds.NONE,
                 ClientChatReadMarks.lastRead("server:play.example", OOC));
-        assertEquals(1, ClientChatReadMarks.size());
+        // The heading and the one mark made.
+        assertEquals(2, ClientChatReadMarks.describe().size());
     }
 
     @Test
@@ -58,17 +59,18 @@ public final class ClientChatReadMarksTest {
         assertTrue(lines.get(0).startsWith("#"));
         assertEquals(3, lines.size());
 
-        ClientChatReadMarks.clear();
+        ClientChatReadMarks.initialize(null, null);
         ClientChatReadMarks.load(lines);
         assertEquals(500L, ClientChatReadMarks.lastRead("server:play.example", GLOBAL));
         assertEquals(77L, ClientChatReadMarks.lastRead("world:My World", OOC));
 
         // A line nobody can read is a mark nobody had.
-        ClientChatReadMarks.clear();
+        ClientChatReadMarks.initialize(null, null);
         ClientChatReadMarks.load(Arrays.asList("garbage", "a\tb\tnot-a-number",
                 "server:x\tglobal\t-5", "server:x\tglobal\t12"));
         assertEquals(12L, ClientChatReadMarks.lastRead("server:x", GLOBAL));
-        assertEquals(1, ClientChatReadMarks.size());
+        assertEquals(Arrays.asList(lines.get(0), "server:x\tglobal\t12"),
+                ClientChatReadMarks.describe());
     }
 
     @Test
@@ -76,9 +78,14 @@ public final class ClientChatReadMarksTest {
         for (int index = 0; index < ClientChatReadMarks.MAX_MARKS + 10; index++) {
             ClientChatReadMarks.markRead("server:" + index, GLOBAL, 1L + index);
         }
-        assertEquals(ClientChatReadMarks.MAX_MARKS, ClientChatReadMarks.size());
+        // The heading and a bound's worth of marks.
+        assertEquals(ClientChatReadMarks.MAX_MARKS + 1,
+                ClientChatReadMarks.describe().size());
         assertEquals(ChatMessageIds.NONE,
                 ClientChatReadMarks.lastRead("server:0", GLOBAL));
+        assertEquals(ChatMessageIds.NONE,
+                ClientChatReadMarks.lastRead("server:9", GLOBAL));
+        assertEquals(11L, ClientChatReadMarks.lastRead("server:10", GLOBAL));
         assertEquals(ClientChatReadMarks.MAX_MARKS + 10L, ClientChatReadMarks.lastRead(
                 "server:" + (ClientChatReadMarks.MAX_MARKS + 9), GLOBAL));
     }

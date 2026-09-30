@@ -12,17 +12,17 @@ import net.minecraft.inventory.IInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
-import net.minecraft.network.NetworkManager;
-import net.minecraft.network.Packet;
-import net.minecraft.network.play.server.S35PacketUpdateTileEntity;
 import net.minecraft.tileentity.TileEntity;
 
 /**
  * A missive board's notices: up to nine missive letters, which the board
- * refills and takes down by itself on the server. Its page reads them
+ * refills and takes down by itself on the server, by the server's
+ * {@code missives} settings as they stand now. Its page reads them
  * through {@link com.ninuna.losttales.quest.missive.MissiveBoardService},
  * which accepts, takes and pins for a player standing within
- * {@link #REACH_SQ}; every change here tells the players watching it.
+ * {@link #REACH_SQ}; every change here tells the players watching it. The
+ * board's model shows none of its notices, so no client is sent them
+ * with the block.
  */
 public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInventory {
     public static final int INVENTORY_SIZE = 9;
@@ -32,23 +32,13 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInve
      * player is further than this.
      */
     public static final double REACH_SQ = 64.0D;
-    public static final int DEFAULT_MIN_AVAILABLE_MISSIVES = 5;
-    public static final int DEFAULT_MAX_AVAILABLE_MISSIVES = 9;
-    public static final long DEFAULT_GENERATION_INTERVAL_TICKS = 36000L;
     private static final long EXPIRATION_CHECK_INTERVAL_TICKS = 1200L;
 
     private final ItemStack[] inventory = new ItemStack[INVENTORY_SIZE];
     private long lastGenerationWorldTime;
     private long nextGenerationWorldTime;
-    private long generationIntervalTicks = DEFAULT_GENERATION_INTERVAL_TICKS;
-    private int minAvailableMissives = DEFAULT_MIN_AVAILABLE_MISSIVES;
-    private int maxAvailableMissives = DEFAULT_MAX_AVAILABLE_MISSIVES;
     private int generationSequence;
     private long nextExpirationCheckWorldTime;
-
-    public LostTalesTileEntityMissiveBoard() {
-        this.applyConfiguredDefaults();
-    }
 
     @Override
     public void updateEntity() {
@@ -79,7 +69,7 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInve
     }
 
     public boolean hasRoomForMissive() {
-        return this.getFirstEmptySlot() >= 0 && this.countAvailableMissives() < this.maxAvailableMissives;
+        return this.getFirstEmptySlot() >= 0 && this.countAvailableMissives() < getMaxAvailableMissives();
     }
 
     public boolean addMissive(ItemStack stack) {
@@ -97,12 +87,13 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInve
 
     private void generateScheduledMissives(long worldTime) {
         int available = this.countAvailableMissives();
-        if (available >= this.maxAvailableMissives || this.getFirstEmptySlot() < 0) {
+        int most = getMaxAvailableMissives();
+        if (available >= most || this.getFirstEmptySlot() < 0) {
             this.markGenerationAttempt(worldTime);
             return;
         }
 
-        int room = Math.min(this.maxAvailableMissives - available, this.getEmptySlotCount());
+        int room = Math.min(most - available, this.getEmptySlotCount());
         int configuredMinBatch = Math.max(1, Math.min(INVENTORY_SIZE, LostTalesConfig.missiveBoardMinGeneratedPerCycle));
         int configuredMaxBatch = Math.max(configuredMinBatch, Math.min(INVENTORY_SIZE, LostTalesConfig.missiveBoardMaxGeneratedPerCycle));
         int maxBatch = Math.min(configuredMaxBatch, room);
@@ -113,7 +104,7 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInve
         }
 
         int toGenerate = minBatch;
-        if (available < this.minAvailableMissives) {
+        if (available < getMinAvailableMissives()) {
             // Refill boards below the desired floor more eagerly, but still only
             // in small batches so missives do not all regenerate at once.
             toGenerate = maxBatch;
@@ -202,45 +193,35 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInve
     }
 
     public void scheduleNextGeneration(long currentWorldTime) {
-        long interval = this.generationIntervalTicks > 0L ? this.generationIntervalTicks : getConfiguredGenerationIntervalTicks();
-        this.nextGenerationWorldTime = currentWorldTime + interval;
+        this.nextGenerationWorldTime = currentWorldTime + getGenerationIntervalTicks();
         this.markDirtyAndSync();
     }
 
-    public int getMaxAvailableMissives() {
-        return this.maxAvailableMissives;
+    /** The most notices a board holds, as the server's settings say now, within its nine slots. */
+    public static int getMaxAvailableMissives() {
+        return Math.max(getMinAvailableMissives(),
+                Math.min(INVENTORY_SIZE, LostTalesConfig.missiveBoardMaxAvailable));
     }
 
-    private void applyConfiguredDefaults() {
-        this.generationIntervalTicks = getConfiguredGenerationIntervalTicks();
-        this.applyMissiveRange(LostTalesConfig.missiveBoardMinAvailable, LostTalesConfig.missiveBoardMaxAvailable);
+    /** The fewest notices a board refills towards at once, as the server's settings say now. */
+    static int getMinAvailableMissives() {
+        return Math.max(0, Math.min(INVENTORY_SIZE, LostTalesConfig.missiveBoardMinAvailable));
     }
 
-    private static long getConfiguredGenerationIntervalTicks() {
+    /** The world ticks between two refills, as the server's settings say now; a minute at the least. */
+    static long getGenerationIntervalTicks() {
         return Math.max(1200L, (long) LostTalesConfig.missiveBoardGenerationIntervalTicks);
-    }
-
-    private void applyMissiveRange(int minAvailableMissives, int maxAvailableMissives) {
-        if (minAvailableMissives < 0) minAvailableMissives = 0;
-        if (minAvailableMissives > INVENTORY_SIZE) minAvailableMissives = INVENTORY_SIZE;
-        if (maxAvailableMissives < minAvailableMissives) maxAvailableMissives = minAvailableMissives;
-        if (maxAvailableMissives > INVENTORY_SIZE) maxAvailableMissives = INVENTORY_SIZE;
-
-        this.minAvailableMissives = minAvailableMissives;
-        this.maxAvailableMissives = maxAvailableMissives;
     }
 
     private boolean isMissiveLetter(ItemStack stack) {
         return stack != null && stack.getItem() == ELostTalesItem.MISSIVE_LETTER.getItem();
     }
 
+    /** Saves the change and tells the players watching the board's page; nothing goes to the block's clients. */
     private void markDirtyAndSync() {
         this.markDirty();
-        if (this.worldObj != null) {
-            this.worldObj.markBlockForUpdate(this.xCoord, this.yCoord, this.zCoord);
-            if (!this.worldObj.isRemote) {
-                MissiveBoardWatches.markChanged();
-            }
+        if (this.worldObj != null && !this.worldObj.isRemote) {
+            MissiveBoardWatches.markChanged();
         }
     }
 
@@ -341,16 +322,8 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInve
 
         this.lastGenerationWorldTime = nbt.getLong("LastGenerationWorldTime");
         this.nextGenerationWorldTime = nbt.getLong("NextGenerationWorldTime");
-        this.applyConfiguredDefaults();
-        this.generationIntervalTicks = nbt.hasKey("GenerationIntervalTicks") ? nbt.getLong("GenerationIntervalTicks") : this.generationIntervalTicks;
-        if (this.generationIntervalTicks <= 0L) {
-            this.generationIntervalTicks = getConfiguredGenerationIntervalTicks();
-        }
-        this.minAvailableMissives = nbt.hasKey("MinAvailableMissives") ? nbt.getInteger("MinAvailableMissives") : this.minAvailableMissives;
-        this.maxAvailableMissives = nbt.hasKey("MaxAvailableMissives") ? nbt.getInteger("MaxAvailableMissives") : this.maxAvailableMissives;
         this.generationSequence = Math.max(0, nbt.getInteger("GenerationSequence"));
         this.nextExpirationCheckWorldTime = nbt.getLong("NextExpirationCheckWorldTime");
-        this.applyMissiveRange(this.minAvailableMissives, this.maxAvailableMissives);
 
         for (int slot = 0; slot < this.inventory.length; slot++) {
             this.inventory[slot] = null;
@@ -375,9 +348,6 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInve
 
         nbt.setLong("LastGenerationWorldTime", this.lastGenerationWorldTime);
         nbt.setLong("NextGenerationWorldTime", this.nextGenerationWorldTime);
-        nbt.setLong("GenerationIntervalTicks", this.generationIntervalTicks);
-        nbt.setInteger("MinAvailableMissives", this.minAvailableMissives);
-        nbt.setInteger("MaxAvailableMissives", this.maxAvailableMissives);
         nbt.setInteger("GenerationSequence", this.generationSequence);
         nbt.setLong("NextExpirationCheckWorldTime", this.nextExpirationCheckWorldTime);
 
@@ -392,17 +362,5 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity implements IInve
             }
         }
         nbt.setTag("Items", list);
-    }
-
-    @Override
-    public Packet getDescriptionPacket() {
-        NBTTagCompound tag = new NBTTagCompound();
-        this.writeToNBT(tag);
-        return new S35PacketUpdateTileEntity(this.xCoord, this.yCoord, this.zCoord, 1, tag);
-    }
-
-    @Override
-    public void onDataPacket(NetworkManager net, S35PacketUpdateTileEntity packet) {
-        this.readFromNBT(packet.func_148857_g());
     }
 }

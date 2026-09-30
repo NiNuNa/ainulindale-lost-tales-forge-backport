@@ -4,6 +4,7 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestMarkerHelper;
+import com.ninuna.losttales.quest.ServerQuestFiles;
 import cpw.mods.fml.common.FMLLog;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -77,7 +78,8 @@ public final class LostTalesClientQuestDefinitionStore {
     /**
      * The server's own quests, as one packet of them carries them:
      * {@code first} starts the list afresh. A quest that takes a bundled
-     * quest's id is left out.
+     * quest's id is left out, and so is every quest past as many as a
+     * server may write.
      */
     public static synchronized void addServerQuestDefinitions(boolean first,
             Collection<LostTalesQuestDefinition> serverQuests) {
@@ -88,7 +90,10 @@ public final class LostTalesClientQuestDefinitionStore {
             for (LostTalesQuestDefinition quest : serverQuests) {
                 if (quest != null && quest.getId() != null
                         && quest.getId().length() > 0
-                        && !STATIC_QUESTS.containsKey(quest.getId())) {
+                        && !STATIC_QUESTS.containsKey(quest.getId())
+                        && (SERVER_QUESTS.containsKey(quest.getId())
+                                || SERVER_QUESTS.size()
+                                        < ServerQuestFiles.MAX_FILES)) {
                     SERVER_QUESTS.put(quest.getId(), quest);
                 }
             }

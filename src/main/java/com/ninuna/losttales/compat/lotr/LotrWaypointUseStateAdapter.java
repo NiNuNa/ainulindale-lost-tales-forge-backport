@@ -15,7 +15,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
-/** Public-API adapter for per-character native LOTR waypoint use counts. */
+/** How often each character has used LOTR's own waypoints, read and written through LOTR's public API. */
 public final class LotrWaypointUseStateAdapter {
 
     private static final UUID DETACHED_PLAYER_ID =

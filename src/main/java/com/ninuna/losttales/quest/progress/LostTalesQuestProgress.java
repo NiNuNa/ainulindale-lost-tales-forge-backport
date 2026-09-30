@@ -1,5 +1,6 @@
 package com.ninuna.losttales.quest.progress;
 
+import com.ninuna.losttales.quest.LostTalesQuestIds;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -183,7 +184,7 @@ public final class LostTalesQuestProgress {
         }
         String questId = tag.getString("QuestId");
         String stageId = tag.getString("StageId");
-        if (!isReasonableIdentifier(questId)
+        if (!LostTalesQuestIds.fits(questId)
                 || stageId.length() > MAX_IDENTIFIER_CHARACTERS
                 || tag.hasKey("ObjectiveProgress")
                 && !(tag.getTag("ObjectiveProgress") instanceof NBTTagList)) {

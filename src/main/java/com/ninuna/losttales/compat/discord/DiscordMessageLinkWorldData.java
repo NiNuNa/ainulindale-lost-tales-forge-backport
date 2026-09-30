@@ -44,10 +44,6 @@ public final class DiscordMessageLinkWorldData extends WorldSavedData {
     private int unsupportedDataVersion = -1;
     private NBTTagCompound preservedNewerData;
 
-    public DiscordMessageLinkWorldData() {
-        this(DATA_NAME);
-    }
-
     public DiscordMessageLinkWorldData(String name) {
         super(name);
     }

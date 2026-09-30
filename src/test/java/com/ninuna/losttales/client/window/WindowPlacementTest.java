@@ -300,7 +300,7 @@ public final class WindowPlacementTest {
         }
     }
 
-    /** Windows stand on their own: moving one moves no other (W7 a). */
+    /** Windows stand on their own: moving one moves no other. */
     @Test
     public void movingAWindowLeavesEveryOtherWhereItStands() {
         TwoWindowLayout.reset();

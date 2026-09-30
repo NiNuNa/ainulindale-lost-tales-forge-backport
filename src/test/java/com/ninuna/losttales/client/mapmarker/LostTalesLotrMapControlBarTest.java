@@ -5,13 +5,29 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.settings.GameSettings;
+import net.minecraft.util.ResourceLocation;
 import org.junit.Test;
 
 public final class LostTalesLotrMapControlBarTest {
+    /** How wide the font below measures every character. */
+    private static final int CHARACTER = 6;
+    private static final FontRenderer FONT = new FixedFont();
     /** Six hints, as the map strip carries them, in the order they are given up. */
-    private static final int[] HINTS = {20, 16, 20, 20, 24, 20};
+    private static final String[] LABELS = {
+            "Close", "Zoom", "Legend", "Find", "Location", "Waypoint"};
+    /**
+     * What a hint's keys measure here: without a client the two keys of a
+     * hint measure nothing, which leaves the slash between them and the
+     * gap on either side of it.
+     */
+    private static final int KEYS = 2 + CHARACTER + 2;
     /** A date about as long as "Mersday 22 Halimath, S.R. 1401   08:53". */
     private static final int[] CALENDAR = {160, 110};
 
@@ -19,7 +35,7 @@ public final class LostTalesLotrMapControlBarTest {
     public void aWideStripShowsEveryHintWithItsLabel() {
         LostTalesControlBar.Layout layout = layout(1200, CALENDAR);
 
-        assertEquals(HINTS.length, layout.visibleHints());
+        assertEquals(LABELS.length, layout.visibleHints());
         assertTrue(layout.showLabels);
         assertTrue(layout.showStatus);
     }
@@ -61,7 +77,7 @@ public final class LostTalesLotrMapControlBarTest {
         assertTrue("names are worth more than an extra bare key",
                 layout.showLabels);
         assertTrue(layout.visibleHints() > 0);
-        assertTrue(layout.visibleHints() < HINTS.length);
+        assertTrue(layout.visibleHints() < LABELS.length);
     }
 
     @Test
@@ -121,8 +137,8 @@ public final class LostTalesLotrMapControlBarTest {
             if (index > 0) {
                 width += 10;
             }
-            width += HINTS[from + index]
-                    + (layout.showLabels ? 3 + HINTS[from + index] : 0);
+            width += KEYS + (layout.showLabels
+                    ? 3 + FONT.getStringWidth(LABELS[from + index]) : 0);
         }
         return width;
     }
@@ -130,8 +146,41 @@ public final class LostTalesLotrMapControlBarTest {
     private static LostTalesControlBar.Layout layout(
             int screenWidth, int[] calendarWidths) {
         List<LostTalesControlBar.Hint> hints =
-                LostTalesControlBar.measuredHints(HINTS);
+                new ArrayList<LostTalesControlBar.Hint>();
+        for (String label : LABELS) {
+            hints.add(LostTalesControlBar.Hint.alternative(
+                    null, FONT, null, 0, label));
+        }
         return LostTalesControlBar.calculateLayout(
                 screenWidth, hints, 3, 180, calendarWidths);
+    }
+
+    /**
+     * A font that needs no client and measures every character
+     * {@link #CHARACTER} pixels wide, so a hint's label and the slash
+     * between its keys have a width to be fitted by.
+     */
+    private static final class FixedFont extends FontRenderer {
+        FixedFont() {
+            super(new GameSettings(),
+                    new ResourceLocation("textures/font/ascii.png"), null,
+                    false);
+        }
+
+        @Override
+        protected void bindTexture(ResourceLocation location) {
+            // No texture manager to bind with.
+        }
+
+        @Override
+        protected InputStream getResourceInputStream(
+                ResourceLocation location) {
+            return new ByteArrayInputStream(new byte[0]);
+        }
+
+        @Override
+        public int getStringWidth(String text) {
+            return text == null ? 0 : text.length() * CHARACTER;
+        }
     }
 }

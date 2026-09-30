@@ -14,12 +14,13 @@ import net.minecraft.client.gui.GuiNewChat;
  * <em>baseline</em>, the edge the newest message sits on: messages stack
  * upward from it and
  * the input bar hangs below it, so a window never moves when a message
- * arrives. The stored position is the baseline's percent of its travel
- * (with the box at its smallest, one empty line), and the visible box is
- * as tall as the window's own height, or the game's chat height while it
- * has none — never what its tabs hold, so neither a message nor another
- * tab brought forward resizes it — and a short window can be placed
- * anywhere on the screen, its top edge included. A window taller than
+ * arrives. A window with no size of its own stands at the default place:
+ * in the middle of the screen, two thirds of its width and height. Once
+ * it is moved or resized it has a place of its own: the baseline's percent
+ * of its travel (with the box at its smallest, one empty line), and its
+ * own width and height — never what its tabs hold, so neither a message
+ * nor another tab brought forward resizes it — and a short window can be
+ * placed anywhere on the screen, its top edge included. A window taller than
  * the room above its baseline is pushed down just far enough to stay on
  * screen and returns to its anchor once it fits; the stored position
  * never changes. Windows keep off the screen edges only: they may
@@ -95,6 +96,11 @@ public final class WindowPlacement {
      * narrow one keep the same proportions.
      */
     public static final double TEXT_WIDTH_SHARE = 0.95D;
+    /**
+     * The share of the screen's width and of its height a window takes
+     * at the default place, in the middle of the screen.
+     */
+    public static final double DEFAULT_SHARE = 2.0D / 3.0D;
 
     private WindowPlacement() {}
 
@@ -180,17 +186,73 @@ public final class WindowPlacement {
 
     /**
      * The chat width one window's lines are drawn and wrapped at: what
-     * its box leaves them at the chat scale, or the game's while the
-     * window has no width of its own. A window's lines follow its own
-     * width only while they can be laid out to it.
+     * its box leaves them at the chat scale. A window's lines follow its
+     * width only while they can be laid out to it; otherwise they keep
+     * the game's own chat width.
      */
     public static int chatWidth(Window window, Minecraft minecraft) {
-        int own = window == null ? 0 : window.getOwnWidth();
-        if (own > 0 && ownLineWidths) {
+        if (window != null && ownLineWidths) {
             return Math.max(1, chatWidthForBox(windowWidth(window, minecraft),
                     minecraft));
         }
         return chatWidth(minecraft);
+    }
+
+    /** Whether the window stands at the default place: it has no size of its own. */
+    public static boolean atDefaultPlace(Window window) {
+        return window != null && window.getOwnWidth() <= 0
+                && !(window.getOwnHeight() > 0.0D);
+    }
+
+    /**
+     * The box width at the default place: two thirds of the screen, in
+     * whole pixels, inside its margins. The feed's width where there is no
+     * screen to measure.
+     */
+    static int defaultWidth(Minecraft minecraft) {
+        int screenWidth = scaledScreenWidth(minecraft);
+        if (screenWidth <= 0) {
+            return windowWidth(minecraft);
+        }
+        return Math.max(1, Math.min((int)Math.round(
+                screenWidth * DEFAULT_SHARE), screenWidth - 2 * EDGE_MARGIN));
+    }
+
+    /**
+     * The box height at the default place: two thirds of the screen, in
+     * whole pixels, inside its margins and never under the least box. The
+     * game's chat height where there is no screen to measure.
+     */
+    static double defaultHeight(Minecraft minecraft) {
+        int screenHeight = scaledScreenHeight(minecraft);
+        if (screenHeight <= 0) {
+            GuiNewChat chat = chat(minecraft);
+            double lines = chat == null ? 20.0D : gameChatLines(chat);
+            return heightForRoom(lines * WindowStyle.LINE_HEIGHT, minecraft);
+        }
+        return Math.max(minHeight(minecraft), Math.min(
+                (double)Math.round(screenHeight * DEFAULT_SHARE),
+                screenHeight - 2.0D * EDGE_MARGIN));
+    }
+
+    /**
+     * Gives a window standing at the default place a place of its own,
+     * exactly where it stands: its box's size and position. Moving or
+     * resizing a window starts from here, so it never jumps. Not written;
+     * the move or resize writes it when it is let go.
+     */
+    static void adoptOwnPlace(Window window, Minecraft minecraft,
+                              int screenWidth, int screenHeight) {
+        if (!atDefaultPlace(window)) {
+            return;
+        }
+        Box box = restingBounds(window, minecraft, screenWidth, screenHeight);
+        WindowLayout.setWindowWidth(window.getId(), box.width, false);
+        WindowLayout.setWindowHeight(window.getId(), box.height, false);
+        WindowLayout.setPosition(window.getId(),
+                windowPercentX(window, box.x, minecraft, screenWidth),
+                windowPercentY(window, box.baseline(), minecraft,
+                        screenHeight), false);
     }
 
     private static int scaledScreenWidth(Minecraft minecraft) {
@@ -220,16 +282,16 @@ public final class WindowPlacement {
     }
 
     /**
-     * The box width of one window: its own, or the game's chat width's
-     * while it has none. A stored width the current screen cannot hold —
-     * the GUI scale changed under a window resized wide — is capped to
-     * what keeps the box inside the screen margins; the stored width
-     * itself is untouched, so scaling back restores it.
+     * The box width of one window: its own, or the default place's while
+     * it has none. A stored width the current screen cannot hold — the GUI
+     * scale changed under a window resized wide — is capped to what keeps
+     * the box inside the screen margins; the stored width itself is
+     * untouched, so scaling back restores it.
      */
     public static int windowWidth(Window window, Minecraft minecraft) {
         int own = window == null ? 0 : window.getOwnWidth();
         if (own <= 0) {
-            return windowWidth(minecraft);
+            return defaultWidth(minecraft);
         }
         int screenWidth = scaledScreenWidth(minecraft);
         return screenWidth <= 0 ? own
@@ -288,21 +350,9 @@ public final class WindowPlacement {
     }
 
     /**
-     * The box height of a window with no height of its own: the game's
-     * chat-height setting in lines, each a line of words at scale 1, the
-     * window's chrome round them. The chat scale sizes the words in a
-     * window, never the window.
-     */
-    public static double defaultHeight(Minecraft minecraft) {
-        GuiNewChat chat = chat(minecraft);
-        double lines = chat == null ? 20.0D : gameChatLines(chat);
-        return heightForRoom(lines * WindowStyle.LINE_HEIGHT, minecraft);
-    }
-
-    /**
      * The box height the window shows: the height the player gave it —
-     * fractions included, so the height is continuous — or the game's
-     * chat height while it has none, never less than the least box.
+     * fractions included, so the height is continuous — or the default
+     * place's while it has none, never less than the least box.
      * Never what its tabs hold: neither bringing another tab forward nor
      * a message arriving ever resizes the window, and the chat scale
      * sizes the words in it, never the window. Every measure of the
@@ -373,6 +423,13 @@ public final class WindowPlacement {
         double height = Math.min(maxHeight, currentHeight(window, minecraft));
         double room = roomForHeight(height, minecraft);
         int barHeight = barHeight(minecraft);
+        if (atDefaultPlace(window)) {
+            // In the middle, on whole pixels; an odd pixel left over goes
+            // to the right and the bottom, so the window leans up and left.
+            return new Box(Math.floor((screenWidth - width) / 2.0D),
+                    Math.floor((screenHeight - height) / 2.0D), width, height,
+                    barHeight, room);
+        }
         double baseline = holdBaseline(baselineFor(window.getOffsetY(),
                 height, minecraft, screenHeight), height, barHeight,
                 screenHeight);
@@ -552,12 +609,7 @@ public final class WindowPlacement {
                 Math.max(MIN_HOLD, size * HOLD_SHARE));
     }
 
-    public static double windowPercentX(double x, Minecraft minecraft,
-                                        int screenWidth) {
-        return percent(x, screenWidth, windowWidth(minecraft), EDGE_MARGIN);
-    }
-
-    /** As above for a window that has a width of its own. */
+    /** The percent of its travel a window's left edge at {@code x} stands at. */
     public static double windowPercentX(Window window, double x,
                                         Minecraft minecraft,
                                         int screenWidth) {

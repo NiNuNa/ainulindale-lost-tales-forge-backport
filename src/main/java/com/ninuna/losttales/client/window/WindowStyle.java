@@ -118,7 +118,7 @@ public final class WindowStyle {
 
     /**
      * The frame a popup wears inside its footprint: a window's, a
-     * pixel of surface with the ink inside it (Nils, 2026-09-24).
+     * pixel of surface with the ink inside it.
      */
     public static final int POPUP_FRAME = LostTalesUiWindowFrame.WIDTH;
 
@@ -213,7 +213,7 @@ public final class WindowStyle {
      * wears the sub-windows' surface — the inset plum black at two
      * thirds, thinned by the game's chat opacity and by {@code opacity} —
      * and a window's frame inside its footprint, as the snap panels
-     * do (Nils, 2026-09-24). The lit row — {@code [rowLeft, rowRight)} by
+     * do. The lit row — {@code [rowLeft, rowRight)} by
      * {@code [rowTop, rowBottom)}, what a press or Enter would take — is
      * the surface in the highlight's tone, cut to the frame's inside;
      * surface and row lie side by side, never one over another, and the

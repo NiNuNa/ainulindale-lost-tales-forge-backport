@@ -10,6 +10,7 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.ChatComponentTranslation;
+import net.minecraft.world.World;
 
 /**
  * Main-thread server authority for a missive board's page. Using the
@@ -101,7 +102,11 @@ public final class MissiveBoardService {
         answer(player, board, MissiveBoardStateReason.TAKEN);
     }
 
-    /** Pins the letter in the inventory's {@code slot} onto the board, where it has room. */
+    /**
+     * Pins the letter in the inventory's {@code slot} onto the board, where
+     * it has room. The letter is posted anew, at the board's time, and
+     * sealed again, so the board keeps it for its whole expiry.
+     */
     public static void pin(EntityPlayerMP player, int dimensionId, int x,
                            int y, int z, int slot, String expectedQuestId) {
         LostTalesTileEntityMissiveBoard board =
@@ -121,7 +126,8 @@ public final class MissiveBoardService {
             answer(player, board, MissiveBoardStateReason.DAMAGED);
             return;
         }
-        if (!board.hasRoomForMissive() || !board.addMissive(stack)) {
+        ItemStack posted = repost(player.worldObj, stack);
+        if (!board.hasRoomForMissive() || !board.addMissive(posted)) {
             answer(player, board, MissiveBoardStateReason.BOARD_FULL);
             return;
         }
@@ -129,6 +135,21 @@ public final class MissiveBoardService {
         player.inventory.markDirty();
         pop(player, board);
         answer(player, board, MissiveBoardStateReason.PINNED);
+    }
+
+    /**
+     * A copy of a genuine letter posted at the world's time now, sealed
+     * again with the world's key. Only a letter whose seal was checked is
+     * handed here.
+     */
+    static ItemStack repost(World world, ItemStack letter) {
+        ItemStack posted = letter.copy();
+        posted.stackSize = 1;
+        LostTalesMissiveData missive = LostTalesMissiveNbt.readFromItemStack(letter);
+        LostTalesMissiveNbt.writeToItemStack(posted,
+                missive.postedAt(world.getTotalWorldTime()));
+        MissiveSeals.seal(world, posted);
+        return posted;
     }
 
     /**
@@ -192,7 +213,8 @@ public final class MissiveBoardService {
         return new LostTalesMissiveBoardStatePacket(dimension, board.xCoord,
                 board.yCoord, board.zCoord, reason,
                 Math.max(0, Math.min(LostTalesMissiveBoardStatePacket.MAX_NOTICES,
-                        board.getMaxAvailableMissives())), notices);
+                        LostTalesTileEntityMissiveBoard.getMaxAvailableMissives())),
+                notices);
     }
 
     /**

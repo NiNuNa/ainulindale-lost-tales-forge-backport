@@ -43,10 +43,6 @@ public final class LostTalesMapMarkerWorldData extends WorldSavedData {
     private NBTTagCompound preservedNewerData;
     private boolean catalogInitialized;
 
-    public LostTalesMapMarkerWorldData() {
-        this(DATA_NAME);
-    }
-
     public LostTalesMapMarkerWorldData(String name) {
         super(name);
     }

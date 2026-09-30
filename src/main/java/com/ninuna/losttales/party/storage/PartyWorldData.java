@@ -28,10 +28,6 @@ public final class PartyWorldData extends WorldSavedData {
     private NBTTagCompound preservedNewerData;
     private transient boolean characterReferencesValidated;
 
-    public PartyWorldData() {
-        this(DATA_NAME);
-    }
-
     public PartyWorldData(String name) {
         super(name);
     }

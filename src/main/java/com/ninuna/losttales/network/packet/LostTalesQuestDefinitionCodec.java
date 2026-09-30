@@ -1,9 +1,11 @@
 package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
+import com.ninuna.losttales.quest.LostTalesQuestIds;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -22,18 +24,36 @@ public final class LostTalesQuestDefinitionCodec {
     static final int MAX_STAGE_OBJECTIVES = 512;
     static final int MAX_STRING_MAP_ENTRIES = 256;
     static final int MAX_IDENTIFIER_BYTES = 256;
+    static final int MAX_QUEST_ID_BYTES = LostTalesQuestIds.MAX_BYTES;
     static final int MAX_NAME_BYTES = 1024;
     static final int MAX_TEXT_BYTES = 8192;
     static final int MAX_MAP_VALUE_BYTES = 4096;
 
     private LostTalesQuestDefinitionCodec() {}
 
+    /**
+     * How many bytes the quest takes on the wire; -1 for one that cannot
+     * be written, an id, a name or a text too long, or too many stages,
+     * objectives or parameters.
+     */
+    public static int encodedSize(LostTalesQuestDefinition quest) {
+        ByteBuf probe = Unpooled.buffer();
+        try {
+            write(probe, quest);
+            return probe.readableBytes();
+        } catch (RuntimeException unwritable) {
+            return -1;
+        } finally {
+            probe.release();
+        }
+    }
+
     public static void write(ByteBuf buf, LostTalesQuestDefinition quest) {
         if (quest == null || quest.getId() == null
                 || quest.getId().length() == 0) {
             throw new IllegalStateException("invalid quest definition");
         }
-        writeString(buf, quest.getId(), MAX_IDENTIFIER_BYTES);
+        writeString(buf, quest.getId(), MAX_QUEST_ID_BYTES);
         writeString(buf, quest.getTitle(), MAX_NAME_BYTES);
         writeString(buf, quest.getDescription(), MAX_TEXT_BYTES);
         buf.writeBoolean(quest.isRepeatable());
@@ -79,7 +99,7 @@ public final class LostTalesQuestDefinitionCodec {
 
     public static LostTalesQuestDefinition read(ByteBuf buf) {
         String id = LostTalesPacketCodec.readUtf8String(buf,
-                MAX_IDENTIFIER_BYTES);
+                MAX_QUEST_ID_BYTES);
         String title = LostTalesPacketCodec.readUtf8String(buf,
                 MAX_NAME_BYTES);
         String description = LostTalesPacketCodec.readUtf8String(buf,

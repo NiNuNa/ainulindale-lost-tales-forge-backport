@@ -22,6 +22,7 @@ import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.chat.server.LostTalesServerBroadcastHook;
 import com.ninuna.losttales.chat.share.ChatShowcase;
+import com.ninuna.losttales.client.window.PinnedWindows;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowLayout;
 import com.ninuna.losttales.client.window.WindowStyle;
@@ -62,7 +63,13 @@ import com.ninuna.losttales.party.sync.PartyInvitationSnapshot;
 import com.ninuna.losttales.party.sync.PartyStateSnapshot;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
 
-/** Builds structured legacy chat components and records entry-animation time. */
+/**
+ * Turns every line that arrives into the chat's own line: a player's or a
+ * Discord member's message, a server line, a console entry. It builds the
+ * line the chat draws, files it under its tab, pings the player where the
+ * line names them, applies edits and reactions to lines already shown, and
+ * keeps what the drawing asks of a line: its hover, flash and arrival time.
+ */
 public final class LostTalesChatPresentation {
     /** The colour a shared quest's name is drawn in: the palette's tone of vanilla gold. */
     static final int QUEST_RGB = LostTalesColors.rgb(LostTalesColors.APRICOT);
@@ -1165,10 +1172,13 @@ public final class LostTalesChatPresentation {
         }
         // What the view's read mark moves to once the line is seen.
         long serverId = ClientChatMessageIds.messageIdOf(chatLineId);
-        // The tab typed in is in front only while no page stands before it.
+        // The tab typed in is in front only while no page stands before
+        // it. Pinned to the screen while playing, its lines stay unread
+        // until the conversation is opened.
         ChatTab typedIn = ClientChatChannelState.getSelected();
         ClientChatChannelViews.record(chatLineId, tab,
                 WindowLayout.showsPage(WindowLayout.windowOf(typedIn))
+                        || PinnedWindows.shows(typedIn)
                         ? null : typedIn, mentioned,
                 serverId, timestampMillis, receivingReplayed);
         ClientChatChannelViews.recordTime(chatLineId, timestampMillis);
@@ -2595,7 +2605,7 @@ public final class LostTalesChatPresentation {
      * The words of a report entry: who reported, where the message was
      * said as a link to it, the reason and the reporter's note. The
      * message itself stands above as the entry's quote. A report counts
-     * as a mention for everyone reading the console (Nils, 2026-09-24).
+     * as a mention for everyone reading the console.
      */
     private static IChatComponent reportNotice(Minecraft minecraft,
                                                ChatConsoleEvent event,

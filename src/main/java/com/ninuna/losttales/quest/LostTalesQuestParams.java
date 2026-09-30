@@ -18,23 +18,6 @@ public final class LostTalesQuestParams {
         return value == null ? "" : value.trim();
     }
 
-    /**
-     * The value under the first of {@code keys} that holds more than
-     * spaces, trimmed; empty for none.
-     */
-    public static String first(Map<String, String> params, String... keys) {
-        if (params == null || keys == null) {
-            return "";
-        }
-        for (String key : keys) {
-            String value = params.get(key);
-            if (value != null && value.trim().length() > 0) {
-                return value.trim();
-            }
-        }
-        return "";
-    }
-
     /** The whole number the value names, spaces ignored; the fallback for none or any other text. */
     public static int parseInt(String value, int fallback) {
         if (value == null) {

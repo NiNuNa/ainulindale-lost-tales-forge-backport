@@ -2,7 +2,6 @@ package com.ninuna.losttales.quest;
 
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerCatalog;
-import com.ninuna.losttales.util.LostTalesCloseables;
 import cpw.mods.fml.common.FMLLog;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -15,6 +14,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 /**
  * Every quest the logical server knows, from three places: the quest files
  * bundled with the mod, read from its classpath; the files a server writes
@@ -23,10 +23,10 @@ import java.util.Map;
  * taken by the other two, nor a server file's by a missive.
  */
 public final class LostTalesQuestRegistry {
-    private static final String INDEX_FILE = "quests/index.json";
-
     private static final Map<String, LostTalesQuestDefinition> STATIC_QUESTS_BY_ID = new LinkedHashMap<String, LostTalesQuestDefinition>();
     private static final Map<String, LostTalesQuestDefinition> SERVER_QUESTS_BY_ID = new LinkedHashMap<String, LostTalesQuestDefinition>();
+    /** Counts the reads of the server's quest files, so what was built from one read knows when it is stale. */
+    private static int serverQuestRevision;
     private static final Map<String, LostTalesQuestDefinition> RUNTIME_QUESTS_BY_ID = new LinkedHashMap<String, LostTalesQuestDefinition>();
     private static List<LostTalesQuestDefinition> sortedQuests = Collections.emptyList();
     private static boolean loaded;
@@ -34,18 +34,16 @@ public final class LostTalesQuestRegistry {
     private LostTalesQuestRegistry() {}
 
     public static synchronized void loadFromClasspath() {
-        Map<String, LostTalesQuestDefinition> loadedQuests = new LinkedHashMap<String, LostTalesQuestDefinition>();
-        List<String> questFiles = loadQuestIndexFromClasspath();
-
-        for (String questFile : questFiles) {
-            LostTalesQuestDefinition quest = loadQuestFromClasspath(questFile);
-            if (quest != null) {
-                loadedQuests.put(quest.getId(), quest);
-            }
+        BundledQuestFiles.Result read = BundledQuestFiles.read(CLASSPATH);
+        for (String problem : read.problems) {
+            FMLLog.warning("[%s] Bundled quest left out: %s",
+                    LostTalesMetaData.MOD_ID, problem);
         }
 
         STATIC_QUESTS_BY_ID.clear();
-        STATIC_QUESTS_BY_ID.putAll(loadedQuests);
+        for (LostTalesQuestDefinition quest : read.quests) {
+            STATIC_QUESTS_BY_ID.put(quest.getId(), quest);
+        }
         rebuildSortedQuests();
         loaded = true;
 
@@ -79,6 +77,7 @@ public final class LostTalesQuestRegistry {
         ensureLoaded();
         ServerQuestFiles.Result result = ServerQuestFiles.read(
                 ServerQuestFiles.directory(), STATIC_QUESTS_BY_ID.keySet());
+        serverQuestRevision++;
         SERVER_QUESTS_BY_ID.clear();
         for (LostTalesQuestDefinition quest : result.quests) {
             SERVER_QUESTS_BY_ID.put(quest.getId(), quest);
@@ -101,10 +100,16 @@ public final class LostTalesQuestRegistry {
 
     /** Forgets the server's own quests as the server stops. */
     public static synchronized void clearServerQuests() {
+        serverQuestRevision++;
         if (!SERVER_QUESTS_BY_ID.isEmpty()) {
             SERVER_QUESTS_BY_ID.clear();
             rebuildSortedQuests();
         }
+    }
+
+    /** Counts the reads of the server's quest files: it changes whenever what players are sent does. */
+    public static synchronized int serverQuestRevision() {
+        return serverQuestRevision;
     }
 
     /** The server's own quests, in the order their files were read: what every player is sent. */
@@ -153,9 +158,21 @@ public final class LostTalesQuestRegistry {
     }
 
     private static boolean mayRegisterRuntime(LostTalesQuestDefinition quest) {
-        return quest != null && quest.getId() != null && quest.getId().length() > 0
+        return quest != null && LostTalesQuestIds.fits(quest.getId())
                 && !STATIC_QUESTS_BY_ID.containsKey(quest.getId())
                 && !SERVER_QUESTS_BY_ID.containsKey(quest.getId());
+    }
+
+    /**
+     * Keeps, of the quests made while the game runs, only those {@code held}
+     * names: the missives some quest log still holds. What every log has
+     * forgotten goes, so the list stays as long as the logs are.
+     */
+    public static synchronized void retainRuntimeQuests(Set<String> held) {
+        ensureLoaded();
+        if (held != null && RUNTIME_QUESTS_BY_ID.keySet().retainAll(held)) {
+            rebuildSortedQuests();
+        }
     }
 
     public static synchronized void clearRuntimeQuests() {
@@ -190,57 +207,16 @@ public final class LostTalesQuestRegistry {
         sortedQuests = Collections.unmodifiableList(sorted);
     }
 
-    private static List<String> loadQuestIndexFromClasspath() {
-        List<String> files = new ArrayList<String>();
-        Reader reader = null;
-        try {
-            reader = openClasspathReader(INDEX_FILE);
-            if (reader == null) {
-                FMLLog.warning("[%s] No quest index at %s: no bundled quests load.",
-                        LostTalesMetaData.MOD_ID, INDEX_FILE);
-            } else {
-                files.addAll(LostTalesQuestDefinitionJsonParser.parseQuestIndex(reader));
-            }
-        } catch (RuntimeException exception) {
-            // A broken index leaves the server without bundled quests, not
-            // without a start.
-            FMLLog.warning("[%s] The quest index %s cannot be read, so no bundled quests load: %s",
-                    LostTalesMetaData.MOD_ID, INDEX_FILE, exception);
-        } finally {
-            LostTalesCloseables.closeQuietly(reader);
-        }
-        return files;
-    }
-
-    private static LostTalesQuestDefinition loadQuestFromClasspath(String questFile) {
-        Reader reader = null;
-        try {
-            reader = openClasspathReader(questFile);
-            if (reader == null) {
-                return null;
-            }
-            return LostTalesQuestDefinitionJsonParser.parseQuest(reader, questFile);
-        } catch (RuntimeException ignored) {
-            return null;
-        } finally {
-            LostTalesCloseables.closeQuietly(reader);
-        }
-    }
-
-    private static Reader openClasspathReader(String questFile) {
-        String path = toClasspathResourcePath(questFile);
-        InputStream stream = LostTalesQuestRegistry.class.getClassLoader().getResourceAsStream(path);
-        return stream == null ? null : new InputStreamReader(stream, StandardCharsets.UTF_8);
-    }
-
-    private static String toClasspathResourcePath(String questFile) {
-        String normalized = LostTalesQuestDefinitionJsonParser.normalizeQuestFile(questFile);
-        int colonIndex = normalized.indexOf(':');
-        if (colonIndex > 0) {
-            String domain = normalized.substring(0, colonIndex);
-            String path = normalized.substring(colonIndex + 1);
-            return "assets/" + domain + "/" + path;
-        }
-        return "assets/" + LostTalesMetaData.MOD_ID + "/" + normalized;
-    }
+    /** The bundled quest files as the server reads them: from the mod's own classpath. */
+    private static final BundledQuestFiles.Source CLASSPATH =
+            new BundledQuestFiles.Source() {
+                @Override
+                public Reader open(String path) {
+                    InputStream stream = LostTalesQuestRegistry.class
+                            .getClassLoader().getResourceAsStream(
+                                    BundledQuestFiles.classpathPath(path));
+                    return stream == null ? null
+                            : new InputStreamReader(stream, StandardCharsets.UTF_8);
+                }
+            };
 }

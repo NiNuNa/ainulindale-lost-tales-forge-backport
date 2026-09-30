@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.quest;
 
 import com.ninuna.losttales.compat.lotr.LotrClientQuestAdapter;
+import com.ninuna.losttales.quest.LostTalesQuestCategory;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveSelection;
@@ -15,7 +16,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.StatCollector;
 
@@ -155,7 +155,8 @@ public final class ClientQuestCatalog {
                     minecraft.theWorld.getTotalWorldTime());
         }
         return new ClientQuestEntry(ClientQuestEntry.Source.LOST_TALES,
-                quest.getId(), quest.getTitle(), "", category(quest),
+                quest.getId(), quest.getTitle(), "",
+                categoryName(LostTalesQuestCategory.of(quest)),
                 quest.getDescription(), status,
                 LostTalesClientQuestProgressStore.isQuestPinned(quest.getId()),
                 progress == null ? 0
@@ -227,7 +228,8 @@ public final class ClientQuestCatalog {
             rewards.add(summary);
         }
         return new ClientQuestEntry(ClientQuestEntry.Source.WORLD,
-                quest.getId(), quest.getTitle(), subtitle, category(quest),
+                quest.getId(), quest.getTitle(), subtitle,
+                categoryName(LostTalesQuestCategory.of(quest)),
                 quest.getDescription(), status, view.isRunning(), 1, 1,
                 remainingTicks, objectives, rewards,
                 Collections.<ClientQuestEntry.Target>emptyList(), null, null);
@@ -253,49 +255,14 @@ public final class ClientQuestCatalog {
     }
 
     /**
-     * A category's name, translated where the code chose it: the word a
-     * category is filed under is its key, {@code Tutorials} as
-     * {@code gui.losttales.quest.category.tutorials}; a faction's own
-     * name stands as it is.
+     * A category's name, from the lang file: the word a category is filed
+     * under ({@link LostTalesQuestCategory}) names its key. An entry carries
+     * this name, and so does a card a player shares from it; a card the
+     * server makes carries the word. A word no key has stands as it is.
      */
     public static String categoryName(String category) {
-        if (category == null || category.length() == 0) {
-            return StatCollector.translateToLocal("gui.losttales.quest.category.misc");
-        }
-        String key = "gui.losttales.quest.category."
-                + category.toLowerCase(Locale.ROOT).replace(' ', '_')
-                        .replace("-", "");
+        String key = LostTalesQuestCategory.key(category);
         return StatCollector.canTranslate(key)
                 ? StatCollector.translateToLocal(key) : category;
-    }
-
-    private static String category(LostTalesQuestDefinition quest) {
-        if (quest != null && quest.isWorldQuest()) {
-            return "World";
-        }
-        String id = quest == null || quest.getId() == null
-                ? "" : quest.getId();
-        int colon = id.indexOf(':');
-        String path = (colon >= 0 ? id.substring(colon + 1) : id)
-                .toLowerCase(Locale.ENGLISH);
-        if (path.startsWith("tutorial/")) {
-            return "Tutorials";
-        }
-        if (path.startsWith("faction/")) {
-            return "Factions";
-        }
-        if (path.startsWith("missive/")) {
-            return "Missives";
-        }
-        if (path.startsWith("path/")) {
-            return "Paths";
-        }
-        if (path.startsWith("regional/") || path.startsWith("region/")) {
-            return "Regional";
-        }
-        if (path.startsWith("story/") || path.startsWith("main/")) {
-            return "Main Story";
-        }
-        return "Miscellaneous";
     }
 }

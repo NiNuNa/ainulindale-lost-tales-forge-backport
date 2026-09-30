@@ -6,6 +6,7 @@ import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.server.CharacterOperationResult;
 import com.ninuna.losttales.character.server.CharacterSyncManager;
+import com.ninuna.losttales.character.server.SeenAccountNames;
 import com.ninuna.losttales.character.state.CharacterPlayerStateAccount;
 import com.ninuna.losttales.character.state.CharacterPlayerStateRecord;
 import com.ninuna.losttales.character.state.CharacterPlayerStateService;
@@ -223,7 +224,10 @@ public final class CharacterDeletionService {
             if (roster.getCharacterAtSlot(character.getSlotIndex()) != null) {
                 return CharacterDeletionMaintenanceResult.SLOT_OCCUPIED;
             }
-            if (nameRefusal(characterData, character) != CharacterErrorId.NONE) {
+            if (nameRefusal(characterData, character,
+                    SeenAccountNames.accountNameOf(target),
+                    SeenAccountNames.ofServer(target.worldObj, target.getUniqueID()))
+                    != CharacterErrorId.NONE) {
                 return CharacterDeletionMaintenanceResult.NAME_TAKEN;
             }
             CharacterPlayerStateWorldData playerStateData =
@@ -416,7 +420,8 @@ public final class CharacterDeletionService {
     /**
      * The owner restoring one of their deleted characters within its
      * retention, into the first free open slot of their roster. Refused
-     * while its name is now another character's, or reserved.
+     * while its name is another character's, another account's or
+     * reserved ({@link #nameRefusal}).
      */
     public synchronized CharacterOperationResult restoreOwn(
             EntityPlayerMP player, long expectedRosterRevision,
@@ -475,7 +480,9 @@ public final class CharacterDeletionService {
                         CharacterErrorId.RESTORE_NOT_FOUND, roster);
             }
             RoleplayCharacter stored = tombstone.getCharacterCopy();
-            CharacterErrorId name = nameRefusal(characterData, stored);
+            CharacterErrorId name = nameRefusal(characterData, stored,
+                    SeenAccountNames.accountNameOf(player),
+                    SeenAccountNames.ofServer(world, ownerId));
             if (name != CharacterErrorId.NONE) {
                 return CharacterOperationResult.failure(name, roster);
             }
@@ -591,18 +598,25 @@ public final class CharacterDeletionService {
 
     /**
      * Why a deleted character cannot come back under its name: a lore
-     * character's or a chat voice's now, or another character's on the
-     * server; {@link CharacterErrorId#NONE} when it can.
+     * character's or a chat voice's, another character's on the server,
+     * or the name of an account the server has seen other than its
+     * owner's, {@code ownAccountName}; {@link CharacterErrorId#NONE} when
+     * it can.
      */
     static CharacterErrorId nameRefusal(CharacterWorldData characterData,
-                                        RoleplayCharacter character) {
+                                        RoleplayCharacter character,
+                                        String ownAccountName,
+                                        SeenAccountNames.Source accounts) {
         String name = character.getName();
         if (LoreCharacterRegistry.getByName(name) != null
                 || CharacterNames.isVoice(name)) {
             return CharacterErrorId.NAME_RESERVED;
         }
-        return characterData.isNameTaken(name, character.getCharacterId())
-                ? CharacterErrorId.DUPLICATE_NAME : CharacterErrorId.NONE;
+        if (characterData.isNameTaken(name, character.getCharacterId())) {
+            return CharacterErrorId.DUPLICATE_NAME;
+        }
+        return SeenAccountNames.isAnotherAccountsName(name, ownAccountName,
+                accounts) ? CharacterErrorId.ACCOUNT_NAME : CharacterErrorId.NONE;
     }
 
     /** The first open slot with nothing in it; -1 for none. */

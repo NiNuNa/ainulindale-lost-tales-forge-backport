@@ -991,28 +991,6 @@ public final class LostTalesMapDecorationRenderer {
                 ^ ((long)(mapX & 0xFFFFFF) << 24) ^ (mapY & 0xFFFFFF);
     }
 
-    /** Test seam: how many scattered kinds there are. */
-    static int kindCount() {
-        return SCATTERED.length;
-    }
-
-    /** Test seam: how wide a kind is drawn on screen at a zoom. */
-    static float drawnWidth(int kind, float zoomScale) {
-        return SCATTERED[kind].sprite.getWorldWidth() * zoomScale;
-    }
-
-    /** Test seam: whether a kind is drawn at all at a given zoom. */
-    static boolean isDrawn(int kind, float zoomScale) {
-        return SCATTERED[kind].sprite.visibilityAlpha(maximumDrawnWidth(
-                SCATTERED[kind].sprite.getWorldWidth(), zoomScale)) > 0.0F;
-    }
-
-    /** Test seam: projected-size fade for one scattered kind. */
-    static float visibilityAlpha(int kind, float zoomScale) {
-        return SCATTERED[kind].sprite.visibilityAlpha(
-                drawnWidth(kind, zoomScale));
-    }
-
     /** Conservative preflight width; individual sites still use exact size. */
     private static float maximumDrawnWidth(
             float worldWidth, float zoomScale) {

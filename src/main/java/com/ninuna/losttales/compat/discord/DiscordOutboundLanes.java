@@ -165,15 +165,6 @@ final class DiscordOutboundLanes<T> {
         return next;
     }
 
-    /** Items waiting across every lane. */
-    int size() {
-        int size = 0;
-        for (Lane<T> lane : this.lanes.values()) {
-            size += lane.items.size();
-        }
-        return size;
-    }
-
     private static final class Lane<T> {
         final ArrayDeque<T> items = new ArrayDeque<T>();
         long notBeforeMillis;

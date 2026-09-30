@@ -356,9 +356,4 @@ final class DiscordMessageLinks {
         }
         return ids;
     }
-
-    /** Test hook: messages currently held. */
-    synchronized int size() {
-        return this.copiesByMessage.size();
-    }
 }

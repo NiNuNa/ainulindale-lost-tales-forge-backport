@@ -66,7 +66,7 @@ final class ChatWindowDrags {
     static void armMembersResize(WindowGestures gestures,
                                  ChatTabActions actions, ChatFrame frame,
                                  Window window, double mouseX) {
-        if (frame == null || window == null || window.isLocked()) {
+        if (frame == null || window == null) {
             return;
         }
         WindowLayout.raise(window.getId());
@@ -167,8 +167,7 @@ final class ChatWindowDrags {
         public void move(double mouseX, double mouseY) {
             ChatFrame frame = ChatFrame.find(this.windowId);
             Window window = WindowLayout.window(this.windowId);
-            if (frame == null || window == null || window.isLocked()
-                    || frame.scale <= 0.0F) {
+            if (frame == null || window == null || frame.scale <= 0.0F) {
                 return;
             }
             double edge = mouseX - this.grabOffset;

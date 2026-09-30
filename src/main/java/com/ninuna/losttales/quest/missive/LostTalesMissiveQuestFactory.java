@@ -9,7 +9,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Converts generated missive data into the existing Lost Tales quest definition model. */
+/**
+ * A missive's quest, made from its letter: one stage of the letter's
+ * objectives, its reward, its words as the quest's description and journal
+ * line, and a locked start, so only the letter starts it. Who issued it is
+ * said on the letter, not in the quest.
+ */
 public final class LostTalesMissiveQuestFactory {
     private static final String DEFAULT_STAGE_ID = "10";
 
@@ -38,58 +43,32 @@ public final class LostTalesMissiveQuestFactory {
         }
 
         List<LostTalesQuestStageDefinition> stages = Collections.<LostTalesQuestStageDefinition>singletonList(new LostTalesQuestStageDefinition(DEFAULT_STAGE_ID, objectives));
-        Map<String, String> journalLog = createJournalLog(missive);
         Map<String, String> prerequisites = Collections.emptyMap();
         Map<String, String> interaction = Collections.emptyMap();
-        Map<String, String> markers = createMarkerHints(missive);
+        Map<String, String> markers = Collections.emptyMap();
 
         return new LostTalesQuestDefinition(
                 missive.getQuestId(),
                 missive.getTitle(),
-                buildDescription(missive),
+                missive.getDescription(),
                 missive.isRepeatable(),
                 LostTalesQuestDefinition.START_MODE_LOCKED,
                 prerequisites,
                 missive.getRewardData().getRewards(),
                 interaction,
                 markers,
-                journalLog,
+                createJournalLog(missive),
                 stages
         );
     }
 
+    /** The journal's line: the letter's flavour text, else its description; none where it has neither. */
     private static Map<String, String> createJournalLog(LostTalesMissiveData missive) {
         LinkedHashMap<String, String> journalLog = new LinkedHashMap<String, String>();
         String entry = missive.getFlavorText().length() > 0 ? missive.getFlavorText() : missive.getDescription();
-        if (entry.length() == 0) {
-            entry = "I accepted a missive from " + getIssuerOrFallback(missive) + ".";
+        if (entry.length() > 0) {
+            journalLog.put(DEFAULT_STAGE_ID, entry);
         }
-        journalLog.put(DEFAULT_STAGE_ID, entry);
         return journalLog;
-    }
-
-    private static Map<String, String> createMarkerHints(LostTalesMissiveData missive) {
-        LinkedHashMap<String, String> markers = new LinkedHashMap<String, String>();
-        String marker = missive.getGenerationContext().get("marker");
-        if (marker == null || marker.length() == 0) {
-            marker = missive.getGenerationContext().get("boardMarker");
-        }
-        if (marker != null && marker.length() > 0) {
-            markers.put("giver", marker);
-        }
-        return markers;
-    }
-
-    private static String buildDescription(LostTalesMissiveData missive) {
-        String description = missive.getDescription();
-        String issuer = getIssuerOrFallback(missive);
-        if (issuer.length() > 0 && description.indexOf(issuer) < 0) {
-            return description.length() == 0 ? "Issued by " + issuer + "." : description + "\n\nIssued by " + issuer + ".";
-        }
-        return description;
-    }
-
-    private static String getIssuerOrFallback(LostTalesMissiveData missive) {
-        return missive.getIssuer().length() == 0 ? "a local notice board" : missive.getIssuer();
     }
 }

@@ -20,15 +20,11 @@ public final class LostTalesQuestParamsTest {
     }
 
     @Test
-    public void theFirstKeyHoldingMoreThanSpacesWins() {
+    public void aBlankValueCountsAsAbsent() {
         Map<String, String> params = new HashMap<String, String>();
         params.put("x", "   ");
-        params.put("posX", " 12 ");
-        params.put("targetX", "40");
 
-        assertEquals("12", LostTalesQuestParams.first(params, "x", "posX", "targetX"));
-        assertEquals("", LostTalesQuestParams.first(params, "y", "posY"));
-        assertEquals("", LostTalesQuestParams.first(null, "x"));
+        assertEquals("", LostTalesQuestParams.value(params, "x"));
     }
 
     @Test

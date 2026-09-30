@@ -15,8 +15,6 @@ import com.ninuna.losttales.client.window.WindowHover;
 public final class ChatHover extends WindowHover {
     /** What of the chat the pointer is on. */
     public enum Kind {
-        /** The {@code +} the empty state offers. */
-        EMPTY_PLUS,
         /** A row of an open completion list. */
         SUGGESTION,
         /** An open completion list's own padding. */
@@ -96,7 +94,6 @@ public final class ChatHover extends WindowHover {
     @Override
     public boolean acts() {
         switch (this.chatKind) {
-            case EMPTY_PLUS:
             case SUGGESTION:
             case PICKER_CELL:
             case PICKER_LABEL:

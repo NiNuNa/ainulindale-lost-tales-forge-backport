@@ -43,6 +43,9 @@ public final class WindowGestures {
 
         /** A window moved or changed its size: whatever follows it follows. */
         void windowsMoved();
+
+        /** Someone tried to move a locked window: its padlock answers. */
+        void lockedMoveTried(Window window);
     }
 
     /**
@@ -139,6 +142,8 @@ public final class WindowGestures {
 
     private TabDrag tabDrag;
     private WindowDrag windowDrag;
+    /** A locked window taken hold of, which moves nowhere; null for none. */
+    private LockedDrag lockedDrag;
     private WindowResize windowResize;
     private FillResize fillResize;
     private ContentDrag contentDrag;
@@ -319,6 +324,18 @@ public final class WindowGestures {
      * vanilla's own handling alone.
      */
     public boolean onDragMove(int mouseX, int mouseY) {
+        if (this.lockedDrag != null) {
+            if (travelled(mouseX, mouseY, this.lockedDrag.pressX,
+                    this.lockedDrag.pressY)) {
+                Window window = WindowLayout.window(
+                        this.lockedDrag.windowId);
+                this.lockedDrag = null;
+                if (window != null) {
+                    this.host.lockedMoveTried(window);
+                }
+            }
+            return true;
+        }
         if (this.contentDrag != null) {
             moveContentDrag();
             return true;
@@ -363,6 +380,7 @@ public final class WindowGestures {
      * travelled collapses the group to the pressed tab.
      */
     public void onRelease() {
+        this.lockedDrag = null;
         if (this.contentDrag != null) {
             ContentDrag drag = this.contentDrag;
             this.contentDrag = null;
@@ -409,6 +427,7 @@ public final class WindowGestures {
      * stands, a resize goes back as it was.
      */
     public void cancelDrags() {
+        this.lockedDrag = null;
         // Nothing carried lands anywhere: the preview goes back into its
         // window and the snap bar goes up.
         this.snapPreview.release(false);
@@ -752,6 +771,8 @@ public final class WindowGestures {
             armFillResize(target.edge, window);
             return;
         }
+        WindowPlacement.adoptOwnPlace(window, this.mc, this.screenWidth,
+                this.screenHeight);
         double left = frame.drawnLeft();
         double right = left + (frame.boxRight - frame.boxLeft);
         double top = frame.boxTop + frame.motionY;
@@ -1141,6 +1162,28 @@ public final class WindowGestures {
     }
 
     /**
+     * Takes hold of a locked window: it comes to the front, moves nowhere,
+     * and once the pointer has travelled its padlock answers, once.
+     */
+    public void armLockedDrag(Window window, int mouseX, int mouseY) {
+        WindowLayout.raise(window.getId());
+        this.lockedDrag = new LockedDrag(window.getId(), mouseX, mouseY);
+    }
+
+    /** A press on a locked window's strip, grip or only tabs, waiting to see whether it travels. */
+    private static final class LockedDrag {
+        final String windowId;
+        final int pressX;
+        final int pressY;
+
+        LockedDrag(String windowId, int pressX, int pressY) {
+            this.windowId = windowId;
+            this.pressX = pressX;
+            this.pressY = pressY;
+        }
+    }
+
+    /**
      * Takes hold of a window by its strip or its grip from the pointer's
      * current position, live at once. A window taken hold of comes to the
      * front, dragged or not.
@@ -1202,6 +1245,10 @@ public final class WindowGestures {
      */
     private void carry(Window window, Landing landing, double x,
                        double baseline) {
+        // A window at the default place takes a place of its own as it
+        // leaves it, the size it has there included.
+        WindowPlacement.adoptOwnPlace(window, this.mc, this.screenWidth,
+                this.screenHeight);
         WindowPlacement.Anchor anchor = WindowPlacement.constrainWindow(
                 window, this.mc, x, baseline, this.screenWidth,
                 this.screenHeight);
@@ -1278,8 +1325,8 @@ public final class WindowGestures {
      * of its length — and from the top edge between the corners the
      * whole screen, or, on a screen wide enough to offer the thirds
      * ({@code thirds}), the left or the right third from the edge's own
-     * left or right third, as Windows 11 snaps on a large screen (Nils,
-     * 2026-09-19). The bottom edge snaps only at its corners; none
+     * left or right third, as Windows 11 snaps on a large screen. The
+     * bottom edge snaps only at its corners; none
      * anywhere else.
      */
     static Window.ScreenFill snapZoneAt(double x, double y,
@@ -1613,8 +1660,7 @@ public final class WindowGestures {
             Window window = windows.get(index);
             // A torn-off window rides under the pointer, so its own row
             // is always there: docking into it would mean nothing.
-            if (window.isLocked()
-                    || window.getId().equals(drag.detachedWindowId)) {
+            if (window.getId().equals(drag.detachedWindowId)) {
                 continue;
             }
             WindowFrame frame = WindowFrame.of(window);
@@ -1903,8 +1949,10 @@ public final class WindowGestures {
 
     /**
      * Tears the dragged tabs off into a window of their own, placed so
-     * its row lands under the pointer. Refused for a locked window, whose
-     * tabs stay in their row while the drag goes on as a ghost.
+     * its row lands under the pointer, as tall and as wide as the window
+     * they leave. Carrying every tab of a locked window is refused, since
+     * that moves the window; its tabs stay in their row while the drag
+     * goes on as a ghost.
      */
     private void tearOff(TabDrag drag) {
         // Placed for the window it is about to become, which is as tall
@@ -1914,11 +1962,13 @@ public final class WindowGestures {
         // the one frame before the carry corrected it.
         Window source = WindowLayout.windowOf(drag.tab);
         WindowPlacement.Anchor anchor = carriedAnchor(source, drag);
-        Window window = WindowLayout.detach(drag.group,
+        Window window = WindowLayout.tearOff(drag.group,
                 WindowPlacement.windowPercentX(source, anchor.x, this.mc,
                         this.screenWidth),
                 WindowPlacement.windowPercentY(source, anchor.baseline,
-                        this.mc, this.screenHeight));
+                        this.mc, this.screenHeight),
+                WindowPlacement.windowWidth(source, this.mc),
+                WindowPlacement.currentHeight(source, this.mc));
         if (window == null) {
             return;
         }

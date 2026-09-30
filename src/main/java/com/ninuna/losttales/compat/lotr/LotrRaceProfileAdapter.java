@@ -147,10 +147,10 @@ public final class LotrRaceProfileAdapter {
             throw new IllegalStateException(
                     "missing physical race definition for " + raceId);
         }
-        // Do not copy EntityLivingBase dimensions from the representative.
-        // LOTR intentionally gives Mordor Orc and Uruk NPCs the same collision
-        // box even though their rendered models differ. Those values previously
-        // overwrote the player registry and placed both cameras at 1.32 blocks.
+        // The dimensions come from the race's own definition, never from the
+        // representative: LOTR gives Mordor Orc and Uruk NPCs the same
+        // collision box although their models differ, which would put both
+        // races' cameras at 1.32 blocks.
         float width = definition.getWidth();
         float height = definition.getHeight();
         float eyeHeight = definition.getStandingEyeHeight();

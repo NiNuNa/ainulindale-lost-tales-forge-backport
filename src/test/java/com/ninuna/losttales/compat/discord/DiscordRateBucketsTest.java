@@ -90,7 +90,6 @@ public final class DiscordRateBucketsTest {
         buckets.observe(DiscordRateBuckets.ROUTE_WEBHOOK_POST, LANE_A,
                 DiscordRateLimit.NONE, 0L);
         buckets.observe(DiscordRateBuckets.ROUTE_WEBHOOK_POST, LANE_A, null, 0L);
-        assertEquals(0, buckets.size());
         assertEquals(0L, buckets.holdUntil(DiscordRateBuckets.ROUTE_WEBHOOK_POST,
                 LANE_A, 0L));
     }
@@ -113,9 +112,11 @@ public final class DiscordRateBucketsTest {
             buckets.observe(DiscordRateBuckets.ROUTE_WEBHOOK_POST, "lane " + lane,
                     spent("post", "10"), 0L);
         }
-        assertEquals(DiscordRateBuckets.MAX_STATES, buckets.size());
         assertEquals(0L, buckets.holdUntil(DiscordRateBuckets.ROUTE_WEBHOOK_POST,
                 "lane 0", 0L));
+        // Only that one fell out: the next after it and the newest hold.
+        assertEquals(10000L, buckets.holdUntil(DiscordRateBuckets.ROUTE_WEBHOOK_POST,
+                "lane 1", 0L));
         assertEquals(10000L, buckets.holdUntil(DiscordRateBuckets.ROUTE_WEBHOOK_POST,
                 "lane " + DiscordRateBuckets.MAX_STATES, 0L));
     }

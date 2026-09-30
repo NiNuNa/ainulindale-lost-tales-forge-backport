@@ -388,7 +388,8 @@ public final class TabRow {
     private float endFraction;
     private boolean cachedShowClose;
     private boolean cachedShowRestore;
-    private boolean cachedWindowControls;
+    /** Whether the row being drawn shows its tabs alone ({@link Row#bare}). */
+    private boolean bare;
     /** What waits in the channels the {@code +} would open, marked after it. */
     private TabMark restoreMark = TabMark.NONE;
     /** Width of the restore control together with its mark. */
@@ -579,15 +580,21 @@ public final class TabRow {
          */
         public float fractionX;
         public float fractionY;
+        /**
+         * Whether the window is locked: it keeps its place and size, so
+         * its fullscreen control stands greyed and its grip moves nothing.
+         */
         public boolean locked;
+        /** Whether the padlock is lit a moment: something tried to move a locked window. */
+        public boolean lockLit;
+        /**
+         * Whether only the tabs are drawn, each where it always stands:
+         * the row of a window pinned to the screen while playing, where
+         * no control can be pressed.
+         */
+        public boolean bare;
         /** Whether a close cross is offered on the selected tab. */
         public boolean closable;
-        /**
-         * Whether the window's own three dots, fullscreen control and
-         * cross are offered. A locked window keeps the tabs and the size it has, so
-         * it offers none of them; its padlock is what unlocks it again.
-         */
-        public boolean windowControls;
         /**
          * How far the window has travelled toward filling the screen,
          * 0..1: the fullscreen control crosses from its outward corners
@@ -802,8 +809,8 @@ public final class TabRow {
         if (localX >= this.controlsRight && localX < row.right) {
             // The stretch past the controls drags the window, the whole
             // band of it; only the grip's own glyph lights. A locked
-            // window's grip is inert: no hover, no tip, no drag.
-            return row.locked ? null : new Hit(HitKind.GRIP, null);
+            // window's grip moves nothing, and its tip says why.
+            return new Hit(HitKind.GRIP, null);
         }
         return null;
     }
@@ -817,7 +824,7 @@ public final class TabRow {
      */
     public boolean isOverGripHandle(FontRenderer font, Row row, double mouseX,
                              double mouseY) {
-        if (row == null || row.locked || !inRowBand(row, mouseY)) {
+        if (row == null || !inRowBand(row, mouseY)) {
             return false;
         }
         layout(font, row);
@@ -888,6 +895,7 @@ public final class TabRow {
             this.cachedFont = null;
         }
         List<Tab> tabs = layout(font, row);
+        this.bare = row.bare;
         if (row.dragging == null) {
             // No hand on this row: whatever the last drag remembered
             // about its crossings is over, and the next starts clean.
@@ -968,8 +976,11 @@ public final class TabRow {
             GL11.glPushMatrix();
             GL11.glTranslatef(this.endFraction, 0.0F, 0.0F);
             try {
-                drawGrip(row.offsetX + this.controlsRight,
-                        row.offsetX + this.endEdge, bottom, this.gripFade);
+                if (!row.bare) {
+                    drawGrip(row.offsetX + this.controlsRight,
+                            row.offsetX + this.endEdge, bottom,
+                            this.gripFade);
+                }
             } finally {
                 GL11.glPopMatrix();
             }
@@ -1000,12 +1011,13 @@ public final class TabRow {
             }
             // The end controls sit centred in the strip, like the selected
             // tab's label; the badge's caps share that centre.
-            if (this.lockX >= 0) {
+            if (!row.bare && this.lockX >= 0) {
                 GL11.glPushMatrix();
                 GL11.glTranslatef(this.endFraction, 0.0F, 0.0F);
                 try {
                     drawLock(row.offsetX + this.lockX, bottom, row.locked,
-                            hovered != null && hovered.kind == HitKind.LOCK,
+                            row.lockLit || hovered != null
+                                    && hovered.kind == HitKind.LOCK,
                             step(this.lockMotion, hovered, HitKind.LOCK));
                 } finally {
                     GL11.glPopMatrix();
@@ -1013,10 +1025,10 @@ public final class TabRow {
             }
             GL11.glPushMatrix();
             GL11.glTranslatef(this.restoreRunFraction, 0.0F, 0.0F);
-            if (this.tabDividerX >= 0) {
+            if (!row.bare && this.tabDividerX >= 0) {
                 drawDivider(row.offsetX + this.tabDividerX, bottom);
             }
-            if (this.restoreX >= 0) {
+            if (!row.bare && this.restoreX >= 0) {
                 // The control says which way it goes: a + while the
                 // list it opens is away, and the same crossbar without
                 // its upright — a minus — while the list is out.
@@ -1040,8 +1052,10 @@ public final class TabRow {
             // The tab search sits at the row's left end, before the
             // first tab, where a browser keeps it.
             step(this.searchMotion, hovered, HitKind.SEARCH, row.searchOpen);
-            drawSearch(searchLeft, searchTop, row.searchOpen,
-                    hovered != null && hovered.kind == HitKind.SEARCH);
+            if (!row.bare) {
+                drawSearch(searchLeft, searchTop, row.searchOpen,
+                        hovered != null && hovered.kind == HitKind.SEARCH);
+            }
             // The window's own controls, in the order a title bar
             // reads: the lock (drawn above), a hairline, its menu,
             // fullscreen and close, another hairline, then the grip —
@@ -1050,30 +1064,30 @@ public final class TabRow {
             GL11.glPushMatrix();
             GL11.glTranslatef(this.endFraction, 0.0F, 0.0F);
             try {
-                if (this.firstDividerX >= 0) {
+                if (!row.bare && this.firstDividerX >= 0) {
                     drawDivider(row.offsetX + this.firstDividerX, bottom);
                 }
-                if (this.windowMenuX >= 0) {
+                if (!row.bare && this.windowMenuX >= 0) {
                     drawEndControl(LostTalesUiSheet.MORE,
                             LostTalesUiSheet.MORE_HOVER,
                             step(this.windowMenuMotion, hovered,
                                     HitKind.WINDOW_MENU),
                             row.offsetX + this.windowMenuX, bottom);
                 }
-                if (this.windowFullscreenX >= 0) {
-                    drawFullscreenControl(row.fullscreenShare,
+                if (!row.bare && this.windowFullscreenX >= 0) {
+                    drawFullscreenControl(row.fullscreenShare, row.locked,
                             step(this.windowFullscreenMotion, hovered,
                                     HitKind.WINDOW_FULLSCREEN),
                             row.offsetX + this.windowFullscreenX, bottom);
                 }
-                if (this.windowCloseX >= 0) {
+                if (!row.bare && this.windowCloseX >= 0) {
                     drawEndControl(LostTalesUiSheet.CLOSE,
                             LostTalesUiSheet.CLOSE_HOVER,
                             step(this.windowCloseMotion, hovered,
                                     HitKind.WINDOW_CLOSE),
                             row.offsetX + this.windowCloseX, bottom);
                 }
-                if (this.secondDividerX >= 0) {
+                if (!row.bare && this.secondDividerX >= 0) {
                     drawDivider(row.offsetX + this.secondDividerX, bottom);
                 }
             } finally {
@@ -1084,7 +1098,7 @@ public final class TabRow {
         }
         // The window's top rule: the strip's last row, over the tabs
         // and controls, the exact width of the strip. Behind it the row
-        // wears the tool strip's surface, the colour it touches (Nils),
+        // wears the tool strip's surface, the colour it touches,
         // so the tool strip runs up under the rule. Where the selected
         // tab stands, neither is drawn: the tab's own surface takes that
         // stretch of the row, joining the tool strip under it, and the
@@ -1160,7 +1174,7 @@ public final class TabRow {
         // Its last row is a rule of its own — the window's top rule,
         // which the history's clip and its top shade hang from — on the
         // tool strip's own surface, which runs under it, as it runs under
-        // the strip's rule (Nils).
+        // the strip's rule.
         float stripLeft = row.offsetX + row.left - STRIP_INSET;
         int toolBottom = bottom + WindowPlacement.TOOL_STRIP_HEIGHT;
         int toolArgb = toolSurfaceArgb();
@@ -1515,6 +1529,7 @@ public final class TabRow {
                         try {
                             tab.tab.drawIcon(Minecraft.getMinecraft(), x,
                                     y, shown, mark);
+                            TabStayMark.draw(tab.tab, x, y, shown);
                         } finally {
                             GL11.glPopMatrix();
                         }
@@ -1683,6 +1698,9 @@ public final class TabRow {
     private void drawTabDraft(Tab tab, Hit hovered, double exactX, int textY,
                               int textAlpha, float draftShare, float tabLeft,
                               double contentRight) {
+        if (this.bare) {
+            return;
+        }
         int draftAlpha = Math.round(textAlpha * draftShare);
         if (draftAlpha < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
             return;
@@ -1722,6 +1740,9 @@ public final class TabRow {
     private void drawTabClose(Tab tab, Hit hovered, TabRoom room,
                               float closeShare, float left, int interiorTop,
                               int controlAlpha) {
+        if (this.bare) {
+            return;
+        }
         int closeAlpha = Math.round(controlAlpha * closeShare);
         if (closeAlpha < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
             return;
@@ -2867,10 +2888,22 @@ public final class TabRow {
      * window rather than swapping in a frame, and each crosses to its
      * lit artwork under the pointer as every end control does.
      */
-    private void drawFullscreenControl(float share, LostTalesUiButtonMotion motion,
+    private void drawFullscreenControl(float share, boolean locked,
+                                       LostTalesUiButtonMotion motion,
                                        int x, int rowBottom) {
         float y = (float)endControlInk(x, FULLSCREEN_WIDTH,
                 LostTalesUiSheet.FULLSCREEN.getHeight(), rowBottom).top;
+        if (locked) {
+            // A locked window keeps its size: the control stays, greyed,
+            // still, and its tip says why.
+            LostTalesUiSheet glyph = share >= 0.5F
+                    ? LostTalesUiSheet.FULLSCREEN_EXIT
+                    : LostTalesUiSheet.FULLSCREEN;
+            LostTalesUiSheet.drawPairWithShadow(glyph, glyph, 0.0F, x,
+                    Math.round(y), Math.round(scaled(0xFF)
+                            * WindowStyle.UNAVAILABLE_OPACITY));
+            return;
+        }
         LostTalesUiButton.drawCrossingGlyphs(LostTalesUiSheet.FULLSCREEN,
                 LostTalesUiSheet.FULLSCREEN_HOVER,
                 LostTalesUiSheet.FULLSCREEN_EXIT,
@@ -3004,7 +3037,7 @@ public final class TabRow {
         // tab at its narrowest and nothing less, and the tabs never
         // reflow as the + comes and goes.
         int restoreRun = restoreRunWidth();
-        int windowRun = windowControlsWidth(row.windowControls);
+        int windowRun = WINDOW_CONTROLS_WIDTH;
         int endControls = restoreRun + END_CONTROL_GAP + windowRun
                 + MIN_GRIP_WIDTH;
         // The row's right edge as it really stands, fractions included:
@@ -3192,24 +3225,14 @@ public final class TabRow {
         controlX += LOCK_WIDTH + END_CONTROL_GAP;
         this.firstDividerX = controlX;
         controlX += DIVIDER_WIDTH + END_CONTROL_GAP;
-        if (row.windowControls) {
-            this.windowMenuX = controlX;
-            controlX += MORE_WIDTH + END_CONTROL_GAP;
-            this.windowFullscreenX = controlX;
-            controlX += FULLSCREEN_WIDTH + END_CONTROL_GAP;
-            this.windowCloseX = controlX;
-            controlX += CLOSE_WIDTH + END_CONTROL_GAP;
-            this.secondDividerX = controlX;
-            controlX += DIVIDER_WIDTH + END_CONTROL_GAP;
-        } else {
-            // A locked window keeps its tabs, its size and its place, so
-            // it offers none of its controls; its lock alone divides off
-            // the grip.
-            this.windowMenuX = -1;
-            this.windowFullscreenX = -1;
-            this.windowCloseX = -1;
-            this.secondDividerX = -1;
-        }
+        this.windowMenuX = controlX;
+        controlX += MORE_WIDTH + END_CONTROL_GAP;
+        this.windowFullscreenX = controlX;
+        controlX += FULLSCREEN_WIDTH + END_CONTROL_GAP;
+        this.windowCloseX = controlX;
+        controlX += CLOSE_WIDTH + END_CONTROL_GAP;
+        this.secondDividerX = controlX;
+        controlX += DIVIDER_WIDTH + END_CONTROL_GAP;
         this.controlsRight = controlX;
         this.cachedTabs = Collections.unmodifiableList(tabs);
         this.cachedChannels = new ArrayList<WindowTab>(channels);
@@ -3219,7 +3242,6 @@ public final class TabRow {
         this.cachedRight = row.right;
         this.cachedRightExact = row.rightExact;
         this.cachedShowClose = showClose;
-        this.cachedWindowControls = row.windowControls;
         this.cachedShowRestore = row.showRestore;
         return this.cachedTabs;
     }
@@ -3357,18 +3379,14 @@ public final class TabRow {
 
     /**
      * Room the window's own controls take at the row's right end: its
-     * lock and the hairline after it always, and on an unlocked window
-     * its menu dots, its fullscreen control, its close cross and a second
-     * hairline before the grip. Each is followed by its own gap.
+     * lock and a hairline, its menu dots, its fullscreen control, its
+     * close cross and a second hairline before the grip. Each is followed
+     * by its own gap.
      */
-    private static int windowControlsWidth(boolean unlocked) {
-        return LOCK_WIDTH + END_CONTROL_GAP
-                + DIVIDER_WIDTH + END_CONTROL_GAP
-                + (unlocked ? MORE_WIDTH + END_CONTROL_GAP
-                        + FULLSCREEN_WIDTH + END_CONTROL_GAP + CLOSE_WIDTH
-                        + END_CONTROL_GAP + DIVIDER_WIDTH + END_CONTROL_GAP
-                        : 0);
-    }
+    private static final int WINDOW_CONTROLS_WIDTH = LOCK_WIDTH
+            + END_CONTROL_GAP + DIVIDER_WIDTH + END_CONTROL_GAP + MORE_WIDTH
+            + END_CONTROL_GAP + FULLSCREEN_WIDTH + END_CONTROL_GAP
+            + CLOSE_WIDTH + END_CONTROL_GAP + DIVIDER_WIDTH + END_CONTROL_GAP;
 
     /**
      * Room the hairline, the {@code +} and its mark take after the tabs,
@@ -3385,53 +3403,9 @@ public final class TabRow {
      * the window's own controls and the grip at the right end, so the
      * tabs do not reflow as something behind the {@code +} goes unread.
      */
-    private static int endControlsWidth(Window window) {
-        return restoreRunWidth() + END_CONTROL_GAP
-                + windowControlsWidth(!window.isLocked())
+    private static int endControlsWidth() {
+        return restoreRunWidth() + END_CONTROL_GAP + WINDOW_CONTROLS_WIDTH
                 + MIN_GRIP_WIDTH;
-    }
-
-    /**
-     * The chat width at which the window's row shows every one of its
-     * tabs whole: each tab's padding, icon, whole label, counters and
-     * both controls, the seams between them, and the room the end
-     * controls keep. Zero when the row cannot be measured, which leaves
-     * the window following the game's own chat width.
-     */
-    public static int boxWidthForWholeRow(Minecraft minecraft, Window window) {
-        if (minecraft == null || minecraft.fontRenderer == null
-                || window == null) {
-            return 0;
-        }
-        FontRenderer font = minecraft.fontRenderer;
-        List<WindowTab> tabs = WindowFrame.visibleTabs(window);
-        if (tabs.isEmpty()) {
-            return 0;
-        }
-        // Every tab is one width, so the row shows every name whole at
-        // the widest tab's natural width — never past the default, at
-        // which a longer name is cut and read by hovering.
-        int widest = 0;
-        for (int index = 0; index < tabs.size(); index++) {
-            widest = Math.max(widest, naturalWidth(font, tabs.get(index)));
-        }
-        int rowWidth = SEARCH_RUN + endControlsWidth(window)
-                + TAB_GAP * (tabs.size() - 1)
-                + Math.min(DEFAULT_TAB_WIDTH, widest) * tabs.size();
-        // The screen lays the row out two pixels inside the window's box
-        // on either side.
-        return Math.max(WindowPlacement.MIN_BOX_WIDTH, rowWidth + 4);
-    }
-
-    /**
-     * A tab's width with nothing given up: its padding, icon, whole
-     * name, draft mark and cross. What every tab shows while the
-     * row has room, up to the default width.
-     */
-    private static int naturalWidth(FontRenderer font, WindowTab tab) {
-        return PADDING_X * 2 + iconWidth(tab) + controlsWidth(true)
-                + font.getStringWidth(tab.title())
-                + (tab.hasDraft() ? COUNTER_GAP + DRAFT_WIDTH : 0);
     }
 
     /**
@@ -3457,7 +3431,7 @@ public final class TabRow {
         if (tabs.isEmpty()) {
             return 0;
         }
-        int rowWidth = SEARCH_RUN + endControlsWidth(window)
+        int rowWidth = SEARCH_RUN + endControlsWidth()
                 + TAB_GAP * (tabs.size() - 1) + reservedRowWidth(tabs);
         return Math.max(WindowPlacement.MIN_BOX_WIDTH,
                 rowWidth + STRIP_INSET * 2);
@@ -3482,7 +3456,6 @@ public final class TabRow {
                 && (row.selected == null ? this.cachedSelected == null
                         : row.selected.equals(this.cachedSelected))
                 && showClose == this.cachedShowClose
-                && row.windowControls == this.cachedWindowControls
                 && row.showRestore == this.cachedShowRestore
                 && row.closedMark.equals(this.restoreMark)
                 && row.tabs.equals(this.cachedChannels);
@@ -3552,7 +3525,7 @@ public final class TabRow {
         // The row spans the window minus the two-pixel insets the screen
         // lays it out with.
         int rowWidth = box.width - 4 - SEARCH_RUN;
-        int available = rowWidth - endControlsWidth(window)
+        int available = rowWidth - endControlsWidth()
                 - TAB_GAP * (tabs.size() - 1);
         return reservedRowWidth(tabs) <= available;
     }

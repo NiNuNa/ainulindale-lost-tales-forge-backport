@@ -17,12 +17,13 @@ import static org.junit.Assert.assertTrue;
 /**
  * The quest files shipped in the jar, read the way the game reads them.
  *
- * <p>There is no datapack reload in 1.7.10, so a quest whose JSON is
- * wrong is only found when a player walks into it. This reads
- * {@code quests/index.json}, parses every file it names, and puts the
- * definitions through the same validator the server logs from: a file
- * the index forgets, an id said twice, a stage with nothing in it or an
- * objective missing the parameters its type needs all fail here instead.</p>
+ * <p>A quest whose JSON is wrong is otherwise only found when a player
+ * walks into it. This reads {@code quests/index.json} and every file it
+ * names through {@link BundledQuestFiles}, as the server and the client
+ * do, and puts the quests through the checker the server logs from: a
+ * file the index names but the jar lacks, an id said twice, a stage with
+ * nothing in it or an objective missing what its type needs all fail
+ * here instead.</p>
  */
 public final class BundledQuestDefinitionTest {
 
@@ -34,32 +35,36 @@ public final class BundledQuestDefinitionTest {
         List<String> files = index();
         assertTrue("the index names some quests", files.size() > 0);
 
-        List<LostTalesQuestDefinition> quests =
-                new ArrayList<LostTalesQuestDefinition>();
+        BundledQuestFiles.Result read = BundledQuestFiles.read(
+                new BundledQuestFiles.Source() {
+                    @Override
+                    public Reader open(String path) {
+                        return BundledQuestDefinitionTest.open(path);
+                    }
+                });
+        assertEquals("no bundled file is left out",
+                new ArrayList<String>(), read.problems);
+        assertEquals("every indexed file loads", files.size(),
+                read.quests.size());
         Set<String> ids = new HashSet<String>();
-        for (String file : files) {
-            LostTalesQuestDefinition quest = parse(file);
-            assertNotNull(file + " could not be parsed", quest);
-            assertTrue(file + " has no id",
-                    quest.getId() != null && quest.getId().length() > 0);
-            assertTrue(file + " has no title",
+        for (LostTalesQuestDefinition quest : read.quests) {
+            assertTrue(quest.getId() + " has no title",
                     quest.getTitle() != null && quest.getTitle().length() > 0);
             assertTrue("two quests share the id " + quest.getId(),
                     ids.add(quest.getId()));
-            assertTrue(quest.getId() + " has no stages",
-                    !quest.getStages().isEmpty());
-            for (LostTalesQuestStageDefinition stage : quest.getStages()) {
-                assertTrue(quest.getId() + " has a stage with no id",
-                        stage.getId() != null && stage.getId().length() > 0);
-                assertTrue(quest.getId() + " stage " + stage.getId()
-                        + " asks for nothing", !stage.getObjectives().isEmpty());
-            }
-            quests.add(quest);
         }
 
         assertEquals("the bundled quests raise no warnings",
                 new ArrayList<String>(),
-                LostTalesQuestDefinitionValidator.describeWarnings(quests));
+                LostTalesQuestDefinitionValidator.describeWarnings(read.quests));
+    }
+
+    /** Nia is named the one way the game names her kind. */
+    @Test
+    public void niaIsNamedByHerRegisteredName() {
+        LostTalesQuestDefinition quest = parse("quests/tutorial/meet_nia.json");
+        assertEquals("losttales.Nia",
+                LostTalesQuestParams.value(quest.getInteraction(), "entity"));
     }
 
     /**

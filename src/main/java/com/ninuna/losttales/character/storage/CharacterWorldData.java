@@ -36,10 +36,6 @@ public class CharacterWorldData extends WorldSavedData {
     private int unsupportedDataVersion = -1;
     private NBTTagCompound preservedNewerData;
 
-    public CharacterWorldData() {
-        this(DATA_NAME);
-    }
-
     public CharacterWorldData(String name) {
         super(name);
     }

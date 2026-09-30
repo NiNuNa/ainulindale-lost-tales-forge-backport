@@ -11,40 +11,62 @@ import static org.junit.Assert.assertTrue;
 public class CharacterStagePoseTest {
 
     private static final float EPSILON = 0.001F;
+    /** Thirty pixels dragged sideways turn the figure this far. */
+    private static final float THIRTY_PIXELS_OF_TURN =
+            30.0F * CharacterStagePose.DEGREES_PER_DRAG_PIXEL;
+    /** Two notches of the wheel forward. */
+    private static final float TWO_NOTCHES_NEARER = 1.12F * 1.12F;
+
+    private long clock = 1L;
+
+    /** A second of long frames: what is shown has caught up with what was asked. */
+    private void settle(CharacterStagePose pose) {
+        for (int frame = 0; frame < 60; frame++) {
+            this.clock += 100000000L;
+            pose.advance(this.clock);
+        }
+    }
 
     @Test
     public void startsSquareToTheScreen() {
         CharacterStagePose pose = new CharacterStagePose();
-        assertEquals(0.0F, pose.getYaw(), EPSILON);
-        assertEquals(0.0F, pose.getPitch(), EPSILON);
-        assertEquals(1.0F, pose.getZoom(), EPSILON);
+        settle(pose);
+        assertEquals(0.0F, pose.getShownYaw(), EPSILON);
+        assertEquals(0.0F, pose.getShownPitch(), EPSILON);
+        assertEquals(1.0F, pose.getShownZoom(), EPSILON);
     }
 
     @Test
     public void draggingRightTurnsTheFrontToTheRight() {
         CharacterStagePose pose = new CharacterStagePose();
         pose.drag(10, 0);
-        assertTrue(pose.getYaw() > 0.0F);
+        settle(pose);
+        assertTrue(pose.getShownYaw() > 0.0F);
         pose.drag(-20, 0);
-        assertTrue(pose.getYaw() < 0.0F);
+        settle(pose);
+        assertTrue(pose.getShownYaw() < 0.0F);
     }
 
     @Test
     public void draggingDownLeansTheHeadTowardTheViewerWithinItsLimit() {
         CharacterStagePose pose = new CharacterStagePose();
         pose.drag(0, 10);
-        assertTrue(pose.getPitch() > 0.0F);
+        settle(pose);
+        assertTrue(pose.getShownPitch() > 0.0F);
         pose.drag(0, 10000);
-        assertEquals(CharacterStagePose.PITCH_LIMIT, pose.getPitch(), EPSILON);
+        settle(pose);
+        assertEquals(CharacterStagePose.PITCH_LIMIT, pose.getShownPitch(), EPSILON);
         pose.drag(0, -20000);
-        assertEquals(-CharacterStagePose.PITCH_LIMIT, pose.getPitch(), EPSILON);
+        settle(pose);
+        assertEquals(-CharacterStagePose.PITCH_LIMIT, pose.getShownPitch(), EPSILON);
     }
 
     @Test
     public void theYawWrapsRatherThanGrowingWithoutEnd() {
         CharacterStagePose pose = new CharacterStagePose();
         pose.drag(100000, 0);
-        assertTrue(pose.getYaw() >= -180.0F && pose.getYaw() < 180.0F);
+        settle(pose);
+        assertTrue(pose.getShownYaw() >= -180.0F && pose.getShownYaw() < 180.0F);
         assertEquals(-180.0F, CharacterStagePose.wrap(180.0F), EPSILON);
         assertEquals(10.0F, CharacterStagePose.wrap(370.0F), EPSILON);
         assertEquals(-10.0F, CharacterStagePose.wrap(-370.0F), EPSILON);
@@ -54,13 +76,17 @@ public class CharacterStagePoseTest {
     public void theWheelZoomsWithinItsLimitsAndForwardBringsNearer() {
         CharacterStagePose pose = new CharacterStagePose();
         pose.wheel(1);
-        assertTrue(pose.getZoom() > 1.0F);
+        settle(pose);
+        assertTrue(pose.getShownZoom() > 1.0F);
         pose.wheel(100);
-        assertEquals(CharacterStagePose.ZOOM_MAX, pose.getZoom(), EPSILON);
+        settle(pose);
+        assertEquals(CharacterStagePose.ZOOM_MAX, pose.getShownZoom(), EPSILON);
         pose.wheel(-200);
-        assertEquals(CharacterStagePose.ZOOM_MIN, pose.getZoom(), EPSILON);
+        settle(pose);
+        assertEquals(CharacterStagePose.ZOOM_MIN, pose.getShownZoom(), EPSILON);
         pose.wheel(0);
-        assertEquals(CharacterStagePose.ZOOM_MIN, pose.getZoom(), EPSILON);
+        settle(pose);
+        assertEquals(CharacterStagePose.ZOOM_MIN, pose.getShownZoom(), EPSILON);
     }
 
     @Test
@@ -68,10 +94,12 @@ public class CharacterStagePoseTest {
         CharacterStagePose pose = new CharacterStagePose();
         pose.drag(30, 30);
         pose.wheel(3);
+        settle(pose);
         pose.reset();
-        assertEquals(0.0F, pose.getYaw(), EPSILON);
-        assertEquals(0.0F, pose.getPitch(), EPSILON);
-        assertEquals(1.0F, pose.getZoom(), EPSILON);
+        settle(pose);
+        assertEquals(0.0F, pose.getShownYaw(), EPSILON);
+        assertEquals(0.0F, pose.getShownPitch(), EPSILON);
+        assertEquals(1.0F, pose.getShownZoom(), EPSILON);
     }
 
     @Test
@@ -85,8 +113,8 @@ public class CharacterStagePoseTest {
             pose.drag(30, 0);
             pose.wheel(2);
             pose.advance(now + 16000000L);
-            assertEquals(pose.getYaw(), pose.getShownYaw(), EPSILON);
-            assertEquals(pose.getZoom(), pose.getShownZoom(), EPSILON);
+            assertEquals(THIRTY_PIXELS_OF_TURN, pose.getShownYaw(), EPSILON);
+            assertEquals(TWO_NOTCHES_NEARER, pose.getShownZoom(), EPSILON);
         } finally {
             settings.restore();
         }
@@ -102,15 +130,15 @@ public class CharacterStagePoseTest {
         // One short frame later it has moved, but not all the way.
         pose.advance(now + 16000000L);
         assertTrue(pose.getShownYaw() > 0.0F);
-        assertTrue(pose.getShownYaw() < pose.getYaw());
+        assertTrue(pose.getShownYaw() < THIRTY_PIXELS_OF_TURN);
         assertTrue(pose.getShownZoom() > 1.0F);
-        assertTrue(pose.getShownZoom() < pose.getZoom());
+        assertTrue(pose.getShownZoom() < TWO_NOTCHES_NEARER);
         // A second later it is there.
         for (int frame = 1; frame <= 60; frame++) {
             pose.advance(now + 16000000L + frame * 16000000L);
         }
-        assertEquals(pose.getYaw(), pose.getShownYaw(), 0.01F);
-        assertEquals(pose.getZoom(), pose.getShownZoom(), 0.001F);
+        assertEquals(THIRTY_PIXELS_OF_TURN, pose.getShownYaw(), 0.01F);
+        assertEquals(TWO_NOTCHES_NEARER, pose.getShownZoom(), 0.001F);
     }
 
     @Test
@@ -118,8 +146,9 @@ public class CharacterStagePoseTest {
         CharacterStagePose pose = new CharacterStagePose();
         pose.drag(40, 10);
         pose.advance(5000000000L);
-        assertEquals(pose.getYaw(), pose.getShownYaw(), EPSILON);
-        assertEquals(pose.getPitch(), pose.getShownPitch(), EPSILON);
+        assertEquals(40.0F * CharacterStagePose.DEGREES_PER_DRAG_PIXEL,
+                pose.getShownYaw(), EPSILON);
+        assertEquals(10.0F * 0.45F, pose.getShownPitch(), EPSILON);
         pose.reset();
         pose.advance(6000000000L);
         assertEquals(0.0F, pose.getShownYaw(), EPSILON);
@@ -183,13 +212,16 @@ public class CharacterStagePoseTest {
     public void thePanIsBoundedAndLetGoByReset() {
         CharacterStagePose pose = new CharacterStagePose();
         pose.pan(10.0F, -5.0F);
-        assertEquals(10.0F, pose.getPanX(), EPSILON);
-        assertEquals(-5.0F, pose.getPanY(), EPSILON);
+        settle(pose);
+        assertEquals(10.0F, pose.getShownPanX(), EPSILON);
+        assertEquals(-5.0F, pose.getShownPanY(), EPSILON);
         pose.pan(10000.0F, 10000.0F);
-        assertEquals(CharacterStagePose.PAN_LIMIT, pose.getPanX(), EPSILON);
-        assertEquals(CharacterStagePose.PAN_LIMIT, pose.getPanY(), EPSILON);
+        settle(pose);
+        assertEquals(CharacterStagePose.PAN_LIMIT, pose.getShownPanX(), EPSILON);
+        assertEquals(CharacterStagePose.PAN_LIMIT, pose.getShownPanY(), EPSILON);
         pose.reset();
-        assertEquals(0.0F, pose.getPanX(), EPSILON);
+        settle(pose);
+        assertEquals(0.0F, pose.getShownPanX(), EPSILON);
     }
 
     @Test

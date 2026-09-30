@@ -64,8 +64,8 @@ public final class WindowScreen extends GuiChat
      * window's strip: the desktop's usual half second.
      */
     private static final long DOUBLE_CLICK_NANOS = 500L * 1000000L;
-    /** Where a tab given a window of its own lands: a little below its old row. */
-    private static final int DETACH_DROP = 40;
+    /** How long a locked window's padlock stays lit after something tried to move it. */
+    private static final long LOCK_NUDGE_NANOS = 600L * 1000000L;
     /** Clear pixels between a new player's tip and what it points at, and between its two lines. */
     private static final int FIRST_TIP_GAP = 4;
     private static final int FIRST_TIP_LINE = 10;
@@ -114,6 +114,11 @@ public final class WindowScreen extends GuiChat
                     for (ScreenPart part : WindowScreen.this.parts) {
                         part.windowsMoved();
                     }
+                }
+
+                @Override
+                public void lockedMoveTried(Window window) {
+                    nudgeLock(window);
                 }
             }, this.snapAssist);
     /** The snap layouts a window's fullscreen control opens. */
@@ -181,6 +186,9 @@ public final class WindowScreen extends GuiChat
     /** The screen's presses, counted: a double click is two in a row. */
     private int pressCount;
     private boolean openAnimationStarted;
+    /** The locked window something last tried to move, and when: its padlock is lit a moment. */
+    private String lockNudgeWindowId;
+    private long lockNudgeNanos;
     /**
      * Whether the sub-windows open as the screen last closed are still to
      * come back: once the first frame has placed what they open by.
@@ -297,6 +305,11 @@ public final class WindowScreen extends GuiChat
         return this.worldless;
     }
 
+    /** Whether the chat opened the screen (T, {@code /}), rather than a page or Settings. */
+    public boolean isOpenedForChat() {
+        return this.openedForChat;
+    }
+
     /**
      * Whether the window screen open now stands without a world: there a
      * conversation, and a page that needs a world, wait unseen.
@@ -349,8 +362,12 @@ public final class WindowScreen extends GuiChat
             return null;
         }
         pageToFocus = page;
-        return minecraft.currentScreen instanceof WindowScreen
-                ? minecraft.currentScreen : new WindowScreen("");
+        if (minecraft.currentScreen instanceof WindowScreen) {
+            // Opened from the screen, by a click: it joins what is shown.
+            WindowView.show(page);
+            return minecraft.currentScreen;
+        }
+        return new WindowScreen("");
     }
 
     /* ---- What the parts reach ---- */
@@ -567,14 +584,14 @@ public final class WindowScreen extends GuiChat
     }
 
     /**
-     * Whether no window has a tab the player can see. A valid state, not
-     * an error: nothing is lost, nothing is being shown. The screen offers
-     * what can be opened instead of keeping a window open to stand in.
+     * Whether no window has a tab on screen: every window closed, or none
+     * holding a tab the view shows. The screen then closes, unless
+     * Settings stands on it alone.
      */
     public static boolean isEmpty() {
         for (Window window : WindowLayout.windows()) {
             for (WindowTab tab : window.getTabs()) {
-                if (tab.isAvailable()) {
+                if (WindowView.isShown(tab)) {
                     return false;
                 }
             }
@@ -653,6 +670,17 @@ public final class WindowScreen extends GuiChat
     @Override
     public void initGui() {
         if (!this.openAnimationStarted) {
+            // What the screen shows is decided as it comes up, after the
+            // screen it replaced has closed: the chat's key the
+            // conversations, a page's key that page, Settings nothing of
+            // its own; the kept tabs always.
+            if (this.openedForChat) {
+                WindowView.forChat();
+            } else if (pageToFocus != null) {
+                WindowView.forPage(pageToFocus);
+            } else {
+                WindowView.forSettings();
+            }
             for (ScreenPart part : this.parts) {
                 part.opening(pageToFocus);
             }
@@ -719,21 +747,24 @@ public final class WindowScreen extends GuiChat
     @Override
     public void updateScreen() {
         super.updateScreen();
-        // Without a world the screen closes once nothing stands on it:
-        // Settings closed, and no page open.
-        if (this.worldless && !this.settingsToOpen && isEmpty()
+        // The screen closes once nothing stands on it: the last window
+        // closed, and no sub-window on the bare screen (Settings alone).
+        // Closing every window is closing the screen.
+        if (!this.settingsToOpen && isEmpty()
                 && this.subWindows.openWindows().isEmpty()) {
             closeScreen();
             return;
         }
-        // Every page in front of its window keeps time: a caret, a list
-        // that follows the world. Without a world, only a page that needs
-        // none. A page may close its own tab as it ticks, and its window
-        // with it, so the windows are walked from a copy.
+        // Every page in front of its window on screen keeps time: a caret,
+        // a list that follows the world. A page may close its own tab as
+        // it ticks, and its window with it, so the windows are walked
+        // from a copy.
         for (Window window : new ArrayList<Window>(WindowLayout.windows())) {
-            WindowTab front = window.getActiveTab();
-            PageContent content = WindowPages.contentOf(front);
-            if (content != null && (!this.worldless || front.isAvailable())) {
+            List<WindowTab> shown = WindowFrame.visibleTabs(window);
+            WindowTab front = WindowFrame.activeTab(window, shown);
+            PageContent content = shown.isEmpty() ? null
+                    : WindowPages.contentOf(front);
+            if (content != null) {
                 content.tick();
             }
         }
@@ -772,6 +803,7 @@ public final class WindowScreen extends GuiChat
             page.content().hidden();
         }
         this.shownPages.clear();
+        WindowView.clear();
         for (ScreenPart part : this.parts) {
             part.closed();
         }
@@ -1031,10 +1063,11 @@ public final class WindowScreen extends GuiChat
     }
 
     /**
-     * A page's key over the page holding the keys (N1 a): the page's own
-     * key closes it, as Ctrl+W does, and another page's brings that page
-     * forward with the keys. False when the press is no page's key, or
-     * its page cannot come forward.
+     * A page's key over the page holding the keys, as a game's screens
+     * switch: another page's key turns the screen to that page alone, the
+     * kept tabs beside it; the key of the page the screen is turned to
+     * closes the screen, every tab waiting in its window. False when the
+     * press is no page's key, or its page cannot come forward.
      */
     private boolean pressPageKey(LostTalesKeyPress press) {
         if (press.command || press.alt) {
@@ -1044,13 +1077,14 @@ public final class WindowScreen extends GuiChat
         if (page == null || !page.isAvailable()) {
             return false;
         }
-        if (page.equals(this.focusedPage)) {
-            closeTab(page);
+        if (WindowView.isFor(page)) {
+            closeScreen();
             return true;
         }
         if (WindowLayout.showPage(page) == null) {
             return false;
         }
+        WindowView.forPage(page);
         focusPage(page);
         return true;
     }
@@ -1074,9 +1108,9 @@ public final class WindowScreen extends GuiChat
         leaveSearchForMenu();
         Window window = isEmpty() ? null : keysWindow();
         if (search) {
-            this.tabMenus.toggleSearch(window, null, emptyPlusAnchor());
+            this.tabMenus.toggleSearch(window, null);
         } else if (open) {
-            this.tabMenus.toggleOpen(window, null, emptyPlusAnchor());
+            this.tabMenus.toggleOpen(window, null);
         } else if (switcher) {
             this.tabMenus.toggleSwitcher(window);
         } else {
@@ -1085,23 +1119,6 @@ public final class WindowScreen extends GuiChat
         }
         syncTypingFocus();
         return true;
-    }
-
-    /** Where a menu for the empty screen hangs: the {@code +} a part offers there; null while none is drawn. */
-    private SubWindowAnchor emptyPlusAnchor() {
-        for (ScreenPart part : this.parts) {
-            SubWindowAnchor anchor = part.emptyPlusAnchor();
-            if (anchor != null) {
-                return anchor;
-            }
-        }
-        return null;
-    }
-
-    /** The empty screen's {@code +} pressed: what can be opened, hung from it; a switch. */
-    public void toggleOpenFromEmpty() {
-        this.tabMenus.toggleOpen(null, null, emptyPlusAnchor());
-        syncTypingFocus();
     }
 
     /** A key for the field of the sub-window in front: a part's, else the sub-window's own. */
@@ -1304,26 +1321,13 @@ public final class WindowScreen extends GuiChat
     /* ---- Moving a tab from a menu ---- */
 
     /**
-     * Gives a tab a window of its own: the new window lands a little
-     * below its old row, kept on screen, and the tab stays in front there
-     * with the keys.
+     * Gives a tab a window of its own, as every new window opens: in the
+     * middle of the screen at two thirds of it, locked. The tab stays in
+     * front there with the keys.
      */
     void detachTab(WindowTab tab) {
-        Window window = tab == null ? null : WindowLayout.windowOf(tab);
-        if (window == null) {
-            return;
-        }
         TabSelection.clear();
-        WindowFrame frame = WindowFrame.of(window);
-        WindowPlacement.Anchor anchor = WindowPlacement.constrainWindow(
-                null, this.mc, frame.boxLeft,
-                frame.tabRowBottom() + DETACH_DROP
-                        + WindowPlacement.lineHeight(this.mc),
-                this.width, this.height);
-        Window detached = WindowLayout.detach(tab,
-                WindowPlacement.windowPercentX(anchor.x, this.mc, this.width),
-                WindowPlacement.windowPercentY(null, anchor.baseline,
-                        this.mc, this.height));
+        Window detached = WindowLayout.moveToOwnWindow(tab);
         if (detached != null) {
             WindowFrame.of(detached).beginAppearing();
             jumpToTab(tab);
@@ -1339,6 +1343,8 @@ public final class WindowScreen extends GuiChat
         if (window == null) {
             return;
         }
+        // A tab the player goes to by hand joins what is shown.
+        WindowView.show(tab);
         WindowLayout.raise(window.getId());
         selectTab(tab);
         if (tab instanceof PageTab) {
@@ -1385,14 +1391,20 @@ public final class WindowScreen extends GuiChat
             return false;
         }
         Window window = keysWindow();
-        if (window == null || window.isLocked()) {
+        boolean snapKey = keyCode == Keyboard.KEY_Z
+                || SnapKeys.direction(keyCode) != null;
+        if (window == null || !snapKey) {
             return false;
         }
-        if (keyCode == Keyboard.KEY_Z || SnapKeys.direction(keyCode) != null) {
-            // A tab standing alone goes back into its window, which the
-            // key then snaps.
-            ContentView.leave();
+        if (window.isLocked()) {
+            // A locked window keeps its place: the key is taken, and the
+            // padlock says so.
+            nudgeLock(window);
+            return true;
         }
+        // A tab standing alone goes back into its window, which the key
+        // then snaps.
+        ContentView.leave();
         if (keyCode == Keyboard.KEY_Z) {
             if (this.snapFlyout.isKeyboardOpen()) {
                 this.snapFlyout.close();
@@ -1409,9 +1421,6 @@ public final class WindowScreen extends GuiChat
             return true;
         }
         SnapKeys.Direction direction = SnapKeys.direction(keyCode);
-        if (direction == null) {
-            return false;
-        }
         Window.ScreenFill next = SnapKeys.next(window.getFill(), direction);
         sendWindowTo(window, next, SnapLayouts.layoutFor(next),
                 Collections.<String, Window.ScreenFill>emptyMap());
@@ -1906,8 +1915,10 @@ public final class WindowScreen extends GuiChat
                 drawSnapPreview(window, drawnBoxes, opening, partialTicks);
             }
             // A window just made from carried tabs fades in on its own,
-            // inside the screen's own motion.
-            LostTalesGuiAnimationSample shown = opening.withOpacity(
+            // inside the screen's own motion. A pinned one was on screen
+            // before the screen opened and does not come in at all.
+            LostTalesGuiAnimationSample shown = PinnedWindows.entrance(
+                    window, opening).withOpacity(
                     frame.appearShare() * others);
             if (drawnBoxes != null
                     && !WindowFrame.visibleTabs(window).isEmpty()) {
@@ -2147,36 +2158,15 @@ public final class WindowScreen extends GuiChat
         if (tabs.isEmpty()) {
             return null;
         }
-        TabRow.Row row = new TabRow.Row();
-        row.tabs = tabs;
-        row.selected = WindowFrame.activeTab(window, tabs);
+        TabRow.Row row = WindowDrawing.rowOf(window, frame, tabs);
         row.marked = TabSelection.selectedIn(window);
-        // Whole-pixel geometry of the drawn (motion included) position;
-        // the fractional remainder is applied when the row is drawn.
-        row.rowBottom = (int)Math.floor(frame.tabRowBottom());
-        row.rowBottomExact = frame.tabRowBottom();
-        row.fractionX = (float)(frame.drawnLeft()
-                - Math.floor(frame.drawnLeft()));
-        row.fractionY = (float)(row.rowBottomExact - row.rowBottom);
-        row.left = (int)Math.floor(frame.drawnLeft()) + 2;
-        row.right = (int)Math.floor(frame.drawnLeft()) + (int)Math.round(
-                frame.boxRight - frame.boxLeft) - 2;
-        // The edge as it really stands, so the tabs follow a resize by
-        // the fraction the edge moves rather than a pixel at a time.
-        row.rightExact = Math.floor(frame.drawnLeft())
-                + (frame.boxRight - frame.boxLeft) - 2;
-        row.offsetX = 0;
-        row.locked = window.isLocked();
+        row.lockLit = isLockLit(window);
         row.moving = this.gestures.isMovingWindow(window.getId());
         row.resizing = this.gestures.isResizingWindow(window.getId());
         row.gliding = frame.isFillGliding();
-        // A locked window keeps the tabs and the size it has, so it
-        // offers neither a tab cross nor the window's own controls: they
-        // are all refused anyway, and would only mislead.
         row.closable = WindowLayout.isClosable(row.selected);
-        row.windowControls = !window.isLocked();
         row.fullscreenShare = frame.fullShare();
-        row.showRestore = !window.isLocked() && hasRestorable();
+        row.showRestore = hasRestorable();
         row.closedMark = row.showRestore ? restorableMark() : TabMark.NONE;
         // The controls say whether this row's own tab search or + menu
         // is out, so a control and its window can never disagree.
@@ -2205,7 +2195,7 @@ public final class WindowScreen extends GuiChat
 
     /** Whether the {@code +} has anything to offer again: a closed page, or a part's. */
     private boolean hasRestorable() {
-        if (WindowPages.hasClosed()) {
+        if (WindowPages.hasClosed() || WindowLayout.hasHidden()) {
             return true;
         }
         for (ScreenPart part : this.parts) {
@@ -2237,37 +2227,15 @@ public final class WindowScreen extends GuiChat
     private void drawPage(WindowFrame frame, LostTalesGuiAnimationSample shown,
                           double pointerX, double pointerY,
                           float partialTicks) {
-        WindowDrawing.drawPageSurface(this.mc, frame, shown);
-        PageContent content = WindowPages.contentOf(frame.page);
-        if (content == null) {
-            return;
-        }
-        LostTalesUiHitBox exact = WindowDrawing.pageBox(frame);
-        LostTalesUiHitBox whole = WindowDrawing.wholePageBox(frame);
-        float fractionX = (float)(exact.left - whole.left);
-        float fractionY = (float)(exact.top - whole.top);
         // The page a held button went down on keeps the pointer wherever
         // it goes, as a screen of its own would.
         boolean onPage = this.hover.is(WindowHover.Kind.PAGE)
                 && this.hover.frame == frame
                 || frame.page.equals(this.pressedPage);
-        boolean depth = this.depthTestAtStart && content.wantsDepthTest();
-        GL11.glPushMatrix();
-        if (depth) {
-            GL11.glEnable(GL11.GL_DEPTH_TEST);
-        }
-        try {
-            GL11.glTranslatef(fractionX, fractionY, 0.0F);
-            content.draw(this.mc, whole, exact.left, exact.top,
-                    onPage ? pointerX - fractionX : WindowHover.AWAY,
-                    onPage ? pointerY - fractionY : WindowHover.AWAY,
-                    partialTicks, Math.round(255.0F * shown.getOpacity()));
-        } finally {
-            if (depth) {
-                GL11.glDisable(GL11.GL_DEPTH_TEST);
-            }
-            GL11.glPopMatrix();
-        }
+        WindowDrawing.drawPage(this.mc, frame, shown,
+                onPage ? pointerX : WindowHover.AWAY,
+                onPage ? pointerY : WindowHover.AWAY, partialTicks,
+                this.depthTestAtStart);
     }
 
     /**
@@ -2470,8 +2438,29 @@ public final class WindowScreen extends GuiChat
     }
 
     /**
+     * Something tried to move or resize a locked window — a drag, a snap
+     * key, its fullscreen control: it stays, its padlock lights a moment,
+     * and a notice over its bar says how to move it.
+     */
+    void nudgeLock(Window window) {
+        if (window == null) {
+            return;
+        }
+        this.lockNudgeWindowId = window.getId();
+        this.lockNudgeNanos = System.nanoTime();
+        showNotice(window.getId(), StatCollector.translateToLocal(
+                "gui.losttales.window.move_locked"));
+    }
+
+    /** Whether the window's padlock is lit a moment by {@link #nudgeLock}. */
+    private boolean isLockLit(Window window) {
+        return window.getId().equals(this.lockNudgeWindowId)
+                && System.nanoTime() - this.lockNudgeNanos < LOCK_NUDGE_NANOS;
+    }
+
+    /**
      * Shows a short notice over a window's bar: why a page's tab closed by
-     * itself. It is placed where the bar stands now and stays there, the
+     * itself, or that a locked window cannot be moved. It is placed where the bar stands now and stays there, the
      * window gone with its last tab or not; with the window not drawn, it
      * stands over the bottom of the screen's middle. A new notice takes
      * the old one's place.
@@ -2560,17 +2549,9 @@ public final class WindowScreen extends GuiChat
             return new WindowHover(WindowHover.Kind.VIEW_LEAVE);
         }
         if (isEmpty()) {
+            // Settings alone on the bare screen: nothing else is there.
             WindowHover sub = this.subWindows.hoverAt(x, y);
-            if (sub != null) {
-                return sub;
-            }
-            for (ScreenPart part : this.parts) {
-                WindowHover empty = part.hoverEmpty(x, y);
-                if (empty != null) {
-                    return empty;
-                }
-            }
-            return WindowHover.NONE;
+            return sub != null ? sub : WindowHover.NONE;
         }
         for (ScreenPart part : this.parts) {
             WindowHover over = part.hoverOverAll(x, y);
@@ -2769,7 +2750,9 @@ public final class WindowScreen extends GuiChat
                 return StatCollector.translateToLocal(
                         "gui.losttales.window.menu");
             case WINDOW_FULLSCREEN:
-                return StatCollector.translateToLocal(window.isFullscreen()
+                return StatCollector.translateToLocal(window.isLocked()
+                        ? "gui.losttales.window.fullscreen_locked"
+                        : window.isFullscreen()
                         ? "gui.losttales.window.exit_fullscreen"
                         : "gui.losttales.window.fullscreen");
             case WINDOW_CLOSE:
@@ -2786,7 +2769,8 @@ public final class WindowScreen extends GuiChat
                         "gui.losttales.window.tab.restore");
             case GRIP:
                 return overGrip ? StatCollector.translateToLocal(
-                        "gui.losttales.window.tab.move") : "";
+                        window.isLocked() ? "gui.losttales.window.move_locked"
+                                : "gui.losttales.window.tab.move") : "";
             default:
                 return "";
         }
@@ -2890,14 +2874,8 @@ public final class WindowScreen extends GuiChat
         }
         this.subWindows.blur();
         if (isEmpty()) {
-            // What a part offers is the whole of the screen's furniture
-            // here; a click anywhere else is the player closing what is
-            // not there.
-            for (ScreenPart part : this.parts) {
-                if (part.pressEmpty(press, mouseX, mouseY, button)) {
-                    break;
-                }
-            }
+            // Settings alone on the bare screen: a press beside it lands
+            // on nothing.
             syncTypingFocus();
             return;
         }
@@ -3088,7 +3066,7 @@ public final class WindowScreen extends GuiChat
         selectWindow(window);
         if (press.tabHit != null && press.tabHit.tab != null) {
             this.tabMenus.showTabMenu(press.tabHit.tab, anchor, false);
-        } else if (!window.isLocked()) {
+        } else {
             this.tabMenus.showWindowMenu(window, anchor, false);
         }
     }
@@ -3114,7 +3092,9 @@ public final class WindowScreen extends GuiChat
             // the screen back, as a title bar does.
             TabSelection.clear();
             selectWindow(window);
-            if (!window.isLocked()) {
+            if (window.isLocked()) {
+                this.gestures.armLockedDrag(window, mouseX, mouseY);
+            } else {
                 pressStrip(window, frame, mouseX, mouseY);
             }
             return;
@@ -3156,13 +3136,17 @@ public final class WindowScreen extends GuiChat
                     // A page pressed in its row takes the keys.
                     focusPage((PageTab)hit.tab);
                 }
-                if (!window.isLocked()) {
+                if (window.isLocked() && wholeWindow) {
+                    // Carrying every tab a locked window holds would move
+                    // the window, which its padlock holds in place; its
+                    // tabs still reorder, tear off and dock.
+                    this.gestures.armLockedDrag(window, mouseX, mouseY);
+                    if (kept) {
+                        TabSelection.selectOnly(window.getId(), hit.tab);
+                    }
+                } else {
                     this.gestures.armTabDrag(window, frame, row, hit.tab,
                             group, mouseX, mouseY, kept, wholeWindow);
-                } else if (kept) {
-                    // A locked row starts no drag, so the press is only
-                    // ever a pick.
-                    TabSelection.selectOnly(window.getId(), hit.tab);
                 }
                 return;
             }
@@ -3189,12 +3173,12 @@ public final class WindowScreen extends GuiChat
                 // with this window's list already out puts it away, and
                 // one with another window's out turns it to this one.
                 this.tabMenus.toggleOpen(window, SubWindowAnchor.onRow(
-                        frame, row, mouseX, this.width, this.height), null);
+                        frame, row, mouseX, this.width, this.height));
                 syncTypingFocus();
                 return;
             case SEARCH:
                 this.tabMenus.toggleSearch(window, SubWindowAnchor.onRow(
-                        frame, row, mouseX, this.width, this.height), null);
+                        frame, row, mouseX, this.width, this.height));
                 syncTypingFocus();
                 return;
             case WINDOW_MENU:
@@ -3202,14 +3186,21 @@ public final class WindowScreen extends GuiChat
                         frame, row, mouseX, this.width, this.height), true);
                 return;
             case WINDOW_FULLSCREEN:
-                WindowLayout.takeFill(window, window.isFullscreen()
-                        ? Window.ScreenFill.NONE : Window.ScreenFill.FULL);
+                if (window.isLocked()) {
+                    nudgeLock(window);
+                } else {
+                    WindowLayout.takeFill(window, window.isFullscreen()
+                            ? Window.ScreenFill.NONE
+                            : Window.ScreenFill.FULL);
+                }
                 return;
             case WINDOW_CLOSE:
                 closeWindow(window);
                 return;
             case GRIP:
-                if (!window.isLocked()) {
+                if (window.isLocked()) {
+                    this.gestures.armLockedDrag(window, mouseX, mouseY);
+                } else {
                     pressStrip(window, frame, mouseX, mouseY);
                 }
                 return;

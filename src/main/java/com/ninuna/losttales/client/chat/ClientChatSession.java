@@ -29,21 +29,24 @@ public final class ClientChatSession {
      * history, its tabs and its conversations are kept; false when the
      * player has arrived somewhere else and the chat starts clean.
      */
-    public static synchronized boolean resume(Minecraft minecraft) {
-        String key = keyOf(minecraft);
-        boolean same = key.length() > 0 && key.equals(serverKey);
-        serverKey = key;
+    public static boolean resume(Minecraft minecraft) {
+        return resume(keyOf(minecraft));
+    }
+
+    /**
+     * The same, for a place already named: a server's address or a
+     * world's folder, as {@link #keyOf} writes them, or empty for none.
+     */
+    static synchronized boolean resume(String key) {
+        String named = key == null ? "" : key;
+        boolean same = named.length() > 0 && named.equals(serverKey);
+        serverKey = named;
         return same;
     }
 
     /** Where the chat on screen came from, as {@link #resume} last read it; empty before a join. */
     public static synchronized String currentKey() {
         return serverKey;
-    }
-
-    /** Names where the chat came from directly; for tests. */
-    static synchronized void resumeAt(String key) {
-        serverKey = key == null ? "" : key;
     }
 
     /**

@@ -46,19 +46,17 @@ final class ClientChatContextHistory {
 
     /**
      * Asks for the conversation the tab stands for, unless this session
-     * already has. Answers whether a request went out, for the tests and
-     * for the caller's own bookkeeping.
+     * already has.
      */
-    static synchronized boolean request(ChatTab tab, String scopeValue) {
+    static synchronized void request(ChatTab tab, String scopeValue) {
         if (tab == null || !isScoped(tab) || scopeValue == null
                 || scopeValue.length() == 0 || !ASKED.add(tab.id())) {
-            return false;
+            return;
         }
         Long newest = NEWEST.get(tab.id());
         LostTalesNetworkHandler.CHANNEL.sendToServer(
                 new LostTalesChatContextHistoryPacket(tab.getChannel(), scopeValue,
                         newest == null ? ChatMessageIds.NONE : newest.longValue()));
-        return true;
     }
 
     /** Whether the tab names one conversation of a channel that has several. */

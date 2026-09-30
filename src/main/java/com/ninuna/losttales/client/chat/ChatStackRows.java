@@ -100,21 +100,6 @@ public final class ChatStackRows {
         }
     }
 
-    /** Rows of the given heights, oldest last; the geometry's own test hook. */
-    public void reset(int[] heights) {
-        this.source = null;
-        this.sourceSize = 0;
-        this.dividerIndex = -1;
-        this.dividerGapBelow = 0;
-        int rows = heights == null ? 0 : heights.length;
-        ensureCapacity(rows);
-        this.count = rows;
-        this.tops[0] = 0;
-        for (int row = 0; row < rows; row++) {
-            this.tops[row + 1] = this.tops[row] + Math.max(1, heights[row]);
-        }
-    }
-
     private void ensureCapacity(int rows) {
         if (this.tops.length < rows + 1) {
             this.tops = Arrays.copyOf(this.tops,

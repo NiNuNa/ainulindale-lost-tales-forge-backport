@@ -1188,7 +1188,7 @@ public final class ChatHistory {
         COUNT_BY_CHANNEL.clear();
     }
 
-    /** Test and diagnostics hook: messages currently within reach. */
+    /** Messages currently within reach. */
     static synchronized int size() {
         return ENTRIES.size();
     }

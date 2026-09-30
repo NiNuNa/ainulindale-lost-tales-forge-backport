@@ -53,27 +53,27 @@ import net.minecraft.world.World;
 import org.lwjgl.input.Keyboard;
 
 /**
- * A waystone, a page a window holds (Q10 a): its settings in one
+ * A waystone, a page a window holds: its settings in one
  * scrolling column of Settings' own rows, in four sections — Marker,
  * Location, Rules and Sharing ({@link WaystoneRows}) — and on the bar
  * Destinations (D) and Save (S). Using a waystone opens it: the server
  * checks the waystone and sends its state as an opening. One waystone is
  * shown at a time; using another turns the page to it, and where the one
  * shown has changes not saved, a question inside the window asks first
- * whether they may go (W4 a).
+ * whether they may go.
  *
  * <p>Every change stays on the page ({@link WaystoneDraft}) until Save
  * sends it with the revision it was read at, lit only once something
  * changed. The server answers every request with the waystone's state
- * and why, which stands over the page's bar (W2 a), as does the line the
+ * and why, which stands over the page's bar, as does the line the
  * server says in the chat while the page is shown; a stale revision
  * brings back what stands now and the page says so. Share and Unshare are
  * sent at once.</p>
  *
- * <p>Destinations opens the map in travel mode beside the waystone's tab
- * (Q11 a). The tab closes by itself, fading as tabs close, once the
+ * <p>Destinations opens the map in travel mode beside the waystone's tab.
+ * The tab closes by itself, fading as tabs close, once the
  * player is more than eight blocks away, in another world, or the
- * waystone is gone (Q8 a), and a notice over the window's bar says
+ * waystone is gone, and a notice over the window's bar says
  * which; the server checks every request whatever the page thinks.</p>
  */
 public final class WaystonePage extends PageContent
@@ -325,7 +325,7 @@ public final class WaystonePage extends PageContent
                         packet.getMarkerId()), this.mc.thePlayer);
     }
 
-    /* ---- Walking away (Q8 a) ---- */
+    /* ---- Walking away ---- */
 
     /**
      * Once a game tick while the page is in front: the waystone watched,
@@ -534,7 +534,7 @@ public final class WaystonePage extends PageContent
         sayWorking(word("saving"));
     }
 
-    /* ---- Destinations (Q11 a) ---- */
+    /* ---- Destinations ---- */
 
     /**
      * The map in travel mode, beside the waystone's tab in its window:

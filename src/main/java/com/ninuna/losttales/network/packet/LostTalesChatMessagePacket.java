@@ -129,8 +129,6 @@ public final class LostTalesChatMessagePacket implements IMessage {
      * travels as its words alone.
      */
     public static final int MAX_BODY_BYTES = 8192;
-    /** An optional id on the wire: a presence flag and a UUID, written whole either way. */
-    static final int IDENTITY_ID_TAIL_BYTES = 1 + 16;
     /** The most one line takes on the wire; the history batch reads it too. */
     public static final int MAX_PACKET_BYTES = 2048
             // Whether the line is an action, and whether its quote is.
@@ -722,7 +720,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
         LostTalesPacketCodec.writeUtf8String(buffer, this.tabId, MAX_TAB_ID_BYTES);
     }
 
-    /** A presence flag and a UUID, always {@link #IDENTITY_ID_TAIL_BYTES} long. */
+    /** A presence flag and a UUID, 17 bytes whether the id is there or not. */
     private static void writeOptionalUuid(ByteBuf buffer, UUID value) {
         buffer.writeBoolean(value != null);
         buffer.writeLong(value == null ? 0L : value.getMostSignificantBits());

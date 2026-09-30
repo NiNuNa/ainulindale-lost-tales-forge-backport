@@ -197,7 +197,11 @@ public final class LostTalesMapMarkerWaypointRegistry {
                 ? null : LOTRWaypoint.waypointForName(code);
     }
 
-    /** Package-visible for policy regression tests without mutating the enum. */
+    /**
+     * The LOTR region a marker's waypoint joins in place of a private one:
+     * its location's own, for a marker that is not discoverable and asks
+     * for its region's unlock; null for every other.
+     */
     static LOTRWaypoint.Region resolveInheritedRegion(
             LostTalesMapMarkerDefinition marker) {
         return marker != null && !marker.isDiscoverable()

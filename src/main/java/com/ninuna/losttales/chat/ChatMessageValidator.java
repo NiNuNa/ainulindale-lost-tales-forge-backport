@@ -59,7 +59,8 @@ public final class ChatMessageValidator {
                 }
                 continue;
             }
-            if (character == '\u00a7'
+            if (character == '\u00a7' || isHiddenBreak(character)
+                    || isDirectionMark(character)
                     || !ChatAllowedCharacters.isAllowedCharacter(character)) {
                 return false;
             }
@@ -68,17 +69,45 @@ public final class ChatMessageValidator {
     }
 
     /**
+     * A character some logs, editors and Discord take for a line break,
+     * though it is not one here: the next line (U+0085) and the line and
+     * paragraph separators (U+2028, U+2029).
+     */
+    static boolean isHiddenBreak(char character) {
+        return character == '\u0085' || character == '\u2028'
+                || character == '\u2029';
+    }
+
+    /**
+     * An invisible mark that turns the text after it around (the embeddings,
+     * overrides and isolates, U+202A-U+202E and U+2066-U+2069): it could
+     * make a line read as something other than what was typed.
+     */
+    static boolean isDirectionMark(char character) {
+        return character >= '\u202a' && character <= '\u202e'
+                || character >= '\u2066' && character <= '\u2069';
+    }
+
+    /**
      * Text in the form a message keeps its paragraphs: every line break a
-     * paragraph break, each paragraph trimmed and empty ones dropped, and
-     * the paragraphs past the last a message holds joined to it by
-     * spaces.
+     * paragraph break (the hidden ones too), direction marks dropped, each
+     * paragraph trimmed and empty ones dropped, and the paragraphs past the
+     * last a message holds joined to it by spaces.
      */
     public static String paragraphs(String text) {
         if (text == null) {
             return "";
         }
-        String[] lines = text.replace("\r\n", "\n").replace('\r', '\n')
-                .split("\n");
+        StringBuilder plain = new StringBuilder(text.length());
+        for (int index = 0; index < text.length(); index++) {
+            char character = text.charAt(index);
+            if (character == '\r' || isHiddenBreak(character)) {
+                plain.append('\n');
+            } else if (!isDirectionMark(character)) {
+                plain.append(character);
+            }
+        }
+        String[] lines = plain.toString().split("\n");
         StringBuilder kept = new StringBuilder(text.length());
         int count = 0;
         for (String line : lines) {
@@ -102,13 +131,33 @@ public final class ChatMessageValidator {
     }
 
     /**
-     * The message as a log line writes it: each paragraph break the two
-     * characters {@code \n}, so no message can start a line of its own
-     * in a log.
+     * The message as a log line writes it, so no message can start a line
+     * of its own in a log: a backslash doubled first, then each line break
+     * written out as {@code \n} or {@code \r}, and every other character a
+     * log may take for a break as its {@code \}{@code u} code. The game's
+     * chat log goes through here too, patched in by the coremod.
      */
     public static String logged(String message) {
-        return message == null ? ""
-                : message.replace(String.valueOf(PARAGRAPH_BREAK), "\\n");
+        if (message == null) {
+            return "";
+        }
+        StringBuilder written = new StringBuilder(message.length() + 8);
+        for (int index = 0; index < message.length(); index++) {
+            char character = message.charAt(index);
+            if (character == '\\') {
+                written.append("\\\\");
+            } else if (character == '\n') {
+                written.append("\\n");
+            } else if (character == '\r') {
+                written.append("\\r");
+            } else if (isHiddenBreak(character)) {
+                written.append(String.format(java.util.Locale.ROOT,
+                        "\\u%04x", Integer.valueOf(character)));
+            } else {
+                written.append(character);
+            }
+        }
+        return written.toString();
     }
 
     /**
@@ -126,9 +175,11 @@ public final class ChatMessageValidator {
                 skipCode = false;
             } else if (character == '\u00a7') {
                 skipCode = true;
-            } else if (character == '\n' || character == '\r') {
+            } else if (character == '\n' || character == '\r'
+                    || isHiddenBreak(character)) {
                 kept.append(' ');
-            } else if (ChatAllowedCharacters.isAllowedCharacter(character)) {
+            } else if (!isDirectionMark(character)
+                    && ChatAllowedCharacters.isAllowedCharacter(character)) {
                 kept.append(character);
             }
         }

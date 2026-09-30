@@ -56,6 +56,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -214,6 +215,12 @@ public final class LostTalesDiscordBridge {
     /** The bindings read at the last start; empty while the bridge is stopped. */
     private volatile DiscordChannelBindings bindings = DiscordChannelBindings.EMPTY;
     /**
+     * The channels that may cross but whose gate let nobody read them at
+     * the last start, by id: the bindings refused them, so a change to
+     * the gates that opens or closes one restarts the bridge.
+     */
+    private Set<String> closedAtStart = Collections.emptySet();
+    /**
      * The bot's gateway connection, when the config asks for one: it
      * hands Discord messages in as they are sent and hears the slash
      * commands; the worker's polling stands in while it is down.
@@ -314,6 +321,7 @@ public final class LostTalesDiscordBridge {
      * does not is told the server is offline as that worker stops.
      */
     public synchronized void start() {
+        this.closedAtStart = closedChannels();
         boolean enabled = LostTalesConfig.discordEnabled;
         boolean botPresent = LostTalesConfig.discordBotToken.trim().length() > 0;
         DiscordChannelBindings configured = enabled
@@ -502,6 +510,33 @@ public final class LostTalesDiscordBridge {
             this.recentAuthors.clear();
         }
         this.busySaid.clear();
+        this.closedAtStart = Collections.emptySet();
+    }
+
+    /**
+     * Starts the bridge again when the gates in force open or close a
+     * channel that may cross, against the last start: the bindings are
+     * read against the gates, so such a change alters what the bridge
+     * carries. Answers whether it restarted. Server thread.
+     */
+    public synchronized boolean restartIfGatesMoved() {
+        if (closedChannels().equals(this.closedAtStart)) {
+            return false;
+        }
+        start();
+        return true;
+    }
+
+    /** The ids of the channels that may cross whose gate lets nobody read them now. */
+    static Set<String> closedChannels() {
+        Set<String> closed = new TreeSet<String>();
+        for (ChatChannel channel : ChatChannel.values()) {
+            if (channel.isBridgeable()
+                    && !DiscordBridgePolicy.isOpenToTheBridge(channel)) {
+                closed.add(channel.getId());
+            }
+        }
+        return closed;
     }
 
     /**
@@ -553,44 +588,6 @@ public final class LostTalesDiscordBridge {
     public synchronized void releaseLinks() {
         DiscordMessageLinkStorage.release();
         this.links = new DiscordMessageLinks();
-    }
-
-    /** Test hook: the live links. */
-    DiscordMessageLinks links() {
-        return this.links;
-    }
-
-    /**
-     * Test hook: makes a worker for {@code configured} the current one
-     * without starting its thread or stopping the one before, which is
-     * how a worker still finishing after a reload is left.
-     */
-    synchronized Thread installIdleWorker(DiscordChannelBindings configured) {
-        Worker idle = new Worker(configured, configured.readsAnything(),
-                configured.sendsAnything(), false);
-        this.bindings = configured;
-        this.worker = idle;
-        return idle;
-    }
-
-    /** Test hook: the binding ids of the posts waiting in a worker's intake, in order. */
-    List<String> queuedPostsOf(Thread worker) {
-        List<String> ids = new ArrayList<String>();
-        if (worker instanceof Worker) {
-            for (Outbound entry : ((Worker) worker).outbound) {
-                if (entry.kind == Outbound.Kind.POST) {
-                    ids.add(entry.bindingKey);
-                }
-            }
-        }
-        return ids;
-    }
-
-    /** Test hook: the bindings a worker was asked to show typing in. */
-    Set<String> typingOf(Thread worker) {
-        return worker instanceof Worker
-                ? new HashSet<String>(((Worker) worker).typingRequests)
-                : Collections.<String>emptySet();
     }
 
     public boolean isRunning() {
@@ -832,10 +829,9 @@ public final class LostTalesDiscordBridge {
      * the rest. A binding that names no Discord channel is asked its
      * webhook's channel once, since the bot must know where to type.
      *
-     * <p>Only this direction crosses. Discord publishes a member's own
-     * typing on the gateway as {@code TYPING_START}, which the bridge
-     * does not subscribe to (it asks for no typing intent), so a
-     * Discord member typing is not shown in game.</p>
+     * <p>The other way comes over the gateway: a Discord member typing in
+     * a channel the bridge reads arrives as {@code TYPING_START} and is
+     * shown in the game where their line would land ({@link DiscordTypers}).</p>
      */
     public void relayTyping(ChatChannel channel, String factionId) {
         Worker running = this.worker;
@@ -1601,14 +1597,26 @@ public final class LostTalesDiscordBridge {
 
     /**
      * Whether a Discord channel can be paired now: the bridge runs with
-     * the bot connected and its slash commands on, since the pairing is
-     * the bot's {@code /link}. What the game's link command asks before
-     * it hands out a code.
+     * the bot's gateway up or coming back, and its slash commands on,
+     * since the pairing is the bot's {@code /link}. What the game's link
+     * command asks before it hands out a code. After Discord closed the
+     * gateway for good no {@code /link} can arrive, so nothing is paired
+     * until a reload.
      */
     public boolean canPair() {
-        return this.worker != null && this.gateway != null
+        DiscordGatewayClient client = this.gateway;
+        return this.worker != null && client != null && !client.isClosedForGood()
                 && LostTalesConfig.discordSlashCommands
                 && LostTalesConfig.discordBotToken.trim().length() > 0;
+    }
+
+    /**
+     * Whether Discord closed the bot's gateway for good this run: a wrong
+     * token, an intent the application lacks. The log says which.
+     */
+    public boolean isGatewayClosedForGood() {
+        DiscordGatewayClient client = this.gateway;
+        return client != null && client.isClosedForGood();
     }
 
     /**
@@ -4025,7 +4033,7 @@ public final class LostTalesDiscordBridge {
         }
     }
 
-    /** Players who show as online: an Invisible one is not counted in the topic (D2 a). */
+    /** Players who show as online: an Invisible one is not counted in the topic. */
     private static int shownPlayerCount(MinecraftServer server) {
         return server.getConfigurationManager() == null ? 0
                 : ChatPresenceService.countShownOnline(

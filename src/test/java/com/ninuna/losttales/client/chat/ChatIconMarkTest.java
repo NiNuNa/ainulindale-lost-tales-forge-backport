@@ -24,7 +24,7 @@ import static org.junit.Assert.assertTrue;
  * tile counting the pings — every unread line, in a whisper — or the
  * white sphere for anything else unread. The mark stands where a head's
  * status sphere stands, and the icon gives it the mark's shape grown by
- * a pixel, as Nils's mock-ups draw it.
+ * a pixel, as the mock-ups draw it.
  */
 public final class ChatIconMarkTest {
     private static final float ICON = TabIcons.SIZE;
@@ -91,7 +91,7 @@ public final class ChatIconMarkTest {
     }
 
     /**
-     * Nils's mock-up of the white sphere on a ten-pixel emoji: the row
+     * The mock-up of the white sphere on a ten-pixel emoji: the row
      * over the sphere keeps all but its last two pixels, the sphere's
      * first row all but its last three, and the rows beside it all but
      * their last four.
@@ -108,7 +108,7 @@ public final class ChatIconMarkTest {
         assertEquals(6.0F, CornerCuts.cutFrom(cut, 9), 0.0F);
     }
 
-    /** Nils's mock-up of the "2" tile: the row over it cut from its left edge, the rows beside it a pixel further left. */
+    /** The mock-up of the "2" tile: the row over it cut from its left edge, the rows beside it a pixel further left. */
     @Test
     public void theTilesCutIsItsBoxGrownByAPixel() {
         LostTalesUiCornerCut cut = TabMark.pings(2).cut(0.0F, 0.0F, ICON);

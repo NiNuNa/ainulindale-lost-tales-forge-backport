@@ -103,12 +103,15 @@ public final class WorldQuestRun {
 
     /**
      * Adds to an objective's count, never past its goal, and to the
-     * helper's part by as much as it really added. Answers what was added.
+     * helper's part by as much as it really added; a run already counting
+     * as many objectives as the world keeps takes no new one. Answers what
+     * was added.
      */
     int add(String objectiveId, int amount, int goal, UUID helper) {
         int current = getCount(objectiveId);
         int added = Math.max(0, Math.min(amount, goal - current));
-        if (added == 0) {
+        if (added == 0 || !this.counts.containsKey(objectiveId)
+                && this.counts.size() >= WorldQuestNbtCodec.MAX_COUNTS) {
             return 0;
         }
         this.counts.put(objectiveId, Integer.valueOf(current + added));

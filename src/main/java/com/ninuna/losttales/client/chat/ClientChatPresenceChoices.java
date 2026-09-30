@@ -66,7 +66,7 @@ public final class ClientChatPresenceChoices {
                 : LostTalesClientAccount.templateId());
     }
 
-    /** As above, for a named account; visible for tests. */
+    /** As above, for a named account. */
     static synchronized void initialize(File configDirectory, UUID accountId) {
         storeFile = configDirectory == null || accountId == null ? null
                 : new File(new File(configDirectory, FOLDER),
@@ -267,13 +267,6 @@ public final class ClientChatPresenceChoices {
                 trim();
             }
         }
-    }
-
-    /** Forgets every choice without touching the file; for tests. */
-    static synchronized void clear() {
-        CHOICES.clear();
-        LINES.clear();
-        ROLEPLAY.clear();
     }
 
     private static boolean isUsableKey(String serverKey) {

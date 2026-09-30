@@ -2,12 +2,14 @@ package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.quest.world.WorldQuestNbtCodec;
+import com.ninuna.losttales.quest.world.WorldQuestRules;
 import com.ninuna.losttales.quest.world.WorldQuestRun;
 import com.ninuna.losttales.quest.world.WorldQuestView;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -24,8 +26,13 @@ import java.util.UUID;
  * cannot be read changes nothing.
  */
 public final class LostTalesWorldQuestSyncPacket implements IMessage {
-    static final int MAX_PACKET_BYTES = 64 * 1024;
-    static final int MAX_ID_BYTES = 256;
+    /**
+     * Room for every run the world keeps at its largest: each id and
+     * objective id at its longest, every run counting as many objectives
+     * as it may.
+     */
+    static final int MAX_PACKET_BYTES = 288 * 1024;
+    static final int MAX_ID_BYTES = WorldQuestRules.MAX_ID_BYTES;
 
     private final List<WorldQuestView> views = new ArrayList<WorldQuestView>();
     private boolean malformed;
@@ -36,18 +43,42 @@ public final class LostTalesWorldQuestSyncPacket implements IMessage {
         this.views.addAll(views);
     }
 
-    /** The runs as the identity {@code viewer} sees them. */
+    /**
+     * The runs as the identity {@code viewer} sees them. A run that could
+     * not be written whole (an id too long, too many objectives) is left
+     * out rather than breaking the packet.
+     */
     public static LostTalesWorldQuestSyncPacket of(
             Collection<WorldQuestRun> runs, UUID viewer) {
         List<WorldQuestView> views = new ArrayList<WorldQuestView>();
         if (runs != null) {
             for (WorldQuestRun run : runs) {
-                if (run != null && views.size() < WorldQuestNbtCodec.MAX_RUNS) {
+                if (run != null && views.size() < WorldQuestNbtCodec.MAX_RUNS
+                        && fits(run)) {
                     views.add(WorldQuestView.of(run, viewer));
                 }
             }
         }
         return new LostTalesWorldQuestSyncPacket(views);
+    }
+
+    private static boolean fits(WorldQuestRun run) {
+        if (!fitsId(run.getQuestId())
+                || run.getCounts().size() > WorldQuestNbtCodec.MAX_COUNTS) {
+            return false;
+        }
+        for (Map.Entry<String, Integer> count : run.getCounts().entrySet()) {
+            if (!fitsId(count.getKey()) || count.getValue() == null
+                    || count.getValue().intValue() < 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean fitsId(String id) {
+        return id != null && id.length() > 0
+                && id.getBytes(StandardCharsets.UTF_8).length <= MAX_ID_BYTES;
     }
 
     @Override

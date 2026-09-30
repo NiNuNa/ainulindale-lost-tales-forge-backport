@@ -220,16 +220,29 @@ public final class LostTalesChatOverlayRenderer {
             ChatFrame.prune(windows);
             ChatWindowLines.prune(windows);
             if (!open) {
+                // No window is on screen, so nothing hit-tests against
+                // one; a window pinned to the screen is drawn after this.
+                for (int index = 0; index < windows.size(); index++) {
+                    ChatFrame.of(windows.get(index)).drawn = false;
+                }
                 drawFeed(minecraft, chat, drawn, screenWidth, screenHeight,
                         partialTicks);
                 return true;
             }
-            ChatFrame.feed().drawn = false;
             if (minecraft.currentScreen instanceof WindowScreen) {
                 // The screen draws its windows after the HUD, each one
                 // whole; vanilla's chat pass is still cancelled here.
+                // While its view shows no conversation (the map's, a
+                // page's), the feed goes on under the windows as it does
+                // while playing, so nothing said is missed.
+                if (!ChatLayout.showsConversation()) {
+                    drawFeed(minecraft, chat, drawn, screenWidth,
+                            screenHeight, partialTicks);
+                }
+                ChatFrame.feed().drawn = false;
                 return true;
             }
+            ChatFrame.feed().drawn = false;
             // Another chat screen is open: the windows are drawn here,
             // back to front, the window in use over the others.
             LostTalesGuiAnimationSample opening =
@@ -440,16 +453,11 @@ public final class LostTalesChatOverlayRenderer {
      * broken by whatever the feed itself shows between two of a
      * sender's messages — every channel interleaved, unlike a window;
      * only a feed whose history cannot be read falls back to the shared
-     * list. Each window marks itself undrawn so nothing hit-tests
-     * against a window that is not on screen.
+     * list.
      */
     private static void drawFeed(Minecraft minecraft, GuiNewChat chat,
                                  List<ChatLine> drawn, int screenWidth,
                                  int screenHeight, float partialTicks) {
-        List<Window> windows = WindowLayout.windows();
-        for (int index = 0; index < windows.size(); index++) {
-            ChatFrame.of(windows.get(index)).drawn = false;
-        }
         ChatFrame frame = ChatFrame.feed();
         // Every line of a conversation whose choice is Everything, and a
         // line addressed to the player of one whose choice is Only
@@ -1140,11 +1148,11 @@ public final class LostTalesChatOverlayRenderer {
                                     columnAlpha));
                 }
                 // The window's frame beside the history, in the colour it
-                // touches (Nils): the timestamp area's, or the panel's
+                // touches: the timestamp area's, or the panel's
                 // own left end; on the right the member list's while it
                 // is out, else the panel's own colour at its full
                 // strength rather than where it has thinned out to
-                // nothing (Nils). A highlighted line recolours its
+                // nothing. A highlighted line recolours its
                 // stretches with its row.
                 int areaArgb = LostTalesUiInk.argb(
                         LostTalesUiInk.SURFACE_RGB, columnAlpha);

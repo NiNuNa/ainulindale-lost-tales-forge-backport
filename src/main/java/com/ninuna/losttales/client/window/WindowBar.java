@@ -531,6 +531,30 @@ public final class WindowBar {
     }
 
     /**
+     * A window's bar strip with nothing on it: its surface, the frame's
+     * surface beside and under it and its edges. What a window pinned to
+     * the screen shows while playing, where nothing can be pressed.
+     */
+    static void drawBare(Minecraft minecraft, WindowFrame frame,
+                         LostTalesGuiAnimationSample shown) {
+        if (minecraft == null || frame == null || !frame.drawn) {
+            return;
+        }
+        int top = top(frame);
+        GL11.glPushMatrix();
+        try {
+            GL11.glTranslatef(fraction(frame),
+                    (float)(frame.barTop() - top), 0.0F);
+            drawSurface(minecraft, frame,
+                    java.util.Collections.<Placed>emptyList(), top,
+                    left(frame), right(frame),
+                    shown == null ? 1.0F : shown.getOpacity());
+        } finally {
+            GL11.glPopMatrix();
+        }
+    }
+
+    /**
      * The bar's surface: the tool strip's plum grey at two thirds, one
      * flat stretch with a hole for each framed button and the well (the
      * well filled with the darker inset), then the window frame's

@@ -104,7 +104,11 @@ public final class LostTalesMapMarkerWaypointUnlockHelper {
         return changed;
     }
 
-    /** Package-visible truth table used by catalog-wide regression tests. */
+    /**
+     * Whether a marker's private region should be unlocked: the marker has
+     * fast travel, is discovered where it has to be, and stands in an
+     * unlocked region where it asks for one.
+     */
     static boolean shouldUnlockPrivateRegion(
             LostTalesMapMarkerDefinition marker, boolean discovered,
             boolean locationRegionUnlocked) {

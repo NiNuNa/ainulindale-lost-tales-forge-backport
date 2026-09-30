@@ -48,10 +48,6 @@ public final class CharacterPlayerStateWorldData extends WorldSavedData {
     private int unsupportedDataVersion = -1;
     private NBTTagCompound preservedNewerData;
 
-    public CharacterPlayerStateWorldData() {
-        this(DATA_NAME_PREFIX + "unbound");
-    }
-
     public CharacterPlayerStateWorldData(String name) {
         super(name);
         this.expectedOwnerId = parseOwnerId(name);

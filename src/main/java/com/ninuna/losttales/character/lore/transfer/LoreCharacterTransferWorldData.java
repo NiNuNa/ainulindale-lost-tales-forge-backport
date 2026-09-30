@@ -35,8 +35,6 @@ public final class LoreCharacterTransferWorldData extends WorldSavedData {
     private String readOnlyReason = "";
     private NBTTagCompound preservedData;
 
-    public LoreCharacterTransferWorldData() { this(DATA_NAME); }
-
     public LoreCharacterTransferWorldData(String name) { super(name); }
 
     @Override

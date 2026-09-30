@@ -2,7 +2,6 @@ package com.ninuna.losttales.character.registry;
 
 import com.ninuna.losttales.util.LostTalesIdentifiers;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -138,10 +137,6 @@ public final class CharacterSkinRegistry {
 
     public static CharacterSkinDefinition get(String id) {
         return id == null ? null : DEFINITIONS.get(LostTalesIdentifiers.normalize(id));
-    }
-
-    public static Collection<CharacterSkinDefinition> getAll() {
-        return DEFINITIONS.values();
     }
 
     public static List<CharacterSkinDefinition> getCompatibleSkins(

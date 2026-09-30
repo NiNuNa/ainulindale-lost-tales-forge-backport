@@ -220,15 +220,12 @@ public final class LostTalesControlBar {
     public static final class Hint {
         private final List<Part> parts;
         private final String label;
-        private final int iconWidth;
         private final int labelWidth;
 
-        private Hint(List<Part> parts, String label,
-                     int iconWidth, int labelWidth) {
+        private Hint(List<Part> parts, String label, int labelWidth) {
             this.parts = parts == null
                     ? Collections.<Part>emptyList() : parts;
             this.label = label == null ? "" : label;
-            this.iconWidth = Math.max(0, iconWidth);
             this.labelWidth = Math.max(0, labelWidth);
         }
 
@@ -296,16 +293,13 @@ public final class LostTalesControlBar {
 
         private static Hint create(
                 FontRenderer font, List<Part> parts, String label) {
-            int width = visiblePartsWidth(parts, true);
-            return new Hint(parts, label, width,
+            return new Hint(parts, label,
                     font == null || label == null
                             ? 0 : font.getStringWidth(label));
         }
 
         int width(boolean withLabel) {
-            int partsWidth = this.parts.isEmpty()
-                    ? this.iconWidth
-                    : visiblePartsWidth(this.parts, withLabel);
+            int partsWidth = visiblePartsWidth(this.parts, withLabel);
             return partsWidth + (withLabel && this.labelWidth > 0
                     ? (partsWidth > 0 ? INPUT_TEXT_GAP : 0)
                             + this.labelWidth : 0);
@@ -324,9 +318,6 @@ public final class LostTalesControlBar {
                 }
                 end = part.draw(minecraft, font, end, inputY);
                 drewPart = true;
-            }
-            if (this.parts.isEmpty()) {
-                end += this.iconWidth;
             }
             if (withLabel && this.label.length() > 0) {
                 int textX = end + (end > x ? INPUT_TEXT_GAP : 0);
@@ -429,7 +420,10 @@ public final class LostTalesControlBar {
         }
     }
 
-    /** Responsive layout result, public so narrow-screen behavior is testable. */
+    /**
+     * What a strip of one width shows: how many hints at each end, whether
+     * they are named, and which status fits beside them.
+     */
     public static final class Layout {
         public final int leftHints;
         public final int rightHints;
@@ -456,15 +450,5 @@ public final class LostTalesControlBar {
         public int visibleHints() {
             return this.leftHints + this.rightHints;
         }
-    }
-
-    /** Test seam: creates deterministic hints without a running client. */
-    public static List<Hint> measuredHints(int... widths) {
-        ArrayList<Hint> result = new ArrayList<Hint>();
-        for (int width : widths) {
-            result.add(new Hint(Collections.<Hint.Part>emptyList(), "x",
-                    width, width));
-        }
-        return Collections.unmodifiableList(result);
     }
 }

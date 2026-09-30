@@ -7,8 +7,10 @@ import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiRules;
 import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
+import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiNewChat;
+import org.lwjgl.opengl.GL11;
 
 /**
  * How a window's own parts are drawn, whatever it holds: the surface its
@@ -50,6 +52,74 @@ public final class WindowDrawing {
                 frame.drawnLeft() - ring, frame.boxTop + frame.motionY - ring,
                 frame.drawnLeft() + (frame.boxRight - frame.boxLeft) + ring,
                 frame.boxBottom + frame.motionY + ring, opening.getOpacity());
+    }
+
+    /**
+     * A window's row as it stands this frame, its tabs {@code tabs}: the
+     * tab in front, and the whole-pixel geometry of where the window is
+     * drawn, motion included, with the fraction past it that is applied
+     * when the row is drawn. What the screen adds its own state to, and
+     * what a pinned window's row is drawn from while playing.
+     */
+    static TabRow.Row rowOf(Window window, WindowFrame frame,
+                            List<WindowTab> tabs) {
+        TabRow.Row row = new TabRow.Row();
+        row.tabs = tabs;
+        row.selected = WindowFrame.activeTab(window, tabs);
+        row.rowBottom = (int)Math.floor(frame.tabRowBottom());
+        row.rowBottomExact = frame.tabRowBottom();
+        row.fractionX = (float)(frame.drawnLeft()
+                - Math.floor(frame.drawnLeft()));
+        row.fractionY = (float)(row.rowBottomExact - row.rowBottom);
+        row.left = (int)Math.floor(frame.drawnLeft()) + 2;
+        row.right = (int)Math.floor(frame.drawnLeft()) + (int)Math.round(
+                frame.boxRight - frame.boxLeft) - 2;
+        // The edge as it really stands, so the tabs follow a resize by
+        // the fraction the edge moves rather than a pixel at a time.
+        row.rightExact = Math.floor(frame.drawnLeft())
+                + (frame.boxRight - frame.boxLeft) - 2;
+        row.offsetX = 0;
+        row.locked = window.isLocked();
+        return row;
+    }
+
+    /**
+     * A page window's page: its surface under the row, then the page drawn
+     * on whole pixels in a matrix moved by the fraction the window stands
+     * on. The pointer is the screen's, or away where the page is not
+     * under it; {@code depthTest} is whether depth testing was on as the
+     * frame began, for a page drawn as a screen of its own.
+     */
+    static void drawPage(Minecraft minecraft, WindowFrame frame,
+                         LostTalesGuiAnimationSample shown, double pointerX,
+                         double pointerY, float partialTicks,
+                         boolean depthTest) {
+        drawPageSurface(minecraft, frame, shown);
+        PageContent content = WindowPages.contentOf(frame.page);
+        if (content == null) {
+            return;
+        }
+        LostTalesUiHitBox exact = pageBox(frame);
+        LostTalesUiHitBox whole = wholePageBox(frame);
+        float fractionX = (float)(exact.left - whole.left);
+        float fractionY = (float)(exact.top - whole.top);
+        boolean depth = depthTest && content.wantsDepthTest();
+        GL11.glPushMatrix();
+        if (depth) {
+            GL11.glEnable(GL11.GL_DEPTH_TEST);
+        }
+        try {
+            GL11.glTranslatef(fractionX, fractionY, 0.0F);
+            content.draw(minecraft, whole, exact.left, exact.top,
+                    Double.isNaN(pointerX) ? pointerX : pointerX - fractionX,
+                    Double.isNaN(pointerY) ? pointerY : pointerY - fractionY,
+                    partialTicks, Math.round(255.0F * shown.getOpacity()));
+        } finally {
+            if (depth) {
+                GL11.glDisable(GL11.GL_DEPTH_TEST);
+            }
+            GL11.glPopMatrix();
+        }
     }
 
     /**
@@ -100,7 +170,7 @@ public final class WindowDrawing {
      * so it lies over the edge shade: one GUI pixel tall exactly like the
      * top rule — the bar strip's first row, mirroring the tab strip whose
      * last row is the top rule. Behind it the row wears the bar's surface,
-     * the colour it touches (Nils), so the bar runs up under the rule.
+     * the colour it touches, so the bar runs up under the rule.
      * Between the baseline and this row lies the window's trailing strip,
      * one line of always visible room.
      */
@@ -130,7 +200,7 @@ public final class WindowDrawing {
      * tool strip: a ring a frame wide just outside the window's box — the
      * rows over it, corners included, and the columns beside the two
      * strips — each stretch in the colour of what it runs beside, as that
-     * was drawn this frame (Nils): the tab strip's over and beside the
+     * was drawn this frame: the tab strip's over and beside the
      * strip, the tool strip's beside it and beside the rows the two rules
      * around it stand on. The frame's edge drawn over its inner pixel lies
      * on it as a framed button's frame lies on its surface. What the

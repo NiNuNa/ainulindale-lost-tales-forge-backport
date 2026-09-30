@@ -224,12 +224,15 @@ public class WindowFrame {
         }
     }
 
-    /** The window's tabs that can be shown now. */
+    /**
+     * The window's tabs on screen now: those the view shows that can be
+     * shown ({@link WindowView#isShown}). A window with none is not drawn.
+     */
     public static List<WindowTab> visibleTabs(Window window) {
         List<WindowTab> tabs = window.getTabs();
         List<WindowTab> result = new ArrayList<WindowTab>(tabs.size());
         for (int index = 0; index < tabs.size(); index++) {
-            if (tabs.get(index).isAvailable()) {
+            if (WindowView.isShown(tabs.get(index))) {
                 result.add(tabs.get(index));
             }
         }

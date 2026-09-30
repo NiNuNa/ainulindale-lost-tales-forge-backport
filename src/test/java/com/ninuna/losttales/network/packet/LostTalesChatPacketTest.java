@@ -27,7 +27,8 @@ import static org.junit.Assert.fail;
 import static org.junit.Assert.assertTrue;
 
 public final class LostTalesChatPacketTest {
-
+    /** An optional id at the payload's tail: a presence flag and a UUID, written whole either way. */
+    private static final int IDENTITY_ID_TAIL_BYTES = 1 + 16;
 
     @Test
     public void sendRequestRoundTripsAndRejectsTrailingData() {
@@ -1035,7 +1036,7 @@ public final class LostTalesChatPacketTest {
         account.toBytes(buffer);
         // A tail claiming a character on an account line is refused.
         buffer.setBoolean(buffer.writerIndex() - scopeTailBytes("")
-                - 3 * LostTalesChatMessagePacket.IDENTITY_ID_TAIL_BYTES, true);
+                - 3 * IDENTITY_ID_TAIL_BYTES, true);
         LostTalesChatMessagePacket forged = new LostTalesChatMessagePacket();
         forged.fromBytes(buffer);
         assertTrue(forged.isMalformed());
@@ -1083,7 +1084,7 @@ public final class LostTalesChatPacketTest {
         assertTrue(cut.isMalformed());
         LostTalesChatMessagePacket shortened = new LostTalesChatMessagePacket();
         shortened.fromBytes(buffer.slice(0, buffer.readableBytes() - scopeTailBytes("")
-                - 2 * LostTalesChatMessagePacket.IDENTITY_ID_TAIL_BYTES));
+                - 2 * IDENTITY_ID_TAIL_BYTES));
         assertTrue(shortened.isMalformed());
         assertNull(shortened.getOwnCharacterId());
         assertNull(shortened.getPartnerCharacterId());
@@ -1096,7 +1097,7 @@ public final class LostTalesChatPacketTest {
         buffer = Unpooled.buffer();
         plain.toBytes(buffer);
         buffer.setBoolean(buffer.writerIndex() - scopeTailBytes("")
-                - LostTalesChatMessagePacket.IDENTITY_ID_TAIL_BYTES, true);
+                - IDENTITY_ID_TAIL_BYTES, true);
         LostTalesChatMessagePacket forged = new LostTalesChatMessagePacket();
         forged.fromBytes(buffer);
         assertTrue(forged.isMalformed());

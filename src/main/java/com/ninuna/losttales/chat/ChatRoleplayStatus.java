@@ -2,7 +2,7 @@ package com.ninuna.losttales.chat;
 
 /**
  * What an identity is doing in the role-play, as Total RP 3's status
- * says it: in character, out of it, or looking for a scene to join (P4 a).
+ * says it: in character, out of it, or looking for a scene to join.
  * Every identity has its own, kept as its status line is: a character
  * starts In Character and the account Out of Character. Every status is
  * one byte on the wire, by its place here, so the order is permanent.

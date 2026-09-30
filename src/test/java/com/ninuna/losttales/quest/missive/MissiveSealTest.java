@@ -82,16 +82,41 @@ public final class MissiveSealTest {
         assertTrue(MissiveSeal.verifies(key(7), reread, seal));
     }
 
+    /**
+     * A letter pinned back on a board is posted at the board's time and
+     * sealed again: its old seal no longer fits, the new one does, and
+     * nothing else it says changed.
+     */
+    @Test
+    public void aRepostedLetterIsSealedAgain() {
+        LostTalesMissiveData letter = LostTalesMissiveData.builder(
+                "losttales:missive/generated/b/1_0", "kill").title("Bounty")
+                .generationWorldTime(1000L)
+                .objective(new LostTalesMissiveObjectiveData("o", "kill", "",
+                        false, null))
+                .build();
+        byte[] old = MissiveSeal.sign(key(7), letter);
+        LostTalesMissiveData posted = letter.postedAt(50000L);
+        assertEquals(50000L, posted.getGenerationWorldTime());
+        assertEquals(letter.getQuestId(), posted.getQuestId());
+        assertEquals(letter.getTitle(), posted.getTitle());
+        assertFalse(MissiveSeal.verifies(key(7), posted, old));
+        assertTrue(MissiveSeal.verifies(key(7), posted,
+                MissiveSeal.sign(key(7), posted)));
+    }
+
     @Test
     public void theKeyIsMadeOnceAndKept() {
-        MissiveSealWorldData data = new MissiveSealWorldData();
+        MissiveSealWorldData data = new MissiveSealWorldData(
+                MissiveSealWorldData.DATA_NAME);
         byte[] first = data.key();
         assertEquals(MissiveSeal.LENGTH, first.length);
         assertArrayEquals(first, data.key());
 
         NBTTagCompound saved = new NBTTagCompound();
         data.writeToNBT(saved);
-        MissiveSealWorldData loaded = new MissiveSealWorldData();
+        MissiveSealWorldData loaded = new MissiveSealWorldData(
+                MissiveSealWorldData.DATA_NAME);
         loaded.readFromNBT(saved);
         assertArrayEquals(first, loaded.key());
     }
@@ -101,7 +126,8 @@ public final class MissiveSealTest {
         NBTTagCompound newer = new NBTTagCompound();
         newer.setInteger(MissiveSealWorldData.TAG_VERSION, MissiveSealWorldData.DATA_VERSION + 1);
         newer.setByteArray(MissiveSealWorldData.TAG_KEY, key(3));
-        MissiveSealWorldData data = new MissiveSealWorldData();
+        MissiveSealWorldData data = new MissiveSealWorldData(
+                MissiveSealWorldData.DATA_NAME);
         data.readFromNBT(newer);
         assertTrue(data.isUnusable());
         assertNull(data.key());

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.WindowKeys;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -19,15 +20,25 @@ import static org.junit.Assert.assertTrue;
  * file, so none shows its bare key, and no two shortcuts share one; the
  * search finds a key by the name its icon writes. The file is read as it
  * ships, not loaded into the game's translator, which other tests read
- * without it.
+ * without it: there a row shows each word as its key, and the key is
+ * what is looked for in the file.
  */
 public final class ChatShortcutsTest {
+    private static final String MOD_KEY = "gui.losttales.";
+
     @Test
     public void everyAreaShortcutAndWordHasItsWords() throws IOException {
         Set<String> written = languageKeys();
-        for (String key : ChatShortcuts.languageKeys()) {
-            assertTrue(key, written.contains(key));
+        int checked = 0;
+        for (MenuWindow.Entry row : ChatShortcuts.rows()) {
+            checked += check(written, row.label);
+            for (Object part : row.keys) {
+                if (part instanceof String) {
+                    checked += check(written, (String)part);
+                }
+            }
         }
+        assertTrue("the rows show their words as keys", checked > 0);
     }
 
     @Test
@@ -41,12 +52,21 @@ public final class ChatShortcutsTest {
     @Test
     public void noTwoShortcutsShareTheirWords() {
         Set<String> shortcuts = new HashSet<String>();
-        for (String key : ChatShortcuts.languageKeys()) {
-            if (key.startsWith("gui.losttales.chat.shortcut.")) {
-                assertTrue(key, shortcuts.add(key));
+        for (MenuWindow.Entry row : ChatShortcuts.rows()) {
+            if (row.label.startsWith("gui.losttales.chat.shortcut.")) {
+                assertTrue(row.label, shortcuts.add(row.label));
             }
         }
         assertTrue(!shortcuts.isEmpty());
+    }
+
+    /** One when {@code shown} is a word's key and the file has it; a failure when it does not. */
+    private static int check(Set<String> written, String shown) {
+        if (shown == null || !shown.startsWith(MOD_KEY)) {
+            return 0;
+        }
+        assertTrue(shown, written.contains(shown));
+        return 1;
     }
 
     private static Set<String> languageKeys() throws IOException {

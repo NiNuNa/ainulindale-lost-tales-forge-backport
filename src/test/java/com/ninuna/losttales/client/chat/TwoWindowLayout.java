@@ -21,7 +21,7 @@ public final class TwoWindowLayout {
     private static final Runnable TWO_WINDOWS = new Runnable() {
         @Override
         public void run() {
-            WindowLayout.addWindow(CONSOLES, CONSOLES.get(0), 0.0D, 0.0D);
+            WindowLayout.addWindow(CONSOLES, CONSOLES.get(0));
             List<ChatTab> conversations = new ArrayList<ChatTab>();
             for (ChatChannel channel : ChatChannel.presentationOrder()) {
                 if (!CONSOLES.contains(ChatTab.of(channel))) {
@@ -29,7 +29,7 @@ public final class TwoWindowLayout {
                 }
             }
             WindowLayout.addWindow(conversations,
-                    ChatTab.of(ChatChannel.GLOBAL), 0.0D, 100.0D);
+                    ChatTab.of(ChatChannel.GLOBAL));
         }
     };
 

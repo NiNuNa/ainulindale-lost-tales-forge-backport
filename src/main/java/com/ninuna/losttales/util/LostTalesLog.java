@@ -5,8 +5,8 @@ import cpw.mods.fml.common.FMLLog;
 
 /**
  * The mod's warnings in the game log, each led by the mod id. Writing one
- * never fails its caller: outside a running game (unit tests, standalone
- * repair tools) FML's logger is not set up, and the line is dropped.
+ * never fails its caller: outside a running game, as in a standalone
+ * repair tool, FML's logger is not set up, and the line is dropped.
  */
 public final class LostTalesLog {
 

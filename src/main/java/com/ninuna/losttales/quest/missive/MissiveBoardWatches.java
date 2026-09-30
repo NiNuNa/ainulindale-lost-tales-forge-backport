@@ -92,16 +92,6 @@ public final class MissiveBoardWatches {
         ticks = 0;
     }
 
-    /** How many watches stand. */
-    static synchronized int size() {
-        return WATCHES.size();
-    }
-
-    /** The board the player watches; null for none. */
-    static synchronized Watch watchOf(UUID player) {
-        return player == null ? null : WATCHES.get(player);
-    }
-
     /** Every few ticks after a change, each watched board again, sent where it moved. */
     @SubscribeEvent
     public void onTick(TickEvent.ServerTickEvent event) {

@@ -95,24 +95,40 @@ public final class DiscordMessageSweepTest {
                 DiscordJson.parseMessages("{\"not\":\"a page\"}"));
         assertTrue(changes.deletedIds.isEmpty());
         assertTrue(changes.edited.isEmpty());
-        assertEquals("every watch stays", 2, sweep.size());
-        // The next page that can be read is compared as ever.
-        assertEquals(Arrays.asList("200"), sweep.apply(Arrays.asList(
-                message("100", "first", ""),
-                message("300", "newer", ""))).deletedIds);
+        // Every watch stays: the next page that can be read is compared
+        // as ever, for both.
+        DiscordMessageSweep.Changes next = sweep.apply(Arrays.asList(
+                message("100", "first, rewritten", "2026-09-01T00:00:00Z"),
+                message("300", "newer", "")));
+        assertEquals(1, next.edited.size());
+        assertEquals("100", next.edited.get(0).id);
+        assertEquals(Arrays.asList("200"), next.deletedIds);
     }
 
+    /** An emptied channel names every message watched, so it says which the bound kept. */
     @Test
     public void theWatchIsBounded() {
+        DiscordMessageSweep relayed = new DiscordMessageSweep();
+        for (int index = 0; index < 200; index++) {
+            relayed.track(message(Integer.toString(1000 + index), "x", ""));
+        }
+        List<String> kept = relayed.apply(
+                Collections.<DiscordJson.Message>emptyList()).deletedIds;
+        assertEquals(128, kept.size());
+        assertEquals("1072", kept.get(0));
+        assertEquals("1199", kept.get(127));
+
         DiscordMessageSweep sweep = new DiscordMessageSweep();
         for (int index = 0; index < 200; index++) {
             sweep.track(message(Integer.toString(1000 + index), "x", ""));
         }
-        assertEquals(128, sweep.size());
         for (int index = 0; index < 200; index++) {
             sweep.watch(Integer.toString(5000 + index));
         }
-        assertEquals(128, sweep.size());
+        kept = sweep.apply(Collections.<DiscordJson.Message>emptyList()).deletedIds;
+        assertEquals(128, kept.size());
+        assertEquals("5072", kept.get(0));
+        assertEquals("5199", kept.get(127));
     }
 
     /**
@@ -125,7 +141,6 @@ public final class DiscordMessageSweepTest {
         DiscordMessageSweep sweep = new DiscordMessageSweep();
         sweep.watch("100");
         sweep.watch("100");
-        assertEquals(1, sweep.size());
         // Edited while nothing watched: not reported.
         assertTrue(sweep.apply(Arrays.asList(
                 message("100", "edited before", "2026-09-01T00:00:00Z"),
@@ -138,6 +153,9 @@ public final class DiscordMessageSweepTest {
         assertEquals(Arrays.asList("200"), sweep.apply(Arrays.asList(
                 message("100", "edited again", "2026-09-01T00:01:00Z"),
                 message("300", "newer", ""))).deletedIds);
+        // Watched twice, it is one watch: an emptied channel names it once.
+        assertEquals(Arrays.asList("100"), sweep.apply(
+                Collections.<DiscordJson.Message>emptyList()).deletedIds);
         // A message already watched keeps the stamp it has.
         DiscordMessageSweep tracked = new DiscordMessageSweep();
         tracked.track(message("100", "hello", ""));

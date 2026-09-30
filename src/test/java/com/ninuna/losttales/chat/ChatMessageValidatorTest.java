@@ -57,6 +57,33 @@ public final class ChatMessageValidatorTest {
                 ChatAction.sentence("Aldric bows.\nHe waits"));
     }
 
+    /**
+     * The characters some logs and Discord take for a line break, and the
+     * marks that turn text around, never pass; pasted text has its breaks
+     * made paragraphs and its marks dropped, and a log tells a typed
+     * backslash from a break.
+     */
+    @Test
+    public void hiddenBreaksAndDirectionMarksNeverPass() {
+        assertFalse(ChatMessageValidator.isValid("one\u2028two"));
+        assertFalse(ChatMessageValidator.isValid("one\u2029two"));
+        assertFalse(ChatMessageValidator.isValid("one\u0085two"));
+        assertFalse(ChatMessageValidator.isValid("one\u202etwo"));
+        assertFalse(ChatMessageValidator.isValid("one\u2067two"));
+        assertEquals("one\ntwo", ChatMessageValidator.paragraphs(
+                "one\u2028two"));
+        assertEquals("onetwo", ChatMessageValidator.paragraphs(
+                "one\u202etwo"));
+        assertEquals("one two", ChatMessageValidator.cleaned("one\u2029two"));
+        assertEquals("onetwo", ChatMessageValidator.cleaned("one\u202atwo"));
+        // A typed backslash and n, and a real break, log differently.
+        assertEquals("one\\\\ntwo", ChatMessageValidator.logged("one\\ntwo"));
+        assertEquals("one\\ntwo", ChatMessageValidator.logged("one\ntwo"));
+        assertEquals("one\\u2028two",
+                ChatMessageValidator.logged("one\u2028two"));
+        assertEquals("one\\rtwo", ChatMessageValidator.logged("one\rtwo"));
+    }
+
     @Test
     public void sectionSignsAndControlCharactersAreRefused() {
         assertFalse(ChatMessageValidator.isValid("gold §6text"));

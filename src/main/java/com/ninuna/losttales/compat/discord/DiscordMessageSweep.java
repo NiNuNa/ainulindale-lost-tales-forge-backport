@@ -51,11 +51,6 @@ final class DiscordMessageSweep {
         return this.tracked.isEmpty();
     }
 
-    /** Test hook: messages currently watched. */
-    int size() {
-        return this.tracked.size();
-    }
-
     /** Starts watching a message the bridge has just relayed. */
     void track(DiscordJson.Message message) {
         if (message == null || message.id == null

@@ -98,6 +98,14 @@ public final class DiscordGatewayClient extends Thread {
         }
     }
 
+    /**
+     * Whether Discord closed the gateway for good: a close code that no
+     * reconnect can mend, after which the client stays down this run.
+     */
+    public boolean isClosedForGood() {
+        return this.fatal;
+    }
+
     /** Runs a short HTTP job off the reader thread; dropped when the queue is full. */
     public boolean submit(Runnable job) {
         return this.running && this.jobs.offer(job);
@@ -219,47 +227,68 @@ public final class DiscordGatewayClient extends Thread {
 
     /** What a server close means: a fatal code stops the client for the session. */
     private boolean closed(int code) {
+        if (closesForGood(code, followsMembers())) {
+            fatal(closedForGoodReason(code));
+            return false;
+        }
+        if (code == 4014) {
+            // The member intents are the ones a server switches on for
+            // the member lists; without them the bridge still relays.
+            this.protocol.dropIntents(DiscordGatewayProtocol.MEMBER_INTENTS);
+            FMLLog.warning("[%s] Discord refused the Server Members or Presence "
+                    + "intent (close 4014): switch both on for the bot in the "
+                    + "Discord developer portal, or turn memberList off; the "
+                    + "gateway goes on without Discord members",
+                    LostTalesMetaData.MOD_ID);
+            this.listener.onMembersRefused();
+            return false;
+        }
+        if (code == 4007 || code == 4009) {
+            // Bad sequence or timed out: the session is gone.
+            this.protocol.forgetSession();
+        }
+        note("Discord gateway closed (" + code + "); reconnecting");
+        return code >= 0 && code < 4000 || code == 4000 || code == 4001
+                || code == 4002 || code == 4003 || code == 4005 || code == 4008;
+    }
+
+    /**
+     * Whether a close with that code keeps the gateway down for the run:
+     * a token or a session Discord refuses, or intents the application
+     * lacks. A refusal of the member intents, while the bot asks for
+     * them ({@code followsMembers}), is not: it connects again without.
+     */
+    static boolean closesForGood(int code, boolean followsMembers) {
         switch (code) {
             case 4004:
-                fatal("Discord refused the bot's token on the gateway (close 4004); "
-                        + "the gateway is off until the config is fixed and reloaded");
-                return false;
             case 4010:
             case 4011:
             case 4012:
-                fatal("Discord refused the gateway session (close " + code
-                        + "); the gateway is off for this run");
-                return false;
-            case 4014:
-                if (followsMembers()) {
-                    // The member intents are the ones a server switches
-                    // on for the member lists; without them the bridge
-                    // still relays.
-                    this.protocol.dropIntents(DiscordGatewayProtocol.MEMBER_INTENTS);
-                    FMLLog.warning("[%s] Discord refused the Server Members or Presence "
-                            + "intent (close 4014): switch both on for the bot in the "
-                            + "Discord developer portal, or turn memberList off; the "
-                            + "gateway goes on without Discord members",
-                            LostTalesMetaData.MOD_ID);
-                    this.listener.onMembersRefused();
-                    return false;
-                }
-                fatal("Discord refused the bot's intents (close 4014): enable the "
-                        + "Message Content intent on the application; the gateway is "
-                        + "off until then");
-                return false;
             case 4013:
-                fatal("Discord refused the bot's intents (close 4013); the gateway "
-                        + "is off for this run");
-                return false;
+                return true;
+            case 4014:
+                return !followsMembers;
             default:
-                if (code == 4007 || code == 4009) {
-                    // Bad sequence or timed out: the session is gone.
-                    this.protocol.forgetSession();
-                }
-                note("Discord gateway closed (" + code + "); reconnecting");
-                return code >= 0 && code < 4000 || code == 4000 || code == 4001
-                        || code == 4002 || code == 4003 || code == 4005 || code == 4008;
+                return false;
+        }
+    }
+
+    /** What the log says of a close that keeps the gateway down. */
+    private static String closedForGoodReason(int code) {
+        switch (code) {
+            case 4004:
+                return "Discord refused the bot's token on the gateway (close 4004); "
+                        + "the gateway is off until the config is fixed and reloaded";
+            case 4013:
+                return "Discord refused the bot's intents (close 4013); the gateway "
+                        + "is off for this run";
+            case 4014:
+                return "Discord refused the bot's intents (close 4014): enable the "
+                        + "Message Content intent on the application; the gateway is "
+                        + "off until then";
+            default:
+                return "Discord refused the gateway session (close " + code
+                        + "); the gateway is off for this run";
         }
     }
 

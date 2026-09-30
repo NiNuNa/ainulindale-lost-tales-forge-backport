@@ -9,7 +9,7 @@ import java.util.UUID;
 
 /**
  * The mark of a role-play status beside a name, on a card and in a member
- * list (P4 a): a small diamond — solid for In Character, hollow for Out
+ * list: a small diamond — solid for In Character, hollow for Out
  * of Character, holed for Looking for a Scene — each in a colour of its
  * own, casting the one shadow. Drawn from its own pixels, standing in
  * until the marks' artwork is painted. An identity whose status is its

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.network.packet;
 
+import com.ninuna.losttales.quest.LostTalesQuestIds;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveData;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveObjectiveData;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveRewardData;
@@ -18,7 +19,7 @@ import java.util.Map;
  * What the server keeps of a letter to make its quest never travels.
  */
 public final class LostTalesMissiveCodec {
-    public static final int MAX_QUEST_ID_BYTES = 512;
+    public static final int MAX_QUEST_ID_BYTES = LostTalesQuestIds.MAX_BYTES;
     public static final int MAX_TYPE_BYTES = 64;
     public static final int MAX_TITLE_BYTES = 512;
     public static final int MAX_ISSUER_BYTES = 512;

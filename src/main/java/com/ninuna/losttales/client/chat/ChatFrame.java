@@ -788,7 +788,7 @@ public final class ChatFrame extends WindowFrame {
         FEED.dividerSource = null;
         FEED.dividerSourceSize = 0;
         FEED.dividerSourceLineId = 0;
-        FEED.rows.reset((List<ChatLine>)null, -1);
+        FEED.rows.reset(null, -1);
         FEED.glide.clear();
     }
 }

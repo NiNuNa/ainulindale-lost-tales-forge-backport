@@ -322,7 +322,7 @@ public final class CharacterWorldDataTest {
     /** A record written before the body and chest keys existed takes the sex's defaults. */
     @Test
     public void aMissingBodyAndChestTypeFollowTheSex() {
-        CharacterWorldData data = new CharacterWorldData();
+        CharacterWorldData data = new CharacterWorldData(CharacterWorldData.DATA_NAME);
         CharacterRoster roster = data.getOrCreateRoster(OWNER_A);
         roster.addCharacter(character(OWNER_A, CHARACTER_A, 0, "Bregil",
                 CharacterBodyTypeRegistry.SLIM,
@@ -350,7 +350,7 @@ public final class CharacterWorldDataTest {
 
     @Test
     public void anActiveCharacterTheRosterDoesNotHoldIsCleared() {
-        CharacterWorldData data = new CharacterWorldData();
+        CharacterWorldData data = new CharacterWorldData(CharacterWorldData.DATA_NAME);
         CharacterRoster roster = data.getOrCreateRoster(OWNER_A);
         roster.addCharacter(character(OWNER_A, CHARACTER_A, 0, "Bregil"));
         roster.setActiveCharacterId(CHARACTER_A);
@@ -392,7 +392,7 @@ public final class CharacterWorldDataTest {
 
     /** Two rosters, one character each, written exactly as the world saves them. */
     private static NBTTagCompound savedRosters() {
-        CharacterWorldData data = new CharacterWorldData();
+        CharacterWorldData data = new CharacterWorldData(CharacterWorldData.DATA_NAME);
         CharacterRoster rosterA = data.getOrCreateRoster(OWNER_A);
         rosterA.addCharacter(character(OWNER_A, CHARACTER_A, 0, "Bregil"));
         data.saveRoster(rosterA);
@@ -406,7 +406,7 @@ public final class CharacterWorldDataTest {
     }
 
     private static CharacterWorldData load(NBTTagCompound saved) {
-        CharacterWorldData data = new CharacterWorldData();
+        CharacterWorldData data = new CharacterWorldData(CharacterWorldData.DATA_NAME);
         data.readFromNBT(saved);
         return data;
     }

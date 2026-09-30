@@ -16,7 +16,7 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 /**
- * The waystone page's rows, made from its draft (Q10 a): Marker,
+ * The waystone page's rows, made from its draft: Marker,
  * Location, Rules and Sharing as sections of Settings' own rows; every
  * row greyed with the reason on a waystone the player may not edit; the
  * typed rows Settings' own lines and numbers, kept on the page; and the

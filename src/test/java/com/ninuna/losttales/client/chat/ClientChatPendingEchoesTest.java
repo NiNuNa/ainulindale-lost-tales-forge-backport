@@ -87,13 +87,15 @@ public final class ClientChatPendingEchoesTest {
     /** Nothing shown early outlives the connection it was said on. */
     @Test
     public void clearingForgetsEverything() {
-        ClientChatPendingEchoes.remember(
-                ClientChatPendingEchoes.nextNonce(), 3, packet(), tab(),
-                null, 0L);
-        assertEquals(1, ClientChatPendingEchoes.size());
+        long nonce = ClientChatPendingEchoes.nextNonce();
+        ClientChatPendingEchoes.remember(nonce, 3, packet(), tab(), null, 0L);
+        assertTrue(ClientChatPendingEchoes.isPending(3));
         ClientChatPendingEchoes.clear();
-        assertEquals(0, ClientChatPendingEchoes.size());
         assertFalse(ClientChatPendingEchoes.isPending(3));
+        // Neither an answer nor the timeout finds it any more.
+        assertNull(ClientChatPendingEchoes.take(nonce));
+        assertTrue(ClientChatPendingEchoes.expired(
+                ClientChatPendingEchoes.TIMEOUT_MILLIS + 1L).isEmpty());
     }
 
     private static ChatTab tab() {

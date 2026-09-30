@@ -7,6 +7,7 @@ import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.client.LostTalesClientThread;
 import com.ninuna.losttales.client.chat.ChatLayout;
+import com.ninuna.losttales.client.window.PinnedWindows;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.config.client.ClientServerConfigCache;
 import com.ninuna.losttales.client.accessory.ClientAccessoryEffectCache;
@@ -38,6 +39,7 @@ import com.ninuna.losttales.client.chat.ChatSpeechBubbles;
 import com.ninuna.losttales.client.chat.LostTalesSpeechBubbleRenderer;
 import com.ninuna.losttales.client.chat.ClientChatChannelState;
 import com.ninuna.losttales.client.chat.ClientChatIgnores;
+import com.ninuna.losttales.client.chat.ClientChatDrafts;
 import com.ninuna.losttales.client.chat.ClientChatReadMarks;
 import com.ninuna.losttales.client.chat.ClientChatSession;
 import com.ninuna.losttales.client.chat.ClientChatChannelViews;
@@ -223,6 +225,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         // the next join's replay starts its unread run where this one
         // left off.
         ClientChatReadMarks.save();
+        ClientChatDrafts.save();
         // A name learned for an ignored account belongs to this server;
         // on another one it may be somebody else's. The stored accounts
         // themselves persist like every other preference.
@@ -302,6 +305,14 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     public void expirePendingChatEchoes(TickEvent.ClientTickEvent event) {
         if (event != null && event.phase == TickEvent.Phase.END) {
             LostTalesChatPresentation.expirePendingEchoes();
+        }
+    }
+
+    /** The page in front of each pinned window keeps time while playing. */
+    @SubscribeEvent
+    public void tickPinnedWindows(TickEvent.ClientTickEvent event) {
+        if (event != null && event.phase == TickEvent.Phase.END) {
+            PinnedWindows.tick(Minecraft.getMinecraft());
         }
     }
 
@@ -647,6 +658,10 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         if (event.type == RenderGameOverlayEvent.ElementType.ALL
                 && !isHudHidden()) {
             Minecraft minecraft = Minecraft.getMinecraft();
+            // The pinned windows stand under the panels. They are the
+            // window screen's own windows while it is open, so they take
+            // no part in the HUD stepping aside for it.
+            PinnedWindows.render(minecraft, event.partialTicks);
             // While the chat is open the panels step aside with the rest
             // of the HUD, fading as one layer with it.
             if (!LostTalesHudFade.beginPanels(minecraft)) {

@@ -1,6 +1,5 @@
 package com.ninuna.losttales.command;
 
-import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestManager;
 import com.ninuna.losttales.quest.LostTalesQuestRegistry;
@@ -24,20 +23,18 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChatComponentTranslation;
-import net.minecraft.util.EnumChatFormatting;
+import net.minecraft.util.StatCollector;
 /**
  * The quest admin command: what the server knows and each player holds,
  * starting, finishing and resetting a player's quests, starter items and
  * markers, reading the server's own quest files again, and starting and
- * stopping world quests.
+ * stopping world quests. Every answer is a line of the lang file,
+ * {@code chat.losttales.quest.command.*}.
  */
 public class LostTalesCommandQuest extends LostTalesCommandBase {
+    private static final String SAY = "chat.losttales.quest.command.";
 
     private final String commandPath;
-
-    public LostTalesCommandQuest() {
-        this(LostTalesMetaData.MOD_ID + "_quest", LostTalesMetaData.MOD_ID + "_quest");
-    }
 
     public LostTalesCommandQuest(String commandName, String commandPath) {
         super(commandName);
@@ -78,7 +75,8 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
         if ("scan".equalsIgnoreCase(action)) {
             EntityPlayerMP player = getTargetPlayer(sender, args, 1);
             if (player != null) {
-                scanInventory(sender, player);
+                answer(sender, LostTalesQuestManager.refreshGatherProgressFromInventory(player),
+                        "scan.done", "scan.nothing", player.getCommandSenderName());
             }
             return;
         }
@@ -87,12 +85,16 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
             if (args.length >= 2 && LostTalesQuestRegistry.getQuest(args[1]) != null) {
                 EntityPlayerMP player = getTargetPlayer(sender, args, 2);
                 if (player != null) {
-                    unpinQuest(sender, player, args[1]);
+                    answer(sender, LostTalesQuestManager.unpinQuest(player, args[1]),
+                            "unpin.done", "unpin.nothing", args[1],
+                            player.getCommandSenderName());
                 }
             } else {
                 EntityPlayerMP player = getTargetPlayer(sender, args, 1);
                 if (player != null) {
-                    unpinQuest(sender, player);
+                    answer(sender, LostTalesQuestManager.unpinQuest(player),
+                            "unpin_all.done", "unpin_all.nothing",
+                            player.getCommandSenderName());
                 }
             }
             return;
@@ -101,7 +103,9 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
         if ("untrackmarker".equalsIgnoreCase(action)) {
             EntityPlayerMP player = getTargetPlayer(sender, args, 1);
             if (player != null) {
-                untrackMarker(sender, player);
+                answer(sender, LostTalesQuestManager.unpinMapMarker(player),
+                        "untrackmarker.done", "untrackmarker.nothing",
+                        player.getCommandSenderName());
             }
             return;
         }
@@ -131,21 +135,28 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
         if (player == null) {
             return;
         }
+        String name = player.getCommandSenderName();
 
         if ("start".equalsIgnoreCase(action)) {
             startQuest(sender, player, questId);
         } else if ("complete".equalsIgnoreCase(action)) {
-            completeQuest(sender, player, questId);
+            answer(sender, LostTalesQuestManager.completeQuest(player, questId),
+                    "complete.done", "complete.failed", questId, name);
         } else if ("reset".equalsIgnoreCase(action)) {
-            resetQuest(sender, player, questId);
+            answer(sender, LostTalesQuestManager.resetQuest(player, questId),
+                    "reset.done", "reset.nothing", questId, name);
         } else if ("abandon".equalsIgnoreCase(action)) {
-            abandonQuest(sender, player, questId);
+            answer(sender, LostTalesQuestManager.abandonQuest(player, questId),
+                    "abandon.done", "abandon.nothing", questId, name);
         } else if ("pin".equalsIgnoreCase(action)) {
-            pinQuest(sender, player, questId);
+            answer(sender, LostTalesQuestManager.pinQuest(player, questId),
+                    "pin.done", "pin.failed", questId, name);
         } else if ("revealmarkers".equalsIgnoreCase(action)) {
-            revealMarkers(sender, player, questId);
+            answer(sender, LostTalesQuestManager.revealQuestMarkers(player, questId),
+                    "reveal.done", "reveal.nothing", questId, name);
         } else if ("trackmarker".equalsIgnoreCase(action)) {
-            trackMarker(sender, player, questId);
+            answer(sender, LostTalesQuestManager.pinMapMarker(player, questId),
+                    "trackmarker.done", "trackmarker.failed", questId, name);
         } else {
             sendUsage(sender);
         }
@@ -153,21 +164,22 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
 
     private void sendDefinitions(ICommandSender sender) {
         Collection<LostTalesQuestDefinition> quests = LostTalesQuestRegistry.getQuests();
-        send(sender, EnumChatFormatting.GOLD + "Loaded Lost Tales quest definitions: " + quests.size());
+        say(sender, "defs.header", Integer.valueOf(quests.size()));
         for (LostTalesQuestDefinition quest : quests) {
-            String flags = " [start=" + quest.getStartMode() + (quest.isRepeatable() ? ", repeatable" : ", one-time") + "]";
-            send(sender, EnumChatFormatting.YELLOW + quest.getId() + EnumChatFormatting.GRAY + " - " + quest.getTitle() + flags);
+            say(sender, "defs.line", quest.getId(), quest.getTitle(),
+                    quest.getStartMode(), new ChatComponentTranslation(SAY
+                            + (quest.isRepeatable() ? "defs.repeatable" : "defs.once")));
             if (!quest.getPrerequisites().isEmpty()) {
-                send(sender, EnumChatFormatting.DARK_GRAY + "  prerequisites: " + quest.getPrerequisites().toString());
+                say(sender, "defs.prerequisites", quest.getPrerequisites().toString());
             }
             if (!quest.getRewards().isEmpty()) {
-                send(sender, EnumChatFormatting.DARK_GRAY + "  rewards: " + quest.getRewards().toString());
+                say(sender, "defs.rewards", quest.getRewards().toString());
             }
             if (!quest.getInteraction().isEmpty()) {
-                send(sender, EnumChatFormatting.DARK_GRAY + "  interaction: " + quest.getInteraction().toString());
+                say(sender, "defs.interaction", quest.getInteraction().toString());
             }
             if (!quest.getMarkers().isEmpty()) {
-                send(sender, EnumChatFormatting.DARK_GRAY + "  markers: " + quest.getMarkers().toString());
+                say(sender, "defs.markers", quest.getMarkers().toString());
             }
         }
     }
@@ -179,140 +191,67 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
         String pinnedMarkerId = LostTalesQuestManager.getPinnedMapMarkerId(player);
         Set<String> discoveredMarkers = LostTalesQuestManager.getDiscoveredMarkerIds(player);
 
-        send(sender, EnumChatFormatting.GOLD + "Quest state for " + player.getCommandSenderName() + ":");
-        send(sender, EnumChatFormatting.GRAY + "Tracked quests: " + (pinnedQuestIds.isEmpty() ? "none" : join(pinnedQuestIds)));
-        send(sender, EnumChatFormatting.GRAY + "Tracked marker: " + (pinnedMarkerId.length() == 0 ? "none" : pinnedMarkerId));
-        send(sender, EnumChatFormatting.GRAY + "Discovered markers: " + (discoveredMarkers.isEmpty() ? "none" : join(discoveredMarkers)));
+        say(sender, "list.header", player.getCommandSenderName());
+        say(sender, "list.tracked", listOrNone(pinnedQuestIds));
+        say(sender, "list.marker", pinnedMarkerId.length() == 0
+                ? new ChatComponentTranslation(SAY + "list.none") : pinnedMarkerId);
+        say(sender, "list.discovered", listOrNone(discoveredMarkers));
         if (active.isEmpty()) {
-            send(sender, EnumChatFormatting.GRAY + "Active: none");
+            say(sender, "list.active", new ChatComponentTranslation(SAY + "list.none"));
         } else {
-            send(sender, EnumChatFormatting.GRAY + "Active:");
+            say(sender, "list.active.header");
             for (LostTalesQuestProgress progress : active) {
                 LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(progress.getQuestId());
                 String title = quest == null ? progress.getQuestId() : quest.getTitle();
-                String progressText = progress.getObjectiveProgress().isEmpty() ? "" : ", objectives " + progress.getObjectiveProgress().toString();
-                send(sender, EnumChatFormatting.YELLOW + "- " + progress.getQuestId() + EnumChatFormatting.GRAY + " (" + title + ", stage " + progress.getStageId() + progressText + ")");
+                say(sender, "list.active.line", progress.getQuestId(), title,
+                        progress.getStageId(), progress.getObjectiveProgress().toString());
             }
         }
-
-        if (completed.isEmpty()) {
-            send(sender, EnumChatFormatting.GRAY + "Completed: none");
-        } else {
-            send(sender, EnumChatFormatting.GRAY + "Completed: " + join(completed));
-        }
+        say(sender, "list.completed", listOrNone(completed));
     }
 
     private void startQuest(ICommandSender sender, EntityPlayerMP player, String questId) {
         LostTalesQuestManager.StartResult result = LostTalesQuestManager.startQuest(player, questId);
-        if (result == LostTalesQuestManager.StartResult.STARTED) {
-            send(sender, EnumChatFormatting.GREEN + "Started quest " + questId + " for " + player.getCommandSenderName() + ".");
-        } else if (result == LostTalesQuestManager.StartResult.UNKNOWN_QUEST) {
-            send(sender, EnumChatFormatting.RED + "Unknown quest: " + questId);
-        } else if (result == LostTalesQuestManager.StartResult.ALREADY_ACTIVE) {
-            send(sender, EnumChatFormatting.YELLOW + player.getCommandSenderName() + " already has this quest active.");
-        } else if (result == LostTalesQuestManager.StartResult.ALREADY_COMPLETED) {
-            send(sender, EnumChatFormatting.YELLOW + player.getCommandSenderName() + " has already completed this one-time quest.");
-        } else if (result == LostTalesQuestManager.StartResult.RESTART_NOT_ALLOWED) {
-            send(sender, EnumChatFormatting.YELLOW + "This quest definition does not allow restarting after failure or abandonment.");
-        } else if (result == LostTalesQuestManager.StartResult.START_NOT_ALLOWED) {
-            send(sender, EnumChatFormatting.RED + "This quest cannot be started from that source.");
-        } else if (result == LostTalesQuestManager.StartResult.REQUIREMENTS_NOT_MET) {
-            send(sender, EnumChatFormatting.RED + "Quest prerequisites are not met.");
-        } else {
-            send(sender, EnumChatFormatting.RED + "Could not start quest for " + player.getCommandSenderName() + ".");
-        }
-    }
-
-    private void completeQuest(ICommandSender sender, EntityPlayerMP player, String questId) {
-        if (LostTalesQuestManager.completeQuest(player, questId)) {
-            send(sender, EnumChatFormatting.GREEN + "Completed quest " + questId + " for " + player.getCommandSenderName() + ".");
-        } else {
-            send(sender, EnumChatFormatting.RED + "Could not complete quest " + questId + ". Is the ID valid?");
-        }
-    }
-
-    private void resetQuest(ICommandSender sender, EntityPlayerMP player, String questId) {
-        if (LostTalesQuestManager.resetQuest(player, questId)) {
-            send(sender, EnumChatFormatting.GREEN + "Reset quest " + questId + " for " + player.getCommandSenderName() + ".");
-        } else {
-            send(sender, EnumChatFormatting.YELLOW + player.getCommandSenderName() + " had no saved state for " + questId + ".");
-        }
-    }
-
-    private void abandonQuest(ICommandSender sender, EntityPlayerMP player, String questId) {
-        if (LostTalesQuestManager.abandonQuest(player, questId)) {
-            send(sender, EnumChatFormatting.GREEN + "Abandoned quest " + questId + " for " + player.getCommandSenderName() + ".");
-        } else {
-            send(sender, EnumChatFormatting.YELLOW + player.getCommandSenderName() + " does not have " + questId + " active.");
-        }
-    }
-
-    private void scanInventory(ICommandSender sender, EntityPlayerMP player) {
-        if (LostTalesQuestManager.refreshGatherProgressFromInventory(player)) {
-            send(sender, EnumChatFormatting.GREEN + "Refreshed gather-objective progress from " + player.getCommandSenderName() + "'s inventory.");
-        } else {
-            send(sender, EnumChatFormatting.YELLOW + "No gather-objective progress changed for " + player.getCommandSenderName() + ".");
-        }
-    }
-
-    private void pinQuest(ICommandSender sender, EntityPlayerMP player, String questId) {
-        if (LostTalesQuestManager.pinQuest(player, questId)) {
-            send(sender, EnumChatFormatting.GREEN + "Tracking quest " + questId + " for " + player.getCommandSenderName() + ".");
-        } else {
-            send(sender, EnumChatFormatting.YELLOW + "Could not track " + questId + ". Is it active for that player?");
-        }
-    }
-
-    private void unpinQuest(ICommandSender sender, EntityPlayerMP player) {
-        if (LostTalesQuestManager.unpinQuest(player)) {
-            send(sender, EnumChatFormatting.GREEN + "Stopped tracking all quests for " + player.getCommandSenderName() + ".");
-        } else {
-            send(sender, EnumChatFormatting.YELLOW + player.getCommandSenderName() + " had no tracked quests.");
-        }
-    }
-
-    private void unpinQuest(ICommandSender sender, EntityPlayerMP player, String questId) {
-        if (LostTalesQuestManager.unpinQuest(player, questId)) {
-            send(sender, EnumChatFormatting.GREEN + "Stopped tracking quest " + questId + " for " + player.getCommandSenderName() + ".");
-        } else {
-            send(sender, EnumChatFormatting.YELLOW + player.getCommandSenderName() + " was not tracking " + questId + ".");
-        }
-    }
-
-    private void revealMarkers(ICommandSender sender, EntityPlayerMP player, String questId) {
-        if (LostTalesQuestManager.revealQuestMarkers(player, questId)) {
-            send(sender, EnumChatFormatting.GREEN + "Revealed marker hints from " + questId + " for " + player.getCommandSenderName() + ".");
-        } else {
-            send(sender, EnumChatFormatting.YELLOW + "No new marker hints were revealed for " + player.getCommandSenderName() + ".");
-        }
-    }
-
-    private void trackMarker(ICommandSender sender, EntityPlayerMP player, String markerId) {
-        if (LostTalesQuestManager.pinMapMarker(player, markerId)) {
-            send(sender, EnumChatFormatting.GREEN + "Tracking marker " + markerId + " for " + player.getCommandSenderName() + ".");
-        } else {
-            send(sender, EnumChatFormatting.YELLOW + "Could not track marker " + markerId + ". It may not be discovered yet.");
-        }
-    }
-
-    private void untrackMarker(ICommandSender sender, EntityPlayerMP player) {
-        if (LostTalesQuestManager.unpinMapMarker(player)) {
-            send(sender, EnumChatFormatting.GREEN + "Stopped tracking marker for " + player.getCommandSenderName() + ".");
-        } else {
-            send(sender, EnumChatFormatting.YELLOW + player.getCommandSenderName() + " had no tracked marker.");
+        String name = player.getCommandSenderName();
+        switch (result) {
+            case STARTED:
+                say(sender, "start.started", questId, name);
+                return;
+            case UNKNOWN_QUEST:
+                sender.addChatMessage(new ChatComponentTranslation(
+                        "chat.losttales.quest.unknown", questId));
+                return;
+            case ALREADY_ACTIVE:
+                say(sender, "start.already_active", name, questId);
+                return;
+            case ALREADY_COMPLETED:
+                say(sender, "start.already_completed", name, questId);
+                return;
+            case RESTART_NOT_ALLOWED:
+                say(sender, "start.not_restartable", questId);
+                return;
+            case START_NOT_ALLOWED:
+                say(sender, "start.wrong_source", questId);
+                return;
+            case REQUIREMENTS_NOT_MET:
+                say(sender, "start.requirements", questId);
+                return;
+            default:
+                say(sender, "start.failed", questId, name);
         }
     }
 
     private void giveStarterItem(ICommandSender sender, String[] args) {
         if (args.length < 2) {
-            send(sender, EnumChatFormatting.RED + "Usage: " + commandPrefix() + " starter <questId> [player] [consume]");
+            say(sender, "starter.usage", commandPrefix());
             return;
         }
 
         String questId = args[1];
         LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(questId);
         if (quest == null) {
-            send(sender, EnumChatFormatting.RED + "Unknown quest: " + questId);
+            sender.addChatMessage(new ChatComponentTranslation(
+                    "chat.losttales.quest.unknown", questId));
             return;
         }
 
@@ -336,7 +275,10 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
         tag.setString("LostTalesQuestId", questId);
         tag.setBoolean("LostTalesQuestConsume", consume);
         stack.setTagCompound(tag);
-        stack.setStackDisplayName("Quest Starter: " + quest.getTitle());
+        // An item's name is kept as written, so it is written in the
+        // server's language.
+        stack.setStackDisplayName(StatCollector.translateToLocalFormatted(
+                SAY + "starter.name", quest.getTitle()));
 
         if (!player.inventory.addItemStackToInventory(stack)) {
             EntityItem dropped = player.dropPlayerItemWithRandomChoice(stack, false);
@@ -346,9 +288,9 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
         }
         player.inventory.markDirty();
 
-        send(sender, EnumChatFormatting.GREEN + "Gave quest starter for " + questId + " to " + player.getCommandSenderName() + ".");
+        say(sender, "starter.given", questId, player.getCommandSenderName());
         if (!quest.canStartFromItem()) {
-            send(sender, EnumChatFormatting.YELLOW + "Note: this quest has startMode='" + quest.getStartMode() + "', so the starter item will not start it unless the quest uses item/any.");
+            say(sender, "starter.note", quest.getStartMode());
         }
     }
 
@@ -360,10 +302,10 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
             if (sender instanceof EntityPlayerMP) {
                 return (EntityPlayerMP) sender;
             }
-            send(sender, EnumChatFormatting.RED + "Console must specify a player.");
+            say(sender, "player.console");
             return null;
         } catch (Exception e) {
-            send(sender, EnumChatFormatting.RED + "Could not find player: " + args[playerArgIndex]);
+            say(sender, "player.unknown", args[playerArgIndex]);
             return null;
         }
     }
@@ -405,9 +347,8 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
         String key = "chat.losttales.quest.world.start."
                 + result.name().toLowerCase(java.util.Locale.ROOT);
         if (result == WorldQuests.StartResult.NOT_READY) {
-            LostTalesQuestDefinition quest = LostTalesQuestRegistry.getQuest(
-                    questId);
-            java.util.List<String> problems = WorldQuestRules.problems(quest);
+            java.util.List<String> problems = WorldQuests.problems(
+                    LostTalesQuestRegistry.getQuest(questId));
             sender.addChatMessage(new ChatComponentTranslation(key, questId,
                     problems.isEmpty() ? "" : problems.get(0)));
             return;
@@ -446,25 +387,53 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
     }
 
     private void sendUsage(ICommandSender sender) {
-        send(sender, EnumChatFormatting.GRAY + getCommandUsage(sender));
-        send(sender, EnumChatFormatting.GRAY + "Examples:");
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " defs");
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " start losttales:tutorial/starter_note");
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " list <player>");
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " scan <player>");
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " starter losttales:tutorial/starter_note");
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " abandon losttales:tutorial/starter_note");
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " pin losttales:tutorial/starter_note");
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " revealmarkers losttales:tutorial/meet_nia");
-        send(sender, EnumChatFormatting.GRAY + commandPrefix() + " trackmarker losttales:quest_giver_nia");
+        sender.addChatMessage(new ChatComponentText(getCommandUsage(sender)));
+        say(sender, "examples");
+        String[] examples = {
+                "defs",
+                "start losttales:tutorial/starter_note",
+                "list <player>",
+                "scan <player>",
+                "starter losttales:tutorial/starter_note",
+                "abandon losttales:tutorial/starter_note",
+                "pin losttales:tutorial/starter_note",
+                "revealmarkers losttales:tutorial/meet_nia",
+                "trackmarker losttales:quest_giver_nia"
+        };
+        for (String example : examples) {
+            sender.addChatMessage(new ChatComponentText(commandPrefix() + " " + example));
+        }
     }
 
     private String commandPrefix() {
         return "/" + commandPath;
     }
 
-    private void send(ICommandSender sender, String message) {
-        sender.addChatMessage(new ChatComponentText(message));
+    /** One of the command's lines, {@code chat.losttales.quest.command.<key>}. */
+    private static void say(ICommandSender sender, String key, Object... args) {
+        sender.addChatMessage(new ChatComponentTranslation(SAY + key, args));
+    }
+
+    /** The line for what happened, or the one for nothing having changed. */
+    private static void answer(ICommandSender sender, boolean changed,
+                               String doneKey, String nothingKey,
+                               Object... args) {
+        say(sender, changed ? doneKey : nothingKey, args);
+    }
+
+    /** The values joined by commas, or the word for none. */
+    private static Object listOrNone(Collection<String> values) {
+        if (values.isEmpty()) {
+            return new ChatComponentTranslation(SAY + "list.none");
+        }
+        StringBuilder builder = new StringBuilder();
+        for (String value : values) {
+            if (builder.length() > 0) {
+                builder.append(", ");
+            }
+            builder.append(value);
+        }
+        return builder.toString();
     }
 
     private boolean isBoolean(String value) {
@@ -473,19 +442,6 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
 
     private boolean parseBoolean(String value) {
         return "true".equalsIgnoreCase(value) || "yes".equalsIgnoreCase(value);
-    }
-
-    private String join(Collection<String> values) {
-        StringBuilder builder = new StringBuilder();
-        boolean first = true;
-        for (String value : values) {
-            if (!first) {
-                builder.append(", ");
-            }
-            builder.append(value);
-            first = false;
-        }
-        return builder.toString();
     }
 
     @Override

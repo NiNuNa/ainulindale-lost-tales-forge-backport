@@ -12,7 +12,6 @@ import com.ninuna.losttales.quest.LostTalesQuestObjectiveMatcher;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveSelection;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveTextHelper;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveType;
-import com.ninuna.losttales.quest.LostTalesQuestParams;
 import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
 import cpw.mods.fml.relauncher.Side;
@@ -406,15 +405,9 @@ public final class LostTalesQuestDialogueHooks {
         return "";
     }
 
-    /** Whether a block of parameters names this entity. */
+    /** Whether a block of parameters names this entity, as the server reads them. */
     private static boolean matches(Map<String, String> params, Entity target) {
-        if (params == null || params.isEmpty()) {
-            return false;
-        }
-        String selector = LostTalesQuestParams.value(params, "entity");
-        return selector.length() > 0
-                && LostTalesQuestObjectiveMatcher.matchesEntity(target,
-                        selector, "");
+        return LostTalesQuestObjectiveMatcher.matchesEntity(target, params);
     }
 
     private static String speakerName(Entity target) {

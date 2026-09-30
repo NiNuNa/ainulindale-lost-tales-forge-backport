@@ -15,11 +15,12 @@ import java.util.Map;
 import java.util.Set;
 import net.minecraft.client.Minecraft;
 /**
- * Client-side helper for deciding which quest/map markers should be emphasized.
- *
- * The modern NeoForge branch marks map markers as active quest markers before
- * rendering. In 1.7.10 we derive that state from the server-synced tracked quest
- * and the bundled client quest definitions.
+ * The places tracked quests send the player, as the world labels, the
+ * compass and the tracker mark them: the map markers a tracked quest and
+ * its current objectives name, with the quest's title, and the
+ * coordinates its go-to objectives and LOTR's tracked quests point at.
+ * Read from the quest log the server sent and the definitions the client
+ * holds.
  */
 @SideOnly(Side.CLIENT)
 public final class LostTalesClientQuestMarkerHelper {
@@ -153,10 +154,8 @@ public final class LostTalesClientQuestMarkerHelper {
                 ? 0 : minecraft.thePlayer.dimension;
     }
 
+    /** A place's label: its quest's title, or the id for a quest without one. */
     private static String createQuestLabel(LostTalesQuestDefinition quest) {
-        if (quest == null) {
-            return "Quest Objective";
-        }
         String title = quest.getTitle();
         return title == null || title.length() == 0 ? quest.getId() : title;
     }

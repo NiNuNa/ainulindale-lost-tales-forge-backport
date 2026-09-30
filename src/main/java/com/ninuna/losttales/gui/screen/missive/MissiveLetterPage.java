@@ -28,7 +28,7 @@ import net.minecraft.util.StatCollector;
 import org.lwjgl.input.Keyboard;
 
 /**
- * A missive letter, a page a window holds (Q9 a): the letter in the
+ * A missive letter, a page a window holds: the letter in the
  * inventory slot it was used from, on the sheet the board's page shows a
  * notice on ({@link MissiveLetterView}), and Accept (A) on the bar,
  * greyed with its reason where the letter cannot be accepted. Using a
@@ -39,7 +39,7 @@ import org.lwjgl.input.Keyboard;
  * Accept, which closes it without a word, since the quest's own banner
  * says it started. The server reads the slot again before it starts the
  * quest, and says a refusal in the chat, which stands over the page's
- * bar instead while the page is shown (W2 a).</p>
+ * bar instead while the page is shown.</p>
  */
 public final class MissiveLetterPage extends PageContent
         implements WorldPageWatch.Watched {

@@ -2,9 +2,10 @@ package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.client.chat.ChatSettingsSections;
 import com.ninuna.losttales.client.settings.ClientSettingsSections;
-import com.ninuna.losttales.config.LostTalesConfig;
-import com.ninuna.losttales.config.client.LostTalesThirdPersonConfig;
+import com.ninuna.losttales.config.DefinedClientOptions;
+import com.ninuna.losttales.config.client.DefinedCameraOptions;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -16,12 +17,26 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * Every client option is set in Settings, or kept in the client file
- * alone on purpose and named so in {@link LostTalesConfig#FILE_ONLY_CLIENT_KEYS};
- * every option of the camera's file is set in Settings (Nils, 2026-09-26,
- * Q2 a). A new option with neither fails here rather than going missing
- * from every screen. The sections stand in the order Nils set them.
+ * alone on purpose and named so in {@link #FILE_ONLY_CLIENT_KEYS}; every
+ * option of the camera's file is set in Settings. A new option with
+ * neither fails here rather than going missing from every screen. The
+ * sections stand in their order.
  */
 public final class SettingsCoverageTest {
+    /**
+     * The client options Settings does not show, kept in the client file
+     * alone: each is state another screen writes as it is used, not a
+     * choice made in a list.
+     */
+    private static final Set<String> FILE_ONLY_CLIENT_KEYS = Collections.unmodifiableSet(
+            new HashSet<String>(Arrays.asList(
+                    // The map's legend writes the categories it hides.
+                    "hiddenMapLegendCategories",
+                    // The map's waypoint editor writes a custom
+                    // waypoint's colour and its note.
+                    "customWaypointColors",
+                    "customWaypointNotes")));
+
     /** Settings as every screen makes it: the windows', the chat's, then every client option's. */
     private static Settings everySection() {
         Settings settings = new Settings(new WindowMenus(new SubWindows()));
@@ -46,9 +61,9 @@ public final class SettingsCoverageTest {
         Set<String> shown = keysKeptIn(everySection(),
                 Settings.Store.CLIENT_FILE);
         Set<String> orphaned = new TreeSet<String>();
-        for (String key : LostTalesConfig.clientOptionKeys()) {
+        for (String key : DefinedClientOptions.keys()) {
             if (!shown.contains(key)
-                    && !LostTalesConfig.FILE_ONLY_CLIENT_KEYS.contains(key)) {
+                    && !FILE_ONLY_CLIENT_KEYS.contains(key)) {
                 orphaned.add(key);
             }
         }
@@ -61,7 +76,7 @@ public final class SettingsCoverageTest {
         Set<String> shown = keysKeptIn(everySection(),
                 Settings.Store.CAMERA_FILE);
         Set<String> orphaned = new TreeSet<String>(
-                LostTalesThirdPersonConfig.optionKeys());
+                DefinedCameraOptions.keys());
         orphaned.removeAll(shown);
         assertEquals("camera options not in Settings",
                 new TreeSet<String>(), orphaned);
@@ -72,10 +87,10 @@ public final class SettingsCoverageTest {
         Settings settings = everySection();
         Set<String> strays = new TreeSet<String>(keysKeptIn(settings,
                 Settings.Store.CLIENT_FILE));
-        strays.removeAll(LostTalesConfig.clientOptionKeys());
+        strays.removeAll(DefinedClientOptions.keys());
         Set<String> cameraStrays = new TreeSet<String>(keysKeptIn(settings,
                 Settings.Store.CAMERA_FILE));
-        cameraStrays.removeAll(LostTalesThirdPersonConfig.optionKeys());
+        cameraStrays.removeAll(DefinedCameraOptions.keys());
         strays.addAll(cameraStrays);
         assertEquals("rows naming no option of their file",
                 new TreeSet<String>(), strays);
@@ -85,11 +100,11 @@ public final class SettingsCoverageTest {
     public void noOptionIsBothInSettingsAndKeptInTheFileAlone() {
         Set<String> both = new TreeSet<String>(keysKeptIn(everySection(),
                 Settings.Store.CLIENT_FILE));
-        both.retainAll(LostTalesConfig.FILE_ONLY_CLIENT_KEYS);
+        both.retainAll(FILE_ONLY_CLIENT_KEYS);
         assertEquals(new TreeSet<String>(), both);
         assertTrue("each key kept in the file alone is an option",
-                LostTalesConfig.clientOptionKeys().containsAll(
-                        LostTalesConfig.FILE_ONLY_CLIENT_KEYS));
+                DefinedClientOptions.keys().containsAll(
+                        FILE_ONLY_CLIENT_KEYS));
     }
 
     @Test

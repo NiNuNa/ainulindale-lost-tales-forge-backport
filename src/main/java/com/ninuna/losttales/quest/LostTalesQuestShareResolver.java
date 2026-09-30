@@ -32,15 +32,15 @@ public final class LostTalesQuestShareResolver {
             return null;
         }
         return ChatShowcase.quest(tokenIndex, reference, quest.getTitle(),
-                category(quest), objective(quest, progress), rewards(quest),
-                quest.canStartFromShare());
+                LostTalesQuestCategory.of(quest), objective(quest, progress),
+                rewards(quest), quest.canStartFromShare());
     }
 
     private static String objective(LostTalesQuestDefinition quest,
                                     LostTalesQuestProgress progress) {
-        int stage = Math.max(0, Math.min(progress.getStageIndex(),
-                quest.getStages().size() - 1));
-        if (quest.getStages().isEmpty()) {
+        int stage = LostTalesQuestObjectiveSelection.getCurrentStageIndex(
+                quest, progress);
+        if (stage < 0) {
             return quest.getDescription();
         }
         StringBuilder text = new StringBuilder();
@@ -64,16 +64,6 @@ public final class LostTalesQuestShareResolver {
         return bounded(rewards.length() == 0
                 ? StatCollector.translateToLocal("gui.losttales.quest.reward.pending")
                 : rewards, ChatShowcase.MAX_QUEST_REWARD_BYTES);
-    }
-
-    private static String category(LostTalesQuestDefinition quest) {
-        String id = quest.getId() == null ? "" : quest.getId().toLowerCase();
-        if (id.contains("tutorial")) return "Tutorials";
-        if (id.contains("missive")) return "Missives";
-        if (id.contains("path/")) return "Paths";
-        if (id.contains("faction")) return "Factions";
-        if (id.contains("story") || id.contains("main")) return "Main Story";
-        return "Regional";
     }
 
     private static String bounded(String value, int maximum) {

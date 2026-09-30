@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,13 +36,6 @@ public final class WindowLayout {
     public static final int MIN_WINDOW_SIZE = 40;
     /** Widest and tallest a stored size may be; no screen is anywhere near this. */
     public static final int MAX_WINDOW_SIZE = 4096;
-    /**
-     * The screen a window is cascaded on when there is no client to
-     * measure one: 854 by 480 at GUI scale two, the smallest window the
-     * game opens at. Only ever used off the client.
-     */
-    private static final int HEADLESS_SCREEN_WIDTH = 427;
-    private static final int HEADLESS_SCREEN_HEIGHT = 240;
     private static final String ID_PREFIX = "w";
 
     private static final List<Window> WINDOWS = new ArrayList<Window>();
@@ -56,6 +50,10 @@ public final class WindowLayout {
     /** By a page tab's id, where its window last stood. */
     private static final Map<String, Place> PLACES =
             new LinkedHashMap<String, Place>();
+    /** The ids of the tabs kept in every view ({@link WindowView}). */
+    private static final Set<String> KEPT = new LinkedHashSet<String>();
+    /** The ids of the tabs pinned one by one to stay on screen while playing. */
+    private static final Set<String> PINNED = new LinkedHashSet<String>();
     private static int nextWindowNumber = 1;
     private static Runnable changeListener;
     /** What lays the windows out for a new player; see {@link #reset}. */
@@ -79,6 +77,8 @@ public final class WindowLayout {
      */
     public static synchronized void reset() {
         PLACES.clear();
+        KEPT.clear();
+        PINNED.clear();
         WINDOWS.clear();
         STACK.clear();
         nextWindowNumber = 1;
@@ -93,16 +93,14 @@ public final class WindowLayout {
     }
 
     /**
-     * Adds a window holding {@code tabs}, {@code active} in front, at a
-     * place in percent of the screen's travel: how a system lays out its
-     * windows for a new player, or gives tabs a loaded layout placed
-     * nowhere a home. Null with no tabs; a tab already open elsewhere
-     * stays where it is.
+     * Adds a window holding {@code tabs}, {@code active} in front, at the
+     * default place and locked, as every new window opens: how a system
+     * lays out its windows for a new player, or gives tabs a loaded layout
+     * placed nowhere a home. Null with no tabs; a tab already open
+     * elsewhere stays where it is.
      */
     public static synchronized Window addWindow(List<? extends WindowTab> tabs,
-                                                WindowTab active,
-                                                double offsetX,
-                                                double offsetY) {
+                                                WindowTab active) {
         List<WindowTab> fresh = new ArrayList<WindowTab>();
         if (tabs != null) {
             for (WindowTab tab : tabs) {
@@ -117,20 +115,17 @@ public final class WindowLayout {
         Window window = newWindow();
         window.tabs().addAll(fresh);
         window.setActiveTab(active);
-        window.setOffsets(clampWindowPercent(offsetX),
-                clampWindowPercent(offsetY));
         WINDOWS.add(window);
         return window;
     }
 
     /* ---- Pages ---- */
 
-    /** The height a page's window first opens at, in GUI pixels: a page wants more room than a conversation. */
-    public static final double PAGE_HEIGHT = 292.0D;
-    /** The width a page's window first opens at, in GUI pixels. */
-    public static final int PAGE_WIDTH = 366;
-
-    /** Where a page's window stood as its tab last left it. */
+    /**
+     * Where a page's window stood as its tab last left it: its padlock,
+     * and its own place and size, a size of 0 standing for the default
+     * place.
+     */
     static final class Place {
         final double x;
         final double y;
@@ -138,22 +133,24 @@ public final class WindowLayout {
         final int width;
         /** The part of the screen the window filled; its own box for none. */
         final Window.ScreenFill fill;
+        final boolean locked;
 
         Place(double x, double y, double height, int width,
-              Window.ScreenFill fill) {
+              Window.ScreenFill fill, boolean locked) {
             this.x = x;
             this.y = y;
             this.height = height;
             this.width = width;
             this.fill = fill == null ? Window.ScreenFill.NONE : fill;
+            this.locked = locked;
         }
     }
 
     /**
      * Brings a page forward: in the window holding its tab, the tab put in
      * front there and the window raised; else in a window of its own,
-     * where the page's window last stood, or cascaded from the front
-     * window at a page's size. Null for no page.
+     * where the page's window last stood, or at the default place,
+     * locked. Null for no page.
      */
     public static synchronized Window showPage(PageTab page) {
         if (page == null) {
@@ -173,13 +170,7 @@ public final class WindowLayout {
             created.setOwnHeight(clampWindowHeight(place.height));
             created.setOwnWidth(clampWindowWidth(place.width));
             created.setFill(place.fill);
-        } else {
-            // A page's size is what the window goes back to from a first
-            // fill, as from any other.
-            cascadeFrom(created, frontWindow());
-            created.setOwnHeight(PAGE_HEIGHT);
-            created.setOwnWidth(PAGE_WIDTH);
-            created.setFill(page.page().firstFill());
+            created.setLocked(place.locked);
         }
         created.tabs().add(page);
         created.setActiveTab(page);
@@ -202,7 +193,7 @@ public final class WindowLayout {
                 PLACES.put(tab.id(), new Place(
                         window.getOffsetX(), window.getOffsetY(),
                         window.getOwnHeight(), window.getOwnWidth(),
-                        window.getFill()));
+                        window.getFill(), window.isLocked()));
             }
         }
     }
@@ -217,6 +208,152 @@ public final class WindowLayout {
         PLACES.clear();
         if (places != null) {
             PLACES.putAll(places);
+        }
+    }
+
+    /* ---- Keeping ---- */
+
+    /**
+     * Whether the tab stays on screen whichever key opened it: kept in
+     * every view. A tab keeps it while closed, for when it opens again.
+     */
+    public static synchronized boolean isKept(WindowTab tab) {
+        return tab != null && KEPT.contains(tab.id());
+    }
+
+    /** Keeps the tab in every view, or lets it go back to its own. */
+    public static synchronized boolean setKept(WindowTab tab, boolean kept) {
+        if (tab == null || isKept(tab) == kept) {
+            return false;
+        }
+        if (kept) {
+            KEPT.add(tab.id());
+        } else {
+            KEPT.remove(tab.id());
+        }
+        changed();
+        return true;
+    }
+
+    /** The ids of the tabs kept in every view, for the layout file. */
+    static synchronized Set<String> kept() {
+        return new LinkedHashSet<String>(KEPT);
+    }
+
+    /** What the layout file said of the kept tabs. */
+    static synchronized void loadKept(Set<String> ids) {
+        KEPT.clear();
+        if (ids != null) {
+            KEPT.addAll(ids);
+        }
+    }
+
+    /* ---- Pinning ---- */
+
+    /**
+     * Whether the tab stays on screen while playing, as part of the HUD:
+     * pinned itself, or standing in a window pinned whole. A pinned tab
+     * also stays in every view.
+     */
+    public static synchronized boolean isPinned(WindowTab tab) {
+        if (!staysPut(tab)) {
+            return false;
+        }
+        if (PINNED.contains(tab.id())) {
+            return true;
+        }
+        Window window = windowOf(tab);
+        return window != null && window.isPinned();
+    }
+
+    /**
+     * Whether the tab can be kept or pinned: every tab but a page that
+     * stands for a thing in the world, which closes as the player walks
+     * away from it.
+     */
+    static boolean staysPut(WindowTab tab) {
+        return tab != null && !(tab instanceof PageTab
+                && ((PageTab)tab).page().opensFromWorld());
+    }
+
+    /**
+     * Pins the tab to stay on screen while playing, or lets it go. Letting
+     * go of one tab of a window pinned whole leaves the window's other
+     * tabs pinned, each by itself.
+     */
+    public static synchronized boolean setPinned(WindowTab tab,
+                                                 boolean pinned) {
+        if (!staysPut(tab) || isPinned(tab) == pinned) {
+            return false;
+        }
+        if (pinned) {
+            PINNED.add(tab.id());
+        } else {
+            PINNED.remove(tab.id());
+            Window window = windowOf(tab);
+            if (window != null && window.isPinned()) {
+                window.setPinned(false);
+                for (WindowTab other : window.tabs()) {
+                    if (!other.equals(tab) && staysPut(other)) {
+                        PINNED.add(other.id());
+                    }
+                }
+            }
+        }
+        changed();
+        return true;
+    }
+
+    /**
+     * Pins a whole window, every tab it holds now and later, or lets all
+     * of it go. Either way its tabs stop being pinned one by one: the
+     * window's pin says it for them, or nothing of it is pinned.
+     */
+    public static synchronized boolean setWindowPinned(String windowId,
+                                                       boolean pinned) {
+        Window window = window(windowId);
+        if (window == null) {
+            return false;
+        }
+        boolean any = window.isPinned() != pinned;
+        window.setPinned(pinned);
+        for (WindowTab tab : window.tabs()) {
+            any |= PINNED.remove(tab.id());
+        }
+        if (any) {
+            changed();
+        }
+        return any;
+    }
+
+    /** The windows with something pinned, back to front: what stays on screen while playing. */
+    public static synchronized List<Window> pinnedWindows() {
+        List<Window> result = new ArrayList<Window>();
+        for (Window window : stacked()) {
+            if (window.isPinned()) {
+                result.add(window);
+                continue;
+            }
+            for (WindowTab tab : window.tabs()) {
+                if (PINNED.contains(tab.id())) {
+                    result.add(window);
+                    break;
+                }
+            }
+        }
+        return result;
+    }
+
+    /** The ids of the tabs pinned one by one, for the layout file. */
+    static synchronized Set<String> pinned() {
+        return new LinkedHashSet<String>(PINNED);
+    }
+
+    /** What the layout file said of the pinned tabs. */
+    static synchronized void loadPinned(Set<String> ids) {
+        PINNED.clear();
+        if (ids != null) {
+            PINNED.addAll(ids);
         }
     }
 
@@ -249,15 +386,12 @@ public final class WindowLayout {
     }
 
     /**
-     * Whether {@link #close} would remove the tab: it is open and its
-     * window is unlocked. A locked window keeps the tabs it has — that
-     * is what locking it is for — so no cross is offered on its row and
-     * no shortcut closes one either. Nothing else is refused: the last
-     * tab of the last window closes like any other.
+     * Whether {@link #close} would remove the tab: whether it is open. The
+     * padlock holds a window's place and size, never its tabs, and the
+     * last tab of the last window closes like any other.
      */
     public static synchronized boolean isClosable(WindowTab tab) {
-        Window window = windowOf(tab);
-        return window != null && !window.isLocked();
+        return windowOf(tab) != null;
     }
 
     /**
@@ -274,15 +408,32 @@ public final class WindowLayout {
     }
 
     /**
-     * Closes a whole window: every tab it holds leaves it and the window
-     * itself goes. What stands behind the tabs is untouched, and closing
-     * the last window is allowed. A locked window is refused, as its
-     * individual tabs are.
+     * Closes a window, locked or not: every tab of it the view shows
+     * leaves it, and the window goes with them unless tabs hidden by the
+     * view stay in it for their own view. What stands behind the tabs is
+     * untouched, and closing the last window is allowed.
      */
     public static synchronized boolean closeWindow(String windowId) {
-        Window window = window(windowId);
-        if (window == null || window.isLocked()) {
+        final Window window = window(windowId);
+        if (window == null) {
             return false;
+        }
+        List<WindowTab> leaving = new ArrayList<WindowTab>();
+        for (WindowTab tab : window.tabs()) {
+            if (WindowView.shows(tab)) {
+                leaving.add(tab);
+            }
+        }
+        if (leaving.size() < window.tabs().size()) {
+            final List<WindowTab> taken = leaving;
+            removeTabs(new TabFilter() {
+                @Override
+                public boolean matches(WindowTab tab) {
+                    return taken.contains(tab) && window.contains(tab);
+                }
+            });
+            changed();
+            return true;
         }
         rememberPlaces(window, window.tabs());
         window.tabs().clear();
@@ -290,6 +441,18 @@ public final class WindowLayout {
         dropWindow(window);
         changed();
         return true;
+    }
+
+    /** Whether a window holds a tab the view hides now, which the {@code +} offers. */
+    public static synchronized boolean hasHidden() {
+        for (Window window : WINDOWS) {
+            for (WindowTab tab : window.tabs()) {
+                if (tab.isAvailable() && !WindowView.shows(tab)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** Picks tabs out of the layout; see {@link #removeTabs}. */
@@ -343,8 +506,8 @@ public final class WindowLayout {
      * The tab that comes forward when the one in front at {@code index}
      * leaves a row that holds {@code tabs} without it, as a browser's
      * tabs do: the tab that stood to its right, else the one to its
-     * left, a tab that cannot be shown now passed over while one that
-     * can stands further along. Null for an empty row.
+     * left, a tab not on screen now passed over while one that is stands
+     * further along. Null for an empty row.
      */
     static WindowTab successor(List<WindowTab> tabs, int index) {
         if (tabs.isEmpty()) {
@@ -352,12 +515,12 @@ public final class WindowLayout {
         }
         int from = Math.max(0, Math.min(index, tabs.size()));
         for (int right = from; right < tabs.size(); right++) {
-            if (tabs.get(right).isAvailable()) {
+            if (WindowView.isShown(tabs.get(right))) {
                 return tabs.get(right);
             }
         }
         for (int left = from - 1; left >= 0; left--) {
-            if (tabs.get(left).isAvailable()) {
+            if (WindowView.isShown(tabs.get(left))) {
                 return tabs.get(left);
             }
         }
@@ -365,44 +528,54 @@ public final class WindowLayout {
     }
 
     /**
-     * The window a tab that opens by itself — a conversation, the
-     * console answering a command — belongs in. The window it is asked
-     * for takes it when that window is unlocked and has room for it;
-     * otherwise the most recently used window that does, front of the
-     * stack first; otherwise a new window cascaded from the one asked
-     * for, or from the front window, since there is no limit on windows.
+     * The window a tab opening in no window of its own belongs in, locked
+     * or not, since the padlock holds a window's place, not its tabs: the
+     * window asked for (the one the player opened it from, or the one of
+     * the conversation last used), else the window most recently brought
+     * to the front that holds a tab of its kind, as long as its row has
+     * room for one more; when they are all full, a new window opens at
+     * the default place.
      *
-     * <p>Null once every window has been closed: a tab never opens the
-     * windows back up by itself. The player decides when a window comes
-     * back.</p>
+     * <p>Null when none was asked for and no window holds a tab of its
+     * kind: a tab never opens a window of its own by itself, and waits in
+     * the {@code +} until the player opens one.</p>
      */
     public static synchronized Window receivingWindow(Window preferred,
                                                       WindowTab tab) {
-        if (isEmpty()) {
-            return null;
-        }
+        // A window whose row cannot hold one more tab at its least — the
+        // widest tab whole, every other down to its icon — is full.
         List<WindowTab> candidate = Collections.singletonList(tab);
-        if (preferred != null && WINDOWS.contains(preferred)
-                && !preferred.isLocked() && hasRoomFor(preferred, candidate)) {
+        boolean asked = preferred != null && WINDOWS.contains(preferred);
+        if (asked && hasRoomFor(preferred, candidate)) {
             return preferred;
         }
-        // A window whose row cannot hold one more tab at its least — the
-        // widest tab whole, every other down to its icon — is full: the
-        // window last brought to the front with room takes the tab, and
-        // when every unlocked window is full a new window opens instead.
-        List<Window> byRecency = byRecency();
-        for (int index = 0; index < byRecency.size(); index++) {
-            Window window = byRecency.get(index);
-            if (!window.isLocked() && hasRoomFor(window, candidate)) {
-                return window;
+        boolean ofItsKind = false;
+        for (Window window : byRecency()) {
+            if (window != preferred && holdsKindOf(window, tab)) {
+                ofItsKind = true;
+                if (hasRoomFor(window, candidate)) {
+                    return window;
+                }
             }
         }
+        if (!asked && !ofItsKind) {
+            return null;
+        }
         Window created = newWindow();
-        cascadeFrom(created, preferred != null ? preferred : frontWindow());
         WINDOWS.add(created);
         // A window that has just opened stands in front of the rest.
         raise(created.getId());
         return created;
+    }
+
+    /** Whether the window holds a tab of the same kind as {@code tab}: a conversation, or a page. */
+    private static boolean holdsKindOf(Window window, WindowTab tab) {
+        for (WindowTab held : window.tabs()) {
+            if (held.getClass() == tab.getClass()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -455,17 +628,15 @@ public final class WindowLayout {
     }
 
     /**
-     * Opens a tab in a window of its own, cascaded from the front
-     * window: how a tab comes back when no window is left to put it
-     * in, and what the screen's empty state offers. Refused for a tab
-     * that is already open.
+     * Opens a tab in a window of its own at the default place, locked:
+     * how a tab comes back when no window is left to put it in. Refused
+     * for a tab that is already open.
      */
     public static synchronized WindowTab openInNewWindow(WindowTab tab) {
         if (tab == null || isOpen(tab)) {
             return null;
         }
         Window created = newWindow();
-        cascadeFrom(created, frontWindow());
         created.tabs().add(tab);
         created.setActiveTab(tab);
         WINDOWS.add(created);
@@ -477,9 +648,8 @@ public final class WindowLayout {
     /**
      * Moves a tab to {@code index} of the target window: the place it
      * ends up at once the move is done, clamped to the row, in a window
-     * that may be its own — a reorder — or another one — a dock. A
-     * locked source or target refuses. A source emptied by the move
-     * disappears.
+     * that may be its own — a reorder — or another one — a dock, locked
+     * or not. A source emptied by the move disappears.
      */
     public static synchronized boolean moveTab(WindowTab tab,
                                                String targetWindowId,
@@ -495,9 +665,9 @@ public final class WindowLayout {
      * been lifted out, so a non-contiguous selection lands as one run
      * and a reorder is described by where the tabs go rather than by
      * which neighbour they land beside. Every tab must be open in one
-     * and the same source window; a locked source or target refuses, so
-     * does a target whose row has no room for the tabs at their least,
-     * and a source emptied by the move disappears.
+     * and the same source window; a target whose row has no room for the
+     * tabs at their least refuses, and a source emptied by the move
+     * disappears.
      */
     public static synchronized boolean moveTabs(List<? extends WindowTab> tabs,
                                                 String targetWindowId,
@@ -515,13 +685,10 @@ public final class WindowLayout {
                                                 int index, boolean persist) {
         List<WindowTab> moved = sameWindowTabs(tabs);
         Window target = window(targetWindowId);
-        if (moved.isEmpty() || target == null || target.isLocked()) {
+        if (moved.isEmpty() || target == null) {
             return false;
         }
         Window source = windowOf(moved.get(0));
-        if (source.isLocked()) {
-            return false;
-        }
         WindowTab active = source.getActiveTab();
         List<WindowTab> list = source.tabs();
         if (source == target) {
@@ -591,37 +758,64 @@ public final class WindowLayout {
     }
 
     /**
-     * Takes the tab out of its window into a new window at the given
-     * percent position, as tall and as wide as the window it came from;
-     * a page's own tab takes the size its window last had, or a page's.
-     * A window's only tab dragged out just moves that window. Refused
-     * for a locked source.
+     * Tears tabs off their window by hand into a new window at the given
+     * percent position, {@code width} by {@code height}: the size of the
+     * window they came from. The player placed it, so it opens unlocked.
+     * The tabs keep their relative order. A window's only tabs dragged out
+     * just move that window, which its padlock refuses.
      */
-    public static synchronized Window detach(WindowTab tab, double offsetX,
-                                             double offsetY) {
-        return detach(Collections.singletonList(tab), offsetX, offsetY);
-    }
-
-    /** As above for a group of tabs, which keep their relative order. */
-    public static synchronized Window detach(List<? extends WindowTab> tabs,
-                                             double offsetX,
-                                             double offsetY) {
+    public static synchronized Window tearOff(List<? extends WindowTab> tabs,
+                                              double offsetX, double offsetY,
+                                              int width, double height) {
         List<WindowTab> moved = sameWindowTabs(tabs);
         if (moved.isEmpty()) {
             return null;
         }
         Window source = windowOf(moved.get(0));
-        if (source.isLocked()) {
-            return null;
-        }
         if (source.tabs().size() == moved.size()) {
             // Everything the window held: the window itself moves,
             // rather than an empty one being left behind.
+            if (source.isLocked()) {
+                return null;
+            }
             source.setOffsets(clampWindowPercent(offsetX),
                     clampWindowPercent(offsetY));
             changed();
             return source;
         }
+        Window window = takeOut(source, moved);
+        window.setLocked(false);
+        window.setOwnWidth(clampWindowWidth(width));
+        window.setOwnHeight(clampWindowHeight(height));
+        window.setOffsets(clampWindowPercent(offsetX),
+                clampWindowPercent(offsetY));
+        changed();
+        return window;
+    }
+
+    /**
+     * Moves a tab into a window of its own at the default place, locked,
+     * as every new window opens; null for a tab closed or alone in its
+     * window.
+     */
+    public static synchronized Window moveToOwnWindow(WindowTab tab) {
+        Window source = windowOf(tab);
+        if (source == null || source.tabs().size() < 2) {
+            return null;
+        }
+        Window window = takeOut(source,
+                Collections.<WindowTab>singletonList(tab));
+        raise(window.getId());
+        changed();
+        return window;
+    }
+
+    /**
+     * Lifts {@code moved} out of {@code source} into a new window, the
+     * last of them in front there, and hands the source's front to a
+     * neighbour where one of them held it. Not written.
+     */
+    private static Window takeOut(Window source, List<WindowTab> moved) {
         WindowTab active = source.getActiveTab();
         int activeIndex = source.tabs().indexOf(active);
         int before = countBefore(moved, source, activeIndex);
@@ -631,27 +825,9 @@ public final class WindowLayout {
                     activeIndex - before));
         }
         Window window = newWindow();
-        Place place = moved.size() == 1 && moved.get(0) instanceof PageTab
-                ? PLACES.get(moved.get(0).id()) : null;
-        if (place != null) {
-            window.setOwnHeight(clampWindowHeight(place.height));
-            window.setOwnWidth(clampWindowWidth(place.width));
-        } else if (moved.size() == 1 && moved.get(0) instanceof PageTab) {
-            window.setOwnHeight(PAGE_HEIGHT);
-            window.setOwnWidth(PAGE_WIDTH);
-        } else {
-            // The size the player gave the window the tabs came out of,
-            // so a tab taken out of a tall window is read in a window as
-            // tall, rather than in whatever the game's settings say.
-            window.setOwnHeight(source.getOwnHeight());
-            window.setOwnWidth(source.getOwnWidth());
-        }
         window.tabs().addAll(moved);
         window.setActiveTab(moved.get(moved.size() - 1));
-        window.setOffsets(clampWindowPercent(offsetX),
-                clampWindowPercent(offsetY));
         WINDOWS.add(window);
-        changed();
         return window;
     }
 
@@ -747,6 +923,7 @@ public final class WindowLayout {
                 window.setOffsets(clampWindowPercent(spec.offsetX),
                         clampWindowPercent(spec.offsetY));
                 window.setLocked(spec.locked);
+                window.setPinned(spec.pinned);
                 window.setFill(spec.fill);
                 window.setOwnHeight(clampWindowHeight(spec.height));
                 window.setOwnWidth(clampWindowWidth(spec.width));
@@ -776,7 +953,7 @@ public final class WindowLayout {
             WindowTab active = window.getActiveTab();
             result.add(new WindowSpec(window.getId(), tabs,
                     active != null && active.isKeptInLayout() ? active : null,
-                    window.isLocked(), window.getOffsetX(),
+                    window.isLocked(), window.isPinned(), window.getOffsetX(),
                     window.getOffsetY(), window.getOwnHeight(),
                     window.getOwnWidth(), window.getFill()));
         }
@@ -789,19 +966,20 @@ public final class WindowLayout {
         final List<WindowTab> tabs;
         final WindowTab activeTab;
         final boolean locked;
+        final boolean pinned;
         final double offsetX;
         final double offsetY;
-        /** The window's own height in GUI pixels; 0 follows the game's settings. */
+        /** The window's own height in GUI pixels; 0 stands at the default place. */
         final double height;
-        /** The window's own width in GUI pixels; 0 follows the game's settings. */
+        /** The window's own width in GUI pixels; 0 stands at the default place. */
         final int width;
         /** The part of the screen the window fills; none in its own box. */
         final Window.ScreenFill fill;
 
         public WindowSpec(String id, List<? extends WindowTab> tabs,
                           WindowTab activeTab, boolean locked,
-                          double offsetX, double offsetY, double height,
-                          int width, Window.ScreenFill fill) {
+                          boolean pinned, double offsetX, double offsetY,
+                          double height, int width, Window.ScreenFill fill) {
             this.id = id;
             List<WindowTab> kept = new ArrayList<WindowTab>();
             if (tabs != null) {
@@ -814,6 +992,7 @@ public final class WindowLayout {
             this.tabs = kept;
             this.activeTab = activeTab;
             this.locked = locked;
+            this.pinned = pinned;
             this.offsetX = offsetX;
             this.offsetY = offsetY;
             this.height = clampWindowHeight(height);
@@ -824,11 +1003,11 @@ public final class WindowLayout {
 
     /**
      * Adds a closed tab as a window's last and puts it in front. Refused
-     * for a locked or missing window and a tab already open.
+     * for a missing window and a tab already open.
      */
     public static synchronized boolean addTab(String windowId, WindowTab tab) {
         Window window = window(windowId);
-        if (tab == null || window == null || window.isLocked() || isOpen(tab)) {
+        if (tab == null || window == null || isOpen(tab)) {
             return false;
         }
         window.tabs().add(tab);
@@ -855,9 +1034,9 @@ public final class WindowLayout {
     }
 
     /**
-     * Gives a window its own width, in GUI pixels, or 0 to follow the
-     * game's chat-width setting again. {@code persist} is false while a
-     * resize is in progress so the file is written once, on release.
+     * Gives a window its own width, in GUI pixels. {@code persist} is
+     * false while a resize is in progress so the file is written once, on
+     * release.
      */
     public static synchronized boolean setWindowWidth(String windowId,
                                                       int width,
@@ -997,6 +1176,24 @@ public final class WindowLayout {
     }
 
     /**
+     * Puts a window back as it first opened: at the default place, in
+     * the middle of the screen at two thirds of it, filling no part of
+     * the screen, and locked.
+     */
+    public static synchronized boolean resetWindow(String windowId) {
+        Window window = window(windowId);
+        if (window == null) {
+            return false;
+        }
+        window.setOwnWidth(0);
+        window.setOwnHeight(0.0D);
+        window.setFill(Window.ScreenFill.NONE);
+        window.setLocked(true);
+        changed();
+        return true;
+    }
+
+    /**
      * A window takes a part of the screen, or gives it back with
      * {@link Window.ScreenFill#NONE}, and comes forward.
      */
@@ -1053,11 +1250,10 @@ public final class WindowLayout {
     }
 
     /**
-     * Gives a window its own height in GUI pixels, or 0 to follow the
-     * game's chat settings again. The height is fractional: a window
-     * keeps the exact size it was dragged to. {@code persist} is false
-     * while a resize is in progress so the file is written once, on
-     * release.
+     * Gives a window its own height in GUI pixels. The height is
+     * fractional: a window keeps the exact size it was dragged to.
+     * {@code persist} is false while a resize is in progress so the file
+     * is written once, on release.
      */
     public static synchronized boolean setWindowHeight(String windowId,
                                                        double height,
@@ -1086,80 +1282,16 @@ public final class WindowLayout {
         changed();
     }
 
-    /** The window last brought to the front, else the first; null with none. */
-    private static Window frontWindow() {
-        List<Window> order = byRecency();
-        return order.isEmpty() ? null : order.get(0);
-    }
-
     /**
-     * Puts a window opened by itself one cascade step right and down
-     * from {@code reference}, at that window's size, so windows opened
-     * that way stack as desktop windows do and the same layout
-     * always gives the same place. With no window to cascade from, the
-     * first one lands where the default layout puts its conversation
-     * window. Measured in the boxes the windows are drawn in when there
-     * is a client to measure with, and otherwise on a screen of a fixed
-     * size: the rule is the same either way, only the pixels differ.
+     * A new window, at the default place and locked: every window opens
+     * in the middle of the screen at two thirds of it, and stays there
+     * until the player unlocks it and moves it.
      */
-    private static void cascadeFrom(Window created, Window reference) {
-        if (reference == null) {
-            created.setOffsets(0.0D, 100.0D);
-            return;
-        }
-        // The size the player gave the window it comes from, as a
-        // detached tab's window takes it.
-        created.setOwnHeight(reference.getOwnHeight());
-        created.setOwnWidth(reference.getOwnWidth());
-        net.minecraft.client.Minecraft minecraft = clientMinecraft();
-        int screenWidth = HEADLESS_SCREEN_WIDTH;
-        int screenHeight = HEADLESS_SCREEN_HEIGHT;
-        if (minecraft != null) {
-            try {
-                net.minecraft.client.gui.ScaledResolution resolution =
-                        new net.minecraft.client.gui.ScaledResolution(minecraft,
-                                minecraft.displayWidth, minecraft.displayHeight);
-                screenWidth = resolution.getScaledWidth();
-                screenHeight = resolution.getScaledHeight();
-            } catch (RuntimeException unavailable) {
-                minecraft = null;
-            }
-        }
-        // The new window is placed by its tab row: the corner is where
-        // the row lands at the size the window opens at, the way a tab
-        // torn off a row is placed, so the new window's row stands a step
-        // below the reference's whatever height it opens at. A reference
-        // filling the screen is measured by the box it goes back to.
-        WindowPlacement.Box from = WindowPlacement.restingBounds(
-                reference, minecraft, screenWidth, screenHeight);
-        int width = WindowPlacement.windowWidth(created, minecraft);
-        double height = WindowPlacement.currentHeight(created, minecraft);
-        WindowCascade.Corner corner = WindowCascade.place(
-                from.x, from.y, width, height, screenWidth,
-                screenHeight, WindowPlacement.EDGE_MARGIN,
-                WindowCascade.STEP);
-        double baseline = WindowPlacement.baselineForRowTop(
-                created, minecraft, corner.y);
-        created.setOffsets(
-                clampWindowPercent(WindowPlacement.windowPercentX(
-                        created, corner.x, minecraft, screenWidth)),
-                clampWindowPercent(WindowPlacement.windowPercentY(
-                        created, baseline, minecraft, screenHeight)));
-    }
-
-    /** The running client, or null headlessly or before it exists. */
-    private static net.minecraft.client.Minecraft clientMinecraft() {
-        try {
-            return net.minecraft.client.Minecraft.getMinecraft();
-        } catch (RuntimeException unavailable) {
-            return null;
-        } catch (LinkageError unavailable) {
-            return null;
-        }
-    }
-
     private static Window newWindow() {
-        return new Window(ID_PREFIX + nextWindowNumber++);
+        Window window = new Window(ID_PREFIX + nextWindowNumber++);
+        window.setOffsets(50.0D, 50.0D);
+        window.setLocked(true);
+        return window;
     }
 
     /** Takes an emptied window out of the layout. */

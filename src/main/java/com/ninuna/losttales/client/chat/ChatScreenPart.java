@@ -90,16 +90,6 @@ import org.lwjgl.opengl.GL11;
 public final class ChatScreenPart extends ScreenPart {
     /** Gap between the typing line's bubble and its words. */
     private static final int TYPING_BUBBLE_GAP = 3;
-    /**
-     * The empty state's strip: as tall as a window's tab row, so what
-     * stands where the chat would be reads as a piece of the same
-     * interface, and with the same clear space around its contents the
-     * row keeps around its own.
-     */
-    private static final int EMPTY_STATE_HEIGHT = TabRow.ROW_HEIGHT;
-    private static final int EMPTY_STATE_PADDING = 4;
-    /** Gap between the + and the line beside it. */
-    private static final int EMPTY_STATE_GAP = 5;
 
     /** The chat's part, on every screen with a world; without one there is no chat. */
     private static final ScreenPart.Maker MAKER = new ScreenPart.Maker() {
@@ -111,6 +101,9 @@ public final class ChatScreenPart extends ScreenPart {
 
     /** Set once a message or command has gone out; the draft is then spent. */
     private boolean sent;
+    /** How often the drafts are written while the chat is open: every five seconds. */
+    private static final int DRAFT_SAVE_TICKS = 100;
+    private int draftTicks;
     /** The short notice over the bar, offered to every collaborator. */
     private final ChatNoticeSink notices = new ChatNoticeSink() {
         @Override
@@ -138,11 +131,6 @@ public final class ChatScreenPart extends ScreenPart {
     /** The game's chat field, drawn the chat's way. */
     private ChatInputField inputField;
     private URI clickedLinkUri;
-    /** The empty state's + as drawn this frame; width zero while none was. */
-    private int emptyPlusLeft;
-    private int emptyPlusTop;
-    private int emptyPlusRight;
-    private int emptyPlusBottom;
     private String composingIdentityKey;
     /**
      * The window whose bar is live as this frame's windows began: the
@@ -209,8 +197,16 @@ public final class ChatScreenPart extends ScreenPart {
      */
     @Override
     public void opening(PageTab forPage) {
+        if (forPage != null || !this.screen.isOpenedForChat()) {
+            return;
+        }
+        // With every conversation window closed, the chat opens as a new
+        // player's does: its first window, in the middle.
+        if (!ChatLayout.hasConversationWindow()) {
+            ChatLayout.openFirstWindow();
+        }
         ChatTab last = ClientChatChannelState.lastUsed();
-        if (forPage != null || last == null) {
+        if (last == null) {
             return;
         }
         ClientChatChannelState.select(last);
@@ -298,6 +294,12 @@ public final class ChatScreenPart extends ScreenPart {
         if (!this.sent) {
             ClientChatChannelState.setDraft(this.inputField.getText());
         }
+        // What is being typed is written down now and then, so a crash
+        // takes a few seconds of it at most.
+        if (++this.draftTicks >= DRAFT_SAVE_TICKS) {
+            this.draftTicks = 0;
+            ClientChatDrafts.save();
+        }
         this.outbox.updateTyping(this.inputField.getText(),
                 ClientChatChannelState.getSelected());
     }
@@ -314,9 +316,11 @@ public final class ChatScreenPart extends ScreenPart {
         }
         ClientChatChannelViews.setScrollEasingSuppressed(false);
         // Every divider that was on a viewed tab has done its job, and
-        // how far the tabs were read is written down.
+        // how far the tabs were read is written down, as is what was left
+        // unsent.
         ClientChatChannelViews.dismissSeenDividers();
         ClientChatReadMarks.save();
+        ClientChatDrafts.save();
         this.outbox.stopTyping();
     }
 
@@ -633,12 +637,6 @@ public final class ChatScreenPart extends ScreenPart {
 
     /* ---- The pointer ---- */
 
-    @Override
-    public WindowHover hoverEmpty(double x, double y) {
-        return emptyStateContains(x, y)
-                ? new ChatHover(ChatHover.Kind.EMPTY_PLUS) : null;
-    }
-
     /** The completion lists, which hang from the bar over everything. */
     @Override
     public WindowHover hoverOverAll(double x, double y) {
@@ -732,14 +730,14 @@ public final class ChatScreenPart extends ScreenPart {
             }
         }
         // A window's member list, where it stands: its left edge resizes
-        // it — while the list stands whole in an unlocked window — a
-        // member's row opens their card, and the list around them
-        // answers nothing.
+        // it while the list stands whole — the padlock holds the window's
+        // size, not what is inside it — a member's row opens their card,
+        // and the list around them answers nothing.
         ChatFrame listed = ChatFrame.drawnAt(x, y);
         if (listed != null && listed.membersShare() >= 1.0F
                 && ChatMemberList.edgeContains(listed.members, x, y)) {
             Window listWindow = WindowLayout.window(listed.windowId);
-            if (listWindow != null && !listWindow.isLocked()) {
+            if (listWindow != null) {
                 ChatHover hover = new ChatHover(
                         ChatHover.Kind.MEMBER_LIST_EDGE);
                 hover.frame = listed;
@@ -827,9 +825,6 @@ public final class ChatScreenPart extends ScreenPart {
             return null;
         }
         switch (chat.chatKind) {
-            case EMPTY_PLUS:
-                return StatCollector.translateToLocal(
-                        "gui.losttales.window.tab.restore");
             case REPLY_CHIP:
                 return StatCollector.translateToLocal(
                         "gui.losttales.chat.message.cancel_reply");
@@ -915,17 +910,6 @@ public final class ChatScreenPart extends ScreenPart {
                 || ChatHover.is(hover, ChatHover.Kind.INDICATOR)
                 || ChatHover.is(hover, ChatHover.Kind.SEND_BUTTON)
                 || ChatHover.is(hover, ChatHover.Kind.TOOLBAR_TOGGLE);
-    }
-
-    @Override
-    public boolean pressEmpty(WindowHover press, int mouseX, int mouseY,
-                              int button) {
-        // The + is the whole of the screen's furniture here, a switch
-        // like every +.
-        if (button == 0 && ChatHover.is(press, ChatHover.Kind.EMPTY_PLUS)) {
-            this.screen.toggleOpenFromEmpty();
-        }
-        return true;
     }
 
     /** A press on a picker, which has just come in front: a cell chosen, a label folded. */
@@ -1293,18 +1277,15 @@ public final class ChatScreenPart extends ScreenPart {
     }
 
     /**
-     * What stands over every window, under the sub-windows: with nothing
-     * open, what the screen shows instead of a bar with no channel
-     * behind it; with only pages, the notice; else the live bar.
+     * What stands over every window, under the sub-windows: with no
+     * window open (Settings alone on the screen), only the notice; with
+     * only pages, the notice; else the live bar.
      */
     @Override
     public void drawUnderSubWindows(boolean empty, boolean typing,
                                     double pointerX, double pointerY) {
         WindowHover hover = this.screen.hover();
         if (empty) {
-            boolean onPlus = ChatHover.is(hover, ChatHover.Kind.EMPTY_PLUS);
-            drawEmptyState(onPlus ? pointerX : WindowHover.AWAY,
-                    onPlus ? pointerY : WindowHover.AWAY);
             this.bar.drawNotice();
             return;
         }
@@ -1810,65 +1791,6 @@ public final class ChatScreenPart extends ScreenPart {
                 : tip + ": " + StatCollector.translateToLocal(why);
     }
 
-    /**
-     * What the screen shows with nothing open: one strip where the chat
-     * would be, carrying a {@code +} that opens a channel, and a line
-     * saying so. Placed and sized from the closed-chat feed's own box,
-     * so it lands where the messages do at any resolution or GUI scale.
-     */
-    private void drawEmptyState(double mouseX, double mouseY) {
-        WindowPlacement.Box box = ChatFeedPlacement.bounds(
-                this.mc, this.screen.width, this.screen.height);
-        int left = (int)Math.round(box.x);
-        int right = left + box.width;
-        int bottom = (int)Math.round(box.baseline());
-        int top = bottom - EMPTY_STATE_HEIGHT;
-        LostTalesChatOverlayRenderer.drawBackdropRow(left, top, right,
-                bottom, LostTalesChatOverlayRenderer.backdropRowAlpha(
-                        this.mc));
-        LostTalesUiRules.drawRule(left, right, top, top + 1,
-                0xFF);
-        LostTalesUiRules.drawRule(left, right, bottom - 1,
-                bottom, 0xFF);
-        this.emptyPlusLeft = left + EMPTY_STATE_PADDING;
-        this.emptyPlusTop = top + (EMPTY_STATE_HEIGHT
-                - TabRow.END_CONTROL_SIZE) / 2;
-        this.emptyPlusRight = this.emptyPlusLeft
-                + TabRow.END_CONTROL_SIZE;
-        this.emptyPlusBottom = this.emptyPlusTop
-                + TabRow.END_CONTROL_SIZE;
-        boolean hovered = emptyStateContains(mouseX, mouseY);
-        // The rules and the band are built from filled quads, which
-        // leave blending off behind them; everything drawn after one
-        // turns it back on for itself.
-        LostTalesUiInk.beginContent();
-        LostTalesUiSheet plus = hovered
-                ? LostTalesUiSheet.PLUS_HOVER : LostTalesUiSheet.PLUS;
-        plus.drawWithShadow(this.emptyPlusLeft
-                        + (TabRow.END_CONTROL_SIZE
-                                - plus.getWidth()) / 2,
-                this.emptyPlusTop + (TabRow.END_CONTROL_SIZE
-                        - plus.getHeight()) / 2, 0xFF);
-        int textX = this.emptyPlusRight + EMPTY_STATE_GAP;
-        int room = Math.max(0, right - EMPTY_STATE_PADDING - textX);
-        LostTalesUiInk.drawText(this.fontRendererObj,
-                "§o" + this.fontRendererObj.trimStringToWidth(
-                        StatCollector.translateToLocal(
-                                "gui.losttales.chat.no_channels"), room),
-                textX, top + LostTalesUiInk.centredStart(EMPTY_STATE_HEIGHT,
-                        LostTalesUiInk.CAP_HEIGHT),
-                LostTalesChatVisualStyle.asideRgb(), 0xFF);
-        this.screen.regions().add(this.emptyPlusLeft, this.emptyPlusTop,
-                this.emptyPlusRight, this.emptyPlusBottom);
-    }
-
-    /** Whether the point is on the empty state's + as drawn last frame. */
-    private boolean emptyStateContains(double mouseX, double mouseY) {
-        return LostTalesUiHitBox.contains(mouseX, mouseY, this.emptyPlusLeft,
-                this.emptyPlusTop, this.emptyPlusRight - this.emptyPlusLeft,
-                this.emptyPlusBottom - this.emptyPlusTop);
-    }
-
     /** Whether a press on the window brings it forward: it is not the one being typed in. */
     private static boolean bringsForward(ChatFrame frame) {
         Window window = WindowLayout.window(frame.windowId);
@@ -2347,7 +2269,7 @@ public final class ChatScreenPart extends ScreenPart {
             return false;
         }
         if (!ChatLayout.isOpen(tab)) {
-            tab = ChatLayout.openTab(tab, band.frame.windowId);
+            tab = ChatLayout.openHere(tab, band.frame.windowId);
             if (tab == null) {
                 return false;
             }
@@ -2672,7 +2594,7 @@ public final class ChatScreenPart extends ScreenPart {
             return;
         }
         if (!ChatLayout.isOpen(tab)) {
-            tab = ChatLayout.openTab(tab,
+            tab = ChatLayout.openHere(tab,
                     LostTalesChatPresentation.windowIdOfSelection());
             if (tab == null) {
                 showNotice(StatCollector.translateToLocal(
@@ -2721,19 +2643,6 @@ public final class ChatScreenPart extends ScreenPart {
     /** A short confirmation above the bar: what the bar draws. */
     void showNotice(String text) {
         this.bar.showNotice(text);
-    }
-
-    /**
-     * Where a menu the empty state's {@code +} opens hangs: the {@code +}
-     * itself, toward the middle of the screen, which is all there is;
-     * null while something is open.
-     */
-    @Override
-    public SubWindowAnchor emptyPlusAnchor() {
-        return WindowScreen.isEmpty() ? SubWindowAnchor.inward(
-                this.emptyPlusLeft, this.emptyPlusTop, this.emptyPlusRight,
-                this.emptyPlusBottom, 0.0D, 0.0D, this.screen.width, this.screen.height,
-                null) : null;
     }
 
     /**

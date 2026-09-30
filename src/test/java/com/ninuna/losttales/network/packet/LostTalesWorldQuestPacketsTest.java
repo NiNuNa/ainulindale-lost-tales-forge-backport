@@ -2,6 +2,8 @@ package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.world.WorldQuestFixtures;
+import com.ninuna.losttales.quest.world.WorldQuestNbtCodec;
+import com.ninuna.losttales.quest.world.WorldQuestRules;
 import com.ninuna.losttales.quest.world.WorldQuestRun;
 import com.ninuna.losttales.quest.world.WorldQuestView;
 import com.ninuna.losttales.quest.world.WorldQuestWorldData;
@@ -58,7 +60,7 @@ public final class LostTalesWorldQuestPacketsTest {
 
     @Test
     public void eachPlayerIsSentTheirOwnPart() {
-        WorldQuestWorldData data = new WorldQuestWorldData();
+        WorldQuestWorldData data = new WorldQuestWorldData(WorldQuestWorldData.DATA_NAME);
         data.start("losttales:world/greenway", 0L, 1000L);
         data.add("losttales:world/greenway", "orcs", 4, 500, this.aldric);
         data.add("losttales:world/greenway", "orcs", 6, 500,
@@ -77,6 +79,55 @@ public final class LostTalesWorldQuestPacketsTest {
         assertEquals(2, view.getHelpers());
         assertEquals(4, view.getMine());
         assertEquals(1000L, view.getEndsAt());
+    }
+
+    /** The fullest store the world keeps still goes in one packet a client reads. */
+    @Test
+    public void everyRunTheWorldKeepsFitsOnePacket() {
+        WorldQuestWorldData data = new WorldQuestWorldData(
+                WorldQuestWorldData.DATA_NAME);
+        for (int run = 0; run < WorldQuestNbtCodec.MAX_RUNS; run++) {
+            String questId = longest("q" + run);
+            data.start(questId, 0L, 1000L);
+            for (int count = 0; count < WorldQuestNbtCodec.MAX_COUNTS;
+                 count++) {
+                data.add(questId, longest("o" + count), 1, 5, this.aldric);
+            }
+        }
+        ByteBuf buffer = Unpooled.buffer();
+        LostTalesWorldQuestSyncPacket.of(data.runs(), this.aldric)
+                .toBytes(buffer);
+        LostTalesWorldQuestSyncPacket decoded =
+                new LostTalesWorldQuestSyncPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals(WorldQuestNbtCodec.MAX_RUNS, decoded.getViews().size());
+    }
+
+    /** A run the world read with an id too long to send is left out, never breaking the packet. */
+    @Test
+    public void aRunThatCannotBeSentIsLeftOut() {
+        WorldQuestWorldData data = new WorldQuestWorldData(
+                WorldQuestWorldData.DATA_NAME);
+        data.start(longest("q") + "x", 0L, 1000L);
+        data.start("losttales:world/greenway", 0L, 1000L);
+        ByteBuf buffer = Unpooled.buffer();
+        LostTalesWorldQuestSyncPacket.of(data.runs(), this.aldric)
+                .toBytes(buffer);
+        LostTalesWorldQuestSyncPacket decoded =
+                new LostTalesWorldQuestSyncPacket();
+        decoded.fromBytes(buffer);
+        assertFalse(decoded.isMalformed());
+        assertEquals(1, decoded.getViews().size());
+    }
+
+    /** {@code prefix} padded to the longest id a world quest may send. */
+    private static String longest(String prefix) {
+        StringBuilder id = new StringBuilder(prefix);
+        while (id.length() < WorldQuestRules.MAX_ID_BYTES) {
+            id.append('x');
+        }
+        return id.toString();
     }
 
     @Test

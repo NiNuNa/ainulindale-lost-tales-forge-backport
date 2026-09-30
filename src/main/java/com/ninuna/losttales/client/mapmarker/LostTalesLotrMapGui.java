@@ -215,6 +215,13 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
     /** The page the map stands on in a window; null on a screen of its own. */
     private LostTalesMapPage page;
     /**
+     * Whether the map stands pinned on the screen while playing. It then
+     * keeps the player in the middle, shows no legend, takes no focus meant
+     * for the open map, and leaves the remembered view as the player left
+     * it on the window screen.
+     */
+    private boolean following;
+    /**
      * What LOTR says about the place under the pointer — its region and
      * its coordinates — kept for the window's bar, where the map in a
      * window shows them.
@@ -242,7 +249,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             return null;
         }
         // The ordinary map opens in its window, filling the screen the
-        // first time and where it was left after that (M1 a).
+        // first time and where it was left after that.
         if (isOrdinary(original) && LostTalesMapPage.standsInWindow()) {
             GuiScreen window = WindowScreen.screenForPage(
                     LostTalesMapPage.PAGE_ID);
@@ -287,6 +294,47 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
     /** Whether the map stands in a window rather than on a screen of its own. */
     boolean inWindow() {
         return this.page != null;
+    }
+
+    /** The map stands pinned on the screen while playing, or on the window screen again. */
+    void setFollowing(boolean following) {
+        this.following = following;
+    }
+
+    /**
+     * Puts the camera over the player where they stand this frame, held
+     * still there. Outside Middle-earth the map stays where it was.
+     */
+    private void followPlayer(float partialTicks) {
+        if (this.mc == null || this.mc.thePlayer == null
+                || this.mc.thePlayer.dimension
+                != LOTRDimension.MIDDLE_EARTH.dimensionID) {
+            return;
+        }
+        float[] camera = new float[
+                LostTalesMapCameraFocus.CAMERA_STATE_SIZE];
+        if (!LostTalesMapCameraFocus.captureCamera(this, camera)) {
+            return;
+        }
+        double x = this.mc.thePlayer.prevPosX + (this.mc.thePlayer.posX
+                - this.mc.thePlayer.prevPosX) * partialTicks;
+        double z = this.mc.thePlayer.prevPosZ + (this.mc.thePlayer.posZ
+                - this.mc.thePlayer.prevPosZ) * partialTicks;
+        float posX = LostTalesLotrMapRotation.clampToMapImage(
+                (float)LostTalesMapCoordinateHelper
+                        .worldToRenderedMapImageX(x),
+                LostTalesLotrMapRotation.mapImageWidth());
+        float posY = LostTalesLotrMapRotation.clampToMapImage(
+                (float)LostTalesMapCoordinateHelper
+                        .worldToRenderedMapImageZ(z),
+                LostTalesLotrMapRotation.mapImageHeight());
+        camera[0] = posX;
+        camera[1] = posY;
+        camera[2] = posX;
+        camera[3] = posY;
+        camera[4] = 0.0F;
+        camera[5] = 0.0F;
+        LostTalesMapCameraFocus.restoreCamera(this, camera);
     }
 
     /* ---- What the window's strip and bar ask of the map ---- */
@@ -664,7 +712,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         float[] camera = new float[
                 LostTalesMapCameraFocus.CAMERA_STATE_SIZE];
         // In a window the map answers WASD and the arrows only while it
-        // holds the keys: typing in a chat bar never moves it (M3 a).
+        // holds the keys: typing in a chat bar never moves it.
         boolean keysElsewhere = this.page != null && !this.page.hasKeys();
         boolean frozen = (isModalOpen() || keysElsewhere)
                 && LostTalesMapCameraFocus.captureCamera(this, camera);
@@ -1343,8 +1391,11 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
                 .clearInvalidLotrSelection(this);
         long now = System.nanoTime();
         // After initGui has restored the remembered view and before the
-        // camera advances, so a shared location flies in from there.
-        consumePendingFocus();
+        // camera advances, so a shared location flies in from there. It
+        // waits for the open map: a pinned one only follows the player.
+        if (!this.following) {
+            consumePendingFocus();
+        }
         // A pass that throws part way through cannot leave the map stuck
         // drawing as though it were square.
         LostTalesLotrMapRotation.clearSheetPasses();
@@ -1353,10 +1404,12 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         advanceMapRotation(now);
         // Ahead of LOTR's own panning so a focus in progress owns the camera
         // for this frame and a drag can take it back on the next one.
-        if (this.cameraFocus.advance(this, now)) {
+        if (this.following) {
+            followPlayer(partialTicks);
+        } else if (this.cameraFocus.advance(this, now)) {
             applyFocusZoom(this.cameraFocus.getCurrentZoomExp());
         }
-        boolean freezeCamera = isModalOpen()
+        boolean freezeCamera = this.following || isModalOpen()
                 || LostTalesGuiAnimations.isContentAnimating(this);
         if (freezeCamera) {
             // LOTR drags from inside its own draw by polling the mouse and
@@ -1395,8 +1448,10 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
                 this, mouseX);
         int fixedMouseY = LostTalesGuiAnimations.forwardMouseY(
                 this, mouseY);
-        LostTalesLotrMapLegend.render(
-                this, fixedMouseX, fixedMouseY);
+        if (!this.following) {
+            LostTalesLotrMapLegend.render(
+                    this, fixedMouseX, fixedMouseY);
+        }
         if (this.fastTravelPrompt != null) {
             this.fastTravelPrompt.render(
                     this, fixedMouseX, fixedMouseY,
@@ -2640,7 +2695,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             return;
         }
         // In a window the screen answers M and J before the map does:
-        // they are the pages' keys (N1 a).
+        // they are the pages' keys.
         if (LostTalesKeyBindings.isMapKey(keyCode)) {
             closeMap();
             return;
@@ -2789,7 +2844,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
      * remembered: it is not this view.</p>
      */
     private void rememberView() {
-        if (!this.smoothZoomInitialized
+        if (this.following || !this.smoothZoomInitialized
                 || !LostTalesLotrMapLayout.isFullscreenLayoutActive(this)) {
             return;
         }

@@ -8,7 +8,7 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 /**
- * A page's answer over its bar (W2 a): done and refused answers stand
+ * A page's answer over its bar: done and refused answers stand
  * their hold and go, a working answer and a fault stand until the page
  * says something else, and a new answer takes the old one's place.
  */

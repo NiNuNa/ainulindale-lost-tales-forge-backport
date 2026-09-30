@@ -32,10 +32,6 @@ public final class ChatMuteWorldData extends WorldSavedData {
     private int unsupportedDataVersion = -1;
     private NBTTagCompound preservedNewerData;
 
-    public ChatMuteWorldData() {
-        this(DATA_NAME);
-    }
-
     public ChatMuteWorldData(String name) {
         super(name);
     }

@@ -7,6 +7,7 @@ import com.ninuna.losttales.client.quest.ClientQuestCatalog;
 import com.ninuna.losttales.client.quest.ClientQuestEntry;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestNotificationStore;
+import com.ninuna.losttales.client.quest.QuestMarks;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.hud.HudPlacementLayout;
 import com.ninuna.losttales.gui.hud.LostTalesNotificationHud;
@@ -211,16 +212,15 @@ public final class LostTalesQuestHudRenderer {
             int target = 0;
             boolean complete = !entry.getObjectives().isEmpty();
             for (ClientQuestEntry.Objective objective : entry.getObjectives()) {
-                String line = (objective.isComplete() ? "✓ " : "◇ ")
-                        + objective.getText();
+                String line = (objective.isComplete() ? QuestMarks.DONE
+                        : QuestMarks.OPEN) + " " + objective.getText();
                 objectiveLines.add(line);
                 current += Math.min(objective.getCurrent(), objective.getTarget());
                 target += objective.getTarget();
                 complete &= objective.isComplete();
             }
             if (objectiveLines.isEmpty()) {
-                objectiveLines.add("\u25c7 " + StatCollector.translateToLocal(
-                        "gui.losttales.quest.objective.none"));
+                objectiveLines.add(noObjective());
                 target = 1;
                 complete = false;
             }
@@ -408,20 +408,32 @@ public final class LostTalesQuestHudRenderer {
             int a = MathHelper.clamp_int((int) (alpha * 210.0F), 0, 210);
             int y = LostTalesNotificationHud.claim(resolution.getScaledWidth(),
                     resolution.getScaledHeight(), NOTIFICATION_HEIGHT);
-            int background = (a << 24);
-            int border = (MathHelper.clamp_int((int) (alpha * 170.0F), 0, 170) << 24) | notification.getType().getColor();
+            int accent = notification.getType().getColor();
+            int background = LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK, a);
+            int border = LostTalesColors.withAlpha(accent,
+                    MathHelper.clamp_int((int) (alpha * 170.0F), 0, 170));
             int textColor = LostTalesColors.withAlpha(LostTalesColors.TEXT_BRIGHT,
                     MathHelper.clamp_int((int)(alpha * 255.0F), 0, 255));
-            int accentColor = (MathHelper.clamp_int((int) (alpha * 255.0F), 0, 255) << 24) | notification.getType().getColor();
+            int accentColor = LostTalesColors.withAlpha(accent,
+                    MathHelper.clamp_int((int) (alpha * 255.0F), 0, 255));
 
-            Gui.drawRect(x + 1, y + 1, x + NOTIFICATION_WIDTH + 1, y + NOTIFICATION_HEIGHT + 1, MathHelper.clamp_int((int) (alpha * 95.0F), 0, 95) << 24);
+            Gui.drawRect(x + 1, y + 1, x + NOTIFICATION_WIDTH + 1, y + NOTIFICATION_HEIGHT + 1,
+                    LostTalesColors.withAlpha(LostTalesColors.PLUM_BLACK,
+                            MathHelper.clamp_int((int) (alpha * 95.0F), 0, 95)));
             Gui.drawRect(x, y, x + NOTIFICATION_WIDTH, y + NOTIFICATION_HEIGHT, background);
             Gui.drawRect(x, y, x + 3, y + NOTIFICATION_HEIGHT, border);
             Gui.drawRect(x, y + NOTIFICATION_HEIGHT - 1, x + NOTIFICATION_WIDTH, y + NOTIFICATION_HEIGHT, accentColor);
             String title = notification.getType().getDisplayTitle();
+            LostTalesSkyrimUiStyle.beginContent();
             font.drawStringWithShadow(trimToWidth(font, title, NOTIFICATION_WIDTH - 16), x + 8, y + 4, accentColor);
             font.drawStringWithShadow(trimToWidth(font, notification.getMessage(), NOTIFICATION_WIDTH - 16), x + 8, y + 17, textColor);
         }
+    }
+
+    /** The tracker's line for a quest with nothing to do right now. */
+    private static String noObjective() {
+        return QuestMarks.OPEN + " " + StatCollector.translateToLocal(
+                "gui.losttales.quest.objective.none");
     }
 
     private static String trimToWidth(FontRenderer font, String text, int width) {
@@ -460,7 +472,7 @@ public final class LostTalesQuestHudRenderer {
                 for (String objective : objectiveText) {
                     String safeObjective = objective == null
                             || objective.length() == 0
-                            ? "\u25C7 No objective" : objective;
+                            ? noObjective() : objective;
                     List<String> objectiveWrapped = font == null
                             ? Collections.singletonList(safeObjective)
                             : font.listFormattedStringToWidth(safeObjective,
@@ -469,7 +481,7 @@ public final class LostTalesQuestHudRenderer {
                 }
             }
             if (wrapped.isEmpty()) {
-                wrapped.add("\u25C7 No objective");
+                wrapped.add(noObjective());
             }
             this.objectiveLines = wrapped;
         }

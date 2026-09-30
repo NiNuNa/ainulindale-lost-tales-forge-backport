@@ -119,13 +119,12 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
             return;
         }
         String key = args[1].toLowerCase(Locale.ROOT);
-        ChatCodeNames.Named named = ChatCodeNames.parse(key);
-        if (named == null || !named.channel.isBridgeable()) {
-            LostTalesCommandConfig.send(sender, EnumChatFormatting.RED
-                    + "Cannot link " + args[1] + ": name a channel that may reach"
-                    + " Discord, or a faction such as gondor.");
+        String refusal = linkRefusal(args[1]);
+        if (refusal != null) {
+            LostTalesCommandConfig.send(sender, EnumChatFormatting.RED + refusal);
             return;
         }
+        ChatCodeNames.Named named = ChatCodeNames.parse(key);
         DiscordBridgeDirection direction = args.length > 2
                 ? DiscordBridgeDirection.parse(args[2]) : DiscordBridgeDirection.BIDIRECTIONAL;
         if (direction == null || direction == DiscordBridgeDirection.DISABLED) {
@@ -138,11 +137,16 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
             // Nobody on Discord stands near anyone.
             direction = DiscordBridgeDirection.GAME_TO_DISCORD;
         }
-        if (!LostTalesDiscordBridge.getInstance().canPair()) {
+        LostTalesDiscordBridge bridge = LostTalesDiscordBridge.getInstance();
+        if (!bridge.canPair()) {
             LostTalesCommandConfig.send(sender, EnumChatFormatting.RED
-                    + "Linking needs the Discord bot connected with its slash commands:"
-                    + " set discord.enabled, discord.botToken, discord.gateway and"
-                    + " discord.slashCommands.");
+                    + (bridge.isGatewayClosedForGood()
+                            ? "The Discord bot is not connected: Discord closed its"
+                                    + " connection for good, and the server log says why."
+                                    + " Put that right, then /losttales discord reload."
+                            : "Linking needs the Discord bot connected with its slash"
+                                    + " commands: set discord.enabled, discord.botToken,"
+                                    + " discord.gateway and discord.slashCommands."));
             return;
         }
         UUID issuer = sender instanceof EntityPlayerMP
@@ -161,6 +165,26 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
                     + " in the game. On Discord, everyone who can see the linked channel"
                     + " reads it: link it to a channel only your staff can see.");
         }
+    }
+
+    /**
+     * Why the game channel {@code typed} names cannot be linked, as the
+     * command says it; null when it can. A private channel never leaves
+     * the game, and a channel whose gate lets nobody read it would carry
+     * nothing.
+     */
+    static String linkRefusal(String typed) {
+        String key = typed == null ? "" : typed.toLowerCase(Locale.ROOT);
+        ChatCodeNames.Named named = ChatCodeNames.parse(key);
+        if (named == null || !named.channel.isBridgeable()) {
+            return "Cannot link " + typed + ": name a channel that may reach"
+                    + " Discord, or a faction such as gondor.";
+        }
+        if (!DiscordBridgePolicy.isOpenToTheBridge(named.channel)) {
+            return "Cannot link " + typed + ": its gate in channels.cfg lets"
+                    + " nobody read it, so nothing would cross.";
+        }
+        return null;
     }
 
     /**

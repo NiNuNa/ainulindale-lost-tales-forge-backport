@@ -768,6 +768,19 @@ public final class Settings {
                     LostTalesConfig.hideHudWithWindows = on;
                 }
             });
+            windows.add(new Numeric("pinnedWindowOpacity",
+                    "gui.losttales.window.settings.pinned_opacity", 5.0D, 0) {
+                @Override
+                protected double get() {
+                    return LostTalesConfig.pinnedWindowOpacity;
+                }
+
+                @Override
+                protected void set(double value) {
+                    LostTalesConfig.pinnedWindowOpacity =
+                            (int)Math.round(value);
+                }
+            });
             return windows;
         }
     }

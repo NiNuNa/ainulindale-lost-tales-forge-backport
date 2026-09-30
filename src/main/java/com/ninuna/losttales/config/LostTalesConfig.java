@@ -26,10 +26,11 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.common.config.Property;
 /**
- * Small legacy Forge config holder.
- *
- * Keep this intentionally simple: modern NeoForge ModConfigSpec values are
- * replaced with static fields loaded during preInit.
+ * Every option of the mod but the camera's, each a static field read from
+ * the config files during preInit and again on every reload. The client
+ * category lives in the client's file, every other category in the
+ * server's, with the roles and the channels in files of their own
+ * ({@link LostTalesSidedConfiguration} routes each category to its file).
  */
 public final class LostTalesConfig {
     public static final String CATEGORY_CLIENT = "client";
@@ -67,22 +68,6 @@ public final class LostTalesConfig {
      */
     public static final Set<String> CLIENT_CATEGORIES = Collections.unmodifiableSet(
             new HashSet<String>(Arrays.asList(CATEGORY_CLIENT)));
-    /**
-     * The client options Settings does not show, kept in the client file
-     * alone: each is state another screen writes as it is used, not a
-     * choice made in a list. Every other client option, and every option
-     * of the camera's file, is set in Settings and saved the moment it
-     * changes (Nils, 2026-09-26, Q2 a); a test fails for an option that is
-     * in neither.
-     */
-    public static final Set<String> FILE_ONLY_CLIENT_KEYS = Collections.unmodifiableSet(
-            new HashSet<String>(Arrays.asList(
-                    // The map's legend writes the categories it hides.
-                    "hiddenMapLegendCategories",
-                    // The map's waypoint editor writes a custom
-                    // waypoint's colour and its note.
-                    "customWaypointColors",
-                    "customWaypointNotes")));
 
     private static File loadedClientFile;
     private static File loadedServerFile;
@@ -246,6 +231,8 @@ public final class LostTalesConfig {
      * window screen is open, leaving the world and the windows.
      */
     public static boolean hideHudWithWindows = true;
+    /** How strong a window pinned to the screen shows while playing, in percent of how it shows on the window screen. */
+    public static int pinnedWindowOpacity = 70;
     /**
      * Whether anything of the mod's moves: every screen, HUD panel and
      * chat motion. Off, everything stands where it ends.
@@ -914,7 +901,7 @@ public final class LostTalesConfig {
                     "linkShowQuestHud",
                     CATEGORY_CLIENT,
                     linkShowQuestHud,
-                    "When true, changing showLostTalesHud also changes showQuestHud. Disabled by default in the 1.7.10 backport to preserve existing per-HUD settings."
+                    "When true, changing showLostTalesHud also changes showQuestHud. Off, the quest tracker keeps its own setting."
             );
             questHudOffsetX = getHudPercent(
                     config, "questHudOffsetX",
@@ -940,7 +927,7 @@ public final class LostTalesConfig {
                     questHudObjectiveLineCount,
                     1,
                     3,
-                    "Maximum wrapped text lines drawn for each objective on the quest HUD."
+                    "The most text lines a tracked quest's objectives take on the tracker, all its objectives together."
             );
             showQuestHudNotifications = config.getBoolean(
                     "showQuestHudNotifications",
@@ -974,7 +961,7 @@ public final class LostTalesConfig {
                     "showWorldQuestMarkers",
                     CATEGORY_CLIENT,
                     showWorldQuestMarkers,
-                    "Render lightweight world-space labels above discovered quest map markers. Uses legacy 1.7.10 nameplate rendering instead of the modern NeoForge level overlay system."
+                    "Show labels in the world over the places tracked quests send you: the quest's title and how far it is."
             );
             showDiscoveredWorldMapMarkers = config.getBoolean(
                     "showDiscoveredWorldMapMarkers",
@@ -994,7 +981,7 @@ public final class LostTalesConfig {
                     "showQuestChatFeedback",
                     CATEGORY_CLIENT,
                     showQuestChatFeedback,
-                    "Send lightweight chat feedback when quests start, advance, or complete."
+                    "Show the server's quest notes in the Client Console: tracking, markers found and rewards received. Off hides only these notes; a refusal always shows."
             );
             chatProximityRadius = config.getInt(
                     "proximityRadius",
@@ -1312,6 +1299,15 @@ public final class LostTalesConfig {
                     hideHudWithWindows,
                     "Fade the game's HUD (hotbar, health, crosshair and the rest) and the Lost Tales panels out while the window screen is open, and back in when it closes."
             );
+            pinnedWindowOpacity = config.getInt(
+                    "pinnedWindowOpacity",
+                    CATEGORY_CLIENT,
+                    pinnedWindowOpacity,
+                    20,
+                    100,
+                    "How strong a pinned window shows while you play, in percent of how it shows on the window screen."
+            );
+
             devSkinOverridePath = config.getString(
                     "devSkinOverridePath",
                     CATEGORY_CLIENT,
@@ -1524,7 +1520,7 @@ public final class LostTalesConfig {
                     missiveBoardGenerationIntervalTicks,
                     1200,
                     240000,
-                    "Server-side interval in ticks between ordinary board refill attempts. 36000 ticks is roughly half an in-game hour."
+                    "World ticks between a board's ordinary refills; 36000 ticks is 30 real minutes. Every board reads it as it stands."
             );
             missiveBoardMinGeneratedPerCycle = config.getInt(
                     "missiveBoardMinGeneratedPerCycle",
@@ -2081,20 +2077,6 @@ public final class LostTalesConfig {
     }
 
     /**
-     * The key of every client option, as the options are defined: from
-     * the first load, or, before it, read against no file.
-     */
-    public static Set<String> clientOptionKeys() {
-        Configuration definitions = shipped;
-        if (definitions == null) {
-            definitions = new Configuration();
-            defineOptions(definitions);
-        }
-        return new java.util.TreeSet<String>(
-                definitions.getCategory(CATEGORY_CLIENT).keySet());
-    }
-
-    /**
      * Sets every option that is saved to what its field holds now, in
      * {@code config}; {@link #save} writes nothing else.
      */
@@ -2169,6 +2151,9 @@ public final class LostTalesConfig {
         profanityProperty.setValidValues(ChatProfanityMode.names());
         config.get(CATEGORY_CLIENT, "hideHudWithWindows",
                 hideHudWithWindows).set(hideHudWithWindows);
+        config.get(CATEGORY_CLIENT, "pinnedWindowOpacity",
+                pinnedWindowOpacity).set(pinnedWindowOpacity);
+
         config.get(CATEGORY_CLIENT, "animations",
                 animations).set(animations);
         config.get(CATEGORY_CLIENT, "animationSpeed",

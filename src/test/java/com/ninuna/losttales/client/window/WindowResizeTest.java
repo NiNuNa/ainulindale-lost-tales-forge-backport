@@ -29,16 +29,25 @@ public final class WindowResizeTest {
         TwoWindowLayout.reset();
     }
 
+    /**
+     * A window stands at the default place until it is given a size of its
+     * own; Reset Window puts it back there, locked and filling nothing.
+     */
     @Test
-    public void aWindowFollowsTheGameSettingUntilItIsResized() {
+    public void aWindowStandsAtTheDefaultPlaceUntilItIsGivenASize() {
         Window window = WindowLayout.firstWindow();
-        assertEquals(0.0D, window.getOwnHeight(), 0.0D);
+        assertTrue(WindowPlacement.atDefaultPlace(window));
+        assertTrue(WindowLayout.setLocked(window.getId(), false));
         assertTrue(WindowLayout.setWindowHeight(window.getId(), 180.0D, true));
         assertEquals(180.0D, window.getOwnHeight(), 0.0D);
-        // Zero gives the window back to the game's chat-height setting.
-        assertTrue(WindowLayout.setWindowHeight(window.getId(), 0.0D, true));
-        assertEquals(0.0D, window.getOwnHeight(), 0.0D);
+        assertFalse(WindowPlacement.atDefaultPlace(window));
+        WindowLayout.setFill(window.getId(), Window.ScreenFill.LEFT, true);
+        assertTrue(WindowLayout.resetWindow(window.getId()));
+        assertTrue(WindowPlacement.atDefaultPlace(window));
+        assertTrue(window.isLocked());
+        assertEquals(Window.ScreenFill.NONE, window.getFill());
         assertFalse(WindowLayout.setWindowHeight("nowhere", 180.0D, true));
+        assertFalse(WindowLayout.resetWindow("nowhere"));
     }
 
     /**
@@ -67,7 +76,7 @@ public final class WindowResizeTest {
 
     @Test
     public void heightIsWrittenAndReadBack() {
-        WindowLayout.detach(ChatTab.of(ChatChannel.PARTY), 40.0D, 20.0D);
+        Tearing.off(ChatTab.of(ChatChannel.PARTY), 40.0D, 20.0D);
         WindowLayout.setWindowHeight("w3", 214.25D, true);
         List<String> lines = WindowLayoutStore.describe();
         boolean found = false;
@@ -120,7 +129,7 @@ public final class WindowResizeTest {
                 WindowLayout.clampWindowWidth(99999));
         assertEquals(320, WindowLayout.clampWindowWidth(320));
 
-        WindowLayout.detach(ChatTab.of(ChatChannel.PARTY), 40.0D, 20.0D);
+        Tearing.off(ChatTab.of(ChatChannel.PARTY), 40.0D, 20.0D);
         assertTrue(WindowLayout.setWindowWidth("w3", 420, true));
         assertEquals(420, WindowLayout.window("w3").getOwnWidth());
         // Its neighbours are untouched: widths are not shared.

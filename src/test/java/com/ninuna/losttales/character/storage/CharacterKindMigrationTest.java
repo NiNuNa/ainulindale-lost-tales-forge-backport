@@ -123,7 +123,7 @@ public final class CharacterKindMigrationTest {
      */
     @Test
     public void aRosterHoldingBothKindsSurvivesTheStore() {
-        CharacterWorldData written = new CharacterWorldData();
+        CharacterWorldData written = new CharacterWorldData(CharacterWorldData.DATA_NAME);
         CharacterRoster roster = written.getOrCreateRoster(OWNER);
         assertTrue(roster.addCharacter(defaultCharacter()));
         assertTrue(roster.addCharacter(roleplay()));
@@ -132,7 +132,7 @@ public final class CharacterKindMigrationTest {
 
         NBTTagCompound saved = new NBTTagCompound();
         written.writeToNBT(saved);
-        CharacterWorldData reloaded = new CharacterWorldData();
+        CharacterWorldData reloaded = new CharacterWorldData(CharacterWorldData.DATA_NAME);
         reloaded.readFromNBT(saved);
 
         CharacterRoster loaded = reloaded.getRoster(OWNER);

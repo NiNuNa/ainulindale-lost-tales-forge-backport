@@ -22,7 +22,7 @@ public final class ClientChatPresenceChoicesTest {
 
     @After
     public void forget() {
-        ClientChatPresenceChoices.clear();
+        ClientChatPresenceChoices.initialize(null, null);
     }
 
     @Test
@@ -72,12 +72,12 @@ public final class ClientChatPresenceChoicesTest {
                 here.get(ChatPresenceIdentity.character(ALDRIC)));
         assertTrue(ClientChatPresenceChoices.forPlace("server").isEmpty());
         List<String> lines = ClientChatPresenceChoices.describe();
-        ClientChatPresenceChoices.clear();
+        ClientChatPresenceChoices.initialize(null, null);
         ClientChatPresenceChoices.load(lines);
         assertEquals("Out hunting", ClientChatPresenceChoices
                 .linesForPlace("server")
                 .get(ChatPresenceIdentity.character(ALDRIC)));
-        ClientChatPresenceChoices.clear();
+        ClientChatPresenceChoices.initialize(null, null);
         ClientChatPresenceChoices.load(Arrays.asList(
                 "server\taccount\tline\t   ",
                 "server\tnobody\tline\tHello",
@@ -107,10 +107,10 @@ public final class ClientChatPresenceChoicesTest {
         assertEquals(ChatRoleplayStatus.LOOKING_FOR_SCENE,
                 here.get(ChatPresenceIdentity.character(ALDRIC)));
         List<String> lines = ClientChatPresenceChoices.describe();
-        ClientChatPresenceChoices.clear();
+        ClientChatPresenceChoices.initialize(null, null);
         ClientChatPresenceChoices.load(lines);
         assertEquals(here, ClientChatPresenceChoices.roleplayForPlace("server"));
-        ClientChatPresenceChoices.clear();
+        ClientChatPresenceChoices.initialize(null, null);
         ClientChatPresenceChoices.load(Arrays.asList(
                 "server\taccount\troleplay\tout_of_character",
                 "server\taccount\troleplay\tdancing",
@@ -125,11 +125,11 @@ public final class ClientChatPresenceChoicesTest {
         ClientChatPresenceChoices.remember("server",
                 ChatPresenceIdentity.character(ALDRIC), ChatPresence.AWAY);
         List<String> lines = ClientChatPresenceChoices.describe();
-        ClientChatPresenceChoices.clear();
+        ClientChatPresenceChoices.initialize(null, null);
         ClientChatPresenceChoices.load(lines);
         assertEquals(ChatPresence.AWAY, ClientChatPresenceChoices
                 .forPlace("server").get(ChatPresenceIdentity.character(ALDRIC)));
-        ClientChatPresenceChoices.clear();
+        ClientChatPresenceChoices.initialize(null, null);
         ClientChatPresenceChoices.load(Arrays.asList(
                 "server\taccount\toffline",
                 "server\tnobody\taway",

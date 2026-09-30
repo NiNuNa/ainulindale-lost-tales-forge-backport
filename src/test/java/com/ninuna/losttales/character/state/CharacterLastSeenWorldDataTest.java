@@ -16,7 +16,7 @@ public final class CharacterLastSeenWorldDataTest {
 
     @Test
     public void anIdentitySeenLatelyIsSeenAndOthersAreNot() {
-        CharacterLastSeenWorldData data = new CharacterLastSeenWorldData();
+        CharacterLastSeenWorldData data = new CharacterLastSeenWorldData(CharacterLastSeenWorldData.DATA_NAME);
         UUID aldric = UUID.randomUUID();
         long now = System.currentTimeMillis();
         data.saw(aldric, now - 3 * DAY);
@@ -27,7 +27,7 @@ public final class CharacterLastSeenWorldDataTest {
 
     @Test
     public void aTimeIsWrittenAtMostOnceAnHour() {
-        CharacterLastSeenWorldData data = new CharacterLastSeenWorldData();
+        CharacterLastSeenWorldData data = new CharacterLastSeenWorldData(CharacterLastSeenWorldData.DATA_NAME);
         UUID aldric = UUID.randomUUID();
         long first = 1000000000L;
         data.saw(aldric, first);
@@ -41,7 +41,7 @@ public final class CharacterLastSeenWorldDataTest {
 
     @Test
     public void itComesBackFromTheSaveAndForgetsTheLongGone() {
-        CharacterLastSeenWorldData data = new CharacterLastSeenWorldData();
+        CharacterLastSeenWorldData data = new CharacterLastSeenWorldData(CharacterLastSeenWorldData.DATA_NAME);
         UUID recent = UUID.randomUUID();
         UUID longGone = UUID.randomUUID();
         long now = System.currentTimeMillis();
@@ -50,7 +50,7 @@ public final class CharacterLastSeenWorldDataTest {
         NBTTagCompound saved = new NBTTagCompound();
         data.writeToNBT(saved);
 
-        CharacterLastSeenWorldData loaded = new CharacterLastSeenWorldData();
+        CharacterLastSeenWorldData loaded = new CharacterLastSeenWorldData(CharacterLastSeenWorldData.DATA_NAME);
         loaded.readFromNBT(saved);
         assertTrue(loaded.seenWithin(recent, 30 * DAY, now));
         assertFalse(loaded.seenWithin(longGone, Long.MAX_VALUE, now));
@@ -68,7 +68,7 @@ public final class CharacterLastSeenWorldDataTest {
         seen.appendTag(entry);
         newer.setTag("Seen", seen);
 
-        CharacterLastSeenWorldData data = new CharacterLastSeenWorldData();
+        CharacterLastSeenWorldData data = new CharacterLastSeenWorldData(CharacterLastSeenWorldData.DATA_NAME);
         data.readFromNBT(newer);
         assertFalse(data.seenWithin(aldric, Long.MAX_VALUE, System.currentTimeMillis()));
         data.saw(aldric, System.currentTimeMillis());
@@ -88,7 +88,7 @@ public final class CharacterLastSeenWorldDataTest {
         seen.appendTag(broken);
         stored.setTag("Seen", seen);
 
-        CharacterLastSeenWorldData data = new CharacterLastSeenWorldData();
+        CharacterLastSeenWorldData data = new CharacterLastSeenWorldData(CharacterLastSeenWorldData.DATA_NAME);
         data.readFromNBT(stored);
         NBTTagCompound written = new NBTTagCompound();
         data.writeToNBT(written);

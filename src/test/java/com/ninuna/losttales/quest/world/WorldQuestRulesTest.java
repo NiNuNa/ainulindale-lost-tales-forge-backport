@@ -2,6 +2,7 @@ package com.ninuna.losttales.quest.world;
 
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestDefinitionValidator;
+import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import java.util.Collections;
 import java.util.List;
 import org.junit.Test;
@@ -63,6 +64,29 @@ public final class WorldQuestRulesTest {
                 LostTalesQuestDefinition.START_MODE_ITEM,
                 objective("orcs", "kill", "entity", "lotr.Orc", "5")))
                 .isEmpty());
+    }
+
+    @Test
+    public void everyIdAndObjectiveFitsWhatPlayersAreSent() {
+        LostTalesQuestObjectiveDefinition[] many =
+                new LostTalesQuestObjectiveDefinition[
+                        WorldQuestNbtCodec.MAX_COUNTS + 1];
+        for (int index = 0; index < many.length; index++) {
+            many[index] = objective("o" + index, "kill", "entity",
+                    "lotr.Orc", "5");
+        }
+        assertFalse(WorldQuestRules.problems(greenway(world("7", null),
+                LostTalesQuestDefinition.START_MODE_LOCKED, many)).isEmpty());
+        StringBuilder longId = new StringBuilder();
+        for (int index = 0; index <= WorldQuestRules.MAX_ID_BYTES; index++) {
+            longId.append('x');
+        }
+        assertFalse("the checker every quest meets says so",
+                LostTalesQuestDefinitionValidator.describeWarnings(
+                        Collections.singletonList(greenway(world("7", null),
+                                LostTalesQuestDefinition.START_MODE_LOCKED,
+                                objective(longId.toString(), "kill", "entity",
+                                        "lotr.Orc", "5")))).isEmpty());
     }
 
     @Test

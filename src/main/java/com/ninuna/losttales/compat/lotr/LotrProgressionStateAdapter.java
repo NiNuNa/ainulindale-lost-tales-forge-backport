@@ -20,8 +20,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Public-API-only adapter for the LOTR progression each character keeps of
- * its own.
+ * The LOTR progression each character keeps of its own, read and written
+ * through LOTR's public API only.
  *
  * <p>The allowlist is deliberately narrower than LOTRPlayerData.save(). Apply
  * starts with the live account blob and overlays only these keys, preserving
@@ -167,7 +167,7 @@ public final class LotrProgressionStateAdapter {
         }
     }
 
-    /** Package-visible seam for testing the LOTR public API without FML bootstrap. */
+    /** The same for a faction already resolved. */
     NBTTagCompound createDefault(LOTRFaction faction) {
         if (faction == null) {
             throw new IllegalArgumentException("Starting faction is missing");

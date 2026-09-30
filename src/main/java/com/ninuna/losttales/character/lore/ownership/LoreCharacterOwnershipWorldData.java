@@ -53,10 +53,6 @@ public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
     private String readOnlyReason = "";
     private NBTTagCompound preservedData;
 
-    public LoreCharacterOwnershipWorldData() {
-        this(DATA_NAME);
-    }
-
     public LoreCharacterOwnershipWorldData(String name) {
         super(name);
     }

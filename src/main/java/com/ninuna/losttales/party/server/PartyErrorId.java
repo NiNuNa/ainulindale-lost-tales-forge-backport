@@ -18,6 +18,7 @@ public enum PartyErrorId {
     PARTY_FULL("party_full"),
     TARGET_NOT_MEMBER("target_not_member"),
     CANNOT_REMOVE_LEADER("cannot_remove_leader"),
+    LEADER_MUST_HAND_OVER("leader_must_hand_over"),
     INVALID_TARGET("invalid_target"),
     TARGET_OFFLINE("target_offline"),
     TARGET_ALREADY_IN_PARTY("target_already_in_party"),

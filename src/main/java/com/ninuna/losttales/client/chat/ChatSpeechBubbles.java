@@ -82,7 +82,7 @@ public final class ChatSpeechBubbles {
     /**
      * Whether the line wears the character its speaker is playing: words
      * spoken as another of their characters stay in the chat, since the
-     * body they would float over is somebody else (Nils, 2026-09-28, C3 a).
+     * body they would float over is somebody else.
      * A speaker whose look is not known yet is taken at their word.
      */
     private static boolean spokenAsPlayed(LostTalesChatMessagePacket packet) {

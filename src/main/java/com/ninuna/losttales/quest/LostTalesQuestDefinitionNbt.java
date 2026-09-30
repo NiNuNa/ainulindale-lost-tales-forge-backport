@@ -10,11 +10,8 @@ import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
 
 /**
- * Small NBT serializer for quest definitions that are authored at runtime.
- *
- * Bundled quests still load from JSON resources. This helper exists so generated
- * missive quests can be saved in player data and synced to clients without needing
- * modern datapack systems that do not exist in Forge 1.7.10.
+ * A quest the game made, a missive's, as the player's quest log saves it.
+ * Quest files load from JSON; only a quest that has no file is kept here.
  */
 public final class LostTalesQuestDefinitionNbt {
     public static final int MAX_STAGES = 256;
@@ -153,6 +150,7 @@ public final class LostTalesQuestDefinitionNbt {
     public static boolean isStructurallyReasonable(NBTTagCompound tag) {
         if (!NbtTags.hasReasonableString(
                 tag, KEY_ID, MAX_IDENTIFIER_CHARACTERS, true)
+                || !LostTalesQuestIds.fits(tag.getString(KEY_ID))
                 || !NbtTags.hasReasonableString(
                 tag, KEY_TITLE, MAX_NAME_CHARACTERS, false)
                 || !NbtTags.hasReasonableString(

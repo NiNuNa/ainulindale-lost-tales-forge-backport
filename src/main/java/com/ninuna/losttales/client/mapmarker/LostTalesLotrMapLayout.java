@@ -207,8 +207,8 @@ public final class LostTalesLotrMapLayout {
             }
         }
         String[] resolved = map.resolveCursorSubtitles(filtered);
-        // In a window the lines stand on the window's bar, beside the date
-        // (U3 a); the map draws none of its own.
+        // In a window the lines stand on the window's bar, beside the date;
+        // the map draws none of its own.
         if (map.inWindow()) {
             map.keepCursorLines(resolved);
             return new String[0];
@@ -483,7 +483,7 @@ public final class LostTalesLotrMapLayout {
 
     /**
      * Whether the map draws its own key-hint strip at its foot: on a screen
-     * of its own. In a window the window's bar stands in its place (U3 a).
+     * of its own. In a window the window's bar stands in its place.
      */
     static boolean drawsControlBar(LOTRGuiMap gui) {
         return hasFooterLayout(gui) && !(gui instanceof LostTalesLotrMapGui

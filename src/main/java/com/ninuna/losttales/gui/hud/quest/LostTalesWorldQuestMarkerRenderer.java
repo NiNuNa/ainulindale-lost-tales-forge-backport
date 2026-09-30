@@ -4,6 +4,7 @@ import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapMarkerData;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestMarkerHelper;
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.gui.style.LostTalesColors;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import java.util.List;
@@ -13,14 +14,12 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.util.MathHelper;
+import net.minecraft.util.StatCollector;
 import org.lwjgl.opengl.GL11;
 /**
- * Lightweight 1.7.10 world-space quest marker labels.
- *
- * The modern branch renders map markers through the level render stage. This
- * backport uses the old nameplate-style GL transform so it remains compatible
- * with Forge 1.7.10 and does not require any modern rendering classes.
+ * Labels in the world over the places tracked quests send the player: the
+ * quest's title and the distance, drawn the way a nameplate is, facing the
+ * camera. A label shows out to twice the configured distance.
  */
 @SideOnly(Side.CLIENT)
 public final class LostTalesWorldQuestMarkerRenderer {
@@ -66,14 +65,10 @@ public final class LostTalesWorldQuestMarkerRenderer {
                     continue;
                 }
 
-                boolean pinned = false;
-                String activeQuestLabel =
-                        LostTalesClientQuestMarkerHelper
-                                .getActiveQuestMarkerLabel(
-                                        activeQuestMarkers,
-                                        marker.getId());
-                boolean activeQuestMarker = activeQuestLabel != null;
-                if (!activeQuestMarker) {
+                String label = LostTalesClientQuestMarkerHelper
+                        .getActiveQuestMarkerLabel(activeQuestMarkers,
+                                marker.getId());
+                if (label == null) {
                     continue;
                 }
 
@@ -83,16 +78,10 @@ public final class LostTalesWorldQuestMarkerRenderer {
                 double dyPlayer = player.posY - markerY;
                 double dzPlayer = player.posZ - marker.getZ();
                 double distSq = dxPlayer * dxPlayer + dyPlayer * dyPlayer + dzPlayer * dzPlayer;
-                if (distSq > maxDistanceSq && !activeQuestMarker) {
-                    continue;
-                }
                 if (distSq > maxDistanceSq * 4.0D) {
                     continue;
                 }
-
-                String label = activeQuestMarker
-                        ? activeQuestLabel : marker.getName();
-                renderMarkerLabel(minecraft.fontRenderer, label, marker.getX(), markerY, marker.getZ(), pinned, activeQuestMarker, Math.sqrt(distSq), maxDistance, cameraX, cameraY, cameraZ);
+                renderMarkerLabel(minecraft.fontRenderer, label, marker.getX(), markerY, marker.getZ(), Math.sqrt(distSq), cameraX, cameraY, cameraZ);
             }
 
             for (LostTalesClientQuestMarkerHelper.ActiveCoordinateMarker marker : activeCoordinateMarkers) {
@@ -106,7 +95,7 @@ public final class LostTalesWorldQuestMarkerRenderer {
                 if (distSq > maxDistanceSq * 4.0D) {
                     continue;
                 }
-                renderMarkerLabel(minecraft.fontRenderer, marker.getLabel(), marker.getX(), marker.getY(), marker.getZ(), false, true, Math.sqrt(distSq), maxDistance, cameraX, cameraY, cameraZ);
+                renderMarkerLabel(minecraft.fontRenderer, marker.getLabel(), marker.getX(), marker.getY(), marker.getZ(), Math.sqrt(distSq), cameraX, cameraY, cameraZ);
             }
         } finally {
             GL11.glDepthMask(true);
@@ -126,20 +115,19 @@ public final class LostTalesWorldQuestMarkerRenderer {
                 && !minecraft.gameSettings.hideGUI;
     }
 
-    private static void renderMarkerLabel(FontRenderer fontRenderer, String markerName, double markerX, double markerY, double markerZ, boolean pinned, boolean activeQuestMarker, double distance, double maxDistance, double cameraX, double cameraY, double cameraZ) {
+    /** One place's label: the tracked quest's title over how far away it is. */
+    private static void renderMarkerLabel(FontRenderer fontRenderer, String questTitle, double markerX, double markerY, double markerZ, double distance, double cameraX, double cameraY, double cameraZ) {
         double renderX = markerX + 0.5D - cameraX;
         double renderY = markerY + LABEL_Y_OFFSET - cameraY;
         double renderZ = markerZ + 0.5D - cameraZ;
 
-        float alpha = distance <= maxDistance * 0.65D || activeQuestMarker
-                ? 1.0F
-                : 1.0F - MathHelper.clamp_float((float) ((distance - maxDistance * 0.65D) / (maxDistance * 0.35D)), 0.0F, 0.75F);
-        int alphaByte = MathHelper.clamp_int((int) (alpha * 255.0F), 48, 255);
-        int textColor = (alphaByte << 24) | (pinned ? 0xFFD37A : activeQuestMarker ? 0xFFFBDE : 0xFFFFFF);
-        int shadowColor = (MathHelper.clamp_int((int) (alpha * 160.0F), 32, 160) << 24);
-        String safeName = markerName == null || markerName.length() == 0 ? "Quest Marker" : markerName;
-        String label = (pinned ? "* " : activeQuestMarker ? "^ " : "^ ") + safeName;
-        String distanceLabel = Math.round(distance) + "m";
+        int textColor = LostTalesColors.TEXT_BRIGHT;
+        int shadowColor = LostTalesColors.BLACK_SHADOW;
+        String label = StatCollector.translateToLocalFormatted(
+                "gui.losttales.quest.label.place", questTitle);
+        String distanceLabel = StatCollector.translateToLocalFormatted(
+                "gui.losttales.quest.label.distance",
+                String.valueOf(Math.round(distance)));
 
         RenderManager renderManager = RenderManager.instance;
         GL11.glPushMatrix();
@@ -153,7 +141,7 @@ public final class LostTalesWorldQuestMarkerRenderer {
         fontRenderer.drawString(label, -labelWidth + 1, 1, shadowColor);
         fontRenderer.drawString(label, -labelWidth, 0, textColor);
         fontRenderer.drawString(distanceLabel, -distanceWidth + 1, 11, shadowColor);
-        fontRenderer.drawString(distanceLabel, -distanceWidth, 10, (alphaByte << 24) | 0xAAAAAA);
+        fontRenderer.drawString(distanceLabel, -distanceWidth, 10, LostTalesColors.TEXT_MUTED);
 
         GL11.glPopMatrix();
     }

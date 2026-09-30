@@ -143,11 +143,6 @@ final class ClientChatPendingEchoes {
         lastNonce = 0L;
     }
 
-    /** Test and diagnostics hook: messages still in flight. */
-    static synchronized int size() {
-        return BY_NONCE.size();
-    }
-
     /** One shown-but-unconfirmed message. */
     static final class Pending {
         final long nonce;

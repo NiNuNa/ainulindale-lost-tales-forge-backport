@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.keybinding;
 import com.ninuna.losttales.client.camera.ThirdPersonCameraRuntime;
 import com.ninuna.losttales.client.camera.ThirdPersonTargetLockController;
 import com.ninuna.losttales.client.character.room.CharacterRoomSession;
+import com.ninuna.losttales.client.window.PinnedWindows;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.config.client.LostTalesThirdPersonConfig;
 import com.ninuna.losttales.gui.hud.LostTalesHudHelper;
@@ -14,6 +15,7 @@ import com.ninuna.losttales.gui.screen.party.PartyPage;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
 import cpw.mods.fml.client.registry.ClientRegistry;
+import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.InputEvent;
 import net.minecraft.client.Minecraft;
@@ -30,7 +32,7 @@ public class LostTalesKeyBindings {
     private static final KeyBinding QUEST_JOURNAL = new KeyBinding("key.losttales.questJournal", Keyboard.KEY_J, CATEGORY);
     /** Unbound until the player gives it a key. */
     private static final KeyBinding PARTY = new KeyBinding("key.losttales.party", Keyboard.KEY_NONE, CATEGORY);
-    /** Unbound until the player gives it a key, as the Party key is (C4 a). */
+    /** Unbound until the player gives it a key, as the Party key is. */
     private static final KeyBinding CHARACTERS = new KeyBinding("key.losttales.characters", Keyboard.KEY_NONE, CATEGORY);
     private static final KeyBinding MAP = new KeyBinding(
             "key.losttales.map", Keyboard.KEY_M, CATEGORY);
@@ -55,6 +57,36 @@ public class LostTalesKeyBindings {
         ClientRegistry.registerKeyBinding(TARGET_LOCK);
         ClientRegistry.registerKeyBinding(CYCLE_TARGET_LEFT);
         ClientRegistry.registerKeyBinding(CYCLE_TARGET_RIGHT);
+    }
+
+    /**
+     * While playing, an arrow pressed with the Modifier Key held goes to
+     * the pinned windows: left and right walk the tabs of one, up and down
+     * pick which one. The arrows are read as keys and are no bindings of
+     * their own, since a key holds one binding and LOTR's alignment keys
+     * are the arrows. A press a pinned window took is spent: whatever is
+     * bound to that arrow does not answer it too, so this runs first.
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public void onPinnedWindowKey(InputEvent.KeyInputEvent event) {
+        if (!Keyboard.getEventKeyState() || Keyboard.isRepeatEvent()) {
+            return;
+        }
+        int key = Keyboard.getEventKey();
+        int tabs = key == Keyboard.KEY_RIGHT ? 1
+                : key == Keyboard.KEY_LEFT ? -1 : 0;
+        int windows = key == Keyboard.KEY_DOWN ? 1
+                : key == Keyboard.KEY_UP ? -1 : 0;
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (tabs == 0 && windows == 0 || minecraft.currentScreen != null
+                || !isModifierKeyDown()) {
+            return;
+        }
+        boolean taken = tabs != 0 ? PinnedWindows.walkTabs(minecraft, tabs)
+                : PinnedWindows.stepWindow(minecraft, windows);
+        if (taken) {
+            KeyBinding.setKeyBindState(key, false);
+        }
     }
 
     @SubscribeEvent

@@ -1,11 +1,8 @@
 package com.ninuna.losttales.client.quest;
 
 import com.ninuna.losttales.quest.world.WorldQuestView;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -39,11 +36,6 @@ public final class ClientWorldQuests {
         }
         received = true;
         ClientQuestCatalog.forget();
-    }
-
-    public static synchronized List<WorldQuestView> views() {
-        return Collections.unmodifiableList(
-                new ArrayList<WorldQuestView>(VIEWS.values()));
     }
 
     public static synchronized WorldQuestView view(String questId) {

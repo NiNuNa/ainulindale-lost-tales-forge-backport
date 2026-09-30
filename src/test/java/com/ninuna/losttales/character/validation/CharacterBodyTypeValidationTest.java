@@ -118,11 +118,6 @@ public final class CharacterBodyTypeValidationTest {
         }
 
         @Override
-        public String getUnavailableReason() {
-            return "";
-        }
-
-        @Override
         public CharacterFactionDefinition resolve(String factionId) {
             return FACTION.equals(factionId) ? this.bree : null;
         }

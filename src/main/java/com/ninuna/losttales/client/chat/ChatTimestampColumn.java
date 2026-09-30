@@ -142,7 +142,8 @@ final class ChatTimestampColumn {
 
     /**
      * An open window's area for times needing {@code timeWidth} pixels,
-     * their clear room included; the geometry's own test hook.
+     * their clear room included: as wide as they need, and never narrower
+     * than the avatar with its gaps.
      */
     static ChatTimestampColumn forTimeWidth(float timeWidth) {
         return new ChatTimestampColumn(true, Math.max(AVATAR_WIDTH,

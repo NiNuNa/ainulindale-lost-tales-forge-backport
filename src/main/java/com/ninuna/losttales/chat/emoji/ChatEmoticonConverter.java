@@ -23,7 +23,7 @@ import java.util.Map;
  */
 public final class ChatEmoticonConverter {
     /**
-     * Emoticon token to emoji, in a stable order for tests and docs.
+     * Emoticon token to emoji, in the order the lines below map them.
      * Mapping a new emoji is one {@code map(...)} line here; nothing
      * else in the mod knows the table.
      */

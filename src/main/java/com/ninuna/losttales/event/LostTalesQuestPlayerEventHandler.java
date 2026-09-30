@@ -65,6 +65,9 @@ public final class LostTalesQuestPlayerEventHandler {
             LostTalesLotrWaystoneTravelAdapter.clearPending(
                     (EntityPlayerMP)event.player);
             WorldQuests.forget(event.player.getUniqueID());
+            // The missives only this player's log held leave the server's
+            // list with them.
+            LostTalesQuestManager.forgetUnheldMissives(event.player);
         }
     }
 

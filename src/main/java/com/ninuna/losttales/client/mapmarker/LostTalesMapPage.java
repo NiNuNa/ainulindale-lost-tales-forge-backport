@@ -4,6 +4,7 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiOrigin;
 import com.ninuna.losttales.client.window.BarItem;
 import com.ninuna.losttales.client.window.PageContent;
+import com.ninuna.losttales.client.window.PinnedWindows;
 import com.ninuna.losttales.client.window.ToolStrip;
 import com.ninuna.losttales.client.window.WindowBar;
 import com.ninuna.losttales.client.window.WindowPages;
@@ -28,7 +29,7 @@ import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
 
 /**
- * The map as a page (M1-M4 a): LOTR's map with everything Lost Tales adds
+ * The map as a page: LOTR's map with everything Lost Tales adds
  * to it, drawn in its window's box as if the box were the whole screen.
  * It works there as it does on a screen of its own — the drag, the zoom,
  * the turn and lean, the markers, waypoints, fast travel, legend, compass
@@ -38,7 +39,7 @@ import org.lwjgl.opengl.GL11;
  * arrows among them, only while it holds the keys. LOTR's special maps,
  * the conquest grid and the control zones, keep a screen of their own.
  *
- * <p>Its window is every window's shape (U1 a, U3 a): the tool strip's
+ * <p>Its window is every window's shape: the tool strip's
  * panel button folds the legend, its cog holds the legend's switches and
  * its well is Find Location; the bar holds Current Location, Create
  * Waypoint and an operator's Teleport, then the place under the pointer,
@@ -49,7 +50,11 @@ import org.lwjgl.opengl.GL11;
  * leaves the screen, as closing the map screen let it go: it comes back
  * where the player left it ({@link LostTalesMapViewMemory}). Its tab stays
  * in its window when the screen closes, as every tab does, and while the
- * window fades in the map fades with it as one picture (N2 a).</p>
+ * window fades in the map fades with it as one picture.</p>
+ *
+ * <p>Pinned to the screen while playing it is a map that follows the
+ * player: at the zoom, turn and lean they left it with, the player in the
+ * middle, with no legend, no pointer and no keys.</p>
  */
 public final class LostTalesMapPage extends PageContent {
     public static final String PAGE_ID = "map";
@@ -67,7 +72,7 @@ public final class LostTalesMapPage extends PageContent {
     private static final String ZOOM_IN = "zoom_in";
 
     private LostTalesLotrMapGui map;
-    /** The map fading in with its window as one picture (N2 a). */
+    /** The map fading in with its window as one picture. */
     private final LostTalesUiLayerFade fade = new LostTalesUiLayerFade();
     private boolean hasKeys;
     /** The buttons that went down on the map and are still held, one bit each. */
@@ -311,6 +316,7 @@ public final class LostTalesMapPage extends PageContent {
         if (gui == null) {
             return;
         }
+        gui.setFollowing(PinnedWindows.standing(minecraft));
         // The map is handed the pointer while it is on the map, and a held
         // button only when it went down on the map: dragged in from
         // elsewhere, it pans nothing.
@@ -451,10 +457,14 @@ public final class LostTalesMapPage extends PageContent {
 
     /**
      * LOTR counts opening the map toward its quests and tells the server
-     * so while the map is the screen; in a window it is told here.
+     * so while the map is the screen; in a window it is told here. A map
+     * pinned to the screen while playing was not opened, and says nothing.
      */
     @Override
     public void shown() {
+        if (PinnedWindows.standing(Minecraft.getMinecraft())) {
+            return;
+        }
         try {
             LOTRPacketHandler.networkWrapper.sendToServer(
                     new LOTRPacketClientMQEvent(
@@ -474,5 +484,6 @@ public final class LostTalesMapPage extends PageContent {
         }
         this.fade.release();
         this.pressedButtons = 0;
+        this.hasKeys = false;
     }
 }

@@ -6,8 +6,8 @@ import java.util.List;
 
 /**
  * One window in the client layout: an ordered row of tabs, the tab
- * currently in front, a lock, a position, its own size, and whether it
- * fills a part of the screen. Instances are owned and mutated only by
+ * currently in front, a lock, a pin, a position, its own size, and whether
+ * it fills a part of the screen. Instances are owned and mutated only by
  * {@link WindowLayout}; everyone else reads them.
  */
 public final class Window {
@@ -15,15 +15,17 @@ public final class Window {
     private final List<WindowTab> tabs = new ArrayList<WindowTab>();
     private WindowTab activeTab;
     private boolean locked;
+    /** Whether the whole window stays on screen while playing: every tab it holds. */
+    private boolean pinned;
     /** Percent of the available screen travel, see HudPlacementLayout. */
     private double offsetX;
     private double offsetY;
     /**
      * The window's own height in GUI pixels, fractions included so it is
-     * as tall as it was dragged; 0 follows the game's chat settings.
+     * as tall as it was dragged; 0 while it stands at the default place.
      */
     private double ownHeight;
-    /** The window's own width in GUI pixels; 0 follows the game's chat settings. */
+    /** The window's own width in GUI pixels; 0 while it stands at the default place. */
     private int ownWidth;
     /**
      * The part of the screen the window fills, or none while it stands
@@ -296,19 +298,20 @@ public final class Window {
 
     public String getId() { return this.id; }
     public boolean isLocked() { return this.locked; }
+    public boolean isPinned() { return this.pinned; }
     public double getOffsetX() { return this.offsetX; }
     public double getOffsetY() { return this.offsetY; }
     /**
      * The height the player gave this window, in GUI pixels and
-     * fractions of one, or 0 while it follows the game's own chat
-     * settings. Whatever the window shows lays itself out in it: a
-     * conversation clips its topmost line where the room ends.
+     * fractions of one, or 0 while it stands at the default place.
+     * Whatever the window shows lays itself out in it: a conversation
+     * clips its topmost line where the room ends.
      */
     public double getOwnHeight() { return this.ownHeight; }
 
     /**
      * The width the player gave this window, in GUI pixels, or 0 while it
-     * follows the game's chat-width setting.
+     * stands at the default place.
      */
     public int getOwnWidth() { return this.ownWidth; }
 
@@ -340,6 +343,8 @@ public final class Window {
     }
 
     void setLocked(boolean locked) { this.locked = locked; }
+
+    void setPinned(boolean pinned) { this.pinned = pinned; }
 
     void setOwnHeight(double height) { this.ownHeight = height; }
 

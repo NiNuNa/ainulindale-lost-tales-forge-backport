@@ -4,7 +4,7 @@ import com.ninuna.losttales.mapmarker.LostTalesMapMarkerIdentity;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-/** Small shared helper for the comma-separated marker-id fields used in quest JSON. */
+/** Reads the comma-separated marker ids a quest file's {@code markers} and objectives name. */
 public final class LostTalesQuestMarkerHelper {
     private LostTalesQuestMarkerHelper() {}
 
@@ -49,18 +49,17 @@ public final class LostTalesQuestMarkerHelper {
         return ids;
     }
 
+    /**
+     * Whether a {@code markers} key is {@code giver}: its markers are placed
+     * where the player meets the giver. Every other key names markers that
+     * stand where the marker files put them.
+     */
     public static boolean isDynamicQuestGiverMarkerKey(String key) {
-        if (key == null) {
-            return false;
-        }
-        String normalized = key.trim().toLowerCase().replace("_", "").replace("-", "");
-        return "giver".equals(normalized)
-                || "questgiver".equals(normalized)
-                || "npc".equals(normalized)
-                || "source".equals(normalized)
-                || "turnin".equals(normalized)
-                || "return".equals(normalized);
+        return GIVER_KEY.equals(key);
     }
+
+    /** The {@code markers} key whose markers stand where the giver was met. */
+    public static final String GIVER_KEY = "giver";
 
     public static void addMarkerIds(List<String> ids, String value) {
         if (ids == null || value == null) {

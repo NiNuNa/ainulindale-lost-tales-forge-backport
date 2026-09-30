@@ -1,9 +1,9 @@
 package com.ninuna.losttales.client.window;
 
 /**
- * Whether the player still stands at the thing a world page is open on
- * — a waystone, a missive board — (Q8 a): in its world, within the reach
- * the server lets a player use it from, and the thing still there. The
+ * Whether the player still stands at the thing a world page is open on,
+ * a waystone or a missive board: in its world, within the reach the
+ * server lets a player use it from, and the thing still there. The
  * page's tab closes by itself once the player does not, and says which
  * it was ({@link WorldPageWatch}); the server checks every request again
  * whatever the page thinks.

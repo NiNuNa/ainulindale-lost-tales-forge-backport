@@ -2,6 +2,7 @@ package com.ninuna.losttales.compat.discord;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -26,7 +27,7 @@ public final class DiscordOutboundLanesTest {
         lanes.poll("b");
         assertEquals("b2", lanes.peek("b"));
         assertEquals(Arrays.asList("b2"), lanes.items("b"));
-        assertEquals(3 - 1, lanes.size());
+        assertEquals(Arrays.asList("a1"), lanes.items("a"));
         assertNull(lanes.peek("c"));
         assertTrue(lanes.items("c").isEmpty());
         assertEquals(Arrays.asList("b", "a"), lanes.webhooks());
@@ -108,11 +109,18 @@ public final class DiscordOutboundLanesTest {
             assertTrue(lanes.add("w", Integer.valueOf(index)));
         }
         assertFalse(lanes.add("w", Integer.valueOf(-1)));
-        assertEquals(DiscordOutboundLanes.MAX_PER_LANE, lanes.size());
+        // The lane holds what it took, first to last, and not the one refused.
+        List<Integer> held = lanes.items("w");
+        assertEquals(DiscordOutboundLanes.MAX_PER_LANE, held.size());
+        assertEquals(Integer.valueOf(0), held.get(0));
+        assertEquals(Integer.valueOf(DiscordOutboundLanes.MAX_PER_LANE - 1),
+                held.get(held.size() - 1));
         assertTrue(lanes.add("other", Integer.valueOf(0)));
         lanes.drop("w");
         assertNull(lanes.peek("w"));
-        assertEquals(1, lanes.size());
+        assertTrue(lanes.items("w").isEmpty());
+        assertEquals(Collections.singletonList(Integer.valueOf(0)),
+                lanes.items("other"));
         // Dropping and delaying a lane that never existed is nothing.
         lanes.drop("none");
         lanes.delay("none", 10L);

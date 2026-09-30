@@ -31,6 +31,8 @@ public final class LostTalesThirdPersonConfigPersistenceTest {
     private final double distance = LostTalesThirdPersonConfig.distanceMultiplier;
     private final int samples =
             LostTalesThirdPersonConfig.projectileTrajectorySamplesPerTick;
+    private final double headTracking =
+            LostTalesThirdPersonConfig.headTrackingAngle;
 
     @After
     public void putTheFieldsBack() {
@@ -38,6 +40,7 @@ public final class LostTalesThirdPersonConfigPersistenceTest {
         LostTalesThirdPersonConfig.distanceMultiplier = this.distance;
         LostTalesThirdPersonConfig.projectileTrajectorySamplesPerTick =
                 this.samples;
+        LostTalesThirdPersonConfig.headTrackingAngle = this.headTracking;
     }
 
     @Test
@@ -74,48 +77,40 @@ public final class LostTalesThirdPersonConfigPersistenceTest {
                 .projectileTrajectorySamplesPerTick);
     }
 
+    /**
+     * The head tracking angle is read as the file holds it, and one past
+     * its bounds is brought to the nearest and written back so.
+     */
     @Test
-    public void legacyHeadTrackingDefaultMigratesToCorrectedLimit()
+    public void theHeadTrackingAngleIsReadAsSetAndKeptWithinItsBounds()
             throws Exception {
-        File directory = temporaryFolder.newFolder("legacy-head-config");
+        File directory = temporaryFolder.newFolder("head-config");
         initializeForgeHome(directory.getParentFile());
         File configFile = LostTalesConfigFiles.clientFile(directory, LostTalesConfigFiles.CAMERA_OPTIONS);
-        Configuration legacy = new Configuration(configFile);
-        legacy.load();
-        legacy.get(LostTalesThirdPersonConfig.CATEGORY_CAMERA,
+        Configuration set = new Configuration(configFile);
+        set.load();
+        set.get(LostTalesThirdPersonConfig.CATEGORY_CAMERA,
                 "headTrackingAngle", 35.0D).set(35.0D);
-        legacy.save();
+        set.save();
 
         LostTalesThirdPersonConfig.load(directory);
 
-        assertEquals(100.0D,
+        assertEquals(35.0D,
                 LostTalesThirdPersonConfig.headTrackingAngle, 0.0D);
-        Configuration migrated = new Configuration(configFile);
-        migrated.load();
-        assertEquals(100.0D, migrated.get(
-                LostTalesThirdPersonConfig.CATEGORY_CAMERA,
-                "headTrackingAngle", 0.0D).getDouble(0.0D), 0.0D);
-    }
 
-    @Test
-    public void formerEightyFiveDegreeDefaultMigratesToCurrentLimit()
-            throws Exception {
-        File directory = temporaryFolder.newFolder("former-head-config");
-        initializeForgeHome(directory.getParentFile());
-        File configFile = LostTalesConfigFiles.clientFile(directory, LostTalesConfigFiles.CAMERA_OPTIONS);
-        Configuration previous = new Configuration(configFile);
-        previous.load();
-        previous.get(LostTalesThirdPersonConfig.CATEGORY_CAMERA,
-                "headTrackingAngle", 85.0D).set(85.0D);
-        previous.save();
+        Configuration past = new Configuration(configFile);
+        past.load();
+        past.get(LostTalesThirdPersonConfig.CATEGORY_CAMERA,
+                "headTrackingAngle", 35.0D).set(200.0D);
+        past.save();
 
         LostTalesThirdPersonConfig.load(directory);
 
-        assertEquals(100.0D,
+        assertEquals(120.0D,
                 LostTalesThirdPersonConfig.headTrackingAngle, 0.0D);
-        Configuration migrated = new Configuration(configFile);
-        migrated.load();
-        assertEquals(100.0D, migrated.get(
+        Configuration written = new Configuration(configFile);
+        written.load();
+        assertEquals(120.0D, written.get(
                 LostTalesThirdPersonConfig.CATEGORY_CAMERA,
                 "headTrackingAngle", 0.0D).getDouble(0.0D), 0.0D);
     }
@@ -157,7 +152,7 @@ public final class LostTalesThirdPersonConfigPersistenceTest {
     public void everyCameraOptionIsWrittenBack() {
         Configuration written = new Configuration();
         LostTalesThirdPersonConfig.writeCurrentValues(written);
-        assertEquals(LostTalesThirdPersonConfig.optionKeys(),
+        assertEquals(DefinedCameraOptions.keys(),
                 new TreeSet<String>(written.getCategory(
                         LostTalesThirdPersonConfig.CATEGORY_CAMERA).keySet()));
     }

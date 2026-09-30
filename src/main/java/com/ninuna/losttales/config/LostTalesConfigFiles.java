@@ -60,6 +60,11 @@ public final class LostTalesConfigFiles {
      */
     public static final String CHAT_READ_MARKS = "chat/read_marks";
     /**
+     * The unsent text of each conversation on each server, a folder under
+     * the client folder holding one file per account.
+     */
+    public static final String CHAT_DRAFTS = "chat/drafts";
+    /**
      * The status each account last chose for each of its identities on
      * each server, a folder under the client folder holding one file per
      * account.

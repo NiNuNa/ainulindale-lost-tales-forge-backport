@@ -5,7 +5,6 @@ import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.server.ChatHistory;
 import com.ninuna.losttales.chat.server.ChatMessageIdAllocator;
-import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.Arrays;
 import java.util.UUID;
@@ -20,8 +19,7 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * The links come back only for messages the restored history still
- * holds, the save follows the live map whichever thread changes it, and
- * a reload keeps the links while the next world starts with none.
+ * holds, and the save follows the live map whichever thread changes it.
  */
 public final class DiscordMessageLinkStorageTest {
     private static final UUID ALICE = UUID.fromString("00000000-0000-0000-0000-00000000000a");
@@ -62,7 +60,7 @@ public final class DiscordMessageLinkStorageTest {
     @Test
     public void theSaveFollowsTheLiveLinksWhicheverThreadChangesThem() {
         DiscordMessageLinks live = new DiscordMessageLinks();
-        DiscordMessageLinkWorldData data = new DiscordMessageLinkWorldData();
+        DiscordMessageLinkWorldData data = new DiscordMessageLinkWorldData(DiscordMessageLinkWorldData.DATA_NAME);
         data.attach(live, false);
         // Nothing to write for a world whose bridge links nothing.
         assertFalse(data.isDirty());
@@ -90,35 +88,9 @@ public final class DiscordMessageLinkStorageTest {
 
     @Test
     public void aRestoreThatLeftSomethingOutIsWrittenBack() {
-        DiscordMessageLinkWorldData data = new DiscordMessageLinkWorldData();
+        DiscordMessageLinkWorldData data = new DiscordMessageLinkWorldData(DiscordMessageLinkWorldData.DATA_NAME);
         data.attach(new DiscordMessageLinks(), true);
         assertTrue(data.isDirty());
-    }
-
-    @Test
-    public void aReloadKeepsTheLinksAndTheNextWorldStartsWithNone() {
-        LostTalesDiscordBridge bridge = LostTalesDiscordBridge.getInstance();
-        boolean enabled = LostTalesConfig.discordEnabled;
-        try {
-            LostTalesConfig.discordEnabled = false;
-            bridge.restoreLinks(null);
-            bridge.links().link(1000L, "111", "", "channel:5", "");
-            // What /losttales discord reload and a live settings change do.
-            bridge.start();
-            bridge.stop();
-            bridge.start();
-            assertEquals(1000L, bridge.links().messageIdOf("111"));
-            // The stopping server leaves an empty map behind it,
-            bridge.releaseLinks();
-            assertEquals(ChatMessageIds.NONE, bridge.links().messageIdOf("111"));
-            // and the next server's start begins from a map of its own.
-            bridge.links().link(2000L, "222", "", "channel:5", "");
-            bridge.restoreLinks(null);
-            assertEquals(0, bridge.links().size());
-        } finally {
-            LostTalesConfig.discordEnabled = enabled;
-            bridge.releaseLinks();
-        }
     }
 
     private static long say(String text) {

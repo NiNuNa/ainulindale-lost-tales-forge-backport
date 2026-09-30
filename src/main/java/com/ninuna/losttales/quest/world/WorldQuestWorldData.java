@@ -5,33 +5,29 @@ import com.ninuna.losttales.util.LostTalesLog;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.WorldSavedData;
 
 /**
  * The world's world quests: every run kept, running or ended, and the
- * rewards waiting for helpers who were not there as their quest succeeded.
- * A store saved by a newer build is kept whole and read-only.
+ * rewards waiting for helpers who were not there as their quest succeeded,
+ * one for each win, so a quest won twice before its helper collects pays
+ * twice. A win pays each account once. A store saved by a newer build is
+ * kept whole and read-only.
  */
 public final class WorldQuestWorldData extends WorldSavedData {
     public static final String DATA_NAME = "losttales_world_quests";
 
     private final Map<String, WorldQuestRun> runs =
             new LinkedHashMap<String, WorldQuestRun>();
-    private final Map<UUID, Set<String>> rewards =
-            new LinkedHashMap<UUID, Set<String>>();
+    private final Map<UUID, List<String>> rewards =
+            new LinkedHashMap<UUID, List<String>>();
     private final List<NBTTagCompound> quarantined =
             new ArrayList<NBTTagCompound>();
     private NBTTagCompound preservedNewerData;
-
-    public WorldQuestWorldData() {
-        this(DATA_NAME);
-    }
 
     public WorldQuestWorldData(String name) {
         super(name);
@@ -87,6 +83,26 @@ public final class WorldQuestWorldData extends WorldSavedData {
     public synchronized WorldQuestRun run(String questId) {
         WorldQuestRun run = this.runs.get(questId);
         return run == null ? null : run.copy();
+    }
+
+    /**
+     * The quests running at {@code now} and not yet past their days, by
+     * id, without copying their runs: what every kill and craft looks at.
+     */
+    public synchronized List<String> runningQuestIds(long now) {
+        List<String> running = new ArrayList<String>();
+        for (WorldQuestRun run : this.runs.values()) {
+            if (run.isRunning() && now < run.getEndsAt()) {
+                running.add(run.getQuestId());
+            }
+        }
+        return running;
+    }
+
+    /** How far the quest's run has come on the objective; 0 for a quest never run. */
+    public synchronized int count(String questId, String objectiveId) {
+        WorldQuestRun run = this.runs.get(questId);
+        return run == null ? 0 : run.getCount(objectiveId);
     }
 
     public synchronized int runningCount() {
@@ -149,12 +165,25 @@ public final class WorldQuestWorldData extends WorldSavedData {
     }
 
     /**
-     * Ends a running quest. On success every helper who added at least
-     * {@code least} gets the quest's reward waiting for them. Answers
-     * whether it ended.
+     * Ends a running quest that pays nobody: it failed or was stopped.
+     * Answers whether it ended.
      */
     public synchronized boolean end(String questId, WorldQuestRun.State state,
-                                    long now, int least) {
+                                    long now) {
+        return state != WorldQuestRun.State.COMPLETED
+                && end(questId, state, now, Integer.MAX_VALUE,
+                        WorldQuestPayees.EACH_ITS_OWN);
+    }
+
+    /**
+     * Ends a running quest. On success each account is paid once: of its
+     * identities that added at least {@code least}, the one that added
+     * most gets the quest's reward waiting for it ({@link WorldQuestPayees}).
+     * Answers whether it ended.
+     */
+    public synchronized boolean end(String questId, WorldQuestRun.State state,
+                                    long now, int least,
+                                    WorldQuestPayees.Accounts accounts) {
         WorldQuestRun run = this.runs.get(questId);
         if (isReadOnly() || run == null || !run.isRunning()
                 || state == WorldQuestRun.State.RUNNING) {
@@ -162,28 +191,39 @@ public final class WorldQuestWorldData extends WorldSavedData {
         }
         run.end(state, now);
         if (state == WorldQuestRun.State.COMPLETED) {
-            for (Map.Entry<UUID, Integer> helper : run.getHelpers().entrySet()) {
-                if (helper.getValue().intValue() >= least) {
-                    waitReward(helper.getKey(), questId);
+            int lost = 0;
+            for (UUID payee : WorldQuestPayees.of(run.getHelpers(), least,
+                    accounts)) {
+                if (!waitReward(payee, questId)) {
+                    lost++;
                 }
+            }
+            if (lost > 0) {
+                LostTalesLog.warning("The world quest %s was won, but %d"
+                        + " helpers already wait for as many rewards as the"
+                        + " world keeps; they are not paid for it", questId,
+                        Integer.valueOf(lost));
             }
         }
         markDirty();
         return true;
     }
 
-    private void waitReward(UUID identity, String questId) {
-        Set<String> waiting = this.rewards.get(identity);
+    /** Leaves the quest's reward waiting for the identity; false when the store has no room for it. */
+    private boolean waitReward(UUID identity, String questId) {
+        List<String> waiting = this.rewards.get(identity);
         if (waiting == null) {
             if (this.rewards.size() >= WorldQuestNbtCodec.MAX_REWARDED) {
-                return;
+                return false;
             }
-            waiting = new LinkedHashSet<String>();
+            waiting = new ArrayList<String>();
             this.rewards.put(identity, waiting);
         }
-        if (waiting.size() < WorldQuestNbtCodec.MAX_REWARDS_EACH) {
-            waiting.add(questId);
+        if (waiting.size() >= WorldQuestNbtCodec.MAX_REWARDS_EACH) {
+            return false;
         }
+        waiting.add(questId);
+        return true;
     }
 
     /** Whether any reward waits for the identity: a cheap question asked often. */
@@ -191,14 +231,14 @@ public final class WorldQuestWorldData extends WorldSavedData {
         return identity != null && this.rewards.containsKey(identity);
     }
 
-    /** Takes the rewards waiting for the identity, as quest ids; empty for none. */
-    public synchronized Set<String> takeRewards(UUID identity) {
+    /** Takes the rewards waiting for the identity, one quest id for each; empty for none. */
+    public synchronized List<String> takeRewards(UUID identity) {
         if (isReadOnly() || identity == null) {
-            return Collections.emptySet();
+            return Collections.emptyList();
         }
-        Set<String> waiting = this.rewards.remove(identity);
+        List<String> waiting = this.rewards.remove(identity);
         if (waiting == null) {
-            return Collections.emptySet();
+            return Collections.emptyList();
         }
         markDirty();
         return waiting;
