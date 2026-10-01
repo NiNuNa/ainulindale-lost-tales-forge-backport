@@ -13,7 +13,7 @@ import java.util.Set;
  * standing for a channel that is more than one conversation is taken as
  * the conversation being read ({@link ChatTab#viewed}), so one Faction
  * row shows one faction. One tab is its open view; the closed-chat feed
- * shows what each conversation's notification choice lets through
+ * shows what each conversation's Show in Feed choice lets through
  * ({@link ChatLayout#feedFilter}). Value semantics, so
  * {@link ClientChatChannelViews} can cache per filter.
  */

@@ -17,12 +17,14 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 /**
- * A sub-window lives in a room — its chat window, or the bare screen —
- * as a window lives on a screen: held inside it and never larger than it
- * down to its least, moved and resized there without sticking to
- * anything, answering its resize band as a chat window does, and
- * remembered in the layout file from the corner of the room it was left
- * nearest, with the size the player gave it if they gave it one.
+ * A sub-window opens locked: measured from its window's room, riding
+ * along as the window moves, carried by nothing and held on the screen.
+ * Unlocked, it goes anywhere on the screen and stays there while its
+ * window moves, resized by the band just outside it; locked again, where
+ * it stands becomes its kind's place in the layout file, measured from
+ * the corner of the room it stands nearest, with the size the player
+ * gave it if they gave it one. Closed unlocked, it forgets where it was
+ * carried and its kind's place too.
  */
 public final class SubWindowsTest {
     private static final int SCREEN_WIDTH = 480;
@@ -51,27 +53,42 @@ public final class SubWindowsTest {
     }
 
     @Test
-    public void aWindowStaysInsideItsRoomAndShrinksWithIt() {
+    public void aLockedWindowRidesWithItsRoomAndIsHeldOnTheScreen() {
         SubWindow window = standing(150, 20, 120, 90);
-        window.layOut(box(50, 40, 200, 150));
-        assertEquals("pushed back inside", 50 + 200 - 120, window.left, 1.0E-9D);
-        assertEquals(120, window.width);
-        window.layOut(box(50, 40, 100, 60));
-        assertEquals("a smaller room narrows it", 100, window.width);
-        assertEquals(60, window.height);
-        assertEquals(50.0D, window.left, 1.0E-9D);
-        assertFalse(window.overflowsRoom());
-        window.layOut(box(50, 40, 200, 150));
-        assertEquals("and a larger one gives the size back", 120, window.width);
-        window.layOut(box(50, 40, 30, 20));
+        LostTalesUiHitBox screen = box(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+        window.layOut(box(50, 40, 200, 150), screen);
+        assertEquals("past its room's edge as it was put", 200.0D,
+                window.left, 1.0E-9D);
+        assertEquals(60.0D, window.top, 1.0E-9D);
+        window.layOut(box(100, 40, 200, 150), screen);
+        assertEquals("it rides along as its window moves", 250.0D,
+                window.left, 1.0E-9D);
+        window.layOut(box(400, 40, 200, 150), screen);
+        assertEquals("never past the screen's edge",
+                SCREEN_WIDTH - 120.0D, window.left, 1.0E-9D);
+        window.layOut(box(0, 0, 200, 150), box(0, 0, 30, 20));
         assertEquals("never under its least", window.minWidth(), window.width);
-        assertTrue("past which the room cuts it", window.overflowsRoom());
     }
 
     @Test
-    public void theResizeBandLiesJustOutsideTheBox() {
+    public void anUnlockedWindowStaysWhereItIsWhileItsWindowMoves() {
+        SubWindows windows = screen();
+        SubWindow window = windows.open(PICKER, "", new StubContent(), null,
+                box(100, 100, 100, 60));
+        assertTrue("every window opens locked", window.isLocked());
+        windows.setLocked(window, false);
+        assertFalse(window.isLocked());
+        double left = window.left;
+        window.layOut(box(300, 10, 100, 100), windows.screenRoom());
+        assertEquals(left, window.left, 1.0E-9D);
+    }
+
+    @Test
+    public void theResizeBandLiesJustOutsideAnUnlockedBox() {
         SubWindow window = standing(100, 60, 120, 90);
-        window.layOut(box(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT));
+        window.locked = false;
+        window.layOut(box(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT),
+                box(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT));
         window.drawnLeft = window.left;
         window.drawnTop = window.top;
         assertEquals(WindowGestures.ResizeEdge.LEFT,
@@ -82,6 +99,8 @@ public final class SubWindowsTest {
                 window.edgeAt(221, 151));
         assertNull("inside, the window's own", window.edgeAt(150, 100));
         assertNull("far off, nobody's", window.edgeAt(10, 10));
+        window.locked = true;
+        assertNull("a locked window keeps its size", window.edgeAt(98, 110));
     }
 
     @Test
@@ -104,10 +123,15 @@ public final class SubWindowsTest {
                         false, 200.0D, 150.0D);
         assertFalse("a window only moved keeps no size", moved.isSized());
         assertEquals("bl", moved.corner());
+        SubWindowPlaces.Placement outside =
+                SubWindowPlaces.placementOf(-30.0D, 10.0D, 40, 30,
+                        false, 200.0D, 150.0D);
+        assertEquals("a place outside the room stays outside it", -30.0D,
+                outside.x(200.0D, 40), 1.0E-9D);
     }
 
     @Test
-    public void aKindResizedOpensWhereAndAsLargeAsItWasLeft() {
+    public void aKindLockedResizedOpensWhereAndAsLargeAsItWasLeft() {
         SubWindows windows = screen();
         LostTalesUiHitBox room = windows.roomOf(null);
         SubWindowPlaces.remember(PICKER, 250.0D,
@@ -115,6 +139,7 @@ public final class SubWindowsTest {
         SubWindow window = windows.open(PICKER, "",
                 new StubContent(), null, box(10, 10, 100, 60));
         assertTrue(window.sized);
+        assertTrue(window.isLocked());
         assertEquals(200, window.width);
         assertEquals(150, window.height);
         assertEquals(MARGIN + 250.0D, window.left, 1.0E-9D);
@@ -130,7 +155,7 @@ public final class SubWindowsTest {
         SubWindow window = windows.open(SubWindowKind.TAB, "",
                 new StubContent(), null, box(10, 10, 100, 60));
         assertFalse(window.sized);
-        assertEquals(100, window.width);
+        assertEquals(Math.max(100, window.minWidth()), window.width);
         assertEquals(SubWindow.STRIP_HEIGHT + 60, window.height);
     }
 
@@ -141,7 +166,7 @@ public final class SubWindowsTest {
                 new StubContent(), null, box(100, 100, 180, 120));
         assertEquals("it opens round the box it is handed", 180, window.width);
         windows.refit(window);
-        assertEquals(100, window.width);
+        assertEquals(Math.max(100, window.minWidth()), window.width);
         assertEquals(SubWindow.STRIP_HEIGHT + 60, window.height);
         assertEquals("its top left stays", 100.0D, window.left, 1.0E-9D);
         window.sized = true;
@@ -151,22 +176,85 @@ public final class SubWindowsTest {
     }
 
     @Test
-    public void aMovedWindowStopsAtItsRoomsEdgeAndSticksToNothing() {
+    public void aLockedWindowIsCarriedByNothingAndAnUnlockedOneGoesAnywhere() {
         SubWindows windows = screen();
-        LostTalesUiHitBox room = windows.roomOf(null);
+        LostTalesUiHitBox screen = windows.screenRoom();
         SubWindow window = windows.open(SubWindowKind.TAB, "",
                 new StubContent(), null, box(100, 100, 100, 60));
+        double left = window.left;
+        windows.armMove(window, 150, 90);
+        assertFalse("the padlock holds it", windows.isHolding());
+        windows.drag(300, 90);
+        assertEquals(left, window.left, 1.0E-9D);
+        windows.setLocked(window, false);
         windows.armMove(window, 150, 90);
         windows.drag(150 + 1000, 90);
-        assertEquals("never past the room's edge",
-                room.left + room.width - window.width, window.left, 1.0E-9D);
-        windows.drag(150 + 3 - (100 - MARGIN), 90);
-        assertEquals("three pixels from the edge it stays three pixels off",
-                room.left + 3.0D, window.left, 1.0E-9D);
+        assertEquals("never past the screen's edge",
+                screen.left + screen.width - window.width, window.left,
+                1.0E-9D);
+        windows.drag(150 - 30, 90);
+        assertEquals(left - 30.0D, window.left, 1.0E-9D);
         windows.release();
-        assertEquals(3.0D, window.x, 1.0E-9D);
-        assertEquals("and the kind is remembered where it was left", "tl",
-                SubWindowPlaces.of(SubWindowKind.TAB).corner());
+        assertNull("nothing is remembered while it is unlocked",
+                SubWindowPlaces.of(SubWindowKind.TAB));
+        windows.setLocked(window, true);
+        assertEquals("locking it makes where it stands its kind's place",
+                "tl", SubWindowPlaces.of(SubWindowKind.TAB).corner());
+        windows.close(window);
+        windows.beginFrame();
+        window.shownShare = 0.0F;
+        windows.beginFrame();
+        SubWindow again = windows.open(SubWindowKind.TAB, "",
+                new StubContent(), null, box(100, 100, 100, 60));
+        assertEquals("it opens where it was locked", left - 30.0D,
+                again.left, 1.0E-9D);
+    }
+
+    @Test
+    public void aWindowClosedUnlockedOpensAtItsKindsPlaceAgain() {
+        SubWindows windows = screen();
+        SubWindow window = windows.open(PICKER, "", new StubContent(), null,
+                box(100, 100, 100, 60));
+        double left = window.left;
+        windows.setLocked(window, false);
+        windows.armMove(window, 150, 90);
+        windows.drag(250, 90);
+        windows.release();
+        windows.close(window);
+        window.shownShare = 0.0F;
+        windows.beginFrame();
+        SubWindow again = windows.open(PICKER, "", new StubContent(), null,
+                box(100, 100, 100, 60));
+        assertTrue(again.isLocked());
+        assertEquals("where its opener puts it", left, again.left, 1.0E-9D);
+    }
+
+    /**
+     * A window closed while unlocked forgets where its kind was locked:
+     * the kind opens where its opener puts it again, locked, and so does
+     * the same window caught while it still fades.
+     */
+    @Test
+    public void aWindowClosedUnlockedForgetsItsKindsPlace() {
+        SubWindows windows = screen();
+        SubWindow window = windows.open(PICKER, "", new StubContent(), null,
+                box(100, 100, 100, 60));
+        double left = window.left;
+        windows.setLocked(window, false);
+        windows.armMove(window, 150, 90);
+        windows.drag(250, 90);
+        windows.release();
+        windows.setLocked(window, true);
+        assertTrue(SubWindowPlaces.of(PICKER) != null);
+        windows.setLocked(window, false);
+        windows.close(window);
+        assertNull(SubWindowPlaces.of(PICKER));
+        SubWindow revived = windows.open(PICKER, "", new StubContent(), null,
+                box(100, 100, 100, 60));
+        assertSame(window, revived);
+        assertTrue(revived.isLocked());
+        assertEquals("where its opener puts it", left, revived.left,
+                1.0E-9D);
     }
 
     @Test
@@ -195,7 +283,7 @@ public final class SubWindowsTest {
         WindowLayoutStore.load(Arrays.asList(
                 "window w1 locked=false x=0.00 y=0.00 active=global tabs=global",
                 "sub test_picker from=br dx=0.00 dy=12.50 w=120 h=160",
-                "sub tab from=tl dx=12.00 dy=40.00",
+                "sub tab from=tl dx=-12.00 dy=40.00",
                 "sub test_list from=tl dx=10.00 dy=20.00 w=140",
                 "sub test_card from=xx dx=1.00 dy=2.00",
                 "sub nonsense from=tl dx=1.00 dy=2.00 w=3 h=4"));
@@ -208,7 +296,8 @@ public final class SubWindowsTest {
         assertEquals(160, picker.height);
         SubWindowPlaces.Placement tab =
                 SubWindowPlaces.of(SubWindowKind.TAB);
-        assertEquals(12.0D, tab.dx, 1.0E-9D);
+        assertEquals("a place past the room's edge", -12.0D, tab.dx,
+                1.0E-9D);
         assertFalse("a place alone keeps no size", tab.isSized());
         assertNull("a size alone is skipped",
                 SubWindowPlaces.of(LIST));
@@ -218,7 +307,7 @@ public final class SubWindowsTest {
         assertTrue(described.contains(
                 "sub test_picker from=br dx=0.00 dy=12.50 w=120 h=160"));
         assertTrue("a place alone is written without a size",
-                described.contains("sub tab from=tl dx=12.00 dy=40.00"));
+                described.contains("sub tab from=tl dx=-12.00 dy=40.00"));
     }
 
     private static SubWindows screen() {

@@ -10,7 +10,7 @@ import net.minecraftforge.common.config.Property;
 
 /**
  * Client-only options for the optional third-person camera overhaul, in
- * their own file: set in Settings, Camera, and saved the moment one
+ * their own file: set in Client Settings, Camera, and saved the moment one
  * changes ({@link #save}).
  */
 public final class LostTalesThirdPersonConfig {

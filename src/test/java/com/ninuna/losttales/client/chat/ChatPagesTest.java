@@ -101,30 +101,44 @@ public final class ChatPagesTest {
         assertNull(WindowTab.fromId("page:nobody"));
     }
 
-    /** A page opens as every window does: at the default place, in the middle, locked. */
+    /**
+     * A page opens as every new window does: a step right and down from
+     * the window in front, at its size, unlocked and in front of it.
+     */
     @Test
-    public void aPageOpensInAWindowOfItsOwnAtTheDefaultPlace() {
+    public void aPageOpensInAWindowOfItsOwnAStepOnFromTheFront() {
+        List<Window> stacked = WindowLayout.stacked();
+        Window front = stacked.get(stacked.size() - 1);
+        WindowPlacement.Box from = WindowPlacement.restingBounds(front, null,
+                427, 240);
         PageTab page = WindowPages.tab(PAGE);
         Window window = WindowLayout.showPage(page);
         assertNotNull(window);
         assertEquals(Arrays.asList(page), window.getTabs());
         assertEquals(page, window.getActiveTab());
-        assertTrue(WindowPlacement.atDefaultPlace(window));
-        assertTrue(window.isLocked());
+        assertFalse(WindowPlacement.atDefaultPlace(window));
+        assertEquals(from.width, window.getOwnWidth());
+        assertEquals(from.height, window.getOwnHeight(), 1.0E-9D);
+        stacked = WindowLayout.stacked();
+        assertSame(window, stacked.get(stacked.size() - 1));
+        assertFalse(window.isLocked());
         assertEquals(Window.ScreenFill.NONE, window.getFill());
         assertSame("shown again, the same window comes forward", window,
                 WindowLayout.showPage(page));
     }
 
-    /** A page's window unlocked and moved comes back where it stood, unlocked; one never moved at the default place. */
+    /** A page's window comes back where it stood, moved or not, unlocked. */
     @Test
     public void aClosedPageComesBackWhereItsWindowStood() {
         PageTab page = WindowPages.tab(PAGE);
         Window window = WindowLayout.showPage(page);
+        double firstX = window.getOffsetX();
+        double firstY = window.getOffsetY();
         WindowLayout.close(page);
-        assertTrue("never moved: the default place again",
-                WindowPlacement.atDefaultPlace(WindowLayout.showPage(page)));
-        window = WindowLayout.windowOf(page);
+        window = WindowLayout.showPage(page);
+        assertEquals("never moved: where it first opened", firstX,
+                window.getOffsetX(), 1.0E-9D);
+        assertEquals(firstY, window.getOffsetY(), 1.0E-9D);
         WindowLayout.setLocked(window.getId(), false);
         WindowLayout.setWindowWidth(window.getId(), 320, false);
         WindowLayout.setWindowHeight(window.getId(), 250.0D, false);
@@ -148,6 +162,7 @@ public final class ChatPagesTest {
         Window window = WindowLayout.windowOf(global);
         ClientChatChannelState.select(global);
         PageTab page = WindowPages.tab(PAGE);
+        WindowLayout.setLocked(window.getId(), false);
         WindowLayout.openTab(page, window.getId());
         WindowLayout.showPage(page);
         assertTrue(WindowLayout.showsPage(window));
@@ -171,6 +186,7 @@ public final class ChatPagesTest {
         Window window = WindowLayout.windowOf(global);
         ClientChatChannelState.select(global);
         PageTab page = WindowPages.tab(PAGE);
+        WindowLayout.setLocked(window.getId(), false);
         WindowLayout.openTab(page, window.getId());
         WindowLayout.showPage(page);
 
@@ -216,11 +232,14 @@ public final class ChatPagesTest {
 
     /** The map opens like any page, never filling the screen by itself; a part of the screen it was given comes back with it. */
     @Test
-    public void aMapLikePageOpensAtTheDefaultPlaceAndThenWhereItWasLeft() {
+    public void aMapLikePageOpensAsAnyPageAndThenWhereItWasLeft() {
         PageTab page = WindowPages.tab(FILLING);
         Window window = WindowLayout.showPage(page);
         assertEquals(Window.ScreenFill.NONE, window.getFill());
-        assertTrue(WindowPlacement.atDefaultPlace(window));
+        String place = String.format(java.util.Locale.ROOT,
+                "x=%.2f y=%.2f height=%.2f width=%d", window.getOffsetX(),
+                window.getOffsetY(), window.getOwnHeight(),
+                window.getOwnWidth());
         WindowLayout.setLocked(window.getId(), false);
         WindowLayout.setFill(window.getId(), Window.ScreenFill.FULL, false);
         WindowLayout.close(page);
@@ -229,8 +248,7 @@ public final class ChatPagesTest {
         WindowLayout.close(page);
         List<String> described = WindowLayoutStore.describe();
         assertTrue(described.toString(), described.contains("place page:"
-                + FILLING + " locked=false x=50.00 y=50.00 height=0.00 width=0"
-                + " fill=full"));
+                + FILLING + " locked=false " + place + " fill=full"));
     }
 
     @Test
@@ -255,6 +273,7 @@ public final class ChatPagesTest {
         ChatTab ooc = ChatTab.of(ChatChannel.OOC);
         Window window = WindowLayout.windowOf(global);
         PageTab page = WindowPages.tab(PAGE);
+        WindowLayout.setLocked(window.getId(), false);
         WindowLayout.openTab(page, window.getId());
         WindowLayout.moveTab(page, window.getId(), 1);
         assertEquals(Arrays.<WindowTab>asList(global, page, ooc),
@@ -278,7 +297,7 @@ public final class ChatPagesTest {
         WindowLayout.setWindowWidth(window.getId(), 320, false);
         WindowLayout.setWindowHeight(window.getId(), 250.0D, false);
         WindowLayout.setPosition(window.getId(), 25.0D, 35.0D, false);
-        assertTrue(window.isLocked());
+        assertTrue(WindowLayout.setLocked(window.getId(), true));
         WindowLayout.removeTabs(new WindowLayout.TabFilter() {
             @Override
             public boolean matches(WindowTab tab) {

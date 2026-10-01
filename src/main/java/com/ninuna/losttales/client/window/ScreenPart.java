@@ -20,11 +20,7 @@ import java.util.List;
  * for that.
  */
 public abstract class ScreenPart {
-    /**
-     * Makes a screen's part; each screen that opens gets its own. A part
-     * that needs a world is not made for a screen that stands without one
-     * ({@link WindowScreen#isWorldless}): its maker answers null.
-     */
+    /** Makes a screen's part; each screen that opens gets its own. */
     public interface Maker {
         ScreenPart make(WindowScreen screen);
     }
@@ -291,7 +287,13 @@ public abstract class ScreenPart {
         return false;
     }
 
-    /** Under the sub-windows: what stands over every window. */
+    /**
+     * Just over the window being typed in, after it and before its
+     * sub-windows: the bar being typed into. A window in front covers it.
+     */
+    public void drawLiveBar(double pointerX, double pointerY) {}
+
+    /** After every window, under the bare screen's sub-windows: what stands over every window. */
     public void drawUnderSubWindows(boolean empty, boolean typing,
                                     double pointerX, double pointerY) {}
 

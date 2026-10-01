@@ -545,6 +545,13 @@ public final class SnapLayouts {
         final float top = (float)panel.box.top;
         final float right = (float)panel.box.right();
         final float bottom = (float)panel.box.bottom();
+        // Like a window, the panel cuts away what lies behind it and
+        // stands on the softened world.
+        LostTalesUiHitBox stands = new LostTalesUiHitBox(left + FRAME,
+                top + FRAME, right - left - 2 * FRAME,
+                bottom - top - 2 * FRAME);
+        WindowDrawing.cutBehind(stands, share);
+        WindowDrawing.softenBehind(stands, share);
         LostTalesUiFlatLayers.draw(surface >>> 24, left, top, right, bottom,
                 new LostTalesUiFlatLayers.Layers() {
                     @Override

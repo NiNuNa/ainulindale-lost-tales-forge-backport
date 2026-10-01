@@ -13,61 +13,113 @@ import net.minecraft.client.gui.FontRenderer;
 /**
  * The strip across a sub-window's top: a window's tool strip, its height
  * and its plum grey, with the rule on its last row. The icon and the name
- * stand at its left, the cross at its right, and the window is carried by
- * it. Under it the content stands on the inset surface, and the frame's
- * ring wears whichever of the two it runs beside.
+ * stand at its left; at its right, as a window's tab row keeps them, the
+ * padlock, a hairline, the cross, another hairline and the grip. Under it
+ * the content stands on the inset surface, and the frame's ring wears
+ * whichever of the two it runs beside.
  */
 final class SubWindowStrip {
     /** A window's tool strip, rule included. */
     static final int HEIGHT = WindowPlacement.TOOL_STRIP_HEIGHT;
-    /** Clear pixels from the box's edge to the icon, and from the cross to the edge. */
+    /** Clear pixels from the box's edge to the icon. */
     private static final int EDGE_MARGIN = 3;
-    /** Clear pixels between the name and the cross. */
-    private static final int CLOSE_GAP = 5;
+    /** Clear pixels between the name and the padlock. */
+    private static final int NAME_GAP = 5;
+    /** Room for a few letters of the name, the least a strip keeps for it. */
+    private static final int FEW_LETTERS = 12;
     /** The capitals' top: centred in the rows above the rule, the odd pixel up. */
     static final int TEXT_TOP = (HEIGHT - 1 - LostTalesUiInk.CAP_HEIGHT) / 2;
+    private static final int GAP = TabRow.END_CONTROL_GAP;
+    private static final int DIVIDER_WIDTH = WindowStyle.DIVIDER_WIDTH;
+    private static final int DIVIDER_HEIGHT = TabRow.END_CONTROL_SIZE;
+    private static final int CLOSE_WIDTH = LostTalesUiSheet.CLOSE.getWidth();
+    private static final int CLOSE_HEIGHT = LostTalesUiSheet.CLOSE.getHeight();
+    private static final int GRIP_WIDTH = LostTalesUiSheet.GRIP.getWidth();
+    private static final int GRIP_HEIGHT = LostTalesUiSheet.GRIP.getHeight();
+    /**
+     * The controls' run at the strip's right end, from the padlock's left
+     * to the edge: each with the gap after it, and the grip's inset.
+     */
+    private static final int CONTROLS_WIDTH = LockAnimation.WIDTH + GAP
+            + DIVIDER_WIDTH + GAP + CLOSE_WIDTH + GAP + DIVIDER_WIDTH + GAP
+            + GRIP_WIDTH + TabRow.GRIP_INSET;
 
     final String label;
     final boolean icon;
     final int textX;
+    /** What the padlock and the cross answer on: their ink and the end controls' clearing. */
+    final LostTalesUiHitBox lockBox;
     final LostTalesUiHitBox closeBox;
+    /** What the grip answers on: the strip from the second hairline to the edge. */
+    final LostTalesUiHitBox gripBox;
+    private final int lockX;
+    private final int lockTop;
+    private final int closeX;
+    private final int closeTop;
+    private final int firstDividerX;
+    private final int secondDividerX;
+    private final int dividerTop;
+    private final int gripX;
+    private final int gripTop;
 
-    private SubWindowStrip(String label, boolean icon, int textX,
-                           LostTalesUiHitBox closeBox) {
+    private SubWindowStrip(String label, boolean icon, int textX, int top,
+                           int right) {
         this.label = label;
         this.icon = icon;
         this.textX = textX;
-        this.closeBox = closeBox;
+        int textTop = top + TEXT_TOP;
+        this.gripX = right - TabRow.GRIP_INSET - GRIP_WIDTH;
+        this.secondDividerX = this.gripX - GAP - DIVIDER_WIDTH;
+        this.closeX = this.secondDividerX - GAP - CLOSE_WIDTH;
+        this.firstDividerX = this.closeX - GAP - DIVIDER_WIDTH;
+        this.lockX = this.firstDividerX - GAP - LockAnimation.WIDTH;
+        this.gripTop = textTop + WindowStyle.centredBoxTop(GRIP_HEIGHT);
+        this.closeTop = textTop + WindowStyle.centredBoxTop(CLOSE_HEIGHT);
+        this.dividerTop = textTop + WindowStyle.centredBoxTop(DIVIDER_HEIGHT);
+        // The resting padlock is centred like its neighbours; the room its
+        // shackle swings in stands above it.
+        this.lockTop = textTop
+                + WindowStyle.centredBoxTop(LockAnimation.SHUT_HEIGHT)
+                - (LockAnimation.HEIGHT - LockAnimation.SHUT_HEIGHT);
+        this.lockBox = new LostTalesUiHitBox(this.lockX, this.lockTop,
+                LockAnimation.WIDTH, LockAnimation.HEIGHT)
+                .grown(TabRow.END_CONTROL_SLACK);
+        this.closeBox = new LostTalesUiHitBox(this.closeX, this.closeTop,
+                CLOSE_WIDTH, CLOSE_HEIGHT).grown(TabRow.END_CONTROL_SLACK);
+        int gripLeft = this.secondDividerX + DIVIDER_WIDTH;
+        this.gripBox = new LostTalesUiHitBox(gripLeft, top, right - gripLeft,
+                HEIGHT - 1);
     }
 
     /**
      * Lays the strip out across {@code left} to {@code right} from
      * {@code top}, whole pixels: the icon when {@code icon}, the name cut
-     * to the room the cross leaves it, and the cross.
+     * to the room the controls leave it, and the controls.
      */
     static SubWindowStrip layOut(FontRenderer font, int left, int right,
                                  int top, String title, boolean icon) {
         int textX = left + EDGE_MARGIN
                 + (icon ? TabIcons.SLOT + TabIcons.GAP : 0);
-        int closeLeft = right - EDGE_MARGIN - TabRow.CONTROL_SIZE;
-        int room = Math.max(0, closeLeft - CLOSE_GAP - textX);
+        int room = Math.max(0, right - CONTROLS_WIDTH - NAME_GAP - textX);
         String shown = font.getStringWidth(title) <= room ? title
                 : LostTalesSkyrimUiStyle.trimToWidth(font, title, room);
-        int textTop = top + TEXT_TOP;
-        return new SubWindowStrip(shown, icon, textX,
-                new LostTalesUiHitBox(closeLeft, textTop
-                        + WindowStyle.centredBoxTop(TabRow.CONTROL_SIZE),
-                        TabRow.CONTROL_SIZE, TabRow.CONTROL_SIZE));
+        return new SubWindowStrip(shown, icon, textX, top, right);
     }
 
     /**
      * How wide a strip must be to show {@code title} whole beside its
-     * cross, and its icon when {@code icon}: what a window opening at its
-     * content's own size is at least as wide as.
+     * controls, and its icon when {@code icon}: what a window opening at
+     * its content's own size is at least as wide as.
      */
     static int widthFor(FontRenderer font, String title, boolean icon) {
-        return EDGE_MARGIN * 2 + (icon ? TabIcons.SLOT + TabIcons.GAP : 0)
-                + font.getStringWidth(title) + CLOSE_GAP + TabRow.CONTROL_SIZE;
+        return EDGE_MARGIN + (icon ? TabIcons.SLOT + TabIcons.GAP : 0)
+                + font.getStringWidth(title) + NAME_GAP + CONTROLS_WIDTH;
+    }
+
+    /** The narrowest strip: its icon, a few letters, and the controls. */
+    static int minWidth() {
+        return EDGE_MARGIN + TabIcons.SLOT + TabIcons.GAP + FEW_LETTERS
+                + NAME_GAP + CONTROLS_WIDTH;
     }
 
     /**
@@ -104,12 +156,13 @@ final class SubWindowStrip {
     }
 
     /**
-     * The icon, the name in ivory and the cross, stepped by
-     * {@code closeMotion}, on the strip laid out from {@code top}.
+     * The icon, the name in ivory, and the controls: the padlock turned to
+     * {@code locked} and lit while {@code lockLit}, the cross, the grip
+     * lit by {@code gripFade}, and the hairlines between them.
      */
     void drawContent(FontRenderer font, int left, int top,
-                     LostTalesUiSheet iconGlyph,
-                     LostTalesUiButtonMotion closeMotion, int alpha) {
+                     LostTalesUiSheet iconGlyph, SubWindow window,
+                     boolean lockLit, int alpha) {
         if (alpha < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
             return;
         }
@@ -124,12 +177,26 @@ final class SubWindowStrip {
         }
         LostTalesUiInk.drawText(font, this.label, this.textX, textTop,
                 LostTalesUiInk.IVORY, alpha);
+        // The padlock's button beat lifts and springs it whole, so the
+        // turn of its shackle stays its own.
+        LostTalesUiButton.beginPose(window.lockMotion, this.lockX,
+                this.lockTop, LockAnimation.WIDTH, LockAnimation.HEIGHT);
+        try {
+            window.lock.draw(this.lockX, this.lockTop, window.isLocked(),
+                    lockLit, alpha);
+        } finally {
+            LostTalesUiButton.endPose();
+        }
+        int divider = Math.round(WindowStyle.DIVIDER_ALPHA * alpha / 255.0F);
+        WindowStyle.drawDivider(this.firstDividerX, this.dividerTop,
+                DIVIDER_HEIGHT, divider);
         LostTalesUiButton.drawGlyph(LostTalesUiSheet.CLOSE,
-                LostTalesUiSheet.CLOSE_HOVER, closeMotion,
-                (float)this.closeBox.left + (TabRow.CONTROL_SIZE
-                        - LostTalesUiSheet.CLOSE.getWidth()) / 2,
-                (int)this.closeBox.top + (TabRow.CONTROL_SIZE
-                        - LostTalesUiSheet.CLOSE.getHeight()) / 2,
-                alpha);
+                LostTalesUiSheet.CLOSE_HOVER, window.closeMotion,
+                this.closeX, this.closeTop, alpha);
+        WindowStyle.drawDivider(this.secondDividerX, this.dividerTop,
+                DIVIDER_HEIGHT, divider);
+        LostTalesUiSheet.drawPairWithShadow(LostTalesUiSheet.GRIP,
+                LostTalesUiSheet.GRIP_HOVER, window.gripFade, this.gripX,
+                this.gripTop, alpha);
     }
 }

@@ -5,6 +5,7 @@ import com.ninuna.losttales.permission.LostTalesCapability;
 import com.ninuna.losttales.permission.LostTalesPermissionCatalog;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -69,6 +70,16 @@ public final class ChatRoleConfig {
     private static final Pattern GRANT_ID = Pattern.compile("[a-z0-9_.]{1,64}");
     private static final Pattern COLOR = Pattern.compile("#?[0-9a-fA-F]{6}");
     private static final int DEFAULT_CUSTOM_RANK = 20;
+    /** The options each kind of entry reads; any other is reported and ignored. */
+    private static final List<String> ROLE_OPTIONS = Collections.unmodifiableList(
+            Arrays.asList("name", "colour", "mention", "rank", "op",
+                    "faction", "grant", "icon", "desc"));
+    private static final List<String> PERMISSION_OPTIONS =
+            Collections.singletonList("capability");
+    private static final List<String> CHANNEL_OPTIONS = Collections.unmodifiableList(
+            Arrays.asList("name", "rule", "colour", "ooc", "bridge"));
+    private static final List<String> GATE_OPTIONS = Collections.unmodifiableList(
+            Arrays.asList("read", "send"));
     /** The prefix a member entry gives a character id rather than an account id. */
     public static final String CHARACTER_MEMBER_PREFIX = "character:";
     /**
@@ -142,6 +153,7 @@ public final class ChatRoleConfig {
     private static ChatAccountRole roleOf(String id, Map<String, List<String>> options,
                                           LostTalesPermissionCatalog permissions,
                                           Warnings out) {
+        warnUnreadOptions("Chat role", id, options, ROLE_OPTIONS, out);
         String name = first(options, "name");
         String description = first(options, "desc");
         int color = LostTalesColorsDefault.ROLE;
@@ -325,6 +337,7 @@ public final class ChatRoleConfig {
                 break;
             }
             Map<String, List<String>> options = optionsOf(entry);
+            warnUnreadOptions("Permission", id, options, PERMISSION_OPTIONS, out);
             Set<String> named = new LinkedHashSet<String>();
             for (String capability : all(options, "capability")) {
                 LostTalesCapability known = LostTalesCapability.byId(capability);
@@ -398,6 +411,7 @@ public final class ChatRoleConfig {
                 continue;
             }
             Map<String, List<String>> options = optionsOf(entry);
+            warnUnreadOptions("Channel", id, options, CHANNEL_OPTIONS, warnings);
             ChatRecipientRule rule = definedRule(first(options, "rule"));
             if (rule == null) {
                 warnings.warn("Channel '" + id + "' names no routing a config "
@@ -584,6 +598,8 @@ public final class ChatRoleConfig {
                 continue;
             }
             Map<String, List<String>> options = optionsOf(entry);
+            warnUnreadOptions("Channel gate", channel.getId(), options,
+                    GATE_OPTIONS, out);
             Set<String> read = roleIds(first(options, "read"), catalog, entry, out);
             Set<String> send = roleIds(first(options, "send"), catalog, entry, out);
             gates.put(channel, new ChatChannelGates.Gate(read, send,
@@ -748,6 +764,22 @@ public final class ChatRoleConfig {
             values.add(part.substring(colon + 1).trim());
         }
         return options;
+    }
+
+    /**
+     * Reports every option of an entry that its kind does not read. A
+     * misspelt option ({@code color:} for {@code colour:}) would otherwise
+     * pass in silence and leave the default standing.
+     */
+    private static void warnUnreadOptions(String kind, String id,
+                                          Map<String, List<String>> options,
+                                          List<String> read, Warnings out) {
+        for (String name : options.keySet()) {
+            if (!read.contains(name)) {
+                out.warn(kind + " '" + id + "' has the option '" + name
+                        + "', which is none of " + read + "; it is ignored");
+            }
+        }
     }
 
     private static String first(Map<String, List<String>> options, String name) {

@@ -1,10 +1,14 @@
 package com.ninuna.losttales.client.mapmarker;
 
+import com.ninuna.losttales.client.keybinding.LostTalesKeyBindings;
+import com.ninuna.losttales.client.window.PageKeys;
+import com.ninuna.losttales.client.window.PageOption;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiOrigin;
 import com.ninuna.losttales.client.window.BarItem;
 import com.ninuna.losttales.client.window.PageContent;
 import com.ninuna.losttales.client.window.PinnedWindows;
+import com.ninuna.losttales.client.window.Settings;
 import com.ninuna.losttales.client.window.ToolStrip;
 import com.ninuna.losttales.client.window.WindowBar;
 import com.ninuna.losttales.client.window.WindowPages;
@@ -40,8 +44,9 @@ import org.lwjgl.opengl.GL11;
  * the conquest grid and the control zones, keep a screen of their own.
  *
  * <p>Its window is every window's shape: the tool strip's
- * panel button folds the legend, its cog holds the legend's switches and
- * its well is Find Location; the bar holds Current Location, Create
+ * panel button folds the legend, its three dots hold the legend's
+ * switches, its cog opens Map Settings and its well is Find Location;
+ * the bar holds Current Location, Create
  * Waypoint and an operator's Teleport, then the place under the pointer,
  * the date, and the zoom. The key-hint strip of the map's own screen is
  * not drawn here.</p>
@@ -107,13 +112,10 @@ public final class LostTalesMapPage extends PageContent {
         return shown != null ? shown : screen;
     }
 
-    /**
-     * The map's tab waits unseen where the map cannot stand in a window,
-     * and on the screen that stands without a world.
-     */
+    /** The map's tab waits unseen where the map cannot stand in a window. */
     @Override
     public boolean isAvailable() {
-        return !WindowScreen.standsWithoutWorld() && standsInWindow();
+        return standsInWindow();
     }
 
 
@@ -154,33 +156,77 @@ public final class LostTalesMapPage extends PageContent {
         }
     }
 
+    /** The map's markers and its terrain: Map Settings. */
     @Override
-    public String choicesHeading() {
-        return "gui.losttales.map.menu.show";
+    public Settings.Place settingsPlace() {
+        return Settings.Place.MAP;
     }
 
-    /** The legend's switches: which kinds of marker the map shows. */
+    /**
+     * The legend's switches: which kinds of marker the map shows, each a
+     * button on the strip in its marker's colour, struck through while
+     * the map leaves its kind out.
+     */
     @Override
-    public List<Choice> choices() {
+    public List<PageOption> options() {
         List<LostTalesMapLegendCategory> categories =
                 LostTalesMapLegendRegistry.getCategories();
-        List<Choice> choices = new ArrayList<Choice>(categories.size());
+        List<PageOption> options = new ArrayList<PageOption>(categories.size());
         for (LostTalesMapLegendCategory category : categories) {
-            choices.add(new Choice(category.getId(),
+            options.add(PageOption.toggle(category.getId(),
                     StatCollector.translateToLocal(
                             category.getTranslationKey()),
                     LostTalesMapLegendRegistry.isCategoryEnabled(
-                            category.getId())));
+                            category.getId()),
+                    LostTalesMapLegendGlyphs.of(category))
+                    .inGroup("kinds", "gui.losttales.map.menu.show"));
         }
-        return choices;
+        return options;
     }
 
     @Override
-    public void choose(String id) {
+    public boolean takeOption(String id, boolean back) {
         LostTalesMapLegendRegistry.toggleCategory(id);
         if (this.map != null) {
             this.map.onMapLegendFiltersChanged();
         }
+        return true;
+    }
+
+    /** The keys the map answers to, for its help. */
+    @Override
+    public List<PageKeys.Area> keyAreas() {
+        return PageKeys.pageArea("gui.losttales.page.map",
+                PageKeys.pageKey(PAGE_ID, "move",
+                        PageKeys.DRAG, PageKeys.OR, Keyboard.KEY_W,
+                        Keyboard.KEY_A, Keyboard.KEY_S, Keyboard.KEY_D),
+                PageKeys.pageKey(PAGE_ID, "zoom", PageKeys.WHEEL),
+                PageKeys.pageKey(PAGE_ID, "turn", PageKeys.RIGHT_DRAG),
+                PageKeys.pageKey(PAGE_ID, "location", Keyboard.KEY_R),
+                PageKeys.pageKey(PAGE_ID, "waypoint", Keyboard.KEY_C),
+                PageKeys.pageKey(PAGE_ID, "find", Keyboard.KEY_F),
+                PageKeys.pageKey(PAGE_ID, "legend", legendKey()),
+                PageKeys.pageKey(PAGE_ID, "travel", PageKeys.CLICK),
+                PageKeys.pageKey(PAGE_ID, "gather", PageKeys.CLICK),
+                PageKeys.pageKey(PAGE_ID, "edit", PageKeys.CLICK),
+                PageKeys.pageKey(PAGE_ID, "stack", PageKeys.CLICK),
+                PageKeys.pageKey(PAGE_ID, "yes",
+                        Keyboard.KEY_RETURN, PageKeys.OR, Keyboard.KEY_Y),
+                PageKeys.pageKey(PAGE_ID, "no",
+                        Keyboard.KEY_ESCAPE, PageKeys.OR, Keyboard.KEY_N),
+                PageKeys.pageKey(PAGE_ID, "destinations",
+                        Keyboard.KEY_LEFT, PageKeys.OR, Keyboard.KEY_RIGHT),
+                PageKeys.pageKey(PAGE_ID, "teleport", PageKeys.CLICK));
+    }
+
+    /**
+     * The key that shows and hides the legend, the Modifier Key: its key
+     * as the Controls screen binds it, Left Alt where it is bound to a
+     * mouse button, which the key icons cannot draw.
+     */
+    private static Integer legendKey() {
+        int code = LostTalesKeyBindings.getMapLegendKeyBinding().getKeyCode();
+        return Integer.valueOf(code > 0 ? code : Keyboard.KEY_LMENU);
     }
 
     @Override
@@ -300,11 +346,15 @@ public final class LostTalesMapPage extends PageContent {
         return this.hasKeys;
     }
 
-    /** Closes the map's tab, its window with it when the map is all it holds. */
-    void close() {
+    /**
+     * The map's key, pressed on the map as a mouse button: what the key
+     * does anywhere on the screen, which closes the screen turned to the
+     * map, and turns it to the map otherwise.
+     */
+    void mapKeyPressed() {
         WindowScreen screen = WindowScreen.current();
         if (screen != null) {
-            screen.closeTab(WindowPages.tab(PAGE_ID));
+            screen.turnTo(WindowPages.tab(PAGE_ID));
         }
     }
 

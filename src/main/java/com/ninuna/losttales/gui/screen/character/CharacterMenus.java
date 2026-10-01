@@ -134,6 +134,7 @@ final class CharacterMenus {
                             capes.cosmeticId))
                     .unavailable(busy));
             if (capes.cosmeticId != CharacterCapeCatalog.NONE_ID) {
+                rows.add(MenuWindow.Entry.separator());
                 rows.add(MenuWindow.Entry.passive(I18n.format(
                         "gui.losttales.character.cape.cosmetic_precedence")));
             }

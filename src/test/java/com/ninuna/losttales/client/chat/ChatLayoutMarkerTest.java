@@ -27,6 +27,23 @@ public final class ChatLayoutMarkerTest {
         assertEquals(0x12AB34, ChatLayoutMarker.bodyColor(piece));
     }
 
+    /** A body break carries the line's mark with its colour; a plain one is words said. */
+    @Test
+    public void aBodyBreakCarriesTheLinesMark() {
+        assertEquals(ChatLineMark.SAID,
+                ChatLayoutMarker.bodyMark(ChatLayoutMarker.bodyBreak(0x12AB34)));
+        for (ChatLineMark mark : ChatLineMark.values()) {
+            ChatComponentText marker = ChatLayoutMarker.bodyBreak(0x12AB34,
+                    mark);
+            assertTrue(ChatLayoutMarker.isBodyBreak(marker));
+            assertEquals(mark, ChatLayoutMarker.bodyMark(marker));
+            assertEquals(0x12AB34, ChatLayoutMarker.bodyColor(marker));
+            assertTrue(ChatLineMark.isMark(mark.separator));
+        }
+        assertFalse(ChatLineMark.isMark("<"));
+        assertFalse(ChatLineMark.isMark("> >"));
+    }
+
     @Test
     public void aMalformedBodyBreakNamesNoColourButStillBreaks() {
         ChatComponentText marker = new ChatComponentText("");

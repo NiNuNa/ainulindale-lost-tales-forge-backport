@@ -1,8 +1,14 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatChannelAccess;
+import com.ninuna.losttales.chat.ChatRecipientRule;
+import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.ChatTabIds;
-import com.ninuna.losttales.client.window.MenuWindow;
+import com.ninuna.losttales.client.window.OptionGlyph;
+import com.ninuna.losttales.client.window.PageHelp;
+import com.ninuna.losttales.client.window.PageOption;
+import com.ninuna.losttales.client.window.Settings;
 import com.ninuna.losttales.client.window.TabMark;
 import com.ninuna.losttales.client.window.ToolStrip;
 import com.ninuna.losttales.client.window.Window;
@@ -41,11 +47,32 @@ import net.minecraft.util.StatCollector;
  * filed under, and the selection points at.</p>
  */
 public final class ChatTab extends WindowTab {
-    /** The rows of a conversation's menu behind the tool strip's cog. */
+    /** A conversation's options, behind its tab's three dots and on its tool strip. */
     private static final String MENU_MARK_READ = "mark_read";
     private static final String MENU_JUMP_UNREAD = "jump_unread";
     private static final String MENU_NOTIFY = "notify";
-    private static final String MENU_HIDE = "hide";
+    private static final String MENU_FEED = "feed";
+    /** The options' two groups: reading, and the conversation's own settings. */
+    private static final String GROUP_READING = "reading";
+    private static final String GROUP_SETTINGS = "settings";
+    /** A tick: Mark as Read. A pattern until its artwork is painted. */
+    private static final OptionGlyph READ_GLYPH = OptionGlyph.pattern(
+            "....#",
+            "...#.",
+            "#.#..",
+            ".#...");
+    /** A bell: Notifications. A pattern until its artwork is painted. */
+    private static final OptionGlyph BELL_GLYPH = OptionGlyph.pattern(
+            "..#..",
+            ".###.",
+            ".###.",
+            "#####",
+            "..#..");
+    private static final OptionGlyph JUMP_GLYPH = OptionGlyph.sprite(
+            LostTalesUiSheet.CHEVRON_5, LostTalesUiSheet.CHEVRON_5_HOVER);
+    private static final OptionGlyph FEED_GLYPH = OptionGlyph.sprite(
+            LostTalesUiSheet.SPEECH_BUBBLE,
+            LostTalesUiSheet.SPEECH_BUBBLE_HOVER);
     /** The timestamp area's button: the person, for the heads the area holds. */
     private static final ToolStrip.Panel AREA_PANEL = new ToolStrip.Panel(
             LostTalesUiSheet.AREA, LostTalesUiSheet.AREA_HOVER,
@@ -398,7 +425,7 @@ public final class ChatTab extends WindowTab {
                 && ClientChatChannelState.getDraft(this).length() > 0;
     }
 
-    /** Nothing of it reaches the player: its notification choice is Nothing. */
+    /** None of its lines chime: its Notifications is Nothing. */
     @Override
     public boolean isMuted() {
         return ChatLayout.isMuted(this);
@@ -409,14 +436,10 @@ public final class ChatTab extends WindowTab {
         return !ClientChatChannelState.canSend(this);
     }
 
-    /**
-     * A conversation shows while its channel is open to the player, and
-     * never on the screen that stands without a world.
-     */
+    /** A conversation shows while its channel is open to the player. */
     @Override
     public boolean isAvailable() {
-        return !WindowScreen.standsWithoutWorld()
-                && ClientChatChannelState.isAvailable(this);
+        return ClientChatChannelState.isAvailable(this);
     }
 
     /**
@@ -457,63 +480,133 @@ public final class ChatTab extends WindowTab {
                 !ChatLayout.isMembersHidden(window));
     }
 
-    /**
-     * A messenger's channel menu. While the tab holds anything unread:
-     * Mark as Read, the counters and the divider gone at once, and Jump to
-     * First Unread, the tab brought forward and its history taken to where
-     * the unread run begins. Then Notifications, the conversation's
-     * choice (Everything, Only Mentions or Nothing) stepped on with a
-     * click and back with a right-click, and Hide Channel (stays closed
-     * when messaged).
-     */
-    /** A conversation always has its Notifications and Hide rows. */
+    /** A conversation always has its four options. */
     @Override
-    public boolean hasMenuRows() {
+    public boolean hasOptions() {
         return true;
     }
 
+    /** Every conversation's cog opens the one Chat Settings. */
     @Override
-    public List<MenuWindow.Entry> menuRows() {
-        List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>(5);
-        boolean divided = ClientChatChannelViews.unreadDividerLine(this) != null;
-        if (ClientChatChannelViews.hasUnread(this) || divided) {
-            rows.add(menuRow(MENU_MARK_READ, "gui.losttales.chat.tab.mark_read"));
-        }
-        if (divided) {
-            rows.add(menuRow(MENU_JUMP_UNREAD,
-                    "gui.losttales.chat.tab.jump_unread"));
-        }
-        rows.add(menuRow(MENU_NOTIFY, "gui.losttales.chat.tab.notify")
-                .withValue(StatCollector.translateToLocal(
-                        ChatLayout.notification(this).labelKey())));
-        rows.add(menuRow(MENU_HIDE, ChatLayout.isHidden(this)
-                ? "gui.losttales.chat.tab.unhide"
-                : "gui.losttales.chat.tab.hide"));
-        return rows;
-    }
-
-    private static MenuWindow.Entry menuRow(String id, String labelKey) {
-        return new MenuWindow.Entry(id, StatCollector.translateToLocal(labelKey));
-    }
-
-    @Override
-    public boolean takeMenuRow(String id) {
-        return takeMenuRow(id, false);
+    public Settings.Place settingsPlace() {
+        return Settings.Place.CHAT;
     }
 
     /**
-     * The choice and the switch stay; reading and jumping are done with
-     * the menu. The choice steps on with a click and back with a
-     * right-click; every other row takes either press alike.
+     * A conversation's help: who reads it and who you speak as there, the
+     * chat's guide, and the chat's keys.
      */
     @Override
-    public boolean takeMenuRow(String id, boolean back) {
+    public PageHelp help() {
+        List<String> guide = new ArrayList<String>();
+        guide.add(StatCollector.translateToLocalFormatted(readersKey(),
+                title()));
+        String speaking = speakingKey();
+        if (speaking != null) {
+            guide.add(StatCollector.translateToLocal(speaking));
+        }
+        guide.addAll(PageHelp.paragraphs("gui.losttales.help.chat"));
+        return new PageHelp(guide, ChatShortcuts.areas());
+    }
+
+    /** The line that says who reads the conversation, by who its lines reach. */
+    private String readersKey() {
+        String prefix = "gui.losttales.help.chat.readers.";
+        if (isWhisper()) {
+            return prefix + (this.npc ? "npc" : "whisper");
+        }
+        if (this.channel.getAccess() == ChatChannelAccess.PARTY_MEMBERSHIP) {
+            return prefix + "party";
+        }
+        switch (this.channel.getRecipientRule()) {
+            case PROXIMITY:
+                return prefix + "proximity";
+            case FACTION:
+                return prefix + "faction";
+            case SELF:
+                return prefix + "self";
+            case CONSOLE_READERS:
+                return prefix + "console";
+            case OPERATORS:
+                return prefix + "operators";
+            default:
+                return prefix + "everyone";
+        }
+    }
+
+    /**
+     * The line that says who you speak as: in character as the character
+     * you play where the channel says so, else as your chat identity; out
+     * of character as your account. None where nobody else reads it.
+     */
+    private String speakingKey() {
+        String prefix = "gui.losttales.help.chat.speaking.";
+        if (this.channel.getRecipientRule() == ChatRecipientRule.SELF) {
+            return null;
+        }
+        if (!ChatRolePresentation.isInCharacter(this.channel)) {
+            return prefix + "account";
+        }
+        return prefix + (ChatRolePresentation.speaksAsPlayedCharacter(
+                this.channel) ? "played" : "identity");
+    }
+
+    /**
+     * A messenger's channel options. Mark as Read, the counters and the
+     * divider gone at once, and Jump to First Unread, the tab brought
+     * forward and its history taken to where the unread run begins; each
+     * greyed while nothing waits unread. Then Notifications and Show in
+     * Feed (Everything, Only Mentions or Nothing: which lines chime, and
+     * which reach the closed feed), each stepped on with a click and back
+     * with a right-click: the channel's own settings. Their glyphs rest
+     * lit at Everything and are struck through at Nothing.
+     */
+    @Override
+    public List<PageOption> options() {
+        List<PageOption> options = new ArrayList<PageOption>(4);
+        boolean divided = ClientChatChannelViews.unreadDividerLine(this) != null;
+        boolean unread = ClientChatChannelViews.hasUnread(this) || divided;
+        options.add(PageOption.action(MENU_MARK_READ,
+                word("gui.losttales.chat.tab.mark_read"), READ_GLYPH)
+                .unavailable(unread ? "" : word("gui.losttales.chat.tab.nothing_unread"))
+                .inGroup(GROUP_READING, ""));
+        options.add(PageOption.action(MENU_JUMP_UNREAD,
+                word("gui.losttales.chat.tab.jump_unread"), JUMP_GLYPH)
+                .unavailable(divided ? "" : word("gui.losttales.chat.tab.nothing_unread"))
+                .inGroup(GROUP_READING, ""));
+        options.add(cycle(MENU_NOTIFY, "gui.losttales.chat.tab.notify",
+                ChatLayout.notification(this), BELL_GLYPH));
+        options.add(cycle(MENU_FEED, "gui.losttales.chat.tab.feed",
+                ChatLayout.feedChoice(this), FEED_GLYPH));
+        return options;
+    }
+
+    /** One of the conversation's two settings, its glyph saying where it stands. */
+    private static PageOption cycle(String id, String labelKey,
+                                    ChatLineChoice choice, OptionGlyph glyph) {
+        return PageOption.cycle(id, word(labelKey), word(choice.labelKey()),
+                choice == ChatLineChoice.EVERYTHING,
+                choice == ChatLineChoice.NOTHING ? glyph.struck() : glyph)
+                .inGroup(GROUP_SETTINGS, "");
+    }
+
+    private static String word(String key) {
+        return StatCollector.translateToLocal(key);
+    }
+
+    /**
+     * The settings stay; reading and jumping are done with the menu. A
+     * setting steps on with a click and back with a right-click; reading
+     * and jumping take either press alike.
+     */
+    @Override
+    public boolean takeOption(String id, boolean back) {
         if (MENU_NOTIFY.equals(id)) {
             ChatLayout.stepNotification(this, back);
             return true;
         }
-        if (MENU_HIDE.equals(id)) {
-            ChatLayout.setHidden(this, !ChatLayout.isHidden(this));
+        if (MENU_FEED.equals(id)) {
+            ChatLayout.stepFeedChoice(this, back);
             return true;
         }
         if (MENU_MARK_READ.equals(id)) {
@@ -554,12 +647,6 @@ public final class ChatTab extends WindowTab {
     @Override
     public String searchCount() {
         return ChatSearch.position() + "/" + ChatSearch.matchCount();
-    }
-
-    @Override
-    public String settingsTip() {
-        return StatCollector.translateToLocal(
-                "gui.losttales.chat.tab.settings");
     }
 
     @Override

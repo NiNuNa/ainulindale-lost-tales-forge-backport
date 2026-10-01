@@ -6,11 +6,9 @@ import com.ninuna.losttales.util.LostTalesTextFiles;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -29,12 +27,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *
  * <pre>
  * window w1 locked=false x=0.00 y=0.00 active=client_console tabs=client_console,operator
- * window w2 locked=true x=62.50 y=100.00 height=180.40 width=326 fill=full active=global tabs=global,ooc,page:journal
+ * window w2 locked=true hud=true gui=true x=62.50 y=100.00 height=180.40 width=326 fill=full active=global tabs=global,ooc,page:journal
  * sub emoji from=br dx=0.00 dy=0.00 w=120 h=160
  * sub tab from=tl dx=12.00 dy=40.00
- * place page:party locked=false x=40.00 y=60.00 height=292.00 width=366 fill=full
- * keep global     (the word, a tab, and the id of a tab kept in every view)
- * pin ooc         (the same for a tab pinned to stay on screen while playing)
+ * place page:party locked=false hud=true x=40.00 y=60.00 height=292.00 width=366 fill=full
  * tips seen=3
  * </pre>
  */
@@ -68,11 +64,6 @@ public final class WindowLayoutStore {
     /** The most lines a layout file is read to; a layout is a few dozen. */
     static final int MAX_LINES = 4096;
     private static final List<Part> PARTS = new CopyOnWriteArrayList<Part>();
-    /** A kept tab's line, and a pinned tab's: the word, a tab, and the tab's id. */
-    private static final String KEEP = "keep";
-    private static final String PIN = "pin";
-    /** The longest tab id a kept or pinned line may name. */
-    private static final int MAX_KEPT_ID = 256;
 
     private static File storeFile;
 
@@ -180,20 +171,9 @@ public final class WindowLayoutStore {
         Map<String, WindowLayout.Place> places =
                 new LinkedHashMap<String, WindowLayout.Place>();
         int tipsSeen = 0;
-        Set<String> kept = new LinkedHashSet<String>();
-        Set<String> pins = new LinkedHashSet<String>();
         for (String raw : lines) {
             String line = raw == null ? "" : raw.trim();
             if (line.length() == 0 || line.startsWith("#")) {
-                continue;
-            }
-            if (line.startsWith(KEEP + "\t") || line.startsWith(PIN + "\t")) {
-                // A tab's id may hold spaces (a conversation with an NPC),
-                // so the line is split at its tab.
-                String id = line.substring(line.indexOf('\t') + 1).trim();
-                if (id.length() > 0 && id.length() <= MAX_KEPT_ID) {
-                    (line.startsWith(KEEP) ? kept : pins).add(id);
-                }
                 continue;
             }
             String[] parts = line.split("\\s+");
@@ -226,8 +206,6 @@ public final class WindowLayoutStore {
         WindowLayout.load(specs);
         SubWindowPlaces.load(placed);
         WindowLayout.loadPlaces(places);
-        WindowLayout.loadKept(kept);
-        WindowLayout.loadPinned(pins);
         FirstTips.load(tipsSeen);
         for (Part part : PARTS) {
             part.loaded();
@@ -235,10 +213,10 @@ public final class WindowLayoutStore {
     }
 
     /**
-     * Where a page's window last stood: its padlock, its place and its
-     * size, a size of 0 standing for the default place; null for a line
-     * that cannot be read, which leaves the page to open at the default
-     * place.
+     * Where a page's window last stood: its padlock, its pins, its place
+     * and its size, a size of 0 standing for the default place; null for
+     * a line that cannot be read, which leaves the page to open at the
+     * default place.
      */
     private static WindowLayout.Place parsePlace(String[] parts) {
         double x = Double.NaN;
@@ -246,12 +224,18 @@ public final class WindowLayoutStore {
         double height = Double.NaN;
         int width = -1;
         Window.ScreenFill fill = Window.ScreenFill.NONE;
-        boolean locked = true;
+        boolean locked = false;
+        boolean hud = false;
+        boolean gui = false;
         for (int index = 2; index < parts.length; index++) {
             String part = parts[index];
             try {
                 if (part.startsWith("locked=")) {
                     locked = Boolean.parseBoolean(part.substring(7));
+                } else if (part.startsWith("hud=")) {
+                    hud = Boolean.parseBoolean(part.substring(4));
+                } else if (part.startsWith("gui=")) {
+                    gui = Boolean.parseBoolean(part.substring(4));
                 } else if (part.startsWith("fill=")) {
                     fill = Window.ScreenFill.fromId(part.substring(5));
                 } else if (part.startsWith("x=")) {
@@ -271,7 +255,8 @@ public final class WindowLayoutStore {
                 || height < 0.0D || width < 0) {
             return null;
         }
-        return new WindowLayout.Place(x, y, height, width, fill, locked);
+        return new WindowLayout.Place(x, y, height, width, fill, locked, hud,
+                gui);
     }
 
     /**
@@ -324,10 +309,11 @@ public final class WindowLayoutStore {
         }
         List<WindowTab> tabs = new ArrayList<WindowTab>();
         WindowTab active = null;
-        // A line that says nothing of them: locked, as every new window
-        // opens, and not pinned.
-        boolean locked = true;
-        boolean pinned = false;
+        // A line that says nothing of them: unlocked, as a window opens
+        // that is not a new player's first, and pinned nowhere.
+        boolean locked = false;
+        boolean hud = false;
+        boolean gui = false;
         double offsetX = 0.0D;
         double offsetY = 0.0D;
         // No size of its own: the window stands at the default place.
@@ -353,8 +339,10 @@ public final class WindowLayoutStore {
                 active = WindowTab.fromId(value);
             } else if ("locked".equals(key)) {
                 locked = "true".equalsIgnoreCase(value);
-            } else if ("pinned".equals(key)) {
-                pinned = "true".equalsIgnoreCase(value);
+            } else if ("hud".equals(key)) {
+                hud = "true".equalsIgnoreCase(value);
+            } else if ("gui".equals(key)) {
+                gui = "true".equalsIgnoreCase(value);
             } else if ("x".equals(key)) {
                 offsetX = parsePercent(value);
             } else if ("y".equals(key)) {
@@ -373,7 +361,7 @@ public final class WindowLayoutStore {
                 }
             }
         }
-        return new WindowLayout.WindowSpec(id, tabs, active, locked, pinned,
+        return new WindowLayout.WindowSpec(id, tabs, active, locked, hud, gui,
                 offsetX, offsetY, height, width, fill);
     }
 
@@ -410,8 +398,11 @@ public final class WindowLayoutStore {
         for (WindowLayout.WindowSpec spec : WindowLayout.describe()) {
             StringBuilder line = new StringBuilder("window ").append(spec.id);
             line.append(" locked=").append(spec.locked);
-            if (spec.pinned) {
-                line.append(" pinned=true");
+            if (spec.pinnedToHud) {
+                line.append(" hud=true");
+            }
+            if (spec.pinnedToGui) {
+                line.append(" gui=true");
             }
             line.append(" x=").append(format(spec.offsetX));
             line.append(" y=").append(format(spec.offsetY));
@@ -455,18 +446,14 @@ public final class WindowLayoutStore {
             WindowLayout.Place place = entry.getValue();
             lines.add("place " + entry.getKey()
                     + " locked=" + place.locked
+                    + (place.pinnedToHud ? " hud=true" : "")
+                    + (place.pinnedToGui ? " gui=true" : "")
                     + " x=" + format(place.x)
                     + " y=" + format(place.y)
                     + " height=" + format(place.height)
                     + " width=" + place.width
                     + (place.fill != Window.ScreenFill.NONE
                             ? " fill=" + place.fill.id() : ""));
-        }
-        for (String id : WindowLayout.kept()) {
-            lines.add(KEEP + "\t" + id);
-        }
-        for (String id : WindowLayout.pinned()) {
-            lines.add(PIN + "\t" + id);
         }
         if (FirstTips.seen() > 0) {
             lines.add(FirstTips.describe());

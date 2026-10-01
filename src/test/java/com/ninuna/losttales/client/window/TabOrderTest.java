@@ -115,8 +115,8 @@ public final class TabOrderTest {
 
     @Test
     public void closingTheFrontTabBringsItsNeighbourForward() {
-        Window window = WindowLayout.addWindow(row(this.a, this.b, this.c,
-                this.d), this.b);
+        Window window = Unlocking.of(WindowLayout.addWindow(row(this.a,
+                this.b, this.c, this.d), this.b));
         WindowLayout.close(this.b);
         assertSame("the one to its right", this.c, window.getActiveTab());
         WindowLayout.setActiveTab(this.d);
@@ -140,7 +140,8 @@ public final class TabOrderTest {
             }
         });
         assertSame(this.c, window.getActiveTab());
-        Window other = WindowLayout.addWindow(row(this.d, this.hidden), this.d);
+        Window other = Unlocking.of(WindowLayout.addWindow(row(this.d,
+                this.hidden), this.d));
         assertNotNull(Tearing.off(this.d, 20.0D, 20.0D));
         assertSame("a tab taken off to a window of its own leaves its neighbour",
                 this.hidden, other.getActiveTab());

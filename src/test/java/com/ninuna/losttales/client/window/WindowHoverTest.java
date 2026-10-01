@@ -19,7 +19,7 @@ public final class WindowHoverTest {
     public void theHandIsWhereAPressActs() {
         for (WindowHover.Kind kind : new WindowHover.Kind[] {
                 WindowHover.Kind.TAB_ROW, WindowHover.Kind.SUB_WINDOW_CLOSE,
-                WindowHover.Kind.SUB_WINDOW_STRIP}) {
+                WindowHover.Kind.SUB_WINDOW_LOCK}) {
             assertEquals(kind.name(), LostTalesMapCursor.Pose.HAND,
                     new WindowHover(kind).pose());
         }
@@ -45,6 +45,9 @@ public final class WindowHoverTest {
         assertEquals("a strip of no window moves nothing",
                 LostTalesMapCursor.Pose.ARROW,
                 new WindowHover(WindowHover.Kind.STRIP).pose());
+        assertEquals("nor a sub-window's strip or grip of no sub-window",
+                LostTalesMapCursor.Pose.ARROW,
+                new WindowHover(WindowHover.Kind.SUB_WINDOW_GRIP).pose());
     }
 
     @Test

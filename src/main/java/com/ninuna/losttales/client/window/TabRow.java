@@ -50,8 +50,9 @@ import org.lwjgl.opengl.GL11;
  * where its room ends — resting the pointer on such a tab slides the
  * name along to show the rest — and its buttons go at fixed shares of
  * the full width, every tab's at once since every tab is one width: the
- * draft mark under two thirds, the cross under a third. A tab's settings
- * are the cog in the tool strip under the row. A button fades as it goes
+ * draft mark under two thirds, the cross under a third. A tab's options,
+ * settings and help are on the tool strip under the row. A button fades
+ * as it goes
  * while the name glides into its room,
  * so nothing jumps. The tab in front keeps its cross throughout; its
  * icon and name are cut short before it like any name, so the cross
@@ -166,10 +167,12 @@ public final class TabRow {
     static final int DEFAULT_TAB_WIDTH = 128;
     /**
      * The shares of {@link #DEFAULT_TAB_WIDTH} under which every tab
-     * gives a button up: the draft mark first, then the cross — the tab
-     * in front keeping its cross whatever its width.
+     * gives a button up: the draft mark first, then the options' three
+     * dots, then the cross — the tab in front keeping its cross whatever
+     * its width.
      */
     static final double DRAFT_SHARE = 2.0D / 3.0D;
+    static final double OPTIONS_SHARE = 1.0D / 2.0D;
     static final double CLOSE_SHARE = 1.0D / 3.0D;
     /** How far a carried tab rises off the row ({@code window.tab.lift}). */
     private static final float LIFT_PIXELS = 1.0F;
@@ -224,13 +227,13 @@ public final class TabRow {
      */
     public static final int END_CONTROL_SIZE = 9;
     /** Clear space between the row's end controls, ink edge to ink edge. */
-    private static final int END_CONTROL_GAP = 5;
+    static final int END_CONTROL_GAP = 5;
     /**
      * Clear pixels round an end control's ink that answer with it, on
      * every side: a five-pixel glyph is a small thing to hit exactly,
      * and with them it answers on the {@link #END_CONTROL_SIZE} square.
      */
-    private static final int END_CONTROL_SLACK = 2;
+    static final int END_CONTROL_SLACK = 2;
     /**
      * Share of a neighbour a dragged tab crosses before it takes that
      * neighbour's place: a third of it, the reach at which the move
@@ -265,7 +268,7 @@ public final class TabRow {
      * Clear space kept at the row's right end, which the grip stands
      * against and no control crosses.
      */
-    private static final int GRIP_INSET = 3;
+    static final int GRIP_INSET = 3;
     /*
      * The ink each end control takes. The lock is measured by the room
      * its whole swing needs rather than by the padlock at rest: the
@@ -275,6 +278,16 @@ public final class TabRow {
     private static final int LOCK_WIDTH = LockAnimation.WIDTH;
     private static final int PLUS_WIDTH = LostTalesUiSheet.PLUS.getWidth();
     private static final int MORE_WIDTH = LostTalesUiSheet.MORE.getWidth();
+    /** A tab's options button, the three dots, left of its cross. */
+    static final int OPTIONS_WIDTH = MORE_WIDTH;
+    /**
+     * Room between the three dots and the cross's square: the row's own
+     * gap between its end controls, ink to ink, less the clear pixels the
+     * cross's square holds left of its ink.
+     */
+    static final int OPTIONS_GAP = END_CONTROL_GAP
+            - (CONTROL_SIZE - LostTalesUiSheet.CLOSE.getWidth()) / 2;
+    private static final int OPTIONS_HEIGHT = LostTalesUiSheet.MORE.getHeight();
     private static final int CLOSE_WIDTH = LostTalesUiSheet.CLOSE.getWidth();
     private static final int FULLSCREEN_WIDTH =
             LostTalesUiSheet.FULLSCREEN.getWidth();
@@ -390,6 +403,10 @@ public final class TabRow {
     private boolean cachedShowRestore;
     /** Whether the row being drawn shows its tabs alone ({@link Row#bare}). */
     private boolean bare;
+    /** Whether the row being drawn is a locked window's ({@link Row#locked}). */
+    private boolean locked;
+    /** The tab whose options are out in the row being drawn; its dots rest lit. */
+    private WindowTab optionsOpen;
     /** What waits in the channels the {@code +} would open, marked after it. */
     private TabMark restoreMark = TabMark.NONE;
     /** Width of the restore control together with its mark. */
@@ -485,6 +502,8 @@ public final class TabRow {
      */
     private final MotionTransition draftShown =
             new MotionTransition(MotionIds.WINDOW_TAB_CONTROLS);
+    private final MotionTransition optionsShown =
+            new MotionTransition(MotionIds.WINDOW_TAB_CONTROLS);
     private final MotionTransition closeShown =
             new MotionTransition(MotionIds.WINDOW_TAB_CONTROLS);
     /**
@@ -519,13 +538,13 @@ public final class TabRow {
     private float alphaScale = 1.0F;
 
     /**
-     * What a point in the row resolves to. {@code CLOSE} and
-     * {@code DRAFT} carry a tab and act on it; {@code WINDOW_MENU},
+     * What a point in the row resolves to. {@code CLOSE}, {@code OPTIONS}
+     * and {@code DRAFT} carry a tab and act on it; {@code WINDOW_MENU},
      * {@code WINDOW_FULLSCREEN} and {@code WINDOW_CLOSE} carry none and
      * act on the window.
      */
     public enum HitKind {
-        TAB, CLOSE, DRAFT, SEARCH, LOCK, RESTORE, WINDOW_MENU,
+        TAB, CLOSE, OPTIONS, DRAFT, SEARCH, LOCK, RESTORE, WINDOW_MENU,
         WINDOW_FULLSCREEN, WINDOW_CLOSE, GRIP
     }
 
@@ -581,8 +600,9 @@ public final class TabRow {
         public float fractionX;
         public float fractionY;
         /**
-         * Whether the window is locked: it keeps its place and size, so
-         * its fullscreen control stands greyed and its grip moves nothing.
+         * Whether the window is locked: it keeps its place, its size and
+         * its tabs, so the {@code +}, the crosses and the fullscreen
+         * control stand greyed, and its tabs and its grip move nothing.
          */
         public boolean locked;
         /** Whether the padlock is lit a moment: something tried to move a locked window. */
@@ -593,7 +613,7 @@ public final class TabRow {
          * no control can be pressed.
          */
         public boolean bare;
-        /** Whether a close cross is offered on the selected tab. */
+        /** Whether the tabs wear their crosses: greyed on a locked row. */
         public boolean closable;
         /**
          * How far the window has travelled toward filling the screen,
@@ -607,6 +627,8 @@ public final class TabRow {
         public boolean searchOpen;
         /** Whether this row's restore list is open right now. */
         public boolean restoreOpen;
+        /** The tab of this row whose options are out right now; null for none. */
+        public WindowTab optionsOpen;
         /** What waits unread in the closed channels, marked after the +. */
         public TabMark closedMark = TabMark.NONE;
         /** Whether this window is the one being dragged right now. */
@@ -710,8 +732,22 @@ public final class TabRow {
     }
 
     /**
-     * The row's {@code +} where it answers, in screen space: what a new
+     * The row's padlock where it answers, in screen space: what a new
      * player's first tip points at. Null while the row does not show it.
+     */
+    public LostTalesUiHitBox lockControlBox(Row row) {
+        if (this.lockX < 0) {
+            return null;
+        }
+        LostTalesUiHitBox box = lockBox(this.lockX, row.rowBottom);
+        return new LostTalesUiHitBox(box.left + row.offsetX + row.fractionX
+                + this.endFraction, box.top + row.fractionY, box.width,
+                box.height);
+    }
+
+    /**
+     * The row's {@code +} where it answers, in screen space: what a new
+     * player's second tip points at. Null while the row does not show it.
      */
     public LostTalesUiHitBox restoreControlBox(Row row) {
         if (this.restoreX < 0) {
@@ -771,6 +807,10 @@ public final class TabRow {
                     .contains(localX, localY)) {
                 return new Hit(HitKind.CLOSE, tab.tab);
             }
+            if (tab.optionsX >= 0 && optionsBox(tab.optionsX, tabTop)
+                    .contains(localX, localY)) {
+                return new Hit(HitKind.OPTIONS, tab.tab);
+            }
             if (tab.draftX >= 0 && draftBox(tab.draftX, tabTop)
                     .contains(localX, localY)) {
                 return new Hit(HitKind.DRAFT, tab.tab);
@@ -809,7 +849,7 @@ public final class TabRow {
         if (localX >= this.controlsRight && localX < row.right) {
             // The stretch past the controls drags the window, the whole
             // band of it; only the grip's own glyph lights. A locked
-            // window's grip moves nothing, and its tip says why.
+            // window's grip moves nothing, and a drag lights its padlock.
             return new Hit(HitKind.GRIP, null);
         }
         return null;
@@ -819,10 +859,10 @@ public final class TabRow {
      * Whether the point lies on the grip's own glyph — with the end
      * controls' clearing round it — rather than anywhere in the empty
      * stretch that also drags the window. The glyph is what the hover
-     * highlight and the move tip answer to, so neither follows a pointer
-     * resting on the bare strip.
+     * highlight answers to, so it does not follow a pointer resting on
+     * the bare strip.
      */
-    public boolean isOverGripHandle(FontRenderer font, Row row, double mouseX,
+    private boolean isOverGripHandle(FontRenderer font, Row row, double mouseX,
                              double mouseY) {
         if (row == null || !inRowBand(row, mouseY)) {
             return false;
@@ -896,6 +936,8 @@ public final class TabRow {
         }
         List<Tab> tabs = layout(font, row);
         this.bare = row.bare;
+        this.locked = row.locked;
+        this.optionsOpen = row.optionsOpen;
         if (row.dragging == null) {
             // No hand on this row: whatever the last drag remembered
             // about its crossings is over, and the next starts clean.
@@ -1032,13 +1074,15 @@ public final class TabRow {
                 // The control says which way it goes: a + while the
                 // list it opens is away, and the same crossbar without
                 // its upright — a minus — while the list is out.
+                // A locked window's + still opens: what it offers opens
+                // in another window.
                 drawEndControl(
                         row.restoreOpen ? LostTalesUiSheet.MINUS
                                 : LostTalesUiSheet.PLUS,
                         row.restoreOpen ? LostTalesUiSheet.MINUS_HOVER
                                 : LostTalesUiSheet.PLUS_HOVER,
                         step(this.restoreMotion, hovered, HitKind.RESTORE),
-                        row.offsetX + this.restoreX, bottom);
+                        row.offsetX + this.restoreX, bottom, false);
                 if (!this.restoreMark.isNone()) {
                     // What waits behind the +, marked as a tab's icon
                     // marks it: the ping tile, else the white sphere.
@@ -1072,7 +1116,7 @@ public final class TabRow {
                             LostTalesUiSheet.MORE_HOVER,
                             step(this.windowMenuMotion, hovered,
                                     HitKind.WINDOW_MENU),
-                            row.offsetX + this.windowMenuX, bottom);
+                            row.offsetX + this.windowMenuX, bottom, false);
                 }
                 if (!row.bare && this.windowFullscreenX >= 0) {
                     drawFullscreenControl(row.fullscreenShare, row.locked,
@@ -1083,9 +1127,11 @@ public final class TabRow {
                 if (!row.bare && this.windowCloseX >= 0) {
                     drawEndControl(LostTalesUiSheet.CLOSE,
                             LostTalesUiSheet.CLOSE_HOVER,
-                            step(this.windowCloseMotion, hovered,
+                            step(this.windowCloseMotion,
+                                    row.locked ? null : hovered,
                                     HitKind.WINDOW_CLOSE),
-                            row.offsetX + this.windowCloseX, bottom);
+                            row.offsetX + this.windowCloseX, bottom,
+                            row.locked);
                 }
                 if (!row.bare && this.secondDividerX >= 0) {
                     drawDivider(row.offsetX + this.secondDividerX, bottom);
@@ -1415,10 +1461,11 @@ public final class TabRow {
             // coming takes its room first and shows after, so the name
             // never runs under a button.
             float closeFade = closeShare(row, selected);
+            float optionsFade = row.bare ? 0.0F : this.optionsShown.clamped();
             float draftFade = tab.draft ? this.draftShown.clamped() : 0.0F;
             TabRoom room = roomFor(laidWidth, iconWidth(tab.tab),
                     tab.labelWidth, drawnDraftWidth(tab, roomPhase(draftFade)),
-                    roomPhase(closeFade));
+                    roomPhase(closeFade), roomPhase(optionsFade));
             // A name the row has cut short is read whole by resting the
             // pointer on it: the marquee runs on the clock while the tab
             // is hovered and glides home once it is not, so a pointer
@@ -1451,6 +1498,8 @@ public final class TabRow {
                         labelRgb, textAlpha);
                 drawTabClose(tab, hovered, room, inkPhase(closeFade), left,
                         top + INTERIOR_TOP, textAlpha);
+                drawTabOptions(tab, hovered, room, inkPhase(optionsFade),
+                        left, top + INTERIOR_TOP, textAlpha);
             } finally {
                 LostTalesUiClip.end(clipped);
             }
@@ -1529,7 +1578,6 @@ public final class TabRow {
                         try {
                             tab.tab.drawIcon(Minecraft.getMinecraft(), x,
                                     y, shown, mark);
-                            TabStayMark.draw(tab.tab, x, y, shown);
                         } finally {
                             GL11.glPopMatrix();
                         }
@@ -1747,10 +1795,50 @@ public final class TabRow {
         if (closeAlpha < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
             return;
         }
+        // A locked window keeps its tabs: the cross stays, greyed and
+        // still, and its tip says why.
         drawTabControl(LostTalesUiSheet.CLOSE, LostTalesUiSheet.CLOSE_HOVER,
-                step(tab.closeMotion, hovered, tab, HitKind.CLOSE),
+                step(tab.closeMotion, this.locked ? null : hovered, tab,
+                        HitKind.CLOSE),
                 (float)snappedLeft(left + room.closeLeft, displayStep()),
-                centredInInterior(interiorTop, CONTROL_SIZE), closeAlpha);
+                centredInInterior(interiorTop, CONTROL_SIZE),
+                heldAlpha(closeAlpha, this.locked));
+    }
+
+    /**
+     * The tab's options, three dots left of its cross, as far as the row
+     * shows them: they rest lit while the tab's options are out, and stand
+     * greyed for a tab with nothing to choose. A locked window still opens
+     * them: options change nothing of its place or its pages.
+     */
+    private void drawTabOptions(Tab tab, Hit hovered, TabRoom room,
+                                float optionsShare, float left,
+                                int interiorTop, int controlAlpha) {
+        if (this.bare) {
+            return;
+        }
+        int alpha = Math.round(controlAlpha * optionsShare);
+        if (alpha < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
+            return;
+        }
+        boolean acts = TabMenus.hasRows(tab.tab);
+        boolean open = tab.tab.equals(this.optionsOpen);
+        LostTalesUiButtonMotion motion = tab.optionsMotion;
+        boolean under = acts && hovered != null
+                && hovered.kind == HitKind.OPTIONS
+                && tab.tab.equals(hovered.tab);
+        motion.advance(System.nanoTime(), open || under, under,
+                under && Mouse.isButtonDown(0));
+        float x = (float)snappedLeft(left + room.optionsLeft, displayStep());
+        int y = centredInInterior(interiorTop, CONTROL_SIZE)
+                + LostTalesUiInk.centredStart(CONTROL_SIZE, OPTIONS_HEIGHT);
+        if (!acts) {
+            LostTalesUiSheet.drawPairWithShadow(LostTalesUiSheet.MORE,
+                    LostTalesUiSheet.MORE, 0.0F, x, y, heldAlpha(alpha, true));
+            return;
+        }
+        LostTalesUiButton.drawGlyph(LostTalesUiSheet.MORE,
+                LostTalesUiSheet.MORE_HOVER, motion, x, y, alpha);
     }
 
     /** How tall a tab's border pieces stand: the selected pair reaches the rule. */
@@ -2223,6 +2311,7 @@ public final class TabRow {
      */
     private void advanceButtons(long now) {
         this.draftShown.advance(now, draftStands(this.sharedDrawn));
+        this.optionsShown.advance(now, optionsStands(this.sharedDrawn));
         this.closeShown.advance(now, closeStands(this.sharedDrawn));
     }
 
@@ -2243,6 +2332,11 @@ public final class TabRow {
     /** Whether every tab of a row this wide shows its draft mark. */
     static boolean draftStands(double width) {
         return width >= DEFAULT_TAB_WIDTH * DRAFT_SHARE - 1.0E-6D;
+    }
+
+    /** Whether every tab of a row this wide shows its options' three dots. */
+    static boolean optionsStands(double width) {
+        return width >= DEFAULT_TAB_WIDTH * OPTIONS_SHARE - 1.0E-6D;
     }
 
     /**
@@ -2868,15 +2962,23 @@ public final class TabRow {
     /**
      * One of the row's end controls — the restore {@code +}, the
      * window's three dots, the window's cross — drawn where it was laid out
-     * and centred in the strip, the way the lock beside them is.
+     * and centred in the strip, the way the lock beside them is;
+     * {@code held} greys one a locked window holds back.
      */
     private void drawEndControl(LostTalesUiSheet resting, LostTalesUiSheet hovered,
                                 LostTalesUiButtonMotion motion, int x,
-                                int rowBottom) {
+                                int rowBottom, boolean held) {
         LostTalesUiHitBox ink = endControlInk(x, resting.getWidth(),
                 resting.getHeight(), rowBottom);
         LostTalesUiButton.drawGlyph(resting, hovered, motion,
-                (float)ink.left, (float)ink.top, scaled(0xFF));
+                (float)ink.left, (float)ink.top,
+                heldAlpha(scaled(0xFF), held));
+    }
+
+    /** The opacity of a control a locked window holds back: greyed, as every action that cannot be taken. */
+    private static int heldAlpha(int alpha, boolean held) {
+        return held ? Math.round(alpha * WindowStyle.UNAVAILABLE_OPACITY)
+                : alpha;
     }
 
     /**
@@ -2900,8 +3002,7 @@ public final class TabRow {
                     ? LostTalesUiSheet.FULLSCREEN_EXIT
                     : LostTalesUiSheet.FULLSCREEN;
             LostTalesUiSheet.drawPairWithShadow(glyph, glyph, 0.0F, x,
-                    Math.round(y), Math.round(scaled(0xFF)
-                            * WindowStyle.UNAVAILABLE_OPACITY));
+                    Math.round(y), heldAlpha(scaled(0xFF), true));
             return;
         }
         LostTalesUiButton.drawCrossingGlyphs(LostTalesUiSheet.FULLSCREEN,
@@ -3119,16 +3220,21 @@ public final class TabRow {
             // cross always.
             float closeShare = !showClose ? 0.0F
                     : selected || closeStands(width) ? 1.0F : 0.0F;
+            float optionsShare = !row.bare && optionsStands(width)
+                    ? 1.0F : 0.0F;
             boolean draftShown = draft && draftStands(width);
             TabRoom settled = roomFor(tabWidth, iconWidth(channel), labelWidth,
-                    draftShown ? COUNTER_GAP + DRAFT_WIDTH : 0, closeShare);
+                    draftShown ? COUNTER_GAP + DRAFT_WIDTH : 0, closeShare,
+                    optionsShare);
             int closeX = closeShare > 0.0F
                     ? x + (int)Math.floor(settled.closeLeft) : -1;
+            int optionsX = optionsShare > 0.0F
+                    ? x + (int)Math.floor(settled.optionsLeft) : -1;
             int draftX = draftShown ? draftLeft(x, icon,
                     (int)Math.floor(settled.labelRoom)) : -1;
             Tab built = new Tab(channel, index, icon, label, labelWidth,
                     draft, x, tabWidth,
-                    closeX, draftX,
+                    closeX, optionsX, draftX,
                     isTrue(this.cachedMuted.get(channel)));
             built.toLeft = cursor - row.left;
             built.exactWidth = width;
@@ -3273,42 +3379,68 @@ public final class TabRow {
 
     /**
      * Where the parts of a tab stand as it is drawn, measured from its
-     * left edge: its cross against the right padding, the edge everything
-     * before the cross is cut at, and how much of the name shows.
+     * left edge: its cross against the right padding, its options' three
+     * dots before the cross, the edge everything before them is cut at,
+     * and how much of the name shows.
      */
     static final class TabRoom {
         /** The cross's left edge, whether or not the cross stands. */
         final double closeLeft;
+        /** The three dots' left edge, whether or not they stand. */
+        final double optionsLeft;
         /** Where the icon, the name and the draft mark are cut. */
         final double contentRight;
         /** The name's room, never past the name itself. */
         final double labelRoom;
 
-        TabRoom(double closeLeft, double contentRight, double labelRoom) {
+        TabRoom(double closeLeft, double optionsLeft, double contentRight,
+                double labelRoom) {
             this.closeLeft = closeLeft;
+            this.optionsLeft = optionsLeft;
             this.contentRight = contentRight;
             this.labelRoom = labelRoom;
         }
     }
 
     /**
-     * What a tab {@code width} wide holds: its cross, shown as far as
-     * {@code closeShare} says — a share from nothing to whole as it
-     * fades — and before it, cut where it begins, its padding, its icon
-     * ({@code iconWidth} with its gap, 0 for none), its name and its
-     * draft mark ({@code draftWidth} as shown). A cross fading hands its
-     * room to the name as it goes, so the name glides into it. Fractions
-     * are kept: the name's cut and everything after it move with the
-     * tab's edge by the fraction the edge moves.
+     * What a tab {@code width} wide holds: its cross and its options' three
+     * dots, each shown as far as its share says ({@code closeShare},
+     * {@code optionsShare}) — a share from nothing to whole as it fades —
+     * and before them, cut where they begin, its padding, its icon
+     * ({@code iconWidth} with its gap, 0 for none), its name and its draft
+     * mark ({@code draftWidth} as shown). The dots stand left of the
+     * cross, as far from its ink as the row's end controls stand from each
+     * other, and against the padding where the cross has gone. A button
+     * fading hands its room to the name as it goes, so the name glides
+     * into it. Fractions are kept: the name's cut and everything after it
+     * move with the tab's edge by the fraction the edge moves.
      */
     static TabRoom roomFor(double width, int iconWidth, int labelWidth,
-                           double draftWidth, float closeShare) {
+                           double draftWidth, float closeShare,
+                           float optionsShare) {
+        double close = CONTROL_GAP + CONTROL_SIZE;
         double closeLeft = width - PADDING_X - CONTROL_SIZE;
-        double contentRight = width - PADDING_X
-                - (CONTROL_GAP + CONTROL_SIZE) * closeShare;
+        double optionsLeft = width - PADDING_X - OPTIONS_WIDTH
+                - (OPTIONS_GAP + CONTROL_SIZE) * closeShare;
+        // The dots' room: the dots and the gap before them, and the
+        // wider gap after them where the cross stands.
+        double options = CONTROL_GAP + OPTIONS_WIDTH
+                + (OPTIONS_GAP - CONTROL_GAP) * closeShare;
+        double contentRight = width - PADDING_X - close * closeShare
+                - options * optionsShare;
         double labelRoom = Math.max(0.0D, Math.min(labelWidth,
                 contentRight - PADDING_X - iconWidth - draftWidth));
-        return new TabRoom(closeLeft, contentRight, labelRoom);
+        return new TabRoom(closeLeft, optionsLeft, contentRight, labelRoom);
+    }
+
+    /**
+     * What a tab's three dots answer on: their ink, as wide as the dots
+     * and as tall as the cross's square, centred in the interior like it.
+     */
+    static LostTalesUiHitBox optionsBox(int optionsX, int tabTop) {
+        return new LostTalesUiHitBox(optionsX,
+                centredInInterior(tabTop + INTERIOR_TOP, CONTROL_SIZE),
+                OPTIONS_WIDTH, CONTROL_SIZE);
     }
 
     /**
@@ -3602,9 +3734,15 @@ public final class TabRow {
         LostTalesUiButtonMotion draftMotion =
                 new LostTalesUiButtonMotion(
                         LostTalesUiButtonMotion.Character.LIFT);
+        /** The options' three dots rise like any glyph that is pressed. */
+        LostTalesUiButtonMotion optionsMotion =
+                new LostTalesUiButtonMotion(
+                        LostTalesUiButtonMotion.Character.LIFT);
         final int width;
         /** Resting left edge of the close cross once settled, or -1. */
         final int closeX;
+        /** Resting left edge of the options' three dots once settled, or -1. */
+        final int optionsX;
         /** Resting left edge of the draft mark once settled, or -1. */
         final int draftX;
         /** Whether the tab's lines are kept out of the closed feed. */
@@ -3612,7 +3750,7 @@ public final class TabRow {
 
         Tab(WindowTab tab, int rowIndex, boolean icon, String label,
             int labelWidth, boolean draft, int x, int width,
-            int closeX, int draftX, boolean muted) {
+            int closeX, int optionsX, int draftX, boolean muted) {
             this.tab = tab;
             this.rowIndex = rowIndex;
             this.icon = icon;
@@ -3623,6 +3761,7 @@ public final class TabRow {
             this.width = width;
             this.exactWidth = width;
             this.closeX = closeX;
+            this.optionsX = optionsX;
             this.draftX = draftX;
             this.muted = muted;
         }
@@ -3646,6 +3785,7 @@ public final class TabRow {
             this.hoverFade = was.hoverFade;
             this.closeMotion = was.closeMotion;
             this.draftMotion = was.draftMotion;
+            this.optionsMotion = was.optionsMotion;
             this.hoverSeconds = was.hoverSeconds;
             this.marqueeOffset = was.marqueeOffset;
         }

@@ -47,11 +47,38 @@ public final class WindowDrawing {
                 + WindowPlacement.TOOL_STRIP_HEIGHT
                 + WindowPlacement.HISTORY_TOP_MARGIN);
         frame.drawn = true;
-        int ring = WindowPlacement.FRAME_WIDTH;
-        LostTalesGuiRegionBlur.getInstance().drawRegion(
-                frame.drawnLeft() - ring, frame.boxTop + frame.motionY - ring,
-                frame.drawnLeft() + (frame.boxRight - frame.boxLeft) + ring,
-                frame.boxBottom + frame.motionY + ring, opening.getOpacity());
+        // What lies behind the window is cut away, then the world under
+        // it softened, over the box it shows and its frame's ring.
+        LostTalesUiHitBox shown = frame.drawnBox();
+        cutBehind(shown, opening.getOpacity());
+        softenBehind(shown, opening.getOpacity());
+    }
+
+    /**
+     * Cuts away whatever was drawn behind a window or a sub-window standing
+     * in {@code box}, its frame's ring included: the world as it stood
+     * before any window is pasted over it first, so no surface ever lies
+     * over another and nothing behind shows through.
+     */
+    public static void cutBehind(LostTalesUiHitBox box, float opacity) {
+        if (box != null) {
+            LostTalesGuiRegionBlur.getInstance().cutFramedRegion(box.left,
+                    box.top, box.left + box.width, box.top + box.height,
+                    WindowPlacement.FRAME_WIDTH, opacity);
+        }
+    }
+
+    /**
+     * Softens the world under a window, a sub-window or a snap preview in
+     * {@code box}, its frame's ring included, while the windows' blur is
+     * on: what every window stands on, after {@link #cutBehind}.
+     */
+    public static void softenBehind(LostTalesUiHitBox box, float opacity) {
+        if (box != null) {
+            LostTalesGuiRegionBlur.getInstance().drawFramedRegion(box.left,
+                    box.top, box.left + box.width, box.top + box.height,
+                    WindowPlacement.FRAME_WIDTH, opacity);
+        }
     }
 
     /**
@@ -161,6 +188,8 @@ public final class WindowDrawing {
         float bottom = (float)(page.top + page.height);
         int surface = WindowStyle.insetArgb(opening.getOpacity()
                 * WindowStyle.opacity(minecraft));
+        frame.contentEdge.first(surface);
+        frame.contentShade.clear();
         LostTalesUiInk.fillRect(left, top, right, bottom, surface);
         fillFrameSides(left, right, top, bottom, surface, surface);
     }
@@ -199,12 +228,13 @@ public final class WindowDrawing {
      * The surface the window's frame lies on over the tab strip and the
      * tool strip: a ring a frame wide just outside the window's box — the
      * rows over it, corners included, and the columns beside the two
-     * strips — each stretch in the colour of what it runs beside, as that
-     * was drawn this frame: the tab strip's over and beside the
-     * strip, the tool strip's beside it and beside the rows the two rules
-     * around it stand on. The frame's edge drawn over its inner pixel lies
-     * on it as a framed button's frame lies on its surface. What the
-     * window holds draws its own stretch below.
+     * strips — each stretch continuing exactly what it runs beside, its
+     * colour and its strength, as that was drawn this frame: the tab
+     * strip's over and beside the strip, the tool strip's beside it and
+     * beside the rows the two rules around it stand on. The frame's edge
+     * drawn over its inner pixel lies on it as a framed button's frame
+     * lies on its surface. What the window holds draws its own stretch
+     * below.
      */
     public static void drawFrameSurface(Minecraft minecraft,
                                         WindowFrame frame,
@@ -213,8 +243,9 @@ public final class WindowDrawing {
                 || opening == null) {
             return;
         }
-        TabRow strip = frame.tabBar;
         int ring = WindowPlacement.FRAME_WIDTH;
+        int beside = frame.tabBar.drawnStripArgb;
+        int besideTools = frame.tabBar.drawnToolArgb;
         float left = (float)frame.drawnLeft();
         float right = left + (float)(frame.boxRight - frame.boxLeft);
         float top = (float)(frame.boxTop + frame.motionY);
@@ -223,13 +254,12 @@ public final class WindowDrawing {
         // The ring's outermost corner pixels lie outside the frame's
         // rounding, as a framed button's footprint corners do.
         LostTalesUiInk.fillRect(left - ring + 1, top - ring, right + ring - 1,
-                top - ring + 1, strip.drawnStripArgb);
+                top - ring + 1, beside);
         LostTalesUiInk.fillRect(left - ring, top - ring + 1, right + ring, top,
-                strip.drawnStripArgb);
-        fillFrameSides(left, right, top, stripRule, strip.drawnStripArgb,
-                strip.drawnStripArgb);
-        fillFrameSides(left, right, stripRule, historyTop,
-                strip.drawnToolArgb, strip.drawnToolArgb);
+                beside);
+        fillFrameSides(left, right, top, stripRule, beside, beside);
+        fillFrameSides(left, right, stripRule, historyTop, besideTools,
+                besideTools);
     }
 
     /**
@@ -256,7 +286,7 @@ public final class WindowDrawing {
     public static void drawFrameEdges(Minecraft minecraft, WindowFrame frame,
                                       LostTalesGuiAnimationSample opening) {
         if (minecraft == null || frame == null || !frame.drawn
-                || opening == null) {
+                || opening == null || frame.isFilledByPage()) {
             return;
         }
         float left = (float)frame.drawnLeft();
@@ -266,5 +296,85 @@ public final class WindowDrawing {
                 (float)(frame.boxBottom + frame.motionY),
                 (float)frame.barTop(),
                 Math.round(255.0F * opening.getOpacity()));
+    }
+
+    /**
+     * What a window its page fills ({@link ContentView}) is cut to while
+     * it is drawn: the box it shows, and its frame's ring beside it, so
+     * the ring's sides are drawn as they always are, in the surface each
+     * stretch runs beside. Null for a window shown whole.
+     */
+    public static LostTalesUiHitBox filledCut(WindowFrame frame) {
+        if (frame == null || !frame.isFilledByPage()) {
+            return null;
+        }
+        LostTalesUiHitBox box = frame.drawnBox();
+        int ring = WindowPlacement.FRAME_WIDTH;
+        return new LostTalesUiHitBox(box.left - ring, box.top,
+                box.width + 2 * ring, box.height);
+    }
+
+    /**
+     * The rest of the frame round a window its page fills: the ring's rows
+     * over and under the box it shows, continuing exactly what touches
+     * that edge — the tab strip, the tool strip or the bar while they slide
+     * out past it, else what the page holds there, stretch by stretch (a
+     * conversation's timestamp area, its panel thinning out as it does,
+     * its member list) — softened as the window is, and the frame's edges
+     * round the box. The window draws none of its own edges while its page
+     * fills it.
+     */
+    public static void drawFilledRing(Minecraft minecraft, WindowFrame frame,
+                                      LostTalesGuiAnimationSample opening) {
+        if (minecraft == null || frame == null || !frame.drawn
+                || opening == null || !frame.isFilledByPage()) {
+            return;
+        }
+        LostTalesUiHitBox box = frame.drawnBox();
+        int ring = WindowPlacement.FRAME_WIDTH;
+        float left = (float)box.left;
+        float right = (float)(box.left + box.width);
+        float top = (float)box.top;
+        float bottom = (float)(box.top + box.height);
+        LostTalesGuiRegionBlur blur = LostTalesGuiRegionBlur.getInstance();
+        blur.drawFramedBand(left - ring, top - ring, right + ring, top,
+                top - ring, bottom + ring, null, opening.getOpacity());
+        blur.drawFramedBand(left - ring, bottom, right + ring, bottom + ring,
+                top - ring, bottom + ring, null, opening.getOpacity());
+        // The ring's outermost corner pixels lie outside the frame's
+        // rounding, as a framed button's footprint corners do.
+        fillRingRow(frame, top, left - ring + 1, right + ring - 1,
+                top - ring, top - ring + 1);
+        fillRingRow(frame, top, left - ring, right + ring, top - ring + 1,
+                top);
+        fillRingRow(frame, bottom - 1.0F, left - ring, right + ring, bottom,
+                bottom + ring - 1);
+        fillRingRow(frame, bottom - 1.0F, left - ring + 1, right + ring - 1,
+                bottom + ring - 1, bottom + ring);
+        LostTalesUiWindowFrame.drawEdges(left, top, right, bottom,
+                Math.round(255.0F * opening.getOpacity()));
+    }
+
+    /**
+     * One row of the ring from {@code from} to {@code to}, over or under
+     * the window's row at {@code y}, continuing what that row wears there:
+     * the strips' one surface, or what the window holds stretch by
+     * stretch, with the shades that lie over it at its edges.
+     */
+    private static void fillRingRow(WindowFrame frame, float y, float from,
+                                    float to, float top, float bottom) {
+        if (y < frame.tabRowBottom() - 1.0D) {
+            LostTalesUiInk.fillRect(from, top, to, bottom,
+                    frame.tabBar.drawnStripArgb);
+            return;
+        }
+        if (y < frame.historyTop() || y >= frame.footTop()
+                || frame.contentEdge.isEmpty()) {
+            LostTalesUiInk.fillRect(from, top, to, bottom,
+                    frame.tabBar.drawnToolArgb);
+            return;
+        }
+        frame.contentEdge.fill(from, to, top, bottom);
+        frame.contentShade.fill(from, to, top, bottom);
     }
 }

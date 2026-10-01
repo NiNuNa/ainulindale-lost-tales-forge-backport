@@ -5,12 +5,12 @@ import java.util.Set;
 
 /**
  * What the screen shows: the tabs of the key that opened it — T the
- * conversations, a page's key that page, Settings nothing of its own —
- * every tab kept in every view ({@link WindowLayout#isKept}) or pinned to
- * stay while playing, and every tab the player opened by hand since. The
- * rest wait hidden in their windows for their own key; a window with
- * nothing shown is not drawn. With no screen open every tab counts as
- * shown. For the session only: a view ends as the screen closes.
+ * conversations, a page's key or Ctrl+, that page —
+ * every tab of a window pinned to the GUI ({@link WindowLayout#isOnGui}),
+ * and every tab the player opened by hand since. The rest wait hidden in
+ * their windows for their own key; a window with nothing shown is not
+ * drawn. With no screen open every tab counts as shown. For the session
+ * only: a view ends as the screen closes.
  */
 public final class WindowView {
     /** What a view is for. */
@@ -20,9 +20,7 @@ public final class WindowView {
         /** The chat's key: the conversations. */
         CHAT,
         /** A page's key: that page. */
-        PAGE,
-        /** Settings, from outside the screen: nothing of its own. */
-        SETTINGS
+        PAGE
     }
 
     private static Kind kind = Kind.NONE;
@@ -30,7 +28,7 @@ public final class WindowView {
     private static PageTab page;
     /** Tabs the player opened by hand while this view stands. */
     private static final Set<WindowTab> BY_HAND = new HashSet<WindowTab>();
-    /** Whether the pinned windows are being drawn while playing: only pinned tabs show. */
+    /** Whether the windows pinned to the HUD are being drawn: only what the HUD shows counts. */
     private static boolean pinnedPass;
 
     private WindowView() {}
@@ -42,12 +40,7 @@ public final class WindowView {
 
     /** The screen opens for a page, or turns to it by its key: that page alone. */
     public static synchronized void forPage(PageTab shown) {
-        set(shown == null ? Kind.SETTINGS : Kind.PAGE, shown);
-    }
-
-    /** The screen opens for Settings: nothing but the kept tabs. */
-    public static synchronized void forSettings() {
-        set(Kind.SETTINGS, null);
+        set(Kind.PAGE, shown);
     }
 
     /** The screen closed: every tab counts as shown again. */
@@ -62,8 +55,8 @@ public final class WindowView {
     }
 
     /**
-     * The pinned windows are about to be drawn while playing: until
-     * {@link #endPinnedPass}, only the pinned tabs count as shown.
+     * The windows pinned to the HUD are about to be drawn: until
+     * {@link #endPinnedPass}, only the tabs the HUD shows count as shown.
      */
     static synchronized void beginPinnedPass() {
         pinnedPass = true;
@@ -71,6 +64,11 @@ public final class WindowView {
 
     static synchronized void endPinnedPass() {
         pinnedPass = false;
+    }
+
+    /** Whether the windows pinned to the HUD are being drawn now. */
+    static synchronized boolean inPinnedPass() {
+        return pinnedPass;
     }
 
     /** A tab the player opened by hand joins what is shown until the screen closes. */
@@ -95,10 +93,10 @@ public final class WindowView {
             return false;
         }
         if (pinnedPass) {
-            return WindowLayout.isPinned(tab);
+            return WindowLayout.isOnHud(tab);
         }
-        if (kind == Kind.NONE || WindowLayout.isKept(tab)
-                || WindowLayout.isPinned(tab) || BY_HAND.contains(tab)) {
+        if (kind == Kind.NONE || WindowLayout.isOnGui(tab)
+                || BY_HAND.contains(tab)) {
             return true;
         }
         switch (kind) {

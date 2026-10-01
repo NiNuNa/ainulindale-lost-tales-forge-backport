@@ -167,6 +167,11 @@ public final class LostTalesConfig {
     /** Whether the world blurs behind every window while the window screen is open. */
     public static boolean windowBackgroundBlur = true;
     public static boolean enableNpcChatStyling = true;
+    /**
+     * How many conversations with NPCs stand open by themselves; the ones
+     * quiet longest close as another opens, and wait in the {@code +}.
+     */
+    public static int npcConversationsOpen = 3;
     public static boolean showChatSpeechBubbles = true;
     public static boolean enableChatPings = true;
     /** The chat's own mention cue, bundled with the mod. */
@@ -615,7 +620,7 @@ public final class LostTalesConfig {
                     CATEGORY_CLIENT,
                     "hudPlacementPreset",
                     hudPlacementPreset,
-                    "Where the HUD's panels stand: custom keeps each panel where it was placed; default, lotr-safe, compact and minimal put every panel in that layout's place. Set in Settings, HUD."
+                    "Where the HUD's panels stand: custom keeps each panel where it was placed; default, lotr-safe, compact and minimal put every panel in that layout's place. Set in Client Settings, HUD."
             );
             hudPresetProperty.setValidValues(HUD_PRESET_VALUES);
             hudPlacementPreset = normalizeHudPreset(hudPresetProperty.getString());
@@ -1364,6 +1369,14 @@ public final class LostTalesConfig {
                     CATEGORY_CLIENT,
                     enableNpcChatStyling,
                     "Show LOTR NPC speech through the Lost Tales chat style with head icons, timestamps, and channels."
+            );
+            npcConversationsOpen = config.getInt(
+                    "npcConversationsOpen",
+                    CATEGORY_CLIENT,
+                    npcConversationsOpen,
+                    1,
+                    10,
+                    "How many conversations with NPCs open a page by themselves; older ones wait in +."
             );
             showChatSpeechBubbles = config.getBoolean(
                     "showChatSpeechBubbles",
@@ -2120,6 +2133,8 @@ public final class LostTalesConfig {
                 showChatSpeechBubbles).set(showChatSpeechBubbles);
         config.get(CATEGORY_CLIENT, "enableNpcChatStyling",
                 enableNpcChatStyling).set(enableNpcChatStyling);
+        config.get(CATEGORY_CLIENT, "npcConversationsOpen",
+                npcConversationsOpen).set(npcConversationsOpen);
         config.get(CATEGORY_CLIENT, "enableChatPings",
                 enableChatPings).set(enableChatPings);
         config.get(CATEGORY_CLIENT, "chatPingSound",

@@ -260,8 +260,11 @@ final class ChatMenus {
      * would. Then the online players, each opening (or selecting) the
      * conversation with them, wearing the head its tab wears and the
      * conversation's mark; the search leaves out a conversation already
-     * open, which it lists among the open tabs. Every row whose name
-     * holds {@code filter}, and a section with none left is left out.
+     * open, which it lists among the open tabs. After them the NPC
+     * conversations of the session in no window, the one that spoke last
+     * first, each wearing the NPC's portrait its tab wears. Every row
+     * whose name holds {@code filter}, and a section with none left is
+     * left out.
      */
     static void addOpenable(Minecraft mc, List<MenuWindow.Entry> entries,
                             String filter, boolean search) {
@@ -285,6 +288,13 @@ final class ChatMenus {
                     && WindowMenus.matchesFilter(name, filter)) {
                 players.add(new MenuWindow.Entry(conversation.id(), name,
                         ChatLayout.isMuted(conversation), -1, conversation));
+            }
+        }
+        for (ChatTab npc : ChatLayout.closedNpcConversations()) {
+            String name = npc.title();
+            if (WindowMenus.matchesFilter(name, filter)) {
+                players.add(new MenuWindow.Entry(npc.id(), name,
+                        npc.isMuted(), -1, npc));
             }
         }
         WindowMenus.addSection(entries, StatCollector.translateToLocal(
@@ -371,25 +381,31 @@ final class ChatMenus {
     }
 
     /**
-     * The mark after the {@code +}: the channels it would list together,
-     * their pings on the tile, else the white sphere while any holds
-     * something unread.
+     * The mark after the {@code +}: the closed conversations it would
+     * list, together, their pings on the tile, else the white sphere
+     * while any holds something unread.
      */
     static TabMark closedMark() {
+        return TabMark.combined(closedConversations());
+    }
+
+    /** Sum of the unread counts of the closed conversations the {@code +} would list. */
+    static int closedUnreadCount() {
+        int total = 0;
+        for (ChatTab tab : closedConversations()) {
+            total += ClientChatChannelViews.unreadCount(tab);
+        }
+        return Math.min(ClientChatChannelViews.MAX_UNREAD + 1, total);
+    }
+
+    /** The closed channels the player could see, then the session's closed NPC conversations. */
+    private static List<ChatTab> closedConversations() {
         List<ChatTab> closed = new ArrayList<ChatTab>();
         for (ChatChannel channel : restorableChannels()) {
             closed.add(ChatTab.of(channel));
         }
-        return TabMark.combined(closed);
-    }
-
-    /** Sum of the unread counts of the channels the {@code +} would list. */
-    static int closedUnreadCount() {
-        int total = 0;
-        for (ChatChannel channel : restorableChannels()) {
-            total += ClientChatChannelViews.unreadCount(channel);
-        }
-        return Math.min(ClientChatChannelViews.MAX_UNREAD + 1, total);
+        closed.addAll(ChatLayout.closedNpcConversations());
+        return closed;
     }
 
     /* ---- The menus over the lines ---- */
@@ -541,11 +557,15 @@ final class ChatMenus {
         entries.add(action(ENTRY_COPY_LINK,
                 "gui.losttales.chat.message.copy_link",
                 whyNotLinkable(aim.chatLineId)));
-        // Your own words are yours to correct or take back. The server
-        // decides that too — this only offers what it would allow. An
-        // operator may take anyone's words back, but never rewrite them:
-        // a removal is visibly a removal, an edit would put words in
-        // another's mouth. Their row wears the Operator crimson.
+        // Your own words are yours to correct or take back, after a
+        // hairline. The server decides that too — this only offers what
+        // it would allow. An operator may take anyone's words back, but
+        // never rewrite them: a removal is visibly a removal, an edit
+        // would put words in another's mouth. Their row wears the
+        // Operator crimson.
+        if (isOwnMessage(aim) || canModerateMessage(aim)) {
+            entries.add(MenuWindow.Entry.separator());
+        }
         if (isOwnMessage(aim)) {
             if (ClientChatMessages.get(aim.messageId) != null) {
                 // Editable only while this client still remembers what
@@ -564,8 +584,10 @@ final class ChatMenus {
                             "gui.losttales.chat.message.delete"))
                     .withLabelColor(OPERATOR_ACTION_COLOR));
         }
-        // Reporting stands last, in crimson behind its mark, as a
-        // messenger's does; on a line it cannot take it says why.
+        // Reporting stands last, after a hairline, in crimson behind its
+        // mark, as a messenger's does; on a line it cannot take it says
+        // why.
+        entries.add(MenuWindow.Entry.separator());
         entries.add(action(ENTRY_REPORT, "gui.losttales.chat.message.report",
                 whyNotReportable(aim))
                 .withLabelColor(OPERATOR_ACTION_COLOR)
@@ -923,7 +945,11 @@ final class ChatMenus {
         }
         // A character can be ignored on its own, the account's other
         // characters still heard; the account row then says it is the
-        // account. Both rows flip to lifting what they laid.
+        // account. Both rows flip to lifting what they laid. A hairline
+        // parts them from what reaches the person.
+        if (!entries.isEmpty()) {
+            entries.add(MenuWindow.Entry.separator());
+        }
         boolean identityRow = name.length() > 0
                 && !name.equalsIgnoreCase(person.accountName);
         if (identityRow) {
@@ -953,6 +979,7 @@ final class ChatMenus {
             // again whenever it changes, and decides for itself anyway.
             boolean muted = ClientChatChannelState.isMutedSender(
                     person.playerId);
+            entries.add(MenuWindow.Entry.separator());
             entries.add(new MenuWindow.Entry(
                     muted ? ENTRY_UNMUTE_ACCOUNT : ENTRY_MUTE_ACCOUNT,
                     StatCollector.translateToLocalFormatted(muted
@@ -1076,7 +1103,11 @@ final class ChatMenus {
             return null;
         }
 
-        /** A choice stays; the status line's row opens its field beside the menu. */
+        /**
+         * A character, a status or a role-play status picked is done with
+         * the menu; the Narrator's switch stays, and the status line's row
+         * opens its field beside the menu.
+         */
         @Override
         public boolean act(MenuWindow menu, MenuWindow.Entry entry,
                            SubWindow window, boolean back) {
@@ -1085,11 +1116,11 @@ final class ChatMenus {
                 ChatMenus.this.menus.show(ChatSubWindows.STATUS_LINE,
                         ClientChatPresence.speakerOf(subject),
                         WindowMenus.besideWindow(window), true);
-            } else {
-                chooseIdentityOrStatus(entry, subject);
-                ChatMenus.this.host.identityChosen();
+                return true;
             }
-            return true;
+            chooseIdentityOrStatus(entry, subject);
+            ChatMenus.this.host.identityChosen();
+            return ENTRY_NARRATOR.equals(entry.id);
         }
     }
 

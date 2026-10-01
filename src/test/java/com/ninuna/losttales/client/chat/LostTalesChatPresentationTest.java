@@ -40,6 +40,44 @@ public final class LostTalesChatPresentationTest {
     }
 
     /**
+     * The player's own line never chimes, the copy of a whisper they
+     * sent included, and neither does a replayed one; any other line
+     * chimes as its conversation's Notifications allows.
+     */
+    @Test
+    public void ownLinesAndReplayedOnesNeverChime() {
+        ChatLayout.reset();
+        try {
+            ChatTab whisper = ChatTab.whisper("Bilbo", "");
+            ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
+            assertTrue(LostTalesChatPresentation.lineChimes(whisper, false,
+                    false, false));
+            assertFalse(LostTalesChatPresentation.lineChimes(whisper, false,
+                    true, false));
+            assertFalse(LostTalesChatPresentation.lineChimes(whisper, true,
+                    true, false));
+            assertFalse(LostTalesChatPresentation.lineChimes(whisper, false,
+                    false, true));
+            assertFalse(LostTalesChatPresentation.lineChimes(global, false,
+                    false, false));
+            assertTrue(LostTalesChatPresentation.lineChimes(global, true,
+                    false, false));
+            assertFalse(LostTalesChatPresentation.lineChimes(global, true,
+                    true, false));
+            ChatLayout.setNotification(global, ChatLineChoice.EVERYTHING);
+            assertTrue(LostTalesChatPresentation.lineChimes(global, false,
+                    false, false));
+            assertFalse(LostTalesChatPresentation.lineChimes(global, false,
+                    true, false));
+            ChatLayout.setNotification(global, ChatLineChoice.NOTHING);
+            assertFalse(LostTalesChatPresentation.lineChimes(global, true,
+                    false, false));
+        } finally {
+            ChatLayout.reset();
+        }
+    }
+
+    /**
      * A Narrator line wears the Narrator's mark for a head and tells its
      * words in italics; the words are still read for everything a
      * message carries.
@@ -571,10 +609,12 @@ public final class LostTalesChatPresentationTest {
             assertEquals("Global Chat: <  Arathorn> ", headerOf(used));
 
             java.util.List<IChatComponent> body = bodyOf(used);
-            // One run, slash and all, behind the chevron: the command as
-            // inline code, in italics and exactly the aside tone.
+            // One run behind the command mark, which stands for the
+            // slash: the command as inline code, in italics and exactly
+            // the aside tone.
             assertEquals(1, body.size());
-            assertEquals(command, body.get(0).getUnformattedTextForChat());
+            assertEquals(command.substring(1),
+                    body.get(0).getUnformattedTextForChat());
             assertTrue(body.get(0).getChatStyle().getItalic());
             assertEquals(Integer.valueOf(LostTalesChatVisualStyle.asideRgb()),
                     ChatColorMarker.decode(body.get(0)));
@@ -586,7 +626,7 @@ public final class LostTalesChatPresentationTest {
                     ChatBodyKind.COMMAND);
             assertEquals("", headerOf(grouped));
             assertEquals(1, bodyOf(grouped).size());
-            assertEquals(command,
+            assertEquals(command.substring(1),
                     bodyOf(grouped).get(0).getUnformattedTextForChat());
         } finally {
             LostTalesConfig.enableChatEmojis = originalEmojis;
@@ -595,8 +635,8 @@ public final class LostTalesChatPresentationTest {
 
     /**
      * A quoted command is still a command: the quote a reply opens with
-     * shows it as inline code, as the line it quotes does, while quoted
-     * words keep the chat's ivory.
+     * shows it behind the command mark as inline code, as the line it
+     * quotes does, while quoted words keep the chat's ivory.
      */
     @Test
     public void aQuotedCommandIsInlineCode() {
@@ -607,7 +647,7 @@ public final class LostTalesChatPresentationTest {
         IChatComponent command = quoteWordsOf(answer.withReply(
                 com.ninuna.losttales.chat.ChatReplyReference.unanchored(
                         "Player125", "/clear", 0xAA5555)));
-        assertEquals("/clear", command.getUnformattedTextForChat());
+        assertEquals("clear", command.getUnformattedTextForChat());
         assertTrue(command.getChatStyle().getItalic());
         assertEquals(Integer.valueOf(LostTalesChatVisualStyle.asideRgb()),
                 ChatReplyMarker.colorOf(command));

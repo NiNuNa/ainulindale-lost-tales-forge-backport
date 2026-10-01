@@ -14,6 +14,8 @@ public class RoleplayCharacter {
     public static final int CURRENT_DATA_VERSION = 10;
     public static final boolean DEFAULT_SHOW_MINECRAFT_CAPE = true;
     public static final int DEFAULT_COSMETIC_CAPE_ID = CharacterCapeCatalog.NONE_ID;
+    /** The longest LOTR title a record keeps. */
+    public static final int MAX_LOTR_TITLE_LENGTH = 64;
 
     private final UUID characterId;
     private final UUID ownerId;
@@ -38,6 +40,8 @@ public class RoleplayCharacter {
     private String pledgedFactionId;
     /** When the character's faction became its faction: its making, or its latest pledge. */
     private long factionSince;
+    /** The LOTR title the character wore when it was last played; empty for none. */
+    private String lotrTitle;
 
     /** A builder for a character with these ids; everything else defaults. */
     public static Builder builder(UUID characterId, UUID ownerId) {
@@ -56,6 +60,7 @@ public class RoleplayCharacter {
                 .startingFaction(source.startingFactionId)
                 .pledgedFaction(source.pledgedFactionId)
                 .factionSince(source.factionSince)
+                .lotrTitle(source.lotrTitle)
                 .createdAt(source.creationTimestamp)
                 .minecraftCapeVisible(source.showMinecraftCape)
                 .cosmeticCape(source.cosmeticCapeId)
@@ -90,6 +95,7 @@ public class RoleplayCharacter {
         this.creationTimestamp = Math.max(0L, builder.creationTimestamp);
         this.factionSince = builder.factionSince > 0L ? builder.factionSince
                 : this.creationTimestamp;
+        this.lotrTitle = normalizeTitle(builder.lotrTitle);
         this.showMinecraftCape = builder.showMinecraftCape;
         this.cosmeticCapeId = CharacterCapeCatalog.normalizeSelection(
                 builder.cosmeticCapeId);
@@ -98,7 +104,8 @@ public class RoleplayCharacter {
     /**
      * Every field a character record holds, with the default a record
      * without the field gets: the body and chest types follow the sex,
-     * the capes are the catalogue's defaults, and there is no pledge.
+     * the capes are the catalogue's defaults, and there is no pledge and
+     * no title.
      */
     public static final class Builder {
         private final UUID characterId;
@@ -113,6 +120,7 @@ public class RoleplayCharacter {
         private String pledgedFactionId = "";
         private long creationTimestamp;
         private long factionSince;
+        private String lotrTitle = "";
         private boolean showMinecraftCape = DEFAULT_SHOW_MINECRAFT_CAPE;
         private int cosmeticCapeId = DEFAULT_COSMETIC_CAPE_ID;
         private String startingWaypointId = "";
@@ -194,6 +202,12 @@ public class RoleplayCharacter {
         /** When the faction became the character's; 0 for its making. */
         public Builder factionSince(long factionSince) {
             this.factionSince = factionSince;
+            return this;
+        }
+
+        /** The LOTR title the character last wore; null or empty for none. */
+        public Builder lotrTitle(String lotrTitle) {
+            this.lotrTitle = lotrTitle == null ? "" : lotrTitle;
             return this;
         }
 
@@ -363,6 +377,51 @@ public class RoleplayCharacter {
     private static String normalizeFactionId(String factionId) {
         return factionId == null ? ""
                 : factionId.trim().toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * The LOTR title the character wore when it was last played, as its
+     * lines and the member lists show it after the name: {@code Gondor
+     * Farmer}. Empty for none. The title of the character being played
+     * is LOTR's live one; this is what the others show.
+     */
+    public String getLotrTitle() {
+        return this.lotrTitle;
+    }
+
+    /**
+     * Keeps the title LOTR reports for this character, read from the
+     * player data of the one being played. Answers whether it changed.
+     */
+    public boolean setLotrTitle(String lotrTitle) {
+        String normalized = normalizeTitle(lotrTitle);
+        if (normalized.equals(this.lotrTitle)) {
+            return false;
+        }
+        this.lotrTitle = normalized;
+        return true;
+    }
+
+    /**
+     * A title as a record keeps it: its words without colour codes or
+     * control characters, trimmed, cut to {@link #MAX_LOTR_TITLE_LENGTH}.
+     */
+    public static String normalizeTitle(String title) {
+        if (title == null) {
+            return "";
+        }
+        StringBuilder kept = new StringBuilder(title.length());
+        for (int index = 0; index < title.length(); index++) {
+            char c = title.charAt(index);
+            if (c == '\u00a7') {
+                index++;
+            } else if (!Character.isISOControl(c)) {
+                kept.append(c);
+            }
+        }
+        String trimmed = kept.toString().trim();
+        return trimmed.length() > MAX_LOTR_TITLE_LENGTH
+                ? trimmed.substring(0, MAX_LOTR_TITLE_LENGTH).trim() : trimmed;
     }
 
     public String getStartingWaypointId() {

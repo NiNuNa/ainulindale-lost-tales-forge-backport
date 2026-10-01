@@ -165,8 +165,8 @@ public final class WindowBarTest {
         BarItem track = button("track").tip("Track (Space)");
         assertEquals("Track (Space)", track.tipText());
         assertTrue(track.isAvailable());
-        track.unavailable("Pick a quest first");
+        track.unavailable("Pick a quest first.");
         assertFalse(track.isAvailable());
-        assertEquals("Pick a quest first", track.tipText());
+        assertEquals("Pick a quest first.", track.tipText());
     }
 }

@@ -587,8 +587,9 @@ public final class WindowBar {
                         WindowStyle.insetArgb(opacity));
             }
         }
-        drawFoot(left, top, right, surface,
-                (float)(frame.boxBottom - frame.boxTop), Math.round(255.0F * share));
+        drawFoot(left, top, 0.0F, right, surface,
+                (float)(frame.boxBottom - frame.boxTop),
+                Math.round(255.0F * share), !frame.isFilledByPage());
     }
 
     /**
@@ -622,24 +623,18 @@ public final class WindowBar {
     }
 
     /**
-     * The window frame's surface beside and under a bar strip, a frame
-     * wide, in the bar's own surface, the row the window's bottom rule
-     * stands on included, and the frame's edges beside and under the bar
-     * with its two bottom corners over it. {@code windowHeight} is how far
-     * the window's box reaches above the bar's foot, for the edges' ramps.
-     */
-    public static void drawFoot(int left, int top, int right, int surface,
-                                float windowHeight, int alpha) {
-        drawFoot(left, top, 0.0F, right, surface, windowHeight, alpha);
-    }
-
-    /**
-     * As above for a bar reaching {@code reach} above {@code top}, the
-     * chat's as it grows for the rows typed in it: the frame beside it
-     * and its edges start that far up.
+     * The window frame's surface beside and under a bar strip reaching
+     * {@code reach} above {@code top} — the chat's grows for the rows
+     * typed in it — a frame wide, in the bar's own surface, the row the
+     * window's bottom rule stands on included; and with {@code edges} the
+     * frame's edges beside and under the bar with its two bottom corners
+     * over it. {@code windowHeight} is how far the window's box reaches
+     * above the bar's foot, for the edges' ramps. A window its page fills
+     * draws its edges round what it shows instead.
      */
     public static void drawFoot(int left, int top, float reach, int right,
-                                int surface, float windowHeight, int alpha) {
+                                int surface, float windowHeight, int alpha,
+                                boolean edges) {
         int bottom = top + WindowPlacement.BAR_STRIP_HEIGHT;
         int ring = WindowPlacement.FRAME_WIDTH;
         float reached = top - reach;
@@ -651,8 +646,10 @@ public final class WindowBar {
         // rounding, as a framed button's footprint corners do.
         LostTalesUiInk.fillRect(left - ring + 1, bottom + ring - 1,
                 right + ring - 1, bottom + ring, surface);
-        LostTalesUiWindowFrame.drawEdgesBelow(left, bottom - windowHeight,
-                right, bottom, reached, alpha);
+        if (edges) {
+            LostTalesUiWindowFrame.drawEdgesBelow(left, bottom - windowHeight,
+                    right, bottom, reached, alpha);
+        }
     }
 
     /**

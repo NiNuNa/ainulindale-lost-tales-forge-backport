@@ -122,6 +122,7 @@ import com.ninuna.losttales.chat.moderation.ChatAuditLog;
 import com.ninuna.losttales.chat.server.ChatMessageIdAllocator;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.server.ChatConsoleCommandHandler;
+import com.ninuna.losttales.chat.server.ChatSpeechGate;
 import com.ninuna.losttales.chat.server.ChatArrivals;
 import com.ninuna.losttales.chat.server.ChatWelcome;
 import com.ninuna.losttales.chat.ChatChannel;
@@ -212,6 +213,7 @@ public class LostTalesCommonProxy {
         MinecraftForge.EVENT_BUS.register(waystoneGenerationHandler);
         MinecraftForge.EVENT_BUS.register(new CharacterRoomWorldHandler());
         MinecraftForge.EVENT_BUS.register(new ChatConsoleCommandHandler());
+        MinecraftForge.EVENT_BUS.register(new ChatSpeechGate());
         MinecraftForge.EVENT_BUS.register(new ChatArrivals());
         cpw.mods.fml.common.FMLCommonHandler.instance().bus().register(new ChatWelcome());
         MinecraftForge.TERRAIN_GEN_BUS.register(waystoneGenerationHandler);

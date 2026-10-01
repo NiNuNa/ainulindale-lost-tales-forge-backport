@@ -433,10 +433,10 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         return drawing;
     }
 
-    /** Closes the map: its window when it stands in one, else its screen. */
+    /** The map's key on the map: in a window it does what the key does on the window screen, else it closes the map's own screen. */
     private void closeMap() {
         if (this.page != null) {
-            this.page.close();
+            this.page.mapKeyPressed();
         } else {
             this.mc.displayGuiScreen(null);
         }

@@ -8,21 +8,23 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Where the player has put each kind of sub-window, remembered per
- * account in the layout file, and which windows were open when the
- * screen last closed. A window opens where its opener puts it, such as
- * hanging from the control pressed, until the player moves or resizes
- * it; from then on it opens where they left it.
- * A place is kept from the corner of the room it was left nearest to, so
- * a picker left in a window's bottom right corner opens in the bottom
- * right corner of whichever window it opens in, however large. A kind the
- * player has only moved keeps its content's own size, which changes with
- * what it holds; one they have resized keeps the size they gave it.
+ * Where each kind of sub-window was last locked, remembered per account
+ * in the layout file, and which windows were open when the screen last
+ * closed. A window opens where its opener puts it, such as hanging from
+ * the control pressed, until the player unlocks it, moves or resizes it
+ * and locks it again; from then on it opens there, until one of its kind
+ * is closed while unlocked.
+ * A place is kept from the corner of its window's room it was locked
+ * nearest to, past that room's edges too, so a picker locked by a
+ * window's bottom right corner opens by the bottom right corner of
+ * whichever window it opens in, however large. A kind the player has only
+ * moved keeps its content's own size, which changes with what it holds;
+ * one they have resized keeps the size they gave it.
  */
 public final class SubWindowPlaces {
     /** The widest and tallest a remembered size is read as. */
     static final int MAX_SIZE = 4096;
-    /** The farthest from its corner a remembered place is read as. */
+    /** The farthest from its corner, inward or outward, a remembered place is read as. */
     static final double MAX_DISTANCE = 4096.0D;
 
     /** A kind's remembered place, and the size the player gave it if they did. */
@@ -31,7 +33,7 @@ public final class SubWindowPlaces {
         final boolean fromRight;
         /** Whether it is measured from the room's bottom edge, else from its top. */
         final boolean fromBottom;
-        /** How far in from those two edges it stands. */
+        /** How far in from those two edges it stands; outside them where it is negative. */
         final double dx;
         final double dy;
         /** The size the player gave the kind; 0 for a kind only moved, which its content sizes. */
@@ -70,7 +72,7 @@ public final class SubWindowPlaces {
         }
     }
 
-    /** A window open as the screen closed: what it was, what it held, and where it stood in which window. */
+    /** A window open as the screen closed: what it was, what it held, where it stood in which window, and whether it was locked. */
     public static final class Reopening {
         public final SubWindowKind kind;
         final String key;
@@ -84,10 +86,12 @@ public final class SubWindowPlaces {
         final int height;
         /** Whether the player had given it its size. */
         final boolean sized;
+        /** Whether it stood locked: its place then counts from its window's room, else from the screen. */
+        final boolean locked;
 
         Reopening(SubWindowKind kind, String key, Object state,
                   String parentId, double x, double y, int width, int height,
-                  boolean sized) {
+                  boolean sized, boolean locked) {
             this.kind = kind;
             this.key = key;
             this.state = state;
@@ -97,6 +101,7 @@ public final class SubWindowPlaces {
             this.width = width;
             this.height = height;
             this.sized = sized;
+            this.locked = locked;
         }
     }
 
@@ -114,8 +119,8 @@ public final class SubWindowPlaces {
     }
 
     /**
-     * Remembers where the player left a window in its room, with its size
-     * when {@code sized}, and writes the layout file.
+     * Remembers where the player locked a window in its room, with its
+     * size when {@code sized}, and writes the layout file.
      */
     static void remember(SubWindowKind kind, double x, double y,
                          int width, int height, boolean sized,
@@ -125,6 +130,20 @@ public final class SubWindowPlaces {
                     roomWidth, roomHeight));
         }
         WindowLayout.persist();
+    }
+
+    /**
+     * Forgets where the kind was locked, as one of it closes unlocked, and
+     * writes the layout file: the kind opens where its opener puts it.
+     */
+    static void forget(SubWindowKind kind) {
+        boolean forgot;
+        synchronized (SubWindowPlaces.class) {
+            forgot = PLACED.remove(kind) != null;
+        }
+        if (forgot) {
+            WindowLayout.persist();
+        }
     }
 
     /**
@@ -181,6 +200,6 @@ public final class SubWindowPlaces {
 
     private static double clampDistance(double value) {
         return Double.isNaN(value) ? 0.0D
-                : Math.max(0.0D, Math.min(MAX_DISTANCE, value));
+                : Math.max(-MAX_DISTANCE, Math.min(MAX_DISTANCE, value));
     }
 }

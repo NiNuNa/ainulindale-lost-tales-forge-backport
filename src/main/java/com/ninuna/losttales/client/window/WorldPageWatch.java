@@ -21,7 +21,7 @@ public final class WorldPageWatch {
     private static final ScreenPart.Maker MAKER = new ScreenPart.Maker() {
         @Override
         public ScreenPart make(WindowScreen screen) {
-            return screen.isWorldless() ? null : new Part(screen);
+            return new Part(screen);
         }
     };
 
@@ -47,7 +47,9 @@ public final class WorldPageWatch {
             if (window != null && notice != null && notice.length() > 0) {
                 screen.showNotice(window.getId(), notice);
             }
-            screen.closeTab(tab);
+            if (window != null && !window.isLocked()) {
+                screen.closeTab(tab);
+            }
         }
         if (WindowLayout.isOpen(tab)) {
             final PageTab closing = tab;

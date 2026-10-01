@@ -9,6 +9,10 @@ import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.client.motion.MotionIds;
 import com.ninuna.losttales.client.motion.MotionTransition;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiTextField;
@@ -22,16 +26,23 @@ import org.lwjgl.input.Mouse;
  * the panel button: over a conversation the timestamp area's person, for
  * the heads the area holds, which drives the area out of the window and
  * back in; over a page the page's own panel, the journal's quest list.
- * At its right end the search, a well a third of the strip wide naming
- * what it searches — {@code Search Global}, {@code Search active quests}
- * — with its magnifier at the well's right end; before the well the full
- * screen button, which shows the tab alone on the whole screen
- * ({@link ContentView}); before that the member list's button, two
- * people, which a page has none of, and before that the cog, which opens
- * the tab's menu. The panel buttons rest lit
- * while their panels are out, and the cog while its menu is. A cog with
- * nothing to choose and a well with nothing to search stay where they
- * are, greyed, and their tips say why.
+ * After it the page's options, each a button of its own
+ * ({@link PageOption}): Mark as Read, Notifications, the journal's
+ * filters, the map's kinds of marker, a party colour; a gap between two
+ * groups, and those the strip has no room for left to the tab's options.
+ * At its right end the help button, a question mark, which opens the
+ * page's help: what the page is for and its keys. Before it the search,
+ * a well a third of the strip wide naming what it searches — {@code
+ * Search Global}, {@code Search active quests} — with its magnifier at
+ * the well's right end; before the well the member list's button, two
+ * people, which a page has none of; before that the full window button,
+ * which lets the tab in front fill its window ({@link ContentView}); and
+ * first the cog, which opens the settings of the page's kind (Chat
+ * Settings for every conversation). The panel buttons rest lit while
+ * their panels are out, the cog and the question mark while what they
+ * open is, and an option while it is on. A cog with no settings, an
+ * option that cannot be taken and a well with nothing to search stay
+ * where they are, greyed, and their tips say why.
  * While a search stands in a well, the count stands inside the well
  * before its end, and the magnifier has crossed over to the cross that
  * clears it: over a conversation the match stood on of how many, with
@@ -51,11 +62,15 @@ public final class ToolStrip {
     public enum Part {
         /** The panel button at the left end: the timestamp area's, or a page's own panel's. */
         PANEL,
-        /** The channel's cog: the menu of the tab in front. */
+        /** One of the options of the tab in front, a button of its own ({@link #optionAt}). */
+        OPTION,
+        /** The cog: the settings of the kind of the tab in front. */
         SETTINGS,
-        MEMBERS_TOGGLE,
-        /** The full screen button: the tab in front alone on the whole screen. */
+        /** The full window button: the tab in front filling its window. */
         VIEW,
+        MEMBERS_TOGGLE,
+        /** The question mark at the strip's right end: the page's help. */
+        HELP,
         FIELD,
         /** The well's magnifier, or the cross it becomes while a search stands. */
         ICON,
@@ -114,6 +129,10 @@ public final class ToolStrip {
     /** Clear pixels round a glyph that answer with it. */
     private static final int SLACK = 2;
     private static final int MAX_QUERY = 64;
+    /** Clear space between two groups of a page's options. */
+    private static final int GROUP_GAP = END_GAP * 2;
+    private static final int HELP_WIDTH = LostTalesUiSheet.QUESTION.getWidth();
+    private static final int HELP_HEIGHT = LostTalesUiSheet.QUESTION.getHeight();
     private static final int MEMBERS_WIDTH = LostTalesUiSheet.MEMBERS.getWidth();
     private static final int MEMBERS_HEIGHT =
             LostTalesUiSheet.MEMBERS.getHeight();
@@ -137,9 +156,13 @@ public final class ToolStrip {
         /** The panel button's glyph size; a width of 0 for a strip with none. */
         int panelWidth;
         int panelHeight;
+        /** The page's options the strip has room for, and where each stands. */
+        PageOption[] options = new PageOption[0];
+        int[] optionX = new int[0];
         int settingsX;
-        int membersX;
         int viewX;
+        int membersX;
+        int helpX;
         /** Whether the strip has a member list button: a page's has none. */
         boolean hasMembers;
         /** Whether the count stands in the well; the query and the room decide. */
@@ -157,6 +180,11 @@ public final class ToolStrip {
     static final class State {
         Layout layout;
         final LostTalesUiButtonMotion panelMotion =
+                new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
+        /** Each option button's motion, by the option's id. */
+        final Map<String, LostTalesUiButtonMotion> optionMotions =
+                new HashMap<String, LostTalesUiButtonMotion>();
+        final LostTalesUiButtonMotion helpMotion =
                 new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
         /** The cog only rises: a quarter turn leaves it as it was. */
         final LostTalesUiButtonMotion settingsMotion =
@@ -247,6 +275,9 @@ public final class ToolStrip {
                 !typed ? Count.NONE : front.walksSearch() ? Count.WALK
                         : Count.FOUND,
                 font.getStringWidth(front.searchCount()));
+        layOptions(laid, front.options(), panel == null
+                ? TabRow.searchButtonLeft(row) + TabRow.searchButtonSize()
+                : laid.panelX + laid.panelWidth);
         frame.toolStrip.layout = laid;
         frame.tabBar.setToolStripHole(laid.hasWell
                 ? new LostTalesUiHitBox(laid.wellLeft, laid.wellTop,
@@ -263,12 +294,12 @@ public final class ToolStrip {
     /**
      * Where everything on a strip stands: the panel button, a glyph
      * {@code panelWidth} by {@code panelHeight} (none for a width of 0),
-     * centred under the tab search; the well against the strip's right
-     * end, {@link #EDGE_MARGIN} in, a third of the strip wide; the full
-     * screen button before it, the member list's button before that
-     * where the strip has one, and the cog before them. A
+     * centred under the tab search; the help button against the strip's
+     * right end, {@link #EDGE_MARGIN} in; the well before it, a third of
+     * the strip wide; before the well the member list's button where the
+     * strip has one, the full window button and the cog. A
      * strip whose third is too narrow for a well, or leaves the buttons no
-     * room, keeps none, and the buttons stand at its right end. A
+     * room, keeps none, and the buttons stand before the help button. A
      * {@code count} stands its text, {@code countWidth} wide, inside the
      * well before its icon, with the chevrons before the icon for a
      * {@link Count#WALK}, where the field leaves them room. Row space.
@@ -287,7 +318,8 @@ public final class ToolStrip {
         laid.panelX = searchButtonLeft
                 + Math.floorDiv(searchButtonSize - panelWidth, 2);
         laid.hasMembers = members;
-        laid.wellRight = stripRight - EDGE_MARGIN;
+        laid.helpX = stripRight - EDGE_MARGIN - HELP_WIDTH;
+        laid.wellRight = laid.helpX - END_GAP;
         laid.wellLeft = laid.wellRight
                 - Math.floorDiv(stripRight - stripLeft, 3);
         int buttons = COG_WIDTH + END_GAP + VIEW_WIDTH + END_GAP
@@ -297,11 +329,11 @@ public final class ToolStrip {
         laid.hasWell = laid.wellRight - laid.wellLeft >= MIN_WELL_WIDTH
                 && laid.wellLeft - buttons >= floor;
         int buttonsRight = laid.hasWell ? laid.wellLeft - END_GAP
-                : stripRight - EDGE_MARGIN;
-        laid.viewX = buttonsRight - VIEW_WIDTH;
-        laid.membersX = laid.viewX - END_GAP - MEMBERS_WIDTH;
-        laid.settingsX = (members ? laid.membersX : laid.viewX) - END_GAP
-                - COG_WIDTH;
+                : laid.helpX - END_GAP;
+        laid.membersX = buttonsRight - MEMBERS_WIDTH;
+        laid.viewX = (members ? laid.membersX - END_GAP : buttonsRight)
+                - VIEW_WIDTH;
+        laid.settingsX = laid.viewX - END_GAP - COG_WIDTH;
         laid.iconSlotLeft = laid.wellRight - WELL_INSET
                 - LostTalesUiSheet.SEARCH.getWidth();
         laid.fieldX = laid.wellLeft + WELL_INSET;
@@ -323,14 +355,45 @@ public final class ToolStrip {
     }
 
     /**
+     * Lays the page's options out after {@code after}, the panel button's
+     * right edge, in their order, a gap between two groups: as many as
+     * stand whole before the cog, the rest left to the tab's options.
+     */
+    static void layOptions(Layout laid, List<PageOption> options, int after) {
+        int limit = laid.settingsX - GROUP_GAP;
+        int x = after + GROUP_GAP;
+        List<PageOption> shown = new ArrayList<PageOption>(options.size());
+        List<Integer> places = new ArrayList<Integer>(options.size());
+        String group = null;
+        for (PageOption option : options) {
+            if (group != null && !group.equals(option.group())) {
+                x += GROUP_GAP - END_GAP;
+            }
+            group = option.group();
+            if (x + option.glyph.width() > limit) {
+                break;
+            }
+            shown.add(option);
+            places.add(Integer.valueOf(x));
+            x += option.glyph.width() + END_GAP;
+        }
+        laid.options = shown.toArray(new PageOption[shown.size()]);
+        laid.optionX = new int[places.size()];
+        for (int index = 0; index < places.size(); index++) {
+            laid.optionX[index] = places.get(index).intValue();
+        }
+    }
+
+    /**
      * Draws a window's strip as laid out by {@link #prepare}, inside the
      * row's own matrix; {@code under} is the part the pointer is on, if
-     * it is on this strip, and {@code menuOut} whether the menu of the
-     * tab in front is out.
+     * it is on this strip, {@code underOption} the option button it is
+     * on, if any, and {@code out} which of what the tab in front opens is
+     * out, so its button rests lit.
      */
     public void draw(FontRenderer font, WindowFrame frame, Window window,
               TabRow.Row row, float alphaScale, Part under,
-              boolean menuOut) {
+              PageOption underOption, Out out) {
         State state = frame == null ? null : frame.toolStrip;
         Layout laid = state == null ? null : state.layout;
         WindowTab front = row == null ? null : row.selected;
@@ -352,31 +415,25 @@ public final class ToolStrip {
                     state.panelMotion, laid.panelX,
                     glyphTop(laid, laid.panelHeight), ink);
         }
-        if (TabMenus.hasRows(front)) {
-            state.settingsMotion.advance(now, menuOut || under == Part.SETTINGS,
-                    under == Part.SETTINGS,
-                    under == Part.SETTINGS && Mouse.isButtonDown(0));
-            LostTalesUiButton.drawGlyph(LostTalesUiSheet.COG,
-                    LostTalesUiSheet.COG_HOVER, state.settingsMotion,
-                    laid.settingsX, glyphTop(laid, COG_HEIGHT), ink);
-        } else {
-            drawGreyed(LostTalesUiSheet.COG, laid.settingsX,
-                    glyphTop(laid, COG_HEIGHT), ink);
-        }
+        drawOptions(state, laid, underOption, now, ink);
+        drawButton(state.settingsMotion, front.settingsPlace() != null,
+                out != null && out.settings, under, Part.SETTINGS,
+                LostTalesUiSheet.COG, LostTalesUiSheet.COG_HOVER,
+                laid.settingsX, glyphTop(laid, COG_HEIGHT), now, ink);
+        drawButton(state.viewMotion, true, false, under, Part.VIEW,
+                LostTalesUiSheet.FULLSCREEN, LostTalesUiSheet.FULLSCREEN_HOVER,
+                laid.viewX, glyphTop(laid, VIEW_HEIGHT), now, ink);
         if (laid.hasMembers) {
-            state.membersMotion.advance(now, front.isMemberListOut(window)
-                            || under == Part.MEMBERS_TOGGLE,
-                    under == Part.MEMBERS_TOGGLE,
-                    under == Part.MEMBERS_TOGGLE && Mouse.isButtonDown(0));
-            LostTalesUiButton.drawGlyph(LostTalesUiSheet.MEMBERS,
-                    LostTalesUiSheet.MEMBERS_HOVER, state.membersMotion,
-                    laid.membersX, glyphTop(laid, MEMBERS_HEIGHT), ink);
+            drawButton(state.membersMotion, true,
+                    front.isMemberListOut(window), under,
+                    Part.MEMBERS_TOGGLE, LostTalesUiSheet.MEMBERS,
+                    LostTalesUiSheet.MEMBERS_HOVER, laid.membersX,
+                    glyphTop(laid, MEMBERS_HEIGHT), now, ink);
         }
-        state.viewMotion.advance(now, under == Part.VIEW, under == Part.VIEW,
-                under == Part.VIEW && Mouse.isButtonDown(0));
-        LostTalesUiButton.drawGlyph(LostTalesUiSheet.FULLSCREEN,
-                LostTalesUiSheet.FULLSCREEN_HOVER, state.viewMotion,
-                laid.viewX, glyphTop(laid, VIEW_HEIGHT), ink);
+        drawButton(state.helpMotion, true, out != null && out.help, under,
+                Part.HELP, LostTalesUiSheet.QUESTION,
+                LostTalesUiSheet.QUESTION_LIT, laid.helpX,
+                glyphTop(laid, HELP_HEIGHT), now, ink);
         if (!laid.hasWell) {
             return;
         }
@@ -485,6 +542,71 @@ public final class ToolStrip {
                 glyphTop(laid, resting.getHeight()), alpha);
     }
 
+    /**
+     * One of the strip's buttons: resting lit while {@code lit} (what it
+     * opens is out) or the pointer is on it, lifting under the pointer;
+     * greyed with no motion while it has nothing to do.
+     */
+    private static void drawButton(LostTalesUiButtonMotion motion,
+                                   boolean acts, boolean lit, Part under,
+                                   Part part, LostTalesUiSheet glyph,
+                                   LostTalesUiSheet litGlyph, int x, int y,
+                                   long now, int ink) {
+        if (!acts) {
+            drawGreyed(glyph, x, y, ink);
+            return;
+        }
+        motion.advance(now, lit || under == part, under == part,
+                under == part && Mouse.isButtonDown(0));
+        LostTalesUiButton.drawGlyph(glyph, litGlyph, motion, x, y, ink);
+    }
+
+    /**
+     * The page's option buttons: each resting lit while it is on, lifting
+     * under the pointer; one that cannot be taken greyed and still.
+     */
+    private static void drawOptions(State state, Layout laid,
+                                    PageOption under, long now, int ink) {
+        for (int index = 0; index < laid.options.length; index++) {
+            PageOption option = laid.options[index];
+            OptionGlyph glyph = option.glyph;
+            int x = laid.optionX[index];
+            int y = glyphTop(laid, glyph.height());
+            if (!option.isAvailable()) {
+                glyph.draw(x, y, 0.0F,
+                        Math.round(ink * WindowStyle.UNAVAILABLE_OPACITY));
+                continue;
+            }
+            LostTalesUiButtonMotion motion = state.optionMotions.get(option.id);
+            if (motion == null) {
+                motion = new LostTalesUiButtonMotion(
+                        LostTalesUiButtonMotion.Character.LIFT);
+                state.optionMotions.put(option.id, motion);
+            }
+            boolean hovered = under != null && under.id.equals(option.id);
+            motion.advance(now, option.on || hovered, hovered,
+                    hovered && Mouse.isButtonDown(0));
+            LostTalesUiButton.beginPose(motion, x, y, glyph.width(),
+                    glyph.height());
+            try {
+                glyph.draw(x, y, motion.lit(), ink);
+            } finally {
+                LostTalesUiButton.endPose();
+            }
+        }
+    }
+
+    /** Which of what the tab in front opens is out: its settings, its help. */
+    public static final class Out {
+        final boolean settings;
+        final boolean help;
+
+        public Out(boolean settings, boolean help) {
+            this.settings = settings;
+            this.help = help;
+        }
+    }
+
     /** A control with nothing to do: its resting glyph, faint, with no motion. */
     private static void drawGreyed(LostTalesUiSheet glyph, int x, int y,
                                    int alpha) {
@@ -494,8 +616,8 @@ public final class ToolStrip {
 
     /**
      * Why a part of {@code window}'s strip has nothing to do for the tab
-     * in front, for its tip: a cog with nothing to choose, a well with
-     * nothing to search; empty while it acts.
+     * in front, for its tip: options with nothing to choose, a cog with
+     * no settings, a well with nothing to search; empty while it acts.
      */
     static String greyedWhy(Part part, Window window) {
         WindowTab front = window == null ? null : window.getActiveTab();
@@ -504,7 +626,7 @@ public final class ToolStrip {
         }
         switch (part) {
             case SETTINGS:
-                return TabMenus.hasRows(front) ? ""
+                return front.settingsPlace() != null ? ""
                         : StatCollector.translateToLocalFormatted(
                                 "gui.losttales.window.cog.nothing",
                                 front.title());
@@ -539,16 +661,22 @@ public final class ToolStrip {
                 laid.panelWidth, laid.panelHeight).contains(x, y)) {
             return Part.PANEL;
         }
+        if (optionIndexAt(laid, x, y) >= 0) {
+            return Part.OPTION;
+        }
         if (glyphBox(laid, laid.settingsX, COG_WIDTH, COG_HEIGHT)
                 .contains(x, y)) {
             return Part.SETTINGS;
+        }
+        if (glyphBox(laid, laid.viewX, VIEW_WIDTH, VIEW_HEIGHT).contains(x, y)) {
+            return Part.VIEW;
         }
         if (laid.hasMembers && glyphBox(laid, laid.membersX, MEMBERS_WIDTH,
                 MEMBERS_HEIGHT).contains(x, y)) {
             return Part.MEMBERS_TOGGLE;
         }
-        if (glyphBox(laid, laid.viewX, VIEW_WIDTH, VIEW_HEIGHT).contains(x, y)) {
-            return Part.VIEW;
+        if (glyphBox(laid, laid.helpX, HELP_WIDTH, HELP_HEIGHT).contains(x, y)) {
+            return Part.HELP;
         }
         if (!laid.hasWell) {
             return null;
@@ -569,6 +697,34 @@ public final class ToolStrip {
             return null;
         }
         return x >= laid.iconSlotLeft - SLACK ? Part.ICON : Part.FIELD;
+    }
+
+    /**
+     * The option whose button a screen point lands on, or null: asked
+     * with the row's fraction taken off, as {@link #partAt} is.
+     */
+    public PageOption optionAt(WindowFrame frame, TabRow.Row row,
+                               double mouseX, double mouseY) {
+        Layout laid = frame == null || row == null ? null
+                : frame.toolStrip.layout;
+        if (laid == null) {
+            return null;
+        }
+        int index = optionIndexAt(laid, mouseX - row.fractionX,
+                mouseY - row.fractionY);
+        return index < 0 ? null : laid.options[index];
+    }
+
+    /** Which of the strip's option buttons a point lands on, or -1. */
+    private static int optionIndexAt(Layout laid, double x, double y) {
+        for (int index = 0; index < laid.options.length; index++) {
+            OptionGlyph glyph = laid.options[index].glyph;
+            if (glyphBox(laid, laid.optionX[index], glyph.width(),
+                    glyph.height()).contains(x, y)) {
+                return index;
+            }
+        }
+        return -1;
     }
 
     /** A glyph's ink with the clear pixels that answer with it. */
@@ -607,8 +763,14 @@ public final class ToolStrip {
                                 front.isPanelOut(window)
                                         ? panel.hideKey : panel.showKey);
             }
+            case OPTION:
+                return "";
             case SETTINGS:
-                return front.settingsTip();
+                return StatCollector.translateToLocal(
+                        front.settingsPlace().titleKey);
+            case HELP:
+                return StatCollector.translateToLocalFormatted(
+                        "gui.losttales.window.help", front.title());
             case MEMBERS_TOGGLE:
                 return StatCollector.translateToLocal(
                         front.isMemberListOut(window)

@@ -51,9 +51,9 @@ public final class CharacterPlayerEventHandler {
             CharacterLastSeen.saw(player.worldObj, leaving.getCharacter() == null
                     ? player.getUniqueID() : leaving.getCharacter().getCharacterId());
         }
-        // The pledge the character leaves with, so its faction answers
-        // while it is away.
-        CharacterPledges.refresh(player);
+        // The pledge and the title the character leaves with, so its
+        // faction answers and its title shows while it is away.
+        CharacterLotrRecord.refresh(player);
         CharacterSwitchCoordinator.getInstance().saveActiveStateOnLogout(player);
         AccessoryInventorySyncManager.clearPlayer(player.getUniqueID());
         CharacterAppearanceSyncManager.broadcastRemoval(player.getUniqueID());
@@ -192,9 +192,9 @@ public final class CharacterPlayerEventHandler {
                         LostTalesMetaData.MOD_ID, player.getUniqueID(),
                         defaultCharacter.getErrorId().getId());
             }
-            // The pledge the played character comes back with, read before
-            // the roster and the appearance go out below.
-            CharacterPledges.refresh(serverPlayer);
+            // The pledge and the title the played character comes back
+            // with, read before the roster and the appearance go out below.
+            CharacterLotrRecord.refresh(serverPlayer);
             // Deleted characters past their retention go before the roster
             // lists the rest.
             CharacterDeletionService.getInstance().purgeExpired(

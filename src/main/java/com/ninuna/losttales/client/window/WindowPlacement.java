@@ -452,9 +452,8 @@ public final class WindowPlacement {
                         int screenWidth, int screenHeight) {
         WindowFrame frame = WindowFrame.find(window.getId());
         if (frame == null || !frame.hasSeenFill()) {
-            Window.ScreenFill fill = ContentView.fillOf(window);
-            return fill == Window.ScreenFill.NONE ? resting
-                    : fillBounds(fill, minecraft, screenWidth, screenHeight);
+            return boundsFor(window, ContentView.fillOf(window), resting,
+                    minecraft, screenWidth, screenHeight);
         }
         WindowPlacement.Box from = frame.fillLegFrom();
         Window.ScreenFill to = frame.fillLegTo();
@@ -463,8 +462,8 @@ public final class WindowPlacement {
             return resting;
         }
         Box start = from == null ? resting : from;
-        Box end = to == Window.ScreenFill.NONE ? resting
-                : fillBounds(to, minecraft, screenWidth, screenHeight);
+        Box end = boundsFor(window, to, resting, minecraft, screenWidth,
+                screenHeight);
         if (share >= 1.0D) {
             return end;
         }
@@ -508,6 +507,65 @@ public final class WindowPlacement {
     }
 
     /**
+     * The box {@code fill} lays a window in: its resting box for none, a
+     * part of the screen, or its own box with its page filling it.
+     */
+    private static Box boundsFor(Window window, Window.ScreenFill fill,
+                                 Box resting, Minecraft minecraft,
+                                 int screenWidth, int screenHeight) {
+        if (fill == Window.ScreenFill.NONE) {
+            return resting;
+        }
+        return fill == Window.ScreenFill.CONTENT
+                ? contentBounds(window, resting, minecraft, screenWidth,
+                        screenHeight)
+                : fillBounds(fill, minecraft, screenWidth, screenHeight);
+    }
+
+    /**
+     * The box a window is laid in while its page fills it
+     * ({@link ContentView}): the box it shows ({@link #shownBox}) with its
+     * row and tool strip above that box's top and its bar below its
+     * bottom, so the page takes the whole of it.
+     */
+    static Box contentBounds(Window window, Box resting, Minecraft minecraft,
+                             int screenWidth, int screenHeight) {
+        Box shown = shownBox(window, resting, minecraft, screenWidth,
+                screenHeight);
+        double room = Math.max(1.0D, shown.height - HISTORY_TOP_MARGIN
+                - lineHeight(minecraft));
+        return new Box(shown.x, shown.y - rowHeight(minecraft), shown.width,
+                heightForRoom(room, minecraft), barHeight(minecraft), room);
+    }
+
+    /**
+     * What a window shows of itself while its page fills it: the box it
+     * stands in otherwise, its own or the part of the screen it fills. The
+     * frame stays round it, a window filling the screen included.
+     */
+    static Box shownBox(Window window, Box resting, Minecraft minecraft,
+                        int screenWidth, int screenHeight) {
+        return window.getFill() == Window.ScreenFill.NONE ? resting
+                : fillBounds(window.getFill(), minecraft, screenWidth,
+                        screenHeight);
+    }
+
+    /**
+     * The box a window shows while its page fills it, or glides to or
+     * from that; null while the window shows its row, strip and bar.
+     */
+    public static Box filledBox(Window window, Minecraft minecraft,
+                                int screenWidth, int screenHeight) {
+        WindowFrame frame = WindowFrame.find(window.getId());
+        if (frame == null || frame.contentShare() <= 0.0F) {
+            return null;
+        }
+        return shownBox(window, restingBounds(window, minecraft,
+                screenWidth, screenHeight), minecraft, screenWidth,
+                screenHeight);
+    }
+
+    /**
      * The box a window fills a part of the screen with: that part of the
      * screen with room for the frame round it, so two windows filling
      * neighbouring parts stand a window gap apart, its lines laid out to its
@@ -520,15 +578,6 @@ public final class WindowPlacement {
         int barHeight = barHeight(minecraft);
         int width = (int)Math.round(boxWidthForChatWidth(
                 fillChatWidth(fill, minecraft, screenWidth), minecraft));
-        if (fill == Window.ScreenFill.CONTENT) {
-            // What the tab holds from the screen's top to its bottom, edge
-            // to edge: the row and the strip above the top, the bar below
-            // the bottom, the frame past the sides.
-            double room = Math.max(1.0D, screenHeight - HISTORY_TOP_MARGIN
-                    - lineHeight(minecraft));
-            return new Box(0.0D, -rowHeight(minecraft), width,
-                    heightForRoom(room, minecraft), barHeight, room);
-        }
         double room = Math.max(1.0D, fill.height(screenHeight)
                 - 2.0D * margin - rowHeight(minecraft) - HISTORY_TOP_MARGIN
                 - barHeight);
@@ -540,10 +589,6 @@ public final class WindowPlacement {
     /** The chat width a window filling {@code fill} is laid out at. */
     static int fillChatWidth(Window.ScreenFill fill, Minecraft minecraft,
                              int screenWidth) {
-        if (fill == Window.ScreenFill.CONTENT) {
-            return Math.max(WindowLayout.MIN_WINDOW_SIZE,
-                    chatWidthForBox(screenWidth, minecraft));
-        }
         return Math.max(WindowLayout.MIN_WINDOW_SIZE, chatWidthForBox(
                 fill.width(screenWidth) - 2 * EDGE_MARGIN,
                 minecraft));
@@ -561,17 +606,29 @@ public final class WindowPlacement {
         int own = chatWidth(window, minecraft);
         WindowFrame frame = WindowFrame.find(window.getId());
         if (frame == null || !frame.hasSeenFill()) {
-            Window.ScreenFill fill = ContentView.fillOf(window);
-            return fill == Window.ScreenFill.NONE ? own
-                    : fillChatWidth(fill, minecraft, screenWidth);
+            return chatWidthFor(window, ContentView.fillOf(window), own,
+                    minecraft, screenWidth);
         }
         WindowPlacement.Box from = frame.fillLegFrom();
         Window.ScreenFill to = frame.fillLegTo();
         int start = from == null ? own
                 : chatWidthForBox(from.width, minecraft);
-        int end = to == Window.ScreenFill.NONE ? own
-                : fillChatWidth(to, minecraft, screenWidth);
+        int end = chatWidthFor(window, to, own, minecraft, screenWidth);
         return (int)Math.round(start + (end - start) * frame.fillShare());
+    }
+
+    /**
+     * The chat width {@code fill} lays a window out at; {@code own} for
+     * none. A page filling its window is laid out to the box the window
+     * shows: its own, or the part of the screen it fills.
+     */
+    private static int chatWidthFor(Window window, Window.ScreenFill fill,
+                                    int own, Minecraft minecraft,
+                                    int screenWidth) {
+        Window.ScreenFill laid = fill == Window.ScreenFill.CONTENT
+                ? window.getFill() : fill;
+        return laid == Window.ScreenFill.NONE ? own
+                : fillChatWidth(laid, minecraft, screenWidth);
     }
 
     /**

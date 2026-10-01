@@ -264,8 +264,7 @@ public final class ChatTabActions {
      * What Ctrl+W closes: the marked tabs while more than one is marked,
      * and the tab being typed in otherwise. The marks always hold the
      * tab in front, so a group closes that one with the rest. A locked
-     * window refuses its tabs either way, so a group holding nothing
-     * closable closes nothing.
+     * window keeps its tabs either way.
      */
     void closeMarkedOrActiveTabs() {
         if (!TabSelection.isGroup()) {

@@ -27,6 +27,7 @@ import com.ninuna.losttales.client.character.ClientLoreCharacterCache;
 import com.ninuna.losttales.client.character.ClientCharacterRacePhysics;
 import com.ninuna.losttales.client.chat.ChatEmojiUsageStore;
 import com.ninuna.losttales.client.chat.ChatSpeechBubbles;
+import com.ninuna.losttales.client.window.ClientSettingsPage;
 import com.ninuna.losttales.client.window.PageContent;
 import com.ninuna.losttales.client.window.WindowPages;
 import com.ninuna.losttales.client.window.WorldPageWatch;
@@ -75,6 +76,7 @@ import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.compat.minecraft.ModDisableabilityAccess;
 import com.ninuna.losttales.config.client.ClientServerConfigCache;
 import com.ninuna.losttales.config.client.LostTalesThirdPersonConfig;
+import com.ninuna.losttales.config.client.ServerSettingsPage;
 import com.ninuna.losttales.entity.npc.LostTalesEntityOdaneGuard;
 import com.ninuna.losttales.entity.npc.LostTalesEntityOdaneMan;
 import com.ninuna.losttales.gui.ELostTalesMapLabels;
@@ -206,10 +208,10 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     /**
      * The quest journal, the party, the map and the characters, each a
      * page a window can hold, with the key that opens it from another
-     * page; the Characters tab's own kinds of sub-window; the Motion Lab,
-     * a page with no key, which needs no world; and the pages that open
-     * only from a thing in the world: a waystone's, a missive board's and
-     * a missive letter's.
+     * page; the Characters tab's own kinds of sub-window; the Motion Lab
+     * and the Server Settings, pages with no key, which need no world;
+     * and the pages that open only from a thing in the world: a
+     * waystone's, a missive board's and a missive letter's.
      */
     private static void registerPages() {
         WindowPages.register(QuestJournalPage.PAGE_ID, "gui.losttales.page.journal",
@@ -258,6 +260,22 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
                     }
                 });
         MotionLabPage.install();
+        WindowPages.register(ClientSettingsPage.PAGE_ID,
+                "gui.losttales.page.client_settings", ClientSettingsPage.ICON,
+                null, new WindowPages.Factory() {
+                    @Override
+                    public PageContent create() {
+                        return new ClientSettingsPage();
+                    }
+                });
+        WindowPages.register(ServerSettingsPage.PAGE_ID,
+                "gui.losttales.page.server_settings", ServerSettingsPage.ICON,
+                null, new WindowPages.Factory() {
+                    @Override
+                    public PageContent create() {
+                        return new ServerSettingsPage();
+                    }
+                });
         // A waystone's page opens only from the waystone: no key, never
         // offered under the +, and gone as the player leaves the world.
         WindowPages.registerWorldPage(WaystonePage.PAGE_ID,

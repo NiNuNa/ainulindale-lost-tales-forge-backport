@@ -15,8 +15,7 @@ import cpw.mods.fml.common.event.FMLServerStoppingEvent;
         name = LostTalesMetaData.MOD_NAME,
         version = LostTalesMetaData.MOD_VERSION,
         dependencies = LostTalesMetaData.MOD_DEPENDENCIES,
-        acceptedMinecraftVersions = LostTalesMetaData.MC_VERSION,
-        guiFactory = LostTalesMetaData.GUI_FACTORY_CLASS
+        acceptedMinecraftVersions = LostTalesMetaData.MC_VERSION
 )
 public class LostTalesMod {
 

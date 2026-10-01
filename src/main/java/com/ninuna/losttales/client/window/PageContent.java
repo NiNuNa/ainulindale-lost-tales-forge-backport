@@ -18,11 +18,13 @@ import net.minecraft.client.Minecraft;
  *
  * <p>The strip is the same as over a conversation, with the page's own
  * parts in it: the button of the page's panel at its left end, where a
- * conversation's timestamp area button stands; the cog, which opens the
- * tab's menu with the page's {@link #choices} in it; and the search well,
- * whose words the page is handed ({@link #search}) and whose count it
- * gives ({@link #found}). A page has no member list, so its strip has no
- * member list button.</p>
+ * conversation's timestamp area button stands; the three dots, which
+ * open the page's options with its {@link #choices} in them; the cog,
+ * which opens the settings of its kind ({@link #settingsPlace}); the
+ * search well, whose words the page is handed ({@link #search}) and whose
+ * count it gives ({@link #found}); and the question mark of its help, its
+ * guide and its keys ({@link #keyAreas}). A page has no member list, so
+ * its strip has no member list button.</p>
  *
  * <p>Every box handed in is in whole GUI pixels, the window having moved
  * the matrix by whatever fraction of a pixel it stands on; the pointer is
@@ -83,30 +85,6 @@ public abstract class PageContent {
         sayRefused(words);
     }
     /**
-     * One row a page puts in its tab's menu; the chosen one is marked, and
-     * one that cannot be taken now is greyed and says why.
-     */
-    public static final class Choice {
-        public final String id;
-        public final String label;
-        public final boolean chosen;
-        /** Why the row cannot be taken now; empty while it can. */
-        public final String unavailable;
-
-        public Choice(String id, String label, boolean chosen) {
-            this(id, label, chosen, "");
-        }
-
-        public Choice(String id, String label, boolean chosen,
-                      String unavailable) {
-            this.id = id;
-            this.label = label == null ? "" : label;
-            this.chosen = chosen;
-            this.unavailable = unavailable == null ? "" : unavailable;
-        }
-    }
-
-    /**
      * The colour the page's tab wears, as a channel's tab wears its
      * channel's: its accent, its glow and its lit name. Ivory for a page
      * with no tone of its own.
@@ -128,18 +106,35 @@ public abstract class PageContent {
     /** The panel's button was pressed. */
     public void togglePanel() {}
 
-    /** The heading over the page's rows in its tab's menu, as a lang key; empty for none. */
-    public String choicesHeading() {
-        return "";
-    }
-
-    /** The rows the page puts in its tab's menu; empty for none. */
-    public List<Choice> choices() {
+    /**
+     * The page's own options: its options menu's rows and its window's
+     * tool strip buttons alike ({@link PageOption}); none by default.
+     */
+    public List<PageOption> options() {
         return Collections.emptyList();
     }
 
-    /** One of its {@link #choices} was taken; the menu stays open. */
-    public void choose(String id) {}
+    /**
+     * One of its {@link #options} taken, by a click or, with {@code back},
+     * a right-click; answers whether the menu stays open. Options are
+     * settings of the page's view, so it does by default.
+     */
+    public boolean takeOption(String id, boolean back) {
+        return true;
+    }
+
+    /**
+     * Where the settings of the page's kind stand, which the tool strip's
+     * cog opens and the page's options offer; null for none.
+     */
+    public Settings.Place settingsPlace() {
+        return null;
+    }
+
+    /** The page's own keys, as its help and the Client Settings page list them; none by default. */
+    public List<PageKeys.Area> keyAreas() {
+        return Collections.emptyList();
+    }
 
     /** What the well says while nothing is typed in it: {@code Search active quests}. */
     public String searchPrompt() {
@@ -222,15 +217,9 @@ public abstract class PageContent {
     /** Once a game tick, while the page is on screen, pinned while playing included: a list that follows the world. */
     public void tick() {}
 
-    /**
-     * Whether the page can be shown now; one that cannot waits in its
-     * window unseen. A page needs a world unless it says otherwise, so on
-     * the screen that stands without one it waits; a page that works
-     * without one — the Motion Lab — answers true here itself, and then
-     * shows over the main menu with Settings.
-     */
+    /** Whether the page can be shown now; one that cannot waits in its window unseen. */
     public boolean isAvailable() {
-        return !WindowScreen.standsWithoutWorld();
+        return true;
     }
 
     /* ---- The quick switcher ---- */

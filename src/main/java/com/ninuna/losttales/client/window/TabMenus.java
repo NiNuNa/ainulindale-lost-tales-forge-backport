@@ -7,28 +7,30 @@ import net.minecraft.util.StatCollector;
 import org.lwjgl.input.Keyboard;
 
 /**
- * The window's own menus: a tab's, behind the tool strip's cog or under a
- * right-click on the tab; a window's, behind the three dots at the end of
- * its row; the {@code +}, listing what can be opened again; the tab
- * search over every tab, open or not; and the quick switcher, the tab
- * search with what the pages find besides. What a tab's menu holds is the
- * tab's own ({@link WindowTab#menuRows}); what can be opened is each
- * system's ({@link ScreenPart#addOpenable}) and the pages no window holds;
- * what a page finds is its own ({@link PageContent#find}).
+ * The window's own menus: a tab's options, behind the three dots on the
+ * tab or under a right-click on it; a window's, Window
+ * Options, behind the three dots at the end of its row; the {@code +},
+ * listing what can be opened again; the tab search over every tab, open
+ * or not; and the quick switcher, the tab search with what the pages find
+ * besides. What a tab's options hold is the tab's own
+ * ({@link WindowTab#options}, which its tool strip also shows as
+ * buttons) and then its kind's settings; what can be
+ * opened is each system's ({@link ScreenPart#addOpenable}) and the pages
+ * no window holds; what a page finds is its own ({@link PageContent#find}).
+ * The tool strip's cog opens the settings of the tab's kind at once.
  */
 final class TabMenus {
-    private static final String ENTRY_DETACH = "window:detach";
-    /** The switch that keeps a tab, or every tab of a window, in every view. */
-    private static final String ENTRY_KEEP = "window:keep";
-    /** The switch that pins a tab, or a whole window, to the screen while playing. */
-    private static final String ENTRY_PIN = "window:pin";
+    /** The switch that pins a window to the HUD, where it stays while playing. */
+    private static final String ENTRY_PIN_HUD = "window:pin_hud";
+    /** The switch that pins a window to the GUI, where every view shows it. */
+    private static final String ENTRY_PIN_GUI = "window:pin_gui";
     /** Marks a search row that jumps to a tab already open. */
     private static final String ENTRY_OPEN_PREFIX = "open:";
     /** Marks a row a page found: this, the page's id, a colon, and the row's own id. */
     private static final String ENTRY_FIND_PREFIX = "find:";
     private static final String ENTRY_WINDOW_RESET = "window_reset";
-    /** The window menu's last row, which opens Settings beside it. */
-    private static final String ENTRY_SETTINGS = "settings";
+    /** Marks a row that opens settings beside its menu: this and the place's name. */
+    private static final String SETTINGS_PREFIX = "settings:";
 
     private final WindowScreen screen;
     private final WindowMenus menus;
@@ -43,17 +45,18 @@ final class TabMenus {
                 SubWindowKind.TAB_SEARCH));
         menus.register(SubWindowKind.SWITCHER, new SearchSource(
                 SubWindowKind.SWITCHER));
+        menus.register(SubWindowKind.HELP, new HelpSource());
     }
 
     /* ---- What opens them ---- */
 
     /**
-     * The tab's menu, behind its cog on the tool strip — a switch, as the
-     * cog is — or under a right-click on the tab, which only opens it or
-     * turns it to the tab: the tab's own rows, and a window of its own for
-     * it. Closing is the cross on the tab and nothing else: a row that
-     * only repeats the button beside it is a second way to lose a tab by
-     * accident.
+     * The tab's options, behind the three dots on the tab — a switch, as
+     * the dots are — or under a right-click on the tab, which only opens
+     * it or turns it to the tab: the tab's own options, then the row that
+     * opens its kind's settings. Closing is the cross on the tab
+     * and nothing else: a row that only repeats the button beside it is a
+     * second way to lose a tab by accident.
      */
     void showTabMenu(WindowTab tab, SubWindowAnchor anchor, boolean toggle) {
         if (tab != null && hasRows(tab)) {
@@ -63,13 +66,95 @@ final class TabMenus {
     }
 
     /**
-     * Whether a tab's menu holds anything: the tab's own rows, keeping it
-     * in every view and pinning it, or a window of its own for it. The cog
-     * of one that holds nothing stays, greyed, and no menu opens for it.
+     * Whether a tab's options hold anything: the page's own choices, or
+     * the settings of its kind. The dots of one that holds nothing stay,
+     * greyed, and no menu opens for it.
      */
     static boolean hasRows(WindowTab tab) {
-        return tab.hasMenuRows() || WindowLayout.staysPut(tab)
-                || offersDetach(tab);
+        return tab.hasOptions() || tab.settingsPlace() != null;
+    }
+
+    /**
+     * The settings of the tab's kind, behind the tool strip's cog, hung
+     * from it: a switch, as the cog is. Every conversation opens the one
+     * Chat Settings. A tab of no kind with settings opens nothing.
+     */
+    void toggleSettings(WindowTab tab, SubWindowAnchor anchor) {
+        Settings.Place place = tab == null ? null : tab.settingsPlace();
+        if (place != null) {
+            this.screen.settings().toggle(place,
+                    WindowMenus.hangingFrom(anchor));
+        }
+    }
+
+    /**
+     * The tab's help, hung from the question mark pressed, else — from
+     * F1 — in the middle of its window: a switch, as the question mark is.
+     */
+    void toggleHelp(WindowTab tab, SubWindowAnchor anchor) {
+        if (tab == null) {
+            return;
+        }
+        Window window = WindowLayout.windowOf(tab);
+        this.menus.show(SubWindowKind.HELP, tab, anchor != null
+                        ? WindowMenus.hangingFrom(anchor)
+                        : WindowMenus.centredIn(window == null ? null
+                                : window.getId()), true);
+    }
+
+    /** Whether the tab's help is out, which lights its question mark. */
+    boolean helpOut(WindowTab tab) {
+        return tab != null && this.menus.isOpenFor(SubWindowKind.HELP, tab);
+    }
+
+    /** Whether the tab's options are out, which lights the three dots on the tab. */
+    boolean optionsOut(WindowTab tab) {
+        return tab != null && this.menus.isOpenFor(SubWindowKind.TAB, tab);
+    }
+
+    /** Whether the settings of the tab's kind are out, which lights its cog. */
+    boolean settingsOut(WindowTab tab) {
+        Settings.Place place = tab == null ? null : tab.settingsPlace();
+        return place != null
+                && this.menus.isOpenFor(SubWindowKind.SETTINGS, place);
+    }
+
+    /** The row that opens a place's settings beside the menu it stands in. */
+    private static MenuWindow.Entry settingsRow(Settings.Place place) {
+        return new MenuWindow.Entry(SETTINGS_PREFIX + place.name(),
+                StatCollector.translateToLocal(place.titleKey)).withSprite(
+                LostTalesUiSheet.COG, LostTalesUiSheet.COG_HOVER, false);
+    }
+
+    /**
+     * A tab's options as its menu lists them: each its row, a hairline
+     * between two groups, and a group's heading over it where it has one.
+     */
+    static List<MenuWindow.Entry> optionRows(List<PageOption> options) {
+        List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
+        String group = null;
+        for (PageOption option : options) {
+            if (!option.group().equals(group)) {
+                if (group != null) {
+                    rows.add(MenuWindow.Entry.separator());
+                }
+                group = option.group();
+                if (option.headingKey().length() > 0) {
+                    rows.add(MenuWindow.Entry.header(
+                            StatCollector.translateToLocal(option.headingKey())));
+                }
+            }
+            rows.add(option.row());
+        }
+        return rows;
+    }
+
+    /** A settings row taken: its settings open beside the menu, or go away while they are out. */
+    private void toggleSettingsBeside(MenuWindow.Entry entry,
+                                      SubWindow menuWindow) {
+        this.screen.settings().toggle(Settings.Place.valueOf(
+                entry.id.substring(SETTINGS_PREFIX.length())),
+                WindowMenus.besideWindow(menuWindow));
     }
 
     /** A switch row named by {@code labelKey}, reading On or Off. */
@@ -82,33 +167,23 @@ final class TabMenus {
                         : "gui.losttales.window.settings.off"));
     }
 
-    /** Whether every tab of the window that can be kept is kept in every view. */
-    private static boolean isKept(Window window) {
-        boolean any = false;
-        for (WindowTab tab : window.getTabs()) {
-            if (WindowLayout.staysPut(tab)) {
-                if (!WindowLayout.isKept(tab)) {
-                    return false;
-                }
-                any = true;
-            }
-        }
-        return any;
-    }
-
-    /** Whether the tab's menu offers it a window of its own: its window holds another tab. */
-    static boolean offersDetach(WindowTab tab) {
-        Window window = WindowLayout.windowOf(tab);
-        return window != null && window.getTabs().size() > 1;
+    /** A row that changes a window's place or its tabs: greyed while the window is locked, {@code whyKey} saying why. */
+    private static MenuWindow.Entry heldWhileLocked(MenuWindow.Entry row,
+                                                    Window window,
+                                                    String whyKey) {
+        return window != null && window.isLocked()
+                ? row.unavailable(StatCollector.translateToLocal(whyKey))
+                : row;
     }
 
     /**
-     * The window's own menu, behind the three dots at the end of its row —
-     * a switch, as the dots are — or under a right-click on the strip: the
-     * settings a window has that nothing else on the row offers. Locking
+     * The window's own menu, Window Options, behind the three dots at the
+     * end of its row — a switch, as the dots are — or under a right-click
+     * on the row or the tool strip anywhere but a tab or the tool strip's
+     * dots: what a window has that nothing else on the row offers. Locking
      * and closing are not among them, since the padlock and the cross
-     * stand beside the dots. Reset Window puts it back as it first opened.
-     * Its last row opens Settings beside it.
+     * stand beside the dots. Its two pins come first, then Reset Window
+     * Layout, and last Window Settings, which opens beside it.
      */
     void showWindowMenu(Window window, SubWindowAnchor anchor,
                         boolean toggle) {
@@ -182,14 +257,6 @@ final class TabMenus {
     }
 
     /* ---- The rows ---- */
-
-    /** The window menu's name: its tab in front, which names it on its row. */
-    private static String windowTitle(Window window) {
-        WindowTab front = window == null ? null : WindowFrame.activeTab(
-                window, WindowFrame.visibleTabs(window));
-        return front == null ? null : StatCollector.translateToLocalFormatted(
-                "gui.losttales.window.sub.window_of", front.title());
-    }
 
     /**
      * What can be opened again: each system's closed tabs, then the pages
@@ -292,9 +359,10 @@ final class TabMenus {
     /**
      * One row of the {@code +} or of the tab search: the tab joins the
      * window the menu was opened for, or — when that window is gone — the
-     * first window, or a window of its own when none is left; a page with
-     * no window to join opens where it last stood. The tab then takes the
-     * keys.
+     * first window, or a window of its own when none is left. A locked
+     * window takes nothing: asked of one, a page opens where it last
+     * stood, and a conversation in an unlocked window of conversations,
+     * else in a window of its own. The tab then takes the keys.
      */
     private void openFromMenu(String windowId, MenuWindow.Entry entry) {
         open(windowId, WindowTab.fromId(entry.id));
@@ -308,9 +376,9 @@ final class TabMenus {
         if (target == null) {
             target = WindowLayout.firstWindow();
         }
-        if (tab instanceof PageTab && target == null) {
+        if (tab instanceof PageTab && (target == null || target.isLocked())) {
             WindowLayout.showPage((PageTab)tab);
-            this.screen.focusPage((PageTab)tab);
+            this.screen.jumpToTab(tab);
             return;
         }
         WindowTab opened = target == null
@@ -323,7 +391,10 @@ final class TabMenus {
 
     /* ---- The sources ---- */
 
-    /** A tab's menu: the tab's own rows, and a window of its own for it. */
+    /**
+     * A tab's options, named as its dots are: the page's own choices, a
+     * hairline, and the row that opens the settings of its kind.
+     */
     private final class TabSource extends WindowMenus.Source {
         @Override
         public boolean stillStands(MenuWindow menu) {
@@ -334,44 +405,105 @@ final class TabMenus {
         @Override
         public void rebuild(MenuWindow menu) {
             WindowTab tab = (WindowTab)menu.about();
-            menu.setTitle(tab.title(), LostTalesUiSheet.COG);
-            List<MenuWindow.Entry> rows =
-                    new ArrayList<MenuWindow.Entry>(tab.menuRows());
-            if (WindowLayout.staysPut(tab)) {
-                rows.add(switchRow(ENTRY_KEEP,
-                        "gui.losttales.window.tab.keep",
-                        WindowLayout.isKept(tab)));
-                rows.add(switchRow(ENTRY_PIN, "gui.losttales.window.tab.pin",
-                        WindowLayout.isPinned(tab)));
-            }
-            // A layout action the row may have no room for: a window of
-            // its own, offered whenever the layout would allow it.
-            if (offersDetach(tab)) {
-                rows.add(new MenuWindow.Entry(ENTRY_DETACH,
-                        StatCollector.translateToLocal(
-                                "gui.losttales.window.tab.detach")));
+            menu.setTitle(tab.optionsTitle(), LostTalesUiSheet.MORE);
+            List<MenuWindow.Entry> rows = optionRows(tab.options());
+            if (tab.settingsPlace() != null) {
+                if (!rows.isEmpty()) {
+                    rows.add(MenuWindow.Entry.separator());
+                }
+                rows.add(settingsRow(tab.settingsPlace()));
             }
             menu.setRows(rows);
         }
 
-        /** The tab's switches stay; its actions and the detach are done with it. */
+        /**
+         * The settings row opens its settings beside the menu, which
+         * stays; the rest are the tab's: its switches stay, its actions
+         * are done with it.
+         */
         @Override
         public boolean act(MenuWindow menu, MenuWindow.Entry entry,
                            SubWindow window, boolean back) {
+            if (entry.id.startsWith(SETTINGS_PREFIX)) {
+                if (!back) {
+                    toggleSettingsBeside(entry, window);
+                }
+                return true;
+            }
+            return ((WindowTab)menu.about()).takeOption(entry.id, back);
+        }
+
+        @Override
+        public boolean takesBack() {
+            return true;
+        }
+    }
+
+    /**
+     * A tab's help, named as its question mark is: the guide, a hairline,
+     * then the tab's own keys and the keys every page shares, under a
+     * field that finds keys by their words or their names. While words
+     * stand in the field the guide steps aside.
+     */
+    private final class HelpSource extends WindowMenus.Source {
+        /** Rows the help opens with at most; it reads, so it opens taller than a menu. */
+        private static final int VISIBLE_ROWS = 20;
+
+        @Override
+        public boolean stillStands(MenuWindow menu) {
+            return menu.about() instanceof WindowTab
+                    && WindowLayout.isOpen((WindowTab)menu.about());
+        }
+
+        @Override
+        public void prepare(MenuWindow menu) {
+            menu.openField(StatCollector.translateToLocal(
+                            "gui.losttales.window.help.search"),
+                    new int[] {Keyboard.KEY_F1}, LostTalesUiSheet.SEARCH,
+                    MenuWindow.MAX_FILTER_LENGTH, false);
+            menu.setRowHeight(MenuWindow.TALL_ROW_HEIGHT);
+            menu.setVisibleRows(VISIBLE_ROWS);
+        }
+
+        @Override
+        public void rebuild(MenuWindow menu) {
             WindowTab tab = (WindowTab)menu.about();
-            if (ENTRY_DETACH.equals(entry.id)) {
-                TabMenus.this.screen.detachTab(tab);
-                return false;
+            menu.setTitle(StatCollector.translateToLocalFormatted(
+                    "gui.losttales.window.help.title", tab.title()),
+                    LostTalesUiSheet.QUESTION);
+            PageHelp help = tab.help();
+            List<PageKeys.Area> areas =
+                    new ArrayList<PageKeys.Area>(help.areas);
+            areas.addAll(PageKeys.windowAreas());
+            String filter = menu.filter().trim();
+            List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
+            if (filter.length() == 0) {
+                for (String paragraph : help.guide) {
+                    rows.add(MenuWindow.Entry.note(paragraph));
+                }
+                if (!rows.isEmpty()) {
+                    rows.add(MenuWindow.Entry.separator());
+                }
             }
-            if (ENTRY_KEEP.equals(entry.id)) {
-                WindowLayout.setKept(tab, !WindowLayout.isKept(tab));
-                return true;
+            List<MenuWindow.Entry> keys = PageKeys.rows(areas, filter);
+            if (keys.isEmpty()) {
+                rows.add(MenuWindow.Entry.passive(StatCollector.translateToLocal(
+                        "gui.losttales.window.help.none")));
             }
-            if (ENTRY_PIN.equals(entry.id)) {
-                WindowLayout.setPinned(tab, !WindowLayout.isPinned(tab));
-                return true;
-            }
-            return tab.takeMenuRow(entry.id, back);
+            rows.addAll(keys);
+            menu.setRows(rows);
+        }
+
+        @Override
+        public boolean readsAsTyped() {
+            return true;
+        }
+
+        /** Nothing in a help is taken: it is read. */
+        @Override
+        public boolean act(MenuWindow menu, MenuWindow.Entry entry,
+                           SubWindow window, boolean back) {
+            return true;
         }
     }
 
@@ -387,59 +519,58 @@ final class TabMenus {
         @Override
         public void rebuild(MenuWindow menu) {
             Window window = WindowLayout.window((String)menu.about());
-            menu.setTitle(windowTitle(window), LostTalesUiSheet.MORE);
-            List<MenuWindow.Entry> entries = new ArrayList<MenuWindow.Entry>(2);
+            menu.setTitle(StatCollector.translateToLocal(
+                    "gui.losttales.window.menu"), LostTalesUiSheet.MORE);
+            List<MenuWindow.Entry> entries = new ArrayList<MenuWindow.Entry>(6);
             if (window != null) {
-                entries.add(switchRow(ENTRY_KEEP,
-                        "gui.losttales.window.menu.keep", isKept(window)));
-                entries.add(switchRow(ENTRY_PIN,
-                        "gui.losttales.window.menu.pin", window.isPinned()));
-                entries.add(new MenuWindow.Entry(ENTRY_WINDOW_RESET,
-                        StatCollector.translateToLocal(
-                                "gui.losttales.window.menu.reset")));
-                entries.add(new MenuWindow.Entry(ENTRY_SETTINGS,
-                        StatCollector.translateToLocal(
-                                "gui.losttales.window.menu.settings"))
-                        .withSprite(LostTalesUiSheet.COG,
-                                LostTalesUiSheet.COG_HOVER, false));
+                entries.add(switchRow(ENTRY_PIN_HUD,
+                        "gui.losttales.window.menu.pin_hud",
+                        window.isPinnedToHud()));
+                entries.add(switchRow(ENTRY_PIN_GUI,
+                        "gui.losttales.window.menu.pin_gui",
+                        window.isPinnedToGui()));
+                entries.add(MenuWindow.Entry.separator());
+                entries.add(heldWhileLocked(new MenuWindow.Entry(
+                        ENTRY_WINDOW_RESET, StatCollector.translateToLocal(
+                                "gui.losttales.window.menu.reset")), window,
+                        "gui.losttales.window.locked.reset"));
+                entries.add(MenuWindow.Entry.separator());
+                entries.add(settingsRow(Settings.Place.WINDOWS));
             }
             menu.setRows(entries);
         }
 
         /**
-         * Settings opens beside the menu, or goes away while it is out,
-         * and the menu stays; the rest are done with it.
+         * Window Settings opens beside the menu, or goes away while it is
+         * out, and the menu stays; so do the pins; the rest are done with
+         * it.
          */
         @Override
         public boolean act(MenuWindow menu, MenuWindow.Entry entry,
                            SubWindow menuWindow, boolean back) {
-            if (ENTRY_SETTINGS.equals(entry.id)) {
-                TabMenus.this.menus.show(SubWindowKind.SETTINGS, null,
-                        WindowMenus.besideWindow(menuWindow), true);
+            if (entry.id.startsWith(SETTINGS_PREFIX)) {
+                if (!back) {
+                    toggleSettingsBeside(entry, menuWindow);
+                }
                 return true;
             }
             Window window = WindowLayout.window((String)menu.about());
             if (window == null) {
                 return false;
             }
-            if (ENTRY_KEEP.equals(entry.id)) {
-                // A switch for the whole window: every tab it holds is
-                // kept in every view, or none is.
-                boolean keep = !isKept(window);
-                for (WindowTab tab : window.getTabs()) {
-                    if (WindowLayout.staysPut(tab)) {
-                        WindowLayout.setKept(tab, keep);
-                    }
-                }
+            if (ENTRY_PIN_HUD.equals(entry.id)) {
+                WindowLayout.setPinnedToHud(window.getId(),
+                        !window.isPinnedToHud());
                 return true;
             }
-            if (ENTRY_PIN.equals(entry.id)) {
-                WindowLayout.setWindowPinned(window.getId(),
-                        !window.isPinned());
+            if (ENTRY_PIN_GUI.equals(entry.id)) {
+                WindowLayout.setPinnedToGui(window.getId(),
+                        !window.isPinnedToGui());
                 return true;
             }
-            if (ENTRY_WINDOW_RESET.equals(entry.id)) {
-                WindowLayout.resetWindow(window.getId());
+            if (ENTRY_WINDOW_RESET.equals(entry.id)
+                    && WindowLayout.resetWindow(window.getId())) {
+                ContentView.leave(window);
             }
             return false;
         }

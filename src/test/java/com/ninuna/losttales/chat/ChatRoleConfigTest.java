@@ -45,6 +45,39 @@ public final class ChatRoleConfigTest {
         ChatRoleCatalog.installServer(null);
     }
 
+    /**
+     * An option an entry's kind does not read is reported and ignored,
+     * and the default stands: {@code color:} is not {@code colour:}.
+     */
+    @Test
+    public void anOptionNoEntryReadsIsReported() {
+        ChatRoleCatalog catalog = ChatRoleConfig.parse(new String[] {
+                "operator=name:Operator;tag:[Operator];color:A94B54;rank:10",
+                "herald=name:Herald;colour:A94B54",
+        }, null, collect);
+        assertEquals(2, warnings.size());
+        assertTrue(warnings.get(0), warnings.get(0).contains("'tag'"));
+        assertTrue(warnings.get(1), warnings.get(1).contains("'color'"));
+        assertEquals(0xA94B54, catalog.byId("herald").getColor());
+        assertFalse("the misspelt colour is not read",
+                catalog.byId("operator").getColor() == 0xA94B54);
+        warnings.clear();
+        ChatRoleConfig.parseGates(new String[] {
+                "operator=read:herald;write:herald"}, catalog, collect);
+        assertEquals(1, warnings.size());
+        assertTrue(warnings.get(0), warnings.get(0).contains("'write'"));
+        warnings.clear();
+        ChatRoleConfig.parsePermissions(new String[] {
+                "keeper=capability:chat.moderate;grants:chat.narrate"}, collect);
+        assertEquals(1, warnings.size());
+        assertTrue(warnings.get(0), warnings.get(0).contains("'grants'"));
+        warnings.clear();
+        ChatRoleConfig.parseChannelDefinitions(new String[] {
+                "trade=name:Trade;rule:everyone;color:C9A227"}, collect);
+        assertEquals(1, warnings.size());
+        assertTrue(warnings.get(0), warnings.get(0).contains("'color'"));
+    }
+
     /** A role's icon is written as a channel's is, read back and written out again. */
     @Test
     public void aRoleWearsTheIconItsEntryNames() {

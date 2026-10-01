@@ -49,6 +49,22 @@ final class ChatHeadMarker {
                 + ':' + ChatColorMarkers.hex(nameColor);
     }
 
+    /**
+     * A character speaking in the Narrator's voice, as an action does: the
+     * head wears the Narrator's mark, and still names the character, so a
+     * click on it or on the name in the words opens that character's card.
+     */
+    static String encodeVoiced(UUID senderId, UUID characterId,
+                               String skinId, String copyText,
+                               int titleColor, int nameColor) {
+        return PREFIX + senderId + ":V:"
+                + (characterId == null ? "" : characterId.toString())
+                + ':' + encodeText(skinId)
+                + ':' + encodeText(copyText)
+                + ':' + ChatColorMarkers.hex(titleColor)
+                + ':' + ChatColorMarkers.hex(nameColor);
+    }
+
     /** NPC variant: the skin field carries the entity's texture path. */
     static String encodeNpc(UUID npcId, String texturePath,
                             String copyText, int titleColor,
@@ -84,7 +100,8 @@ final class ChatHeadMarker {
             UUID senderId = UUID.fromString(
                     value.substring(start, separator));
             char identity = value.charAt(separator + 1);
-            if (identity != 'A' && identity != 'C' && identity != 'N') {
+            if (identity != 'A' && identity != 'C' && identity != 'N'
+                    && identity != 'V') {
                 return null;
             }
             String[] fields = value.substring(separator + 3)
@@ -92,12 +109,13 @@ final class ChatHeadMarker {
             if (fields.length != 5) {
                 return null;
             }
-            UUID characterId = identity != 'C' || fields[0].length() == 0
+            UUID characterId = (identity != 'C' && identity != 'V')
+                    || fields[0].length() == 0
                     ? null : UUID.fromString(fields[0]);
             return new Data(senderId, identity == 'A', identity == 'N',
                     characterId, decodeText(fields[1]),
                     decodeText(fields[2]), parseColor(fields[3]),
-                    parseColor(fields[4]), false, avatar);
+                    parseColor(fields[4]), false, avatar, identity == 'V');
         } catch (IllegalArgumentException ignored) {
             return null;
         }
@@ -173,7 +191,7 @@ final class ChatHeadMarker {
      */
     static Data colorsOnly(int nameColor, int titleColor) {
         return new Data(null, false, false, null, "", "", titleColor,
-                nameColor, false, false);
+                nameColor, false, false, false);
     }
 
     /**
@@ -203,6 +221,12 @@ final class ChatHeadMarker {
          * window's timestamp area rather than in the row.
          */
         final boolean avatar;
+        /**
+         * Whether a character speaks here in the Narrator's voice: an
+         * action's head, which wears the Narrator's mark and still names
+         * the character.
+         */
+        final boolean voiced;
         final String skinId;
         final String copyText;
         final int titleColor;
@@ -231,9 +255,10 @@ final class ChatHeadMarker {
                             this.senderId);
         }
 
-        /** Whether the line is the Narrator's: its head slot holds the Narrator's mark. */
+        /** Whether the line is in the Narrator's voice: its head slot holds the Narrator's mark. */
         boolean isNarrator() {
-            return !this.accountIdentity && ChatNarrator.isNarratorSkin(this.skinId);
+            return this.voiced || (!this.accountIdentity
+                    && ChatNarrator.isNarratorSkin(this.skinId));
         }
 
         /**
@@ -260,7 +285,7 @@ final class ChatHeadMarker {
         static Data head(UUID senderId, boolean accountIdentity,
                          boolean npcIdentity, String skinId) {
             return new Data(senderId, accountIdentity, npcIdentity, null,
-                    skinId, "", 0, 0, true, false);
+                    skinId, "", 0, 0, true, false, false);
         }
 
         /**
@@ -272,7 +297,7 @@ final class ChatHeadMarker {
                            UUID characterId, String skinId) {
             return new Data(senderId, accountIdentity, false,
                     accountIdentity ? null : characterId, skinId, "", 0, 0,
-                    false, false);
+                    false, false, false);
         }
 
         /**
@@ -281,19 +306,20 @@ final class ChatHeadMarker {
          */
         static Data npc(UUID npcId, String portrait) {
             return new Data(npcId, false, true, null, portrait, "", 0, 0,
-                    false, false);
+                    false, false, false);
         }
 
         private Data(UUID senderId, boolean accountIdentity,
                      boolean npcIdentity, UUID characterId, String skinId,
                      String copyText, int titleColor, int nameColor,
-                     boolean quoted, boolean avatar) {
+                     boolean quoted, boolean avatar, boolean voiced) {
             this.senderId = senderId;
             this.accountIdentity = accountIdentity;
             this.npcIdentity = npcIdentity;
             this.characterId = characterId;
             this.quoted = quoted;
             this.avatar = avatar;
+            this.voiced = voiced;
             this.skinId = skinId == null ? "" : skinId;
             this.copyText = copyText == null ? "" : copyText;
             this.titleColor = titleColor & 0xFFFFFF;

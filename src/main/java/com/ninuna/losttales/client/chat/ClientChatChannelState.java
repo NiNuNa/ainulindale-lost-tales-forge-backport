@@ -196,6 +196,17 @@ public final class ClientChatChannelState {
         return isSelectable(lastUsed) ? lastUsed : null;
     }
 
+    /**
+     * Makes {@code tab} the conversation last used again while
+     * {@code visited} is: what the chat's key comes back to after a visit
+     * that was not the player's pick, as the command key's to the console.
+     */
+    public static synchronized void comeBackTo(ChatTab tab, ChatTab visited) {
+        if (visited != null && visited.equals(lastUsed) && isSelectable(tab)) {
+            lastUsed = tab;
+        }
+    }
+
     private static void choose(ChatTab tab) {
         selected = tab;
         lastUsed = tab;

@@ -85,6 +85,7 @@ public final class CharacterNbtCodec {
     private static final String TAG_PLEDGED_FACTION_ID = "PledgedFactionId";
     private static final String TAG_CREATION_TIMESTAMP = "CreationTimestamp";
     private static final String TAG_FACTION_SINCE = "FactionSince";
+    private static final String TAG_LOTR_TITLE = "LotrTitle";
 
     private static final int MAX_REASONABLE_AGE = 100000;
     private static final int MAX_STABLE_IDENTIFIER_LENGTH = 64;
@@ -277,6 +278,7 @@ public final class CharacterNbtCodec {
         tag.setString(TAG_PLEDGED_FACTION_ID, character.getPledgedFactionId());
         tag.setLong(TAG_CREATION_TIMESTAMP, character.getCreationTimestamp());
         tag.setLong(TAG_FACTION_SINCE, character.getFactionSince());
+        tag.setString(TAG_LOTR_TITLE, character.getLotrTitle());
         return tag;
     }
 
@@ -820,12 +822,25 @@ public final class CharacterNbtCodec {
             repaired = true;
         }
 
+        // The LOTR title the character last wore; a record without one,
+        // or with one that holds colour codes or runs too long, keeps
+        // what is left of it.
+        boolean hasLotrTitle = tag.hasKey(TAG_LOTR_TITLE,
+                Constants.NBT.TAG_STRING);
+        String storedLotrTitle = hasLotrTitle
+                ? tag.getString(TAG_LOTR_TITLE) : "";
+        String lotrTitle = RoleplayCharacter.normalizeTitle(storedLotrTitle);
+        if (!hasLotrTitle || !lotrTitle.equals(storedLotrTitle)) {
+            repaired = true;
+        }
+
         RoleplayCharacter character = RoleplayCharacter
                 .builder(characterId, characterOwnerId)
                 .slot(slotIndex).name(name).race(raceId).gender(genderId)
                 .skin(skinId).age(age).startingFaction(startingFactionId)
                 .pledgedFaction(pledgedFactionId)
                 .factionSince(factionSince)
+                .lotrTitle(lotrTitle)
                 .createdAt(creationTimestamp)
                 .minecraftCapeVisible(showMinecraftCape)
                 .cosmeticCape(cosmeticCapeId)

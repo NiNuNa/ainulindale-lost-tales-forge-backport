@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatNarrator;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.network.packet.ChatPacketFixtures;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
@@ -351,10 +352,10 @@ public final class ChatLineWrapperTest {
             assertEquals(header, plain(lines.get(0)));
             assertNull(indentMarker(lines.get(0)));
             assertTrue(plain(lines.get(1)).startsWith(
-                    ChatLineWrapper.BODY_SEPARATOR));
+                    ChatLineMark.SAID.separator));
             assertEquals(-1, indentOf(lines.get(1), chatOpen));
             int separator = METRICS.width(
-                    ChatLineWrapper.BODY_SEPARATOR);
+                    ChatLineMark.SAID.separator);
             for (int index = 2; index < lines.size(); index++) {
                 assertEquals(separator,
                         indentOf(lines.get(index), chatOpen));
@@ -387,10 +388,10 @@ public final class ChatLineWrapperTest {
             // No header row: the chevron opens the row the line is
             // already on, and the wrapped rest is inset by it.
             assertTrue(plain(lines.get(0)).startsWith(
-                    ChatLineWrapper.BODY_SEPARATOR));
+                    ChatLineMark.SAID.separator));
             assertEquals(-1, indentOf(lines.get(0), chatOpen));
             int separator = METRICS.width(
-                    ChatLineWrapper.BODY_SEPARATOR);
+                    ChatLineMark.SAID.separator);
             for (int index = 1; index < lines.size(); index++) {
                 assertEquals(separator,
                         indentOf(lines.get(index), chatOpen));
@@ -399,13 +400,13 @@ public final class ChatLineWrapperTest {
     }
 
     /**
-     * A command echo opens its body behind the chevron in the sender's
-     * colour, as a message does, and every continuation of it is inset
-     * by the chevron. The command is the body's own text: a copy reads
-     * it as typed, and the chevron adds nothing to it.
+     * A command echo opens its body behind the command mark in the
+     * sender's colour, as a message does behind its chevron, and every
+     * continuation of it is inset by the mark. The mark stands for the
+     * command's slash, so the words follow without it.
      */
     @Test
-    public void commandEchoesOpenTheBodyBehindTheChevron() {
+    public void commandEchoesOpenTheBodyBehindTheCommandMark() {
         String command = "/losttales mapmarker add a marker with a "
                 + "name long enough to wrap around the window";
         IChatComponent line = LostTalesChatPresentation.build(
@@ -423,25 +424,24 @@ public final class ChatLineWrapperTest {
                     : "Global Chat: <  Arathorn> ";
             assertEquals(header, plain(lines.get(0)));
             assertTrue(plain(lines.get(1)).startsWith(
-                    ChatLineWrapper.BODY_SEPARATOR + "/losttales"));
+                    ChatLineMark.COMMAND.separator + "losttales"));
             assertEquals(-1, indentOf(lines.get(1), chatOpen));
             int separator = METRICS.width(
-                    ChatLineWrapper.BODY_SEPARATOR);
+                    ChatLineMark.COMMAND.separator);
             for (int index = 2; index < lines.size(); index++) {
                 assertEquals(separator,
                         indentOf(lines.get(index), chatOpen));
             }
-            // The command reads back as typed; the chevron adds
-            // nothing.
-            assertEquals(header.trim() + " " + command,
+            // The words are the command without its slash.
+            assertEquals(header.trim() + " " + command.substring(1),
                     joinedText(lines));
-            // The chevron carries the sender's colour.
+            // The mark carries the sender's colour.
             Integer color = null;
             for (Object value : lines.get(1)) {
                 IChatComponent part = (IChatComponent)value;
                 if (ChatBodyMarker.isMarker(part)) {
                     color = ChatBodyMarker.decode(part);
-                    assertEquals(ChatLineWrapper.BODY_SEPARATOR,
+                    assertEquals(ChatLineMark.COMMAND.separator,
                             part.getUnformattedTextForChat());
                 }
             }
@@ -529,7 +529,7 @@ public final class ChatLineWrapperTest {
             }
         }
         assertNotNull("the body opens with no chevron", chevron);
-        assertEquals(ChatLineWrapper.BODY_SEPARATOR,
+        assertEquals(ChatLineMark.SAID.separator,
                 chevron.getUnformattedTextForChat());
         // The sender's name colour, exactly as the packet gave it
         // (the packet names its title colour first).
@@ -545,13 +545,14 @@ public final class ChatLineWrapperTest {
     }
 
     /**
-     * An action is one sentence: its speaker's name opens its words on
-     * the row the header is on, behind no chevron, all in italics. No row
-     * names the speaker, so an open window draws no name row and no
-     * avatar for it, and the name's span ends where the words begin.
+     * An action is the Narrator's to tell: it stands under the Narrator's
+     * name row, whose head wears the Narrator's mark and still names the
+     * speaker, and its words open behind the action mark in parchment
+     * with the speaker's name, all in italics. The name's span ends where
+     * the words begin.
      */
     @Test
-    public void anActionIsOneSentenceBehindNoChevron() {
+    public void anActionStandsUnderTheNarrator() {
         IChatComponent message = build(
                 ChatPacketFixtures.line(ChatChannel.GLOBAL, "Aldric", "Steve",
                         "draws his sword.").colors(0x55AA55, 0x336633).build()
@@ -560,30 +561,40 @@ public final class ChatLineWrapperTest {
             List<IChatComponent> lines = ChatLineWrapper.wrap(METRICS,
                     message, 400, open, 1.0F, 1.0F, 1.0F, null);
             assertNotNull(lines);
-            assertEquals(1, lines.size());
-            IChatComponent row = lines.get(0);
+            assertEquals(2, lines.size());
+            IChatComponent header = lines.get(0);
+            assertTrue(ChatLayoutMarker.isHeaderRow(header));
+            assertTrue(words(header), words(header).contains(
+                    ChatNarrator.NAME));
+            assertFalse(words(header), words(header).contains("Aldric"));
+            ChatHeadMarker.Data head = ChatHeadMarker.of(header);
+            assertNotNull(head);
+            assertTrue(head.voiced);
+            assertTrue(head.isNarrator());
+            assertEquals(open, head.avatar);
+            IChatComponent row = lines.get(1);
             assertTrue(ChatLayoutMarker.isBodyRow(row));
-            assertFalse(ChatLayoutMarker.isHeaderRow(row));
-            assertNull(ChatAvatar.of(row));
             assertTrue(words(row), words(row).endsWith(
                     "Aldric draws his sword."));
             boolean spanEnds = false;
+            Integer markColour = null;
             for (Object value : row) {
                 IChatComponent part = (IChatComponent)value;
-                assertFalse("no chevron", ChatBodyMarker.isMarker(part));
-                spanEnds |= ChatLayoutMarker.isSpanEnd(part);
                 String text = part.getUnformattedTextForChat();
+                if (ChatBodyMarker.isMarker(part)) {
+                    assertEquals(ChatLineMark.ACTION.separator, text);
+                    markColour = ChatBodyMarker.decode(part);
+                    continue;
+                }
+                spanEnds |= ChatLayoutMarker.isSpanEnd(part);
                 if (text.trim().length() > 0 && ("Aldric".equals(text)
                         || text.contains("sword"))) {
                     assertTrue(text, part.getChatStyle().getItalic());
                 }
             }
             assertTrue(spanEnds);
-            // The head stands in the feed's row; a window takes it for
-            // the avatar slot, which a row of words draws nothing in.
-            ChatHeadMarker.Data head = ChatHeadMarker.of(row);
-            assertNotNull(head);
-            assertEquals(open, head.avatar);
+            assertEquals(Integer.valueOf(ChatNarrator.color() & 0xFFFFFF),
+                    markColour);
         }
     }
 

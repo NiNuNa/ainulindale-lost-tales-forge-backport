@@ -61,6 +61,28 @@ public final class ChatMenusTest {
                 ChatMenus.closedUnreadCount());
     }
 
+    /** A closed NPC conversation's unread lines count after the {@code +} too. */
+    @Test
+    public void theClosedCountTakesInClosedNpcConversations() {
+        ClientChatChannelViews.clear();
+        try {
+            ChatTab npc = ChatTab.npc("Grey Wanderer");
+            ChatLayout.noteNpcSpoke(npc);
+            assertFalse(ChatLayout.isOpen(npc));
+            int before = ChatMenus.closedUnreadCount();
+            ChatTab selected = ChatTab.of(ChatChannel.OOC);
+            ClientChatChannelViews.record(-1, npc, selected, false,
+                    ChatMessageIds.NONE, System.currentTimeMillis(), false);
+            ClientChatChannelViews.record(-2, npc, selected, false,
+                    ChatMessageIds.NONE, System.currentTimeMillis(), false);
+            assertEquals(Math.min(ClientChatChannelViews.MAX_UNREAD + 1,
+                    before + 2), ChatMenus.closedUnreadCount());
+            assertFalse(ChatMenus.closedMark().isNone());
+        } finally {
+            ClientChatChannelViews.clear();
+        }
+    }
+
     /**
      * The chat's part of the {@code +} and the tab search: its closed
      * channels, each row's id its tab's, and nothing else while no player
@@ -84,6 +106,44 @@ public final class ChatMenusTest {
         List<MenuWindow.Entry> none = new ArrayList<MenuWindow.Entry>();
         ChatMenus.addOpenable(null, none, "zzzz-nothing", true);
         assertTrue(none.isEmpty());
+    }
+
+    /**
+     * The NPC conversations of the session in no window are offered
+     * after the players, the one that spoke last first, each row's id
+     * its tab's and the tab its icon; one standing open is not, and the
+     * filter narrows them by name.
+     */
+    @Test
+    public void theChatOffersItsClosedNpcConversations() {
+        ChatTab bilbo = ChatTab.npc("Bilbo");
+        ChatTab frodo = ChatTab.npc("Frodo");
+        ChatTab sam = ChatTab.npc("Sam");
+        ChatLayout.noteNpcSpoke(bilbo);
+        ChatLayout.noteNpcSpoke(frodo);
+        ChatLayout.noteNpcSpoke(sam);
+        assertTrue(ChatLayout.openTab(sam, null) != null);
+        List<MenuWindow.Entry> entries = new ArrayList<MenuWindow.Entry>();
+        ChatMenus.addOpenable(null, entries, "", false);
+        List<String> ids = new ArrayList<String>();
+        for (MenuWindow.Entry entry : entries) {
+            if (entry.id.startsWith("npc:")) {
+                ids.add(entry.id);
+                assertEquals(ChatTab.fromId(entry.id), entry.icon);
+            }
+        }
+        assertEquals(Arrays.asList(frodo.id(), bilbo.id()), ids);
+        assertTrue(ChatLayout.hasClosedNpcConversation());
+        List<MenuWindow.Entry> narrowed = new ArrayList<MenuWindow.Entry>();
+        ChatMenus.addOpenable(null, narrowed, "bil", true);
+        int npcRows = 0;
+        for (MenuWindow.Entry entry : narrowed) {
+            if (entry.id.startsWith("npc:")) {
+                npcRows++;
+                assertEquals(bilbo.id(), entry.id);
+            }
+        }
+        assertEquals(1, npcRows);
     }
 
     @Test

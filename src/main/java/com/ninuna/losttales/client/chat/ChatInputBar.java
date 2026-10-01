@@ -656,7 +656,7 @@ public final class ChatInputBar {
         WindowBar.drawFoot(this.left, this.top, this.growth, barRight,
                 surface,
                 frame == null ? 0.0F : (float)(frame.boxBottom - frame.boxTop),
-                faded(255));
+                faded(255), frame == null || !frame.isFilledByPage());
     }
 
     /**

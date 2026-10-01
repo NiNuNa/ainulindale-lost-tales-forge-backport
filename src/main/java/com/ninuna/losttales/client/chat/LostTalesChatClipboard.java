@@ -193,17 +193,24 @@ final class LostTalesChatClipboard {
 
     /**
      * A row's own words: everything the chat itself puts around a
-     * message — the channel prefix, the timestamp, the chevron a body
-     * opens with — is left out, and an emoji is read back as the
-     * shortcode it was typed as rather than as the blank slot its
-     * sprite is drawn into.
+     * message — the channel prefix, the timestamp, the mark a body opens
+     * with — is left out, and an emoji is read back as the shortcode it
+     * was typed as rather than as the blank slot its sprite is drawn
+     * into. A command's mark stands for its slash, so the slash comes
+     * back: a copy reads the command as it runs.
      */
     private static String words(IChatComponent line) {
         StringBuilder text = new StringBuilder();
         for (Object value : line) {
             IChatComponent part = (IChatComponent)value;
+            if (ChatBodyMarker.isMarker(part)) {
+                if (part.getUnformattedTextForChat().trim().equals(
+                        String.valueOf(ChatLineMark.COMMAND.symbol))) {
+                    text.append(ChatLineMark.COMMAND.symbol);
+                }
+                continue;
+            }
             if (ChatPrefixMarker.isMarker(part)
-                    || ChatBodyMarker.isMarker(part)
                     || ChatFoldMarker.isMarker(part)) {
                 continue;
             }

@@ -1,5 +1,8 @@
 package com.ninuna.losttales.gui.screen.party;
 
+import com.ninuna.losttales.client.window.PageKeys;
+import com.ninuna.losttales.client.window.OptionGlyph;
+import com.ninuna.losttales.client.window.PageOption;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.client.party.ClientPartyDisplayNames;
 import com.ninuna.losttales.client.party.ClientPartyStateCache;
@@ -46,7 +49,7 @@ import org.lwjgl.opengl.GL11;
  * it one), then the invitations to the player and those the party sent.
  * The window holds the rest: the search in its tool strip's well narrows
  * the list, the colour the player wears in the party is chosen behind its
- * cog, and its input bar holds the invite field, whose list offers who can
+ * three dots, and its input bar holds the invite field, whose list offers who can
  * be invited, the leader's Name Party, then what can be done about the row
  * picked, the go-here marker, and Leave (Disband for the leader) last in
  * red.
@@ -636,6 +639,21 @@ public final class PartyPage extends PageContent {
         }
     }
 
+    /** The keys the party answers to, for its help. */
+    @Override
+    public List<PageKeys.Area> keyAreas() {
+        return PageKeys.pageArea("gui.losttales.page.party",
+                PageKeys.pageKey(PAGE_ID, "pick",
+                        Keyboard.KEY_UP, PageKeys.OR, Keyboard.KEY_DOWN),
+                PageKeys.pageKey(PAGE_ID, "offered",
+                        Keyboard.KEY_UP, PageKeys.OR, Keyboard.KEY_DOWN),
+                PageKeys.pageKey(PAGE_ID, "complete", Keyboard.KEY_TAB),
+                PageKeys.pageKey(PAGE_ID, "invite", Keyboard.KEY_RETURN),
+                PageKeys.pageKey(PAGE_ID, "name", Keyboard.KEY_RETURN),
+                PageKeys.pageKey(PAGE_ID, "leave_field", Keyboard.KEY_ESCAPE),
+                PageKeys.pageKey(PAGE_ID, "wheel", PageKeys.WHEEL));
+    }
+
     /**
      * The invite field's keys while it is typed in: the arrows walk the
      * players it offers, Tab writes the chosen one's name, Return invites
@@ -789,37 +807,37 @@ public final class PartyPage extends PageContent {
                 : member.getColor().getRgb();
     }
 
+    /**
+     * The colours the player can wear in the party, each a chip, theirs
+     * chosen; one another member wears is greyed.
+     */
     @Override
-    public String choicesHeading() {
-        return "gui.losttales.party.menu.colour";
-    }
-
-    /** The colours the player can wear in the party, theirs marked; one another member wears is greyed. */
-    @Override
-    public List<Choice> choices() {
+    public List<PageOption> options() {
         PartyStateSnapshot snapshot = getSnapshot();
         PartySnapshot party = snapshot == null ? null : snapshot.getParty();
         PartyMemberSnapshot own = ownMember(snapshot);
-        List<Choice> choices = new ArrayList<Choice>();
+        List<PageOption> options = new ArrayList<PageOption>();
         for (PartyColor colour : PartyColor.values()) {
             String why = party == null
                     ? I18n.format("gui.losttales.party.no_party")
                     : isColorInUseByAnother(party,
                             snapshot.getActiveIdentityId(), colour)
                     ? I18n.format("gui.losttales.party.colour.taken") : "";
-            choices.add(new Choice(colour.name(),
+            options.add(PageOption.choice(colour.name(),
                     ClientPartyDisplayNames.color(colour),
-                    own != null && own.getColor() == colour, why));
+                    own != null && own.getColor() == colour,
+                    OptionGlyph.chip(colour.getRgb())).unavailable(why)
+                    .inGroup("colours", "gui.losttales.party.menu.colour"));
         }
-        return choices;
+        return options;
     }
 
     @Override
-    public void choose(String id) {
+    public boolean takeOption(String id, boolean back) {
         PartyStateSnapshot snapshot = getSnapshot();
         PartySnapshot party = snapshot == null ? null : snapshot.getParty();
         if (party == null || this.pendingRequestId != 0) {
-            return;
+            return true;
         }
         for (PartyColor colour : PartyColor.values()) {
             if (colour.name().equals(id)
@@ -830,6 +848,7 @@ public final class PartyPage extends PageContent {
                         party.getRevision(), colour), true);
             }
         }
+        return true;
     }
 
     @Override

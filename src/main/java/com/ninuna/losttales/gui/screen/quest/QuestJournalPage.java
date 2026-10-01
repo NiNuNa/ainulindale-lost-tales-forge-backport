@@ -1,5 +1,8 @@
 package com.ninuna.losttales.gui.screen.quest;
 
+import com.ninuna.losttales.client.window.PageKeys;
+import com.ninuna.losttales.client.window.OptionGlyph;
+import com.ninuna.losttales.client.window.PageOption;
 import com.ninuna.losttales.client.quest.ClientQuestCatalog;
 import com.ninuna.losttales.client.quest.ClientQuestEntry;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
@@ -10,6 +13,7 @@ import com.ninuna.losttales.client.window.BarItem;
 import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.PageContent;
 import com.ninuna.losttales.client.window.PageSearch;
+import com.ninuna.losttales.client.window.Settings;
 import com.ninuna.losttales.client.window.ToolStrip;
 import com.ninuna.losttales.client.window.WindowBar;
 import com.ninuna.losttales.client.window.WindowPages;
@@ -54,7 +58,7 @@ import com.ninuna.losttales.quest.LostTalesQuestRewardText;
 /**
  * The quest journal, a page a window holds: the quests on the left, the
  * one being read on the right. The window holds the rest: the list's
- * button at its tool strip's left, the filters behind its cog, the search
+ * button at its tool strip's left, the filters behind its three dots, the search
  * in its well, and the quest's actions on its input bar, where
  * Abandon and Clear ask first. It reads the shared presentation assembled
  * from Lost Tales and LOTR's synchronized quest state, and draws itself
@@ -84,7 +88,7 @@ public final class QuestJournalPage extends PageContent {
     /** What the pointer is on: asked once a frame, read by every draw. */
     private enum Hovered { NOTHING, CATEGORY, QUEST }
 
-    /** The filters, in the order the tab's menu lists them. */
+    /** The filters, in the order the page's options list them. */
     private static final QuestFilter[] FILTERS = QuestFilter.values();
 
     /** The bar's items: their ids, which the page is told when one is pressed. */
@@ -328,29 +332,50 @@ public final class QuestJournalPage extends PageContent {
         this.listOut = !this.listOut;
     }
 
+    /** The tracker, the banners, the conversation and the quests' marks: Quest Settings. */
     @Override
-    public String choicesHeading() {
-        return "gui.losttales.quest.menu.show";
+    public Settings.Place settingsPlace() {
+        return Settings.Place.QUESTS;
     }
 
-    /** The filters, the one in force marked. */
+    /** The filters, the one in force chosen; each a button on the strip. */
     @Override
-    public List<Choice> choices() {
-        List<Choice> choices = new ArrayList<Choice>(FILTERS.length);
+    public List<PageOption> options() {
+        List<PageOption> options = new ArrayList<PageOption>(FILTERS.length);
         for (QuestFilter each : FILTERS) {
-            choices.add(new Choice(each.name(), translate(each.labelKey),
-                    each == this.filter));
+            options.add(PageOption.choice(each.name(),
+                    translate(each.labelKey), each == this.filter, each.glyph)
+                    .inGroup("filters", "gui.losttales.quest.menu.show"));
         }
-        return choices;
+        return options;
     }
 
     @Override
-    public void choose(String id) {
+    public boolean takeOption(String id, boolean back) {
         for (QuestFilter each : FILTERS) {
             if (each.name().equals(id)) {
                 setFilter(each);
             }
         }
+        return true;
+    }
+
+    /** The keys the journal answers to, for its help. */
+    @Override
+    public List<PageKeys.Area> keyAreas() {
+        return PageKeys.pageArea("gui.losttales.page.journal",
+                PageKeys.pageKey(PAGE_ID, "track",
+                        Keyboard.KEY_SPACE, PageKeys.OR, Keyboard.KEY_RETURN,
+                        PageKeys.OR, PageKeys.DOUBLE_CLICK),
+                PageKeys.pageKey(PAGE_ID, "filter", Keyboard.KEY_F),
+                PageKeys.pageKey(PAGE_ID, "pick",
+                        Keyboard.KEY_UP, PageKeys.OR, Keyboard.KEY_DOWN),
+                PageKeys.pageKey(PAGE_ID, "scroll",
+                        Keyboard.KEY_PRIOR, PageKeys.OR, Keyboard.KEY_NEXT),
+                PageKeys.pageKey(PAGE_ID, "ends",
+                        Keyboard.KEY_HOME, PageKeys.OR, Keyboard.KEY_END),
+                PageKeys.pageKey(PAGE_ID, "fold", PageKeys.CLICK),
+                PageKeys.pageKey(PAGE_ID, "wheel", PageKeys.WHEEL));
     }
 
     /** The well names the filter in force: {@code Search active quests}. */
@@ -1659,10 +1684,15 @@ public final class QuestJournalPage extends PageContent {
         clampSelectionAndScroll();
     }
 
-    /** Cuts what is drawn next to a box of the page, where the page really stands on the screen. */
+    /**
+     * Cuts what is drawn next to a box of the page, where the page really
+     * stands on the screen, until {@link #disableScissor} puts back the
+     * cut that stood before.
+     */
     private void enableScissor(int x, int y, int width, int height) {
         ScaledResolution scaled = new ScaledResolution(this.mc, this.mc.displayWidth, this.mc.displayHeight);
         int scale = scaled.getScaleFactor();
+        GL11.glPushAttrib(GL11.GL_SCISSOR_BIT | GL11.GL_ENABLE_BIT);
         GL11.glEnable(GL11.GL_SCISSOR_TEST);
         GL11.glScissor((int)Math.round((this.clipX + x) * scale),
                 this.mc.displayHeight - (int)Math.round((this.clipY + y + height) * scale),
@@ -1670,26 +1700,46 @@ public final class QuestJournalPage extends PageContent {
     }
 
     private void disableScissor() {
-        GL11.glDisable(GL11.GL_SCISSOR_TEST);
+        GL11.glPopAttrib();
     }
 
     private enum QuestFilter {
+        // The glyphs are patterns until their artwork is painted.
         ALL("gui.losttales.quest.filter.all",
-                "gui.losttales.quest.search.all"),
+                "gui.losttales.quest.search.all", OptionGlyph.pattern(
+                        "#####",
+                        ".....",
+                        "#####",
+                        ".....",
+                        "#####")),
         ACTIVE("gui.losttales.quest.filter.active",
-                "gui.losttales.quest.search.active"),
+                "gui.losttales.quest.search.active", OptionGlyph.sprite(
+                        LostTalesUiSheet.EXCLAMATION,
+                        LostTalesUiSheet.EXCLAMATION_LIT)),
         COMPLETED("gui.losttales.quest.filter.completed",
-                "gui.losttales.quest.search.completed"),
+                "gui.losttales.quest.search.completed", OptionGlyph.pattern(
+                        "....#",
+                        "...#.",
+                        "#.#..",
+                        ".#...")),
         HISTORY("gui.losttales.quest.filter.history",
-                "gui.losttales.quest.search.history");
+                "gui.losttales.quest.search.history", OptionGlyph.pattern(
+                        "#####",
+                        ".#.#.",
+                        "..#..",
+                        ".#.#.",
+                        "#####"));
 
         private final String labelKey;
         /** What the well says while this filter is in force. */
         private final String promptKey;
+        /** Its button on the strip and its row's picture. */
+        private final OptionGlyph glyph;
 
-        QuestFilter(String labelKey, String promptKey) {
+        QuestFilter(String labelKey, String promptKey, OptionGlyph glyph) {
             this.labelKey = labelKey;
             this.promptKey = promptKey;
+            this.glyph = glyph;
         }
 
         private QuestFilter next() {

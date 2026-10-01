@@ -17,36 +17,64 @@ public final class WindowPlacementTest {
     }
 
     /**
-     * A tab standing alone takes the whole screen for what it holds: the
-     * window's row and strip past the top edge, its bar past the bottom
-     * one and its frame past the sides. Nothing the window keeps changes,
-     * so putting it back gives it its own box again.
+     * A page filling its window takes the window's whole box: the row and
+     * strip past its top edge, the bar past its bottom one. Nothing the
+     * window keeps changes, so giving them back gives it its own box
+     * again.
      */
     @Test
-    public void aTabStandingAloneHasItsFurniturePastTheScreensEdges() {
+    public void aPageFillingItsWindowHasTheRowAndTheBarPastItsEdges() {
         TwoWindowLayout.reset();
         Window conversation = WindowLayout.windows().get(1);
         WindowPlacement.Box before = WindowPlacement.windowBounds(
                 conversation, null, 1000, 600);
         assertTrue(ContentView.enter(conversation));
         try {
-            WindowPlacement.Box alone = WindowPlacement.windowBounds(
+            WindowPlacement.Box filled = WindowPlacement.windowBounds(
                     conversation, null, 1000, 600);
-            assertEquals(0.0D, alone.x, 0.0001D);
-            assertEquals(-WindowPlacement.rowHeight(null), alone.y, 0.0001D);
-            assertEquals("the bar starts at the bottom edge", 600.0D,
-                    alone.barTop(), 0.0001D);
-            assertEquals(WindowPlacement.boxWidthForChatWidth(
-                    WindowPlacement.chatWidthForBox(1000.0D, null), null),
-                    alone.width, 0.0001D);
+            assertEquals(before.x, filled.x, 0.0001D);
+            assertEquals(before.y - WindowPlacement.rowHeight(null),
+                    filled.y, 0.0001D);
+            assertEquals("the bar starts at the window's bottom edge",
+                    before.bottom(), filled.barTop(), 0.0001D);
+            assertEquals(before.width, filled.width);
             assertEquals(Window.ScreenFill.NONE, conversation.getFill());
         } finally {
-            ContentView.leave();
+            ContentView.leave(conversation);
         }
         WindowPlacement.Box after = WindowPlacement.windowBounds(
                 conversation, null, 1000, 600);
         assertEquals(before.x, after.x, 0.0001D);
         assertEquals(before.y, after.y, 0.0001D);
+    }
+
+    /**
+     * A window filling the screen gives its page the whole screen within
+     * its frame: its row and strip past the box's top, its bar past its
+     * bottom, the frame kept at the screen's edges as the full screen
+     * window keeps it.
+     */
+    @Test
+    public void aPageFillingAWindowThatFillsTheScreenKeepsItsFrame() {
+        TwoWindowLayout.reset();
+        Window conversation = WindowLayout.windows().get(1);
+        assertTrue(WindowLayout.setFill(conversation.getId(),
+                Window.ScreenFill.FULL, false));
+        assertTrue(ContentView.enter(conversation));
+        try {
+            WindowPlacement.Box full = WindowPlacement.fillBounds(
+                    Window.ScreenFill.FULL, null, 1000, 600);
+            WindowPlacement.Box filled = WindowPlacement.windowBounds(
+                    conversation, null, 1000, 600);
+            assertEquals(full.x, filled.x, 0.0001D);
+            assertEquals(full.y - WindowPlacement.rowHeight(null), filled.y,
+                    0.0001D);
+            assertEquals("the bar starts at the full screen box's foot",
+                    full.y + full.height, filled.barTop(), 0.0001D);
+            assertEquals(full.width, filled.width, 0.0001D);
+        } finally {
+            ContentView.leave(conversation);
+        }
     }
 
     /**

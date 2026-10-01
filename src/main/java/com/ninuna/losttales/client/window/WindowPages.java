@@ -113,7 +113,7 @@ public final class WindowPages {
      * Registers a page under {@code id}, a code name as a channel's is:
      * lower-case letters, digits and underscores. A second page under an
      * id already taken is refused. Its window opens as every window does,
-     * and its {@code key}, when it has one, opens it from another page and
+     * in the middle and unlocked, and its {@code key}, when it has one, opens it from another page and
      * closes it from itself.
      */
     public static synchronized void register(String id, String titleKey,

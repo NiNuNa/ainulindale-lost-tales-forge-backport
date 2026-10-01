@@ -19,11 +19,10 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.StatCollector;
 
 /**
- * The chat's sections of Settings, after the windows' own: its Look,
- * Messages, Mentions, Typing and Closed Feed, every conversation's
- * notification choice and Hide, everyone ignored, and every shortcut the
- * chat has. Every Settings has
- * them, a screen's without a world too.
+ * The chat's sections of Settings, Chat Settings, after the windows' own:
+ * its Look, Messages, Mentions, Typing and Closed Feed, and everyone
+ * ignored. A conversation's own Notifications and Show in Feed stand in
+ * its options, not here. Every Settings has them.
  */
 public final class ChatSettingsSections {
     /**
@@ -47,9 +46,6 @@ public final class ChatSettingsSections {
             });
         }
     };
-    /** A conversation's rows: the choice or the switch, then the tab's id. */
-    private static final String CHANNEL_NOTIFY_PREFIX = "channel:notify:";
-    private static final String CHANNEL_HIDE_PREFIX = "channel:hide:";
     /** An ignore's row: an account's by its id, an identity's by its id and name. */
     private static final String IGNORED_ACCOUNT_PREFIX = "ignored:account:";
     private static final String IGNORED_IDENTITY_PREFIX = "ignored:identity:";
@@ -58,16 +54,21 @@ public final class ChatSettingsSections {
 
     private ChatSettingsSections() {}
 
-    /** Adds the chat's sections to a screen's Settings; the Ignored section's notice shows over its bar. */
+    /**
+     * Adds the chat's sections to a screen's Settings: Chat Settings, which
+     * every conversation's cog opens. The Ignored section's notice shows
+     * over the chat's bar.
+     */
     static void addTo(Settings settings, ChatNoticeSink notices) {
-        settings.addSection(new LookSection());
-        settings.addSection(settingsOnly("messages", messages()));
-        settings.addSection(settingsOnly("mentions", mentions()));
-        settings.addSection(settingsOnly("typing", typing()));
-        settings.addSection(settingsOnly("feed", feed()));
-        settings.addSection(new ChannelsSection());
-        settings.addSection(new IgnoredSection(notices));
-        settings.addSection(new ShortcutsSection());
+        settings.addSection(Settings.Place.CHAT, new LookSection());
+        settings.addSection(Settings.Place.CHAT,
+                settingsOnly("messages", messages()));
+        settings.addSection(Settings.Place.CHAT,
+                settingsOnly("mentions", mentions()));
+        settings.addSection(Settings.Place.CHAT,
+                settingsOnly("typing", typing()));
+        settings.addSection(Settings.Place.CHAT, settingsOnly("feed", feed()));
+        settings.addSection(Settings.Place.CHAT, new IgnoredSection(notices));
     }
 
     private static String titleKey(String id) {
@@ -340,6 +341,18 @@ public final class ChatSettingsSections {
                 LostTalesConfig.enableNpcChatStyling = on;
             }
         });
+        messages.add(new Settings.Numeric("npcConversationsOpen",
+                "gui.losttales.chat.settings.npc_conversations", 1.0D, 0) {
+            @Override
+            protected double get() {
+                return LostTalesConfig.npcConversationsOpen;
+            }
+
+            @Override
+            protected void set(double value) {
+                LostTalesConfig.npcConversationsOpen = (int)Math.round(value);
+            }
+        });
         messages.add(new Settings.ModSwitch("showChatSpeechBubbles",
                 "gui.losttales.chat.settings.bubbles") {
             @Override
@@ -511,83 +524,6 @@ public final class ChatSettingsSections {
         return Minecraft.getMinecraft().gameSettings;
     }
 
-    /* ---- Channels ---- */
-
-    /**
-     * Every channel the player can see, in the order the chat shows
-     * them, then every whisper and NPC conversation standing in a
-     * window, each under its name and icon with its notification choice
-     * and its Hide switch: the same rows its tab's menu has. The whisper
-     * channel itself has no tab, only its conversations, so the order
-     * the chat shows leaves it out.
-     */
-    static final class ChannelsSection extends Settings.Section {
-        @Override
-        public String titleKey() {
-            return ChatSettingsSections.titleKey("channels");
-        }
-
-        @Override
-        public List<MenuWindow.Entry> rows() {
-            List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
-            for (ChatChannel channel : ChatChannel.presentationOrder()) {
-                if (ClientChatChannelState.isAvailable(channel)) {
-                    addChannel(rows, ChatTab.of(channel));
-                }
-            }
-            for (Window window : WindowLayout.windows()) {
-                for (WindowTab each : window.getTabs()) {
-                    ChatTab tab = ChatTab.from(each);
-                    if (tab != null && tab.isWhisper()) {
-                        addChannel(rows, tab);
-                    }
-                }
-            }
-            return rows;
-        }
-
-        private static void addChannel(List<MenuWindow.Entry> rows,
-                                       ChatTab tab) {
-            rows.add(MenuWindow.Entry.group(
-                    ClientChatChannelState.displayName(tab), tab,
-                    ClientChatChannelState.displayColor(tab)));
-            rows.add(new MenuWindow.Entry(CHANNEL_NOTIFY_PREFIX + tab.id(),
-                    StatCollector.translateToLocal(
-                            "gui.losttales.chat.settings.channel.notify"))
-                    .withValue(StatCollector.translateToLocal(
-                            ChatLayout.notification(tab).labelKey())));
-            rows.add(new MenuWindow.Entry(CHANNEL_HIDE_PREFIX + tab.id(),
-                    StatCollector.translateToLocal(
-                            "gui.losttales.chat.settings.channel.hide"))
-                    .withValue(Settings.onOff(ChatLayout.isHidden(tab))));
-        }
-
-        /**
-         * The choice steps on with a click and back with a right-click;
-         * the switch flips on a click and a right-click leaves it.
-         */
-        @Override
-        public boolean take(MenuWindow.Entry entry, boolean back) {
-            String id = entry.id;
-            ChatTab tab;
-            if (id.startsWith(CHANNEL_NOTIFY_PREFIX)) {
-                tab = ChatTab.fromId(id.substring(CHANNEL_NOTIFY_PREFIX.length()));
-                if (tab != null) {
-                    ChatLayout.stepNotification(tab, back);
-                }
-                return true;
-            }
-            if (id.startsWith(CHANNEL_HIDE_PREFIX)) {
-                tab = ChatTab.fromId(id.substring(CHANNEL_HIDE_PREFIX.length()));
-                if (tab != null && !back) {
-                    ChatLayout.setHidden(tab, !ChatLayout.isHidden(tab));
-                }
-                return true;
-            }
-            return false;
-        }
-    }
-
     /* ---- Ignored ---- */
 
     /** Everyone ignored, each with the way to stop; a line saying so where nobody is. */
@@ -663,21 +599,6 @@ public final class ChatSettingsSections {
                 this.notices.showNotice(StatCollector.translateToLocalFormatted(
                         "gui.losttales.chat.unignored", shown));
             }
-        }
-    }
-
-    /* ---- Shortcuts ---- */
-
-    /** Every shortcut the chat has, each a row that is read, not taken. */
-    private static final class ShortcutsSection extends Settings.Section {
-        @Override
-        public String titleKey() {
-            return ChatSettingsSections.titleKey("shortcuts");
-        }
-
-        @Override
-        public List<MenuWindow.Entry> rows() {
-            return ChatShortcuts.rows();
         }
     }
 }

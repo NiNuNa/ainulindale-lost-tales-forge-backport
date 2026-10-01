@@ -9,6 +9,7 @@ import cpw.mods.fml.common.FMLLog;
 import lotr.common.LOTRLevelData;
 import lotr.common.LOTRDimension;
 import lotr.common.LOTRPlayerData;
+import lotr.common.LOTRTitle;
 import lotr.common.fac.LOTRFaction;
 import lotr.common.world.map.LOTRWaypoint;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -60,6 +61,8 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
     private String[] builtDenied;
     /** Whether an unreadable pledge has been logged; it is said once. */
     private volatile boolean pledgeWarned;
+    /** Whether an unreadable title has been logged; it is said once. */
+    private volatile boolean titleWarned;
 
     public static LotrCharacterAdapter getInstance() {
         return INSTANCE;
@@ -442,6 +445,42 @@ public final class LotrCharacterAdapter implements CharacterFactionResolver {
         } catch (RuntimeException exception) {
             warnPledgeOnce(exception);
             return null;
+        }
+    }
+
+    /**
+     * The LOTR title the player wears, as LOTR names it in this server's
+     * language ({@code Gondor Farmer}): empty for none, null when LOTR's
+     * player data cannot be read.
+     */
+    public String getTitleName(EntityPlayerMP player) {
+        if (player == null || player.worldObj == null
+                || player.worldObj.isRemote) {
+            return null;
+        }
+        try {
+            LOTRPlayerData data = LOTRLevelData.getData(player);
+            if (data == null) {
+                return null;
+            }
+            LOTRTitle.PlayerTitle worn = data.getPlayerTitle();
+            return worn == null || worn.getTitle() == null ? ""
+                    : worn.getTitle().getDisplayName(player);
+        } catch (LinkageError error) {
+            warnTitleOnce(error);
+            return null;
+        } catch (RuntimeException exception) {
+            warnTitleOnce(exception);
+            return null;
+        }
+    }
+
+    private void warnTitleOnce(Throwable cause) {
+        if (!this.titleWarned) {
+            this.titleWarned = true;
+            FMLLog.warning("[%s] A player's LOTR title could not be read; "
+                            + "lines and member lists show none: %s",
+                    LostTalesMetaData.MOD_ID, cause.toString());
         }
     }
 

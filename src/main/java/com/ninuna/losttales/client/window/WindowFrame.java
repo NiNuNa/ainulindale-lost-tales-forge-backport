@@ -93,11 +93,24 @@ public class WindowFrame {
     /** How much of its opacity the window showed when last drawn. */
     private float shown = 1.0F;
     /**
-     * How much of the window shows while another window's tab stands
-     * alone on the screen ({@link ContentView}): set by the screen every
-     * frame, all of it otherwise.
+     * The box the window shows while its page fills it, or glides to or
+     * from that ({@link ContentView}): its row, strip and bar lie past
+     * this box's edges, and nothing past them is drawn or pointed at.
+     * Null while the window shows whole. Set by the screen every frame.
      */
-    private float viewShare = 1.0F;
+    private WindowPlacement.Box filledBox;
+    /**
+     * The surfaces what the window holds wears along its top and bottom
+     * edges this frame: a page's inset; a conversation's timestamp area,
+     * its panel thinning out as it does, its member list. The frame's ring
+     * over and under a window its page fills continues them.
+     */
+    public final EdgeStretches contentEdge = new EdgeStretches();
+    /**
+     * What lies over those surfaces at the edges: a conversation's shades
+     * hanging from its rules. The ring continues them over its surfaces.
+     */
+    public final EdgeStretches contentShade = new EdgeStretches();
     /**
      * How far the window has come along its glide to the part of the
      * screen it fills, or back to its own box, eased from the moment it
@@ -187,6 +200,25 @@ public class WindowFrame {
             }
         }
         return null;
+    }
+
+    /**
+     * Whether a window drawn in front of window {@code windowId} covers the
+     * point: what that window, its bar and its sub-windows may not answer
+     * to there. False once the frames reach the window itself.
+     */
+    public static boolean coveredAbove(String windowId, double x, double y) {
+        List<WindowFrame> frames = drawnFrames();
+        for (int index = frames.size() - 1; index >= 0; index--) {
+            WindowFrame frame = frames.get(index);
+            if (frame.windowId.equals(windowId)) {
+                return false;
+            }
+            if (frame.contains(x, y)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Frames of windows drawn this frame, back to front. */
@@ -386,17 +418,24 @@ public class WindowFrame {
     }
 
     /**
-     * The share the window showed when last drawn, its fade in and any
-     * fading away for a tab standing alone: what the window's input bar,
-     * drawn after the window, fades by.
+     * The share the window showed when last drawn, its fade in: what the
+     * window's input bar, drawn after the window, fades by.
      */
     public float shownShare() {
-        return this.shown * this.viewShare;
+        return this.shown;
     }
 
-    /** How much of the window shows while another window's tab stands alone on the screen. */
-    void setViewShare(float share) {
-        this.viewShare = Math.max(0.0F, Math.min(1.0F, share));
+    /**
+     * What the window shows of itself this frame while its page fills it
+     * ({@link WindowPlacement#filledBox}); null while it shows whole.
+     */
+    void fillWithPage(WindowPlacement.Box box) {
+        this.filledBox = box;
+    }
+
+    /** Whether the window's page fills it, or glides to or from that: only {@link #drawnBox} of it shows. */
+    public boolean isFilledByPage() {
+        return this.filledBox != null;
     }
 
     /** Whether {@link #advanceFill} has placed the window at all yet. */
@@ -446,9 +485,8 @@ public class WindowFrame {
     }
 
     /**
-     * How far the window stands toward showing its tab alone on the whole
-     * screen, 0..1 ({@link ContentView}): what every other window fades
-     * away by as it comes and back as it goes.
+     * How far the window stands toward its page filling it, 0..1
+     * ({@link ContentView}): above 0, only the box it shows is drawn.
      */
     public float contentShare() {
         if (this.fillLegTo == Window.ScreenFill.CONTENT) {
@@ -553,21 +591,30 @@ public class WindowFrame {
         return this.stackTop - WindowPlacement.HISTORY_TOP_MARGIN;
     }
 
-    /** The window's box as it is drawn this frame, opening motion included. */
-    LostTalesUiHitBox drawnBox() {
+    /**
+     * The window's box as it is drawn this frame, opening motion included:
+     * while its page fills it, the box it shows.
+     */
+    public LostTalesUiHitBox drawnBox() {
+        if (this.filledBox != null) {
+            return new LostTalesUiHitBox(LostTalesDisplayPixels.snap(
+                    this.filledBox.x + this.motionX),
+                    LostTalesDisplayPixels.snap(this.filledBox.y)
+                            + this.motionY,
+                    this.filledBox.width, this.filledBox.height);
+        }
         return new LostTalesUiHitBox(drawnLeft(), this.boxTop + this.motionY,
                 this.boxRight - this.boxLeft, this.boxBottom - this.boxTop);
     }
 
     /**
      * Whether the point lies within the window as it is drawn — its
-     * strip, its messages and its bar, opening motion included — from
-     * its first pixel up to the pixel past its last, as everything it
-     * draws is measured. The border outside it is the resize band's.
+     * strip, its messages and its bar, opening motion included, or what
+     * it shows while its page fills it — from its first pixel up to the
+     * pixel past its last, as everything it draws is measured. The border
+     * outside it is the resize band's.
      */
     public boolean contains(double x, double y) {
-        return LostTalesUiHitBox.contains(x, y, drawnLeft(),
-                this.boxTop + this.motionY, this.boxRight - this.boxLeft,
-                this.boxBottom - this.boxTop);
+        return drawnBox().contains(x, y);
     }
 }

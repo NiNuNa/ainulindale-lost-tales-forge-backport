@@ -7,7 +7,8 @@ import java.util.List;
 /**
  * One server config key as an operator's client sees it: where it lives,
  * what it holds, what it defaults to, its bounds and its comment. A
- * secret key travels with an empty value and is only ever written, never
+ * secret key travels without its value, as one blank value while it is
+ * set and as none while it is not, and is only ever written, never
  * shown. Immutable; the value of a list is a copy.
  */
 public final class ServerConfigEntry {
@@ -133,6 +134,11 @@ public final class ServerConfigEntry {
 
     public boolean isSecret() {
         return this.secret;
+    }
+
+    /** Whether a secret holds a value on the server; false for any other entry. */
+    public boolean isSecretSet() {
+        return this.secret && !this.values.isEmpty();
     }
 
     public List<String> getValidValues() {

@@ -21,10 +21,12 @@ import net.minecraft.util.IChatComponent;
  * break</em> in the body starts a row of its own under the words — the
  * reactions a message wears — aligned under the body. A <em>body
  * break</em> marker after the sender ends the header row and opens the
- * message body on the next one, behind the separator the wrapper draws
- * in the sender's colour ({@link ChatBodyMarker}) — the chat's chevron,
- * or a label the line names itself; it carries that colour, since a
- * grouped continuation has no head marker to read it from. An
+ * message body on the next one, behind the mark the wrapper draws in the
+ * sender's colour ({@link ChatBodyMarker}): the line's kind
+ * ({@link ChatLineMark}), {@code >} for words said, {@code /} for a
+ * command, {@code *} for an action. It carries that colour and that
+ * mark, since a grouped continuation has no head marker to read them
+ * from. An
  * <em>indent</em>
  * marker opens every continuation line of a wrapped message and records
  * the anchor's offset twice — for the closed HUD (channel prefix shown)
@@ -35,9 +37,7 @@ import net.minecraft.util.IChatComponent;
  * say which rows name its speaker and which carry its words, so the
  * stack can lay each out, measure it and draw it at its own size.</p>
  *
- * <p>An action has no header row: an <em>action break</em> in place of
- * the body break opens its words on the row it is on, behind no chevron,
- * the speaker's name the sentence's first word; a <em>span end</em>
+ * <p>An action names its speaker inside its words: a <em>span end</em>
  * after that name closes the speaker's span, which a header closes with
  * its bracket.</p>
  */
@@ -50,7 +50,6 @@ final class ChatLayoutMarker {
     private static final String ROW = "row";
     private static final String HEADER = "header";
     private static final String BODY_ROW = "bodyrow";
-    private static final String ACTION = "action";
     private static final String SPAN_END = "spanend";
 
     private ChatLayoutMarker() {}
@@ -99,25 +98,20 @@ final class ChatLayoutMarker {
         return marker(PREFIX + BODY_ROW);
     }
 
-    /**
-     * Ends the header row and opens the message body. Everything before
-     * it is the message's header; everything after it is its body, which
-     * begins on a row of its own behind the chat's chevron.
-     * {@code senderColor} is the colour the chevron is drawn in: the
-     * marker carries it because a grouped line has no head marker to
-     * read it from.
-     */
+    /** A body break for words said, behind the chevron. */
     static ChatComponentText bodyBreak(int senderColor) {
-        return marker(PREFIX + BODY + (senderColor & 0xFFFFFF));
+        return bodyBreak(senderColor, ChatLineMark.SAID);
     }
 
     /**
-     * Ends an action's header — its channel prefix and head — and opens
-     * its words on the same row, behind no chevron: the sentence is the
-     * line. Continuation rows start at the words' own edge.
+     * Ends the header row and opens the message body. Everything before
+     * it is the message's header; everything after it is its body, which
+     * begins on a row of its own behind {@code mark}, drawn in
+     * {@code color}. The marker carries both, because a grouped line has
+     * no head marker to read them from.
      */
-    static ChatComponentText actionBreak() {
-        return marker(PREFIX + ACTION);
+    static ChatComponentText bodyBreak(int color, ChatLineMark mark) {
+        return marker(PREFIX + BODY + (color & 0xFFFFFF) + ':' + mark.symbol);
     }
 
     /**
@@ -186,9 +180,6 @@ final class ChatLayoutMarker {
         if (BODY_ROW.equals(payload)) {
             return Data.BODY_ROW;
         }
-        if (ACTION.equals(payload)) {
-            return Data.ACTION;
-        }
         if (SPAN_END.equals(payload)) {
             return Data.SPAN_END;
         }
@@ -237,11 +228,6 @@ final class ChatLayoutMarker {
         return data != null && data.rowBreak;
     }
 
-    static boolean isActionBreak(IChatComponent component) {
-        Data data = decode(component);
-        return data != null && data.actionBreak;
-    }
-
     static boolean isSpanEnd(IChatComponent component) {
         Data data = decode(component);
         return data != null && data.spanEnd;
@@ -286,12 +272,25 @@ final class ChatLayoutMarker {
         if (payload == null || !payload.startsWith(BODY)) {
             return -1;
         }
+        String fields = payload.substring(BODY.length());
+        int colon = fields.indexOf(':');
         try {
-            return Integer.parseInt(payload.substring(BODY.length()))
-                    & 0xFFFFFF;
+            return Integer.parseInt(colon < 0 ? fields
+                    : fields.substring(0, colon)) & 0xFFFFFF;
         } catch (NumberFormatException ignored) {
             return -1;
         }
+    }
+
+    /** The mark a body break opens the words with; words said for anything else. */
+    static ChatLineMark bodyMark(IChatComponent component) {
+        String payload = payloadOf(component);
+        if (payload == null || !payload.startsWith(BODY)) {
+            return ChatLineMark.SAID;
+        }
+        int colon = payload.indexOf(':', BODY.length());
+        return colon < 0 || colon + 1 >= payload.length() ? ChatLineMark.SAID
+                : ChatLineMark.of(payload.charAt(colon + 1));
     }
 
     static final class Data {
@@ -307,17 +306,13 @@ final class ChatLayoutMarker {
                 new Data(false, false, false, 0, 0, -1, -1, false);
         static final Data BODY_ROW =
                 new Data(false, false, false, 0, 0, -1, -1, false);
-        static final Data ACTION = new Data(false, false, false, 0, 0, -1,
-                -1, false, true, false);
         static final Data SPAN_END = new Data(false, false, false, 0, 0, -1,
-                -1, false, false, true);
+                -1, false, true);
 
         final boolean anchor;
         final boolean lineBreak;
         final boolean bodyBreak;
         final boolean rowBreak;
-        /** Whether this marker opens an action's words ({@link #actionBreak}). */
-        final boolean actionBreak;
         /** Whether this marker closes the speaker's span ({@link #spanEnd}). */
         final boolean spanEnd;
         private final int closedIndent;
@@ -343,14 +338,12 @@ final class ChatLayoutMarker {
                      int closedIndent, int openIndent, int nameColor,
                      int titleColor, boolean rowBreak) {
             this(anchor, lineBreak, bodyBreak, closedIndent, openIndent,
-                    nameColor, titleColor, rowBreak, false, false);
+                    nameColor, titleColor, rowBreak, false);
         }
 
         private Data(boolean anchor, boolean lineBreak, boolean bodyBreak,
                      int closedIndent, int openIndent, int nameColor,
-                     int titleColor, boolean rowBreak,
-                     boolean actionBreak, boolean spanEnd) {
-            this.actionBreak = actionBreak;
+                     int titleColor, boolean rowBreak, boolean spanEnd) {
             this.spanEnd = spanEnd;
             this.rowBreak = rowBreak;
             this.anchor = anchor;

@@ -5,62 +5,101 @@ import com.ninuna.losttales.client.motion.MotionTransition;
 import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.util.StatCollector;
 
 /**
- * The line at the top of the screen while a tab stands alone
- * ({@link ContentView}), saying how to leave, as a browser says it of its
- * full screen: <em>Leave Full Screen (Esc)</em>. It shows for a moment as
- * the tab comes to stand alone, and again while the pointer is near the
- * screen's top edge or on it; a click on it puts the tab back into its
- * window. A popup: it wears the window frame and never moves.
+ * The line at the top of a window whose page fills it
+ * ({@link ContentView}), saying how to leave, as a video player says how
+ * to leave its full screen: <em>Leave Full Window (Esc)</em>. It shows for a
+ * moment as the page comes to fill the window, and again while the
+ * pointer is in the window near its top edge or on the line; a click on
+ * it gives the window its row, strip and bar back. A popup: it wears the
+ * window frame and never moves.
  */
 final class ContentViewLine {
-    /** Clear rows between the screen's top edge and the line. */
+    /** Clear rows between the window's top edge and the line. */
     private static final int TOP = 4;
-    /** How near the top edge the pointer brings the line back. */
+    /** How near the window's top edge the pointer brings the line back. */
     private static final int REACH = 16;
 
-    private final MotionTransition fade =
-            new MotionTransition(MotionIds.WINDOW_VIEW_LINE);
-    /** Where the line stood when last drawn; null while it is not shown. */
-    private LostTalesUiHitBox box;
+    /** Each window's line: its fade, and where it stood when last drawn. */
+    private final Map<String, Line> lines = new HashMap<String, Line>();
 
-    /** Draws the line where it is wanted; {@code pointed} lights its words. */
-    void draw(FontRenderer font, int screenWidth, double pointerX,
-              double pointerY, boolean pointed, PointerRegions regions) {
+    private static final class Line {
+        final MotionTransition fade =
+                new MotionTransition(MotionIds.WINDOW_VIEW_LINE);
+        /** Null while the line is not shown. */
+        LostTalesUiHitBox box;
+    }
+
+    /**
+     * Draws the line of every window whose page fills it, where it is
+     * wanted; the one under the pointer, {@code pointedId}, lights.
+     */
+    void draw(FontRenderer font, double pointerX, double pointerY,
+              String pointedId, PointerRegions regions) {
         long now = System.nanoTime();
-        if (!ContentView.isOn()) {
-            this.fade.settle(false);
-            this.box = null;
-            return;
+        Iterator<Map.Entry<String, Line>> gone =
+                this.lines.entrySet().iterator();
+        while (gone.hasNext()) {
+            if (!ContentView.isOn(gone.next().getKey())) {
+                gone.remove();
+            }
         }
         String words = StatCollector.translateToLocal(
                 "gui.losttales.window.view.leave");
         int width = WindowStyle.popupLineWidth(font, words);
-        int left = (screenWidth - width) / 2;
-        LostTalesUiHitBox at = new LostTalesUiHitBox(left, TOP, width,
-                WindowStyle.POPUP_LINE_HEIGHT);
         long hold = Math.round(Motions.param(MotionIds.WINDOW_VIEW_LINE,
                 "hold", 2500.0F) * 1000000.0D);
-        boolean wanted = now - ContentView.enteredNanos() < hold
-                || pointerY < REACH || at.contains(pointerX, pointerY);
-        float opacity = this.fade.advance(now, wanted);
-        if (opacity < LostTalesUiInk.MIN_VISIBLE_ALPHA / 255.0F) {
-            this.box = null;
-            return;
+        for (WindowFrame frame : WindowFrame.drawnFrames()) {
+            if (!ContentView.isOn(frame.windowId)) {
+                continue;
+            }
+            Line line = this.lines.get(frame.windowId);
+            if (line == null) {
+                line = new Line();
+                this.lines.put(frame.windowId, line);
+            }
+            LostTalesUiHitBox window = frame.drawnBox();
+            int left = (int)Math.floor(window.left) + LostTalesUiInk
+                    .centredStart((int)Math.floor(window.width), width);
+            int top = (int)Math.floor(window.top) + TOP;
+            LostTalesUiHitBox at = new LostTalesUiHitBox(left, top, width,
+                    WindowStyle.POPUP_LINE_HEIGHT);
+            // A window lying over this one's top covers its line too.
+            boolean covered = WindowFrame.drawnAt(left + width / 2.0D,
+                    top + 1.0D) != frame;
+            boolean nearTop = window.contains(pointerX, pointerY)
+                    && pointerY < window.top + REACH;
+            boolean wanted = now - ContentView.enteredNanos(frame.windowId)
+                    < hold || nearTop || at.contains(pointerX, pointerY);
+            float opacity = line.fade.advance(now, wanted && !covered);
+            if (opacity < LostTalesUiInk.MIN_VISIBLE_ALPHA / 255.0F) {
+                line.box = null;
+                continue;
+            }
+            line.box = at;
+            WindowStyle.drawPopupLine(font, words,
+                    frame.windowId.equals(pointedId)
+                            ? WindowStyle.LANDING_RGB : LostTalesUiInk.IVORY,
+                    left, top, opacity);
+            regions.add(left, top, left + width,
+                    top + WindowStyle.POPUP_LINE_HEIGHT);
         }
-        this.box = at;
-        WindowStyle.drawPopupLine(font, words, pointed
-                ? WindowStyle.LANDING_RGB : LostTalesUiInk.IVORY, left, TOP,
-                opacity);
-        regions.add(left, TOP, left + width,
-                TOP + WindowStyle.POPUP_LINE_HEIGHT);
     }
 
-    /** Whether the point is on the line as it was last drawn. */
-    boolean contains(double x, double y) {
-        return this.box != null && this.box.contains(x, y);
+    /** The window whose line is under the point as it was last drawn; null for none. */
+    String windowAt(double x, double y) {
+        for (Map.Entry<String, Line> entry : this.lines.entrySet()) {
+            LostTalesUiHitBox box = entry.getValue().box;
+            if (box != null && box.contains(x, y)) {
+                return entry.getKey();
+            }
+        }
+        return null;
     }
 }

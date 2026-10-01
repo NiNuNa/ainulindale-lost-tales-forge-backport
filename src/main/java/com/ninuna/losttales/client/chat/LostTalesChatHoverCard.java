@@ -596,7 +596,9 @@ final class LostTalesChatHoverCard {
                     inSpan = true;
                 }
                 if (head != null) {
-                    inSpan = true;
+                    // An action's head is worn in the Narrator's voice and
+                    // opens no card; the speaker's name in its words does.
+                    inSpan = !head.voiced;
                     if (head.npcIdentity) {
                         identitySpan = true;
                     }

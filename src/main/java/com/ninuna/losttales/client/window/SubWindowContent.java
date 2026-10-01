@@ -143,31 +143,13 @@ public abstract class SubWindowContent {
         return null;
     }
 
-    /** The room of a window too large for it, which every cut is kept inside too; null for none. */
-    private static LostTalesUiHitBox outerClip;
-
-    /** Keeps every cut inside {@code box} until it is set back to null. */
-    static void setOuterClip(LostTalesUiHitBox box) {
-        outerClip = box;
-    }
-
     /**
      * Cuts what is drawn next to a box of the screen, {@code left} and
-     * {@code top} where it really stands, and never past the outer cut;
-     * false where the scissor cannot be had, and nothing is then cut.
+     * {@code top} where it really stands; false where the scissor cannot
+     * be had, and nothing is then cut.
      */
     public static boolean beginClip(Minecraft minecraft, double left, double top,
                              double width, double height) {
-        if (outerClip != null) {
-            double right = Math.min(left + width,
-                    outerClip.left + outerClip.width);
-            double bottom = Math.min(top + height,
-                    outerClip.top + outerClip.height);
-            left = Math.max(left, outerClip.left);
-            top = Math.max(top, outerClip.top);
-            width = Math.max(0.0D, right - left);
-            height = Math.max(0.0D, bottom - top);
-        }
         try {
             ScaledResolution resolution = new ScaledResolution(minecraft,
                     minecraft.displayWidth, minecraft.displayHeight);

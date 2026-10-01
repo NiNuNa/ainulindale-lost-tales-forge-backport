@@ -22,6 +22,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiItemIcon;
 import com.ninuna.losttales.gui.style.LostTalesUiRules;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatDeliveryMark;
@@ -330,13 +331,16 @@ public final class LostTalesChatOverlayRenderer {
         // anything reads their width: the lines are laid out against it.
         // The list takes the width its edge was dragged to, within a third
         // of the window and the words' least room beside it, and narrows
-        // with the window down to its heads rather than leaving.
+        // with the window down to its heads rather than leaving. A window
+        // with nothing on screen leaves both as they stand.
         float windowChatWidth = chatWidth / chat.func_146244_h() + 6.0F;
         ChatMemberList.measure(frame.members,
                 ChatLayout.getMembersWidth(window), windowChatWidth,
                 ChatTimestampColumn.of(frame, minecraft.fontRenderer)
                         .messageX());
-        frame.advancePanels(window, view != null);
+        if (view != null) {
+            frame.advancePanels(window);
+        }
         // The unread divider opens a run of its own under it while it
         // stands, so the window lays its lines out knowing where it is.
         Integer unread = view == null ? null
@@ -403,29 +407,33 @@ public final class LostTalesChatOverlayRenderer {
             ClientChatOlderHistory.requestIfAtTop(minecraft, view, lines,
                     maximum > 0.0D && scroll >= maximum - 0.01D);
         }
-        // The window's own rectangle of the blurred frame, the ring its
-        // frame stands on included, under the backdrop; drawn only while
-        // the chat screen captured one this frame, so every other path
+        // What lies behind the window is cut away over the box it shows
+        // and its frame's ring. Then the blurred frame goes under the
+        // backdrop in the frame's shape, its four outermost corner pixels
+        // left to what stands behind as the cut leaves them; drawn only
+        // while the screen captured one this frame, so every other path
         // keeps the plain backdrop. The history band thins out to the
         // right exactly as its backdrop does; the tab row's band and the
-        // bar's stay whole.
+        // bar's stay whole. A window its page fills shows only its box.
+        LostTalesUiHitBox shownBox = frame.drawnBox();
+        float blurOpacity = opening.getOpacity();
+        WindowDrawing.cutBehind(shownBox, blurOpacity);
         int ring = WindowPlacement.FRAME_WIDTH;
         LostTalesGuiRegionBlur blur = LostTalesGuiRegionBlur.getInstance();
-        double blurLeft = frame.drawnLeft() - ring;
-        double blurRight = frame.drawnLeft() + (frame.boxRight - frame.boxLeft)
-                + ring;
-        double blurTop = frame.boxTop + frame.motionY - ring;
-        double blurBottom = frame.boxBottom + frame.motionY + ring;
-        double historyTop = frame.drawnBaseline() - room;
-        double historyBottom = frame.drawnBaseline()
-                + WindowPlacement.lineHeight(minecraft);
-        float blurOpacity = opening.getOpacity();
-        blur.drawRegion(blurLeft, blurTop, blurRight, historyTop,
-                blurOpacity);
-        blur.drawFadedRegion(blurLeft, historyTop, blurRight, historyBottom,
-                BACKDROP_FADE_WEIGHTS, blurOpacity);
-        blur.drawRegion(blurLeft, historyBottom, blurRight, blurBottom,
-                blurOpacity);
+        double blurLeft = shownBox.left - ring;
+        double blurRight = shownBox.left + shownBox.width + ring;
+        double blurTop = shownBox.top - ring;
+        double blurBottom = shownBox.top + shownBox.height + ring;
+        double historyTop = Math.max(blurTop, Math.min(blurBottom,
+                frame.drawnBaseline() - room));
+        double historyBottom = Math.max(historyTop, Math.min(blurBottom,
+                frame.drawnBaseline() + WindowPlacement.lineHeight(minecraft)));
+        blur.drawFramedBand(blurLeft, blurTop, blurRight, historyTop,
+                blurTop, blurBottom, null, blurOpacity);
+        blur.drawFramedBand(blurLeft, historyTop, blurRight, historyBottom,
+                blurTop, blurBottom, BACKDROP_FADE_WEIGHTS, blurOpacity);
+        blur.drawFramedBand(blurLeft, historyBottom, blurRight, blurBottom,
+                blurTop, blurBottom, null, blurOpacity);
         // The newest line sits on the baseline; the whole window rides
         // the opening motion, tabs and bar included. The origin is the
         // frame's, not the placement box's: the box is where the window
@@ -445,7 +453,7 @@ public final class LostTalesChatOverlayRenderer {
     }
 
     /**
-     * The closed-chat feed: the lines each conversation's notification
+     * The closed-chat feed: the lines each conversation's Show in Feed
      * choice lets through, its tab open or closed, as one fading stack
      * at the feed's own position, with the
      * channel prefixes that tell the channels apart. The feed lays its
@@ -459,9 +467,9 @@ public final class LostTalesChatOverlayRenderer {
                                  List<ChatLine> drawn, int screenWidth,
                                  int screenHeight, float partialTicks) {
         ChatFrame frame = ChatFrame.feed();
-        // Every line of a conversation whose choice is Everything, and a
-        // line addressed to the player of one whose choice is Only
-        // Mentions; typing shows for the first alone.
+        // Every line of a conversation shown in the feed with All
+        // Messages, and a line addressed to the player of one shown with
+        // Only Mentions; typing shows for the first alone.
         List<ChatTab> feedTabs = ChatLayout.feedTabs();
         ChatLineFilter filter = ChatLayout.feedFilter();
         // Someone typing into a conversation the feed carries raises
@@ -1147,13 +1155,13 @@ public final class LostTalesChatOverlayRenderer {
                                     LostTalesUiInk.SURFACE_RGB,
                                     columnAlpha));
                 }
-                // The window's frame beside the history, in the colour it
-                // touches: the timestamp area's, or the panel's
-                // own left end; on the right the member list's while it
-                // is out, else the panel's own colour at its full
-                // strength rather than where it has thinned out to
-                // nothing. A highlighted line recolours its
-                // stretches with its row.
+                // The window's frame beside the history continues exactly
+                // what it touches, its colour and its strength: the
+                // timestamp area, or the panel's left end at its full
+                // strength; on the right the member list while it is out,
+                // else the panel's right end, where it has thinned out as
+                // far as it does. A highlighted line recolours its
+                // stretches with its row, and a lit member its own.
                 int areaArgb = LostTalesUiInk.argb(
                         LostTalesUiInk.SURFACE_RGB, columnAlpha);
                 int panelArgb = LostTalesUiInk.argb(
@@ -1161,7 +1169,29 @@ public final class LostTalesChatOverlayRenderer {
                 LostTalesUiInk.fillRect(ringLeft, topEdge, panelLeft, bottomEdge,
                         columns.shows() ? areaArgb : panelArgb);
                 LostTalesUiInk.fillRect(windowRight, topEdge, ringRight, bottomEdge,
-                        panelRight < windowRight ? areaArgb : panelArgb);
+                        panelRight < windowRight ? areaArgb
+                                : LostTalesUiInk.argb(WindowStyle.backdropRgb(),
+                                        panelEndAlpha(panelAlpha)));
+                // What the history's top and bottom edges touch, stretch by
+                // stretch, for the ring over and under a window the
+                // conversation fills: the timestamp area, the panel thinning
+                // out along the window as it does, the member list.
+                float panelCurveLeft = originX + panelLeft * scale;
+                float panelCurveRight = originX + panelRight * scale;
+                if (columns.shows()) {
+                    frame.contentEdge.first(areaArgb);
+                    frame.contentEdge.from(originX + messageLeft * scale,
+                            panelArgb, panelCurveLeft, panelCurveRight,
+                            BACKDROP_FADE_WEIGHTS);
+                } else {
+                    frame.contentEdge.first(panelArgb, panelCurveLeft,
+                            panelCurveRight, BACKDROP_FADE_WEIGHTS);
+                }
+                if (panelRight < windowRight) {
+                    frame.contentEdge.from(originX + panelRight * scale,
+                            areaArgb);
+                }
+                frame.contentShade.clear();
                 // Rows the history does not reach: hatched, so the
                 // region reads as holding no messages rather than as a
                 // gap. The hatch hangs from the panel's top and stops
@@ -1409,8 +1439,8 @@ public final class LostTalesChatOverlayRenderer {
                             }
                         } else if (bandRgb != backdropRgb) {
                             // With no timestamp area, the window's frame
-                            // beside the line takes the line's band as the
-                            // panel's own left end wears it.
+                            // beside the line continues the line's band as
+                            // the panel's left end wears it.
                             recolour(ringLeft, ringLeft,
                                     y - rowHeight - headroom / scale,
                                     panelLeft, y, panelAlpha, backdropRgb,
@@ -1418,13 +1448,12 @@ public final class LostTalesChatOverlayRenderer {
                         }
                         if (bandRgb != backdropRgb
                                 && panelRight >= windowRight) {
-                            // On the right the frame wears the panel at
-                            // its full strength, and the line's band there
-                            // the same way.
+                            // On the right it continues the band as the
+                            // panel's right end wears it, thinned as far.
                             recolour(windowRight, windowRight,
                                     y - rowHeight - headroom / scale,
-                                    ringRight, y, panelAlpha, backdropRgb,
-                                    bandRgb, FLAT_WEIGHTS);
+                                    ringRight, y, panelEndAlpha(panelAlpha),
+                                    backdropRgb, bandRgb, FLAT_WEIGHTS);
                         }
                         if (pinged) {
                             // A mention also wears a bar by the window's
@@ -1737,19 +1766,32 @@ public final class LostTalesChatOverlayRenderer {
                         WindowStyle.TOP_EDGE_FADE_HEIGHT, fadeAlpha);
                 drawEdgeFade(panelLeft, panelRight, bottomEdge, topEdge,
                         WindowStyle.BOTTOM_EDGE_FADE_HEIGHT, fadeAlpha);
+                // The window's frame beside the rows the shades darken
+                // continues them: on the left at the strength the
+                // panel's shade starts with; on the right beside the
+                // member list as it wears them, and beside the panel's
+                // right end, where they have faded out, not at all.
+                drawFlatEdgeFades(ringLeft, panelLeft, topEdge, bottomEdge,
+                        fadeAlpha);
                 if (panelRight < windowRight) {
                     // The member list's rows fade by the rules as the
                     // words do, evenly across its width.
-                    LostTalesUiRules.drawEdgeFade(panelRight, windowRight, panelRight,
-                            windowRight, topEdge, bottomEdge,
-                            WindowStyle.TOP_EDGE_FADE_HEIGHT, fadeAlpha,
-                            WindowStyle.backdropRgb(), false);
-                    LostTalesUiRules.drawEdgeFade(panelRight, windowRight, panelRight,
-                            windowRight, bottomEdge, topEdge,
-                            WindowStyle.BOTTOM_EDGE_FADE_HEIGHT, fadeAlpha,
-                            WindowStyle.backdropRgb(), false);
+                    drawFlatEdgeFades(panelRight, ringRight, topEdge,
+                            bottomEdge, fadeAlpha);
                 }
                 GL11.glPopMatrix();
+                // Over and under a window the conversation fills, the
+                // frame's ring continues the shades at the edge's own
+                // strength, as the rows next to it wear them.
+                int shadeArgb = LostTalesUiInk.argb(WindowStyle.backdropRgb(),
+                        fadeAlpha);
+                frame.contentShade.first(shadeArgb,
+                        originX + panelLeft * scale,
+                        originX + panelRight * scale, SHADE_RAMP);
+                if (panelRight < windowRight) {
+                    frame.contentShade.from(originX + panelRight * scale,
+                            shadeArgb);
+                }
             }
             endHoles(masked);
             masked = false;
@@ -1938,6 +1980,25 @@ public final class LostTalesChatOverlayRenderer {
                              float limit, float height, int alpha) {
         LostTalesUiRules.drawEdgeFade(left, right, left, right, edge, limit, height, alpha,
                 WindowStyle.backdropRgb(), true);
+    }
+
+    /** The shades' ramp across the panel: full at its left end, nothing at its right. */
+    private static final float[] SHADE_RAMP = {1.0F, 0.0F};
+
+    /**
+     * The shades by both rules, even across {@code left} to {@code right}:
+     * what the member list wears, and the frame's ring beside a stretch
+     * that wears them at full strength.
+     */
+    private static void drawFlatEdgeFades(float left, float right,
+                                          float topEdge, float bottomEdge,
+                                          int alpha) {
+        LostTalesUiRules.drawEdgeFade(left, right, left, right, topEdge,
+                bottomEdge, WindowStyle.TOP_EDGE_FADE_HEIGHT, alpha,
+                WindowStyle.backdropRgb(), false);
+        LostTalesUiRules.drawEdgeFade(left, right, left, right, bottomEdge,
+                topEdge, WindowStyle.BOTTOM_EDGE_FADE_HEIGHT, alpha,
+                WindowStyle.backdropRgb(), false);
     }
 
     /**
@@ -3531,6 +3592,12 @@ public final class LostTalesChatOverlayRenderer {
      * screen is open: the game's chat opacity, carried by the opening
      * fade. Every line is at it, so the panel can be one piece.
      */
+    /** The panel's strength at its right end, {@code panelAlpha} thinned as its profile ends. */
+    private static int panelEndAlpha(int panelAlpha) {
+        return Math.round(panelAlpha
+                * BACKDROP_FADE_WEIGHTS[BACKDROP_FADE_WEIGHTS.length - 1]);
+    }
+
     private static int backdropAlpha(float opacity,
                                      LostTalesGuiAnimationSample opening) {
         return Math.max(0, Math.min(255,

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.motion;
 
+import com.ninuna.losttales.client.window.PageKeys;
 import com.ninuna.losttales.client.window.BarItem;
 import com.ninuna.losttales.client.window.MenuWindow;
 import com.ninuna.losttales.client.window.PageAnswer;
@@ -7,6 +8,7 @@ import com.ninuna.losttales.client.window.PageContent;
 import com.ninuna.losttales.client.window.PageSearch;
 import com.ninuna.losttales.client.window.PageTab;
 import com.ninuna.losttales.client.window.ScreenPart;
+import com.ninuna.losttales.client.window.Settings;
 import com.ninuna.losttales.client.window.ToolStrip;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowBar;
@@ -53,9 +55,6 @@ import org.lwjgl.opengl.GL11;
  * lets what was not saved go. In the list a motion tuned and not saved
  * wears the draft pen, and one the Lab's saved version plays reads in
  * honey.</p>
- *
- * <p>It touches no world and no player, so it opens over the main menu as
- * well as in a world.</p>
  */
 public final class MotionLabPage extends PageContent {
     /** The code name the page is registered and remembered under. */
@@ -801,6 +800,22 @@ public final class MotionLabPage extends PageContent {
 
     /* ---- The keys ---- */
 
+    /** The keys the Motion Lab answers to, for its help. */
+    @Override
+    public List<PageKeys.Area> keyAreas() {
+        return PageKeys.pageArea("gui.losttales.page.motion_lab",
+                PageKeys.pageKey(PAGE_ID, "pick",
+                        Keyboard.KEY_UP, PageKeys.OR, Keyboard.KEY_DOWN),
+                PageKeys.pageKey(PAGE_ID, "replay", Keyboard.KEY_SPACE),
+                PageKeys.pageKey(PAGE_ID, "scroll",
+                        Keyboard.KEY_PRIOR, PageKeys.OR, Keyboard.KEY_NEXT),
+                PageKeys.pageKey(PAGE_ID, "step",
+                        PageKeys.CLICK, PageKeys.OR, PageKeys.RIGHT_CLICK),
+                PageKeys.pageKey(PAGE_ID, "ten",
+                        Keyboard.KEY_LSHIFT, PageKeys.PLUS, PageKeys.CLICK),
+                PageKeys.pageKey(PAGE_ID, "wheel", PageKeys.WHEEL));
+    }
+
     /** The arrows walk the motions, Space plays the sample again, and the page keys scroll the rows. */
     @Override
     public boolean keyTyped(char typedChar, int keyCode) {
@@ -838,6 +853,12 @@ public final class MotionLabPage extends PageContent {
     @Override
     public int tone() {
         return LostTalesColors.rgb(LostTalesColors.MOTION_LAB_TONE);
+    }
+
+    /** Animations, their speed and reduced motion: Motion Settings. */
+    @Override
+    public Settings.Place settingsPlace() {
+        return Settings.Place.MOTION;
     }
 
     /* ---- The window's strip ---- */
@@ -1021,11 +1042,6 @@ public final class MotionLabPage extends PageContent {
 
     /* ---- Life ---- */
 
-    /** The Lab touches no world and no player, so it shows in a world and over the main menu alike. */
-    @Override
-    public boolean isAvailable() {
-        return true;
-    }
 
     /** The Lab's tab closed while it was shown: what was tuned and not saved goes with it. */
     @Override

@@ -41,7 +41,11 @@ public class WindowHover {
         SUB_WINDOW_RESIZE,
         /** The cross on a sub-window's strip. */
         SUB_WINDOW_CLOSE,
-        /** A sub-window's strip, which moves it. */
+        /** The padlock on a sub-window's strip. */
+        SUB_WINDOW_LOCK,
+        /** The grip at a sub-window's strip's end, which moves it while unlocked. */
+        SUB_WINDOW_GRIP,
+        /** A sub-window's strip, which moves it while unlocked. */
         SUB_WINDOW_STRIP,
         /** A sub-window's content where nothing of it answers. */
         SUB_WINDOW,
@@ -49,7 +53,7 @@ public class WindowHover {
         RESIZE,
         /** A tab, a tab's control, an end control or the grip. */
         TAB_ROW,
-        /** A window's tool strip: its panel button, its cog, its member list's button or its search. */
+        /** A window's tool strip: its panel button, its options, its cog, its member list's button, its search or its help. */
         TOOL_STRIP,
         /** The bare stretch of a tab row. */
         STRIP,
@@ -57,7 +61,7 @@ public class WindowHover {
         OVERLAY,
         /** What a screen part draws: its hover says what. */
         CONTENT,
-        /** The line at the top of the screen that puts a tab standing alone back into its window. */
+        /** The line at the top of a window its page fills, which gives it its row, strip and bar back. */
         VIEW_LEAVE
     }
 
@@ -70,8 +74,8 @@ public class WindowHover {
     public TabRow.Hit tabHit;
     /** On a tool strip, which of its controls; null anywhere else. */
     public ToolStrip.Part stripPart;
-    /** Whether the pointer is on the grip's own glyph. */
-    public boolean overGrip;
+    /** On a tool strip's option button, the option; null anywhere else. */
+    public PageOption stripOption;
     /** On a sub-window, the sub-window; null anywhere else. */
     public SubWindow subWindow;
     /** On a sub-window's resize band, the edge. */
@@ -113,10 +117,16 @@ public class WindowHover {
     public boolean acts() {
         switch (this.kind) {
             case SUB_WINDOW_CLOSE:
-            case SUB_WINDOW_STRIP:
-            case TAB_ROW:
+            case SUB_WINDOW_LOCK:
             case VIEW_LEAVE:
                 return true;
+            case SUB_WINDOW_STRIP:
+            case SUB_WINDOW_GRIP:
+                // A strip carries its sub-window only while it is not
+                // locked; a locked one is inert.
+                return this.subWindow != null && !this.subWindow.isLocked();
+            case TAB_ROW:
+                return !heldOnRow();
             case STRIP:
                 // A strip moves its window only while the window is not
                 // locked; a locked one is inert.
@@ -124,6 +134,10 @@ public class WindowHover {
             case TOOL_STRIP:
                 // Every control acts but a greyed one; the field takes
                 // the caret without a hand.
+                if (this.stripPart == ToolStrip.Part.OPTION) {
+                    return this.stripOption != null
+                            && this.stripOption.isAvailable();
+                }
                 return this.stripPart != null
                         && this.stripPart != ToolStrip.Part.FIELD
                         && ToolStrip.greyedWhy(this.stripPart,
@@ -141,6 +155,28 @@ public class WindowHover {
                         && this.barItem.isAvailable()
                         && this.barItem.kind != BarItem.Kind.FIELD
                         && this.barItem.kind != BarItem.Kind.WORDS;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Whether the pointer is on a control of a locked window's row that
+     * the padlock holds back: the {@code +}, a cross, the fullscreen
+     * control or the grip.
+     */
+    private boolean heldOnRow() {
+        if (this.window == null || !this.window.isLocked()
+                || this.tabHit == null) {
+            return false;
+        }
+        switch (this.tabHit.kind) {
+            case CLOSE:
+            case RESTORE:
+            case WINDOW_FULLSCREEN:
+            case WINDOW_CLOSE:
+            case GRIP:
+                return true;
             default:
                 return false;
         }

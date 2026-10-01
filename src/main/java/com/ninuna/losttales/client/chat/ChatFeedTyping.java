@@ -8,8 +8,9 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * The closed feed's typing row: who is typing into the conversations the
- * feed carries, each conversation named as the feed names a line's
+ * The closed feed's typing row: who is typing into the conversations
+ * whose every line the feed carries ({@link ChatLayout#feedTabs}), each
+ * conversation named as the feed names a line's
  * channel ("Global: Aldric is typing"), in the feed's own order. While
  * anyone types, the feed's lines rise a row and the typing row comes up
  * under them from the feed's bottom edge; once nobody does, the lines

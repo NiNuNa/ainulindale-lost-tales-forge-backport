@@ -44,7 +44,7 @@ public final class WindowGestures {
         /** A window moved or changed its size: whatever follows it follows. */
         void windowsMoved();
 
-        /** Someone tried to move a locked window: its padlock answers. */
+        /** Someone tried to move a locked window, or to put a tab into it: its padlock answers. */
         void lockedMoveTried(Window window);
     }
 
@@ -629,7 +629,8 @@ public final class WindowGestures {
                 return null;
             }
             Window window = WindowLayout.window(frame.windowId);
-            if (window == null || window.isLocked()) {
+            if (window == null || window.isLocked()
+                    || frame.isFilledByPage()) {
                 continue;
             }
             // A window filling a part of the screen answers only on the
@@ -1170,7 +1171,7 @@ public final class WindowGestures {
         this.lockedDrag = new LockedDrag(window.getId(), mouseX, mouseY);
     }
 
-    /** A press on a locked window's strip, grip or only tabs, waiting to see whether it travels. */
+    /** A press on a locked window's strip, grip or a tab of it, waiting to see whether it travels. */
     private static final class LockedDrag {
         final String windowId;
         final int pressX;
@@ -1191,8 +1192,8 @@ public final class WindowGestures {
     public void armWindowDrag(WindowFrame frame, int mouseX, int mouseY) {
         WindowLayout.raise(frame.windowId);
         if (ContentView.isOn(frame.windowId)) {
-            // A tab standing alone keeps the whole screen until it is
-            // put back into its window.
+            // A window its page fills stands where it is until it has its
+            // row, strip and bar back.
             return;
         }
         this.windowDrag = new WindowDrag(frame.windowId,
@@ -1647,8 +1648,8 @@ public final class WindowGestures {
 
     /**
      * Finds the row the dragged tab would dock into at the pointer: a
-     * row whose band the pointer is in (with some slack around its tabs)
-     * and whose window is not locked.
+     * row whose band the pointer is in (with some slack around its tabs).
+     * A locked window's row takes nothing, and nothing behind it does.
      */
     private void updateDropTarget(TabDrag drag, int mouseX, int mouseY) {
         drag.targetWindowId = null;
@@ -1699,6 +1700,12 @@ public final class WindowGestures {
                             : pulledBeyond(stripOff, bandOff,
                                     RETURN_DISTANCE))) {
                 continue;
+            }
+            if (window.isLocked()) {
+                // A locked window takes no tab: its padlock answers, and
+                // the tabs stay under the hand.
+                this.host.lockedMoveTried(window);
+                return;
             }
             // Where the carried run itself stands over this row: its
             // tabs ride at a fixed offset from the pointer — the grab
@@ -1950,9 +1957,8 @@ public final class WindowGestures {
     /**
      * Tears the dragged tabs off into a window of their own, placed so
      * its row lands under the pointer, as tall and as wide as the window
-     * they leave. Carrying every tab of a locked window is refused, since
-     * that moves the window; its tabs stay in their row while the drag
-     * goes on as a ghost.
+     * they leave. A locked window's tabs are never taken hold of, so none
+     * of them comes here.
      */
     private void tearOff(TabDrag drag) {
         // Placed for the window it is about to become, which is as tall

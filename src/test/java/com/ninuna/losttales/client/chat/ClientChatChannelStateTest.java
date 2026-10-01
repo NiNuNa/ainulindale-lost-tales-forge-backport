@@ -51,6 +51,32 @@ public final class ClientChatChannelStateTest {
         assertEquals(ChatChannel.GLOBAL, ClientChatChannelState.getSelected().getChannel());
     }
 
+    /**
+     * The command key's visit to the console is not what the chat's key
+     * comes back to: the conversation used before it is, unless another
+     * was picked meanwhile.
+     */
+    @Test
+    public void theChatKeyComesBackToTheConversationUsedBeforeTheConsole() {
+        ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
+        ChatTab ooc = ChatTab.of(ChatChannel.OOC);
+        ChatTab console = ChatTab.of(ChatChannel.CLIENT_CONSOLE);
+        ClientChatChannelState.select(global);
+        ClientChatChannelState.select(console);
+        assertEquals(console, ClientChatChannelState.lastUsed());
+        ClientChatChannelState.comeBackTo(global, console);
+        assertEquals(global, ClientChatChannelState.lastUsed());
+        // Another conversation picked during the visit stays the last used.
+        ClientChatChannelState.select(console);
+        ClientChatChannelState.select(ooc);
+        ClientChatChannelState.comeBackTo(global, console);
+        assertEquals(ooc, ClientChatChannelState.lastUsed());
+        // Opened by the chat's own key, there is nothing to come back to.
+        ClientChatChannelState.select(console);
+        ClientChatChannelState.comeBackTo(null, console);
+        assertEquals(console, ClientChatChannelState.lastUsed());
+    }
+
     @Test
     public void sentHistoryIsKeptPerTabAndClearedWithTheState() {
         ChatTab global = ChatTab.of(ChatChannel.GLOBAL);
@@ -204,13 +230,13 @@ public final class ClientChatChannelStateTest {
     }
 
     /**
-     * The feed reads every channel the player can see whose choice lets
-     * its lines through, closed ones included: every line where the
-     * choice is Everything, a line addressed to the player where it is
-     * Only Mentions, none where it is Nothing.
+     * The feed reads every channel the player can see whose Show in Feed
+     * lets its lines through, closed ones included: every line where it
+     * is All Messages, a line addressed to the player where it is Only
+     * Mentions, none where it is Nothing. Notifications has no say in it.
      */
     @Test
-    public void theFeedShowsClosedChannelsAsTheirChoiceAllows() {
+    public void theFeedShowsClosedChannelsAsShowInFeedAllows() {
         ChatTab ooc = ChatTab.of(ChatChannel.OOC);
         ChatTab faction = ChatTab.of(ChatChannel.FACTION, "lotr:gondor");
         assertTrue(ChatLineFilter.of(ChatLayout.feedTabs(),
@@ -218,19 +244,21 @@ public final class ClientChatChannelStateTest {
         assertTrue(ChatLayout.close(ChatTab.of(ChatChannel.OOC)));
         assertTrue(ChatLineFilter.of(ChatLayout.feedTabs(),
                 java.util.Collections.<ChatTab>emptySet()).accepts(ooc));
-        ChatLayout.setNotification(ChatTab.of(ChatChannel.OOC), ChatNotification.NOTHING);
+        ChatLayout.setNotification(ChatTab.of(ChatChannel.OOC), ChatLineChoice.NOTHING);
+        assertTrue(ChatLayout.feedFilter().accepts(ooc, false));
+        ChatLayout.setFeedChoice(ChatTab.of(ChatChannel.OOC), ChatLineChoice.NOTHING);
         assertFalse(ChatLayout.feedFilter().accepts(ooc, false));
         assertFalse(ChatLayout.feedFilter().accepts(ooc, true));
         assertTrue(ChatLayoutViews.reopen(ChatChannel.OOC));
         assertFalse(ChatLayout.feedFilter().accepts(ooc, true));
-        ChatLayout.setNotification(ChatTab.of(ChatChannel.OOC),
-                ChatNotification.ONLY_MENTIONS);
+        ChatLayout.setFeedChoice(ChatTab.of(ChatChannel.OOC),
+                ChatLineChoice.ONLY_MENTIONS);
         assertFalse(ChatLayout.feedFilter().accepts(ooc, false));
         assertTrue(ChatLayout.feedFilter().accepts(ooc, true));
         assertFalse(ChatLayout.feedTabs().contains(ooc));
         assertTrue(ChatLayout.mentionFeedTabs().contains(ooc));
-        ChatLayout.setNotification(ChatTab.of(ChatChannel.OOC),
-                ChatNotification.EVERYTHING);
+        ChatLayout.setFeedChoice(ChatTab.of(ChatChannel.OOC),
+                ChatLineChoice.EVERYTHING);
         assertTrue(ChatLayout.feedFilter().accepts(ooc, false));
         assertTrue(ChatLineFilter.of(ChatLayout.feedTabs(),
                 java.util.Collections.<ChatTab>emptySet()).accepts(ooc));
@@ -254,10 +282,10 @@ public final class ClientChatChannelStateTest {
         ChatTab whisper = ChatLayout.openWhisper("Bilbo", "", null);
         assertTrue(ChatLineFilter.of(ChatLayout.feedTabs(),
                 java.util.Collections.<ChatTab>emptySet()).accepts(whisper));
-        ChatLayout.setNotification(whisper, ChatNotification.ONLY_MENTIONS);
+        ChatLayout.setFeedChoice(whisper, ChatLineChoice.ONLY_MENTIONS);
         assertFalse(ChatLayout.feedFilter().accepts(whisper, false));
         assertTrue(ChatLayout.feedFilter().accepts(whisper, true));
-        ChatLayout.setNotification(whisper, ChatNotification.NOTHING);
+        ChatLayout.setFeedChoice(whisper, ChatLineChoice.NOTHING);
         assertFalse(ChatLayout.feedFilter().accepts(whisper, true));
     }
 

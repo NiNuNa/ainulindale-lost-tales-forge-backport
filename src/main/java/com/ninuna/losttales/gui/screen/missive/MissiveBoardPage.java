@@ -1,5 +1,6 @@
 package com.ninuna.losttales.gui.screen.missive;
 
+import com.ninuna.losttales.client.window.PageKeys;
 import com.ninuna.losttales.block.ELostTalesBlock;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityMissiveBoard;
 import com.ninuna.losttales.client.motion.MotionIds;
@@ -688,6 +689,20 @@ public final class MissiveBoardPage extends PageContent
     }
 
     /* ---- The keys ---- */
+
+    /** The keys the missive board answers to, for its help. */
+    @Override
+    public List<PageKeys.Area> keyAreas() {
+        return PageKeys.pageArea("gui.losttales.page.missive_board",
+                PageKeys.pageKey(PAGE_ID, "accept", Keyboard.KEY_A),
+                PageKeys.pageKey(PAGE_ID, "take", Keyboard.KEY_T),
+                PageKeys.pageKey(PAGE_ID, "pin", Keyboard.KEY_P),
+                PageKeys.pageKey(PAGE_ID, "pick",
+                        Keyboard.KEY_UP, PageKeys.OR, Keyboard.KEY_DOWN),
+                PageKeys.pageKey(PAGE_ID, "turn",
+                        Keyboard.KEY_PRIOR, PageKeys.OR, Keyboard.KEY_NEXT),
+                PageKeys.pageKey(PAGE_ID, "wheel", PageKeys.WHEEL));
+    }
 
     /**
      * The arrows walk the notices, the page keys turn the letter, and A,

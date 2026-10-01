@@ -48,6 +48,12 @@ final class ChatGroupRuns {
      */
     private static final long GROUP_WINDOW_MILLIS = 8L * 60L * 1000L;
     /**
+     * Who the Narrator's voice runs under, whoever lends it: its own lines
+     * and every action stand in one run under one Narrator header.
+     */
+    static final UUID NARRATOR_VOICE = UUID.nameUUIDFromBytes(
+            "losttales:narrator".getBytes(java.nio.charset.Charset.forName("UTF-8")));
+    /**
      * How long the closed feed keeps a line on screen, in milliseconds:
      * the fade the renderer draws, in the units a message's timestamp is
      * in. A message there this long after the one before it finds the
@@ -73,22 +79,6 @@ final class ChatGroupRuns {
                                       long timestampMillis,
                                       boolean groupable,
                                       IChatComponent groupedLine) {
-        remember(chatLineId, tab, senderId, identityName, accountLine,
-                timestampMillis, groupable, false, groupedLine);
-    }
-
-    /**
-     * As above; a message that {@code standsAlone} — an action, whose
-     * sentence names its speaker — opens no run either, so the message
-     * after it keeps its own header.
-     */
-    static synchronized void remember(int chatLineId, ChatTab tab,
-                                      UUID senderId, String identityName,
-                                      boolean accountLine,
-                                      long timestampMillis,
-                                      boolean groupable,
-                                      boolean standsAlone,
-                                      IChatComponent groupedLine) {
         if (tab == null || senderId == null || identityName == null
                 || groupedLine == null) {
             return;
@@ -100,7 +90,7 @@ final class ChatGroupRuns {
         // filed under the other.
         ENTRIES.put(Integer.valueOf(chatLineId), new Entry(ChatTab.viewed(tab),
                 senderId, identityName, accountLine, timestampMillis,
-                groupable && !standsAlone, standsAlone, groupedLine));
+                groupable, groupedLine));
         while (ENTRIES.size() > ClientChatChannelViews.maxTrackedLines()) {
             Iterator<Integer> oldest = ENTRIES.keySet().iterator();
             oldest.next();
@@ -123,8 +113,7 @@ final class ChatGroupRuns {
         }
         ENTRIES.put(Integer.valueOf(chatLineId), new Entry(entry.tab,
                 entry.senderId, entry.identityName, entry.accountLine,
-                entry.timestampMillis, entry.groupable, entry.standsAlone,
-                groupedLine));
+                entry.timestampMillis, entry.groupable, groupedLine));
     }
 
     /**
@@ -192,8 +181,7 @@ final class ChatGroupRuns {
                     && entry.timestampMillis - previous.timestampMillis
                             <= previousSpanMillis;
             if (!grouped[index]) {
-                // A message standing alone opens no run for the next.
-                runHead = entry != null && entry.standsAlone ? null : entry;
+                runHead = entry;
             }
             previous = entry;
         }
@@ -230,17 +218,13 @@ final class ChatGroupRuns {
         final long timestampMillis;
         /** Whether this message may ever be shown without its header. */
         final boolean groupable;
-        /** Whether this message neither joins a run nor opens one. */
-        final boolean standsAlone;
         /** The line without its repeated header; a view picks between the two. */
         final IChatComponent groupedLine;
 
         private Entry(ChatTab tab, UUID senderId, String identityName,
                       boolean accountLine, long timestampMillis,
-                      boolean groupable, boolean standsAlone,
-                      IChatComponent groupedLine) {
+                      boolean groupable, IChatComponent groupedLine) {
             this.groupable = groupable;
-            this.standsAlone = standsAlone;
             this.tab = tab;
             this.senderId = senderId;
             this.identityName = identityName;

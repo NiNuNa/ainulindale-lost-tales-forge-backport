@@ -2,7 +2,6 @@ package com.ninuna.losttales.client.window;
 
 import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
 import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
-import com.ninuna.losttales.client.gui.animation.LostTalesGuiRegionBlur;
 import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
@@ -428,9 +427,10 @@ public final class SnapPreview {
         if (right - left < 2.0F || bottom - top < 2.0F) {
             return;
         }
-        int ring = WindowPlacement.FRAME_WIDTH;
-        LostTalesGuiRegionBlur.getInstance().drawRegion(left - ring,
-                top - ring, right + ring, bottom + ring, opacity);
+        LostTalesUiHitBox standsIn = new LostTalesUiHitBox(left, top,
+                right - left, bottom - top);
+        WindowDrawing.cutBehind(standsIn, opacity);
+        WindowDrawing.softenBehind(standsIn, opacity);
         float surfaceShare = opacity
                 * WindowStyle.opacity(minecraft);
         fillGlass(left, top, right, bottom, holes,

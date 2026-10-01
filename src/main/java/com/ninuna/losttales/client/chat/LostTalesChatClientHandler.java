@@ -176,7 +176,6 @@ public final class LostTalesChatClientHandler {
             if (head == null || head == previous) {
                 return;
             }
-            boolean stray = false;
             boolean adopted = false;
             for (int index = 0; index < messages.size()
                     && index < UNTRACKED_SCAN_LIMIT; index++) {
@@ -186,13 +185,9 @@ public final class LostTalesChatClientHandler {
                 }
                 if (line != null && ClientChatChannelViews.tabOf(
                         line.getChatLineID()) == null) {
-                    stray = true;
                     adopted |= LostTalesChatPresentation.adoptStrayLine(
                             messages, index);
                 }
-            }
-            if (!stray) {
-                return;
             }
             if (adopted) {
                 // The drawn lines are rebuilt from the adopted history,
@@ -202,12 +197,6 @@ public final class LostTalesChatClientHandler {
                         minecraft.ingameGUI.getChatGUI());
                 this.watchedHead = messages.isEmpty()
                         ? null : messages.get(0);
-            }
-            ChatTab console = ChatTab.of(ChatChannel.CLIENT_CONSOLE);
-            if (!ChatLayout.isOpen(console)
-                    && !ChatLayout.isHidden(console)) {
-                ChatLayout.openTab(console,
-                        LostTalesChatPresentation.windowIdOfSelection());
             }
         } catch (RuntimeException ignored) {
             // Watching is best-effort; the chat itself is untouched.

@@ -13,7 +13,7 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 /**
- * A new player's three tips: shown in turn as the chat first
+ * A new player's four tips: shown in turn as the chat first
  * opens, each gone with a click, and never again once the last has gone,
  * which the account's window layout file remembers.
  */
@@ -32,9 +32,11 @@ public final class FirstTipsTest {
     }
 
     @Test
-    public void theThreeTipsShowInTurnAndThenNeverAgain() {
+    public void theFourTipsShowInTurnAndThenNeverAgain() {
         assertNull("nothing before the chat opens", FirstTips.current());
         FirstTips.chatOpened();
+        assertSame(FirstTips.Tip.LOCK, FirstTips.current());
+        assertTrue(FirstTips.dismiss());
         assertSame(FirstTips.Tip.PLUS, FirstTips.current());
         assertTrue(FirstTips.dismiss());
         assertSame(FirstTips.Tip.HEAD, FirstTips.current());
@@ -56,7 +58,7 @@ public final class FirstTipsTest {
         FirstTips.screenClosed();
         assertNull(FirstTips.current());
         FirstTips.chatOpened();
-        assertSame(FirstTips.Tip.HEAD, FirstTips.current());
+        assertSame(FirstTips.Tip.PLUS, FirstTips.current());
     }
 
     @Test
@@ -65,11 +67,12 @@ public final class FirstTipsTest {
         FirstTips.dismiss();
         FirstTips.dismiss();
         FirstTips.dismiss();
+        FirstTips.dismiss();
         List<String> lines = WindowLayoutStore.describe();
-        assertTrue(lines.toString(), lines.contains("tips seen=3"));
+        assertTrue(lines.toString(), lines.contains("tips seen=4"));
         FirstTips.load(0);
         WindowLayoutStore.load(lines);
-        assertEquals(3, FirstTips.seen());
+        assertEquals(4, FirstTips.seen());
         FirstTips.chatOpened();
         assertNull("read back, none shows", FirstTips.current());
     }

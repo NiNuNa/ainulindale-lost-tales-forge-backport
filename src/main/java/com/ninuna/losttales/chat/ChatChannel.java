@@ -72,7 +72,7 @@ public final class ChatChannel {
      */
     public static final ChatChannel CLIENT_CONSOLE = register("client_console", "Client Console", ChatPresentationMode.OUT_OF_CHARACTER,
             ChatRecipientRule.SELF, ChatChannelAccess.NONE,
-            LostTalesColors.rgb(LostTalesColors.ROSE_GRAY), false);
+            LostTalesColors.rgb(LostTalesColors.CONSOLE_TONE), false);
     /**
      * The server's own console, one stream every reader shares: what the
      * server did — started, stopped, a command run, a message taken
@@ -83,7 +83,7 @@ public final class ChatChannel {
     // The two consoles wear one grey: they are one kind of place.
     public static final ChatChannel SERVER_CONSOLE = register("server_console", "Server Console", ChatPresentationMode.OUT_OF_CHARACTER,
             ChatRecipientRule.CONSOLE_READERS, ChatChannelAccess.NONE,
-            LostTalesColors.rgb(LostTalesColors.ROSE_GRAY), false);
+            LostTalesColors.rgb(LostTalesColors.CONSOLE_TONE), false);
     /**
      * A private conversation between two players, in character. Not a tab of its own:
      * every whisper partner is one tab on this channel, and the client

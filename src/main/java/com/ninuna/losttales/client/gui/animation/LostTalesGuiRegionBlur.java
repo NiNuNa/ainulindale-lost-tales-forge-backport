@@ -1,22 +1,26 @@
 package com.ninuna.losttales.client.gui.animation;
 
 import java.nio.ByteBuffer;
+import java.nio.FloatBuffer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
+import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 
 /**
- * A blurred copy of the frame for panels that soften the world behind
- * their own rectangle while everything around them stays sharp — the
- * open chat windows above all. Once per frame the current frame is
- * captured, blurred with the same Gaussian shader the full-screen GUI
- * blur uses, captured again, and the sharp copy is put back; the
- * blurred copy is then a texture any caller may paste a region of, in
- * GUI coordinates. Everything is best-effort: without framebuffers or
- * the shader nothing is captured, {@link #drawRegion} draws nothing,
- * and the panels keep their plain backdrop.
+ * Copies of the frame as it stood before any window was drawn, for the
+ * windows drawn over it. The sharp copy cuts away whatever lies behind a
+ * window ({@link #cutFramedRegion}): pasted over the window's box first,
+ * it leaves only the world under it, so no window ever shows through
+ * another. The blurred copy softens the world behind a window's own
+ * rectangle while everything around it stays sharp: the frame is blurred
+ * with the same Gaussian shader the full-screen GUI blur uses, captured
+ * again, and the sharp copy is put back. Both are textures any caller may
+ * paste a region of, in GUI coordinates. Everything is best-effort:
+ * without framebuffers nothing is captured and nothing is pasted, and
+ * without the shader or a world there is no blur.
  */
 public final class LostTalesGuiRegionBlur {
     private static final LostTalesGuiRegionBlur INSTANCE =
@@ -26,6 +30,8 @@ public final class LostTalesGuiRegionBlur {
 
     private final LostTalesGuiBlurRenderer blur =
             new LostTalesGuiBlurRenderer();
+    /** The model view matrix a framed box is pasted in, read back for each paste. */
+    private final FloatBuffer matrix = BufferUtils.createFloatBuffer(16);
     private int sharpTexture = -1;
     private int blurredTexture = -1;
     private int width = -1;
@@ -40,7 +46,10 @@ public final class LostTalesGuiRegionBlur {
      */
     private double guiWidth = 1.0D;
     private double guiHeight = 1.0D;
-    private long capturedNanos;
+    /** When the sharp copy was taken, or 0 for none. */
+    private long sharpNanos;
+    /** When the blurred copy was taken, or 0 for none. */
+    private long blurredNanos;
 
     private LostTalesGuiRegionBlur() {}
 
@@ -49,18 +58,21 @@ public final class LostTalesGuiRegionBlur {
     }
 
     /**
-     * Captures and blurs the frame as drawn so far; the screen looks
-     * exactly as before when this returns, and {@link #drawRegion} can
-     * paste blurred rectangles for the rest of the frame. Called before
-     * anything of the caller's own is drawn.
+     * Captures the frame as drawn so far, and blurs a copy of it at
+     * {@code strength} while there is a world to blur; 0 takes the sharp
+     * copy alone. The screen looks exactly as before when this returns:
+     * {@link #cutFramedRegion} can paste the sharp frame and
+     * {@link #drawFramedRegion} the blurred one for the rest of the frame.
+     * Called before anything of the caller's own is drawn. Answers
+     * whether the blurred copy was taken.
      */
     public boolean capture(Minecraft minecraft, float partialTicks,
                            float strength) {
-        this.capturedNanos = 0L;
-        if (minecraft == null || minecraft.theWorld == null
-                || minecraft.getFramebuffer() == null
+        this.sharpNanos = 0L;
+        this.blurredNanos = 0L;
+        if (minecraft == null || minecraft.getFramebuffer() == null
                 || !OpenGlHelper.isFramebufferEnabled()
-                || strength <= 0.01F || minecraft.displayWidth <= 0
+                || minecraft.displayWidth <= 0
                 || minecraft.displayHeight <= 0) {
             return false;
         }
@@ -73,12 +85,14 @@ public final class LostTalesGuiRegionBlur {
             this.guiHeight = Math.max(1.0D,
                     resolution.getScaledHeight_double());
             copyFrameInto(this.sharpTexture, minecraft);
-            if (!this.blur.render(minecraft, partialTicks, strength)) {
+            this.sharpNanos = System.nanoTime();
+            if (minecraft.theWorld == null || strength <= 0.01F
+                    || !this.blur.render(minecraft, partialTicks, strength)) {
                 return false;
             }
             copyFrameInto(this.blurredTexture, minecraft);
             drawFullFrame(this.sharpTexture, minecraft);
-            this.capturedNanos = System.nanoTime();
+            this.blurredNanos = System.nanoTime();
             return true;
         } catch (RuntimeException failure) {
             release();
@@ -86,38 +100,124 @@ public final class LostTalesGuiRegionBlur {
         }
     }
 
-    /** Whether a region drawn now would show this frame's capture. */
-    public boolean isFresh() {
-        return this.capturedNanos > 0L
-                && System.nanoTime() - this.capturedNanos < FRESH_NANOS;
+    /** Whether a copy taken at {@code nanos} is this frame's. */
+    private static boolean fresh(long nanos) {
+        return nanos > 0L && System.nanoTime() - nanos < FRESH_NANOS;
     }
 
     /**
-     * Pastes the blurred frame inside one GUI-space rectangle. Nothing
-     * is drawn without a fresh capture, so callers need not know
-     * whether the blur is available at all.
+     * Cuts away whatever was drawn since the capture inside a framed box
+     * {@code left} to {@code right} by {@code top} to {@code bottom}: the
+     * sharp frame is pasted over the box and the frame's {@code ring}
+     * round it, the ring's four outermost corner pixels left out as a
+     * frame leaves them. A window or a sub-window does this before it
+     * draws itself, so nothing behind it shows through. Nothing is drawn
+     * without a fresh capture.
      */
-    public void drawRegion(double left, double top, double right,
-                           double bottom, float opacity) {
-        drawFadedRegion(left, top, right, bottom, null, opacity);
+    public void cutFramedRegion(double left, double top, double right,
+                                double bottom, int ring, float opacity) {
+        if (fresh(this.sharpNanos)) {
+            drawFramed(this.sharpTexture, left, top, right, bottom, ring,
+                    opacity);
+        }
     }
 
     /**
-     * As {@link #drawRegion}, but the blur thins out across the region
-     * the way the chat backdrop does. {@code fadeWeights} is that
-     * profile sampled evenly from the left edge to the right — one more
-     * entry than the steps it is drawn in — and {@code null} fades
-     * nothing.
+     * Softens the world under a framed box: the blurred frame pasted over
+     * the box and its frame's {@code ring}, in the frame's own shape, as
+     * {@link #cutFramedRegion} cuts it. Nothing is drawn without a fresh
+     * blurred capture, so with the windows' blur off the world stays sharp.
      */
-    public void drawFadedRegion(double left, double top, double right,
-                                double bottom, float[] fadeWeights,
-                                float opacity) {
-        drawMapped(left, top, right, bottom, fadeWeights,
-                left, top, right, bottom, opacity);
+    public void drawFramedRegion(double left, double top, double right,
+                                 double bottom, int ring, float opacity) {
+        if (fresh(this.blurredNanos)) {
+            drawFramed(this.blurredTexture, left, top, right, bottom, ring,
+                    opacity);
+        }
     }
 
     /**
-     * As {@link #drawFadedRegion} for callers drawing inside their own
+     * A texture over a box and its ring, the ring's four outermost corner
+     * pixels left out. The box may stand in a moved or scaled matrix, as a
+     * list following the caret does: the frame is sampled where the box
+     * really lands on the screen, so what shows under it is what stands
+     * behind it.
+     */
+    private void drawFramed(int texture, double left, double top,
+                            double right, double bottom, int ring,
+                            float opacity) {
+        this.matrix.clear();
+        GL11.glGetFloat(GL11.GL_MODELVIEW_MATRIX, this.matrix);
+        double scaleX = this.matrix.get(0);
+        double scaleY = this.matrix.get(5);
+        double moveX = this.matrix.get(12);
+        double moveY = this.matrix.get(13);
+        if (!(scaleX > 0.0D) || !(scaleY > 0.0D)) {
+            scaleX = 1.0D;
+            scaleY = 1.0D;
+            moveX = 0.0D;
+            moveY = 0.0D;
+        }
+        drawStrip(texture, left - ring + 1, top - ring, right + ring - 1,
+                top - ring + 1, scaleX, scaleY, moveX, moveY, opacity);
+        drawStrip(texture, left - ring, top - ring + 1, right + ring,
+                bottom + ring - 1, scaleX, scaleY, moveX, moveY, opacity);
+        drawStrip(texture, left - ring + 1, bottom + ring - 1,
+                right + ring - 1, bottom + ring, scaleX, scaleY, moveX,
+                moveY, opacity);
+    }
+
+    /** One strip of a framed paste, sampled where the matrix puts it. */
+    private void drawStrip(int texture, double left, double top,
+                           double right, double bottom, double scaleX,
+                           double scaleY, double moveX, double moveY,
+                           float opacity) {
+        drawMapped(texture, left, top, right, bottom, null,
+                moveX + left * scaleX, moveY + top * scaleY,
+                moveX + right * scaleX, moveY + bottom * scaleY, 0.0D, 1.0D,
+                opacity);
+    }
+
+    /**
+     * Pastes one band, {@code top} to {@code bottom}, of the blurred frame
+     * under a framed box: the frame's ring reaches from {@code frameTop}
+     * to {@code frameBottom}, and where the band takes in the ring's first
+     * or last row, its four outermost corner pixels are left out as
+     * {@link #drawFramedRegion} leaves them. {@code fadeWeights} thins the
+     * blur out across the band as the chat backdrop does: that profile
+     * sampled evenly from the left edge to the right, one more entry than
+     * the steps it is drawn in; {@code null} fades nothing. Nothing is
+     * drawn without a fresh capture.
+     */
+    public void drawFramedBand(double left, double top, double right,
+                               double bottom, double frameTop,
+                               double frameBottom, float[] fadeWeights,
+                               float opacity) {
+        if (!fresh(this.blurredNanos) || right - left <= 2.0D
+                || bottom <= top) {
+            return;
+        }
+        double inset = 1.0D / (right - left);
+        double upper = Math.max(top, Math.min(bottom, frameTop + 1.0D));
+        double lower = Math.max(upper, Math.min(bottom, frameBottom - 1.0D));
+        // The ring's first row, the rows between, and its last row.
+        double[] from = {top, upper, lower};
+        double[] to = {upper, lower, bottom};
+        for (int piece = 0; piece < 3; piece++) {
+            if (to[piece] <= from[piece]) {
+                continue;
+            }
+            boolean corners = piece != 1;
+            drawMapped(this.blurredTexture, left, from[piece], right,
+                    to[piece], fadeWeights, left, from[piece], right,
+                    to[piece], corners ? inset : 0.0D,
+                    corners ? 1.0D - inset : 1.0D, opacity);
+        }
+    }
+
+    /**
+     * Pastes the blurred frame, thinned out by {@code fadeWeights} as
+     * {@link #drawFramedBand} does, for callers drawing inside their own
      * translate and scale: the quad's vertices are the local coordinates
      * given — the current transform places them — while the texture is
      * sampled at the screen rectangle they map to, described by where
@@ -128,42 +228,49 @@ public final class LostTalesGuiRegionBlur {
             double localLeft, double localTop, double localRight,
             double localBottom, float[] fadeWeights, double screenLeft,
             double screenTop, double scale, float opacity) {
-        if (scale <= 0.0D) {
+        if (scale <= 0.0D || !fresh(this.blurredNanos)) {
             return;
         }
-        drawMapped(localLeft, localTop, localRight, localBottom,
-                fadeWeights,
+        drawMapped(this.blurredTexture, localLeft, localTop, localRight,
+                localBottom, fadeWeights,
                 screenLeft + (localLeft) * scale,
                 screenTop + (localTop) * scale,
                 screenLeft + (localRight) * scale,
                 screenTop + (localBottom) * scale,
-                opacity);
+                0.0D, 1.0D, opacity);
     }
 
-    private void drawMapped(double vertexLeft, double vertexTop,
-                            double vertexRight, double vertexBottom,
-                            float[] fadeWeights, double screenLeft,
-                            double screenTop, double screenRight,
-                            double screenBottom, float opacity) {
-        if (!isFresh() || this.blurredTexture < 0
-                || vertexRight <= vertexLeft
-                || vertexBottom <= vertexTop || opacity <= 0.0F) {
+    /**
+     * Pastes {@code texture} over a region, the share {@code spanFrom} to
+     * {@code spanTo} of its width alone; the fade profile still runs
+     * across the whole region.
+     */
+    private void drawMapped(int texture, double vertexLeft,
+                            double vertexTop, double vertexRight,
+                            double vertexBottom, float[] fadeWeights,
+                            double screenLeft, double screenTop,
+                            double screenRight, double screenBottom,
+                            double spanFrom, double spanTo, float opacity) {
+        if (texture < 0 || vertexRight <= vertexLeft
+                || vertexBottom <= vertexTop || screenRight <= screenLeft
+                || opacity <= 0.0F) {
             return;
         }
         // Only what lies on the screen is drawn: a region reaching past
         // an edge — a window hanging off the screen — is cut to the
         // screen, the quad and the sample alike, so the frame's last
-        // column is never stretched across the part beyond. The fade
-        // profile still runs across the whole region.
-        double clipLeft = Math.max(0.0D, screenLeft);
-        double clipRight = Math.min(this.guiWidth, screenRight);
+        // column is never stretched across the part beyond.
+        double screenWidth = screenRight - screenLeft;
+        double shownFrom = Math.max(spanFrom, -screenLeft / screenWidth);
+        double shownTo = Math.min(spanTo,
+                (this.guiWidth - screenLeft) / screenWidth);
+        double clipLeft = screenLeft + screenWidth * shownFrom;
+        double clipRight = screenLeft + screenWidth * shownTo;
         double clipTop = Math.max(0.0D, screenTop);
         double clipBottom = Math.min(this.guiHeight, screenBottom);
         if (clipRight <= clipLeft || clipBottom <= clipTop) {
             return;
         }
-        double shownFrom = (clipLeft - screenLeft) / (screenRight - screenLeft);
-        double shownTo = (clipRight - screenLeft) / (screenRight - screenLeft);
         double topShare = (clipTop - screenTop) / (screenBottom - screenTop);
         double bottomShare = (clipBottom - screenTop)
                 / (screenBottom - screenTop);
@@ -183,8 +290,9 @@ public final class LostTalesGuiRegionBlur {
         if (steps < 1) {
             return;
         }
+        boolean depthTest = pasteWithoutDepth();
         GL11.glEnable(GL11.GL_TEXTURE_2D);
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, this.blurredTexture);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture);
         GL11.glEnable(GL11.GL_BLEND);
         OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA,
                 GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
@@ -232,18 +340,43 @@ public final class LostTalesGuiRegionBlur {
         tessellator.draw();
         GL11.glShadeModel(GL11.GL_FLAT);
         GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+        endPaste(depthTest);
+    }
+
+    /**
+     * Turns the depth test off for a paste and answers whether it was on.
+     * A paste is flat and lies at z 0: tested, it would leave its depth
+     * behind, and whatever the HUD draws after it further back would be
+     * hidden there. LOTR's compass leans back from z 0 and lost its far
+     * half that way.
+     */
+    private static boolean pasteWithoutDepth() {
+        boolean depthTest = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
+        if (depthTest) {
+            GL11.glDisable(GL11.GL_DEPTH_TEST);
+        }
+        return depthTest;
+    }
+
+    /** Puts the depth test back as {@link #pasteWithoutDepth} found it. */
+    private static void endPaste(boolean depthTest) {
+        if (depthTest) {
+            GL11.glEnable(GL11.GL_DEPTH_TEST);
+        }
     }
 
     public void release() {
         this.blur.release();
         releaseTextures();
-        this.capturedNanos = 0L;
+        this.sharpNanos = 0L;
+        this.blurredNanos = 0L;
     }
 
     public void resetAfterResourceReload() {
         this.blur.resetAfterResourceReload();
         releaseTextures();
-        this.capturedNanos = 0L;
+        this.sharpNanos = 0L;
+        this.blurredNanos = 0L;
     }
 
     /**
@@ -260,6 +393,7 @@ public final class LostTalesGuiRegionBlur {
                 minecraft.displayWidth, minecraft.displayHeight);
         double width = resolution.getScaledWidth_double();
         double height = resolution.getScaledHeight_double();
+        boolean depthTest = pasteWithoutDepth();
         GL11.glEnable(GL11.GL_TEXTURE_2D);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture);
         GL11.glDisable(GL11.GL_BLEND);
@@ -273,6 +407,7 @@ public final class LostTalesGuiRegionBlur {
         tessellator.addVertexWithUV(0.0D, 0.0D, 0.0D, 0.0D, 1.0D);
         tessellator.draw();
         GL11.glEnable(GL11.GL_ALPHA_TEST);
+        endPaste(depthTest);
     }
 
     private void ensureTextures(Minecraft minecraft) {

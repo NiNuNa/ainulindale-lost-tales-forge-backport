@@ -111,7 +111,7 @@ public final class ChatTimestampCentreTest {
     private static ChatLine words(int id) {
         ChatComponentText row = new ChatComponentText("");
         row.appendSibling(ChatBodyMarker.separator(
-                ChatLineWrapper.BODY_SEPARATOR, -1));
+                ChatLineMark.SAID.separator, -1));
         row.appendSibling(new ChatComponentText("words"));
         return new ChatLine(0, row, id);
     }

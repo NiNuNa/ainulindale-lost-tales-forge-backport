@@ -1,5 +1,6 @@
 package com.ninuna.losttales.gui.screen.waystone;
 
+import com.ninuna.losttales.client.window.PageKeys;
 import com.ninuna.losttales.block.ELostTalesBlock;
 import com.ninuna.losttales.block.custom.LostTalesBlockWaystone;
 import com.ninuna.losttales.block.tileentity.LostTalesTileEntityWaystone;
@@ -537,10 +538,11 @@ public final class WaystonePage extends PageContent
     /* ---- Destinations ---- */
 
     /**
-     * The map in travel mode, beside the waystone's tab in its window:
-     * the next place picked on the map is travelled to from this
-     * waystone, which the server checks again. Where the map cannot stand
-     * in a window it opens on a screen of its own, as before.
+     * The map in travel mode, beside the waystone's tab in its window, or
+     * in a window of its own while that one is locked: the next place
+     * picked on the map is travelled to from this waystone, which the
+     * server checks again. Where the map cannot stand in a window it opens
+     * on a screen of its own.
      */
     private void travel() {
         if (this.state == null || !this.state.hasFastTravel()
@@ -643,6 +645,17 @@ public final class WaystonePage extends PageContent
     }
 
     /* ---- The window's strip ---- */
+
+    /** The keys the waystone answers to, for its help. */
+    @Override
+    public List<PageKeys.Area> keyAreas() {
+        return PageKeys.pageArea("gui.losttales.page.waystone",
+                PageKeys.pageKey(PAGE_ID, "destinations", Keyboard.KEY_D),
+                PageKeys.pageKey(PAGE_ID, "save", Keyboard.KEY_S),
+                PageKeys.pageKey(PAGE_ID, "step", PageKeys.CLICK),
+                PageKeys.pageKey(PAGE_ID, "back", PageKeys.RIGHT_CLICK),
+                PageKeys.pageKey(PAGE_ID, "wheel", PageKeys.WHEEL));
+    }
 
     @Override
     public String searchPrompt() {

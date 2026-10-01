@@ -45,22 +45,19 @@ public final class ChatGroupRunsTest {
     }
 
     /**
-     * An action names its speaker in its own sentence: it never stands
-     * under the name row before it, and the line after it opens a run of
-     * its own rather than standing headless under the action.
+     * Actions are told in the Narrator's voice, whoever acts: two in a row,
+     * by two speakers, stand under one Narrator header, and a speaker's own
+     * line after them opens a run of its own.
      */
     @Test
-    public void anActionStandsAlone() {
-        remember(1, ChatChannel.GLOBAL, ALICE, "Alice", START);
-        ChatGroupRuns.remember(2, ChatTab.of(ChatChannel.GLOBAL), ALICE,
-                "Alice", true, START + 1000L, false, true,
-                new ChatComponentText("grouped"));
+    public void actionsRunOnUnderTheNarrator() {
+        remember(1, ChatChannel.GLOBAL, ChatGroupRuns.NARRATOR_VOICE,
+                "Narrator", START);
+        remember(2, ChatChannel.GLOBAL, ChatGroupRuns.NARRATOR_VOICE,
+                "Narrator", START + 1000L);
         remember(3, ChatChannel.GLOBAL, ALICE, "Alice", START + 2000L);
-        remember(4, ChatChannel.GLOBAL, ALICE, "Alice", START + 3000L);
-        assertArrayEquals(new boolean[] { true, false, false, false },
-                ChatGroupRuns.continuationsOf(newestFirst(1, 2, 3, 4), null));
-        assertArrayEquals(new boolean[] { true, false, false, false },
-                ChatGroupRuns.continuationsInFeed(newestFirst(1, 2, 3, 4)));
+        assertArrayEquals(new boolean[] { false, true, false },
+                ChatGroupRuns.continuationsOf(newestFirst(1, 2, 3), null));
     }
 
     /** Ids as a view holds them: newest first, like vanilla's history. */

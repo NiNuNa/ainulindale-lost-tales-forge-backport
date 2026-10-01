@@ -69,7 +69,7 @@ public final class CharacterStateCheckpointHandler {
             if (player != null) {
                 CharacterSwitchCoordinator.getInstance()
                         .checkpointActiveState(player);
-                CharacterPledges.refreshAndSync(player);
+                CharacterLotrRecord.refreshAndSync(player);
             }
         }
     }

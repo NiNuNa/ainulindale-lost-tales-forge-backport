@@ -9,6 +9,7 @@ import com.ninuna.losttales.chat.ChatRoleplayStatus;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.client.window.TabRow;
+import com.ninuna.losttales.client.window.WindowPlacement;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.compat.lotr.LotrFactionBannerResolver;
 import com.ninuna.losttales.gui.style.LostTalesDisplayPixels;
@@ -65,7 +66,8 @@ import org.lwjgl.opengl.GL11;
  * name has room, and every piece keeps whole display pixels. A row is the
  * member's head, wearing its status as every head does — Offline for
  * everyone under Offline — their name in the colour it wears in the
- * conversation, and their LOTR title under it where they carry one. The
+ * conversation with their LOTR title after it, online or not, and under
+ * them their status line while they are here. The
  * absent are drawn fainter ({@link #OFFLINE_OPACITY}) until the pointer
  * lights them, as Discord's are. A click opens the member's card and a
  * right-click their menu, as on a name in a message.</p>
@@ -500,8 +502,8 @@ public final class ChatMemberList {
      * Draws a window's list in the window's own space, whose units are
      * the chat's pixels: its surface from {@code left} to the window's
      * right edge at {@code windowRight} between the rules at {@code top}
-     * and {@code bottom} — the list is {@link #WIDTH} wide and stands as
-     * far into the window as it has come out, the rest past the edge —
+     * and {@code bottom} — the list keeps its whole width and stands as
+     * far into the window as it has come out, the rest cut at the edge —
      * its separator, and its rows, cut to the room the history's rules
      * leave. {@code originX}, {@code originY} and {@code scale} carry the
      * space onto the screen, where the rows are recorded for the pointer.
@@ -572,6 +574,10 @@ public final class ChatMemberList {
         boolean clipped = LostTalesUiClip.begin(minecraft,
                 state.screenLeft, state.screenRight, clipTop, clipBottom,
                 true);
+        // The lit row, whose colour the window's frame beside it takes.
+        float litTop = 0.0F;
+        float litBottom = 0.0F;
+        int litRgb = -1;
         try {
             for (Row row : state.rows) {
                 // Rows move by whole display pixels, as the history's
@@ -585,19 +591,19 @@ public final class ChatMemberList {
                 }
                 if (row.member == null) {
                     drawHeading(minecraft, font, tab, row, rowsLeft, rowTop,
-                            unit, roomRight, rowsOriginX, scale, clipTop,
-                            clipBottom, alpha);
+                            unit, roomRight, rowsOriginX, scale,
+                            state.screenRight, clipTop, clipBottom, alpha);
                     continue;
                 }
                 float lit = row.member == state.lit ? state.hoverFade : 0.0F;
                 if (lit > 0.0F) {
+                    litRgb = LostTalesUiInk.blend(LostTalesUiInk.SURFACE_RGB,
+                            LostTalesChatVisualStyle.selectedLineRgb(), lit);
+                    litTop = rowTop;
+                    litBottom = rowBottom;
                     LostTalesChatOverlayRenderer.recolourSurface(rowsLeft,
                             rowTop, windowRight, rowBottom, surfaceAlpha,
-                            LostTalesUiInk.SURFACE_RGB,
-                            LostTalesUiInk.blend(
-                                    LostTalesUiInk.SURFACE_RGB,
-                                    LostTalesChatVisualStyle.selectedLineRgb(),
-                                    lit));
+                            LostTalesUiInk.SURFACE_RGB, litRgb);
                 }
                 drawMember(minecraft, font, state, row.member, rowsLeft,
                         rowTop, unit, roomRight, rowsOriginX, scale, clipTop,
@@ -613,6 +619,23 @@ public final class ChatMemberList {
         } finally {
             LostTalesUiClip.end(clipped);
         }
+        if (litRgb >= 0) {
+            // The window's frame beside the lit row wears its colour, as
+            // the ring beside anything wears what it touches, cut to the
+            // room the rows are cut to.
+            boolean ringClipped = LostTalesUiClip.begin(minecraft,
+                    state.screenRight,
+                    state.screenRight + WindowPlacement.FRAME_WIDTH,
+                    clipTop, clipBottom, true);
+            try {
+                LostTalesChatOverlayRenderer.recolourSurface(windowRight,
+                        litTop, windowRight + WindowPlacement.FRAME_WIDTH / scale,
+                        litBottom, surfaceAlpha, LostTalesUiInk.SURFACE_RGB,
+                        litRgb);
+            } finally {
+                LostTalesUiClip.end(ringClipped);
+            }
+        }
         LostTalesUiRules.drawVerticalRule(left, left
                         + ChatTimestampColumn.SEPARATOR_WIDTH, top, bottom,
                 alpha);
@@ -623,14 +646,15 @@ public final class ChatMemberList {
      * small text in its aside tone, its capitals centred in the row, the
      * odd pixel up, sinking into the list's edge where it is cut. A
      * heading stands behind its group's icon, as a tab's name stands
-     * behind the tab's.
+     * behind the tab's. Nothing of it shows past {@code listRight}, the
+     * window's edge on screen.
      */
     private static void drawHeading(Minecraft minecraft, FontRenderer font,
                                     ChatTab tab, Row row, float rowsLeft,
                                     float rowTop, float unit, float roomRight,
                                     float rowsOriginX, float scale,
-                                    float clipTop, float clipBottom,
-                                    int alpha) {
+                                    float listRight, float clipTop,
+                                    float clipBottom, int alpha) {
         int textTop = LostTalesUiInk.centredStart(HEADER_HEIGHT,
                 LostTalesUiInk.CAP_HEIGHT);
         int textLeft = INSET;
@@ -649,7 +673,8 @@ public final class ChatMemberList {
             }
             drawCutText(minecraft, font, row.heading, textLeft, textTop,
                     LostTalesChatVisualStyle.asideRgb(), alpha, roomRight,
-                    0.0F, rowsOriginX, scale * unit, clipTop, clipBottom);
+                    rowsOriginX, scale * unit, listRight, clipTop,
+                    clipBottom);
         } finally {
             GL11.glPopMatrix();
         }
@@ -780,7 +805,8 @@ public final class ChatMemberList {
      * the odd pixel up, each sinking into the list's edge where it is cut.
      * A row drawn faint is one picture faded ({@link LostTalesUiFlatLayers}):
      * no layer of it — the hat, the face, a shadow — shows through the one
-     * above it.
+     * above it. Nothing of it shows past the window's edge while the list
+     * slides out from under it.
      */
     private static void drawMember(final Minecraft minecraft,
                                    final FontRenderer font, State state,
@@ -802,8 +828,11 @@ public final class ChatMemberList {
         ChatPresenceIdentity identity = member.getCharacterId() == null
                 ? ChatPresenceIdentity.ACCOUNT
                 : ChatPresenceIdentity.character(member.getCharacterId());
-        String statusLine = ClientChatProfanity.filter(
-                ClientChatPresence.lineOf(member.getPlayerId(), identity));
+        // The status line is for those here, Away and Do Not Disturb
+        // included; an offline member keeps the name and title only.
+        String statusLine = !member.isOnline() ? ""
+                : ClientChatProfanity.filter(ClientChatPresence.lineOf(
+                        member.getPlayerId(), identity));
         // The role-play status's mark stands at the end of the name's line,
         // which gives it its room; an NPC and an offline member wear none.
         final ChatRoleplayStatus roleplay = member.isNpc() || !member.isOnline()
@@ -820,6 +849,7 @@ public final class ChatMemberList {
                 said ? capitals + TITLE_GAP + capitals : capitals);
         final int textLeft = INSET + ChatAvatar.ICON_WIDTH + NAME_GAP;
         final float unitScale = scale * unit;
+        final float listRight = state.screenRight;
         // The display pixels one of the list's units takes, which a mark
         // standing for a head is fitted to as an avatar's is.
         final float pixelsPerUnit = unitScale
@@ -852,7 +882,7 @@ public final class ChatMemberList {
                             drawCutParts(minecraft, font, nameLine,
                                     textLeft, nameTop, alpha, nameRight,
                                     nameSlide, rowsOriginX, unitScale,
-                                    clipTop, clipBottom);
+                                    listRight, clipTop, clipBottom);
                             if (roleplay != null) {
                                 LostTalesUiFlatLayers.nextLayer();
                                 ChatRoleplayMark.draw(roleplay,
@@ -867,7 +897,8 @@ public final class ChatMemberList {
                                         textLeft, nameTop + capitals
                                                 + TITLE_GAP, alpha,
                                         roomRight, statusSlide, rowsOriginX,
-                                        unitScale, clipTop, clipBottom);
+                                        unitScale, listRight, clipTop,
+                                        clipBottom);
                             }
                         }
                     });
@@ -903,13 +934,6 @@ public final class ChatMemberList {
         return (float)TabRow.snapped(next, step);
     }
 
-    /**
-     * Words from {@code x} that sink into the edge at {@code right} where
-     * they are cut, as a cut tab name does, slid {@code slide} units left
-     * — sinking into the left edge too as far as they have gone past it;
-     * {@code originX} and {@code scale} carry the words' space onto the
-     * screen, and the words stay between the history's rules.
-     */
     /** One piece of a row's line: its words, a formatting code ahead of them, their colour. */
     private static final class Part {
         final String text;
@@ -936,7 +960,9 @@ public final class ChatMemberList {
      * A line of pieces, each in its own colour and its emojis drawn, from
      * {@code x}, cut at {@code right} and sinking into that edge — and
      * into the left one as far as it has slid past it — as a cut tab name
-     * does.
+     * does. {@code originX} and {@code scale} carry the line's space onto
+     * the screen, where it stays between the history's rules and left of
+     * {@code listRight}, the window's edge.
      */
     private static void drawCutParts(final Minecraft minecraft,
                                      final FontRenderer font,
@@ -944,7 +970,8 @@ public final class ChatMemberList {
                                      final int y, final int alpha,
                                      float right, final float slide,
                                      float originX, float scale,
-                                     float clipTop, float clipBottom) {
+                                     float listRight, float clipTop,
+                                     float clipBottom) {
         int width = width(font, parts);
         float room = right - x;
         if (room <= 0.0F) {
@@ -955,8 +982,9 @@ public final class ChatMemberList {
             return;
         }
         float depth = LostTalesUiFading.sideFadeDepth(room * scale);
-        LostTalesUiFading.drawFading(minecraft, originX + x * scale,
-                originX + right * scale, clipTop, clipBottom, depth,
+        LostTalesUiFading.drawFadingWithin(minecraft, originX + x * scale,
+                originX + right * scale, listRight, clipTop, clipBottom,
+                depth,
                 LostTalesUiFading.sideFadeStrength(slide * scale,
                         depth),
                 LostTalesUiFading.sideFadeStrength(
@@ -991,10 +1019,18 @@ public final class ChatMemberList {
         }
     }
 
-    private static void drawCutText(Minecraft minecraft, FontRenderer font,
-                                    String text, int x, int y, int rgb,
-                                    int alpha, float right, float slide,
-                                    float originX, float scale, float clipTop,
+    /**
+     * Plain words from {@code x}, cut at {@code right} and sinking into
+     * that edge, in the space {@link #drawCutParts} draws in and held by
+     * the same edges.
+     */
+    private static void drawCutText(Minecraft minecraft,
+                                    final FontRenderer font,
+                                    final String text, final int x,
+                                    final int y, final int rgb,
+                                    final int alpha, float right,
+                                    float originX, float scale,
+                                    float listRight, float clipTop,
                                     float clipBottom) {
         int width = font.getStringWidth(text);
         float room = right - x;
@@ -1006,12 +1042,19 @@ public final class ChatMemberList {
             return;
         }
         float depth = LostTalesUiFading.sideFadeDepth(room * scale);
-        LostTalesUiFading.drawFadingText(minecraft, font, text, x,
-                -slide, y, rgb, alpha, originX + x * scale,
-                originX + right * scale, clipTop, clipBottom, depth,
-                LostTalesUiFading.sideFadeStrength(slide * scale,
-                        depth),
-                LostTalesUiFading.sideFadeStrength(
-                        (width - slide - room) * scale, depth));
+        LostTalesUiFading.drawFadingWithin(minecraft, originX + x * scale,
+                originX + right * scale, listRight, clipTop, clipBottom,
+                depth, 0.0F, LostTalesUiFading.sideFadeStrength(
+                        (width - room) * scale, depth),
+                new LostTalesUiFading.FadingPainter() {
+                    @Override
+                    public void paint(float share) {
+                        int sliceAlpha = Math.round(alpha * share);
+                        if (sliceAlpha >= LostTalesUiInk.MIN_VISIBLE_ALPHA) {
+                            LostTalesUiInk.drawText(font, text, x, y, rgb,
+                                    sliceAlpha);
+                        }
+                    }
+                });
     }
 }

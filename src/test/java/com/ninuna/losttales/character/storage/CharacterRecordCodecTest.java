@@ -75,6 +75,36 @@ public final class CharacterRecordCodecTest {
         assertEquals("lotr:gondor", loaded.getFactionId());
     }
 
+    /** The title the character last wore shows while it is not played, so the record keeps it. */
+    @Test
+    public void theLotrTitleRoundTrips() {
+        RoleplayCharacter titled = character("");
+        assertTrue(titled.setLotrTitle("Gondor Farmer"));
+        assertFalse(titled.setLotrTitle("Gondor Farmer"));
+        assertEquals("Gondor Farmer", CharacterNbtCodec.readCharacterRecord(
+                CharacterNbtCodec.writeCharacterRecord(titled), OWNER)
+                .getLotrTitle());
+        assertEquals("", CharacterNbtCodec.readCharacterRecord(
+                CharacterNbtCodec.writeCharacterRecord(character("")), OWNER)
+                .getLotrTitle());
+    }
+
+    /** A title keeps its words only: no colour code, no control character, no more than it may hold. */
+    @Test
+    public void aTitleIsKeptAsWordsOnly() {
+        NBTTagCompound record = CharacterNbtCodec.writeCharacterRecord(
+                character(""));
+        record.setString("LotrTitle", "§6Gondor§r Farmer\n");
+        assertEquals("Gondor Farmer", CharacterNbtCodec.readCharacterRecord(
+                record, OWNER).getLotrTitle());
+        StringBuilder long_ = new StringBuilder();
+        for (int index = 0; index < 100; index++) {
+            long_.append('a');
+        }
+        assertEquals(RoleplayCharacter.MAX_LOTR_TITLE_LENGTH,
+                RoleplayCharacter.normalizeTitle(long_.toString()).length());
+    }
+
     @Test
     public void aRecordOfTheEarlierLayoutIsRefused() {
         NBTTagCompound record = CharacterNbtCodec.writeCharacterRecord(

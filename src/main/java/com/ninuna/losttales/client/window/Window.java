@@ -6,17 +6,19 @@ import java.util.List;
 
 /**
  * One window in the client layout: an ordered row of tabs, the tab
- * currently in front, a lock, a pin, a position, its own size, and whether
- * it fills a part of the screen. Instances are owned and mutated only by
- * {@link WindowLayout}; everyone else reads them.
+ * currently in front, a lock, its two pins, a position, its own size, and
+ * whether it fills a part of the screen. Instances are owned and mutated
+ * only by {@link WindowLayout}; everyone else reads them.
  */
 public final class Window {
     private final String id;
     private final List<WindowTab> tabs = new ArrayList<WindowTab>();
     private WindowTab activeTab;
     private boolean locked;
-    /** Whether the whole window stays on screen while playing: every tab it holds. */
-    private boolean pinned;
+    /** Whether the window stays on screen while playing, as part of the HUD. */
+    private boolean pinnedToHud;
+    /** Whether every view of the window screen shows the window, whichever key opened it. */
+    private boolean pinnedToGui;
     /** Percent of the available screen travel, see HudPlacementLayout. */
     private double offsetX;
     private double offsetY;
@@ -86,10 +88,11 @@ public final class Window {
         public static final ScreenFill RIGHT_QUARTER =
                 named("right_quarter", 9, 0, 3, 2);
         /**
-         * The whole screen for the tab's content alone ({@link ContentView}):
-         * the window's row, strip and bar lie past the screen's edges. Never
+         * The window's own box for its page alone ({@link ContentView}):
+         * the window's row, strip and bar lie past the box's edges. Never
          * a window's own fill, never snapped to and never saved, so it is
-         * none of the named parts the layout file reads.
+         * none of the named parts the layout file reads; its edges are
+         * the box's, not these.
          */
         public static final ScreenFill CONTENT = new ScreenFill("content", 0,
                 0, COLUMNS, ROWS, 0.0D, 0.0D, 1.0D, 1.0D);
@@ -298,7 +301,8 @@ public final class Window {
 
     public String getId() { return this.id; }
     public boolean isLocked() { return this.locked; }
-    public boolean isPinned() { return this.pinned; }
+    public boolean isPinnedToHud() { return this.pinnedToHud; }
+    public boolean isPinnedToGui() { return this.pinnedToGui; }
     public double getOffsetX() { return this.offsetX; }
     public double getOffsetY() { return this.offsetY; }
     /**
@@ -344,7 +348,9 @@ public final class Window {
 
     void setLocked(boolean locked) { this.locked = locked; }
 
-    void setPinned(boolean pinned) { this.pinned = pinned; }
+    void setPinnedToHud(boolean pinned) { this.pinnedToHud = pinned; }
+
+    void setPinnedToGui(boolean pinned) { this.pinnedToGui = pinned; }
 
     void setOwnHeight(double height) { this.ownHeight = height; }
 

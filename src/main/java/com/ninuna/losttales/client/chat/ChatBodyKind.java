@@ -2,9 +2,10 @@ package com.ninuna.losttales.client.chat;
 
 /**
  * How a line built from a message packet presents its body. The header
- * — channel prefix, head, name and title — and the chevron read the
- * same whatever the kind; the kind decides whether the body is read for
- * markup, emoji, links, mentions and shares or shown exactly as it is.
+ * — channel prefix, head, name and title — reads the same whatever the
+ * kind; the kind decides the mark the body opens behind
+ * ({@link ChatLineMark}) and whether the body is read for markup, emoji,
+ * links, mentions and shares or shown exactly as it is.
  */
 enum ChatBodyKind {
     /**
@@ -13,11 +14,10 @@ enum ChatBodyKind {
      */
     MESSAGE,
     /**
-     * A command the player sent: the body opens behind the chevron, as
-     * a message's does, and is the command as typed, slash and all, as
-     * the chat's inline code, in italics and the aside tone; a command
-     * is not prose and nothing in it is markup, a mention, an emoji or a
-     * share.
+     * A command the player sent: the body opens behind the command mark,
+     * which stands for its slash, and is the command as the chat's inline
+     * code, in italics and the aside tone; a command is not prose and
+     * nothing in it is markup, a mention, an emoji or a share.
      */
     COMMAND,
     /**

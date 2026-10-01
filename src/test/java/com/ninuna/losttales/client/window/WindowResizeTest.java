@@ -31,21 +31,24 @@ public final class WindowResizeTest {
 
     /**
      * A window stands at the default place until it is given a size of its
-     * own; Reset Window puts it back there, locked and filling nothing.
+     * own; Reset Window Layout puts an unlocked one back there, filling
+     * nothing, and locks it again. A locked window stays as it is.
      */
     @Test
     public void aWindowStandsAtTheDefaultPlaceUntilItIsGivenASize() {
         Window window = WindowLayout.firstWindow();
         assertTrue(WindowPlacement.atDefaultPlace(window));
-        assertTrue(WindowLayout.setLocked(window.getId(), false));
         assertTrue(WindowLayout.setWindowHeight(window.getId(), 180.0D, true));
         assertEquals(180.0D, window.getOwnHeight(), 0.0D);
         assertFalse(WindowPlacement.atDefaultPlace(window));
         WindowLayout.setFill(window.getId(), Window.ScreenFill.LEFT, true);
         assertTrue(WindowLayout.resetWindow(window.getId()));
         assertTrue(WindowPlacement.atDefaultPlace(window));
-        assertTrue(window.isLocked());
+        assertTrue("reset, it is locked again", window.isLocked());
         assertEquals(Window.ScreenFill.NONE, window.getFill());
+        WindowLayout.setWindowHeight(window.getId(), 180.0D, true);
+        assertFalse("locked, it stays as it is",
+                WindowLayout.resetWindow(window.getId()));
         assertFalse(WindowLayout.setWindowHeight("nowhere", 180.0D, true));
         assertFalse(WindowLayout.resetWindow("nowhere"));
     }

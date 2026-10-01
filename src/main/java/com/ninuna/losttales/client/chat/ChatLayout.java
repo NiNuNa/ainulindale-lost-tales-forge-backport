@@ -30,14 +30,16 @@ import java.util.Set;
  *
  * <ul>
  * <li>The window a new player starts with: Global and OOC, Global in
- * front, filling the screen's bottom-left quarter.</li>
- * <li>Each conversation's two preferences: its notification choice
- * ({@link ChatNotification}: which of its lines reach the closed feed
- * and which chime) and <em>hidden</em> (once closed it stays closed when
- * a message arrives).</li>
+ * front, in the middle of the screen at two thirds of it.</li>
+ * <li>Each conversation's two choices ({@link ChatLineChoice}):
+ * Notifications, which of its lines chime, and Show in Feed, which of its
+ * lines reach the closed feed.</li>
+ * <li>The NPC conversations of the session: only the last few stay open
+ * by themselves, and the {@code +} opens the others again.</li>
  * <li>Closed channels: a plain channel in no window is gone from every
  * window, its history untouched, restorable into any window, and back
- * with its next message unless it is hidden. Closing is about tabs
+ * with its next message, but for Operator Chat and the consoles, which
+ * open only by hand ({@link #opensByItself}). Closing is about tabs
  * only: a closed channel keeps receiving, keeps its history, its unread
  * counts and its preferences.</li>
  * <li>Whisper tabs, remembered per server.</li>
@@ -57,35 +59,48 @@ public final class ChatLayout {
                     ChatTab.of(ChatChannel.GLOBAL),
                     ChatTab.of(ChatChannel.OOC)));
     /**
-     * The channels a new player's window leaves closed that wait to be
-     * opened by hand rather than opening with their next line: staff
-     * talk and the consoles, which speak often and are not conversations.
+     * The channels that never open by themselves, only by hand: staff talk
+     * and the consoles, which speak often and are not conversations. They
+     * wait in the {@code +}.
      */
-    private static final List<ChatTab> FIRST_HIDDEN =
+    private static final List<ChatTab> OPENED_BY_HAND =
             Collections.unmodifiableList(Arrays.asList(
                     ChatTab.of(ChatChannel.OPERATOR),
                     ChatTab.of(ChatChannel.CLIENT_CONSOLE),
                     ChatTab.of(ChatChannel.SERVER_CONSOLE)));
     /**
-     * Each conversation's notification choice, where it is not
-     * {@link ChatNotification#EVERYTHING}.
+     * Each conversation's Notifications choice, where it is not the
+     * conversation's default ({@link #defaultNotification}).
      *
-     * <p>This and the hidden set below hold row entries. A scoped
-     * channel's conversations share the one entry the row holds, so a
-     * choice for the Faction tab is the channel's rather than whichever
-     * faction happened to be on screen. Every accessor normalises
-     * through {@link ChatTab#row}, so a caller holding a line's own tab
-     * asks the same question.</p>
+     * <p>This and the feed choices below hold row entries. A scoped channel's conversations share the one entry the
+     * row holds, so a choice for the Faction tab is the channel's rather
+     * than whichever faction happened to be on screen. Every accessor
+     * normalises through {@link ChatTab#row}, so a caller holding a
+     * line's own tab asks the same question.</p>
      */
-    private static final Map<ChatTab, ChatNotification> NOTIFICATIONS =
-            new HashMap<ChatTab, ChatNotification>();
+    private static final Map<ChatTab, ChatLineChoice> NOTIFICATIONS =
+            new HashMap<ChatTab, ChatLineChoice>();
+    /** Each conversation's Show in Feed choice, where it is not Everything. */
+    private static final Map<ChatTab, ChatLineChoice> FEED_CHOICES =
+            new HashMap<ChatTab, ChatLineChoice>();
+    /** How many NPC conversations the session remembers having spoken. */
+    static final int MAX_NPC_CONVERSATIONS = 64;
     /**
-     * Tabs a message may not reopen; they stay closed until restored. A
-     * whisper tab here was closed by hand, and is closed only until
-     * somebody speaks in it again: a replay may not bring it back, a
-     * live line does.
+     * The NPC conversations that have spoken this session, the one quiet
+     * longest first, each with the turn it last spoke on; the
+     * {@link #MAX_NPC_CONVERSATIONS} most recent at most. For the
+     * session only.
      */
-    private static final Set<ChatTab> HIDDEN = new HashSet<ChatTab>();
+    private static final Map<ChatTab, Long> NPC_SPOKEN =
+            new LinkedHashMap<ChatTab, Long>();
+    /** The turn the last NPC line of the session spoke on. */
+    private static long npcTurn;
+    /**
+     * The whispers closed by hand. Each is closed only until somebody
+     * speaks in it again: a replay may not bring it back, a live line
+     * does ({@link #reopenConversation}).
+     */
+    private static final Set<ChatTab> CLOSED_BY_HAND = new HashSet<ChatTab>();
     /**
      * Whisper tabs remembered per place, by the session's server key:
      * where each was open, in order, and which were closed by hand. A
@@ -109,6 +124,13 @@ public final class ChatLayout {
      * window. For the session only.
      */
     private static final Set<ChatTab> WAITING = new LinkedHashSet<ChatTab>();
+    /**
+     * The window the chat last opened for a conversation because none
+     * would take it: the ones after it join it, and the chat's key brings
+     * it forward while anything in it waits unread. For the session only;
+     * null for none.
+     */
+    private static String collectingWindowId;
     /** Closed-chat feed position, percent of its travel; vanilla's spot. */
     private static double feedOffsetX;
     private static double feedOffsetY = 100.0D;
@@ -172,13 +194,15 @@ public final class ChatLayout {
         install();
         PART.clear();
         WAITING.clear();
+        collectingWindowId = null;
+        forgetNpcConversations();
         WindowLayout.reset();
     }
 
     /**
      * A new player's window: Global and OOC, Global in front, in the
-     * middle of the screen at two thirds of it and locked, as every new
-     * window opens. Every other channel starts closed; Proximity, Faction
+     * middle of the screen at two thirds of it and locked, the one window
+     * that opens locked. Every other channel starts closed; Proximity, Faction
      * and Party open with their first line, and Operator and the consoles
      * wait in the {@code +} until opened by hand. From then on the layout
      * is whatever the player makes of it.
@@ -187,7 +211,6 @@ public final class ChatLayout {
         @Override
         public void run() {
             WindowLayout.addWindow(FIRST_TABS, FIRST_TABS.get(0));
-            HIDDEN.addAll(FIRST_HIDDEN);
         }
     };
 
@@ -268,52 +291,92 @@ public final class ChatLayout {
     /* ---- Preferences ---- */
 
     /**
-     * The conversation's notification choice:
-     * {@link ChatNotification#EVERYTHING} unless the player chose
-     * another.
+     * The Notifications choice a conversation starts with: Everything for
+     * a whisper, with a player or an NPC, and Only Mentions for every
+     * channel, the consoles and Operator included.
      */
-    public static synchronized ChatNotification notification(ChatTab tab) {
-        ChatNotification choice = tab == null ? null
-                : NOTIFICATIONS.get(ChatTab.row(tab));
-        return choice == null ? ChatNotification.EVERYTHING : choice;
+    static ChatLineChoice defaultNotification(ChatTab tab) {
+        return tab != null && tab.isWhisper()
+                ? ChatLineChoice.EVERYTHING : ChatLineChoice.ONLY_MENTIONS;
+    }
+
+    /** The conversation's Notifications choice: its default unless the player chose another. */
+    public static synchronized ChatLineChoice notification(ChatTab tab) {
+        ChatTab row = ChatTab.row(tab);
+        ChatLineChoice choice = row == null ? null : NOTIFICATIONS.get(row);
+        return choice == null ? defaultNotification(row) : choice;
     }
 
     /**
-     * Chooses how much of the conversation reaches the player while they
-     * are not reading it. Nothing else changes: the tab still shows
-     * every line when selected, every line still counts unread, and the
-     * history is untouched.
+     * Chooses which of the conversation's new lines chime. Nothing else
+     * changes: every line still counts unread, the feed still shows what
+     * Show in Feed lets through, and the history is untouched.
      */
     public static synchronized void setNotification(ChatTab tab,
-                                                    ChatNotification choice) {
+                                                    ChatLineChoice choice) {
         ChatTab row = ChatTab.row(tab);
-        if (row == null || choice == null) {
+        if (row == null || choice == null || notification(row) == choice) {
             return;
         }
-        ChatNotification before = choice == ChatNotification.EVERYTHING
-                ? NOTIFICATIONS.remove(row) : NOTIFICATIONS.put(row, choice);
-        if ((before == null ? ChatNotification.EVERYTHING : before) != choice) {
-            WindowLayout.persist();
+        if (choice == defaultNotification(row)) {
+            NOTIFICATIONS.remove(row);
+        } else {
+            NOTIFICATIONS.put(row, choice);
         }
+        WindowLayout.persist();
     }
 
     /**
-     * Steps the conversation's choice on, or {@code back}, as a
+     * Steps the conversation's Notifications on, or {@code back}, as a
      * few-word option is stepped: round the three.
      */
-    public static synchronized ChatNotification stepNotification(
+    public static synchronized ChatLineChoice stepNotification(
             ChatTab tab, boolean back) {
-        ChatNotification next = notification(tab).step(back);
+        ChatLineChoice next = notification(tab).step(back);
         setNotification(tab, next);
         return next;
     }
 
+    /** The conversation's Show in Feed choice: All Messages unless the player chose another. */
+    public static synchronized ChatLineChoice feedChoice(ChatTab tab) {
+        ChatTab row = ChatTab.row(tab);
+        ChatLineChoice choice = row == null ? null : FEED_CHOICES.get(row);
+        return choice == null ? ChatLineChoice.EVERYTHING : choice;
+    }
+
     /**
-     * Whether the conversation's news is kept out of the way: nothing of
-     * it reaches the player. Its tab writes its name in italics.
+     * Chooses which of the conversation's lines reach the closed feed.
+     * Nothing else changes: every line still counts unread and chimes as
+     * Notifications says.
+     */
+    public static synchronized void setFeedChoice(ChatTab tab,
+                                                  ChatLineChoice choice) {
+        ChatTab row = ChatTab.row(tab);
+        if (row == null || choice == null || feedChoice(row) == choice) {
+            return;
+        }
+        if (choice == ChatLineChoice.EVERYTHING) {
+            FEED_CHOICES.remove(row);
+        } else {
+            FEED_CHOICES.put(row, choice);
+        }
+        WindowLayout.persist();
+    }
+
+    /** Steps the conversation's Show in Feed on, or {@code back}, round the three. */
+    public static synchronized ChatLineChoice stepFeedChoice(ChatTab tab,
+                                                             boolean back) {
+        ChatLineChoice next = feedChoice(tab).step(back);
+        setFeedChoice(tab, next);
+        return next;
+    }
+
+    /**
+     * Whether the conversation is muted: none of its lines chime. Its
+     * tab writes its name in italics.
      */
     public static synchronized boolean isMuted(ChatTab tab) {
-        return notification(tab) == ChatNotification.NOTHING;
+        return notification(tab) == ChatLineChoice.NOTHING;
     }
 
     public static synchronized boolean isMuted(ChatChannel channel) {
@@ -321,29 +384,33 @@ public final class ChatLayout {
     }
 
     /**
-     * Whether a line of the conversation addressed to the player, a
-     * mention or a reply, chimes; Do Not Disturb holds it still.
-     */
-    public static synchronized boolean isPingAudible(ChatTab tab) {
-        return chimes(tab, true);
-    }
-
-    /**
-     * Whether a line of the conversation chimes: one {@code addressed}
-     * to the player, or any line of a whisper, as its choice allows.
+     * Whether a new line of the conversation chimes as its Notifications
+     * choice allows: any line where it is Everything, one
+     * {@code addressed} to the player, a mention or a reply, where it is
+     * Only Mentions. The caller leaves out the player's own lines and
+     * replayed ones; Do Not Disturb holds the chime still.
      */
     public static synchronized boolean chimes(ChatTab tab, boolean addressed) {
-        return tab != null && notification(tab).chimes(addressed,
-                tab.isWhisper());
+        return tab != null && notification(tab).lets(addressed);
     }
 
     /**
-     * The conversations with a choice of their own, the file's order: by
-     * id, NPC conversations left out, since they end with the session.
+     * The conversations whose Notifications is not their default, the
+     * file's order: by id, NPC conversations left out, since they end
+     * with the session.
      */
     static synchronized List<ChatTab> notificationTabs() {
+        return writtenTabs(NOTIFICATIONS.keySet());
+    }
+
+    /** The conversations whose Show in Feed is not All Messages, in the same order. */
+    static synchronized List<ChatTab> feedChoiceTabs() {
+        return writtenTabs(FEED_CHOICES.keySet());
+    }
+
+    private static List<ChatTab> writtenTabs(Set<ChatTab> tabs) {
         List<ChatTab> result = new ArrayList<ChatTab>();
-        for (ChatTab tab : NOTIFICATIONS.keySet()) {
+        for (ChatTab tab : tabs) {
             if (!tab.isNpc()) {
                 result.add(tab);
             }
@@ -357,75 +424,39 @@ public final class ChatLayout {
         return result;
     }
 
-    /** Whether a message may not reopen the tab while it is closed. */
-    public static synchronized boolean isHidden(ChatTab tab) {
-        return tab != null && HIDDEN.contains(ChatTab.row(tab));
-    }
-
-    /** Hidden plain tabs in a stable order, for the file. */
-    public static synchronized List<ChatTab> hiddenTabs() {
-        return plainTabsOf(HIDDEN);
-    }
-
     /**
-     * Whether an arriving message may reopen the tab once it is closed:
-     * a closed tab reopens on its next message unless it is hidden.
-     * Hiding an open tab closes nothing and mutes nothing — it only
-     * takes effect once the tab is closed, and the channel keeps
-     * receiving, keeps its history and its unread counts either way.
+     * Whether a line arriving may open the tab while it is closed. Operator
+     * Chat and the consoles never do: they open by hand. Nor does a whisper
+     * closed by hand, which a live line opens again
+     * ({@link #reopenConversation}) and a replay does not.
      */
-    public static synchronized void setHidden(ChatTab tab, boolean hidden) {
-        setPreference(HIDDEN, tab, hidden);
-    }
-
-    private static void setPreference(Set<ChatTab> set, ChatTab tab,
-                                      boolean on) {
-        if (tab == null) {
-            return;
-        }
-        boolean changed = on ? set.add(tab) : set.remove(tab);
-        if (changed) {
-            WindowLayout.persist();
-        }
-    }
-
-    private static List<ChatTab> plainTabsOf(Set<ChatTab> set) {
-        List<ChatTab> result = new ArrayList<ChatTab>();
-        for (ChatTab tab : set) {
-            if (!tab.isWhisper()) {
-                result.add(tab);
-            }
-        }
-        Collections.sort(result, new Comparator<ChatTab>() {
-            @Override
-            public int compare(ChatTab a, ChatTab b) {
-                return a.id().compareTo(b.id());
-            }
-        });
-        return result;
+    public static synchronized boolean opensByItself(ChatTab tab) {
+        ChatTab row = tab == null ? null : ChatTab.row(tab);
+        return row != null && !OPENED_BY_HAND.contains(row)
+                && !CLOSED_BY_HAND.contains(row);
     }
 
     /**
      * The conversations whose every line the closed feed carries, in its
-     * order: every channel the player can see whose choice is
-     * {@link ChatNotification#EVERYTHING}, in presentation order, whether
-     * or not it has a tab — closing a tab hides the tab, not the
-     * channel's messages — then every open conversation tab with the same
-     * choice. Conversations are read from their open tabs only: a closed
-     * one is hidden until its next message reopens it. Their typing shows
-     * in the feed too.
+     * order: every channel the player can see whose Show in Feed is
+     * {@link ChatLineChoice#ALL}, in presentation order, whether or not
+     * it has a tab — closing a tab hides the tab, not the channel's
+     * messages — then every open conversation tab with the same choice.
+     * Conversations are read from their open tabs only: a closed one is
+     * hidden until its next message reopens it. Their typing shows in the
+     * feed too.
      */
     public static List<ChatTab> feedTabs() {
-        return feedTabs(ChatNotification.EVERYTHING);
+        return feedTabs(ChatLineChoice.EVERYTHING);
     }
 
     /**
      * The conversations only whose lines addressed to the player the
-     * closed feed carries, in the same order: those whose choice is
-     * {@link ChatNotification#ONLY_MENTIONS}.
+     * closed feed carries, in the same order: those whose Show in Feed
+     * is {@link ChatLineChoice#ONLY_MENTIONS}.
      */
     public static List<ChatTab> mentionFeedTabs() {
-        return feedTabs(ChatNotification.ONLY_MENTIONS);
+        return feedTabs(ChatLineChoice.ONLY_MENTIONS);
     }
 
     /** What the closed feed shows: see {@link #feedTabs} and {@link #mentionFeedTabs}. */
@@ -433,14 +464,14 @@ public final class ChatLayout {
         return ChatLineFilter.of(feedTabs(), mentionFeedTabs());
     }
 
-    private static List<ChatTab> feedTabs(ChatNotification choice) {
-        List<ChatTab> audible = new ArrayList<ChatTab>();
+    private static List<ChatTab> feedTabs(ChatLineChoice choice) {
+        List<ChatTab> shown = new ArrayList<ChatTab>();
         for (ChatChannel channel : ChatChannel.presentationOrder()) {
             ChatTab tab = ChatTab.of(channel);
             if (ClientChatChannelState.isAvailable(tab)
-                    && notification(tab) == choice
+                    && feedChoice(tab) == choice
                     && !PinnedWindows.shows(tab)) {
-                audible.add(tab);
+                shown.add(tab);
             }
         }
         for (WindowTab each : WindowLayout.order()) {
@@ -450,12 +481,12 @@ public final class ChatLayout {
             ChatTab tab = ChatTab.from(each);
             if (tab != null && tab.isWhisper()
                     && ClientChatChannelState.isAvailable(tab)
-                    && notification(tab) == choice
+                    && feedChoice(tab) == choice
                     && !PinnedWindows.shows(tab)) {
-                audible.add(tab);
+                shown.add(tab);
             }
         }
-        return audible;
+        return shown;
     }
 
     /* ---- Closing and opening ---- */
@@ -463,15 +494,15 @@ public final class ChatLayout {
     /**
      * Removes the tab from its window, as {@link WindowLayout#close}
      * does; a whisper closed by hand stays closed through a replay, and
-     * comes back with the next live line. The notification choice is
-     * untouched: a closed tab keeps it for when it is restored.
+     * comes back with the next live line. The tab's choices are
+     * untouched: a closed tab keeps them for when it is restored.
      */
     public static synchronized boolean close(ChatTab tab) {
         if (!WindowLayout.isClosable(tab)) {
             return false;
         }
         if (isRemembered(tab)) {
-            HIDDEN.add(ChatTab.row(tab));
+            CLOSED_BY_HAND.add(ChatTab.row(tab));
         }
         return WindowLayout.close(tab);
     }
@@ -489,9 +520,11 @@ public final class ChatLayout {
     }
 
     /**
-     * Opens a conversation's tab where a tab that opens by itself belongs
-     * ({@link WindowLayout#receivingWindow}), and answers it as the layout
-     * holds it. The row holds one entry per channel and per person, so a
+     * Opens a conversation's tab where it belongs
+     * ({@link WindowLayout#openTab}): the window asked for, else another
+     * that holds conversations, never a locked one, else a window of its
+     * own; and answers it as the layout holds it. The row holds one entry
+     * per channel and per person, so a
      * conversation held as one character opens as its row entry: a line's
      * own tab never stands in a window beside the one that shows it. Null
      * while no window holds a conversation: the tab waits for the chat's
@@ -500,18 +533,55 @@ public final class ChatLayout {
     public static synchronized ChatTab openTab(ChatTab tab,
                                                String preferredWindowId) {
         ChatTab row = ChatTab.row(tab);
+        int windows = WindowLayout.windows().size();
         ChatTab opened = ChatTab.from(WindowLayout.openTab(row,
                 preferredWindowId));
         if (opened == null && row != null) {
             WAITING.add(row);
         }
+        if (opened != null && WindowLayout.windows().size() > windows) {
+            // No window would take it, so it has one of its own, unlocked:
+            // the next that finds no room joins it.
+            collectingWindowId = WindowLayout.windowOf(opened).getId();
+        }
         return opened;
     }
 
     /**
+     * The conversation the chat's key shows first: one waiting unread in
+     * the window the chat opened for conversations that found no room,
+     * its front one if that waits, else the first that does. Null while
+     * nothing waits there, or that window is gone.
+     */
+    public static synchronized ChatTab waitingInOwnWindow() {
+        Window window = WindowLayout.window(collectingWindowId);
+        if (window == null) {
+            return null;
+        }
+        ChatTab front = ChatTab.from(window.getActiveTab());
+        if (waits(front)) {
+            return front;
+        }
+        for (WindowTab each : window.getTabs()) {
+            ChatTab tab = ChatTab.from(each);
+            if (waits(tab)) {
+                return tab;
+            }
+        }
+        return null;
+    }
+
+    private static boolean waits(ChatTab tab) {
+        return ClientChatChannelState.isSelectable(tab)
+                && ClientChatChannelViews.hasUnread(tab);
+    }
+
+    /**
      * Opens a conversation the player asked for — a whisper, a link, a
-     * jump to a line — as {@link #openTab} does, and when no window holds
-     * a conversation, in the chat's first window, which it opens.
+     * jump to a line — as {@link #openTab} does; when no window holds a
+     * conversation, the chat's first window opens with it, the
+     * conversation in a window of its own beside it, since the first
+     * window opens locked.
      */
     public static synchronized ChatTab openHere(ChatTab tab,
                                                 String preferredWindowId) {
@@ -548,10 +618,8 @@ public final class ChatLayout {
             }
         }
         Set<String> closed = new LinkedHashSet<String>();
-        for (ChatTab tab : HIDDEN) {
-            if (isRemembered(tab)) {
-                closed.add(tab.id());
-            }
+        for (ChatTab tab : CLOSED_BY_HAND) {
+            closed.add(tab.id());
         }
         CONVERSATIONS.put(serverKey, open);
         CLOSED_CONVERSATIONS.put(serverKey, closed);
@@ -573,7 +641,7 @@ public final class ChatLayout {
             for (String id : closed) {
                 ChatTab tab = ChatTab.fromId(id);
                 if (isRemembered(tab)) {
-                    HIDDEN.add(tab);
+                    CLOSED_BY_HAND.add(tab);
                 }
             }
         }
@@ -582,10 +650,24 @@ public final class ChatLayout {
             for (String[] entry : open) {
                 ChatTab tab = ChatTab.fromId(entry[1]);
                 if (isRemembered(tab) && !isOpen(tab)) {
-                    HIDDEN.remove(tab);
-                    openTab(tab, entry[0]);
+                    CLOSED_BY_HAND.remove(tab);
+                    putBack(tab, entry[0]);
                 }
             }
+        }
+    }
+
+    /**
+     * Puts a remembered whisper back in the window it stood in, locked or
+     * not: that is the layout as the player left it, not a tab arriving.
+     * With that window gone it opens as any conversation does.
+     */
+    private static void putBack(ChatTab tab, String windowId) {
+        Window window = WindowLayout.window(windowId);
+        if (window == null) {
+            openTab(tab, null);
+        } else {
+            WindowLayout.appendTabs(window, Collections.singletonList(tab));
         }
     }
 
@@ -599,7 +681,7 @@ public final class ChatLayout {
         if (row == null || !row.isWhisper()) {
             return null;
         }
-        HIDDEN.remove(ChatTab.row(row));
+        CLOSED_BY_HAND.remove(ChatTab.row(row));
         return openTab(row, preferredWindowId);
     }
 
@@ -607,19 +689,16 @@ public final class ChatLayout {
      * Closes every whisper and NPC tab: a conversation ends with the
      * session it was held in, and so does its tab — the place's whisper
      * tabs are remembered first, open and closed by hand alike, and come
-     * back on the next visit, each with its notification choice. An NPC
-     * conversation's choice goes with it. A window left empty goes, the
-     * last one included.
+     * back on the next visit, each with its choices. The NPC
+     * conversations of the session go, with their choices. A window left
+     * empty goes, the last one included.
      */
     public static synchronized void closeConversations() {
         rememberConversations(conversationsPlace);
         WAITING.clear();
-        Iterator<ChatTab> closedByHand = HIDDEN.iterator();
-        while (closedByHand.hasNext()) {
-            if (isRemembered(closedByHand.next())) {
-                closedByHand.remove();
-            }
-        }
+        collectingWindowId = null;
+        forgetNpcConversations();
+        CLOSED_BY_HAND.clear();
         List<WindowTab> removed = WindowLayout.removeTabs(
                 new WindowLayout.TabFilter() {
                     @Override
@@ -629,15 +708,149 @@ public final class ChatLayout {
                                 && conversation.isWhisper();
                     }
                 });
-        for (WindowTab tab : removed) {
-            ChatTab conversation = ChatTab.from(tab);
-            if (conversation != null && conversation.isNpc()) {
-                NOTIFICATIONS.remove(conversation);
-            }
-            HIDDEN.remove(tab);
-        }
         if (!removed.isEmpty()) {
             WindowLayout.persist();
+        }
+    }
+
+    /* ---- NPC conversations ---- */
+
+    /**
+     * Notes that an NPC conversation spoke: the session keeps the
+     * {@link #MAX_NPC_CONVERSATIONS} that spoke last, so the {@code +}
+     * can open one again once it is closed.
+     */
+    public static synchronized void noteNpcSpoke(ChatTab tab) {
+        if (tab == null || !tab.isNpc()) {
+            return;
+        }
+        NPC_SPOKEN.remove(tab);
+        NPC_SPOKEN.put(tab, Long.valueOf(++npcTurn));
+        Iterator<ChatTab> quietest = NPC_SPOKEN.keySet().iterator();
+        while (NPC_SPOKEN.size() > MAX_NPC_CONVERSATIONS && quietest.hasNext()) {
+            quietest.next();
+            quietest.remove();
+        }
+    }
+
+    /**
+     * The NPC conversations of the session in no window, the one that
+     * spoke last first: what the {@code +} offers to open again.
+     */
+    static synchronized List<ChatTab> closedNpcConversations() {
+        List<ChatTab> result = new ArrayList<ChatTab>();
+        for (ChatTab tab : NPC_SPOKEN.keySet()) {
+            if (!isOpen(tab)) {
+                result.add(tab);
+            }
+        }
+        Collections.reverse(result);
+        return result;
+    }
+
+    /**
+     * Whether an NPC conversation of the session is in no window. Asked
+     * per frame for the {@code +}, so it only scans.
+     */
+    static synchronized boolean hasClosedNpcConversation() {
+        for (ChatTab tab : NPC_SPOKEN.keySet()) {
+            if (!isOpen(tab)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Closes NPC pages while more are open than {@code limit} allows,
+     * the ones quiet longest first, after {@code spoke}'s page opened by
+     * itself. Kept open: the page that spoke, a page in front of its
+     * window and a page holding a draft. A page leaves as one that ends
+     * by itself does, from a locked window too, and the {@code +} opens
+     * it again.
+     */
+    public static synchronized void closeQuietNpcConversations(ChatTab spoke,
+                                                               int limit) {
+        Map<ChatTab, Long> open = new LinkedHashMap<ChatTab, Long>();
+        Set<ChatTab> exempt = new HashSet<ChatTab>();
+        if (spoke != null) {
+            exempt.add(spoke);
+        }
+        for (Window window : WindowLayout.windows()) {
+            for (WindowTab each : window.getTabs()) {
+                ChatTab tab = ChatTab.from(each);
+                if (tab == null || !tab.isNpc()) {
+                    continue;
+                }
+                Long turn = NPC_SPOKEN.get(tab);
+                open.put(tab, turn == null ? Long.valueOf(0L) : turn);
+                if (each.equals(window.getActiveTab())
+                        || ClientChatChannelState.getDraft(tab).length() > 0) {
+                    exempt.add(tab);
+                }
+            }
+        }
+        final List<ChatTab> closing = npcPagesToClose(open, exempt, limit);
+        if (closing.isEmpty()) {
+            return;
+        }
+        WindowLayout.removeTabs(new WindowLayout.TabFilter() {
+            @Override
+            public boolean matches(WindowTab tab) {
+                return closing.contains(tab);
+            }
+        });
+        WindowLayout.persist();
+    }
+
+    /**
+     * The NPC pages to close so that at most {@code limit} stay open:
+     * {@code open} holds each open page with when it last spoke, and the
+     * ones quiet longest close first, never one {@code exempt}. Fewer
+     * close when the exempt pages alone pass the limit.
+     */
+    static List<ChatTab> npcPagesToClose(Map<ChatTab, Long> open,
+                                         Set<ChatTab> exempt, int limit) {
+        List<ChatTab> closing = new ArrayList<ChatTab>();
+        int excess = open.size() - Math.max(0, limit);
+        if (excess <= 0) {
+            return closing;
+        }
+        List<Map.Entry<ChatTab, Long>> quietFirst =
+                new ArrayList<Map.Entry<ChatTab, Long>>(open.entrySet());
+        Collections.sort(quietFirst, new Comparator<Map.Entry<ChatTab, Long>>() {
+            @Override
+            public int compare(Map.Entry<ChatTab, Long> a,
+                               Map.Entry<ChatTab, Long> b) {
+                return a.getValue().compareTo(b.getValue());
+            }
+        });
+        for (Map.Entry<ChatTab, Long> entry : quietFirst) {
+            if (closing.size() >= excess) {
+                break;
+            }
+            if (!exempt.contains(entry.getKey())) {
+                closing.add(entry.getKey());
+            }
+        }
+        return closing;
+    }
+
+    /** Forgets the session's NPC conversations and their choices. */
+    private static void forgetNpcConversations() {
+        NPC_SPOKEN.clear();
+        npcTurn = 0L;
+        Iterator<ChatTab> notified = NOTIFICATIONS.keySet().iterator();
+        while (notified.hasNext()) {
+            if (notified.next().isNpc()) {
+                notified.remove();
+            }
+        }
+        Iterator<ChatTab> fed = FEED_CHOICES.keySet().iterator();
+        while (fed.hasNext()) {
+            if (fed.next().isNpc()) {
+                fed.remove();
+            }
         }
     }
 
@@ -789,7 +1002,12 @@ public final class ChatLayout {
     private static final String TOOLBAR = "toolbar";
     private static final String CLOSED = "closed";
     private static final String NOTIFY = "notify";
-    private static final String HIDDEN_LINE = "hidden";
+    /**
+     * A Show in Feed line. Not {@code feed}: the feed's position line is
+     * written alone under that word, which takes every line it begins
+     * with ({@link WindowLayoutStore#saveLine}).
+     */
+    private static final String FEED_CHOICE = "feedchoice";
     private static final String CONVERSATION = "conversation";
     private static final String CLOSED_CONVERSATION = "closedconversation";
     /** What a window line says of an area or member list put away. */
@@ -807,16 +1025,19 @@ public final class ChatLayout {
      * feed x=0.00 y=100.00
      * toolbar collapsed=false
      * closed faction
-     * notify mentions ooc
-     * notify nothing whisper:Steve|Aldric
-     * hidden operator
+     * notify everything ooc
+     * notify mentions whisper:Steve|Aldric
+     * feedchoice nothing server_console
      * </pre>
      *
-     * <p>A conversation's notification choice, where it is not
-     * {@code everything}, stands on a {@code notify} line: the choice
-     * ({@code mentions} or {@code nothing}) and the tab id, whispers
-     * included and NPC conversations not. A whisper tab is remembered per
-     * place on a line of its own: {@code conversation}, the place, the
+     * <p>A conversation's Notifications, where it is not the
+     * conversation's default, stands on a {@code notify} line: the choice
+     * ({@code everything}, {@code mentions} or {@code nothing}) and the
+     * tab id. Its Show in Feed, where it is not {@code everything}, stands on a
+     * {@code feedchoice} line the same way ({@code mentions} or
+     * {@code nothing}). Both name whispers too, never an NPC
+     * conversation, whose choices end with the session. A whisper tab is
+     * remembered per place on a line of its own: {@code conversation}, the place, the
      * window and the tab id for one that was open;
      * {@code closedconversation}, the place and the tab id for one closed
      * by hand. These lines are tab-separated, since a name or a place may
@@ -826,7 +1047,8 @@ public final class ChatLayout {
         @Override
         public void clear() {
             NOTIFICATIONS.clear();
-            HIDDEN.clear();
+            FEED_CHOICES.clear();
+            CLOSED_BY_HAND.clear();
             CONVERSATIONS.clear();
             CLOSED_CONVERSATIONS.clear();
             conversationsPlace = "";
@@ -848,19 +1070,16 @@ public final class ChatLayout {
                 readNotification(line.split("\t"));
                 return true;
             }
+            if (line.startsWith(FEED_CHOICE + "\t")) {
+                readFeedChoice(line.split("\t"));
+                return true;
+            }
             String[] parts = line.split("\\s+");
             String key = parts[0];
             if (parts.length == 2 && CLOSED.equals(key)) {
                 ChatChannel channel = ChatChannel.fromId(parts[1]);
                 if (channel != null) {
                     CLOSED_READ.add(channel);
-                }
-                return true;
-            }
-            if (parts.length == 2 && HIDDEN_LINE.equals(key)) {
-                ChatTab tab = ChatTab.fromId(parts[1]);
-                if (tab != null) {
-                    HIDDEN.add(tab);
                 }
                 return true;
             }
@@ -893,11 +1112,24 @@ public final class ChatLayout {
             if (fields.length != 3) {
                 return;
             }
-            ChatNotification choice = ChatNotification.fromId(fields[1]);
-            ChatTab tab = ChatTab.fromId(fields[2]);
-            if (choice != null && tab != null && !tab.isNpc()
-                    && choice != ChatNotification.EVERYTHING) {
-                NOTIFICATIONS.put(ChatTab.row(tab), choice);
+            ChatLineChoice choice = ChatLineChoice.fromId(fields[1]);
+            ChatTab row = ChatTab.row(ChatTab.fromId(fields[2]));
+            if (choice != null && row != null && !row.isNpc()
+                    && choice != defaultNotification(row)) {
+                NOTIFICATIONS.put(row, choice);
+            }
+        }
+
+        /** A {@code feedchoice} line: the choice, then the tab it is for. */
+        private void readFeedChoice(String[] fields) {
+            if (fields.length != 3) {
+                return;
+            }
+            ChatLineChoice choice = ChatLineChoice.fromId(fields[1]);
+            ChatTab row = ChatTab.row(ChatTab.fromId(fields[2]));
+            if (choice != null && row != null && !row.isNpc()
+                    && choice != ChatLineChoice.EVERYTHING) {
+                FEED_CHOICES.put(row, choice);
             }
         }
 
@@ -942,8 +1174,8 @@ public final class ChatLayout {
          * Every plain channel the file neither placed nor closed goes to
          * the first window holding a conversation, so a channel added
          * after the file was written is never silently lost; with no such
-         * window, one opens for them. Staff talk and the consoles are the exception: they wait
-         * in the {@code +}, hidden, as they do for a new player. A file
+         * window, one opens for them. Staff talk and the consoles are the
+         * exception: they open only by hand, and wait in the {@code +}. A file
          * that names no window and closes every channel describes the
          * empty layout and is loaded as one.
          */
@@ -955,9 +1187,7 @@ public final class ChatLayout {
                 if (WindowLayout.isOpen(tab) || CLOSED_READ.contains(channel)) {
                     continue;
                 }
-                if (FIRST_HIDDEN.contains(tab)) {
-                    HIDDEN.add(tab);
-                } else {
+                if (!OPENED_BY_HAND.contains(tab)) {
                     unplaced.add(tab);
                 }
             }
@@ -1000,8 +1230,9 @@ public final class ChatLayout {
                 lines.add(NOTIFY + "\t" + notification(tab).id() + "\t"
                         + tab.id());
             }
-            for (ChatTab tab : hiddenTabs()) {
-                lines.add(HIDDEN_LINE + " " + tab.id());
+            for (ChatTab tab : feedChoiceTabs()) {
+                lines.add(FEED_CHOICE + "\t" + feedChoice(tab).id() + "\t"
+                        + tab.id());
             }
             rememberConversations(conversationsPlace);
             for (Map.Entry<String, List<String[]>> place

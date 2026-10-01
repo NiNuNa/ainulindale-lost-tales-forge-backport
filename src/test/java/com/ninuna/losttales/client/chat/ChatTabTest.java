@@ -1,5 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.client.window.PageOption;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.client.window.Tearing;
 import com.ninuna.losttales.client.window.WindowLayout;
@@ -44,13 +45,55 @@ public final class ChatTabTest {
         assertEquals("trade", tab.id());
         assertSame(tab, ChatTab.of(trade));
         assertEquals(tab, ChatTab.fromId("trade"));
+        // It starts as every channel does: chiming for mentions alone,
+        // every line in the feed.
+        assertEquals(ChatLineChoice.ONLY_MENTIONS, ChatLayout.notification(tab));
+        assertEquals(ChatLineChoice.EVERYTHING, ChatLayout.feedChoice(tab));
+    }
+
+    /**
+     * A conversation's options, with nothing unread: Mark as Read and Jump
+     * to First Unread greyed with their reason, then its own settings,
+     * Notifications and Show in Feed, in a group of their own; each setting
+     * steps on with a click and back with a right-click round the same
+     * three words, reads the choice it stands on, and keeps the menu open.
+     */
+    @Test
+    public void aConversationsOptionsStepBothChoices() {
+        ClientChatChannelViews.clear();
+        TwoWindowLayout.reset();
+        ChatTab ooc = ChatTab.of(ChatChannel.OOC);
+        List<String> ids = new java.util.ArrayList<String>();
+        for (PageOption option : ooc.options()) {
+            ids.add(option.id);
+        }
+        assertEquals(Arrays.asList("mark_read", "jump_unread", "notify",
+                "feed"), ids);
+        assertFalse(ooc.options().get(0).isAvailable());
+        assertFalse(ooc.options().get(1).isAvailable());
+        assertFalse(ooc.options().get(1).group().equals(
+                ooc.options().get(2).group()));
+        assertEquals(ChatLineChoice.ONLY_MENTIONS.labelKey(),
+                ooc.options().get(2).value);
+        assertEquals(ChatLineChoice.EVERYTHING.labelKey(),
+                ooc.options().get(3).value);
+        // Show in Feed at Everything rests lit.
+        assertTrue(ooc.options().get(3).on);
+        assertTrue(ooc.takeOption("feed", false));
+        assertEquals(ChatLineChoice.ONLY_MENTIONS, ChatLayout.feedChoice(ooc));
+        assertTrue(ooc.takeOption("notify", true));
+        assertEquals(ChatLineChoice.EVERYTHING, ChatLayout.notification(ooc));
+        assertEquals(ChatLineChoice.ONLY_MENTIONS, ChatLayout.feedChoice(ooc));
+        assertTrue(ooc.takeOption("notify", false));
+        assertTrue(ooc.takeOption("notify", false));
+        assertTrue(ooc.isMuted());
     }
 
     /**
      * The registry hands out a new object for a channel every time it is
      * filled, and an access broadcast fills it on every login, logout,
      * mute and role change. A tab has to survive that, or a window's
-     * tabs, its mutes and its hidden set all quietly stop matching.
+     * tabs and its choices all quietly stop matching.
      */
     @Test
     public void aTabSurvivesItsChannelBeingRegisteredAgain() {
@@ -126,11 +169,12 @@ public final class ChatTabTest {
         assertEquals(ChatTab.of(ChatChannel.GLOBAL),
                 WindowLayout.window("w2").getActiveTab());
         assertEquals(1, countWhispers());
-        // A locked window asked for takes it: the padlock holds a
-        // window's place, not its tabs.
-        assertTrue(WindowLayout.window("w1").isLocked());
+        // A locked window asked for takes nothing: the whisper opens in
+        // the unlocked window that holds conversations.
+        assertTrue(WindowLayout.setLocked("w1", true));
         ChatTab alex = ChatLayout.openWhisper("Alex", "", "w1");
-        assertTrue(WindowLayout.window("w1").contains(alex));
+        assertFalse(WindowLayout.window("w1").contains(alex));
+        assertTrue(WindowLayout.window("w2").contains(alex));
         // Whispers cycle like any tab and never count as closed channels.
         ClientChatChannelState.select(steve);
         assertEquals(steve, ClientChatChannelState.getSelected());
@@ -141,9 +185,9 @@ public final class ChatTabTest {
         assertNull(ChatLayout.openWhisper("", "", "w2"));
         // A conversation's tab is not a window's: no window line names
         // it, and an older file's whisper tab is dropped on load. Its
-        // notification choice is kept, on a line of its own; an NPC
+        // Notifications is kept, on a line of its own; an NPC
         // conversation's never is.
-        ChatLayout.setNotification(alex, ChatNotification.NOTHING);
+        ChatLayout.setNotification(alex, ChatLineChoice.NOTHING);
         assertTrue(ChatLayout.isMuted(alex));
         List<String> lines = WindowLayoutStore.describe();
         assertTrue(lines.contains("notify\tnothing\twhisper:Alex"));
@@ -157,7 +201,7 @@ public final class ChatTabTest {
         assertFalse(ChatLayout.isOpen(alex));
         assertTrue(ChatLayout.isMuted(alex));
         assertFalse(ChatLayout.isMuted(ChatTab.npc("Grey Wanderer")));
-        ChatLayout.setNotification(alex, ChatNotification.EVERYTHING);
+        ChatLayout.setNotification(alex, ChatLineChoice.EVERYTHING);
         assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.PROXIMITY,
                 ChatChannel.FACTION, ChatChannel.OOC,
                 ChatChannel.PARTY), ChatLayoutViews.channelsOf(WindowLayout.window("w2")));

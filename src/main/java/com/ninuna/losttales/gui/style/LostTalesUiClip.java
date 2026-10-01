@@ -16,6 +16,13 @@ public final class LostTalesUiClip {
     private LostTalesUiClip() {}
 
     /**
+     * The rectangle in GUI space every clip {@link #begin} cuts stays
+     * inside: what a window whose page fills it shows, while that window
+     * is drawn ({@link #beginOuter}); null for none.
+     */
+    private static LostTalesUiHitBox outer;
+
+    /**
      * Slack for the clip's display-pixel conversion: far above any
      * floating-point error the conversion can accumulate, far below the
      * smallest genuine fraction of a display pixel an edge can carry.
@@ -60,6 +67,17 @@ public final class LostTalesUiClip {
     public static boolean begin(Minecraft minecraft, double leftX,
                              double rightX, double topY, double bottomY,
                              boolean inward) {
+        if (outer != null) {
+            double outerRight = outer.left + outer.width;
+            double outerBottom = outer.top + outer.height;
+            leftX = Double.isNaN(leftX) ? outer.left
+                    : Math.max(leftX, outer.left);
+            rightX = Double.isNaN(rightX) ? outerRight
+                    : Math.min(rightX, outerRight);
+            topY = Double.isNaN(topY) ? outer.top : Math.max(topY, outer.top);
+            bottomY = Double.isNaN(bottomY) ? outerBottom
+                    : Math.min(bottomY, outerBottom);
+        }
         try {
             ScaledResolution resolution = new ScaledResolution(minecraft,
                     minecraft.displayWidth, minecraft.displayHeight);
@@ -118,6 +136,27 @@ public final class LostTalesUiClip {
         if (clipped) {
             GL11.glPopAttrib();
         }
+    }
+
+    /**
+     * Cuts everything drawn to {@code box}, a rectangle in GUI space, the
+     * clips begun inside it included, until {@link #endOuter}: a window
+     * whose page fills it, whose row, strip and bar slide out past its
+     * edges. False when nothing of it shows; nothing is cut then.
+     */
+    public static boolean beginOuter(Minecraft minecraft,
+                                     LostTalesUiHitBox box) {
+        if (!begin(minecraft, box.left, box.left + box.width, box.top,
+                box.top + box.height, false)) {
+            return false;
+        }
+        outer = box;
+        return true;
+    }
+
+    public static void endOuter(boolean clipped) {
+        outer = null;
+        end(clipped);
     }
 
     private static final FloatBuffer LOCAL_CLIP_MATRIX =

@@ -45,20 +45,27 @@ public final class ChatLayoutViews {
     }
 
     /**
-     * Reopens a closed channel as the last tab of the window that takes a
-     * tab: false for one already open.
+     * Reopens a closed channel as the last tab of the window that takes
+     * it, its front tab left alone: false for one already open, or with
+     * no window to take it.
      */
     public static boolean reopen(ChatChannel channel) {
-        ChatTab tab = ChatTab.of(channel);
-        if (tab == null || WindowLayout.isOpen(tab)) {
-            return false;
-        }
-        Window window = WindowLayout.receivingWindow(null, tab);
-        return window != null && WindowLayout.addTab(window.getId(), tab);
+        return reopenIn(channel, null);
     }
 
-    /** Reopens a closed channel as the given window's last tab. */
+    /**
+     * Reopens a closed channel as the given window's last tab, or where a
+     * conversation opens while that window is locked: false for a missing
+     * window or a channel already open.
+     */
     public static boolean reopen(ChatChannel channel, String windowId) {
-        return WindowLayout.addTab(windowId, ChatTab.of(channel));
+        return WindowLayout.window(windowId) != null
+                && reopenIn(channel, windowId);
+    }
+
+    private static boolean reopenIn(ChatChannel channel, String windowId) {
+        ChatTab tab = ChatTab.of(channel);
+        return tab != null && !WindowLayout.isOpen(tab)
+                && WindowLayout.openTab(tab, windowId) != null;
     }
 }

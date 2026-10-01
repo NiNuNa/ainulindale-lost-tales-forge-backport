@@ -151,6 +151,11 @@ public final class LostTalesHudFade {
         LAYER.release();
     }
 
+    /** Whether the HUD shows whole this frame, fading neither out nor in. */
+    public static boolean isWhole() {
+        return shown >= 1.0F;
+    }
+
     private static boolean isGone() {
         return shown <= 0.0F;
     }

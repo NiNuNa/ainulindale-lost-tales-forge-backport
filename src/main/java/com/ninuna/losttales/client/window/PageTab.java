@@ -72,38 +72,30 @@ public final class PageTab extends WindowTab {
         return !this.page.opensFromWorld();
     }
 
+    @Override
+    public List<PageOption> options() {
+        return content().options();
+    }
+
     /**
-     * The page's own rows, under their heading with the chosen one marked
-     * in honey, as a chosen status is; one that cannot be taken greyed.
+     * The page's help: the guide the language file holds for it under
+     * {@code gui.losttales.help.page.<its code name>}, and its keys.
      */
     @Override
-    public List<MenuWindow.Entry> menuRows() {
-        PageContent page = content();
-        List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
-        for (PageContent.Choice choice : page.choices()) {
-            rows.add(new MenuWindow.Entry(choice.id, choice.label, false,
-                    choice.chosen ? LostTalesColors.rgb(LostTalesColors.HONEY)
-                            : -1, null).unavailable(choice.unavailable));
-        }
-        if (rows.isEmpty() || page.choicesHeading().length() == 0) {
-            return rows;
-        }
-        List<MenuWindow.Entry> headed = new ArrayList<MenuWindow.Entry>();
-        WindowMenus.addSection(headed, StatCollector.translateToLocal(
-                page.choicesHeading()), rows);
-        return headed;
+    public PageHelp help() {
+        return new PageHelp(PageHelp.paragraphs(
+                "gui.losttales.help.page." + this.page.id),
+                content().keyAreas());
     }
 
     @Override
-    public boolean hasMenuRows() {
-        return !content().choices().isEmpty();
+    public Settings.Place settingsPlace() {
+        return content().settingsPlace();
     }
 
-    /** A choice taken; the menu stays for the next. */
     @Override
-    public boolean takeMenuRow(String id) {
-        content().choose(id);
-        return true;
+    public boolean takeOption(String id, boolean back) {
+        return content().takeOption(id, back);
     }
 
     @Override

@@ -17,8 +17,8 @@ import java.util.TreeSet;
 /**
  * The server-side keys of a Forge configuration as entries: every
  * category but the client's, each property with its type, bounds,
- * comment and valid values, and the secrets blanked. What the operator
- * screen and the commands read; nothing here touches a file.
+ * comment and valid values, and the secrets blanked. What the Server
+ * Settings page and the commands read; nothing here touches a file.
  */
 public final class ServerConfigSnapshot {
 
@@ -101,9 +101,15 @@ public final class ServerConfigSnapshot {
         return entries;
     }
 
+    /**
+     * One property as an entry. A secret keeps its value at home: it
+     * leaves as one blank value while it holds one and as none while it
+     * does not, so a page can say whether it is set.
+     */
     static ServerConfigEntry entryOf(String category, String key, Property property,
                                      boolean secret) {
-        List<String> values = secret ? Collections.singletonList("")
+        List<String> values = secret ? (property.getString().length() == 0
+                        ? Collections.<String>emptyList() : Collections.singletonList(""))
                 : property.isList() ? Arrays.asList(property.getStringList())
                 : Collections.singletonList(property.getString());
         List<String> defaults = secret ? Collections.singletonList("")
@@ -129,19 +135,6 @@ public final class ServerConfigSnapshot {
         return ServerConfigEntry.Type.STRING;
     }
 
-    static Property.Type propertyTypeOf(ServerConfigEntry.Type type) {
-        switch (type) {
-            case INTEGER:
-                return Property.Type.INTEGER;
-            case BOOLEAN:
-                return Property.Type.BOOLEAN;
-            case DOUBLE:
-                return Property.Type.DOUBLE;
-            default:
-                return Property.Type.STRING;
-        }
-    }
-
     /** The entry named, or null. */
     public static ServerConfigEntry find(List<ServerConfigEntry> entries,
                                          String category, String key) {
@@ -155,59 +148,5 @@ public final class ServerConfigSnapshot {
             }
         }
         return null;
-    }
-
-    /**
-     * A configuration holding these entries as properties, the shape the
-     * Forge config screen edits; secrets stand empty. The client builds
-     * one from the snapshot, and a file is never involved.
-     */
-    public static Configuration toConfiguration(List<ServerConfigEntry> entries) {
-        Configuration config = new Configuration();
-        for (ServerConfigEntry entry : entries) {
-            Property.Type type = propertyTypeOf(entry.getType());
-            Property property = entry.isList()
-                    ? new Property(entry.getKey(), toArray(entry.getValues()), type)
-                    : new Property(entry.getKey(), entry.getValue(), type);
-            if (entry.isList()) {
-                property.setDefaultValues(toArray(entry.getDefaults()));
-            } else {
-                property.setDefaultValue(entry.getDefault());
-            }
-            property.comment = entry.getComment();
-            property.setLanguageKey(entry.getLangKey());
-            applyBounds(property, entry);
-            if (!entry.getValidValues().isEmpty()) {
-                property.setValidValues(toArray(entry.getValidValues()));
-            }
-            config.getCategory(entry.getCategory()).put(entry.getKey(), property);
-        }
-        return config;
-    }
-
-    private static void applyBounds(Property property, ServerConfigEntry entry) {
-        try {
-            if (entry.getType() == ServerConfigEntry.Type.INTEGER) {
-                if (entry.getMinValue().length() > 0) {
-                    property.setMinValue(Integer.parseInt(entry.getMinValue()));
-                }
-                if (entry.getMaxValue().length() > 0) {
-                    property.setMaxValue(Integer.parseInt(entry.getMaxValue()));
-                }
-            } else if (entry.getType() == ServerConfigEntry.Type.DOUBLE) {
-                if (entry.getMinValue().length() > 0) {
-                    property.setMinValue(Double.parseDouble(entry.getMinValue()));
-                }
-                if (entry.getMaxValue().length() > 0) {
-                    property.setMaxValue(Double.parseDouble(entry.getMaxValue()));
-                }
-            }
-        } catch (NumberFormatException ignored) {
-            // A bound the snapshot could not name leaves the property unbounded.
-        }
-    }
-
-    private static String[] toArray(List<String> values) {
-        return values.toArray(new String[values.size()]);
     }
 }

@@ -19,6 +19,7 @@ import com.ninuna.losttales.client.quest.ClientQuestCatalog;
 import com.ninuna.losttales.client.window.BarLead;
 import com.ninuna.losttales.client.window.FirstTips;
 import com.ninuna.losttales.client.window.MenuWindow;
+import com.ninuna.losttales.client.window.PageKeys;
 import com.ninuna.losttales.client.window.PageTab;
 import com.ninuna.losttales.client.window.ScreenPart;
 import com.ninuna.losttales.client.window.Settings;
@@ -40,6 +41,7 @@ import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.client.window.WindowTab;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
+import com.ninuna.losttales.gui.style.LostTalesUiClip;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiRules;
@@ -91,16 +93,22 @@ public final class ChatScreenPart extends ScreenPart {
     /** Gap between the typing line's bubble and its words. */
     private static final int TYPING_BUBBLE_GAP = 3;
 
-    /** The chat's part, on every screen with a world; without one there is no chat. */
+    /** The chat's part, on every screen. */
     private static final ScreenPart.Maker MAKER = new ScreenPart.Maker() {
         @Override
         public ScreenPart make(WindowScreen screen) {
-            return screen.isWorldless() ? null : new ChatScreenPart(screen);
+            return new ChatScreenPart(screen);
         }
     };
 
+    /** The Client Console, which the command key opens the chat on. */
+    private static final ChatTab CONSOLE =
+            ChatTab.of(ChatChannel.CLIENT_CONSOLE);
+
     /** Set once a message or command has gone out; the draft is then spent. */
     private boolean sent;
+    /** The conversation last used as the command key opened the console; null for the chat's key. */
+    private ChatTab usedBeforeCommand;
     /** How often the drafts are written while the chat is open: every five seconds. */
     private static final int DRAFT_SAVE_TICKS = 100;
     private int draftTicks;
@@ -163,11 +171,12 @@ public final class ChatScreenPart extends ScreenPart {
     /**
      * Gives every window screen opened from now on the chat's part and
      * every window's field the chat's look, gives every Settings the
-     * chat's sections — with or without a world, part or none — and
+     * chat's sections, and
      * registers the chat's kinds of sub-window before the layout file that
      * remembers their places is read.
      */
     public static void install() {
+        PageKeys.addKind(ChatShortcuts.areas());
         ChatSubWindows.install();
         ChatWindowFields.install();
         WindowScreen.addPart(MAKER);
@@ -193,7 +202,12 @@ public final class ChatScreenPart extends ScreenPart {
     /**
      * Opened by the chat's key, the screen brings back the conversation
      * last used: in front of its window, over a page there, and the window
-     * over the others.
+     * over the others. A conversation that opened by itself in a window of
+     * its own, since no window would take it, and waits there unread comes
+     * first instead. Opened by the command key, the screen brings the
+     * Client Console there, where the command and its answer stand: in
+     * that conversation's window, or where a conversation opens while
+     * that window is locked.
      */
     @Override
     public void opening(PageTab forPage) {
@@ -206,12 +220,26 @@ public final class ChatScreenPart extends ScreenPart {
             ChatLayout.openFirstWindow();
         }
         ChatTab last = ClientChatChannelState.lastUsed();
-        if (last == null) {
+        ChatTab front = last;
+        ChatTab waiting = ChatLayout.waitingInOwnWindow();
+        if (waiting != null && !this.screen.isOpenedForCommand()) {
+            front = waiting;
+        }
+        if (this.screen.isOpenedForCommand()) {
+            Window beside = WindowLayout.windowOf(last);
+            ChatTab console = ChatLayout.openHere(CONSOLE,
+                    beside == null ? null : beside.getId());
+            if (ClientChatChannelState.isSelectable(console)) {
+                front = console;
+                this.usedBeforeCommand = last;
+            }
+        }
+        if (front == null) {
             return;
         }
-        ClientChatChannelState.select(last);
-        WindowLayout.setActiveTab(last);
-        Window window = WindowLayout.windowOf(last);
+        ClientChatChannelState.select(front);
+        WindowLayout.setActiveTab(front);
+        Window window = WindowLayout.windowOf(front);
         if (window != null) {
             WindowLayout.raise(window.getId());
         }
@@ -314,6 +342,9 @@ public final class ChatScreenPart extends ScreenPart {
             ClientChatChannelState.setDraft(
                     this.sent ? "" : this.inputField.getText());
         }
+        // The command key's visit to the console is not what the chat's
+        // key comes back to, unless another conversation was used since.
+        ClientChatChannelState.comeBackTo(this.usedBeforeCommand, CONSOLE);
         ClientChatChannelViews.setScrollEasingSuppressed(false);
         // Every divider that was on a viewed tab has done its job, and
         // how far the tabs were read is written down, as is what was left
@@ -437,18 +468,25 @@ public final class ChatScreenPart extends ScreenPart {
         this.bar.updateInputBounds();
     }
 
-    /** The closed channels, and the people online to open a conversation with. */
+    /**
+     * The closed channels, the people online to open a conversation with,
+     * and the closed NPC conversations of the session.
+     */
     @Override
     public void addOpenable(List<MenuWindow.Entry> entries, String filter,
                             boolean search) {
         ChatMenus.addOpenable(this.mc, entries, filter, search);
     }
 
-    /** Closed channels that can be read, and people online to whisper to. */
+    /**
+     * Closed channels that can be read, people online to whisper to, and
+     * closed NPC conversations.
+     */
     @Override
     public boolean hasRestorable() {
         return !ChatMenus.restorableChannels().isEmpty()
-                || ChatMenus.hasWhisperCandidates(this.mc);
+                || ChatMenus.hasWhisperCandidates(this.mc)
+                || ChatLayout.hasClosedNpcConversation();
     }
 
     @Override
@@ -456,7 +494,7 @@ public final class ChatScreenPart extends ScreenPart {
         return ChatMenus.closedMark();
     }
 
-    /** How many unread lines wait in the closed channels, when any do. */
+    /** How many unread lines wait in the closed conversations, when any do. */
     @Override
     public String restoreTip() {
         int unread = ChatMenus.closedUnreadCount();
@@ -558,7 +596,8 @@ public final class ChatScreenPart extends ScreenPart {
             // The page in front of the keys is the tab Ctrl+W means.
             if (this.screen.focusedPage() != null) {
                 this.screen.closeTab(this.screen.focusedPage());
-            } else {
+            } else if (!this.screen.heldByLock(WindowLayout.windowOf(
+                    ClientChatChannelState.getSelected()))) {
                 this.tabActions.closeMarkedOrActiveTabs();
             }
             return true;
@@ -662,9 +701,13 @@ public final class ChatScreenPart extends ScreenPart {
         double barX = x - this.bar.fractionX();
         double barY = y - this.bar.fractionY() - this.bar.entranceOffset();
         int barRight = this.bar.inputBarRight();
-        // With only pages shown there is no bar, and nothing of one answers.
-        boolean liveBar = hasField();
-        ChatFrame otherBar = otherBarAt(x, barY);
+        // With only pages shown there is no bar, and nothing of one
+        // answers; nor while a conversation fills its window, nor where a
+        // window in front of it covers it.
+        ChatFrame active = this.bar.activeFrame();
+        boolean liveBar = hasField() && !barFilled() && (active == null
+                || !WindowFrame.coveredAbove(active.windowId, x, y));
+        ChatFrame otherBar = otherBarAt(x, y, barY);
         if (otherBar != null) {
             ChatHover hover = new ChatHover(ChatHover.Kind.OTHER_BAR);
             hover.frame = otherBar;
@@ -1284,14 +1327,24 @@ public final class ChatScreenPart extends ScreenPart {
     @Override
     public void drawUnderSubWindows(boolean empty, boolean typing,
                                     double pointerX, double pointerY) {
-        WindowHover hover = this.screen.hover();
-        if (empty) {
+        if (empty || !typing) {
+            // No window, or every window shows a page: there is no bar
+            // to type into, only its notice.
             this.bar.drawNotice();
-            return;
         }
-        if (!typing) {
-            // Every window shows a page: there is no bar to type into.
-            this.bar.drawNotice();
+    }
+
+    /**
+     * The bar being typed into, with its window: a window in front of it
+     * covers it, as it covers the rest of that window.
+     */
+    @Override
+    public void drawLiveBar(double pointerX, double pointerY) {
+        WindowHover hover = this.screen.hover();
+        ChatFrame barFrame = this.bar.activeFrame();
+        if (barFrame != null && barFrame.contentShare() >= 1.0F) {
+            // Its conversation fills the window: the bar is out past the
+            // window's foot until a key that types brings it back.
             return;
         }
         int barRight = this.bar.inputBarRight();
@@ -1306,10 +1359,14 @@ public final class ChatScreenPart extends ScreenPart {
         boolean onPicker = ChatHover.is(hover, ChatHover.Kind.PICKER_BUTTON);
         double controlX = onControl ? barX : WindowHover.AWAY;
         double controlY = onControl ? barY : WindowHover.AWAY;
+        // Sliding out past the foot of a window its conversation comes
+        // to fill, or back, it is cut where the window ends.
+        LostTalesUiHitBox filled = WindowDrawing.filledCut(barFrame);
+        boolean cut = filled != null
+                && LostTalesUiClip.beginOuter(this.mc, filled);
         GL11.glPushMatrix();
         // The live bar fades in with a window still appearing: one just
         // made from tabs carried out of their row.
-        ChatFrame barFrame = this.bar.activeFrame();
         ChatInputBar.beginFade(barFrame == null ? 1.0F
                 : barFrame.shownShare());
         try {
@@ -1330,7 +1387,14 @@ public final class ChatScreenPart extends ScreenPart {
         } finally {
             ChatInputBar.endFade();
             GL11.glPopMatrix();
+            LostTalesUiClip.endOuter(cut);
         }
+    }
+
+    /** Whether the live bar's conversation fills its window, or glides to or from that. */
+    private boolean barFilled() {
+        ChatFrame frame = this.bar.activeFrame();
+        return frame != null && frame.isFilledByPage();
     }
 
     /**
@@ -1341,7 +1405,7 @@ public final class ChatScreenPart extends ScreenPart {
     @Override
     public void drawOverSubWindows(boolean typing, double pointerX,
                                    double pointerY, int mouseX, int mouseY) {
-        if (!typing) {
+        if (!typing || barFilled()) {
             return;
         }
         WindowHover hover = this.screen.hover();
@@ -1788,7 +1852,7 @@ public final class ChatScreenPart extends ScreenPart {
         String tip = StatCollector.translateToLocal(state.langKey());
         String why = ClientChatDeliveryMarks.reasonOf(chatLineId).langKey();
         return why.length() == 0 ? tip
-                : tip + ": " + StatCollector.translateToLocal(why);
+                : tip + " " + StatCollector.translateToLocal(why);
     }
 
     /** Whether a press on the window brings it forward: it is not the one being typed in. */
@@ -1807,12 +1871,13 @@ public final class ChatScreenPart extends ScreenPart {
      * it asks for the live bar to come there, which is what it then
      * does.
      */
-    private ChatFrame otherBarAt(double x, double barY) {
+    private ChatFrame otherBarAt(double x, double y, double barY) {
         ChatFrame active = this.bar.activeFrame();
         List<ChatFrame> frames = ChatFrame.drawn();
         for (int index = frames.size() - 1; index >= 0; index--) {
             ChatFrame frame = frames.get(index);
-            if (frame == active || frame.page != null) {
+            if (frame == active || frame.page != null
+                    || frame.isFilledByPage()) {
                 continue;
             }
             double top = frame.barTop();
@@ -1820,7 +1885,9 @@ public final class ChatScreenPart extends ScreenPart {
             if (x >= left && x < left + (frame.boxRight - frame.boxLeft)
                     && barY >= top
                     && barY < top + WindowPlacement.BAR_STRIP_HEIGHT) {
-                return frame;
+                // A window in front covers the bars of those behind it.
+                return WindowFrame.coveredAbove(frame.windowId, x, y)
+                        ? null : frame;
             }
         }
         return null;
@@ -2011,8 +2078,9 @@ public final class ChatScreenPart extends ScreenPart {
      * A picker's cell chosen, by a click or by Enter in its search: the
      * Reactions window's pick is sent as a reaction to the message it is
      * aimed at and writes nothing, and any other pick is written into the
-     * input, which then has the keys again. The window stays open either
-     * way, for the next pick.
+     * input, which then has the keys again. The window closes after the
+     * pick, as a messenger's picker does; held open with Shift, it stays
+     * for the next.
      */
     private void choosePickerEntry(ChatPickerPanel picker,
                                    ChatPickerPanel.Entry entry) {
@@ -2023,11 +2091,16 @@ public final class ChatScreenPart extends ScreenPart {
                 sendReaction(target, emoji, true);
                 ChatEmojiUsageStore.recordUse(emoji);
             }
-            return;
+        } else {
+            this.completion.insertToken(picker.insertionText(entry));
+            picker.releaseKeys();
+            this.inputField.setFocused(true);
         }
-        this.completion.insertToken(picker.insertionText(entry));
-        picker.releaseKeys();
-        this.inputField.setFocused(true);
+        if (!GuiScreen.isShiftKeyDown()) {
+            this.screen.subWindows().close(this.screen.subWindows().find(
+                    this.bar.kindOf(picker), ""));
+            this.screen.syncTypingFocus();
+        }
     }
 
     /** A picker's button: its window opens where it last stood, or closes. */

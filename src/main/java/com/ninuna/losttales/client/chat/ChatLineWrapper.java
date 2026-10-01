@@ -13,10 +13,10 @@ import net.minecraft.util.IChatComponent;
  * wrapper measures the header up to the
  * {@link ChatLayoutMarker#anchor() anchor marker}, lays the sender out
  * against the remaining width, and opens the body on the next row at
- * the left edge behind a chevron in the sender's colour
- * ({@link ChatBodyMarker}). Every continuation line of the body opens
- * with an {@link ChatLayoutMarker#indent indent marker} of the
- * chevron's width, so a wrapped body reads as one block beside it. The
+ * the left edge behind its mark in the sender's colour
+ * ({@link ChatBodyMarker}, {@link ChatLineMark}). Every continuation line
+ * of the body opens with an {@link ChatLayoutMarker#indent indent marker}
+ * of the mark's width, so a wrapped body reads as one block beside it. The
  * closed feed names the sender in brackets with the small head inside
  * them; an open window names them plainly, their head standing as the
  * avatar in the window's timestamp area ({@link ChatAvatar}) and taking
@@ -29,28 +29,22 @@ import net.minecraft.util.IChatComponent;
  *          continues beside the chevron       continues beside it
  * </pre>
  *
- * <p>The brackets are the chat's punctuation, like the chevron, so the
+ * <p>The brackets are the chat's punctuation, like the mark, so the
  * open window leaves them out as it lays the row out, together with the
  * clear space the closing one keeps; a reply's quote loses its opening
- * bracket the same way, and its closing one stands a word's space after
- * the quoted name as the chevron before the quoted words.</p>
+ * bracket the same way, and its closing mark stands a word's space after
+ * the quoted name, before the quoted words.</p>
  *
  * <p>The rows are one message: they share a chat line id, so identity,
  * grouping, hover, scrolling and removal all still see a single
  * message. A grouped continuation carries no sender at all and so has
  * no header row; its body starts on the row it is already on, behind
- * the same chevron, and the run stays aligned. The chevron is
- * the chat's own punctuation rather than the sender's words: it is added
- * here, so the stored message never holds it and copying a line copies
- * what was said.</p>
- *
- * <p>An action is a sentence rather than a speaker and their words: its
- * {@link ChatLayoutMarker#actionBreak() action break} opens the words on
- * the row the header is on, behind no chevron, and its continuations
- * start at the edge. It has no row naming its speaker, so it is never
- * drawn at the speaker's size and never wears the time behind a name.
- * An open window takes its head for the avatar slot as it does a name
- * row's, which draws nothing on a row of words.</p>
+ * the same mark, and the run stays aligned. The mark says what kind of
+ * line it is ({@link ChatLineMark}: {@code >} words said, {@code /} a
+ * command, {@code *} an action the Narrator tells). It is the chat's own
+ * punctuation rather than the sender's words: it is added here, so the
+ * stored message never holds it and copying a line copies what was
+ * said.</p>
  *
  * <p>A row drawn at another size than the words has another width in
  * its own text ({@link #roomFor}), so the header and the body are each
@@ -81,13 +75,6 @@ import net.minecraft.util.IChatComponent;
 final class ChatLineWrapper {
     /** Room the body must have on a line before it is worth starting there. */
     static final int MIN_BODY_WIDTH = 40;
-    /**
-     * What a message body opens with: the chat's chevron and one space,
-     * drawn in the sender's colour. Its measured width is also the inset
-     * every continuation line of that body takes, so a wrapped body
-     * lines up beside the chevron rather than under it.
-     */
-    static final String BODY_SEPARATOR = "> ";
     /** A very long prefix indents continuation lines by at most this share. */
     static final float MAX_INDENT_RATIO = 0.5F;
     private static final char FORMATTING_ESCAPE = 167;
@@ -221,14 +208,9 @@ final class ChatLineWrapper {
         // that size leaves it; a line that is words from its first row
         // down keeps the whole width.
         boolean opensBody = false;
-        boolean action = false;
         for (int index = bodyIndex + 1; index < parts.size(); index++) {
             if (ChatLayoutMarker.isBodyBreak(parts.get(index))) {
                 opensBody = true;
-                break;
-            }
-            if (ChatLayoutMarker.isActionBreak(parts.get(index))) {
-                action = true;
                 break;
             }
         }
@@ -237,7 +219,7 @@ final class ChatLineWrapper {
         // Laid out for an open window, the speaker's brackets go and the
         // head becomes the row's avatar.
         boolean[] dropped = new boolean[parts.size()];
-        int avatarIndex = chatOpen && (opensBody || action)
+        int avatarIndex = chatOpen && opensBody
                 ? markAvatarHeader(parts, bodyIndex, dropped) : -1;
         if (prefix > headerWidth) {
             return null;
@@ -286,8 +268,6 @@ final class ChatLineWrapper {
                 // The reactions stand on a row of their own under the
                 // words, where the body's own continuations start.
                 builder.breakRow();
-            } else if (ChatLayoutMarker.isActionBreak(part)) {
-                builder.beginAction();
             } else if (ChatLayoutMarker.isBodyBreak(part)) {
                 if (chatOpen && stamp != null && builder.used > 0) {
                     // The name's row ends on the time, a space clear of
@@ -296,7 +276,7 @@ final class ChatLineWrapper {
                 }
                 int senderColor = ChatLayoutMarker.bodyColor(part);
                 builder.beginBody(senderColor < 0 ? nameColor
-                        : senderColor);
+                        : senderColor, ChatLayoutMarker.bodyMark(part));
             } else if (isAtomic(part)) {
                 builder.appendAtomic(part);
             } else {
@@ -318,8 +298,7 @@ final class ChatLineWrapper {
                                 boolean[] dropped) {
         int bodyBreak = -1;
         for (int index = bodyIndex + 1; index < parts.size(); index++) {
-            if (ChatLayoutMarker.isBodyBreak(parts.get(index))
-                    || ChatLayoutMarker.isActionBreak(parts.get(index))) {
+            if (ChatLayoutMarker.isBodyBreak(parts.get(index))) {
                 bodyBreak = index;
                 break;
             }
@@ -365,8 +344,8 @@ final class ChatLineWrapper {
      * trimmed to what is left, and anything after it is dropped. Laid
      * out for an open window, the row opens on a gap of {@code indent}
      * pixels, the quote wears no bubble, the quoted name loses its
-     * opening bracket and its closing one stands a word's space after
-     * the name, as the chevron before the quoted words. {@code width} is
+     * opening bracket and its closing mark stands a word's space after
+     * the name, before the quoted words. {@code width} is
      * the room after the gap.
      */
     private static void placeLeadingRow(Builder builder,
@@ -388,7 +367,8 @@ final class ChatLineWrapper {
             if (chatOpen && ChatSpacerMarker.decode(part) >= 0
                     && index + 1 < breakIndex
                     && ChatReplyMarker.isMarker(parts.get(index + 1))
-                    && isBracket(parts.get(index + 1), ">")) {
+                    && ChatLineMark.isMark(parts.get(index + 1)
+                            .getUnformattedTextForChat())) {
                 part = ChatSpacerMarker.of(metrics.width(" "));
             }
             int partWidth = partWidth(metrics, part);
@@ -565,17 +545,17 @@ final class ChatLineWrapper {
 
         /**
          * Ends the header and opens the message body at the left edge,
-         * behind the chat's chevron drawn in the sender's colour. A header that drew
+         * behind the line's mark drawn in the sender's colour. A header that drew
          * nothing — a grouped continuation, whose runs are all hidden in
          * this state — keeps the row it is on, so the body of a run
          * always begins in the same place. From here on every
-         * continuation line is inset by the chevron's width, up to
+         * continuation line is inset by the mark's width, up to
          * the same ceiling a long header's indent has, and has the whole
          * width: only the header is drawn at the large size.
          */
-        void beginBody(int senderColor) {
+        void beginBody(int senderColor, ChatLineMark mark) {
             this.width = this.bodyWidth;
-            int separatorWidth = this.metrics.width(BODY_SEPARATOR);
+            int separatorWidth = this.metrics.width(mark.separator);
             int inset = Math.min(separatorWidth, this.maxIndent);
             this.closedIndent = inset;
             this.openIndent = inset;
@@ -596,24 +576,9 @@ final class ChatLineWrapper {
             }
             this.bodyFirstRow = this.lines.size();
             this.used = 0;
-            place(ChatBodyMarker.separator(BODY_SEPARATOR, senderColor),
+            place(ChatBodyMarker.separator(mark.separator, senderColor),
                     separatorWidth);
             this.lineStart = separatorWidth;
-        }
-
-        /**
-         * Ends an action's header and opens its words on the row the
-         * header is on, behind no chevron: the name and the words are one
-         * sentence. Every continuation line starts at the edge, and none
-         * of the rows names a speaker, so none is drawn at the large
-         * size.
-         */
-        void beginAction() {
-            this.width = this.bodyWidth;
-            this.closedIndent = 0;
-            this.openIndent = 0;
-            this.indent = 0;
-            this.bodyFirstRow = this.lines.size();
         }
 
         void place(IChatComponent piece, int pieceWidth) {

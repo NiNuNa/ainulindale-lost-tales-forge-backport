@@ -22,7 +22,7 @@ import java.util.Set;
 
 /**
  * The server's own config, read and written live: a snapshot of every
- * server-side key for an operator's screen or a command, and an apply
+ * server-side key for the Server Settings page or a command, and an apply
  * that validates each change against the file, writes the file once,
  * reloads the static values and restarts whatever the changed categories
  * own — the Discord bridge for its category, the chat access sync for the
@@ -127,7 +127,7 @@ public final class LostTalesServerConfigService {
                 continue;
             }
             if (entry.isSecret() && !change.isList() && change.getValue().length() == 0) {
-                // An empty secret is the screen saying "leave it".
+                // An empty secret is the page saying "leave it".
                 continue;
             }
             String reason = ServerConfigChangeValidator.refusal(entry, change);
@@ -198,8 +198,8 @@ public final class LostTalesServerConfigService {
     /**
      * The server's files as they are on disk — the options, the roles
      * and the channels as one configuration — with the category metadata
-     * the screen shows and each option in its shipped definition, so the
-     * screen restores the mod's default rather than the file's value.
+     * the page shows and each option in its shipped definition, so the
+     * page restores the mod's default rather than the file's value.
      */
     private static Configuration openFile() {
         Configuration config = LostTalesConfig.openServerConfiguration();

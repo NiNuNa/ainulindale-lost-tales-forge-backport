@@ -8,7 +8,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
  *
  * <p>The page is its body, split by one rule into the quest list and what
  * the chosen quest says. Its name, its filters, its search and its actions
- * are the window's: its tab, its tool strip's cog and well, and its input
+ * are the window's: its tab, its tool strip's options and well, and its input
  * bar. The list is a panel the strip's
  * left button folds away, and a page too narrow for both halves shows
  * one of them over the whole body: the list while it is out, else the

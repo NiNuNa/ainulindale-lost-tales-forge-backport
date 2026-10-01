@@ -6,19 +6,20 @@ import com.ninuna.losttales.gui.style.LostTalesUiButtonMotion;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 
 /**
- * One sub-window: a kind, what it holds, the window it belongs to,
- * and where it stands in that window. Its box takes its strip — a
- * window's tool strip holding its icon, its name and its cross
+ * One sub-window: a kind, what it holds, the window it belongs to, where
+ * it stands and whether it is locked. Its box takes its strip — a
+ * window's tool strip holding its icon, its name and its controls
  * ({@link SubWindowStrip}) — and under that its content; the frame runs
  * just outside the box, as a window's does.
  *
- * <p>A sub-window lives inside its window as a window lives on a
- * screen: its room is the window's box, a frame and two clear pixels
- * in from its edges, and it rides along as that window moves. The player
- * puts it somewhere in the room and gives it a size; every frame it is laid
- * out from those, held inside the room and never larger than it, down to
- * its least size, past which the room's edge cuts it. A window on the bare
- * screen, with no window open, has the screen for its room.</p>
+ * <p>A sub-window opens locked, at the place its kind was last locked in
+ * or where its opener puts it. Locked, it is measured from its window's
+ * room — the window's box, a frame and two clear pixels in from its edges
+ * — so it rides along as that window moves, and it can be neither moved
+ * nor resized. Unlocked, it stands where the player carries it on the
+ * screen, past its window's edges if they like, and stays there while the
+ * window moves. Either way it is held on the screen. A window on the bare
+ * screen has the screen for its room.</p>
  *
  * <p>Its place may stand between whole pixels while it is moved; it is
  * drawn laid on the display's grid and every hit test asks the box it was
@@ -36,15 +37,20 @@ public final class SubWindow {
     public final SubWindowContent content;
     /** The window it belongs to; null for one on the bare screen. */
     public String parentId;
-    /** Where the player put it in its room, from the room's top left, fractions and all. */
+    /**
+     * Where it stands, fractions and all: from its room's top left while
+     * locked, on the screen while unlocked.
+     */
     double x;
     double y;
     /** The size the player gave it, or its content's own. */
     int wantedWidth;
     int wantedHeight;
+    /** Whether it stands in its place in its window, and neither moves nor resizes. */
+    boolean locked = true;
     /** The room it was last laid out in; null while its window is not drawn. */
     LostTalesUiHitBox room;
-    /** Where it stands on the screen, as laid out in its room. */
+    /** Where it stands on the screen, as laid out. */
     public double left;
     public double top;
     int width;
@@ -54,6 +60,15 @@ public final class SubWindow {
             new MotionTransition(MotionIds.WINDOW_SUB_OPEN);
     final LostTalesUiButtonMotion closeMotion = new LostTalesUiButtonMotion(
             LostTalesUiButtonMotion.Character.SNAP);
+    final LostTalesUiButtonMotion lockMotion = new LostTalesUiButtonMotion(
+            LostTalesUiButtonMotion.Character.LIFT);
+    /** The padlock on its strip, turning as it is locked and unlocked. */
+    final LockAnimation lock = new LockAnimation();
+    /** How far the grip has lit under the pointer, and when that was last stepped. */
+    float gripFade;
+    long gripNanos;
+    /** When a press the padlock held back last lit it; 0 for never. */
+    long lockNudgeNanos;
     /** Where the box was drawn this frame, laid on the display's grid. */
     double drawnLeft;
     double drawnTop;
@@ -89,6 +104,11 @@ public final class SubWindow {
         return this.open;
     }
 
+    /** Whether it stands locked in its window's room. */
+    public boolean isLocked() {
+        return this.locked;
+    }
+
     /** Opens it again while it is still fading out, or starts it closing. */
     void setOpen(boolean open) {
         this.open = open;
@@ -111,24 +131,22 @@ public final class SubWindow {
     }
 
     /**
-     * Lays the window out in {@code room}: as large as the player wants it,
-     * never larger than the room nor smaller than its least, and where they
-     * put it, held inside the room.
+     * Lays the window out: as large as the player wants it, never larger
+     * than {@code screen} nor smaller than its least, where it stands —
+     * measured from {@code room} while locked — and held on the screen.
      */
-    void layOut(LostTalesUiHitBox room) {
+    void layOut(LostTalesUiHitBox room, LostTalesUiHitBox screen) {
         this.room = room;
         this.width = fitted(this.wantedWidth, minWidth(),
-                (int)Math.floor(room.width));
+                (int)Math.floor(screen.width));
         this.height = fitted(this.wantedHeight, minHeight(),
-                (int)Math.floor(room.height));
-        this.left = room.left + held(this.x, room.width - this.width);
-        this.top = room.top + held(this.y, room.height - this.height);
-    }
-
-    /** Whether the window as laid out is larger than its room, which then cuts it. */
-    boolean overflowsRoom() {
-        return this.room != null && (this.width > this.room.width
-                || this.height > this.room.height);
+                (int)Math.floor(screen.height));
+        double wantedLeft = this.locked ? room.left + this.x : this.x;
+        double wantedTop = this.locked ? room.top + this.y : this.y;
+        this.left = screen.left + held(wantedLeft - screen.left,
+                screen.width - this.width);
+        this.top = screen.top + held(wantedTop - screen.top,
+                screen.height - this.height);
     }
 
     /** A size no smaller than {@code min} and, above that, no larger than {@code room}. */
@@ -164,36 +182,50 @@ public final class SubWindow {
                 Math.max(0, this.height - STRIP_HEIGHT));
     }
 
-    /** Whether the point is on the window as drawn, its strip and content, inside its room. */
+    /** Whether the point is on the window as drawn, its strip and content. */
     boolean contains(double x, double y) {
-        return this.open && drawnBox().contains(x, y) && inRoom(x, y);
+        return this.open && drawnBox().contains(x, y);
     }
 
     /** Whether the point is on the title strip as drawn. */
     boolean stripContains(double x, double y) {
         return this.open && LostTalesUiHitBox.contains(x, y, this.drawnLeft,
-                this.drawnTop, this.width, STRIP_HEIGHT) && inRoom(x, y);
+                this.drawnTop, this.width, STRIP_HEIGHT);
     }
 
     /** Whether the point is on the strip's cross, as drawn. */
     boolean closeContains(double x, double y) {
-        return this.open && this.strip != null && this.strip.closeBox.contains(
-                x - this.fractionX, y - this.fractionY) && inRoom(x, y);
+        return onControl(this.strip == null ? null : this.strip.closeBox,
+                x, y);
     }
 
-    /** Whether the point lies where the room lets the window show. */
-    private boolean inRoom(double x, double y) {
-        return !overflowsRoom() || this.room.contains(x, y);
+    /** Whether the point is on the strip's padlock, as drawn. */
+    boolean lockContains(double x, double y) {
+        return onControl(this.strip == null ? null : this.strip.lockBox,
+                x, y);
+    }
+
+    /** Whether the point is on the strip's grip, as drawn. */
+    boolean gripContains(double x, double y) {
+        return onControl(this.strip == null ? null : this.strip.gripBox,
+                x, y);
+    }
+
+    private boolean onControl(LostTalesUiHitBox control, double x,
+                              double y) {
+        return this.open && control != null
+                && control.contains(x - this.fractionX, y - this.fractionY);
     }
 
     /**
      * The edge or corner of the window the point is on: the band
      * {@link WindowGestures#RESIZE_BORDER} wide just outside the box,
      * a corner reaching {@link WindowGestures#RESIZE_CORNER} along
-     * both its edges, as a window's do; null anywhere else.
+     * both its edges, as a window's do; null anywhere else, and anywhere
+     * while it is locked.
      */
     WindowGestures.ResizeEdge edgeAt(double x, double y) {
-        if (!this.open) {
+        if (!this.open || this.locked) {
             return null;
         }
         LostTalesUiHitBox box = drawnBox();
@@ -241,14 +273,11 @@ public final class SubWindow {
 
     /** The narrowest the window may be: its content's, and room for its strip. */
     int minWidth() {
-        return Math.max(this.content.minWidth(), MIN_STRIP_WIDTH);
+        return Math.max(this.content.minWidth(), SubWindowStrip.minWidth());
     }
 
     /** The shortest the window may be: its strip over its content's least. */
     int minHeight() {
         return STRIP_HEIGHT + this.content.minHeight();
     }
-
-    /** Room for the strip's icon and cross with a few letters of its name between. */
-    private static final int MIN_STRIP_WIDTH = 64;
 }

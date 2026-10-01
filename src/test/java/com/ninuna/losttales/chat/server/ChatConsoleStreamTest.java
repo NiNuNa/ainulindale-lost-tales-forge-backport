@@ -91,44 +91,6 @@ public final class ChatConsoleStreamTest {
         assertEquals(null, ChatConsoleEvent.Severity.fromOrdinal(-1));
     }
 
-    /** What a command carried is repeated only when it is safe to. */
-    @Test
-    public void commandsAreDescribedWithoutTheirSecrets() {
-        assertEquals("/gamemode 1 Steve",
-                ChatConsoleStream.describeCommand("gamemode", new String[] {"1", "Steve"}));
-        assertEquals("/losttales chat mute Bob 15m spam",
-                ChatConsoleStream.describeCommand("losttales",
-                        new String[] {"chat", "mute", "Bob", "15m", "spam"}));
-        // A private message keeps whom it went to, never what it said.
-        assertEquals("/msg Bob ...",
-                ChatConsoleStream.describeCommand("msg", new String[] {"Bob", "the", "key"}));
-        assertEquals("/tell Bob",
-                ChatConsoleStream.describeCommand("Tell", new String[] {"Bob"}));
-        // A config change keeps the key, never the value.
-        assertEquals("/losttales config set discord botToken ...",
-                ChatConsoleStream.describeCommand("losttales", new String[] {
-                        "config", "set", "discord", "botToken", "abc.def.ghi"}));
-        assertEquals("/losttales config get discord botToken",
-                ChatConsoleStream.describeCommand("losttales", new String[] {
-                        "config", "get", "discord", "botToken"}));
-        // A binding keeps its channel and direction, never the addresses.
-        String bind = ChatConsoleStream.describeCommand("losttales", new String[] {
-                "discord", "bind", "ooc", "BIDIRECTIONAL",
-                "channel=123456789012345678",
-                "webhook=https://discord.com/api/webhooks/1/secret"});
-        assertEquals("/losttales discord bind ooc BIDIRECTIONAL channel=... webhook=...", bind);
-        assertFalse(bind.contains("secret"));
-        assertEquals("/say", ChatConsoleStream.describeCommand("say", null));
-        // Cut to a line.
-        StringBuilder long_ = new StringBuilder();
-        for (int index = 0; index < 400; index++) {
-            long_.append('y');
-        }
-        String cut = ChatConsoleStream.describeCommand("say", new String[] {long_.toString()});
-        assertTrue(cut.length() <= 256);
-        assertTrue(cut.endsWith("..."));
-    }
-
     /** The save's events come back in order under their own ids, once each. */
     @Test
     public void restoredEventsComeBackOnceEachAndMoveTheAllocatorOn() {

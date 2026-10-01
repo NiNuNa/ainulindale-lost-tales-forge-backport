@@ -3,45 +3,39 @@ package com.ninuna.losttales.client.settings;
 import com.ninuna.losttales.client.camera.CameraPresetDefinition;
 import com.ninuna.losttales.client.camera.CameraPresetFileStore;
 import com.ninuna.losttales.client.camera.ThirdPersonCameraRuntime;
-import com.ninuna.losttales.client.window.PageTab;
 import com.ninuna.losttales.client.window.Settings;
-import com.ninuna.losttales.client.window.WindowPages;
-import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.config.client.LostTalesThirdPersonConfig;
 import com.ninuna.losttales.gui.screen.LostTalesHudPlacementGui;
 import java.util.Locale;
 import net.minecraft.client.Minecraft;
-import net.minecraft.util.StatCollector;
 
 /**
- * Every client option but the chat's, in Settings after the chat's
- * sections: HUD, Compass, Quests, Map, Camera (the camera's own file, its
- * options under small headings), Motion, Screens, Appearance and
- * Developer. A row reads and writes its option's field
- * ({@link OptionField}), keeps within the bounds its option is defined
- * with, restores the value the mod ships, and saves its file the moment
- * it changes. The HUD section opens the HUD placement editor, and the
- * Motion section the Motion Lab.
+ * Every client option but the chat's, each section where it belongs: HUD,
+ * Compass, Camera (the camera's own file, its options under small
+ * headings), Screens, Appearance and Developer on the Client Settings
+ * page; Quests in Quest Settings, Map in Map Settings, and Motion in
+ * Motion Settings, the Motion Lab's. A row reads and writes its option's
+ * field ({@link OptionField}), keeps within the bounds its option is
+ * defined with, restores the value the mod ships, and saves its file the
+ * moment it changes. The HUD section opens the HUD placement editor.
  */
 public final class ClientSettingsSections {
-    /** The Motion Lab's page, which the Motion section opens. */
-    public static final String MOTION_LAB_PAGE = "motion_lab";
     private static final String PREFIX = "gui.losttales.settings.";
 
     /** The sections, given to every Settings as it is made. */
     public static final Settings.Sections SECTIONS = new Settings.Sections() {
         @Override
         public void addTo(Settings settings) {
-            settings.addSection(hud());
-            settings.addSection(compass());
-            settings.addSection(quests());
-            settings.addSection(map());
-            settings.addSection(camera());
-            settings.addSection(motion());
-            settings.addSection(screens());
-            settings.addSection(appearance());
-            settings.addSection(developer());
+            settings.addSection(Settings.Place.CLIENT, hud());
+            settings.addSection(Settings.Place.CLIENT, compass());
+            settings.addSection(Settings.Place.QUESTS, quests());
+            settings.addSection(Settings.Place.MAP, map());
+            settings.addSection(Settings.Place.CLIENT, camera());
+            settings.addSection(Settings.Place.MOTION, motion());
+            settings.addSection(Settings.Place.CLIENT, screens());
+            settings.addSection(Settings.Place.CLIENT, appearance());
+            settings.addSection(Settings.Place.CLIENT, developer());
         }
     };
 
@@ -630,8 +624,9 @@ public final class ClientSettingsSections {
     /* ---- Motion ---- */
 
     /**
-     * The one set of motion settings every motion answers to, and the way
-     * into the Motion Lab, where each motion is tuned.
+     * The one set of settings every motion of the screens and the HUD
+     * answers to; each motion itself is tuned in the Motion Lab. The
+     * camera's motion is the camera's own.
      */
     private static Settings.Section motion() {
         return new OptionSection("motion") {
@@ -640,20 +635,6 @@ public final class ClientSettingsSections {
                 add(number(OptionFile.CLIENT, "animationSpeed", "motion.speed",
                         0.05D, 2));
                 add(toggle(OptionFile.CLIENT, "reducedMotion", "motion.reduced"));
-                add(new Settings.Action("motion_lab", PREFIX + "motion.lab") {
-                    @Override
-                    protected String unavailable() {
-                        PageTab lab = WindowPages.tab(MOTION_LAB_PAGE);
-                        return lab != null && lab.isAvailable() ? ""
-                                : StatCollector.translateToLocal(
-                                        PREFIX + "motion.lab.unavailable");
-                    }
-
-                    @Override
-                    protected void run() {
-                        WindowScreen.openPage(MOTION_LAB_PAGE);
-                    }
-                });
             }
         };
     }

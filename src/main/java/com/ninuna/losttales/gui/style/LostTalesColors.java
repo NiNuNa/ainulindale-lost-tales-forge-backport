@@ -72,6 +72,8 @@ public class LostTalesColors {
      * none, so slate blue stands in until one is chosen.
      */
     public static final int MOTION_LAB_TONE = SLATE_BLUE;
+    /** The two consoles' grey, which the Client and Server Settings pages wear too. */
+    public static final int CONSOLE_TONE = ROSE_GRAY;
 
     /** Ivory used by map artwork, HUD labels, and default chat identities. */
     public static final int HUD_LABEL = IVORY;

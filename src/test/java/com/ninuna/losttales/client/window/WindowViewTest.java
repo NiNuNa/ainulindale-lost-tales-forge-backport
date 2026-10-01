@@ -21,9 +21,9 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * A key shows its own tabs and hides the rest in their windows; a kept tab
- * shows in every view, a pinned one besides stays while playing; closing a
- * window closes what the view shows of it.
+ * A key shows its own tabs and hides the rest in their windows; a window
+ * pinned to the GUI shows in every view, one pinned to the HUD stays while
+ * playing; closing a window closes what the view shows of it.
  */
 public final class WindowViewTest {
     private static final String PAGE = "view_page";
@@ -109,18 +109,6 @@ public final class WindowViewTest {
     }
 
     @Test
-    public void settingsShowsNothingOfItsOwn() {
-        PageTab page = WindowPages.tab(PAGE);
-        WindowLayout.showPage(page);
-        WindowView.forSettings();
-        assertFalse(WindowView.shows(page));
-        assertFalse(WindowView.shows(GLOBAL));
-        WindowLayout.setKept(GLOBAL, true);
-        assertTrue("a kept tab stands behind Settings too",
-                WindowView.shows(GLOBAL));
-    }
-
-    @Test
     public void aTabOpenedByHandJoinsTheViewUntilTheScreenCloses() {
         PageTab page = WindowPages.tab(PAGE);
         WindowLayout.showPage(page);
@@ -149,109 +137,79 @@ public final class WindowViewTest {
     }
 
     @Test
-    public void aKeptTabShowsInEveryView() {
+    public void aWindowPinnedToTheGuiShowsInEveryView() {
         PageTab page = WindowPages.tab(PAGE);
         WindowLayout.showPage(page);
-        assertTrue(WindowLayout.setKept(GLOBAL, true));
-        assertFalse("kept already", WindowLayout.setKept(GLOBAL, true));
+        String chat = WindowLayout.windowOf(GLOBAL).getId();
+        assertTrue(WindowLayout.setPinnedToGui(chat, true));
+        assertFalse("pinned already", WindowLayout.setPinnedToGui(chat, true));
         WindowView.forPage(page);
         assertTrue(WindowView.shows(GLOBAL));
-        assertFalse(WindowView.shows(OOC));
-        assertTrue(WindowLayout.setKept(GLOBAL, false));
+        assertTrue("every page the window holds", WindowView.shows(OOC));
+        assertFalse("another window's pages wait for their key",
+                WindowView.shows(ChatTab.of(ChatChannel.CLIENT_CONSOLE)));
+        assertTrue(WindowLayout.setPinnedToGui(chat, false));
         assertFalse(WindowView.shows(GLOBAL));
     }
 
     @Test
-    public void aPinnedTabShowsInEveryView() {
+    public void aWindowPinnedToTheHudAloneStaysOutOfOtherViews() {
         PageTab page = WindowPages.tab(PAGE);
         WindowLayout.showPage(page);
-        assertTrue(WindowLayout.setPinned(GLOBAL, true));
+        String chat = WindowLayout.windowOf(GLOBAL).getId();
+        assertTrue(WindowLayout.setPinnedToHud(chat, true));
         WindowView.forPage(page);
-        assertTrue(WindowView.shows(GLOBAL));
-        assertFalse(WindowView.shows(OOC));
+        assertFalse(WindowView.shows(GLOBAL));
+        WindowView.forChat();
+        assertTrue("its own key still shows it", WindowView.shows(GLOBAL));
     }
 
     @Test
-    public void whilePlayingOnlyThePinnedTabsShow() {
-        WindowLayout.setPinned(GLOBAL, true);
+    public void whilePlayingOnlyTheWindowsPinnedToTheHudShow() {
+        Window chat = WindowLayout.windowOf(GLOBAL);
+        WindowLayout.setPinnedToHud(chat.getId(), true);
+        WindowLayout.setPinnedToGui(WindowLayout.windowOf(
+                ChatTab.of(ChatChannel.CLIENT_CONSOLE)).getId(), true);
+        assertEquals(Arrays.asList(chat), WindowLayout.hudWindows());
         WindowView.beginPinnedPass();
         try {
             assertTrue(WindowView.shows(GLOBAL));
-            assertFalse(WindowView.shows(OOC));
-            assertEquals(Arrays.asList(GLOBAL), WindowFrame.visibleTabs(
-                    WindowLayout.windowOf(GLOBAL)));
+            assertTrue(WindowView.shows(OOC));
+            assertFalse("pinned to the GUI only",
+                    WindowView.shows(ChatTab.of(ChatChannel.CLIENT_CONSOLE)));
         } finally {
             WindowView.endPinnedPass();
         }
-        assertTrue(WindowView.shows(OOC));
+        assertTrue(WindowView.shows(ChatTab.of(ChatChannel.CLIENT_CONSOLE)));
     }
 
     @Test
-    public void aWindowPinnedWholePinsEveryTabItHolds() {
-        Window window = WindowLayout.windowOf(GLOBAL);
-        assertFalse(WindowLayout.isPinned(OOC));
-        assertTrue(WindowLayout.setWindowPinned(window.getId(), true));
-        assertFalse("pinned already",
-                WindowLayout.setWindowPinned(window.getId(), true));
-        assertTrue(WindowLayout.isPinned(GLOBAL));
-        assertTrue(WindowLayout.isPinned(OOC));
-        assertTrue(WindowLayout.pinned().isEmpty());
-        assertEquals(Arrays.asList(window), WindowLayout.pinnedWindows());
-        assertTrue(WindowLayout.setWindowPinned(window.getId(), false));
-        assertFalse(WindowLayout.isPinned(GLOBAL));
-        assertTrue(WindowLayout.pinnedWindows().isEmpty());
+    public void theTwoPinsAreSwitchedApart() {
+        Window chat = WindowLayout.windowOf(GLOBAL);
+        assertTrue(WindowLayout.setPinnedToHud(chat.getId(), true));
+        assertFalse(chat.isPinnedToGui());
+        assertTrue(WindowLayout.setPinnedToGui(chat.getId(), true));
+        assertTrue(WindowLayout.setPinnedToHud(chat.getId(), false));
+        assertTrue("letting the HUD go leaves the GUI's pin",
+                chat.isPinnedToGui());
+        assertTrue(WindowLayout.hudWindows().isEmpty());
+        assertFalse(WindowLayout.setPinnedToHud("nope", true));
+        assertFalse(WindowLayout.setPinnedToGui("nope", true));
     }
 
     @Test
-    public void lettingOneTabOfAPinnedWindowGoLeavesTheOthersPinned() {
-        Window window = WindowLayout.windowOf(GLOBAL);
-        WindowLayout.setWindowPinned(window.getId(), true);
-        assertTrue(WindowLayout.setPinned(GLOBAL, false));
-        assertFalse(window.isPinned());
-        assertFalse(WindowLayout.isPinned(GLOBAL));
-        assertTrue(WindowLayout.isPinned(OOC));
-        assertFalse(WindowLayout.pinned().contains(GLOBAL.id()));
-        assertTrue(WindowLayout.pinned().contains(OOC.id()));
-        assertEquals(Arrays.asList(window), WindowLayout.pinnedWindows());
-    }
-
-    @Test
-    public void pinningAWindowWholeTakesTheSinglePinsOfItsTabs() {
-        Window window = WindowLayout.windowOf(GLOBAL);
-        WindowLayout.setPinned(GLOBAL, true);
-        assertTrue(WindowLayout.setWindowPinned(window.getId(), true));
-        assertTrue(WindowLayout.pinned().isEmpty());
-        assertTrue(WindowLayout.isPinned(GLOBAL));
-        WindowLayout.setWindowPinned(window.getId(), false);
-        assertFalse("nothing of the window stays pinned",
-                WindowLayout.isPinned(GLOBAL));
-    }
-
-    @Test
-    public void unpinningAWindowNotPinnedWholeLetsItsTabsGo() {
-        Window window = WindowLayout.windowOf(GLOBAL);
-        WindowLayout.setPinned(GLOBAL, true);
-        assertTrue(WindowLayout.setWindowPinned(window.getId(), false));
-        assertFalse(WindowLayout.isPinned(GLOBAL));
-        assertFalse("nothing left to let go",
-                WindowLayout.setWindowPinned(window.getId(), false));
-        assertFalse(WindowLayout.setWindowPinned("nope", true));
-    }
-
-    @Test
-    public void aPageOfTheWorldIsNeitherKeptShownNorPinned() {
+    public void aPageOfTheWorldNeverShowsPinned() {
         PageTab world = WindowPages.tab(WORLD);
         assertNotNull(world);
         assertFalse(WindowLayout.staysPut(world));
         assertFalse(WindowLayout.staysPut(null));
         assertTrue(WindowLayout.staysPut(GLOBAL));
-        assertFalse(WindowLayout.setPinned(world, true));
-        assertFalse(WindowLayout.isPinned(world));
         Window window = WindowLayout.showPage(world);
         assertNotNull(window);
-        WindowLayout.setWindowPinned(window.getId(), true);
-        assertFalse("not even in a window pinned whole",
-                WindowLayout.isPinned(world));
+        WindowLayout.setPinnedToHud(window.getId(), true);
+        WindowLayout.setPinnedToGui(window.getId(), true);
+        assertFalse(WindowLayout.isOnHud(world));
+        assertFalse(WindowLayout.isOnGui(world));
     }
 
     @Test
@@ -278,44 +236,40 @@ public final class WindowViewTest {
     }
 
     @Test
-    public void keptAndPinnedTabsRoundTripThroughTheLayoutFile() {
-        WindowLayout.setKept(GLOBAL, true);
-        WindowLayout.setPinned(OOC, true);
+    public void theWindowsPinsRoundTripThroughTheLayoutFile() {
+        Window chat = WindowLayout.windowOf(GLOBAL);
         Window consoles = WindowLayout.windowOf(
                 ChatTab.of(ChatChannel.CLIENT_CONSOLE));
-        WindowLayout.setWindowPinned(consoles.getId(), true);
+        WindowLayout.setPinnedToHud(chat.getId(), true);
+        WindowLayout.setPinnedToGui(consoles.getId(), true);
         List<String> described = WindowLayoutStore.describe();
         assertTrue(described.toString(),
-                described.contains("keep\t" + GLOBAL.id()));
+                described.toString().contains(" hud=true"));
         assertTrue(described.toString(),
-                described.contains("pin\t" + OOC.id()));
+                described.toString().contains(" gui=true"));
         TwoWindowLayout.reset();
-        assertFalse(WindowLayout.isKept(GLOBAL));
+        assertTrue(WindowLayout.hudWindows().isEmpty());
         WindowLayoutStore.load(described);
-        assertTrue(WindowLayout.isKept(GLOBAL));
-        assertFalse(WindowLayout.isKept(OOC));
-        assertTrue(WindowLayout.isPinned(OOC));
-        assertFalse(WindowLayout.isPinned(GLOBAL));
-        assertTrue("the window's own pin comes back with it",
-                WindowLayout.window(consoles.getId()).isPinned());
+        assertTrue(WindowLayout.window(chat.getId()).isPinnedToHud());
+        assertFalse(WindowLayout.window(chat.getId()).isPinnedToGui());
+        assertTrue(WindowLayout.window(consoles.getId()).isPinnedToGui());
+        assertFalse(WindowLayout.window(consoles.getId()).isPinnedToHud());
         assertEquals(described, WindowLayoutStore.describe());
     }
 
     @Test
-    public void aKeepOrPinLineWithNoIdOrAnOverlongOneIsLeftOut() {
-        StringBuilder overlong = new StringBuilder();
-        for (int index = 0; index < 300; index++) {
-            overlong.append('a');
-        }
-        WindowLayoutStore.load(Arrays.asList(
-                "window w1 x=0.00 y=0.00 active=global tabs=global,ooc",
-                "keep\t",
-                "pin\t" + overlong,
-                "keep\t" + overlong,
-                "pin\t" + OOC.id()));
-        assertTrue(WindowLayout.kept().isEmpty());
-        assertEquals(1, WindowLayout.pinned().size());
-        assertTrue(WindowLayout.isPinned(OOC));
+    public void aPageComesBackWithTheWindowsPinsItLeft() {
+        PageTab page = WindowPages.tab(PAGE);
+        Window window = WindowLayout.showPage(page);
+        WindowLayout.setPinnedToHud(window.getId(), true);
+        assertTrue(WindowLayout.close(page));
+        List<String> described = WindowLayoutStore.describe();
+        assertTrue(described.toString(), described.toString().contains(
+                "place " + page.id() + " locked=false hud=true x="));
+        TwoWindowLayout.reset();
+        WindowLayoutStore.load(described);
+        assertTrue(WindowLayout.showPage(page).isPinnedToHud());
+        assertFalse(WindowLayout.windowOf(page).isPinnedToGui());
     }
 
     /** A page with nothing on it. */

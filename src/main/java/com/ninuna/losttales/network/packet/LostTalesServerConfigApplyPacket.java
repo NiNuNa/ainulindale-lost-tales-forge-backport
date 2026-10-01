@@ -20,7 +20,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * The changes an operator's screen or command wants written. The server
+ * The changes the Server Settings page wants written. The server
  * trusts none of it: the asker is checked to be an operator on the server
  * thread, and every change is validated against the file before it is
  * set; the result comes back as its own packet.

@@ -24,6 +24,7 @@ public final class WindowStackTest {
     @Before
     public void reset() {
         ChatLayout.reset();
+        Unlocking.all();
     }
 
     @After

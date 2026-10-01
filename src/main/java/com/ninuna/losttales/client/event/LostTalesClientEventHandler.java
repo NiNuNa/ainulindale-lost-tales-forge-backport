@@ -658,16 +658,18 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         if (event.type == RenderGameOverlayEvent.ElementType.ALL
                 && !isHudHidden()) {
             Minecraft minecraft = Minecraft.getMinecraft();
-            // The pinned windows stand under the panels. They are the
-            // window screen's own windows while it is open, so they take
-            // no part in the HUD stepping aside for it.
+            // The windows pinned to the HUD stand under the panels. Those
+            // the window screen shows are its own while it is open, so
+            // they take no part in the HUD stepping aside for it.
             PinnedWindows.render(minecraft, event.partialTicks);
             // While the chat is open the panels step aside with the rest
-            // of the HUD, fading as one layer with it.
+            // of the HUD, fading as one layer with it, and so does a
+            // pinned window the screen's view hides.
             if (!LostTalesHudFade.beginPanels(minecraft)) {
                 return;
             }
             try {
+                PinnedWindows.renderWithHud(minecraft, event.partialTicks);
                 // Every passing notice claims its strip of the one slot,
                 // top down, in the order it is drawn here.
                 LostTalesNotificationHud.beginFrame();

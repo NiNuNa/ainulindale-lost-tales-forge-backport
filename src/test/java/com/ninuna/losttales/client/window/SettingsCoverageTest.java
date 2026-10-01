@@ -120,35 +120,42 @@ public final class SettingsCoverageTest {
     }
 
     @Test
-    public void theSectionsStandInTheirOrder() {
-        List<String> expected = Arrays.asList(
-                "gui.losttales.window.settings.section.windows",
+    public void eachSectionStandsInItsPlaceInItsOrder() {
+        Settings settings = everySection();
+        assertEquals(Arrays.asList(
+                "gui.losttales.window.settings.section.windows"),
+                settings.sectionTitleKeys(Settings.Place.WINDOWS));
+        assertEquals(Arrays.asList(
                 "gui.losttales.chat.settings.section.look",
                 "gui.losttales.chat.settings.section.messages",
                 "gui.losttales.chat.settings.section.mentions",
                 "gui.losttales.chat.settings.section.typing",
                 "gui.losttales.chat.settings.section.feed",
-                "gui.losttales.chat.settings.section.channels",
-                "gui.losttales.chat.settings.section.ignored",
-                "gui.losttales.chat.settings.section.shortcuts",
+                "gui.losttales.chat.settings.section.ignored"),
+                settings.sectionTitleKeys(Settings.Place.CHAT));
+        assertEquals(Arrays.asList("gui.losttales.settings.section.quests"),
+                settings.sectionTitleKeys(Settings.Place.QUESTS));
+        assertEquals(Arrays.asList("gui.losttales.settings.section.map"),
+                settings.sectionTitleKeys(Settings.Place.MAP));
+        assertEquals(Arrays.asList("gui.losttales.settings.section.motion"),
+                settings.sectionTitleKeys(Settings.Place.MOTION));
+        assertEquals(Arrays.asList(
+                "gui.losttales.window.settings.section.shortcuts",
                 "gui.losttales.settings.section.hud",
                 "gui.losttales.settings.section.compass",
-                "gui.losttales.settings.section.quests",
-                "gui.losttales.settings.section.map",
                 "gui.losttales.settings.section.camera",
-                "gui.losttales.settings.section.motion",
                 "gui.losttales.settings.section.screens",
                 "gui.losttales.settings.section.appearance",
-                "gui.losttales.settings.section.developer");
-        assertEquals(expected, everySection().sectionTitleKeys());
+                "gui.losttales.settings.section.developer"),
+                settings.sectionTitleKeys(Settings.Place.CLIENT));
     }
 
     @Test
     public void aSystemsSectionsAreAddedOnce() {
         Settings settings = everySection();
-        int before = settings.sectionTitleKeys().size();
+        int before = settings.allSettings().size();
         ClientSettingsSections.SECTIONS.addTo(settings);
-        assertEquals(before, settings.sectionTitleKeys().size());
+        assertEquals(before, settings.allSettings().size());
     }
 
     @Test

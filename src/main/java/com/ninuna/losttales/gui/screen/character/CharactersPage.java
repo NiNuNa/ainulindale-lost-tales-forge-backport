@@ -1,5 +1,6 @@
 package com.ninuna.losttales.gui.screen.character;
 
+import com.ninuna.losttales.client.window.PageKeys;
 import com.ninuna.losttales.character.model.CharacterProfile;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.CharacterSlotState;
@@ -892,6 +893,17 @@ public final class CharactersPage extends PageContent {
     }
 
     /* ---- The keys ---- */
+
+    /** The keys the Characters page answers to, for its help. */
+    @Override
+    public List<PageKeys.Area> keyAreas() {
+        return PageKeys.pageArea("gui.losttales.page.characters",
+                PageKeys.pageKey(PAGE_ID, "pick",
+                        Keyboard.KEY_UP, PageKeys.OR, Keyboard.KEY_DOWN),
+                PageKeys.pageKey(PAGE_ID, "refresh", Keyboard.KEY_R),
+                PageKeys.pageKey(PAGE_ID, "turn", PageKeys.DRAG),
+                PageKeys.pageKey(PAGE_ID, "wheel", PageKeys.WHEEL));
+    }
 
     /** The arrows walk the roster; R asks the server again. */
     @Override

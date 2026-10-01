@@ -448,18 +448,18 @@ public final class ChatFrame extends WindowFrame {
 
     /**
      * Moves the timestamp area's and the member list's motions on to
-     * this instant, toward what the window asks of them — the list only
-     * while the window shows a conversation. Called once a frame before
-     * the window is laid out; the first call stands them in their state.
+     * this instant, toward where their buttons left them. Called once a
+     * frame before a conversation is laid out; the first call stands them
+     * in their state. Only the buttons move them: a window the view hides
+     * comes back with its list as it was.
      */
-    public void advancePanels(Window window, boolean showsConversation) {
+    public void advancePanels(Window window) {
         if (window == null) {
             return;
         }
         long now = System.nanoTime();
         this.areaMotion.advance(now, !ChatLayout.isAreaHidden(window));
-        this.membersMotion.advance(now, !ChatLayout.isMembersHidden(window)
-                && showsConversation);
+        this.membersMotion.advance(now, !ChatLayout.isMembersHidden(window));
     }
 
     /** How far the timestamp area stands in the window, 0..1. */

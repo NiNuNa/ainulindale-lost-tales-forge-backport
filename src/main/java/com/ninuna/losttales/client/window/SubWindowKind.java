@@ -18,7 +18,7 @@ public final class SubWindowKind {
     private static final Map<String, SubWindowKind> KINDS =
             new LinkedHashMap<String, SubWindowKind>();
 
-    /** A tab's menu, behind the cog on the tool strip. */
+    /** A tab's options, behind the three dots on the tool strip. */
     public static final SubWindowKind TAB = register("tab",
             "gui.losttales.window.sub.tab");
     /** A window's own menu, behind the three dots at the end of its row. */
@@ -45,6 +45,9 @@ public final class SubWindowKind {
     /** A question before an action that cannot be undone ({@link QuestionWindow}). */
     public static final SubWindowKind QUESTION = register("question",
             "gui.losttales.window.sub.question");
+    /** A page's help: what it is for, and its keys ({@link PageHelp}). */
+    public static final SubWindowKind HELP = register("help",
+            "gui.losttales.window.sub.help");
 
     /** What the layout file remembers the kind's place by. */
     public final String id;

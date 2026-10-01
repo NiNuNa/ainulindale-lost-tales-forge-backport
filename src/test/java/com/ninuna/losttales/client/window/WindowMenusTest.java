@@ -65,7 +65,7 @@ public final class WindowMenusTest {
         WindowMenus next = new WindowMenus(bound());
         next.register(kind, source);
         assertTrue(next.restore(new SubWindowPlaces.Reopening(kind, "", menu,
-                null, 20.0D, 20.0D, 80, 40, true)));
+                null, 20.0D, 20.0D, 80, 40, true, true)));
         assertTrue(next.isOpen(kind));
         WindowHover row = new WindowHover(WindowHover.Kind.SUB_WINDOW);
         row.menuEntry = menu.entries().get(0);

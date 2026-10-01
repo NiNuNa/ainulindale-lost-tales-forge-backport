@@ -687,7 +687,10 @@ public final class ChatMemberDirectory {
                 online ? server : "", 0, online);
     }
 
-    /** An absent character, in its faction's colour; the title is read from a player here only. */
+    /**
+     * An absent character, in its faction's colour, with the title it wore
+     * when it was last played: a title is part of the name.
+     */
     private static LostTalesChatMembersPacket.Member characterMember(
             UUID owner, String account, RoleplayCharacter character) {
         int color = LotrFactionColors.forFactionId(character.getFactionId(),
@@ -695,7 +698,8 @@ public final class ChatMemberDirectory {
         return new LostTalesChatMembersPacket.Member(owner, account,
                 character.getCharacterId(),
                 PlayableIdentity.displayName(character, account), color,
-                character.getSkinId(), "", color, ABSENT_GROUP, "", 0, false);
+                character.getSkinId(), character.getLotrTitle(), color,
+                ABSENT_GROUP, "", 0, false);
     }
 
     /** An absent account, in the colour of its highest role the channel shows. */

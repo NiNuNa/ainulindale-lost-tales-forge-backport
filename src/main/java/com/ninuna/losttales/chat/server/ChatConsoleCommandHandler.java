@@ -1,5 +1,6 @@
 package com.ninuna.losttales.chat.server;
 
+import com.ninuna.losttales.chat.ChatCommandText;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import net.minecraft.command.ICommandSender;
@@ -12,7 +13,7 @@ import net.minecraftforge.event.CommandEvent;
  * one entry naming who ran what, and for a player where — the tab
  * their client reported just ahead of the command
  * ({@link ChatCommandContexts}) — with the words the console must not
- * repeat left out ({@link ChatConsoleStream#describeCommand}). Only
+ * repeat left out ({@link ChatCommandText#describe}). Only
  * people count — a player, or whoever is at the server's own console;
  * a command block runs on a clock and would drown the stream, and it
  * is world data staff can read for themselves. Recorded as the command
@@ -49,7 +50,7 @@ public final class ChatConsoleCommandHandler {
         }
         LostTalesChatService.console(ChatConsoleEvent.Kind.COMMAND,
                 ChatConsoleEvent.Severity.INFO, actor,
-                ChatConsoleStream.describeCommand(event.command.getCommandName(),
+                ChatCommandText.describe(event.command.getCommandName(),
                         event.parameters), context);
         noteRecorded(actor, System.currentTimeMillis());
         // A command may make somebody an operator, or no longer one, or

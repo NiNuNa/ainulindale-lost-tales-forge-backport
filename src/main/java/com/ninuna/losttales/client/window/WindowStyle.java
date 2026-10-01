@@ -5,9 +5,12 @@ import com.ninuna.losttales.client.motion.Motions;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesSkyrimUiStyle;
+import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiRules;
 import com.ninuna.losttales.gui.style.LostTalesUiWindowFrame;
+import java.util.Collections;
+import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.renderer.OpenGlHelper;
@@ -172,6 +175,73 @@ public final class WindowStyle {
         return LostTalesUiInk.argb(backdropRgb(), Math.round(SURFACE_ALPHA * share));
     }
 
+    /**
+     * A flat colour {@code argb} over {@code [left, right)} by
+     * {@code [top, bottom)} whose opacity follows {@code weights}, sampled
+     * evenly from {@code curveLeft} to {@code curveRight} and held at its
+     * end values past them: a surface that thins out along its width, as
+     * a conversation's panel does, or a stretch of the frame's ring
+     * continuing one. Null weights draw it flat.
+     */
+    public static void fillProfiled(float left, float top, float right,
+                                    float bottom, int argb, float curveLeft,
+                                    float curveRight, float[] weights) {
+        if (weights == null || weights.length < 2
+                || !(curveRight > curveLeft)) {
+            LostTalesUiInk.fillRect(left, top, right, bottom, argb);
+            return;
+        }
+        int alpha = argb >>> 24;
+        int rgb = argb & 0xFFFFFF;
+        if (alpha == 0 || right <= left || bottom <= top) {
+            return;
+        }
+        int steps = weights.length - 1;
+        float span = curveRight - curveLeft;
+        Tessellator tessellator = LostTalesSkyrimUiStyle.beginQuads(true);
+        if (left < curveLeft) {
+            profiledQuad(tessellator, left, Math.min(right, curveLeft), top,
+                    bottom, rgb, alpha * weights[0], alpha * weights[0]);
+        }
+        for (int step = 0; step < steps; step++) {
+            float x0 = curveLeft + span * step / steps;
+            float x1 = curveLeft + span * (step + 1) / steps;
+            float from = Math.max(left, x0);
+            float to = Math.min(right, x1);
+            if (to <= from) {
+                continue;
+            }
+            float w0 = weights[step];
+            float w1 = weights[step + 1];
+            float atFrom = w0 + (w1 - w0) * (from - x0) / (x1 - x0);
+            float atTo = w0 + (w1 - w0) * (to - x0) / (x1 - x0);
+            profiledQuad(tessellator, from, to, top, bottom, rgb,
+                    alpha * atFrom, alpha * atTo);
+        }
+        if (right > curveRight) {
+            profiledQuad(tessellator, Math.max(left, curveRight), right, top,
+                    bottom, rgb, alpha * weights[steps],
+                    alpha * weights[steps]);
+        }
+        LostTalesSkyrimUiStyle.endQuads(tessellator, true);
+    }
+
+    /** One quad of a profiled fill, its left and right edges at their own opacity. */
+    private static void profiledQuad(Tessellator tessellator, float left,
+                                     float right, float top, float bottom,
+                                     int rgb, float leftAlpha,
+                                     float rightAlpha) {
+        int a0 = Math.max(0, Math.min(255, Math.round(leftAlpha)));
+        int a1 = Math.max(0, Math.min(255, Math.round(rightAlpha)));
+        // The GUI pass culls back faces: the backdrops' own winding.
+        tessellator.setColorRGBA_I(rgb, a1);
+        tessellator.addVertex(right, bottom, 0.0D);
+        tessellator.addVertex(right, top, 0.0D);
+        tessellator.setColorRGBA_I(rgb, a0);
+        tessellator.addVertex(left, top, 0.0D);
+        tessellator.addVertex(left, bottom, 0.0D);
+    }
+
     /** The inset surface at {@code share} of its opacity. */
     public static int insetArgb(float share) {
         return LostTalesUiInk.argb(LostTalesUiInk.SURFACE_RGB, Math.round(INSET_ALPHA * share));
@@ -210,6 +280,7 @@ public final class WindowStyle {
     /**
      * A popup's surface over {@code [left, right)} by {@code [top,
      * bottom)}: what follows the pointer or the caret and never moves
+     * cuts away what lies behind it, stands on the softened world, and
      * wears the sub-windows' surface — the inset plum black at two
      * thirds, thinned by the game's chat opacity and by {@code opacity} —
      * and a window's frame inside its footprint, as the snap panels
@@ -234,6 +305,12 @@ public final class WindowStyle {
                 || boxBottom <= boxTop) {
             return;
         }
+        // Like a window, a popup cuts away what lies behind it and stands
+        // on the softened world.
+        LostTalesUiHitBox stands = new LostTalesUiHitBox(boxLeft, boxTop,
+                boxRight - boxLeft, boxBottom - boxTop);
+        WindowDrawing.cutBehind(stands, share);
+        WindowDrawing.softenBehind(stands, share);
         int surface = LostTalesUiInk.argb(LostTalesUiInk.SURFACE_RGB, surfaceAlpha);
         float litLeft = Math.max(boxLeft, rowLeft);
         float litTop = Math.max(boxTop, rowTop);
@@ -241,14 +318,46 @@ public final class WindowStyle {
         float litBottom = Math.min(boxBottom, rowBottom);
         fillAround(boxLeft, boxTop, boxRight, boxBottom, litLeft, litTop,
                 litRight, litBottom, surface);
-        if (litRight > litLeft && litBottom > litTop) {
-            LostTalesUiInk.fillRect(litLeft, litTop, litRight, litBottom,
-                    LostTalesUiInk.argb(LostTalesUiInk.SURFACE_HIGHLIGHT_RGB, surfaceAlpha));
+        int lit = LostTalesUiInk.argb(LostTalesUiInk.SURFACE_HIGHLIGHT_RGB,
+                surfaceAlpha);
+        boolean rowLit = litRight > litLeft && litBottom > litTop;
+        if (rowLit) {
+            LostTalesUiInk.fillRect(litLeft, litTop, litRight, litBottom, lit);
         }
         LostTalesUiWindowFrame.drawSurface(boxLeft, boxTop, boxRight,
                 boxBottom, surface);
+        if (rowLit) {
+            // The ring beside the lit row wears its colour, as the ring
+            // beside anything wears what it touches.
+            recolourRingBeside(boxLeft, boxRight, litLeft, litTop, litRight,
+                    litBottom, surfaceAlpha, LostTalesUiInk.SURFACE_RGB,
+                    LostTalesUiInk.SURFACE_HIGHLIGHT_RGB);
+        }
         LostTalesUiWindowFrame.drawEdges(boxLeft, boxTop, boxRight,
                 boxBottom, Math.round(255.0F * share));
+    }
+
+    /**
+     * The frame's ring beside a stretch {@code top} to {@code bottom} of a
+     * box {@code boxLeft} to {@code boxRight}, recoloured from
+     * {@code fromRgb} to {@code toRgb} at {@code alpha} on each side the
+     * stretch reaches ({@code left} at the box's left, {@code right} at
+     * its right): a lit row running to the frame takes the ring with it.
+     */
+    public static void recolourRingBeside(float boxLeft, float boxRight,
+                                          float left, float top,
+                                          float right, float bottom,
+                                          int alpha, int fromRgb,
+                                          int toRgb) {
+        int ring = LostTalesUiWindowFrame.WIDTH;
+        if (left <= boxLeft) {
+            recolourFlat(boxLeft - ring, top, boxLeft, bottom, alpha,
+                    fromRgb, toRgb);
+        }
+        if (right >= boxRight) {
+            recolourFlat(boxRight, top, boxRight + ring, bottom, alpha,
+                    fromRgb, toRgb);
+        }
     }
 
     /** Whether the blend equations a recolour needs are there; asked once. */
@@ -320,6 +429,49 @@ public final class WindowStyle {
     public static void drawPopup(float left, float top, float right, float bottom,
                           float opacity) {
         drawPopup(left, top, right, bottom, opacity, 0.0F, 0.0F, 0.0F, 0.0F);
+    }
+
+    /** The widest a tip grows before its words go on to another line. */
+    public static final int TIP_MAX_WIDTH = 220;
+
+    /**
+     * A tip's lines: whole while it fits {@link #TIP_MAX_WIDTH}, else
+     * broken between its words.
+     */
+    public static List<String> tipLines(FontRenderer font, String text) {
+        if (popupLineWidth(font, text) <= TIP_MAX_WIDTH) {
+            return Collections.singletonList(text);
+        }
+        @SuppressWarnings("unchecked")
+        List<String> lines = font.listFormattedStringToWidth(text,
+                TIP_MAX_WIDTH - POPUP_INSET * 2);
+        return lines;
+    }
+
+    /** How tall a popup of {@code lines} lines of words stands. */
+    public static int popupLinesHeight(int lines) {
+        return POPUP_LINE_HEIGHT + Math.max(0, lines - 1) * LINE_HEIGHT;
+    }
+
+    /**
+     * A popup of several lines of words with its top left at {@code x},
+     * {@code y}, as wide as its widest line: a long tip.
+     */
+    public static void drawPopupLines(FontRenderer font, List<String> lines,
+                                      int x, int y, float opacity) {
+        int width = 0;
+        for (String line : lines) {
+            width = Math.max(width, popupLineWidth(font, line));
+        }
+        drawPopup(x, y, x + width, y + popupLinesHeight(lines.size()),
+                opacity);
+        int alpha = Math.round(255.0F * Math.max(0.0F,
+                Math.min(1.0F, opacity)));
+        for (int index = 0; index < lines.size(); index++) {
+            LostTalesUiInk.drawText(font, lines.get(index), x + POPUP_INSET,
+                    y + POPUP_INSET + index * LINE_HEIGHT,
+                    LostTalesUiInk.IVORY, alpha);
+        }
     }
 
     /** A one-line popup's width for {@code text}: the text, the inset either side. */

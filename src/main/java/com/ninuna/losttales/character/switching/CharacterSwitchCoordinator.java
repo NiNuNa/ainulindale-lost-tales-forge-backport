@@ -7,7 +7,7 @@ import com.ninuna.losttales.compat.lotr.hired.LotrHiredUnitCustody;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.server.CharacterOperationResult;
-import com.ninuna.losttales.character.server.CharacterPledges;
+import com.ninuna.losttales.character.server.CharacterLotrRecord;
 import com.ninuna.losttales.character.server.CharacterRaceGameplayHandler;
 import com.ninuna.losttales.character.state.CharacterLiveStatePersistence;
 import com.ninuna.losttales.character.state.CharacterPlayerStateAccount;
@@ -578,9 +578,9 @@ public final class CharacterSwitchCoordinator {
             // account that has never been left gets its record from this.
             sourceSnapshot = this.playerStateService.captureOrCreate(
                     player, playerStateAccount, stores.playerStates, source);
-            // The source's pledge as the player leaves it, while the live
-            // LOTR data is still the source's.
-            CharacterPledges.refresh(player, stores.rosters, roster,
+            // The source's pledge and title as the player leaves it, while
+            // the live LOTR data is still the source's.
+            CharacterLotrRecord.refresh(player, stores.rosters, roster,
                     sourceCharacter);
             // An account never played before starts from fresh defaults; a
             // character always has a record once the account is bootstrapped.
@@ -690,8 +690,8 @@ public final class CharacterSwitchCoordinator {
             commitFlushed = true;
 
             // The live LOTR data is the target's now; its record keeps
-            // the pledge it holds.
-            CharacterPledges.refresh(player, stores.rosters, roster,
+            // the pledge and the title it holds.
+            CharacterLotrRecord.refresh(player, stores.rosters, roster,
                     targetCharacter);
             CharacterRaceGameplayHandler.apply(player, targetCharacter);
             LotrHiredUnitCustody.settle(player, target, roster);

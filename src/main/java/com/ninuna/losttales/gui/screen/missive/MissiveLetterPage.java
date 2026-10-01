@@ -1,5 +1,6 @@
 package com.ninuna.losttales.gui.screen.missive;
 
+import com.ninuna.losttales.client.window.PageKeys;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.client.window.BarItem;
 import com.ninuna.losttales.client.window.PageContent;
@@ -253,6 +254,16 @@ public final class MissiveLetterPage extends PageContent
         LostTalesUiHitBox sheet = sheet(box);
         return this.slot >= 0 && sheet.contains(x, y)
                 && this.view.scroll(sheet, lines);
+    }
+
+    /** The keys the missive letter answers to, for its help. */
+    @Override
+    public List<PageKeys.Area> keyAreas() {
+        return PageKeys.pageArea("gui.losttales.page.missive_letter",
+                PageKeys.pageKey(PAGE_ID, "accept", Keyboard.KEY_A),
+                PageKeys.pageKey(PAGE_ID, "turn",
+                        Keyboard.KEY_PRIOR, PageKeys.OR, Keyboard.KEY_NEXT),
+                PageKeys.pageKey(PAGE_ID, "wheel", PageKeys.WHEEL));
     }
 
     /** The page keys turn the letter, and A takes Accept while it can be taken, as its tip names it. */

@@ -10,6 +10,5 @@ public class LostTalesMetaData {
             MC_VERSION = "1.7.10",
 
             CLIENT_PROXY_CLASS = "com.ninuna.losttales.proxy.LostTalesClientProxy",
-            SERVER_PROXY_CLASS = "com.ninuna.losttales.proxy.LostTalesServerProxy",
-            GUI_FACTORY_CLASS = "com.ninuna.losttales.config.client.LostTalesConfigGuiFactory";
+            SERVER_PROXY_CLASS = "com.ninuna.losttales.proxy.LostTalesServerProxy";
 }

@@ -7,8 +7,10 @@ import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import net.minecraft.client.Minecraft;
@@ -16,22 +18,25 @@ import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.settings.GameSettings;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.StatCollector;
-import org.lwjgl.input.Keyboard;
 
 /**
- * Settings: every option in one sub-window, in sections under a search
- * field — the window system's own Windows section first, what reaches
- * every window, then each system's sections in the order it added them,
- * and Defaults last. Each option takes effect and is saved the moment it
- * changes: a switch flips on a click, a few-word option steps forward on
- * a click and back on a right-click, a number steps with the chevrons
- * beside it and is typed into where its value is clicked, a colour opens
- * the palette beside the window. The game's own options read here are
- * written to the game's options, so its own screens and this window
- * always agree. Restore Defaults puts every setting of every section back
- * as the mod and the game ship it, after asking in its own place. A row
- * is acted on by its id, so a list read again as it is typed into acts
- * the same.
+ * Settings: every client option, each section in its {@link Place}.
+ * Window Settings, what reaches every window, opens from a window's
+ * Window Options; the settings of each kind of page (Chat Settings for
+ * every conversation, Quest Settings for the journal, Map Settings for
+ * the map, Motion Settings for the Motion Lab) open from the page's cog
+ * and its options; everything else, the keys among it, stands on the
+ * Client Settings page. Each place
+ * shows its sections under a search field, in the order the systems
+ * added them, and Defaults last. Each option takes effect and is saved
+ * the moment it changes: a switch flips on a click, a few-word option
+ * steps forward on a click and back on a right-click, a number steps with
+ * the chevrons beside it and is typed into where its value is clicked, a
+ * colour opens the palette beside it. The game's own options read here
+ * are written to the game's options, so its own screens and these always
+ * agree. Restore Defaults puts every setting of its place back as the mod
+ * and the game ship it, after asking in its own place. A row is acted on
+ * by its id, so a list read again as it is typed into acts the same.
  */
 public final class Settings {
     /** Marks a setting's row; the rest of the id is its key. */
@@ -74,6 +79,33 @@ public final class Settings {
     /** A system's sections, added to every Settings as it is made. */
     public interface Sections {
         void addTo(Settings settings);
+    }
+
+    /**
+     * Where a section stands: in a sub-window a window's Window Options or
+     * a page's cog opens, or on the Client Settings page, which holds what
+     * has no window or page of its own.
+     */
+    public enum Place {
+        /** Window Settings, from a window's Window Options: what reaches every window. */
+        WINDOWS("gui.losttales.window.settings.title.windows"),
+        /** Chat Settings, from every conversation's cog. */
+        CHAT("gui.losttales.window.settings.title.chat"),
+        /** Quest Settings, from the journal's cog. */
+        QUESTS("gui.losttales.window.settings.title.quests"),
+        /** Map Settings, from the map's cog. */
+        MAP("gui.losttales.window.settings.title.map"),
+        /** Motion Settings, from the Motion Lab's cog: what every screen's and the HUD's motion answers to. */
+        MOTION("gui.losttales.window.settings.title.motion"),
+        /** The Client Settings page. */
+        CLIENT("gui.losttales.page.client_settings");
+
+        /** The name the place goes by, on its sub-window's strip and on the row that opens it. */
+        public final String titleKey;
+
+        Place(String titleKey) {
+            this.titleKey = titleKey;
+        }
     }
 
     /** Every system's sections, in the order the systems gave them. */
@@ -625,12 +657,16 @@ public final class Settings {
 
     private final WindowMenus menus;
     private final List<Section> sections = new ArrayList<Section>();
-    /** Whether Restore Defaults is asking before it restores. */
-    private boolean confirmingRestore;
+    /** Where each section stands, by the section. */
+    private final Map<Section, Place> places =
+            new IdentityHashMap<Section, Place>();
+    /** The places whose Restore Defaults is asking before it restores. */
+    private final Set<Place> confirmingRestore = EnumSet.noneOf(Place.class);
 
     Settings(WindowMenus menus) {
         this.menus = menus;
-        this.sections.add(new WindowsSection());
+        addSection(Place.WINDOWS, new WindowsSection());
+        addSection(Place.CLIENT, new ShortcutsSection());
         for (Sections system : SYSTEMS) {
             system.addTo(this);
         }
@@ -647,11 +683,13 @@ public final class Settings {
     }
 
     /**
-     * Adds a system's section after those already there; Defaults stays
-     * last. A second section under a heading already there is left out.
+     * Adds a system's section to {@code place}, after those already
+     * there; Defaults stays last. A second section under a heading already
+     * there is left out.
      */
-    public void addSection(Section section) {
-        if (section == null || this.sections.contains(section)) {
+    public void addSection(Place place, Section section) {
+        if (place == null || section == null
+                || this.sections.contains(section)) {
             return;
         }
         for (Section held : this.sections) {
@@ -660,16 +698,34 @@ public final class Settings {
             }
         }
         this.sections.add(section);
+        this.places.put(section, place);
     }
 
-    /** Settings, opened beside a sub-window or in the middle of a window; a switch. */
-    void toggle(WindowMenus.FirstPlace place) {
-        this.menus.show(SubWindowKind.SETTINGS, null, place, true);
+    /** The sections of {@code place}, in the order they were added. */
+    private List<Section> sectionsOf(Place place) {
+        List<Section> of = new ArrayList<Section>();
+        for (Section section : this.sections) {
+            if (this.places.get(section) == place) {
+                of.add(section);
+            }
+        }
+        return of;
     }
 
-    /** Settings brought in front, opened at {@code place} where it is not out. */
-    void show(WindowMenus.FirstPlace place) {
-        this.menus.show(SubWindowKind.SETTINGS, null, place, false);
+    /**
+     * The settings of a place other than the Client Settings page, in a
+     * sub-window opened at {@code first} — beside the menu whose row asked
+     * for them; a switch.
+     */
+    void toggle(Place place, WindowMenus.FirstPlace first) {
+        this.menus.show(SubWindowKind.SETTINGS, place, first, true);
+    }
+
+    /** A colour's palette at {@code first}, as a colour's row opens it; a switch. */
+    void openPalette(Setting setting, WindowMenus.FirstPlace first) {
+        if (setting instanceof Colour) {
+            this.menus.show(SubWindowKind.PALETTE, setting.key, first, true);
+        }
     }
 
     /**
@@ -687,10 +743,10 @@ public final class Settings {
         }
     }
 
-    /** Every section's heading, in the order they stand. */
-    List<String> sectionTitleKeys() {
-        List<String> keys = new ArrayList<String>(this.sections.size());
-        for (Section section : this.sections) {
+    /** The headings of a place's sections, in the order they stand. */
+    List<String> sectionTitleKeys(Place place) {
+        List<String> keys = new ArrayList<String>();
+        for (Section section : sectionsOf(place)) {
             keys.add(section.titleKey());
         }
         return keys;
@@ -708,6 +764,22 @@ public final class Settings {
     /* ---- The Windows section ---- */
 
     /** The windows' colour, then what else reaches every window. */
+    /**
+     * Every key of every page, each a row that is read, not taken; each
+     * page's help lists its own ({@link PageHelp}).
+     */
+    private static final class ShortcutsSection extends Section {
+        @Override
+        public String titleKey() {
+            return "gui.losttales.window.settings.section.shortcuts";
+        }
+
+        @Override
+        public List<MenuWindow.Entry> rows() {
+            return PageKeys.rows(PageKeys.everyArea(), "");
+        }
+    }
+
     private static final class WindowsSection extends Section {
         @Override
         public String titleKey() {
@@ -788,22 +860,22 @@ public final class Settings {
     /* ---- The rows ---- */
 
     /**
-     * The window's rows for what has been typed into its search: every
-     * row whose name, value, group or section holds the words, a group
-     * kept whole where its name holds them, a section's header over what
-     * is left of it, and a line saying so where nothing is.
+     * A place's rows for what has been typed into its search: every row
+     * whose name, value, group or section holds the words, a group kept
+     * whole where its name holds them, a section's header over what is
+     * left of it, and a line saying so where nothing is.
      */
-    List<MenuWindow.Entry> rows(String filter) {
+    List<MenuWindow.Entry> rows(Place place, String filter) {
         String wanted = filter == null ? ""
                 : filter.trim().toLowerCase(Locale.ROOT);
         List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>();
-        for (Section section : this.sections) {
+        for (Section section : sectionsOf(place)) {
             section(rows, StatCollector.translateToLocal(section.titleKey()),
                     section.rows(), wanted);
         }
         section(rows, StatCollector.translateToLocal(
                 "gui.losttales.window.settings.section.defaults"),
-                restoreRows(), wanted);
+                restoreRows(place), wanted);
         if (rows.isEmpty()) {
             rows.add(MenuWindow.Entry.passive(StatCollector.translateToLocal(
                     "gui.losttales.window.settings.none")));
@@ -868,10 +940,10 @@ public final class Settings {
         return words.toString();
     }
 
-    /** Restore Defaults, or the question it asks in its own place. */
-    private List<MenuWindow.Entry> restoreRows() {
+    /** A place's Restore Defaults, or the question it asks in its own place. */
+    private List<MenuWindow.Entry> restoreRows(Place place) {
         List<MenuWindow.Entry> rows = new ArrayList<MenuWindow.Entry>(1);
-        rows.add(this.confirmingRestore
+        rows.add(this.confirmingRestore.contains(place)
                 ? new MenuWindow.Entry(RESTORE_CONFIRM,
                         StatCollector.translateToLocal(
                                 "gui.losttales.window.settings.restore.confirm"))
@@ -883,17 +955,18 @@ public final class Settings {
     /* ---- Taking a row ---- */
 
     /**
-     * A row taken: a click, or with {@code back} a right-click, which
-     * steps a setting back; on a number's row, {@code part} says which of
-     * its chevrons or its value the press landed on. Answers the setting
-     * whose own window a row asks to be opened beside Settings — a
-     * colour's palette, the field a number or a line is typed into — or
-     * null.
+     * A row of {@code place} taken: a click, or with {@code back} a
+     * right-click, which steps a setting back; on a number's row,
+     * {@code part} says which of its chevrons or its value the press
+     * landed on. Answers the setting whose own window a row asks to be
+     * opened beside it — a colour's palette, the field a number or a line
+     * is typed into — or null.
      */
-    private Setting take(MenuWindow.Entry entry, String part, boolean back) {
+    Setting take(Place place, MenuWindow.Entry entry, String part,
+                 boolean back) {
         String id = entry.id;
         if (!RESTORE.equals(id)) {
-            this.confirmingRestore = false;
+            this.confirmingRestore.remove(place);
         }
         if (id.startsWith(SETTING_PREFIX)) {
             Setting setting = find(id.substring(SETTING_PREFIX.length()));
@@ -910,17 +983,21 @@ public final class Settings {
             return null;
         }
         if (RESTORE.equals(id)) {
-            this.confirmingRestore = !back;
-            return null;
-        }
-        if (RESTORE_CONFIRM.equals(id)) {
-            this.confirmingRestore = false;
-            if (!back) {
-                restoreAll();
+            if (back) {
+                this.confirmingRestore.remove(place);
+            } else {
+                this.confirmingRestore.add(place);
             }
             return null;
         }
-        for (Section section : this.sections) {
+        if (RESTORE_CONFIRM.equals(id)) {
+            this.confirmingRestore.remove(place);
+            if (!back) {
+                restoreAll(place);
+            }
+            return null;
+        }
+        for (Section section : sectionsOf(place)) {
             if (section.take(entry, back)) {
                 changed();
                 return null;
@@ -957,10 +1034,10 @@ public final class Settings {
         return null;
     }
 
-    /** Every setting of every section back as the mod and the game ship it. */
-    private void restoreAll() {
+    /** Every setting of a place's sections back as the mod and the game ship it. */
+    private void restoreAll(Place place) {
         Set<Store> stores = EnumSet.noneOf(Store.class);
-        for (Section section : this.sections) {
+        for (Section section : sectionsOf(place)) {
             for (Setting setting : section.settings()) {
                 setting.restore();
                 setting.changed();
@@ -1088,23 +1165,29 @@ public final class Settings {
 
     /* ---- The sources ---- */
 
-    /** Settings itself: its search, its sections, Defaults. */
+    /** A place's settings in a sub-window, about the place: its search, its sections, Defaults. */
     private final class SettingsSource extends WindowMenus.Source {
+        @Override
+        public boolean stillStands(MenuWindow menu) {
+            return menu.about() instanceof Place;
+        }
+
         @Override
         public void prepare(MenuWindow menu) {
             menu.openField(StatCollector.translateToLocal(
                             "gui.losttales.window.settings.search"),
-                    WindowKeys.withCommand(Keyboard.KEY_COMMA),
-                    LostTalesUiSheet.SEARCH, MenuWindow.MAX_FILTER_LENGTH,
-                    false);
-            Settings.this.confirmingRestore = false;
+                    null, LostTalesUiSheet.SEARCH,
+                    MenuWindow.MAX_FILTER_LENGTH, false);
+            Settings.this.confirmingRestore.remove(menu.about());
         }
 
         @Override
         public void rebuild(MenuWindow menu) {
-            menu.setTitle(null, LostTalesUiSheet.COG);
+            Place place = (Place)menu.about();
+            menu.setTitle(StatCollector.translateToLocal(place.titleKey),
+                    LostTalesUiSheet.COG);
             menu.setRowHeight(MenuWindow.TALL_ROW_HEIGHT);
-            menu.setRows(rows(menu.filter()));
+            menu.setRows(rows(place, menu.filter()));
         }
 
         @Override
@@ -1136,7 +1219,7 @@ public final class Settings {
         @Override
         public boolean act(MenuWindow menu, MenuWindow.Entry entry,
                            String part, SubWindow window, boolean back) {
-            Setting opened = take(entry, part, back);
+            Setting opened = take((Place)menu.about(), entry, part, back);
             if (opened instanceof Colour) {
                 Settings.this.menus.show(SubWindowKind.PALETTE, opened.key,
                         WindowMenus.besideWindow(window), true);

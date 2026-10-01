@@ -1438,6 +1438,24 @@ public final class LostTalesChatService {
         return null;
     }
 
+    /**
+     * Whether a muted account is refused a way to speak that does not
+     * pass through {@link #send} ({@link ChatSpeechGate}); a refused
+     * player is told, as a refused line is.
+     */
+    public static boolean refuseIfMuted(EntityPlayerMP player) {
+        if (player == null || player.worldObj == null
+                || player.worldObj.isRemote) {
+            return false;
+        }
+        ChatMuteEntry mute = activeMute(player);
+        if (mute == null) {
+            return false;
+        }
+        tellMuted(player, mute);
+        return true;
+    }
+
     /** The mute currently silencing the player's account, or null. */
     private static ChatMuteEntry activeMute(EntityPlayerMP player) {
         return ChatMuteStorage.get(player.worldObj).getActiveMute(

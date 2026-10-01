@@ -14,10 +14,10 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * A tab standing alone in full screen: its window is laid out past the
- * screen's edges while it stands, its own fill untouched, and it goes back
- * into its window once another tab comes in front there, the window is
- * gone, or the keys go to another window.
+ * A page filling its window: the window is laid out with its row, strip
+ * and bar past its edges while the page fills it, its own fill untouched;
+ * each window has its own, and gives it up once another page comes in
+ * front there or the window is gone.
  */
 public final class ContentViewTest {
     private final BarLeadTest.Tab map = new BarLeadTest.Tab("Map", true);
@@ -28,12 +28,12 @@ public final class ContentViewTest {
     public void reset() {
         ChatLayout.reset();
         WindowLayout.load(Collections.<WindowLayout.WindowSpec>emptyList());
-        ContentView.leave();
+        ContentView.leaveAll();
     }
 
     @After
     public void cleanUp() {
-        ContentView.leave();
+        ContentView.leaveAll();
         ChatLayout.reset();
     }
 
@@ -42,7 +42,7 @@ public final class ContentViewTest {
     }
 
     @Test
-    public void aTabStandsAloneUntilAnotherComesInFront() {
+    public void aPageFillsItsWindowUntilAnotherComesInFront() {
         Window window = WindowLayout.addWindow(row(this.map, this.journal),
                 this.map);
         assertTrue(ContentView.enter(window));
@@ -50,34 +50,55 @@ public final class ContentViewTest {
         assertEquals(Window.ScreenFill.CONTENT, ContentView.fillOf(window));
         assertEquals("never the window's own fill", Window.ScreenFill.NONE,
                 window.getFill());
-        ContentView.follow(window, false);
-        ContentView.follow(null, false);
-        assertTrue("keys in its window, or nowhere, keep it", ContentView.isOn());
+        ContentView.follow();
+        assertTrue(ContentView.isOn(window));
         WindowLayout.setActiveTab(this.journal);
-        ContentView.follow(window, false);
-        assertFalse(ContentView.isOn());
+        ContentView.follow();
+        assertFalse(ContentView.isOn(window));
+        assertEquals(Window.ScreenFill.NONE, ContentView.fillOf(window));
+    }
+
+    /**
+     * While playing, a window pinned to the HUD shows its page filling it,
+     * whether or not the player let it fill the window on the screen.
+     */
+    @Test
+    public void aPinnedWindowShowsItsPageFillingItWhilePlaying() {
+        Window window = WindowLayout.addWindow(row(this.map), this.map);
+        assertEquals(Window.ScreenFill.NONE, ContentView.fillOf(window));
+        WindowView.beginPinnedPass();
+        try {
+            assertEquals(Window.ScreenFill.CONTENT,
+                    ContentView.fillOf(window));
+        } finally {
+            WindowView.endPinnedPass();
+        }
         assertEquals(Window.ScreenFill.NONE, ContentView.fillOf(window));
     }
 
     @Test
-    public void theKeysGoingToAnotherWindowPutItBack() {
+    public void eachWindowHasItsOwn() {
         Window first = WindowLayout.addWindow(row(this.global), this.global);
         Window second = WindowLayout.addWindow(row(this.map), this.map);
         assertTrue(ContentView.enter(first));
-        ContentView.follow(second, false);
-        assertFalse(ContentView.isOn());
-        assertTrue(ContentView.enter(first));
-        assertTrue(ContentView.leave());
-        assertFalse("put back once", ContentView.leave());
+        assertTrue(ContentView.enter(second));
+        assertTrue(ContentView.isOn(first));
+        assertTrue(ContentView.isOn(second.getId()));
+        assertTrue(ContentView.leave(first));
+        assertFalse("given back once", ContentView.leave(first));
+        assertTrue("the other keeps its own", ContentView.isOn(second));
+        ContentView.leaveAll();
+        assertFalse(ContentView.isOn(second));
     }
 
     @Test
-    public void aClosedWindowPutsItsTabBack() {
+    public void aClosedWindowGivesItsPageBack() {
         Window window = WindowLayout.addWindow(row(this.map), this.map);
         assertTrue(ContentView.enter(window));
         WindowLayout.load(Collections.<WindowLayout.WindowSpec>emptyList());
-        ContentView.follow(null, false);
-        assertFalse(ContentView.isOn());
-        assertFalse("nothing to stand alone", ContentView.enter(null));
+        ContentView.follow();
+        assertFalse(ContentView.isOn(window));
+        assertFalse("nothing to fill", ContentView.enter(null));
+        assertFalse(ContentView.leave(null));
     }
 }

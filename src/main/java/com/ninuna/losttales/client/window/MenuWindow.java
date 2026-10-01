@@ -13,6 +13,7 @@ import com.ninuna.losttales.gui.style.LostTalesUiCaret;
 import com.ninuna.losttales.gui.style.LostTalesUiFlatLayers;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
+import com.ninuna.losttales.gui.style.LostTalesUiRules;
 import com.ninuna.losttales.gui.style.LostTalesUiSheet;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -28,16 +29,18 @@ import org.lwjgl.input.Mouse;
 
 /**
  * A menu in a sub-window of its own: the rows a control or the pointer
- * opens — a tab's menu behind the tool strip's cog, what can be opened
- * behind the {@code +}, Settings, a message's or a person's actions.
+ * opens — a tab's options behind the tool strip's three dots, what can
+ * be opened behind the {@code +}, Settings, a page's help, a message's or
+ * a person's actions.
  * Each kind of menu has one window. The menu lays its rows out in the
  * window's content box, draws them, hit tests them and scrolls them;
  * what the rows are, what they are about and what they do is its
  * owner's business ({@link WindowMenus}), which hands the menu new rows
  * whenever what they say has changed. A list may carry <em>header</em>
- * rows — a section label over a hairline, never taken — and a list longer
- * than its window scrolls by the wheel, a honey hairline on an edge
- * saying more lies past it.
+ * rows — a section label over a hairline, never taken — and
+ * <em>separators</em>, a lone hairline between two groups of rows that
+ * belong together; a list longer than its window scrolls by the wheel, a
+ * honey hairline on an edge saying more lies past it.
  *
  * <p>A menu may hold a field above its rows, which takes what is typed
  * while its window is in front and until a row is taken: a search that
@@ -65,6 +68,14 @@ public final class MenuWindow extends SubWindowContent {
             LostTalesInputIconRenderer.BASE_ICON_HEIGHT + 2;
     /** Rows a window opens with at most; a longer list scrolls behind them. */
     public static final int MAX_VISIBLE_ROWS = 12;
+    /** A separator's room: two clear pixels, its hairline, two clear pixels. */
+    static final int SEPARATOR_HEIGHT = 5;
+    /** The widest a note makes its menu; a wider menu's notes take its width. */
+    private static final int NOTE_WIDTH = 220;
+    /** A note's lines, from one line's top to the next's. */
+    private static final int NOTE_LINE = 10;
+    /** Clear room above a note's first line and under its last. */
+    private static final int NOTE_PADDING = 2;
     /** Longest thing a field takes unless told otherwise; far past any tab's name. */
     public static final int MAX_FILTER_LENGTH = 48;
     /** Seam between a shortcut's key icons and the + joining them. */
@@ -201,6 +212,13 @@ public final class MenuWindow extends SubWindowContent {
          * padding as a header is; never taken.
          */
         public boolean group;
+        /** A hairline between two groups of rows; never hovered, never taken. */
+        public boolean separator;
+        /**
+         * A paragraph that is read, not taken: its words wrapped to the
+         * menu's width over as many lines as they need; a page's help.
+         */
+        public boolean note;
         /** Whether the row is a number's: its value between two chevrons. */
         boolean stepper;
         /** Whether each chevron still moves the number; one at its bound is muted. */
@@ -213,6 +231,13 @@ public final class MenuWindow extends SubWindowContent {
          * stand still as it changes.
          */
         String[] stepperWidest = NO_WORDS;
+        /** What the row says under the pointer while it can be taken: what its setting does; empty for nothing. */
+        String tip = "";
+        /**
+         * The colour the value is drawn in; -1 for the aside tone. A
+         * value changed but not yet saved stands in honey.
+         */
+        int valueColor = -1;
 
         public Entry(String id, String label) {
             this(id, label, false, false, false, -1, null);
@@ -270,6 +295,18 @@ public final class MenuWindow extends SubWindowContent {
             return this;
         }
 
+        /** The same entry saying {@code words} under the pointer while it can be taken. */
+        public Entry withTip(String words) {
+            this.tip = words == null ? "" : words;
+            return this;
+        }
+
+        /** The same entry with its value in {@code rgb}: a change waiting to be saved. */
+        public Entry withValueColor(int rgb) {
+            this.valueColor = rgb;
+            return this;
+        }
+
         /** The same entry with its label in the given colour. */
         public Entry withLabelColor(int color) {
             this.labelColor = color;
@@ -312,6 +349,20 @@ public final class MenuWindow extends SubWindowContent {
         /** A display row that cannot be taken. */
         public static Entry passive(String label) {
             return new Entry("", label, false, true, false, -1, null);
+        }
+
+        /** A hairline parting one group of rows from the next. */
+        public static Entry separator() {
+            Entry entry = new Entry("", "", false, true, false, -1, null);
+            entry.separator = true;
+            return entry;
+        }
+
+        /** A paragraph, wrapped to the menu's width; see {@link #note}. */
+        public static Entry note(String text) {
+            Entry entry = new Entry("", text, false, true, false, -1, null);
+            entry.note = true;
+            return entry;
         }
 
         /** A group's name in {@code rgb}, a channel's {@code icon} before it or none. */
@@ -358,11 +409,15 @@ public final class MenuWindow extends SubWindowContent {
             copy.valuePictureWidth = this.valuePictureWidth;
             copy.keys = this.keys;
             copy.group = this.group;
+            copy.separator = this.separator;
+            copy.note = this.note;
             copy.stepper = this.stepper;
             copy.canLess = this.canLess;
             copy.canMore = this.canMore;
             copy.stepperTip = this.stepperTip;
             copy.stepperWidest = this.stepperWidest;
+            copy.tip = this.tip;
+            copy.valueColor = this.valueColor;
             return copy;
         }
 
@@ -395,9 +450,9 @@ public final class MenuWindow extends SubWindowContent {
             this.rowHeight = rowHeight;
         }
 
-        /** Rows the box shows, the last of them perhaps in part. */
-        double shownRows() {
-            return (this.rowsBottom - this.rowsTop) / (double)this.rowHeight;
+        /** How tall the band the rows glide in is. */
+        int band() {
+            return this.rowsBottom - this.rowsTop;
         }
     }
 
@@ -416,19 +471,27 @@ public final class MenuWindow extends SubWindowContent {
     private List<Entry> entries = Collections.emptyList();
     /** How tall a row is: a menu's own, or {@link #TALL_ROW_HEIGHT}. */
     private int rowHeight = ROW_HEIGHT;
+    /** Rows the window opens with at most: {@link #MAX_VISIBLE_ROWS}, or a menu's own. */
+    private int visibleRows = MAX_VISIBLE_ROWS;
+    /** The width the notes are wrapped to: the rows' room in the box last laid out. */
+    private int noteWidth = NOTE_WIDTH - PADDING_X * 2;
+    /** Each note's lines at {@link #noteWidth}, by its words. */
+    private final Map<String, List<String>> noteLines =
+            new HashMap<String, List<String>>();
+    private int noteLinesWidth = -1;
     /** Width of the colour column: a bar, or a chip when a row is a colour. */
     private int swatchWidth = SWATCH_WIDTH;
     /** Left edge of the labels inside the box, past any swatch column. */
     private int labelX = PADDING_X;
-    /** First row asked for — the wheel's target; rows above it lie past the top edge. */
-    private double scrollRows;
+    /** How far down the list the wheel asked for, in pixels; what lies above it is past the top edge. */
+    private double scrollPixels;
     /**
-     * The row offset the list is drawn at, easing toward
-     * {@link #scrollRows} with the windows' shared scroll motion so a
+     * The offset the list is drawn at, easing toward
+     * {@link #scrollPixels} with the windows' shared scroll motion so a
      * wheel turn glides the rows instead of jumping them. Hit testing
      * reads this too, so it always answers for what is on screen.
      */
-    private double renderedScrollRows;
+    private double renderedScrollPixels;
     private long scrollNanos;
     /**
      * The field above the rows — the windows' one text field, caret,
@@ -499,6 +562,11 @@ public final class MenuWindow extends SubWindowContent {
         this.rowHeight = Math.max(ROW_HEIGHT, height);
     }
 
+    /** How many rows the window opens with at most; a page's help opens taller than a menu. */
+    public void setVisibleRows(int rows) {
+        this.visibleRows = Math.max(1, rows);
+    }
+
     /**
      * Hands the menu its rows in place of the ones it had, the scroll and
      * each row's light carried on, so a list handed over again as it is
@@ -511,7 +579,7 @@ public final class MenuWindow extends SubWindowContent {
         boolean chips = false;
         boolean icons = false;
         for (Entry entry : this.entries) {
-            if (entry.group) {
+            if (entry.group || entry.separator) {
                 continue;
             }
             swatches |= entry.color >= 0;
@@ -534,8 +602,8 @@ public final class MenuWindow extends SubWindowContent {
 
     /** Starts the list over at its top with no row lit: the menu opened, or turned to something else. */
     void restart() {
-        this.scrollRows = 0.0D;
-        this.renderedScrollRows = 0.0D;
+        this.scrollPixels = 0.0D;
+        this.renderedScrollPixels = 0.0D;
         this.spriteFades.clear();
         this.labelFades.clear();
         this.chevrons.clear();
@@ -780,6 +848,14 @@ public final class MenuWindow extends SubWindowContent {
 
     /** The width a row takes whole: from the window's edge to its value's end. */
     private int rowWidth(Minecraft minecraft, FontRenderer font, Entry entry) {
+        if (entry.separator) {
+            return 0;
+        }
+        if (entry.note) {
+            // A note wraps: it asks for no more than a note's width.
+            return PADDING_X + Math.min(font.getStringWidth(entry.label),
+                    NOTE_WIDTH - PADDING_X * 2) + PADDING_X;
+        }
         int label = entry.labelStyle != null
                 ? entry.labelStyle.width(font, entry.label)
                 : font.getStringWidth(entry.label);
@@ -796,11 +872,101 @@ public final class MenuWindow extends SubWindowContent {
                 + PADDING_X;
     }
 
-    /** Every row up to {@link #MAX_VISIBLE_ROWS}, the field above them. */
+    /** Every row up to {@link #visibleRows}, the field above them, {@code width} wide. */
     @Override
     public int naturalHeight(int width) {
-        return PADDING_Y * 2 + fieldHeight() + this.rowHeight * Math.max(1,
-                Math.min(this.entries.size(), MAX_VISIBLE_ROWS));
+        wrapNotesTo(width);
+        return PADDING_Y * 2 + fieldHeight() + heightOfRows(Math.max(1,
+                Math.min(rowCount(), this.visibleRows)));
+    }
+
+    /**
+     * How many rows the list counts as: every row but the separators, a
+     * note as many as its lines take of the menu's rows.
+     */
+    private int rowCount() {
+        int rows = 0;
+        for (Entry entry : this.entries) {
+            rows += rowsOf(entry);
+        }
+        return rows;
+    }
+
+    /** How many of the menu's rows an entry counts as: none for a separator. */
+    private int rowsOf(Entry entry) {
+        if (entry.separator) {
+            return 0;
+        }
+        return entry.note ? Math.max(1, (heightOf(entry) + this.rowHeight - 1)
+                / this.rowHeight) : 1;
+    }
+
+    /**
+     * How tall a row stands: a separator its hairline's room, a note its
+     * lines, any other the menu's row.
+     */
+    private int heightOf(Entry entry) {
+        if (entry.separator) {
+            return SEPARATOR_HEIGHT;
+        }
+        return entry.note ? NOTE_PADDING * 2
+                + linesOf(entry).size() * NOTE_LINE : this.rowHeight;
+    }
+
+    /**
+     * How tall the list's first {@code rows} rows stand, with the
+     * separators between them, a note cut at the rows it has room for; a
+     * list shorter than that is as tall as it is, and never shorter than
+     * one row.
+     */
+    private int heightOfRows(int rows) {
+        int height = 0;
+        int counted = 0;
+        for (Entry entry : this.entries) {
+            if (counted >= rows) {
+                break;
+            }
+            int of = rowsOf(entry);
+            height += counted + of <= rows ? heightOf(entry)
+                    : (rows - counted) * this.rowHeight;
+            counted += of;
+        }
+        return Math.max(this.rowHeight, height);
+    }
+
+    /** The notes wrapped to a content box {@code width} wide from now on. */
+    private void wrapNotesTo(int width) {
+        this.noteWidth = Math.max(1, width - PADDING_X * 2);
+    }
+
+    /** A note's words over the lines they take at {@link #noteWidth}. */
+    private List<String> linesOf(Entry entry) {
+        if (this.noteLinesWidth != this.noteWidth) {
+            this.noteLines.clear();
+            this.noteLinesWidth = this.noteWidth;
+        }
+        List<String> lines = this.noteLines.get(entry.label);
+        if (lines == null) {
+            lines = new ArrayList<String>();
+            for (Object line : Minecraft.getMinecraft().fontRenderer
+                    .listFormattedStringToWidth(entry.label, this.noteWidth)) {
+                lines.add(String.valueOf(line));
+            }
+            this.noteLines.put(entry.label, lines);
+        }
+        return lines;
+    }
+
+    /**
+     * Where each row's top stands under the first row's, and at the end
+     * how tall the whole list is.
+     */
+    private int[] rowTops() {
+        int[] tops = new int[this.entries.size() + 1];
+        for (int index = 0; index < this.entries.size(); index++) {
+            tops[index + 1] = tops[index] + heightOf(this.entries.get(index));
+        }
+        return tops;
     }
 
     @Override
@@ -829,14 +995,14 @@ public final class MenuWindow extends SubWindowContent {
     /** As above for a window {@code width} wide. */
     public LostTalesUiHitBox firstContentBox(SubWindowAnchor anchor, int width,
                                              LostTalesUiHitBox room) {
+        wrapNotesTo(width);
         int roomLeft = (int)Math.ceil(room.left);
         int roomTop = (int)Math.ceil(room.top);
         int roomRight = (int)Math.floor(room.left + room.width);
         int roomBottom = (int)Math.floor(room.top + room.height);
         int frame = SubWindow.STRIP_HEIGHT + PADDING_Y * 2
                 + fieldHeight();
-        int wanted = Math.max(1, Math.min(this.entries.size(),
-                MAX_VISIBLE_ROWS));
+        int wanted = Math.max(1, Math.min(rowCount(), this.visibleRows));
         int roomBelow = rowsIn(roomBottom - anchor.bottom - SubWindowAnchor.REACH
                 - frame);
         int roomAbove = rowsIn(anchor.top - SubWindowAnchor.REACH - roomTop - frame);
@@ -845,7 +1011,7 @@ public final class MenuWindow extends SubWindowContent {
                 : !(roomAbove >= wanted || roomAbove >= roomBelow);
         int rows = Math.max(1, Math.min(wanted,
                 below ? roomBelow : roomAbove));
-        int height = frame + rows * this.rowHeight;
+        int height = frame + heightOfRows(rows);
         int left = Math.max(roomLeft, Math.min(roomRight - width,
                 anchor.fromRight ? anchor.right - width : anchor.left));
         int top = Math.max(roomTop, Math.min(roomBottom - height,
@@ -866,6 +1032,7 @@ public final class MenuWindow extends SubWindowContent {
     public LostTalesUiHitBox firstContentBoxBeside(LostTalesUiHitBox sibling,
                                             LostTalesUiHitBox room) {
         int width = naturalWidth();
+        wrapNotesTo(width);
         double roomRight = room.left + room.width;
         double roomBottom = room.top + room.height;
         int gap = WindowPlacement.WINDOW_GAP;
@@ -876,11 +1043,10 @@ public final class MenuWindow extends SubWindowContent {
                 : sibling.left - gap - width;
         left = Math.max(room.left, Math.min(roomRight - width, left));
         double top = Math.max(room.top, sibling.top);
-        int wanted = Math.max(1, Math.min(this.entries.size(),
-                MAX_VISIBLE_ROWS));
+        int wanted = Math.max(1, Math.min(rowCount(), this.visibleRows));
         int rows = Math.max(1, Math.min(wanted,
                 rowsIn((int)Math.floor(roomBottom - top) - frame)));
-        int height = frame + rows * this.rowHeight;
+        int height = frame + heightOfRows(rows);
         top = Math.max(room.top, Math.min(roomBottom - height, top));
         return new LostTalesUiHitBox(left,
                 top + SubWindow.STRIP_HEIGHT, width,
@@ -895,13 +1061,13 @@ public final class MenuWindow extends SubWindowContent {
      */
     public LostTalesUiHitBox firstContentBoxCentred(LostTalesUiHitBox room) {
         int width = naturalWidth();
+        wrapNotesTo(width);
         int frame = SubWindow.STRIP_HEIGHT + PADDING_Y * 2
                 + fieldHeight();
-        int wanted = Math.max(1, Math.min(this.entries.size(),
-                MAX_VISIBLE_ROWS));
+        int wanted = Math.max(1, Math.min(rowCount(), this.visibleRows));
         int rows = Math.max(1, Math.min(wanted,
                 rowsIn((int)Math.floor(room.height) - frame)));
-        int height = frame + rows * this.rowHeight;
+        int height = frame + heightOfRows(rows);
         double left = room.left + Math.max(0, LostTalesUiInk.centredStart(
                 (int)Math.floor(room.width), width));
         double top = room.top + Math.max(0, LostTalesUiInk.centredStart(
@@ -946,14 +1112,12 @@ public final class MenuWindow extends SubWindowContent {
         WindowHover hover = new WindowHover(WindowHover.Kind.SUB_WINDOW);
         hover.menuEntry = takes ? row : null;
         hover.acts = takes;
-        hover.tip = row == null ? "" : row.unavailable;
+        hover.tip = row == null ? "" : takes ? row.tip : row.unavailable;
         if (takes && row.stepper) {
             // A stepper's parts answer where they are drawn, measured as
             // the draw measures them.
-            int firstRow = (int)Math.floor(this.renderedScrollRows);
             hover.part = stepperPartAt(x, y, at.left + at.width - PADDING_X,
-                    firstRowY(at, firstRow)
-                            + (index - firstRow) * this.rowHeight,
+                    listTop(at) + rowTops()[index],
                     this.rowHeight, stepperTextWidth(
                             Minecraft.getMinecraft().fontRenderer, row));
             if (PART_VALUE.equals(hover.part)) {
@@ -964,12 +1128,13 @@ public final class MenuWindow extends SubWindowContent {
     }
 
     /**
-     * Moves the list's target by whole rows; beyond either end it stays
-     * put. The drawn rows glide after the target.
+     * Moves the list's target by whole rows' height; beyond either end it
+     * stays put. The drawn rows glide after the target.
      */
     @Override
     public void scrollBy(int lines) {
-        this.scrollRows += WheelStep.menuRows(lines);
+        this.scrollPixels += WheelStep.pixels(WheelStep.menuRows(lines),
+                this.rowHeight);
     }
 
     @Override
@@ -1026,45 +1191,51 @@ public final class MenuWindow extends SubWindowContent {
                 && !this.entries.get(hoveredIndex).isTakeable()) {
             hoveredIndex = -1;
         }
-        // Rows are laid out from the drawn offset — whole rows pick where
-        // the list starts, the fraction slides it — and clipped to the
-        // band they glide in; one extra row fills the gap the slide opens.
-        int firstRow = (int)Math.floor(this.renderedScrollRows);
-        int firstY = firstRowY(at, firstRow);
+        // Rows are laid out from the drawn offset and clipped to the band
+        // they glide in; only those the band shows are drawn.
+        int[] tops = rowTops();
+        int listTop = listTop(at);
         // The hovered row is the window's surface recoloured, cut to the
         // band, before anything lands on it.
         if (hoveredIndex >= 0) {
-            int litTop = firstY + (hoveredIndex - firstRow) * this.rowHeight;
-            WindowStyle.recolourFlat(at.left,
-                    Math.max(at.rowsTop, litTop), at.left + at.width,
-                    Math.min(at.rowsBottom, litTop + this.rowHeight),
+            int litTop = Math.max(at.rowsTop, listTop + tops[hoveredIndex]);
+            int litBottom = Math.min(at.rowsBottom,
+                    listTop + tops[hoveredIndex + 1]);
+            WindowStyle.recolourFlat(at.left, litTop, at.left + at.width,
+                    litBottom, surfaceAlpha, LostTalesUiInk.SURFACE_RGB,
+                    LostTalesUiInk.SURFACE_HIGHLIGHT_RGB);
+            // The frame beside the row takes its colour with it.
+            WindowStyle.recolourRingBeside(at.left, at.left + at.width,
+                    at.left, litTop, at.left + at.width, litBottom,
                     surfaceAlpha, LostTalesUiInk.SURFACE_RGB,
                     LostTalesUiInk.SURFACE_HIGHLIGHT_RGB);
         }
         drawField(minecraft, font, at, alpha);
-        int last = Math.min(this.entries.size(),
-                firstRow + (int)Math.ceil(at.shownRows()) + 1);
         boolean clipped = beginClip(minecraft, clipX + (at.left - box.left),
                 clipY + (at.rowsTop - box.top), at.width,
                 at.rowsBottom - at.rowsTop);
         try {
-            int rowY = firstY;
-            for (int index = Math.max(0, firstRow); index < last; index++) {
-                drawRow(minecraft, font, at, this.entries.get(index), rowY,
-                        index == hoveredIndex, pointerX, pointerY, elapsed,
-                        alpha);
-                rowY += this.rowHeight;
+            for (int index = 0; index < this.entries.size(); index++) {
+                int rowY = listTop + tops[index];
+                if (rowY >= at.rowsBottom) {
+                    break;
+                }
+                if (listTop + tops[index + 1] > at.rowsTop) {
+                    drawRow(minecraft, font, at, this.entries.get(index), rowY,
+                            index == hoveredIndex, pointerX, pointerY,
+                            elapsed, alpha);
+                }
             }
         } finally {
             endClip(clipped);
         }
         // A hairline on an edge the list continues past.
         int more = LostTalesUiInk.argb(MORE_RGB, alpha);
-        if (this.scrollRows > 0.0D) {
+        if (this.scrollPixels > 0.0D) {
             Gui.drawRect(at.left + 1, at.top + 1, at.left + at.width - 1,
                     at.top + 2, more);
         }
-        if (this.scrollRows < maxScroll(at) - 0.01D) {
+        if (this.scrollPixels < maxScroll(at) - 0.5D) {
             Gui.drawRect(at.left + 1, at.top + at.height - 2,
                     at.left + at.width - 1, at.top + at.height - 1, more);
         }
@@ -1081,6 +1252,27 @@ public final class MenuWindow extends SubWindowContent {
                          Entry entry, int rowY, boolean hovered,
                          double pointerX, double pointerY, double elapsed,
                          int alpha) {
+        if (entry.separator) {
+            // A quiet hairline, the tab row's dividers laid on their side.
+            LostTalesUiRules.drawRule(at.left + PADDING_X,
+                    at.left + at.width - PADDING_X, rowY + 2, rowY + 3,
+                    Math.round(WindowStyle.DIVIDER_ALPHA * alpha / 255.0F));
+            return;
+        }
+        if (entry.note) {
+            // A paragraph: its lines at the padding, in the chat's ivory,
+            // or the colour the note was given.
+            int y = rowY + NOTE_PADDING;
+            int rgb = entry.labelColor >= 0 ? entry.labelColor
+                    : LostTalesUiInk.IVORY;
+            for (String line : linesOf(entry)) {
+                LostTalesUiInk.drawText(font, line, at.left + PADDING_X,
+                        y + LostTalesUiInk.centredStart(NOTE_LINE,
+                                LostTalesUiInk.CAP_HEIGHT), rgb, alpha);
+                y += NOTE_LINE;
+            }
+            return;
+        }
         int labelTop = rowY + LostTalesUiInk.centredStart(this.rowHeight,
                 LostTalesUiInk.CAP_HEIGHT);
         if (entry.header) {
@@ -1207,6 +1399,7 @@ public final class MenuWindow extends SubWindowContent {
                            Entry entry, int x, int rowY, int labelTop,
                            int alpha) {
         int aside = WindowStyle.asideRgb();
+        int valueRgb = entry.valueColor >= 0 ? entry.valueColor : aside;
         if (entry.valuePicture != null) {
             entry.valuePicture.draw(minecraft, x, labelTop, alpha);
             x += entry.valuePictureWidth
@@ -1220,7 +1413,7 @@ public final class MenuWindow extends SubWindowContent {
         }
         if (entry.value.length() > 0) {
             LostTalesUiInk.drawText(font, entry.value, x,
-                    labelTop, aside, alpha);
+                    labelTop, valueRgb, alpha);
             x += font.getStringWidth(entry.value);
         }
         int keyY = rowY + LostTalesUiInk.centredStart(this.rowHeight,
@@ -1301,6 +1494,7 @@ public final class MenuWindow extends SubWindowContent {
                 textLeft + LostTalesUiInk.centredStart(textWidth,
                         font.getStringWidth(entry.value)),
                 labelTop, PART_VALUE.equals(pointed) ? LostTalesUiInk.IVORY
+                        : entry.valueColor >= 0 ? entry.valueColor
                         : WindowStyle.asideRgb(), alpha);
     }
 
@@ -1505,15 +1699,15 @@ public final class MenuWindow extends SubWindowContent {
 
     /** The furthest the list scrolls in {@code at}: its last row whole at the bottom. */
     private double maxScroll(Layout at) {
-        return Math.max(0.0D, this.entries.size() - at.shownRows());
+        return Math.max(0.0D, rowTops()[this.entries.size()] - at.band());
     }
 
     /** Keeps both the target and the drawn offset within the list as the box shows it. */
     private void clampScroll(Layout at) {
         double max = maxScroll(at);
-        this.scrollRows = Math.max(0.0D, Math.min(max, this.scrollRows));
-        this.renderedScrollRows = Math.max(0.0D,
-                Math.min(max, this.renderedScrollRows));
+        this.scrollPixels = Math.max(0.0D, Math.min(max, this.scrollPixels));
+        this.renderedScrollPixels = Math.max(0.0D,
+                Math.min(max, this.renderedScrollPixels));
     }
 
     /**
@@ -1524,23 +1718,28 @@ public final class MenuWindow extends SubWindowContent {
         long now = System.nanoTime();
         double elapsed = (now - this.scrollNanos) / 1.0E9D;
         this.scrollNanos = now;
-        if (Math.abs(this.scrollRows - this.renderedScrollRows) <= 0.01D) {
-            this.renderedScrollRows = this.scrollRows;
+        if (Math.abs(this.scrollPixels - this.renderedScrollPixels) <= 0.1D) {
+            this.renderedScrollPixels = this.scrollPixels;
             return;
         }
-        this.renderedScrollRows = Motions.followTravel(MotionIds.WINDOW_SCROLL,
-                this.renderedScrollRows, this.scrollRows, elapsed);
+        this.renderedScrollPixels = Motions.followTravel(
+                MotionIds.WINDOW_SCROLL, this.renderedScrollPixels,
+                this.scrollPixels, elapsed);
     }
 
-    /** The field and the rows in a content box, at this menu's row height. */
+    /**
+     * The field and the rows in a content box, at this menu's row height,
+     * its notes wrapped to the box.
+     */
     private Layout layOut(LostTalesUiHitBox box) {
-        return new Layout(box, fieldHeight(), this.rowHeight);
+        Layout at = new Layout(box, fieldHeight(), this.rowHeight);
+        wrapNotesTo(at.width);
+        return at;
     }
 
-    /** Where the row {@code firstRow} is drawn: the fraction of the drawn offset slides it up. */
-    private int firstRowY(Layout at, int firstRow) {
-        return at.rowsTop - (int)Math.round(
-                (this.renderedScrollRows - firstRow) * this.rowHeight);
+    /** Where the list's first row is drawn: the drawn offset slides it up past the band. */
+    private int listTop(Layout at) {
+        return at.rowsTop - (int)Math.round(this.renderedScrollPixels);
     }
 
     /**
@@ -1555,10 +1754,9 @@ public final class MenuWindow extends SubWindowContent {
         if (index < 0) {
             return null;
         }
-        int firstRow = (int)Math.floor(this.renderedScrollRows);
-        return new LostTalesUiHitBox(at.left, firstRowY(at, firstRow)
-                + (index - firstRow) * this.rowHeight, at.width,
-                this.rowHeight);
+        int[] tops = rowTops();
+        return new LostTalesUiHitBox(at.left, listTop(at) + tops[index],
+                at.width, tops[index + 1] - tops[index]);
     }
 
     /**
@@ -1571,10 +1769,14 @@ public final class MenuWindow extends SubWindowContent {
                 && y < at.rowsBottom)) {
             return -1;
         }
-        int firstRow = (int)Math.floor(this.renderedScrollRows);
-        int index = firstRow + (int)Math.floor(
-                (y - firstRowY(at, firstRow)) / (double)this.rowHeight);
-        return index >= 0 && index < this.entries.size() ? index : -1;
+        double offset = y - listTop(at);
+        int[] tops = rowTops();
+        for (int index = 0; index < this.entries.size(); index++) {
+            if (offset >= tops[index] && offset < tops[index + 1]) {
+                return index;
+            }
+        }
+        return -1;
     }
 
     /**

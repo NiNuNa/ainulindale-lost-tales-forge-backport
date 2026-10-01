@@ -204,18 +204,44 @@ public final class TabRowTest {
     /**
      * Every tab gives its buttons up at fixed shares of the full width,
      * all tabs at once since they share one width: the draft mark under
-     * two thirds, the cross under a third.
+     * two thirds, the options' three dots under a half, the cross under a
+     * third.
      */
     @Test
     public void buttonsGoAtFixedSharesOfTheFullWidth() {
         double full = TabRow.DEFAULT_TAB_WIDTH;
         assertTrue(TabRow.draftStands(full * 2.0D / 3.0D));
         assertFalse(TabRow.draftStands(full * 2.0D / 3.0D - 0.01D));
+        assertTrue(TabRow.optionsStands(full / 2.0D));
+        assertFalse(TabRow.optionsStands(full / 2.0D - 0.01D));
         assertTrue(TabRow.closeStands(full / 3.0D));
         assertFalse(TabRow.closeStands(full / 3.0D - 0.01D));
-        // In that order, so a narrowing row never shows a draft mark
-        // without a cross after it.
-        assertTrue(TabRow.DRAFT_SHARE > TabRow.CLOSE_SHARE);
+        // In that order, so a narrowing row never shows a draft mark or
+        // the dots without a cross after them.
+        assertTrue(TabRow.DRAFT_SHARE > TabRow.OPTIONS_SHARE);
+        assertTrue(TabRow.OPTIONS_SHARE > TabRow.CLOSE_SHARE);
+    }
+
+    /**
+     * The options' three dots stand left of the cross, as far from its ink
+     * as the row's end controls stand from each other, and take the
+     * cross's place against the padding once the cross has gone; the name
+     * gives them their room.
+     */
+    @Test
+    public void theDotsStandLeftOfTheCross() {
+        TabRow.TabRoom both = TabRow.roomFor(100.0D, 13, 90, 0.0D, 1.0F,
+                1.0F);
+        double crossInk = both.closeLeft + (TabRow.CONTROL_SIZE
+                - LostTalesUiSheet.CLOSE.getWidth()) / 2;
+        assertEquals(TabRow.END_CONTROL_GAP,
+                crossInk - (both.optionsLeft + TabRow.OPTIONS_WIDTH), EPSILON);
+        assertEquals(both.optionsLeft - TabRow.CONTROL_GAP,
+                both.contentRight, EPSILON);
+        TabRow.TabRoom dotsAlone = TabRow.roomFor(100.0D, 13, 90, 0.0D,
+                0.0F, 1.0F);
+        assertEquals(100 - TabRow.PADDING_X - TabRow.OPTIONS_WIDTH,
+                dotsAlone.optionsLeft, EPSILON);
     }
 
     /**
@@ -228,7 +254,7 @@ public final class TabRowTest {
         int icon = 13;
         int name = 90;
         TabRow.TabRoom shown = TabRow.roomFor(100.0D,
-                icon, name, 0.0D, 1.0F);
+                icon, name, 0.0D, 1.0F, 0.0F);
         assertEquals(100 - TabRow.PADDING_X
                 - TabRow.CONTROL_SIZE, shown.closeLeft, EPSILON);
         assertEquals(100 - TabRow.PADDING_X - CONTROL,
@@ -238,17 +264,17 @@ public final class TabRowTest {
         double previous = shown.labelRoom;
         for (float close = 0.9F; close >= 0.0F; close -= 0.1F) {
             TabRow.TabRoom fading = TabRow.roomFor(
-                    100.0D, icon, name, 0.0D, close);
+                    100.0D, icon, name, 0.0D, close, 0.0F);
             assertTrue(fading.labelRoom > previous);
             assertTrue(fading.labelRoom - previous <= CONTROL * 0.1D + EPSILON);
             previous = fading.labelRoom;
         }
         // A short name never takes more than it is wide.
         assertEquals(12.0D, TabRow.roomFor(100.0D, icon, 12, 0.0D,
-                0.0F).labelRoom, EPSILON);
+                0.0F, 0.0F).labelRoom, EPSILON);
         // The draft mark stands between the name and the cross.
         assertEquals(shown.labelRoom - 20.0D, TabRow.roomFor(100.0D,
-                icon, name, 20.0D, 1.0F).labelRoom, EPSILON);
+                icon, name, 20.0D, 1.0F, 0.0F).labelRoom, EPSILON);
     }
 
     /**
@@ -260,7 +286,7 @@ public final class TabRowTest {
     public void theTabInFrontCutsItsIconBeforeItsCross() {
         int width = TabRow.PADDING_X * 2 + 10;
         TabRow.TabRoom narrow = TabRow.roomFor(width,
-                13, 40, 0.0D, 1.0F);
+                13, 40, 0.0D, 1.0F, 0.0F);
         assertEquals(width - TabRow.PADDING_X
                 - TabRow.CONTROL_SIZE, narrow.closeLeft, EPSILON);
         assertEquals(narrow.closeLeft - TabRow.CONTROL_GAP,
@@ -321,7 +347,7 @@ public final class TabRowTest {
                 float left = 212 + tab.drawnLeftOffset;
                 float width = tab.drawnWidthSnapped;
                 TabRow.TabRoom room = TabRow.roomFor(
-                        width, 13, 40, 0.0D, 1.0F);
+                        width, 13, 40, 0.0D, 1.0F, 0.0F);
                 double edge = left + width;
                 assertEquals(edge - TabRow.PADDING_X
                         - TabRow.CONTROL_SIZE,
@@ -411,7 +437,7 @@ public final class TabRowTest {
                                             double toLeft, double toWidth) {
         TabRow.Tab tab = new TabRow.Tab(
                 ChatTab.of(com.ninuna.losttales.chat.ChatChannel.GLOBAL), 0, false,
-                "Global", 30, false, 0, (int)toWidth, -1, -1, false);
+                "Global", 30, false, 0, (int)toWidth, -1, -1, -1, false);
         tab.standAt(fromLeft, fromWidth, 1.0D / 3.0D);
         tab.toLeft = toLeft;
         tab.exactWidth = toWidth;

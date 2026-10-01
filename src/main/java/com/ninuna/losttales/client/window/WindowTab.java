@@ -101,35 +101,49 @@ public abstract class WindowTab {
     /* ---- What the window's tool strip offers while the tab is in front ---- */
 
     /**
-     * The rows the tab puts in its menu behind the tool strip's cog: a
-     * page's choices, a conversation's switches. The menu adds a window of
-     * its own for the tab after them.
+     * The tab's own options: the rows of its options menu (the three dots
+     * on its tab, a right-click on it) and the buttons of its window's
+     * tool strip alike ({@link PageOption}).
      */
-    public List<MenuWindow.Entry> menuRows() {
+    public List<PageOption> options() {
         return Collections.emptyList();
     }
 
     /**
-     * Whether the tab puts any row in its menu, asked every frame to grey
-     * the cog of a tab with nothing to choose; a tab whose rows cost
-     * something to build answers without building them.
+     * The settings of the tab's kind (Chat, Quest, Map, Motion Settings),
+     * which the tool strip's cog opens and the tab's options offer after
+     * its own rows; every conversation shares Chat Settings. Null for a
+     * tab with none.
      */
-    public boolean hasMenuRows() {
-        return !menuRows().isEmpty();
+    public Settings.Place settingsPlace() {
+        return null;
     }
 
-    /** One of its menu's rows taken; answers whether the menu stays open. */
-    public boolean takeMenuRow(String id) {
+    /**
+     * Whether the tab has any option, asked every frame to grey the three
+     * dots of a tab with nothing to choose; a tab whose options cost
+     * something to build answers without building them.
+     */
+    public boolean hasOptions() {
+        return !options().isEmpty();
+    }
+
+    /**
+     * One of its options taken, on its row or its button; with
+     * {@code back}, by a right-click, which steps a cycle back and takes
+     * every other kind as a click does. Answers whether the menu stays
+     * open.
+     */
+    public boolean takeOption(String id, boolean back) {
         return false;
     }
 
     /**
-     * As above, taken with a right-click when {@code back} says so: a
-     * few-word choice steps back. A tab with no such row takes either
-     * press alike.
+     * What the tab's help says, behind the question mark at the end of
+     * the tool strip and under F1: its guide and its own keys.
      */
-    public boolean takeMenuRow(String id, boolean back) {
-        return takeMenuRow(id);
+    public PageHelp help() {
+        return new PageHelp(null, null);
     }
 
     /** The panel button at the strip's left end; null for none. */
@@ -190,10 +204,13 @@ public abstract class WindowTab {
         return String.valueOf(Math.max(0, searchFound()));
     }
 
-    /** What the cog says under the pointer. */
-    public String settingsTip() {
+    /**
+     * What the options button says under the pointer, and what the menu
+     * it opens is called: {@code Global Chat Options}, {@code Map Options}.
+     */
+    public final String optionsTitle() {
         return StatCollector.translateToLocalFormatted(
-                "gui.losttales.window.page.settings", title());
+                "gui.losttales.window.page.options", title());
     }
 
     @Override

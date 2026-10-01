@@ -88,6 +88,21 @@ public final class LostTalesUiFading {
                            double clipRight, double clipTop,
                            double clipBottom, float depth, float leftStrength,
                            float rightStrength, FadingPainter painter) {
+        drawFadingWithin(minecraft, clipLeft, clipRight, Double.NaN, clipTop,
+                clipBottom, depth, leftStrength, rightStrength, painter);
+    }
+
+    /**
+     * As {@link #drawFading}, with nothing drawn past {@code boundRight}:
+     * the right edge of the clip the caller stands in, which a slice's own
+     * cut would otherwise replace. The fade stays where the words' room
+     * ends, and the bound cuts them hard, as a window's edge does.
+     */
+    public static void drawFadingWithin(Minecraft minecraft, double clipLeft,
+                           double clipRight, double boundRight,
+                           double clipTop, double clipBottom, float depth,
+                           float leftStrength, float rightStrength,
+                           FadingPainter painter) {
         if (clipRight <= clipLeft) {
             return;
         }
@@ -106,8 +121,8 @@ public final class LostTalesUiFading {
                 clipLeft + leftSlices / (double)factor);
         double rightStart = LostTalesDisplayPixels.snap(
                 clipRight - rightSlices / (double)factor);
-        drawSlice(minecraft, painter, 1.0F, leftEnd, rightStart, clipTop,
-                clipBottom);
+        drawSlice(minecraft, painter, 1.0F, leftEnd, rightStart, boundRight,
+                clipTop, clipBottom);
         for (int slice = 0; slice < leftSlices; slice++) {
             // A slice's opacity is read at its middle: none at the very
             // edge for what has fully gone past it, the whole at the
@@ -119,7 +134,7 @@ public final class LostTalesUiFading {
                             leftEnd - (leftSlices - slice) / (double)factor),
                     LostTalesDisplayPixels.snap(
                             leftEnd - (leftSlices - slice - 1) / (double)factor),
-                    clipTop, clipBottom);
+                    boundRight, clipTop, clipBottom);
         }
         for (int slice = 0; slice < rightSlices; slice++) {
             float share = 1.0F - rightStrength
@@ -129,15 +144,21 @@ public final class LostTalesUiFading {
                             rightStart + (rightSlices - slice - 1) / (double)factor),
                     LostTalesDisplayPixels.snap(
                             rightStart + (rightSlices - slice) / (double)factor),
-                    clipTop, clipBottom);
+                    boundRight, clipTop, clipBottom);
         }
     }
 
-    /** What the painter draws, once, cut to one stretch of screen. */
+    /**
+     * What the painter draws, once, cut to one stretch of screen and at
+     * {@code boundRight}, which may be NaN for no bound.
+     */
     private static void drawSlice(Minecraft minecraft, FadingPainter painter,
                                   float share, double clipLeft,
-                                  double clipRight, double clipTop,
-                                  double clipBottom) {
+                                  double clipRight, double boundRight,
+                                  double clipTop, double clipBottom) {
+        if (!Double.isNaN(boundRight)) {
+            clipRight = Math.min(clipRight, boundRight);
+        }
         if (clipRight <= clipLeft || share <= 0.0F) {
             return;
         }

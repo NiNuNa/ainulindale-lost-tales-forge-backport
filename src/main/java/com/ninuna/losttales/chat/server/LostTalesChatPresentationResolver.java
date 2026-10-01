@@ -6,9 +6,6 @@ import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.compat.lotr.LotrFactionColors;
 import com.ninuna.losttales.faction.FactionDemonyms;
 import com.ninuna.losttales.gui.style.LostTalesColors;
-import lotr.common.LOTRLevelData;
-import lotr.common.LOTRPlayerData;
-import lotr.common.LOTRTitle;
 import net.minecraft.entity.player.EntityPlayerMP;
 
 /** Reads optional LOTR presentation fields without making routing depend on them. */
@@ -16,22 +13,14 @@ final class LostTalesChatPresentationResolver {
 
     private LostTalesChatPresentationResolver() {}
 
+    /**
+     * How {@code character} — or, for null, the account — is shown on a
+     * line or in a member list: its title, and its faction's colour and
+     * people.
+     */
     static Presentation resolve(EntityPlayerMP player,
                                 RoleplayCharacter character) {
-        String title = "";
-        try {
-            LOTRPlayerData data = LOTRLevelData.getData(player);
-            LOTRTitle.PlayerTitle playerTitle = data == null
-                    ? null : data.getPlayerTitle();
-            if (playerTitle != null && playerTitle.getTitle() != null) {
-                title = playerTitle.getTitle().getDisplayName(player);
-            }
-        } catch (LinkageError ignored) {
-            title = "";
-        } catch (RuntimeException ignored) {
-            title = "";
-        }
-
+        String title = titleOf(player, character);
         int factionColor = LostTalesColors.rgb(
                 LostTalesColors.HUD_LABEL);
         String factionName = "";
@@ -52,6 +41,21 @@ final class LostTalesChatPresentationResolver {
         // title and character name on that exact same RGB source.
         return new Presentation(title, factionColor, factionColor,
                 factionName);
+    }
+
+    /**
+     * The title a character shows after its name: LOTR's live one for the
+     * character the player plays (and the account playing as itself), the
+     * one its record kept for any other character the player speaks as.
+     */
+    private static String titleOf(EntityPlayerMP player,
+                                  RoleplayCharacter character) {
+        if (character != null && !character.getCharacterId().equals(
+                ChatIdentitySelection.playedId(player))) {
+            return character.getLotrTitle();
+        }
+        String live = LotrCharacterAdapter.getInstance().getTitleName(player);
+        return live == null ? "" : live;
     }
 
     static final class Presentation {
